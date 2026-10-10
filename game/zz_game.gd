@@ -724,6 +724,14 @@ func start() -> void:
 	if not authoritative:
 		return
 
+	# A map laid out when the world opened, before the module added the delivered maps, is the
+	# practice street; if the server now has maps it would rather play, the first map is one of
+	# those. Found by dot-server-deploy's zombiezone_client: a delivered server read six maps and
+	# played the one built in.
+	if not map_doc.is_empty() and catalogue != null and next_map_id == &"" \
+			and not catalogue.playable(config.map_ids).has(StringName(str(map_doc.get("id", "")))):
+		map_doc = {}
+
 	# Built again here: on a server nothing was listening when the world opened (the module
 	# builds the bridge after), and a map built before it is a map no client is ever sent.
 	if not map_doc.is_empty():

@@ -49,7 +49,7 @@ func _ready() -> void:
 	DotLog.info(CHANNEL, "the world is up", {
 		"tick_rate": game.tick_rate,
 		"maps": config.map_directory,
-		"round": config.round_seconds,
+		"difficulty": config.difficulty,
 	})
 
 	# [b]Not started here.[/b] `start()` builds the map and puts everybody on it, and nothing

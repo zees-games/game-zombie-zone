@@ -87,6 +87,7 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 - **The practice street's spawns were inside its tables**, found by `headless_maps`; and zombie-zone-maps' builder stretched door floors along the wrong axis, found the same way.
 - **A command and a cvar were both `zz_boxes`**; the cvar is `zz_box_drops`. **Push-to-talk and shove were both V**; shove is F.
 - **Three stand-ins called Odell**: names are drawn from the ones not taken.
+- **A delivered server always played the practice street first**: the world lays a map out in `_ready`, before the module adds the delivered maps, and `start()` rebuilt that one. It re-picks now when the map it holds is not one the server would choose. And **`zz_server.gd` logged `config.round_seconds`**, a prop-hunt field, as a SCRIPT ERROR no suite here loads that scene to see. Both found by dot-server-deploy's `zombiezone_client`, which joins a real client to the delivered pack.
 
 ## Validating
 
