@@ -1,0 +1,1208 @@
+{
+ "format": 1,
+ "comment": "The random boxes. A box type has an id, a title, a colour, how likely each kind of zombie is to drop it ('drop': common, special, brute, and 'map' for one a map leaves lying about), and its outcomes. An outcome has a weight, a title shown to everybody, a message ({name} is whoever opened it), and a list of actions. Every action's 'do' and its parameters are documented in game/zz_boxes.gd (the _do_ methods); an action this game does not know refuses the whole file at load, naming it. 'who' picks whom a survivor action touches: opener (default), team, others, near (radius), random, nearest (count), downed, dead. Effects from 'pace', 'damage_boost' and the like stack: two that each double something make it four times.",
+ "boxes": [
+  {
+   "id": "explosive",
+   "title": "Explosive Box",
+   "colour": "#e2482b",
+   "drop": {
+    "common": 4,
+    "special": 5,
+    "brute": 2,
+    "map": 3
+   },
+   "outcomes": [
+    {
+     "id": "airstrike_nearest",
+     "title": "Airstrike!",
+     "weight": 5,
+     "message": "{name} called in an airstrike. On the people standing next to them.",
+     "actions": [
+      {
+       "do": "airstrike",
+       "target": "nearest",
+       "count": 3,
+       "damage": 70,
+       "delay": 1.6
+      }
+     ]
+    },
+    {
+     "id": "airstrike_zombies",
+     "title": "Carpet bombing",
+     "weight": 5,
+     "message": "Shells rain on the horde.",
+     "actions": [
+      {
+       "do": "airstrike",
+       "target": "zombies",
+       "count": 6,
+       "damage": 200,
+       "delay": 1.0
+      }
+     ]
+    },
+    {
+     "id": "airstrike_team",
+     "title": "Danger close",
+     "weight": 2,
+     "message": "Incoming on everybody. Move!",
+     "actions": [
+      {
+       "do": "airstrike",
+       "target": "team",
+       "count": 4,
+       "damage": 50,
+       "delay": 2.0
+      }
+     ]
+    },
+    {
+     "id": "blast_here",
+     "title": "Booby-trapped",
+     "weight": 4,
+     "message": "It was rigged. {name} is having a bad day.",
+     "actions": [
+      {
+       "do": "explode",
+       "radius": 5.0,
+       "damage": 120,
+       "survivor_scale": 0.35
+      }
+     ]
+    },
+    {
+     "id": "clear_room",
+     "title": "Shockwave",
+     "weight": 5,
+     "message": "Everything nearby is flattened.",
+     "actions": [
+      {
+       "do": "kill_zombies",
+       "radius": 18,
+       "kinds": "commons"
+      },
+      {
+       "do": "explode",
+       "radius": 8.0,
+       "damage": 300,
+       "survivor_scale": 0.0
+      }
+     ]
+    },
+    {
+     "id": "pipes",
+     "title": "Party favours",
+     "weight": 5,
+     "message": "Three charges, beeping. The crowd loves them.",
+     "actions": [
+      {
+       "do": "lure",
+       "seconds": 6,
+       "damage": 400
+      },
+      {
+       "do": "lure",
+       "seconds": 6,
+       "damage": 400
+      },
+      {
+       "do": "lure",
+       "seconds": 6,
+       "damage": 400
+      }
+     ]
+    },
+    {
+     "id": "grenades",
+     "title": "Grenade crate",
+     "weight": 5,
+     "message": "Grenades for everyone.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "who": "team",
+       "tier": "thrown"
+      }
+     ]
+    },
+    {
+     "id": "launcher",
+     "title": "Bring the big gun",
+     "weight": 3,
+     "message": "{name} found a launcher.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "id": "launcher"
+      }
+     ]
+    },
+    {
+     "id": "chain",
+     "title": "Chain reaction",
+     "weight": 2,
+     "message": "Explosions everywhere at once.",
+     "actions": [
+      {
+       "do": "explode",
+       "at": "random_near",
+       "radius": 5,
+       "damage": 150,
+       "survivor_scale": 0.2
+      },
+      {
+       "do": "explode",
+       "at": "random_near",
+       "radius": 5,
+       "damage": 150,
+       "survivor_scale": 0.2
+      },
+      {
+       "do": "explode",
+       "at": "random_near",
+       "radius": 5,
+       "damage": 150,
+       "survivor_scale": 0.2
+      }
+     ]
+    },
+    {
+     "id": "dud",
+     "title": "Dud",
+     "weight": 3,
+     "message": "It was empty. Just a smell of powder.",
+     "actions": [
+      {
+       "do": "message",
+       "text": "{name}'s box was a dud."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "incendiary",
+   "title": "Incendiary Box",
+   "colour": "#ff8a1f",
+   "drop": {
+    "common": 4,
+    "special": 4,
+    "brute": 2,
+    "map": 3
+   },
+   "outcomes": [
+    {
+     "id": "ring",
+     "title": "Ring of fire",
+     "weight": 5,
+     "message": "Fire all round {name}.",
+     "actions": [
+      {
+       "do": "fire",
+       "radius": 6.0,
+       "seconds": 12,
+       "damage": 6
+      }
+     ]
+    },
+    {
+     "id": "ignite_all",
+     "title": "Torch the street",
+     "weight": 5,
+     "message": "Every zombie nearby goes up in flames.",
+     "actions": [
+      {
+       "do": "ignite_zombies",
+       "radius": 30,
+       "seconds": 8
+      }
+     ]
+    },
+    {
+     "id": "self_burn",
+     "title": "Well, that was hot",
+     "weight": 3,
+     "message": "{name} is on fire.",
+     "actions": [
+      {
+       "do": "burn",
+       "seconds": 3,
+       "dps": 6
+      }
+     ]
+    },
+    {
+     "id": "molotov_rain",
+     "title": "Molotov rain",
+     "weight": 4,
+     "message": "Bottles from the sky.",
+     "actions": [
+      {
+       "do": "molotov_rain",
+       "count": 8,
+       "radius": 16,
+       "damage": 8
+      }
+     ]
+    },
+    {
+     "id": "napalm",
+     "title": "Napalm",
+     "weight": 2,
+     "message": "Fire everywhere. Everywhere.",
+     "actions": [
+      {
+       "do": "molotov_rain",
+       "count": 16,
+       "radius": 26,
+       "damage": 10
+      },
+      {
+       "do": "ignite_zombies",
+       "radius": 40,
+       "seconds": 10
+      }
+     ]
+    },
+    {
+     "id": "flamer",
+     "title": "Burning rounds",
+     "weight": 4,
+     "message": "{name}'s gun hits twice as hard for a minute.",
+     "actions": [
+      {
+       "do": "damage_boost",
+       "scale": 2.0,
+       "seconds": 60
+      }
+     ]
+    },
+    {
+     "id": "team_rounds",
+     "title": "Incendiary ammo for all",
+     "weight": 3,
+     "message": "Everybody's shots hit harder for half a minute.",
+     "actions": [
+      {
+       "do": "damage_boost",
+       "who": "team",
+       "scale": 1.5,
+       "seconds": 30
+      }
+     ]
+    },
+    {
+     "id": "brute_bait",
+     "title": "Smoke signal",
+     "weight": 2,
+     "message": "Something big saw the smoke.",
+     "actions": [
+      {
+       "do": "brute"
+      }
+     ]
+    },
+    {
+     "id": "fizz",
+     "title": "Fizzle",
+     "weight": 3,
+     "message": "It sparked and went out.",
+     "actions": [
+      {
+       "do": "message",
+       "text": "{name}'s box fizzled."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "medical",
+   "title": "Med Box",
+   "colour": "#3fd06a",
+   "drop": {
+    "common": 5,
+    "special": 4,
+    "brute": 3,
+    "map": 5
+   },
+   "outcomes": [
+    {
+     "id": "full_heal",
+     "title": "Field surgery",
+     "weight": 5,
+     "message": "{name} is patched up.",
+     "actions": [
+      {
+       "do": "heal",
+       "fraction": 1.0
+      }
+     ]
+    },
+    {
+     "id": "team_heal",
+     "title": "First aid for all",
+     "weight": 4,
+     "message": "Everybody gets some health back.",
+     "actions": [
+      {
+       "do": "heal",
+       "who": "team",
+       "fraction": 0.5
+      }
+     ]
+    },
+    {
+     "id": "revive_all",
+     "title": "Get up!",
+     "weight": 4,
+     "message": "Everybody who was down is back on their feet.",
+     "actions": [
+      {
+       "do": "revive"
+      },
+      {
+       "do": "temp_health",
+       "who": "team",
+       "amount": 20
+      }
+     ]
+    },
+    {
+     "id": "rescue",
+     "title": "Back from the dead",
+     "weight": 2,
+     "message": "The dead come back.",
+     "actions": [
+      {
+       "do": "rescue"
+      }
+     ]
+    },
+    {
+     "id": "medkits",
+     "title": "Medkits",
+     "weight": 4,
+     "message": "A medkit for everyone.",
+     "actions": [
+      {
+       "do": "give_item",
+       "who": "team",
+       "item": "medkit"
+      }
+     ]
+    },
+    {
+     "id": "pills",
+     "title": "Pills",
+     "weight": 5,
+     "message": "Pills for everyone.",
+     "actions": [
+      {
+       "do": "give_item",
+       "who": "team",
+       "item": "pills"
+      }
+     ]
+    },
+    {
+     "id": "aura",
+     "title": "Healing aura",
+     "weight": 4,
+     "message": "Stand close: the air itself heals.",
+     "actions": [
+      {
+       "do": "heal_zone",
+       "radius": 6,
+       "seconds": 20,
+       "rate": 4
+      }
+     ]
+    },
+    {
+     "id": "adrenaline",
+     "title": "Adrenaline",
+     "weight": 4,
+     "message": "{name} is fast and borrowed-healthy.",
+     "actions": [
+      {
+       "do": "haste"
+      },
+      {
+       "do": "temp_health",
+       "amount": 40
+      }
+     ]
+    },
+    {
+     "id": "poison",
+     "title": "Poisoned",
+     "weight": 2,
+     "message": "It was not medicine.",
+     "actions": [
+      {
+       "do": "hurt",
+       "who": "team",
+       "amount": 15
+      }
+     ]
+    },
+    {
+     "id": "placebo",
+     "title": "Placebo",
+     "weight": 2,
+     "message": "{name} feels better. Nothing actually happened.",
+     "actions": [
+      {
+       "do": "temp_health",
+       "amount": 5
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "horde",
+   "title": "Horde Box",
+   "colour": "#9b4fe0",
+   "drop": {
+    "common": 3,
+    "special": 3,
+    "brute": 1,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "mob_now",
+     "title": "Here they come",
+     "weight": 5,
+     "message": "A horde is on its way.",
+     "actions": [
+      {
+       "do": "mob",
+       "scale": 1.5
+      }
+     ]
+    },
+    {
+     "id": "double_mob",
+     "title": "Here they ALL come",
+     "weight": 2,
+     "message": "Two hordes.",
+     "actions": [
+      {
+       "do": "mob",
+       "scale": 1.5
+      },
+      {
+       "do": "mob",
+       "scale": 1.5
+      }
+     ]
+    },
+    {
+     "id": "frenzy",
+     "title": "Horde frenzy",
+     "weight": 5,
+     "message": "Hordes come twice as often for two minutes.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "mob_rate",
+       "scale": 2.0,
+       "seconds": 120
+      }
+     ]
+    },
+    {
+     "id": "bigger",
+     "title": "Bigger hordes",
+     "weight": 4,
+     "message": "Every horde is half again as big for three minutes.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "mob_size",
+       "scale": 1.5,
+       "seconds": 180
+      }
+     ]
+    },
+    {
+     "id": "fast",
+     "title": "Fast zombies",
+     "weight": 3,
+     "message": "The zombies are faster for a minute.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "zombie_speed",
+       "scale": 1.3,
+       "seconds": 60
+      }
+     ]
+    },
+    {
+     "id": "bile_opener",
+     "title": "Covered in it",
+     "weight": 4,
+     "message": "{name} is covered in bile. Everything is coming for them.",
+     "actions": [
+      {
+       "do": "bile",
+       "seconds": 15
+      }
+     ]
+    },
+    {
+     "id": "panic",
+     "title": "Alarm",
+     "weight": 3,
+     "message": "An alarm. Hold on for thirty seconds.",
+     "actions": [
+      {
+       "do": "panic",
+       "seconds": 30
+      }
+     ]
+    },
+    {
+     "id": "calm",
+     "title": "Eye of the storm",
+     "weight": 3,
+     "message": "The zombies freeze for ten seconds.",
+     "actions": [
+      {
+       "do": "freeze_zombies",
+       "seconds": 10
+      }
+     ]
+    },
+    {
+     "id": "slow",
+     "title": "Molasses",
+     "weight": 3,
+     "message": "The zombies are slow for a minute.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "zombie_speed",
+       "scale": 0.6,
+       "seconds": 60
+      }
+     ]
+    },
+    {
+     "id": "cleanse",
+     "title": "Calm",
+     "weight": 2,
+     "message": "Every effect on the horde is gone.",
+     "actions": [
+      {
+       "do": "clear_effects"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "special",
+   "title": "Special Box",
+   "colour": "#b0202a",
+   "drop": {
+    "common": 2,
+    "special": 4,
+    "brute": 2,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "three",
+     "title": "Ambush",
+     "weight": 5,
+     "message": "Three specials, right now.",
+     "actions": [
+      {
+       "do": "special",
+       "count": 3
+      }
+     ]
+    },
+    {
+     "id": "harder",
+     "title": "Hardened specials",
+     "weight": 4,
+     "message": "Specials take half again as much for three minutes.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "special_health",
+       "scale": 1.5,
+       "seconds": 180
+      }
+     ]
+    },
+    {
+     "id": "swarm",
+     "title": "Specials swarm",
+     "weight": 4,
+     "message": "Specials come twice as often for two minutes.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "special_rate",
+       "scale": 2.0,
+       "seconds": 120
+      }
+     ]
+    },
+    {
+     "id": "brute",
+     "title": "BRUTE",
+     "weight": 2,
+     "message": "Something huge is coming.",
+     "actions": [
+      {
+       "do": "brute"
+      }
+     ]
+    },
+    {
+     "id": "leapers",
+     "title": "Leapers",
+     "weight": 3,
+     "message": "Two leapers.",
+     "actions": [
+      {
+       "do": "special",
+       "kind": "leaper",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "id": "riders",
+     "title": "Riders",
+     "weight": 3,
+     "message": "Two riders.",
+     "actions": [
+      {
+       "do": "special",
+       "kind": "rider",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "id": "strangler_pair",
+     "title": "Tongues",
+     "weight": 3,
+     "message": "Two stranglers.",
+     "actions": [
+      {
+       "do": "special",
+       "kind": "strangler",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "id": "cull",
+     "title": "Cull",
+     "weight": 3,
+     "message": "Every special nearby drops dead.",
+     "actions": [
+      {
+       "do": "kill_zombies",
+       "radius": 60,
+       "kinds": "specials"
+      }
+     ]
+    },
+    {
+     "id": "trophy",
+     "title": "Hunter's trophy",
+     "weight": 3,
+     "message": "{name} gets a sniper rifle.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "id": "sniper"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "arsenal",
+   "title": "Arsenal Box",
+   "colour": "#3b8ff0",
+   "drop": {
+    "common": 5,
+    "special": 5,
+    "brute": 3,
+    "map": 5
+   },
+   "outcomes": [
+    {
+     "id": "primary",
+     "title": "Upgrade",
+     "weight": 6,
+     "message": "{name} found a better gun.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "tier": "primary"
+      }
+     ]
+    },
+    {
+     "id": "heavy",
+     "title": "Heavy weapon",
+     "weight": 3,
+     "message": "{name} found something heavy.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "tier": "heavy"
+      }
+     ]
+    },
+    {
+     "id": "minigun",
+     "title": "Minigun",
+     "weight": 2,
+     "message": "{name} has a minigun. Stand behind them.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "id": "minigun"
+      }
+     ]
+    },
+    {
+     "id": "ammo_all",
+     "title": "Ammo drop",
+     "weight": 5,
+     "message": "Ammunition for everyone.",
+     "actions": [
+      {
+       "do": "give_ammo",
+       "who": "team"
+      }
+     ]
+    },
+    {
+     "id": "melee",
+     "title": "Something sharp",
+     "weight": 3,
+     "message": "{name} found a melee weapon.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "tier": "melee"
+      }
+     ]
+    },
+    {
+     "id": "boost",
+     "title": "Hollow points",
+     "weight": 4,
+     "message": "{name}'s shots hit twice as hard for a minute.",
+     "actions": [
+      {
+       "do": "damage_boost",
+       "scale": 2.0,
+       "seconds": 60
+      }
+     ]
+    },
+    {
+     "id": "team_boost",
+     "title": "Hollow points for all",
+     "weight": 3,
+     "message": "Everybody hits harder for thirty seconds.",
+     "actions": [
+      {
+       "do": "damage_boost",
+       "who": "team",
+       "scale": 1.5,
+       "seconds": 30
+      }
+     ]
+    },
+    {
+     "id": "shuffle",
+     "title": "Weapon roulette",
+     "weight": 3,
+     "message": "Everybody's guns are swapped for something random.",
+     "actions": [
+      {
+       "do": "shuffle_weapons"
+      }
+     ]
+    },
+    {
+     "id": "throwables",
+     "title": "Throw things",
+     "weight": 4,
+     "message": "Something to throw for everyone.",
+     "actions": [
+      {
+       "do": "give_weapon",
+       "who": "team",
+       "tier": "thrown"
+      }
+     ]
+    },
+    {
+     "id": "empty",
+     "title": "Empty crate",
+     "weight": 2,
+     "message": "Just packing peanuts.",
+     "actions": [
+      {
+       "do": "message",
+       "text": "{name}'s arsenal box was empty."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "mystery",
+   "title": "Mystery Box",
+   "colour": "#f2c94c",
+   "drop": {
+    "common": 4,
+    "special": 4,
+    "brute": 4,
+    "map": 3
+   },
+   "outcomes": [
+    {
+     "id": "moon",
+     "title": "Low gravity",
+     "weight": 4,
+     "message": "Everybody floats for half a minute.",
+     "actions": [
+      {
+       "do": "low_gravity",
+       "who": "team"
+      }
+     ]
+    },
+    {
+     "id": "speed",
+     "title": "Speed",
+     "weight": 4,
+     "message": "Everybody is fast for twenty seconds.",
+     "actions": [
+      {
+       "do": "haste",
+       "who": "team"
+      }
+     ]
+    },
+    {
+     "id": "heavy",
+     "title": "Lead boots",
+     "weight": 3,
+     "message": "Everybody is slow for fifteen seconds.",
+     "actions": [
+      {
+       "do": "heavy",
+       "who": "team"
+      }
+     ]
+    },
+    {
+     "id": "ahead",
+     "title": "Shortcut",
+     "weight": 3,
+     "message": "{name} was thrown ahead.",
+     "actions": [
+      {
+       "do": "teleport",
+       "to": "ahead"
+      }
+     ]
+    },
+    {
+     "id": "lost",
+     "title": "Lost",
+     "weight": 2,
+     "message": "{name} is somewhere else entirely.",
+     "actions": [
+      {
+       "do": "teleport",
+       "to": "random"
+      }
+     ]
+    },
+    {
+     "id": "swap",
+     "title": "Switcheroo",
+     "weight": 3,
+     "message": "{name} traded places with somebody.",
+     "actions": [
+      {
+       "do": "swap"
+      }
+     ]
+    },
+    {
+     "id": "god",
+     "title": "Untouchable",
+     "weight": 3,
+     "message": "Nothing can hurt {name} for ten seconds.",
+     "actions": [
+      {
+       "do": "invulnerable",
+       "seconds": 10
+      }
+     ]
+    },
+    {
+     "id": "flash",
+     "title": "Flashbang",
+     "weight": 3,
+     "message": "{name} can't see.",
+     "actions": [
+      {
+       "do": "blind",
+       "seconds": 3
+      }
+     ]
+    },
+    {
+     "id": "knock",
+     "title": "Spring-loaded",
+     "weight": 3,
+     "message": "{name} went flying.",
+     "actions": [
+      {
+       "do": "knock"
+      }
+     ]
+    },
+    {
+     "id": "more",
+     "title": "More boxes",
+     "weight": 3,
+     "message": "Three more boxes fell out.",
+     "actions": [
+      {
+       "do": "drop_boxes",
+       "count": 3
+      }
+     ]
+    },
+    {
+     "id": "gamble",
+     "title": "Double or nothing",
+     "weight": 3,
+     "message": "Two random things happen.",
+     "actions": [
+      {
+       "do": "random",
+       "pick": 2,
+       "choices": [
+        [
+         {
+          "do": "give_weapon",
+          "tier": "heavy"
+         }
+        ],
+        [
+         {
+          "do": "mob",
+          "scale": 1.0
+         }
+        ],
+        [
+         {
+          "do": "heal",
+          "who": "team",
+          "fraction": 0.5
+         }
+        ],
+        [
+         {
+          "do": "special",
+          "count": 2
+         }
+        ],
+        [
+         {
+          "do": "airstrike",
+          "target": "zombies",
+          "count": 5,
+          "damage": 200
+         }
+        ],
+        [
+         {
+          "do": "bile",
+          "seconds": 10
+         }
+        ],
+        [
+         {
+          "do": "give_item",
+          "who": "team",
+          "item": "pills"
+         }
+        ],
+        [
+         {
+          "do": "brute"
+         }
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "id": "nothing",
+     "title": "Nothing",
+     "weight": 3,
+     "message": "Absolutely nothing happened. Suspicious.",
+     "actions": [
+      {
+       "do": "message",
+       "text": "{name}'s box did nothing. For now."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "cursed",
+   "title": "Cursed Box",
+   "colour": "#2a2a32",
+   "drop": {
+    "common": 1,
+    "special": 2,
+    "brute": 4,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "doom",
+     "title": "Doom",
+     "weight": 3,
+     "message": "Bile, a horde, and a brute. Good luck.",
+     "actions": [
+      {
+       "do": "bile",
+       "seconds": 15
+      },
+      {
+       "do": "mob",
+       "scale": 1.5
+      },
+      {
+       "do": "brute"
+      }
+     ]
+    },
+    {
+     "id": "drain",
+     "title": "Drained",
+     "weight": 3,
+     "message": "Everybody loses health.",
+     "actions": [
+      {
+       "do": "hurt",
+       "who": "team",
+       "amount": 25
+      }
+     ]
+    },
+    {
+     "id": "hunted",
+     "title": "Hunted",
+     "weight": 3,
+     "message": "{name} is covered in bile, and the specials are coming too.",
+     "actions": [
+      {
+       "do": "bile",
+       "seconds": 15
+      },
+      {
+       "do": "special",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "id": "blessing",
+     "title": "Blessing in disguise",
+     "weight": 3,
+     "message": "Heal, ammo, and a heavy weapon.",
+     "actions": [
+      {
+       "do": "heal",
+       "who": "team",
+       "fraction": 1.0
+      },
+      {
+       "do": "give_ammo",
+       "who": "team"
+      },
+      {
+       "do": "give_weapon",
+       "tier": "heavy"
+      }
+     ]
+    },
+    {
+     "id": "nightmare",
+     "title": "Nightmare",
+     "weight": 2,
+     "message": "Everything is harder for three minutes.",
+     "actions": [
+      {
+       "do": "pace",
+       "what": "mob_rate",
+       "scale": 1.5,
+       "seconds": 180
+      },
+      {
+       "do": "pace",
+       "what": "special_health",
+       "scale": 1.5,
+       "seconds": 180
+      },
+      {
+       "do": "pace",
+       "what": "zombie_speed",
+       "scale": 1.15,
+       "seconds": 180
+      }
+     ]
+    },
+    {
+     "id": "sacrifice",
+     "title": "Sacrifice",
+     "weight": 2,
+     "message": "{name} goes down. Everybody else is healed.",
+     "actions": [
+      {
+       "do": "hurt",
+       "amount": 500
+      },
+      {
+       "do": "heal",
+       "who": "others",
+       "fraction": 1.0
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

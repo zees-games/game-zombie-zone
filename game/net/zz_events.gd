@@ -1,0 +1,766 @@
+extends RefCounted
+
+const ZzGame := preload("../zz_game.gd")
+
+## The wire format for everything that is not a snapshot or an input.
+##
+## Encoders and decoders in pairs, and nothing checks that they are inverses for you —
+## `headless_net` round-trips every one of them, because this family has already shipped a
+## serialisation whose two ends never met: dot-moderation wrote `"voice muted"` and read
+## back a warning, and the one thing that addon existed for silently did nothing.
+##
+## [b]The map is a document, and it travels whole.[/b] `MAP` carries the normalised document
+## a server built (see [ZzMapDoc]), deflated: a client builds the identical map from it and
+## needs no map files of its own.
+##
+## [b]A snapshot carries what moves; an event carries what happens.[/b] Survivors and zombies
+## are entities in the snapshot. Everything else is said once, here: a zombie appearing (its
+## kind and variant, which never change) and going; a survivor down, picked up, held, freed;
+## something lying on the ground and picked up; a box's outcome; a pool of acid, a thrown
+## rock and where it landed; an explosion; an objective; a gate. A pool and a rock are pure
+## functions of how they began, so one event each draws all of their lives.
+
+enum Kind {
+	## Who you are and how fast the server ticks.
+	HELLO,
+	## The map, as a document. Build it from this.
+	MAP,
+	## A player is in the world: net id, name, side, face.
+	JOIN,
+	LEAVE,
+	## A player changed sides.
+	TEAM,
+	## The clock and the numbers a client cannot count for itself.
+	CLOCK,
+	## A map began or ended, and how.
+	ROUND,
+	## The map moved on: in the start area, playing.
+	PHASE,
+	## Somebody is dead, and what did it.
+	DEATH,
+	## Somebody was handed a weapon.
+	ARMED,
+	## Text for one player, or for everybody.
+	NOTICE,
+	## One routed chat line.
+	CHAT,
+	## What this one player's camera is on now that they are out. To its owner only.
+	SPECTATE,
+	## A zombie appeared: its net id, kind, variant and where.
+	NPC,
+	## A zombie went: killed, or tidied away.
+	NPC_GONE,
+	## A survivor went down, and what did it.
+	DOWN,
+	## A survivor was picked up, and by whom (0: a box).
+	REVIVE,
+	## A dead survivor is back.
+	RESCUE,
+	## A survivor is held by a special: which zombie, and how.
+	PIN,
+	## Let go, and why.
+	UNPIN,
+	## Something is on the ground: an id, a kind, an item, a place.
+	LOOT,
+	## It is not any more, and who took it.
+	LOOT_GONE,
+	## A box was opened: by whom, which, what came out.
+	BOX,
+	## A pool of acid, a fire, a healing glow: an id, a kind, a place, a radius, a lifetime.
+	HAZARD,
+	HAZARD_GONE,
+	## Something thrown or falling: an id, a kind, where from, how fast.
+	THROW,
+	## It landed, or hit somebody.
+	LANDED,
+	## An explosion: where, how big, what kind.
+	BLAST,
+	## A survivor was covered in bile, for so long.
+	BILE,
+	## An objective changed: which, and to what (`holding`, `done`).
+	OBJECTIVE,
+	## A gate opened.
+	GATE,
+	## What the boxes are doing to the game: one line per kind of effect.
+	EFFECTS,
+	## To one survivor: you were hurt, this much, from there.
+	HURT,
+	## To one survivor: your ammunition was filled.
+	AMMO,
+}
+
+enum Ask {
+	## I have built my world and can receive. Tell me everything in it.
+	READY,
+	## I typed a line. The server decides what channel it lands on and who hears it.
+	SAY,
+	## I am out: show me the next person, the previous one, or the other camera.
+	SPECTATE,
+}
+
+## Every decoder returns an `ok` beside its fields, and every caller checks it.
+##
+## [b]A reader past its end returns plausible zeros rather than failing.[/b] dot-net shipped
+## with exhaustion that was not sticky, so a decoder that skipped this check got a
+## believable value for the field AFTER the overrun — and a truncated packet decodes as a
+## valid message about nothing.
+const NAME_BYTES := 64
+const ID_BYTES := 64
+const TEXT_BYTES := 256
+
+## The largest map a reader accepts: [ZzMapDoc.WIRE_LIMIT] and its header.
+const MAP_BYTES := 65536 + 16
+
+## The most an avatar document may take in a JOIN.
+const AVATAR_BYTES := 1024
+
+## The box effects list, as JSON.
+const EFFECTS_BYTES := 2048
+
+## Where a body may be, in metres, on the wire. Read from [ZzGame], not written here: a
+## quantised position is decoded against this range, and two files holding two numbers put
+## the thing somewhere else (game-arena: 256 against 128).
+const WORLD_EXTENT := ZzGame.NET_WORLD_EXTENT
+const POS_BITS := 24
+
+## Velocities of thrown things, m/s.
+const SPEED_MAX := 80.0
+const SPEED_BITS := 14
+
+## Clocks, in seconds: well past any map.
+const CLOCK_MAX := 7200.0
+const CLOCK_BITS := 18
+
+const TEAM_BITS := 3
+const PHASE_BITS := 3
+
+
+static func kind_name(kind: int) -> String:
+	var names := Kind.keys()
+	return String(names[kind]) if kind >= 0 and kind < names.size() else "?"
+
+
+static func ask_name(ask: int) -> String:
+	var names := Ask.keys()
+	return String(names[ask]) if ask >= 0 and ask < names.size() else "?"
+
+
+static func _w() -> DotNetWriter:
+	return DotNetWriter.new()
+
+
+static func _pos(w: DotNetWriter, at: Vector3) -> void:
+	w.write_vector3_range(at, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+
+
+static func _read_pos(r: DotNetReader) -> Vector3:
+	return r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
+
+
+# --- Hello -----------------------------------------------------------------
+
+static func write_hello(player_id: int, tick_rate: int, server_tick: int, difficulty: int, max_incaps: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_uint(tick_rate, 9)
+	w.write_varint(server_tick)
+	w.write_uint(clampi(difficulty, 0, 3), 2)
+	w.write_uint(clampi(max_incaps, 0, 15), 4)
+	return w.to_bytes()
+
+
+static func read_hello(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var tick_rate := r.read_uint(9)
+	var server_tick := r.read_varint()
+	var difficulty := r.read_uint(2)
+	var max_incaps := r.read_uint(4)
+	return {
+		"player_id": player_id, "tick_rate": tick_rate, "server_tick": server_tick,
+		"difficulty": difficulty, "max_incaps": max_incaps, "ok": r.ok(),
+	}
+
+
+# --- The map -----------------------------------------------------------------
+
+## The map: [ZzMapDoc.encode]'s bytes, as they are. Opaque here, and checked at the other end.
+static func write_map(encoded: PackedByteArray) -> PackedByteArray:
+	var w := _w()
+	w.write_bytes(encoded)
+	return w.to_bytes()
+
+
+static func read_map(r: DotNetReader) -> Dictionary:
+	var encoded := r.read_bytes(MAP_BYTES)
+	return {"encoded": encoded, "ok": r.ok() and not encoded.is_empty()}
+
+
+# --- Players ---------------------------------------------------------------
+
+## A join, or a change to who somebody is. Appended, never inserted.
+static func write_join(
+	player_id: int, net_id: int, display_name: String, team: int,
+	avatar: DotAvatar = null
+) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_varint(net_id)
+	w.write_string(display_name, NAME_BYTES)
+	w.write_varint(maxi(team, 0))
+	w.write_string(JSON.stringify(avatar.to_dict()) if avatar != null else "", AVATAR_BYTES)
+	return w.to_bytes()
+
+
+static func read_join(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var net_id := r.read_varint()
+	var display_name := r.read_string(NAME_BYTES)
+	var team := r.read_varint()
+	var text := r.read_string(AVATAR_BYTES)
+	var avatar: DotAvatar = null
+
+	# A document that does not parse is the stock person, not a refused join.
+	if text != "":
+		var parsed: Variant = JSON.parse_string(text)
+
+		if parsed is Dictionary:
+			var built := DotAvatar.from_dict(parsed)
+
+			if built.ok:
+				avatar = built.value
+
+	return {
+		"player_id": player_id, "net_id": net_id, "name": display_name, "team": team,
+		"avatar": avatar, "ok": r.ok(),
+	}
+
+
+static func write_player(player_id: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	return w.to_bytes()
+
+
+static func read_player(r: DotNetReader) -> int:
+	return r.read_varint()
+
+
+static func write_team(player_id: int, team: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_varint(maxi(team, 0))
+	return w.to_bytes()
+
+
+static func read_team(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var team := r.read_varint()
+	return {"player_id": player_id, "team": team, "ok": r.ok()}
+
+
+## A death or a down: who, by whom (a session, or 0), by what (a zombie kind, or empty), why.
+static func write_death(player_id: int, by: int, why: StringName, by_kind: StringName = &"") -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_varint(by)
+	w.write_string(String(why), ID_BYTES)
+	w.write_string(String(by_kind), ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_death(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var by := r.read_varint()
+	var why := r.read_string(ID_BYTES)
+	var by_kind := r.read_string(ID_BYTES)
+	return {"player_id": player_id, "by": by, "why": StringName(why), "by_kind": StringName(by_kind), "ok": r.ok()}
+
+
+## Somebody, and somebody else (a reviver, 0 for nobody).
+static func write_pair(player_id: int, other: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_varint(maxi(other, 0))
+	return w.to_bytes()
+
+
+static func read_pair(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var other := r.read_varint()
+	return {"player_id": player_id, "other": other, "ok": r.ok()}
+
+
+static func write_armed(player_id: int, weapon_id: StringName) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_string(String(weapon_id), ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_armed(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var weapon_id := r.read_string(ID_BYTES)
+	return {"player_id": player_id, "weapon_id": StringName(weapon_id), "ok": r.ok()}
+
+
+# --- The map's clock -----------------------------------------------------------
+
+## The clock: the map number, its phase and how long it has been in it, a survival hold's time
+## and goal (0 for none), who is left, the objective in play and its state.
+static func write_clock(
+	round_number: int, phase: int, elapsed: float, held: float, goal: float,
+	alive: int, playable: bool, objective: int, objective_state: int, objective_ends: float
+) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(round_number)
+	w.write_uint(clampi(phase, 0, 7), PHASE_BITS)
+	w.write_float_range(clampf(elapsed, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_float_range(clampf(held, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_float_range(clampf(goal, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_uint(clampi(alive, 0, 255), 8)
+	w.write_bool(playable)
+	w.write_uint(clampi(objective + 1, 0, 31), 5)
+	w.write_uint(clampi(objective_state, 0, 3), 2)
+	w.write_float_range(clampf(objective_ends, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	return w.to_bytes()
+
+
+static func read_clock(r: DotNetReader) -> Dictionary:
+	var round_number := r.read_varint()
+	var phase := r.read_uint(PHASE_BITS)
+	var elapsed := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	var held := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	var goal := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	var alive := r.read_uint(8)
+	var playable := r.read_bool()
+	var objective := r.read_uint(5) - 1
+	var objective_state := r.read_uint(2)
+	var objective_ends := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	return {
+		"round": round_number, "phase": phase, "elapsed": elapsed, "held": held, "goal": goal,
+		"alive": alive, "playable": playable, "objective": objective,
+		"objective_state": objective_state, "objective_ends": objective_ends, "ok": r.ok(),
+	}
+
+
+## A map began or ended. [param won] whether the survivors made it, and [param why] the
+## server's sentence, which is what the HUD prints.
+static func write_round(number: int, began: bool, won: bool, why: String = "") -> PackedByteArray:
+	var w := _w()
+	w.write_varint(number)
+	w.write_bool(began)
+	w.write_bool(won)
+	w.write_string(why, TEXT_BYTES)
+	return w.to_bytes()
+
+
+static func read_round(r: DotNetReader) -> Dictionary:
+	var number := r.read_varint()
+	var began := r.read_bool()
+	var won := r.read_bool()
+	var why := r.read_string(TEXT_BYTES)
+	return {"round": number, "began": began, "won": won, "why": why, "ok": r.ok()}
+
+
+static func write_phase(phase: int) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(phase, 0, 7), PHASE_BITS)
+	return w.to_bytes()
+
+
+static func read_phase(r: DotNetReader) -> Dictionary:
+	var phase := r.read_uint(PHASE_BITS)
+	return {"phase": phase, "ok": r.ok()}
+
+
+# --- Watching --------------------------------------------------------------
+
+## A view dot-spectate decided, for the one player it belongs to. Sessions, 0 is nobody.
+static func write_spectate(
+	viewer: int, mode: int, target: int, killer: int, death_at: Vector3
+) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(viewer)
+	w.write_uint(clampi(mode, 0, 7), 3)
+	w.write_varint(maxi(target, 0))
+	w.write_varint(maxi(killer, 0))
+	_pos(w, death_at)
+	return w.to_bytes()
+
+
+static func read_spectate(r: DotNetReader) -> Dictionary:
+	var viewer := r.read_varint()
+	var mode := r.read_uint(3)
+	var target := r.read_varint()
+	var killer := r.read_varint()
+	var death_at := _read_pos(r)
+	return {
+		"viewer": viewer, "mode": mode, "target": target, "killer": killer,
+		"death_at": death_at, "ok": r.ok(),
+	}
+
+
+## Next (+1), previous (-1), or the other camera (0).
+static func write_ask_spectate(direction: int) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(direction, -1, 1) + 1, 2)
+	return w.to_bytes()
+
+
+static func read_ask_spectate(r: DotNetReader) -> Dictionary:
+	var raw := r.read_uint(2)
+	return {"direction": clampi(raw, 0, 2) - 1, "ok": r.ok()}
+
+
+# --- Zombies -----------------------------------------------------------------
+
+static func write_npc(net_id: int, kind: StringName, variant: int, at: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(net_id)
+	w.write_string(String(kind), ID_BYTES)
+	w.write_uint(variant & 0xFFFF, 16)
+	_pos(w, at)
+	return w.to_bytes()
+
+
+static func read_npc(r: DotNetReader) -> Dictionary:
+	var net_id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	var variant := r.read_uint(16)
+	var at := _read_pos(r)
+	return {"net_id": net_id, "kind": StringName(kind), "variant": variant, "at": at, "ok": r.ok()}
+
+
+## A zombie gone: [param killed] says it died rather than being tidied away, so a client can
+## leave a body.
+static func write_npc_gone(net_id: int, killed: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(net_id)
+	w.write_bool(killed)
+	return w.to_bytes()
+
+
+static func read_npc_gone(r: DotNetReader) -> Dictionary:
+	var net_id := r.read_varint()
+	var killed := r.read_bool()
+	return {"net_id": net_id, "killed": killed, "ok": r.ok()}
+
+
+## A survivor held: who, by which zombie (its net id), how.
+static func write_pin(player_id: int, npc_net_id: int, kind: StringName) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_varint(npc_net_id)
+	w.write_string(String(kind), ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_pin(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var npc_net_id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	return {"player_id": player_id, "npc": npc_net_id, "kind": StringName(kind), "ok": r.ok()}
+
+
+# --- Things on the ground ------------------------------------------------------
+
+static func write_loot(id: int, kind: StringName, item: StringName, at: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_string(String(kind), ID_BYTES)
+	w.write_string(String(item), ID_BYTES)
+	_pos(w, at)
+	return w.to_bytes()
+
+
+static func read_loot(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	var item := r.read_string(ID_BYTES)
+	var at := _read_pos(r)
+	return {"id": id, "kind": StringName(kind), "item": StringName(item), "at": at, "ok": r.ok()}
+
+
+static func write_loot_gone(id: int, by: int) -> PackedByteArray:
+	return write_pair(id, by)
+
+
+static func read_loot_gone(r: DotNetReader) -> Dictionary:
+	var pair := read_pair(r)
+	return {"id": pair["player_id"], "by": pair["other"], "ok": pair["ok"]}
+
+
+## A box opened: by whom, which type, the outcome's title and the message.
+static func write_box(player_id: int, type_id: StringName, title: String, message: String) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_string(String(type_id), ID_BYTES)
+	w.write_string(title, NAME_BYTES)
+	w.write_string(message, TEXT_BYTES)
+	return w.to_bytes()
+
+
+static func read_box(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var type_id := r.read_string(ID_BYTES)
+	var title := r.read_string(NAME_BYTES)
+	var message := r.read_string(TEXT_BYTES)
+	return {"player_id": player_id, "type": StringName(type_id), "title": title, "message": message, "ok": r.ok()}
+
+
+## The effects the boxes have running, as the HUD lists them.
+static func write_effects(summary: Array) -> PackedByteArray:
+	var w := _w()
+	var rows: Array = []
+
+	for e: Dictionary in summary:
+		rows.append([str(e["title"]), int(e["stacks"]), snappedf(float(e["seconds"]), 0.1), str(e["who"]), snappedf(float(e["scale"]), 0.01)])
+
+	w.write_string(JSON.stringify(rows), EFFECTS_BYTES)
+	return w.to_bytes()
+
+
+static func read_effects(r: DotNetReader) -> Dictionary:
+	var text := r.read_string(EFFECTS_BYTES)
+	var rows: Array = []
+	var parsed: Variant = JSON.parse_string(text) if text != "" else []
+
+	if parsed is Array:
+		for row: Variant in parsed:
+			if row is Array and (row as Array).size() >= 5:
+				rows.append({"title": str(row[0]), "stacks": int(row[1]), "seconds": float(row[2]), "who": str(row[3]), "scale": float(row[4])})
+
+	return {"effects": rows, "ok": r.ok()}
+
+
+# --- Hazards and thrown things ---------------------------------------------------
+
+static func write_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_string(String(kind), ID_BYTES)
+	_pos(w, at)
+	w.write_float_range(clampf(radius, 0.0, 64.0), 0.0, 64.0, 12)
+	w.write_float_range(clampf(seconds, 0.0, 600.0), 0.0, 600.0, 14)
+	return w.to_bytes()
+
+
+static func read_hazard(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	var at := _read_pos(r)
+	var radius := r.read_float_range(0.0, 64.0, 12)
+	var seconds := r.read_float_range(0.0, 600.0, 14)
+	return {"id": id, "kind": StringName(kind), "at": at, "radius": radius, "seconds": seconds, "ok": r.ok()}
+
+
+static func write_id(id: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	return w.to_bytes()
+
+
+static func read_id(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	return {"id": id, "ok": r.ok()}
+
+
+static func write_throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_string(String(kind), ID_BYTES)
+	_pos(w, from)
+	w.write_vector3_range(velocity, -SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	return w.to_bytes()
+
+
+static func read_throw(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	var from := _read_pos(r)
+	var velocity := r.read_vector3_range(-SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	return {"id": id, "kind": StringName(kind), "from": from, "velocity": velocity, "ok": r.ok()}
+
+
+static func write_landed(id: int, kind: StringName, at: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_string(String(kind), ID_BYTES)
+	_pos(w, at)
+	return w.to_bytes()
+
+
+static func read_landed(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var kind := r.read_string(ID_BYTES)
+	var at := _read_pos(r)
+	return {"id": id, "kind": StringName(kind), "at": at, "ok": r.ok()}
+
+
+static func write_blast(at: Vector3, radius: float, kind: StringName) -> PackedByteArray:
+	var w := _w()
+	_pos(w, at)
+	w.write_float_range(clampf(radius, 0.0, 64.0), 0.0, 64.0, 12)
+	w.write_string(String(kind), ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_blast(r: DotNetReader) -> Dictionary:
+	var at := _read_pos(r)
+	var radius := r.read_float_range(0.0, 64.0, 12)
+	var kind := r.read_string(ID_BYTES)
+	return {"at": at, "radius": radius, "kind": StringName(kind), "ok": r.ok()}
+
+
+static func write_bile(player_id: int, seconds: float) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_float_range(clampf(seconds, 0.0, 120.0), 0.0, 120.0, 12)
+	return w.to_bytes()
+
+
+static func read_bile(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var seconds := r.read_float_range(0.0, 120.0, 12)
+	return {"player_id": player_id, "seconds": seconds, "ok": r.ok()}
+
+
+# --- Objectives ----------------------------------------------------------------
+
+## An objective changed: its index and state (1 holding, 2 done).
+static func write_objective(index: int, state: int) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(index, 0, 31), 5)
+	w.write_uint(clampi(state, 0, 3), 2)
+	return w.to_bytes()
+
+
+static func read_objective(r: DotNetReader) -> Dictionary:
+	var index := r.read_uint(5)
+	var state := r.read_uint(2)
+	return {"index": index, "state": state, "ok": r.ok()}
+
+
+static func write_gate(gate: String) -> PackedByteArray:
+	var w := _w()
+	w.write_string(gate, ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_gate(r: DotNetReader) -> Dictionary:
+	var gate := r.read_string(ID_BYTES)
+	return {"gate": gate, "ok": r.ok()}
+
+
+## You were hurt: how much, from where. For the red edge of the screen that says which way.
+static func write_hurt(amount: float, from: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_float_range(clampf(amount, 0.0, 500.0), 0.0, 500.0, 12)
+	_pos(w, from)
+	return w.to_bytes()
+
+
+static func read_hurt(r: DotNetReader) -> Dictionary:
+	var amount := r.read_float_range(0.0, 500.0, 12)
+	var from := _read_pos(r)
+	return {"amount": amount, "from": from, "ok": r.ok()}
+
+
+# --- Chat ------------------------------------------------------------------
+
+## A chat line's own field widths. Wider than the rules allow, so a rule can be raised
+## without the wire silently truncating what it lets through.
+const CHAT_BYTES := 200
+const CHAT_CHANNEL_BYTES := 24
+const CHAT_KEY_BYTES := 48
+const CHAT_KIND_BITS := 4
+
+
+## One routed line, in [DotChatMessage]'s own wire shape.
+##
+## [b]Field by field rather than `var_to_bytes`, like every other message here.[/b] A
+## dictionary serialised whole is a dictionary whose contents are whatever the sender put
+## in it — including keys a client will happily read — and the widths below are the
+## validation. `x.p` is the one meta field this game carries: the speaker's session id, so
+## a client can colour a line by whose it is.
+static func write_chat(wire: Dictionary) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(int(wire.get("n", 0)))
+	w.write_uint(int(wire.get("t", 0)), 32)
+	w.write_string(str(wire.get("c", "")), CHAT_CHANNEL_BYTES)
+	w.write_uint(
+		maxi(0, DotChatMessage.kind_from_name(str(wire.get("k", "say")))), CHAT_KIND_BITS
+	)
+	w.write_string(str(wire.get("s", "")), CHAT_KEY_BYTES)
+	w.write_string(str(wire.get("d", "")), NAME_BYTES)
+	w.write_string(str(wire.get("w", "")), CHAT_KEY_BYTES)
+	w.write_string(str(wire.get("m", "")), CHAT_BYTES)
+
+	var meta: Variant = wire.get("x")
+	var player_id := 0
+
+	if typeof(meta) == TYPE_DICTIONARY:
+		player_id = int((meta as Dictionary).get("p", 0))
+
+	w.write_varint(maxi(player_id, 0))
+	return w.to_bytes()
+
+
+static func read_chat(r: DotNetReader) -> Dictionary:
+	var out := {
+		"n": r.read_varint(),
+		"t": r.read_uint(32),
+		"c": r.read_string(CHAT_CHANNEL_BYTES),
+	}
+
+	var kind := r.read_uint(CHAT_KIND_BITS)
+	out["k"] = (
+		DotChatMessage.KIND_NAMES[kind] if kind >= 0 and kind < DotChatMessage.KIND_NAMES.size()
+		else "say"
+	)
+
+	out["s"] = r.read_string(CHAT_KEY_BYTES)
+	out["d"] = r.read_string(NAME_BYTES)
+	out["w"] = r.read_string(CHAT_KEY_BYTES)
+	out["m"] = r.read_string(CHAT_BYTES)
+
+	var player_id := r.read_varint()
+
+	if player_id > 0:
+		out["x"] = {"p": player_id}
+
+	out["ok"] = r.ok()
+	return out
+
+
+## What a client sends when somebody presses Enter: a channel and a line, and nothing else.
+##
+## [b]No speaker, no time, no colour.[/b] Everything about what a line MEANS is decided on
+## the server — who said it, whether they are gagged, whether they are talking too fast,
+## which channel they may use and who can hear it. A client that sent any of that would be
+## a client that could claim it.
+static func write_say(channel_id: StringName, text: String) -> PackedByteArray:
+	var w := _w()
+	w.write_string(String(channel_id), CHAT_CHANNEL_BYTES)
+	w.write_string(text, CHAT_BYTES)
+	return w.to_bytes()
+
+
+static func read_say(r: DotNetReader) -> Dictionary:
+	var out := {
+		"channel": r.read_string(CHAT_CHANNEL_BYTES),
+		"text": r.read_string(CHAT_BYTES),
+	}
+	out["ok"] = r.ok()
+	return out
+
+
+static func write_notice(text: String) -> PackedByteArray:
+	var w := _w()
+	w.write_string(text, TEXT_BYTES)
+	return w.to_bytes()
+
+
+static func read_notice(r: DotNetReader) -> Dictionary:
+	var text := r.read_string(TEXT_BYTES)
+	return {"text": text, "ok": r.ok()}

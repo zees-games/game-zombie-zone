@@ -1,0 +1,224 @@
+extends RefCounted
+
+const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzWeapons := preload("zz_weapons.gd")
+
+## Things on the ground a survivor presses E on: weapons, ammunition, a medkit, pills, something
+## to throw, and the boxes.
+##
+## [b]One list, one id space, one wire event each way.[/b] Whatever lies on the ground is an
+## entry here with a kind, an item and a place; a client is told when one appears and when one
+## goes, and draws it (`ZzLootView`). What using one DOES is the game's: an ammo pile is never
+## used up, a weapon replaces the one in its slot, a box is opened by [ZzBoxes].
+##
+## [b]Looked at, not walked over.[/b] A survivor picks up the thing they are looking at within
+## reach, which is the genre's way: walking over a shotgun in a fight and swapping your rifle for
+## it without meaning to is the thing nobody wants.
+
+const CHANNEL := "zz.loot"
+
+const WEAPON := &"weapon"
+const AMMO := &"ammo"
+const MEDKIT := &"medkit"
+const PILLS := &"pills"
+const THROWABLE := &"throwable"
+const BOX := &"box"
+
+## How close to the line of sight a thing must be to be the one looked at, in metres.
+const AIM_SLACK := 0.55
+
+signal added(id: int, kind: StringName, item: StringName, at: Vector3)
+signal removed(id: int, by: StringName)
+
+## The game (`zz_game.gd`), untyped: it preloads this file.
+var game = null
+
+## id -> {kind, item, at, until}
+var entries: Dictionary = {}
+
+var _next_id: int = 1
+var _rng := RandomNumberGenerator.new()
+
+
+func _init(p_game: Object) -> void:
+	game = p_game
+	_rng.seed = 911
+
+
+func clear() -> void:
+	for id: int in entries.keys():
+		removed.emit(id, &"")
+
+	entries.clear()
+
+
+## Lays out what the map left lying about. A weapon or a box with no id is drawn at random.
+func place_from_map(doc: Dictionary) -> void:
+	_rng.seed = hash(str(doc.get("id", ""))) ^ int(game.round_number)
+
+	for item: Dictionary in doc.get("items", []):
+		var kind := StringName(str(item["kind"]))
+		var what := StringName(str(item.get("id", "")))
+
+		match kind:
+			WEAPON:
+				if what == &"" or not ZzWeapons.exists(what):
+					what = ZzWeapons.random_of(&"primary", _rng)
+			THROWABLE:
+				if what == &"" or not ZzWeapons.exists(what):
+					what = ZzWeapons.random_of(&"thrown", _rng)
+			BOX:
+				if what == &"" and game.boxes != null:
+					what = game.boxes.random_type(&"map", _rng)
+
+		var _id := add(kind, what, ZzMapDoc.v3(item["at"]))
+
+
+func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0) -> int:
+	var id := _next_id
+	_next_id += 1
+	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0}
+	added.emit(id, kind, item, at)
+	return id
+
+
+func remove(id: int, by: StringName = &"") -> void:
+	if entries.erase(id):
+		removed.emit(id, by)
+
+
+func exists(id: int) -> bool:
+	return entries.has(id)
+
+
+func position_of(id: int) -> Vector3:
+	return (entries[id] as Dictionary)["at"] if entries.has(id) else Vector3.INF
+
+
+func kind_of(id: int) -> StringName:
+	return (entries[id] as Dictionary)["kind"] if entries.has(id) else &""
+
+
+func count_of(kind: StringName) -> int:
+	var n := 0
+
+	for id: int in entries:
+		if (entries[id] as Dictionary)["kind"] == kind:
+			n += 1
+
+	return n
+
+
+## The oldest entry of [param kind], or -1.
+func oldest(kind: StringName) -> int:
+	var best := -1
+
+	for id: int in entries:
+		if (entries[id] as Dictionary)["kind"] == kind and (best < 0 or id < best):
+			best = id
+
+	return best
+
+
+## The entry nearest the line from [param eye] along [param aim], within [param reach]; -1 for none.
+func looked_at(eye: Vector3, aim: Vector3, reach: float) -> int:
+	var best := -1
+	var best_score := INF
+
+	for id: int in entries:
+		var at: Vector3 = (entries[id] as Dictionary)["at"] + Vector3(0.0, 0.25, 0.0)
+		var to := at - eye
+		var along := to.dot(aim)
+
+		if along < 0.0 or along > reach + 0.3:
+			continue
+
+		var off := (to - aim * along).length()
+
+		if off > AIM_SLACK + along * 0.08:
+			continue
+
+		var score := off + along * 0.1
+
+		if score < best_score and game.clear_between(eye, at + Vector3(0.0, 0.1, 0.0)):
+			best_score = score
+			best = id
+
+	return best
+
+
+## Seconds of holding E a thing takes: a box takes a moment, the rest none.
+func use_seconds(id: int) -> float:
+	return game.config.box_open_seconds if kind_of(id) == BOX else 0.0
+
+
+## [param player] uses entry [param id].
+func use(id: int, player) -> void:
+	if not entries.has(id):
+		return
+
+	var e: Dictionary = entries[id]
+	var item: StringName = e["item"]
+
+	match e["kind"]:
+		WEAPON, THROWABLE:
+			if game.arm(player, item):
+				# A gun picked up is drawn, as the genre does; a grenade is pocketed, or a
+				# survivor who walked over one in a fight finds a grenade in their hand.
+				if e["kind"] == WEAPON:
+					game._draw(player, item)
+				remove(id, player.player_id)
+		AMMO:
+			# A pile is never used up: the genre leaves it there for the next person.
+			var _filled := give_ammo(player)
+			game.ammo_given.emit(player.player_id)
+		MEDKIT:
+			if player.medkits >= 1:
+				game.refused.emit(player.player_id, "You already have a medkit.")
+				return
+			player.medkits = 1
+			remove(id, player.player_id)
+		PILLS:
+			if player.pills >= 1:
+				game.refused.emit(player.player_id, "You already have pills.")
+				return
+			player.pills = 1
+			remove(id, player.player_id)
+		BOX:
+			var at: Vector3 = e["at"]
+			remove(id, player.player_id)
+			game.boxes.open(item, player, at)
+
+
+## Fills every ammunition pool [param player] carries.
+static func give_ammo(player) -> int:
+	if player.weapons == null or player.weapons.arsenal == null:
+		return 0
+
+	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var total := 0
+
+	for pool in arsenal.ammo().pools():
+		total += arsenal.add_ammo(pool, maxi(arsenal.ammo().cap(pool), 1))
+
+	return total
+
+
+func tick(_delta: float) -> void:
+	var now: float = game.now()
+
+	for id: int in entries.keys():
+		var until := float((entries[id] as Dictionary)["until"])
+
+		if until > 0.0 and now >= until:
+			remove(id, &"")
+
+
+func describe() -> Dictionary:
+	var counts := {}
+
+	for id: int in entries:
+		var kind: StringName = (entries[id] as Dictionary)["kind"]
+		counts[kind] = int(counts.get(kind, 0)) + 1
+
+	return counts

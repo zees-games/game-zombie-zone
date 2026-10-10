@@ -1,0 +1,4981 @@
+{
+  "format": 1,
+  "comment": "Written by tools/measure_props.gd from props/kits.json. Do not edit by hand.",
+  "recolour": {
+    "furniture": {
+      "plant": [
+        0.24,
+        0.52,
+        0.24
+      ]
+    },
+    "nature": {
+      "grass": [
+        0.34,
+        0.56,
+        0.22
+      ],
+      "leafsGreen": [
+        0.28,
+        0.52,
+        0.2
+      ],
+      "leafsDark": [
+        0.18,
+        0.38,
+        0.16
+      ],
+      "woodBark": [
+        0.4,
+        0.29,
+        0.19
+      ],
+      "woodBarkDark": [
+        0.32,
+        0.23,
+        0.15
+      ],
+      "dirt": [
+        0.44,
+        0.33,
+        0.22
+      ],
+      "stone": [
+        0.6,
+        0.6,
+        0.58
+      ],
+      "wood": [
+        0.6,
+        0.44,
+        0.29
+      ],
+      "woodDark": [
+        0.46,
+        0.32,
+        0.21
+      ],
+      "woodInner": [
+        0.86,
+        0.76,
+        0.6
+      ]
+    }
+  },
+  "props": [
+    {
+      "id": "cars_ambulance",
+      "title": "Ambulance",
+      "kit": "cars",
+      "model": "assets/props/cars/ambulance.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.88,
+        5.2
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_box",
+      "title": "Box",
+      "kit": "cars",
+      "model": "assets/props/cars/box.glb",
+      "scale": 1.6,
+      "size": [
+        1.144,
+        1.144,
+        1.144
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_cone",
+      "title": "Cone",
+      "kit": "cars",
+      "model": "assets/props/cars/cone.glb",
+      "scale": 1.6,
+      "size": [
+        0.762,
+        0.952,
+        0.762
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_debris-bumper",
+      "title": "Debris-bumper",
+      "kit": "cars",
+      "model": "assets/props/cars/debris-bumper.glb",
+      "scale": 1.6,
+      "size": [
+        2.08,
+        0.64,
+        0.72
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_debris-door",
+      "title": "Debris-door",
+      "kit": "cars",
+      "model": "assets/props/cars/debris-door.glb",
+      "scale": 1.6,
+      "size": [
+        0.301,
+        1.44,
+        1.28
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_debris-tire",
+      "title": "Debris-tire",
+      "kit": "cars",
+      "model": "assets/props/cars/debris-tire.glb",
+      "scale": 1.6,
+      "size": [
+        0.56,
+        0.96,
+        0.96
+      ],
+      "offset": [
+        0.0,
+        0.48,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_delivery",
+      "title": "Delivery",
+      "kit": "cars",
+      "model": "assets/props/cars/delivery.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.64,
+        5.2
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_firetruck",
+      "title": "Firetruck",
+      "kit": "cars",
+      "model": "assets/props/cars/firetruck.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.72,
+        5.44
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_garbage-truck",
+      "title": "Garbage-truck",
+      "kit": "cars",
+      "model": "assets/props/cars/garbage-truck.glb",
+      "scale": 1.6,
+      "size": [
+        2.56,
+        2.56,
+        5.52
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_hatchback-sports",
+      "title": "Hatchback-sports",
+      "kit": "cars",
+      "model": "assets/props/cars/hatchback-sports.glb",
+      "scale": 1.6,
+      "size": [
+        2.08,
+        1.76,
+        4.56
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_police",
+      "title": "Police",
+      "kit": "cars",
+      "model": "assets/props/cars/police.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.96
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_sedan",
+      "title": "Sedan",
+      "kit": "cars",
+      "model": "assets/props/cars/sedan.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.08
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_suv",
+      "title": "Suv",
+      "kit": "cars",
+      "model": "assets/props/cars/suv.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.32
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_suv-luxury",
+      "title": "Suv-luxury",
+      "kit": "cars",
+      "model": "assets/props/cars/suv-luxury.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.56
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_taxi",
+      "title": "Taxi",
+      "kit": "cars",
+      "model": "assets/props/cars/taxi.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.4,
+        4.4
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_truck",
+      "title": "Truck",
+      "kit": "cars",
+      "model": "assets/props/cars/truck.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.72
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_truck-flat",
+      "title": "Truck-flat",
+      "kit": "cars",
+      "model": "assets/props/cars/truck-flat.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.08,
+        4.392
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "cars_van",
+      "title": "Van",
+      "kit": "cars",
+      "model": "assets/props/cars/van.glb",
+      "scale": 1.6,
+      "size": [
+        2.4,
+        2.16,
+        4.4
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bathroom_cabinet",
+      "title": "Bathroom cabinet",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathroomCabinet.glb",
+      "scale": 2.3,
+      "size": [
+        0.529,
+        0.897,
+        0.299
+      ],
+      "offset": [
+        -0.725,
+        0.0,
+        0.333
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bathroom_cabinet_drawer",
+      "title": "Bathroom cabinet drawer",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathroomCabinetDrawer.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.085,
+        0.736
+      ],
+      "offset": [
+        -0.495,
+        -0.134,
+        0.667
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bathroom_mirror",
+      "title": "Bathroom mirror",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathroomMirror.glb",
+      "scale": 2.3,
+      "size": [
+        0.693,
+        1.0,
+        0.332
+      ],
+      "offset": [
+        -0.347,
+        0.0,
+        -0.054
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_bathroom_sink",
+      "title": "Bathroom sink",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathroomSink.glb",
+      "scale": 2.3,
+      "size": [
+        0.782,
+        1.288,
+        0.667
+      ],
+      "offset": [
+        -0.391,
+        0.92,
+        0.333
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bathroom_sink_square",
+      "title": "Bathroom sink square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathroomSinkSquare.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.334,
+        0.69
+      ],
+      "offset": [
+        -0.495,
+        -0.131,
+        0.69
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bathtub",
+      "title": "Bathtub",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bathtub.glb",
+      "scale": 2.3,
+      "size": [
+        2.737,
+        0.966,
+        1.288
+      ],
+      "offset": [
+        -1.368,
+        0.0,
+        0.644
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bear",
+      "title": "Teddy bear",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bear.glb",
+      "scale": 2.3,
+      "size": [
+        0.896,
+        1.035,
+        0.569
+      ],
+      "offset": [
+        -0.448,
+        0.0,
+        0.285
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bed_bunk",
+      "title": "Bed bunk",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bedBunk.glb",
+      "scale": 2.3,
+      "size": [
+        1.313,
+        1.955,
+        2.519
+      ],
+      "offset": [
+        -0.657,
+        0.0,
+        1.259
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bed_double",
+      "title": "Bed double",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bedDouble.glb",
+      "scale": 2.3,
+      "size": [
+        2.199,
+        0.862,
+        2.587
+      ],
+      "offset": [
+        -1.099,
+        0.0,
+        1.294
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bed_single",
+      "title": "Bed single",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bedSingle.glb",
+      "scale": 2.3,
+      "size": [
+        1.313,
+        0.862,
+        2.587
+      ],
+      "offset": [
+        -1.542,
+        0.0,
+        1.294
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bench",
+      "title": "Bench",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bench.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        1.081,
+        0.46
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bench_cushion",
+      "title": "Bench cushion",
+      "kit": "furniture",
+      "model": "assets/props/furniture/benchCushion.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        1.058,
+        0.46
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bench_cushion_low",
+      "title": "Bench cushion low",
+      "kit": "furniture",
+      "model": "assets/props/furniture/benchCushionLow.glb",
+      "scale": 2.3,
+      "size": [
+        0.966,
+        0.46,
+        0.506
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bookcase_closed",
+      "title": "Bookcase closed",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bookcaseClosed.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        1.955,
+        0.575
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bookcase_closed_doors",
+      "title": "Bookcase closed doors",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bookcaseClosedDoors.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        1.955,
+        0.575
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bookcase_closed_wide",
+      "title": "Bookcase closed wide",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bookcaseClosedWide.glb",
+      "scale": 2.3,
+      "size": [
+        1.84,
+        1.817,
+        0.575
+      ],
+      "offset": [
+        -0.92,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bookcase_open",
+      "title": "Bookcase open",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bookcaseOpen.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        2.024,
+        0.575
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_bookcase_open_low",
+      "title": "Bookcase open low",
+      "kit": "furniture",
+      "model": "assets/props/furniture/bookcaseOpenLow.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        0.92,
+        0.575
+      ],
+      "offset": [
+        -0.46,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_books",
+      "title": "Books",
+      "kit": "furniture",
+      "model": "assets/props/furniture/books.glb",
+      "scale": 2.3,
+      "size": [
+        0.346,
+        0.239,
+        0.217
+      ],
+      "offset": [
+        -0.173,
+        0.0,
+        0.109
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cabinet_bed",
+      "title": "Bedside cabinet",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cabinetBed.glb",
+      "scale": 2.3,
+      "size": [
+        0.612,
+        0.536,
+        0.495
+      ],
+      "offset": [
+        -0.283,
+        0.0,
+        0.224
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cabinet_bed_drawer",
+      "title": "Bedside drawers",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cabinetBedDrawer.glb",
+      "scale": 2.3,
+      "size": [
+        0.612,
+        0.605,
+        0.5
+      ],
+      "offset": [
+        -0.283,
+        0.0,
+        0.222
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cabinet_bed_drawer_table",
+      "title": "Bedside table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cabinetBedDrawerTable.glb",
+      "scale": 2.3,
+      "size": [
+        0.612,
+        0.605,
+        0.5
+      ],
+      "offset": [
+        -0.283,
+        0.0,
+        0.222
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cabinet_television",
+      "title": "Cabinet television",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cabinetTelevision.glb",
+      "scale": 2.3,
+      "size": [
+        1.84,
+        0.713,
+        0.575
+      ],
+      "offset": [
+        -0.92,
+        0.0,
+        0.287
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cabinet_television_doors",
+      "title": "Cabinet television doors",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cabinetTelevisionDoors.glb",
+      "scale": 2.3,
+      "size": [
+        1.84,
+        0.713,
+        0.598
+      ],
+      "offset": [
+        -0.92,
+        0.0,
+        0.276
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cardboard_box_closed",
+      "title": "Cardboard box closed",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cardboardBoxClosed.glb",
+      "scale": 2.3,
+      "size": [
+        0.489,
+        0.646,
+        0.489
+      ],
+      "offset": [
+        -0.244,
+        0.0,
+        0.244
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_cardboard_box_open",
+      "title": "Cardboard box open",
+      "kit": "furniture",
+      "model": "assets/props/furniture/cardboardBoxOpen.glb",
+      "scale": 2.3,
+      "size": [
+        0.855,
+        0.646,
+        0.489
+      ],
+      "offset": [
+        -0.244,
+        0.0,
+        0.244
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_ceiling_fan",
+      "title": "Ceiling fan",
+      "kit": "furniture",
+      "model": "assets/props/furniture/ceilingFan.glb",
+      "scale": 2.3,
+      "size": [
+        1.046,
+        0.308,
+        1.208
+      ],
+      "offset": [
+        -0.128,
+        0.308,
+        0.003
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_chair",
+      "title": "Chair",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chair.glb",
+      "scale": 2.3,
+      "size": [
+        0.46,
+        1.081,
+        0.46
+      ],
+      "offset": [
+        -0.23,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_chair_cushion",
+      "title": "Chair cushion",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chairCushion.glb",
+      "scale": 2.3,
+      "size": [
+        0.46,
+        1.058,
+        0.46
+      ],
+      "offset": [
+        -0.23,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_chair_desk",
+      "title": "Chair desk",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chairDesk.glb",
+      "scale": 2.3,
+      "size": [
+        0.77,
+        1.397,
+        0.723
+      ],
+      "offset": [
+        -0.385,
+        0.0,
+        0.361
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_chair_modern_cushion",
+      "title": "Chair modern cushion",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chairModernCushion.glb",
+      "scale": 2.3,
+      "size": [
+        0.46,
+        1.058,
+        0.46
+      ],
+      "offset": [
+        -0.23,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_chair_modern_frame_cushion",
+      "title": "Chair modern frame cushion",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chairModernFrameCushion.glb",
+      "scale": 2.3,
+      "size": [
+        0.46,
+        1.058,
+        0.46
+      ],
+      "offset": [
+        -0.23,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_chair_rounded",
+      "title": "Chair rounded",
+      "kit": "furniture",
+      "model": "assets/props/furniture/chairRounded.glb",
+      "scale": 2.3,
+      "size": [
+        0.46,
+        1.046,
+        0.46
+      ],
+      "offset": [
+        -0.23,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_coat_rack",
+      "title": "Coat rack",
+      "kit": "furniture",
+      "model": "assets/props/furniture/coatRack.glb",
+      "scale": 2.3,
+      "size": [
+        1.03,
+        0.644,
+        0.309
+      ],
+      "offset": [
+        -0.515,
+        0.0,
+        0.155
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_coat_rack_standing",
+      "title": "Coat rack standing",
+      "kit": "furniture",
+      "model": "assets/props/furniture/coatRackStanding.glb",
+      "scale": 2.3,
+      "size": [
+        0.627,
+        1.771,
+        0.627
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_computer_keyboard",
+      "title": "Computer keyboard",
+      "kit": "furniture",
+      "model": "assets/props/furniture/computerKeyboard.glb",
+      "scale": 2.3,
+      "size": [
+        0.649,
+        0.063,
+        0.272
+      ],
+      "offset": [
+        -0.325,
+        0.0,
+        0.136
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_computer_mouse",
+      "title": "Computer mouse",
+      "kit": "furniture",
+      "model": "assets/props/furniture/computerMouse.glb",
+      "scale": 2.3,
+      "size": [
+        0.114,
+        0.054,
+        0.196
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.098
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_computer_screen",
+      "title": "Computer screen",
+      "kit": "furniture",
+      "model": "assets/props/furniture/computerScreen.glb",
+      "scale": 2.3,
+      "size": [
+        0.903,
+        0.677,
+        0.239
+      ],
+      "offset": [
+        -0.452,
+        0.0,
+        0.12
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_desk",
+      "title": "Desk",
+      "kit": "furniture",
+      "model": "assets/props/furniture/desk.glb",
+      "scale": 2.3,
+      "size": [
+        1.689,
+        0.884,
+        0.902
+      ],
+      "offset": [
+        -0.822,
+        0.0,
+        0.423
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_desk_corner",
+      "title": "Desk corner",
+      "kit": "furniture",
+      "model": "assets/props/furniture/deskCorner.glb",
+      "scale": 2.3,
+      "size": [
+        2.241,
+        0.884,
+        2.241
+      ],
+      "offset": [
+        -1.121,
+        0.0,
+        1.121
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_dryer",
+      "title": "Dryer",
+      "kit": "furniture",
+      "model": "assets/props/furniture/dryer.glb",
+      "scale": 2.3,
+      "size": [
+        0.897,
+        1.081,
+        0.874
+      ],
+      "offset": [
+        -0.449,
+        0.0,
+        0.368
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_hood_large",
+      "title": "Hood large",
+      "kit": "furniture",
+      "model": "assets/props/furniture/hoodLarge.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.85,
+        0.655
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.328
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_hood_modern",
+      "title": "Hood modern",
+      "kit": "furniture",
+      "model": "assets/props/furniture/hoodModern.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.919,
+        0.655
+      ],
+      "offset": [
+        -0.495,
+        0.069,
+        0.328
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_kitchen_bar",
+      "title": "Kitchen island",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenBar.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.966,
+        0.483
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.241
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_bar_end",
+      "title": "Kitchen island end",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenBarEnd.glb",
+      "scale": 2.3,
+      "size": [
+        0.234,
+        0.966,
+        0.483
+      ],
+      "offset": [
+        -0.117,
+        0.0,
+        0.241
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_blender",
+      "title": "Kitchen blender",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenBlender.glb",
+      "scale": 2.3,
+      "size": [
+        0.312,
+        0.523,
+        0.251
+      ],
+      "offset": [
+        -0.156,
+        0.0,
+        0.125
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_cabinet",
+      "title": "Kitchen cabinet",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinet.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.035,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_cabinet_corner_inner",
+      "title": "Kitchen cabinet corner inner",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetCornerInner.glb",
+      "scale": 2.3,
+      "size": [
+        1.058,
+        1.035,
+        1.058
+      ],
+      "offset": [
+        -0.529,
+        0.0,
+        0.529
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_cabinet_corner_round",
+      "title": "Kitchen cabinet corner round",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetCornerRound.glb",
+      "scale": 2.3,
+      "size": [
+        1.035,
+        1.035,
+        1.035
+      ],
+      "offset": [
+        -0.517,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_cabinet_drawer",
+      "title": "Kitchen cabinet drawer",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetDrawer.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.035,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_cabinet_upper",
+      "title": "Kitchen cabinet upper",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetUpper.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.897,
+        0.506
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.23
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_kitchen_cabinet_upper_corner",
+      "title": "Kitchen cabinet upper corner",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetUpperCorner.glb",
+      "scale": 2.3,
+      "size": [
+        0.495,
+        0.897,
+        0.483
+      ],
+      "offset": [
+        -0.247,
+        0.0,
+        0.241
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_kitchen_cabinet_upper_double",
+      "title": "Kitchen cabinet upper double",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetUpperDouble.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.897,
+        0.506
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.23
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_kitchen_cabinet_upper_low",
+      "title": "Kitchen cabinet upper low",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCabinetUpperLow.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        0.449,
+        0.506
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.23
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_kitchen_coffee_machine",
+      "title": "Kitchen coffee machine",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenCoffeeMachine.glb",
+      "scale": 2.3,
+      "size": [
+        0.436,
+        0.408,
+        0.552
+      ],
+      "offset": [
+        -0.218,
+        0.0,
+        0.276
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_fridge",
+      "title": "Kitchen fridge",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenFridge.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        2.116,
+        0.671
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.313
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_fridge_built_in",
+      "title": "Kitchen fridge built in",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenFridgeBuiltIn.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.998,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_fridge_large",
+      "title": "Kitchen fridge large",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenFridgeLarge.glb",
+      "scale": 2.3,
+      "size": [
+        1.196,
+        2.116,
+        0.933
+      ],
+      "offset": [
+        -0.598,
+        0.0,
+        0.32
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_fridge_small",
+      "title": "Kitchen fridge small",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenFridgeSmall.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.381,
+        0.671
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.313
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_microwave",
+      "title": "Kitchen microwave",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenMicrowave.glb",
+      "scale": 2.3,
+      "size": [
+        0.667,
+        0.414,
+        0.529
+      ],
+      "offset": [
+        -0.333,
+        0.0,
+        0.241
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_sink",
+      "title": "Kitchen sink",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenSink.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.127,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_stove",
+      "title": "Kitchen stove",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenStove.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.035,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_kitchen_stove_electric",
+      "title": "Kitchen stove electric",
+      "kit": "furniture",
+      "model": "assets/props/furniture/kitchenStoveElectric.glb",
+      "scale": 2.3,
+      "size": [
+        0.989,
+        1.035,
+        1.035
+      ],
+      "offset": [
+        -0.495,
+        0.0,
+        0.517
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lamp_round_floor",
+      "title": "Lamp round floor",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampRoundFloor.glb",
+      "scale": 2.3,
+      "size": [
+        0.35,
+        1.978,
+        0.404
+      ],
+      "offset": [
+        -0.138,
+        0.0,
+        0.138
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lamp_round_table",
+      "title": "Lamp round table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampRoundTable.glb",
+      "scale": 2.3,
+      "size": [
+        0.35,
+        0.723,
+        0.404
+      ],
+      "offset": [
+        -0.138,
+        0.0,
+        0.138
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lamp_square_ceiling",
+      "title": "Lamp square ceiling",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampSquareCeiling.glb",
+      "scale": 2.3,
+      "size": [
+        0.276,
+        0.529,
+        0.276
+      ],
+      "offset": [
+        -0.138,
+        0.0,
+        0.138
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_lamp_square_floor",
+      "title": "Lamp square floor",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampSquareFloor.glb",
+      "scale": 2.3,
+      "size": [
+        0.276,
+        1.978,
+        0.276
+      ],
+      "offset": [
+        -0.138,
+        0.0,
+        0.138
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lamp_square_table",
+      "title": "Lamp square table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampSquareTable.glb",
+      "scale": 2.3,
+      "size": [
+        0.276,
+        0.667,
+        0.276
+      ],
+      "offset": [
+        -0.138,
+        0.0,
+        0.138
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lamp_wall",
+      "title": "Lamp wall",
+      "kit": "furniture",
+      "model": "assets/props/furniture/lampWall.glb",
+      "scale": 2.3,
+      "size": [
+        0.521,
+        0.213,
+        0.346
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.173
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_laptop",
+      "title": "Laptop",
+      "kit": "furniture",
+      "model": "assets/props/furniture/laptop.glb",
+      "scale": 2.3,
+      "size": [
+        0.607,
+        0.372,
+        0.552
+      ],
+      "offset": [
+        -0.304,
+        0.0,
+        0.276
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_chair",
+      "title": "Lounge chair",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeChair.glb",
+      "scale": 2.3,
+      "size": [
+        1.127,
+        1.058,
+        0.943
+      ],
+      "offset": [
+        -0.563,
+        0.0,
+        0.472
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_chair_relax",
+      "title": "Lounge chair relax",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeChairRelax.glb",
+      "scale": 2.3,
+      "size": [
+        1.127,
+        1.449,
+        1.552
+      ],
+      "offset": [
+        -0.563,
+        0.0,
+        0.776
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_design_chair",
+      "title": "Lounge design chair",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeDesignChair.glb",
+      "scale": 2.3,
+      "size": [
+        1.678,
+        0.92,
+        0.943
+      ],
+      "offset": [
+        -0.839,
+        0.0,
+        0.472
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_design_sofa",
+      "title": "Lounge design sofa",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeDesignSofa.glb",
+      "scale": 2.3,
+      "size": [
+        2.576,
+        0.92,
+        0.943
+      ],
+      "offset": [
+        -1.288,
+        0.0,
+        0.472
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_design_sofa_corner",
+      "title": "Lounge design sofa corner",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeDesignSofaCorner.glb",
+      "scale": 2.3,
+      "size": [
+        3.105,
+        0.92,
+        3.105
+      ],
+      "offset": [
+        -1.552,
+        0.0,
+        1.552
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_sofa",
+      "title": "Lounge sofa",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeSofa.glb",
+      "scale": 2.3,
+      "size": [
+        2.254,
+        1.058,
+        0.943
+      ],
+      "offset": [
+        -1.127,
+        0.0,
+        0.472
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_sofa_corner",
+      "title": "Lounge sofa corner",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeSofaCorner.glb",
+      "scale": 2.3,
+      "size": [
+        2.254,
+        1.058,
+        2.254
+      ],
+      "offset": [
+        -1.127,
+        0.0,
+        1.127
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_sofa_long",
+      "title": "Lounge sofa long",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeSofaLong.glb",
+      "scale": 2.3,
+      "size": [
+        2.254,
+        1.058,
+        1.886
+      ],
+      "offset": [
+        -1.127,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_lounge_sofa_ottoman",
+      "title": "Ottoman",
+      "kit": "furniture",
+      "model": "assets/props/furniture/loungeSofaOttoman.glb",
+      "scale": 2.3,
+      "size": [
+        1.012,
+        0.529,
+        1.035
+      ],
+      "offset": [
+        -1.587,
+        0.0,
+        -0.426
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_pillow",
+      "title": "Pillow",
+      "kit": "furniture",
+      "model": "assets/props/furniture/pillow.glb",
+      "scale": 2.3,
+      "size": [
+        0.529,
+        0.511,
+        0.204
+      ],
+      "offset": [
+        -0.264,
+        0.0,
+        0.102
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_pillow_blue",
+      "title": "Pillow blue",
+      "kit": "furniture",
+      "model": "assets/props/furniture/pillowBlue.glb",
+      "scale": 2.3,
+      "size": [
+        0.529,
+        0.296,
+        0.146
+      ],
+      "offset": [
+        -0.264,
+        0.0,
+        0.073
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_pillow_blue_long",
+      "title": "Pillow blue long",
+      "kit": "furniture",
+      "model": "assets/props/furniture/pillowBlueLong.glb",
+      "scale": 2.3,
+      "size": [
+        1.188,
+        0.511,
+        0.204
+      ],
+      "offset": [
+        -0.295,
+        0.0,
+        0.102
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_pillow_long",
+      "title": "Pillow long",
+      "kit": "furniture",
+      "model": "assets/props/furniture/pillowLong.glb",
+      "scale": 2.3,
+      "size": [
+        0.889,
+        0.511,
+        0.204
+      ],
+      "offset": [
+        -0.445,
+        0.0,
+        0.102
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_plant_small1",
+      "title": "Plant small1",
+      "kit": "furniture",
+      "model": "assets/props/furniture/plantSmall1.glb",
+      "scale": 2.3,
+      "size": [
+        0.218,
+        0.322,
+        0.218
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_plant_small2",
+      "title": "Plant small2",
+      "kit": "furniture",
+      "model": "assets/props/furniture/plantSmall2.glb",
+      "scale": 2.3,
+      "size": [
+        0.218,
+        0.322,
+        0.218
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_plant_small3",
+      "title": "Plant small3",
+      "kit": "furniture",
+      "model": "assets/props/furniture/plantSmall3.glb",
+      "scale": 2.3,
+      "size": [
+        0.225,
+        0.333,
+        0.195
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_potted_plant",
+      "title": "Potted plant",
+      "kit": "furniture",
+      "model": "assets/props/furniture/pottedPlant.glb",
+      "scale": 2.3,
+      "size": [
+        0.488,
+        1.504,
+        0.555
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_radio",
+      "title": "Radio",
+      "kit": "furniture",
+      "model": "assets/props/furniture/radio.glb",
+      "scale": 2.3,
+      "size": [
+        0.725,
+        0.525,
+        0.224
+      ],
+      "offset": [
+        -0.362,
+        0.0,
+        0.112
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_rug_doormat",
+      "title": "Doormat",
+      "kit": "furniture",
+      "model": "assets/props/furniture/rugDoormat.glb",
+      "scale": 2.3,
+      "size": [
+        0.987,
+        0.023,
+        0.545
+      ],
+      "offset": [
+        -0.494,
+        0.0,
+        0.273
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_rug_rectangle",
+      "title": "Rug rectangle",
+      "kit": "furniture",
+      "model": "assets/props/furniture/rugRectangle.glb",
+      "scale": 2.3,
+      "size": [
+        3.611,
+        0.023,
+        2.116
+      ],
+      "offset": [
+        -1.805,
+        0.0,
+        1.058
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_rug_round",
+      "title": "Rug round",
+      "kit": "furniture",
+      "model": "assets/props/furniture/rugRound.glb",
+      "scale": 2.3,
+      "size": [
+        2.116,
+        0.023,
+        2.116
+      ],
+      "offset": [
+        -1.058,
+        0.0,
+        1.058
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_rug_rounded",
+      "title": "Rug rounded",
+      "kit": "furniture",
+      "model": "assets/props/furniture/rugRounded.glb",
+      "scale": 2.3,
+      "size": [
+        3.611,
+        0.023,
+        2.116
+      ],
+      "offset": [
+        -1.805,
+        0.0,
+        1.058
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_rug_square",
+      "title": "Rug square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/rugSquare.glb",
+      "scale": 2.3,
+      "size": [
+        2.08,
+        0.023,
+        2.116
+      ],
+      "offset": [
+        -1.04,
+        0.0,
+        1.058
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_shower",
+      "title": "Shower",
+      "kit": "furniture",
+      "model": "assets/props/furniture/shower.glb",
+      "scale": 2.3,
+      "size": [
+        1.292,
+        2.516,
+        1.338
+      ],
+      "offset": [
+        0.646,
+        0.0,
+        0.623
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_shower_round",
+      "title": "Shower round",
+      "kit": "furniture",
+      "model": "assets/props/furniture/showerRound.glb",
+      "scale": 2.3,
+      "size": [
+        1.292,
+        2.516,
+        1.292
+      ],
+      "offset": [
+        -0.646,
+        0.0,
+        0.646
+      ],
+      "disguise": false
+    },
+    {
+      "id": "furniture_side_table",
+      "title": "Side table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/sideTable.glb",
+      "scale": 2.3,
+      "size": [
+        1.229,
+        0.884,
+        0.506
+      ],
+      "offset": [
+        -0.592,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_side_table_drawers",
+      "title": "Side table drawers",
+      "kit": "furniture",
+      "model": "assets/props/furniture/sideTableDrawers.glb",
+      "scale": 2.3,
+      "size": [
+        1.229,
+        0.884,
+        0.511
+      ],
+      "offset": [
+        -0.592,
+        0.0,
+        0.227
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_speaker",
+      "title": "Speaker",
+      "kit": "furniture",
+      "model": "assets/props/furniture/speaker.glb",
+      "scale": 2.3,
+      "size": [
+        0.34,
+        1.464,
+        0.34
+      ],
+      "offset": [
+        -0.17,
+        0.0,
+        0.17
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_speaker_small",
+      "title": "Speaker small",
+      "kit": "furniture",
+      "model": "assets/props/furniture/speakerSmall.glb",
+      "scale": 2.3,
+      "size": [
+        0.34,
+        0.685,
+        0.306
+      ],
+      "offset": [
+        -0.17,
+        0.0,
+        0.153
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_stool_bar",
+      "title": "Stool bar",
+      "kit": "furniture",
+      "model": "assets/props/furniture/stoolBar.glb",
+      "scale": 2.3,
+      "size": [
+        0.611,
+        1.0,
+        0.529
+      ],
+      "offset": [
+        -0.305,
+        0.0,
+        0.264
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_stool_bar_square",
+      "title": "Stool bar square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/stoolBarSquare.glb",
+      "scale": 2.3,
+      "size": [
+        0.353,
+        0.931,
+        0.34
+      ],
+      "offset": [
+        -0.305,
+        0.0,
+        0.264
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table",
+      "title": "Table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/table.glb",
+      "scale": 2.3,
+      "size": [
+        1.935,
+        0.751,
+        1.029
+      ],
+      "offset": [
+        -0.968,
+        0.0,
+        0.514
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_cloth",
+      "title": "Table cloth",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCloth.glb",
+      "scale": 2.3,
+      "size": [
+        1.935,
+        0.751,
+        1.029
+      ],
+      "offset": [
+        -0.968,
+        0.0,
+        0.514
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_coffee",
+      "title": "Table coffee",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCoffee.glb",
+      "scale": 2.3,
+      "size": [
+        1.52,
+        0.529,
+        0.92
+      ],
+      "offset": [
+        0.3,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_coffee_glass",
+      "title": "Table coffee glass",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCoffeeGlass.glb",
+      "scale": 2.3,
+      "size": [
+        1.52,
+        0.529,
+        0.92
+      ],
+      "offset": [
+        0.3,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_coffee_glass_square",
+      "title": "Table coffee glass square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCoffeeGlassSquare.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        0.529,
+        0.92
+      ],
+      "offset": [
+        0.6,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_coffee_square",
+      "title": "Table coffee square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCoffeeSquare.glb",
+      "scale": 2.3,
+      "size": [
+        0.92,
+        0.529,
+        0.92
+      ],
+      "offset": [
+        0.6,
+        0.0,
+        0.23
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_cross",
+      "title": "Picnic table",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCross.glb",
+      "scale": 2.3,
+      "size": [
+        1.96,
+        0.799,
+        1.029
+      ],
+      "offset": [
+        -0.98,
+        0.0,
+        0.514
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_cross_cloth",
+      "title": "Picnic table with cloth",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableCrossCloth.glb",
+      "scale": 2.3,
+      "size": [
+        1.96,
+        0.799,
+        1.029
+      ],
+      "offset": [
+        -0.98,
+        0.0,
+        0.514
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_glass",
+      "title": "Table glass",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableGlass.glb",
+      "scale": 2.3,
+      "size": [
+        1.935,
+        0.752,
+        1.029
+      ],
+      "offset": [
+        -0.968,
+        0.0,
+        0.514
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_table_round",
+      "title": "Table round",
+      "kit": "furniture",
+      "model": "assets/props/furniture/tableRound.glb",
+      "scale": 2.3,
+      "size": [
+        1.593,
+        0.843,
+        1.84
+      ],
+      "offset": [
+        -0.797,
+        0.621,
+        0.92
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_television_antenna",
+      "title": "Television antenna",
+      "kit": "furniture",
+      "model": "assets/props/furniture/televisionAntenna.glb",
+      "scale": 2.3,
+      "size": [
+        0.608,
+        0.236,
+        0.184
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.092
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_television_modern",
+      "title": "Television modern",
+      "kit": "furniture",
+      "model": "assets/props/furniture/televisionModern.glb",
+      "scale": 2.3,
+      "size": [
+        1.575,
+        1.046,
+        0.295
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_television_vintage",
+      "title": "Television vintage",
+      "kit": "furniture",
+      "model": "assets/props/furniture/televisionVintage.glb",
+      "scale": 2.3,
+      "size": [
+        0.943,
+        0.621,
+        0.621
+      ],
+      "offset": [
+        -0.472,
+        0.0,
+        0.31
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_toaster",
+      "title": "Toaster",
+      "kit": "furniture",
+      "model": "assets/props/furniture/toaster.glb",
+      "scale": 2.3,
+      "size": [
+        0.432,
+        0.299,
+        0.23
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_toilet",
+      "title": "Toilet",
+      "kit": "furniture",
+      "model": "assets/props/furniture/toilet.glb",
+      "scale": 2.3,
+      "size": [
+        0.719,
+        1.037,
+        1.098
+      ],
+      "offset": [
+        -0.359,
+        0.0,
+        -0.549
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_toilet_square",
+      "title": "Toilet square",
+      "kit": "furniture",
+      "model": "assets/props/furniture/toiletSquare.glb",
+      "scale": 2.3,
+      "size": [
+        0.698,
+        1.037,
+        0.891
+      ],
+      "offset": [
+        -0.349,
+        0.0,
+        0.445
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_trashcan",
+      "title": "Trashcan",
+      "kit": "furniture",
+      "model": "assets/props/furniture/trashcan.glb",
+      "scale": 2.3,
+      "size": [
+        0.478,
+        0.984,
+        0.538
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.012
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_washer",
+      "title": "Washer",
+      "kit": "furniture",
+      "model": "assets/props/furniture/washer.glb",
+      "scale": 2.3,
+      "size": [
+        0.897,
+        1.081,
+        0.897
+      ],
+      "offset": [
+        -0.449,
+        0.0,
+        0.356
+      ],
+      "disguise": true
+    },
+    {
+      "id": "furniture_washer_dryer_stacked",
+      "title": "Washer dryer stacked",
+      "kit": "furniture",
+      "model": "assets/props/furniture/washerDryerStacked.glb",
+      "scale": 2.3,
+      "size": [
+        0.897,
+        2.162,
+        0.897
+      ],
+      "offset": [
+        -0.449,
+        0.0,
+        0.356
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_bench-damaged",
+      "title": "Bench-damaged",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/bench-damaged.glb",
+      "scale": 1.8,
+      "size": [
+        1.635,
+        0.933,
+        0.819
+      ],
+      "offset": [
+        0.044,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_coffin",
+      "title": "Coffin",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/coffin.glb",
+      "scale": 1.8,
+      "size": [
+        1.033,
+        0.585,
+        1.508
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_coffin-old",
+      "title": "Coffin-old",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/coffin-old.glb",
+      "scale": 1.8,
+      "size": [
+        1.033,
+        0.36,
+        1.508
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_cross-wood",
+      "title": "Cross-wood",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/cross-wood.glb",
+      "scale": 1.8,
+      "size": [
+        0.774,
+        1.881,
+        0.774
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_crypt-small",
+      "title": "Crypt-small",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/crypt-small.glb",
+      "scale": 1.8,
+      "size": [
+        2.43,
+        1.8,
+        2.52
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_debris",
+      "title": "Debris",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/debris.glb",
+      "scale": 1.8,
+      "size": [
+        0.965,
+        0.288,
+        0.985
+      ],
+      "offset": [
+        0.035,
+        0.0,
+        0.067
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_debris-wood",
+      "title": "Debris-wood",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/debris-wood.glb",
+      "scale": 1.8,
+      "size": [
+        0.825,
+        0.18,
+        0.908
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.001
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_fire-basket",
+      "title": "Fire-basket",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/fire-basket.glb",
+      "scale": 1.8,
+      "size": [
+        0.75,
+        0.302,
+        0.75
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_grave",
+      "title": "Grave",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/grave.glb",
+      "scale": 1.8,
+      "size": [
+        1.303,
+        0.205,
+        2.234
+      ],
+      "offset": [
+        0.036,
+        0.0,
+        -0.02
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-bevel",
+      "title": "Gravestone-bevel",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-bevel.glb",
+      "scale": 1.8,
+      "size": [
+        0.81,
+        0.953,
+        0.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-broken",
+      "title": "Gravestone-broken",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-broken.glb",
+      "scale": 1.8,
+      "size": [
+        0.916,
+        0.614,
+        0.705
+      ],
+      "offset": [
+        -0.053,
+        0.0,
+        -0.127
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-cross",
+      "title": "Gravestone-cross",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-cross.glb",
+      "scale": 1.8,
+      "size": [
+        0.81,
+        1.647,
+        0.594
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-decorative",
+      "title": "Gravestone-decorative",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-decorative.glb",
+      "scale": 1.8,
+      "size": [
+        0.918,
+        1.07,
+        0.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-round",
+      "title": "Gravestone-round",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-round.glb",
+      "scale": 1.8,
+      "size": [
+        0.81,
+        1.035,
+        0.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_gravestone-wide",
+      "title": "Gravestone-wide",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/gravestone-wide.glb",
+      "scale": 1.8,
+      "size": [
+        1.53,
+        1.027,
+        0.54
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_hay-bale",
+      "title": "Hay-bale",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/hay-bale.glb",
+      "scale": 1.8,
+      "size": [
+        1.092,
+        0.637,
+        0.723
+      ],
+      "offset": [
+        0.0,
+        -0.023,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_iron-fence",
+      "title": "Iron-fence",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/iron-fence.glb",
+      "scale": 1.8,
+      "size": [
+        1.8,
+        1.582,
+        0.198
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.585
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_iron-fence-bar",
+      "title": "Iron-fence-bar",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/iron-fence-bar.glb",
+      "scale": 1.8,
+      "size": [
+        0.215,
+        1.204,
+        0.186
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_iron-fence-damaged",
+      "title": "Iron-fence-damaged",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/iron-fence-damaged.glb",
+      "scale": 1.8,
+      "size": [
+        1.8,
+        1.585,
+        0.585
+      ],
+      "offset": [
+        0.0,
+        0.003,
+        0.392
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_lantern-candle",
+      "title": "Lantern-candle",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/lantern-candle.glb",
+      "scale": 1.8,
+      "size": [
+        0.432,
+        0.698,
+        0.432
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_lightpost-double",
+      "title": "Lightpost-double",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/lightpost-double.glb",
+      "scale": 1.8,
+      "size": [
+        0.376,
+        2.28,
+        1.308
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_lightpost-single",
+      "title": "Lightpost-single",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/lightpost-single.glb",
+      "scale": 1.8,
+      "size": [
+        0.376,
+        2.28,
+        0.837
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.236
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_pine",
+      "title": "Pine",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/pine.glb",
+      "scale": 1.8,
+      "size": [
+        2.12,
+        4.144,
+        2.402
+      ],
+      "offset": [
+        0.0,
+        0.18,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_pine-crooked",
+      "title": "Pine-crooked",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/pine-crooked.glb",
+      "scale": 1.8,
+      "size": [
+        2.12,
+        3.795,
+        2.402
+      ],
+      "offset": [
+        -0.032,
+        0.18,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_pine-fall",
+      "title": "Pine-fall",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/pine-fall.glb",
+      "scale": 1.8,
+      "size": [
+        2.12,
+        4.144,
+        2.402
+      ],
+      "offset": [
+        0.0,
+        0.18,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_pumpkin",
+      "title": "Pumpkin",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/pumpkin.glb",
+      "scale": 1.8,
+      "size": [
+        0.679,
+        0.578,
+        0.679
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_pumpkin-carved",
+      "title": "Pumpkin-carved",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/pumpkin-carved.glb",
+      "scale": 1.8,
+      "size": [
+        0.679,
+        0.578,
+        0.679
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_rocks",
+      "title": "Rocks",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/rocks.glb",
+      "scale": 1.8,
+      "size": [
+        1.937,
+        0.679,
+        1.736
+      ],
+      "offset": [
+        -0.185,
+        0.0,
+        -0.092
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_rocks-tall",
+      "title": "Rocks-tall",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/rocks-tall.glb",
+      "scale": 1.8,
+      "size": [
+        1.86,
+        1.058,
+        1.836
+      ],
+      "offset": [
+        -0.011,
+        0.0,
+        0.099
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_stone-wall",
+      "title": "Stone-wall",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/stone-wall.glb",
+      "scale": 1.8,
+      "size": [
+        1.8,
+        1.305,
+        0.36
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.72
+      ],
+      "disguise": true
+    },
+    {
+      "id": "graveyard_stone-wall-damaged",
+      "title": "Stone-wall-damaged",
+      "kit": "graveyard",
+      "model": "assets/props/graveyard/stone-wall-damaged.glb",
+      "scale": 1.8,
+      "size": [
+        1.8,
+        1.305,
+        0.36
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.72
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_cactus_tall",
+      "title": "Cactus tall",
+      "kit": "nature",
+      "model": "assets/props/nature/cactus_tall.glb",
+      "scale": 2.5,
+      "size": [
+        0.991,
+        1.875,
+        0.848
+      ],
+      "offset": [
+        0.003,
+        0.125,
+        -0.093
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_campfire_logs",
+      "title": "Campfire",
+      "kit": "nature",
+      "model": "assets/props/nature/campfire_logs.glb",
+      "scale": 2.5,
+      "size": [
+        0.73,
+        0.156,
+        0.73
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_crop_melon",
+      "title": "Melon",
+      "kit": "nature",
+      "model": "assets/props/nature/crop_melon.glb",
+      "scale": 2.5,
+      "size": [
+        1.044,
+        0.87,
+        0.904
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_crop_pumpkin",
+      "title": "Pumpkin",
+      "kit": "nature",
+      "model": "assets/props/nature/crop_pumpkin.glb",
+      "scale": 2.5,
+      "size": [
+        1.103,
+        0.835,
+        1.13
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_fence_planks",
+      "title": "Fence planks",
+      "kit": "nature",
+      "model": "assets/props/nature/fence_planks.glb",
+      "scale": 2.5,
+      "size": [
+        2.5,
+        0.863,
+        0.24
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        1.195
+      ],
+      "disguise": false
+    },
+    {
+      "id": "nature_fence_simple",
+      "title": "Fence simple",
+      "kit": "nature",
+      "model": "assets/props/nature/fence_simple.glb",
+      "scale": 2.5,
+      "size": [
+        2.5,
+        0.863,
+        0.175
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        1.163
+      ],
+      "disguise": false
+    },
+    {
+      "id": "nature_flower_purple_a",
+      "title": "Flower purple a",
+      "kit": "nature",
+      "model": "assets/props/nature/flower_purpleA.glb",
+      "scale": 2.5,
+      "size": [
+        0.398,
+        0.606,
+        0.453
+      ],
+      "offset": [
+        0.062,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_flower_red_a",
+      "title": "Flower red a",
+      "kit": "nature",
+      "model": "assets/props/nature/flower_redA.glb",
+      "scale": 2.5,
+      "size": [
+        0.398,
+        0.731,
+        0.453
+      ],
+      "offset": [
+        0.062,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_flower_yellow_a",
+      "title": "Flower yellow a",
+      "kit": "nature",
+      "model": "assets/props/nature/flower_yellowA.glb",
+      "scale": 2.5,
+      "size": [
+        0.398,
+        0.481,
+        0.453
+      ],
+      "offset": [
+        0.062,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_grass_large",
+      "title": "Grass large",
+      "kit": "nature",
+      "model": "assets/props/nature/grass_large.glb",
+      "scale": 2.5,
+      "size": [
+        1.022,
+        0.635,
+        1.02
+      ],
+      "offset": [
+        -0.013,
+        0.125,
+        0.02
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_hanging_moss",
+      "title": "Hanging moss",
+      "kit": "nature",
+      "model": "assets/props/nature/hanging_moss.glb",
+      "scale": 2.5,
+      "size": [
+        0.4,
+        1.196,
+        0.087
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        -1.206
+      ],
+      "disguise": false
+    },
+    {
+      "id": "nature_lily_large",
+      "title": "Lily large",
+      "kit": "nature",
+      "model": "assets/props/nature/lily_large.glb",
+      "scale": 2.5,
+      "size": [
+        0.68,
+        0.245,
+        0.785
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": false
+    },
+    {
+      "id": "nature_log",
+      "title": "Log",
+      "kit": "nature",
+      "model": "assets/props/nature/log.glb",
+      "scale": 2.5,
+      "size": [
+        0.585,
+        0.433,
+        1.775
+      ],
+      "offset": [
+        -0.019,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_log_large",
+      "title": "Log large",
+      "kit": "nature",
+      "model": "assets/props/nature/log_large.glb",
+      "scale": 2.5,
+      "size": [
+        2.5,
+        1.042,
+        1.373
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        -0.055
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_log_stack",
+      "title": "Log stack",
+      "kit": "nature",
+      "model": "assets/props/nature/log_stack.glb",
+      "scale": 2.5,
+      "size": [
+        1.062,
+        0.866,
+        1.775
+      ],
+      "offset": [
+        0.031,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_mushroom_red_tall",
+      "title": "Mushroom red tall",
+      "kit": "nature",
+      "model": "assets/props/nature/mushroom_redTall.glb",
+      "scale": 2.5,
+      "size": [
+        0.309,
+        0.626,
+        0.357
+      ],
+      "offset": [
+        -0.002,
+        0.125,
+        -0.009
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_plant_bush",
+      "title": "Plant bush",
+      "kit": "nature",
+      "model": "assets/props/nature/plant_bush.glb",
+      "scale": 2.5,
+      "size": [
+        0.99,
+        0.611,
+        0.99
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_plant_bush_detailed",
+      "title": "Leafy bush",
+      "kit": "nature",
+      "model": "assets/props/nature/plant_bushDetailed.glb",
+      "scale": 2.5,
+      "size": [
+        1.506,
+        0.901,
+        1.506
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_plant_bush_large",
+      "title": "Plant bush large",
+      "kit": "nature",
+      "model": "assets/props/nature/plant_bushLarge.glb",
+      "scale": 2.5,
+      "size": [
+        0.936,
+        0.607,
+        0.839
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_plant_bush_small",
+      "title": "Plant bush small",
+      "kit": "nature",
+      "model": "assets/props/nature/plant_bushSmall.glb",
+      "scale": 2.5,
+      "size": [
+        0.957,
+        0.518,
+        0.841
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_pot_large",
+      "title": "Pot large",
+      "kit": "nature",
+      "model": "assets/props/nature/pot_large.glb",
+      "scale": 2.5,
+      "size": [
+        1.409,
+        0.5,
+        1.22
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_pot_small",
+      "title": "Pot small",
+      "kit": "nature",
+      "model": "assets/props/nature/pot_small.glb",
+      "scale": 2.5,
+      "size": [
+        0.809,
+        0.67,
+        0.7
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_rock_large_a",
+      "title": "Rock large a",
+      "kit": "nature",
+      "model": "assets/props/nature/rock_largeA.glb",
+      "scale": 2.5,
+      "size": [
+        1.962,
+        0.649,
+        2.539
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_rock_small_a",
+      "title": "Rock small a",
+      "kit": "nature",
+      "model": "assets/props/nature/rock_smallA.glb",
+      "scale": 2.5,
+      "size": [
+        0.902,
+        0.478,
+        0.902
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_rock_tall_a",
+      "title": "Rock tall a",
+      "kit": "nature",
+      "model": "assets/props/nature/rock_tallA.glb",
+      "scale": 2.5,
+      "size": [
+        2.458,
+        2.49,
+        1.708
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_sign",
+      "title": "Sign",
+      "kit": "nature",
+      "model": "assets/props/nature/sign.glb",
+      "scale": 2.5,
+      "size": [
+        0.75,
+        1.022,
+        0.175
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.044
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_stone_large_a",
+      "title": "Stone large a",
+      "kit": "nature",
+      "model": "assets/props/nature/stone_largeA.glb",
+      "scale": 2.5,
+      "size": [
+        1.962,
+        0.649,
+        2.539
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_stone_small_a",
+      "title": "Stone small a",
+      "kit": "nature",
+      "model": "assets/props/nature/stone_smallA.glb",
+      "scale": 2.5,
+      "size": [
+        0.902,
+        0.478,
+        0.902
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_stump_old",
+      "title": "Stump old",
+      "kit": "nature",
+      "model": "assets/props/nature/stump_old.glb",
+      "scale": 2.5,
+      "size": [
+        0.891,
+        0.666,
+        0.928
+      ],
+      "offset": [
+        -0.044,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_stump_round",
+      "title": "Stump round",
+      "kit": "nature",
+      "model": "assets/props/nature/stump_round.glb",
+      "scale": 2.5,
+      "size": [
+        0.803,
+        0.516,
+        0.928
+      ],
+      "offset": [
+        0.0,
+        0.125,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_cone",
+      "title": "Tree cone",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_cone.glb",
+      "scale": 4.5,
+      "size": [
+        2.383,
+        6.436,
+        2.383
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_default",
+      "title": "Tree default",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_default.glb",
+      "scale": 4.5,
+      "size": [
+        3.398,
+        7.685,
+        2.942
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_default_fall",
+      "title": "Tree default fall",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_default_fall.glb",
+      "scale": 4.5,
+      "size": [
+        3.398,
+        7.685,
+        2.942
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_detailed",
+      "title": "Tree detailed",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_detailed.glb",
+      "scale": 4.5,
+      "size": [
+        3.812,
+        5.996,
+        3.427
+      ],
+      "offset": [
+        0.04,
+        0.225,
+        -0.039
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_fat",
+      "title": "Tree fat",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_fat.glb",
+      "scale": 4.5,
+      "size": [
+        3.398,
+        5.177,
+        2.942
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_oak",
+      "title": "Tree oak",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_oak.glb",
+      "scale": 4.5,
+      "size": [
+        2.882,
+        5.518,
+        3.328
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_oak_fall",
+      "title": "Tree oak fall",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_oak_fall.glb",
+      "scale": 4.5,
+      "size": [
+        2.882,
+        5.518,
+        3.328
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_pine_round_a",
+      "title": "Round pine",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_pineRoundA.glb",
+      "scale": 4.5,
+      "size": [
+        2.777,
+        6.149,
+        3.206
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_pine_tall_a",
+      "title": "Tall pine",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_pineTallA.glb",
+      "scale": 4.5,
+      "size": [
+        1.738,
+        6.883,
+        1.764
+      ],
+      "offset": [
+        -0.063,
+        0.225,
+        -0.009
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_plateau",
+      "title": "Tree plateau",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_plateau.glb",
+      "scale": 4.5,
+      "size": [
+        2.753,
+        5.622,
+        2.947
+      ],
+      "offset": [
+        0.1,
+        0.225,
+        -0.009
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_simple",
+      "title": "Tree simple",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_simple.glb",
+      "scale": 4.5,
+      "size": [
+        1.596,
+        6.837,
+        1.843
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_small",
+      "title": "Tree small",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_small.glb",
+      "scale": 4.5,
+      "size": [
+        1.596,
+        4.995,
+        1.843
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "nature_tree_tall",
+      "title": "Tree tall",
+      "kit": "nature",
+      "model": "assets/props/nature/tree_tall.glb",
+      "scale": 4.5,
+      "size": [
+        1.798,
+        7.595,
+        2.076
+      ],
+      "offset": [
+        0.0,
+        0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_construction-barrier",
+      "title": "Construction-barrier",
+      "kit": "roads",
+      "model": "assets/props/roads/construction-barrier.glb",
+      "scale": 7.5,
+      "size": [
+        1.016,
+        0.975,
+        1.688
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_construction-cone",
+      "title": "Construction-cone",
+      "kit": "roads",
+      "model": "assets/props/roads/construction-cone.glb",
+      "scale": 7.5,
+      "size": [
+        0.563,
+        0.703,
+        0.563
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_construction-fence",
+      "title": "Construction-fence",
+      "kit": "roads",
+      "model": "assets/props/roads/construction-fence.glb",
+      "scale": 7.5,
+      "size": [
+        0.563,
+        1.341,
+        2.813
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_construction-light",
+      "title": "Construction-light",
+      "kit": "roads",
+      "model": "assets/props/roads/construction-light.glb",
+      "scale": 7.5,
+      "size": [
+        0.563,
+        1.753,
+        0.563
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_dumpster",
+      "title": "Dumpster",
+      "kit": "roads",
+      "model": "assets/props/roads/dumpster.glb",
+      "scale": 7.5,
+      "size": [
+        2.063,
+        1.571,
+        2.775
+      ],
+      "offset": [
+        -0.056,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_electricity-pole",
+      "title": "Electricity-pole",
+      "kit": "roads",
+      "model": "assets/props/roads/electricity-pole.glb",
+      "scale": 7.5,
+      "size": [
+        4.343,
+        3.937,
+        1.607
+      ],
+      "offset": [
+        0.059,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_light-curved",
+      "title": "Light-curved",
+      "kit": "roads",
+      "model": "assets/props/roads/light-curved.glb",
+      "scale": 7.5,
+      "size": [
+        0.375,
+        5.062,
+        1.688
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.656
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_light-square",
+      "title": "Light-square",
+      "kit": "roads",
+      "model": "assets/props/roads/light-square.glb",
+      "scale": 7.5,
+      "size": [
+        0.375,
+        4.5,
+        1.781
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.703
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_road-sign-stop",
+      "title": "Road-sign-stop",
+      "kit": "roads",
+      "model": "assets/props/roads/road-sign-stop.glb",
+      "scale": 7.5,
+      "size": [
+        0.581,
+        3.706,
+        1.037
+      ],
+      "offset": [
+        0.095,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_road-sign-warning",
+      "title": "Road-sign-warning",
+      "kit": "roads",
+      "model": "assets/props/roads/road-sign-warning.glb",
+      "scale": 7.5,
+      "size": [
+        0.58,
+        3.739,
+        1.104
+      ],
+      "offset": [
+        0.094,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_sign-highway",
+      "title": "Sign-highway",
+      "kit": "roads",
+      "model": "assets/props/roads/sign-highway.glb",
+      "scale": 7.5,
+      "size": [
+        0.993,
+        5.305,
+        7.5
+      ],
+      "offset": [
+        0.309,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "roads_traffic-light",
+      "title": "Traffic-light",
+      "kit": "roads",
+      "model": "assets/props/roads/traffic-light.glb",
+      "scale": 7.5,
+      "size": [
+        0.882,
+        3.862,
+        0.675
+      ],
+      "offset": [
+        0.104,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_barrel",
+      "title": "Barrel",
+      "kit": "survival",
+      "model": "assets/props/survival/barrel.glb",
+      "scale": 2.9,
+      "size": [
+        0.686,
+        0.998,
+        0.686
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_barrel-open",
+      "title": "Barrel-open",
+      "kit": "survival",
+      "model": "assets/props/survival/barrel-open.glb",
+      "scale": 2.9,
+      "size": [
+        0.686,
+        0.998,
+        0.686
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_bedroll",
+      "title": "Bedroll",
+      "kit": "survival",
+      "model": "assets/props/survival/bedroll.glb",
+      "scale": 2.9,
+      "size": [
+        0.9,
+        0.362,
+        1.762
+      ],
+      "offset": [
+        0.0,
+        0.145,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_box",
+      "title": "Box",
+      "kit": "survival",
+      "model": "assets/props/survival/box.glb",
+      "scale": 2.9,
+      "size": [
+        0.725,
+        0.725,
+        0.725
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_box-large",
+      "title": "Box-large",
+      "kit": "survival",
+      "model": "assets/props/survival/box-large.glb",
+      "scale": 2.9,
+      "size": [
+        0.725,
+        0.725,
+        1.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_box-large-open",
+      "title": "Box-large-open",
+      "kit": "survival",
+      "model": "assets/props/survival/box-large-open.glb",
+      "scale": 2.9,
+      "size": [
+        0.725,
+        0.888,
+        1.45
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_box-open",
+      "title": "Box-open",
+      "kit": "survival",
+      "model": "assets/props/survival/box-open.glb",
+      "scale": 2.9,
+      "size": [
+        0.725,
+        0.888,
+        0.725
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_bucket",
+      "title": "Bucket",
+      "kit": "survival",
+      "model": "assets/props/survival/bucket.glb",
+      "scale": 2.9,
+      "size": [
+        0.418,
+        0.557,
+        0.418
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_campfire-pit",
+      "title": "Campfire-pit",
+      "kit": "survival",
+      "model": "assets/props/survival/campfire-pit.glb",
+      "scale": 2.9,
+      "size": [
+        0.806,
+        0.316,
+        0.781
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_chest",
+      "title": "Chest",
+      "kit": "survival",
+      "model": "assets/props/survival/chest.glb",
+      "scale": 2.9,
+      "size": [
+        0.755,
+        0.746,
+        0.789
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.017
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_fence",
+      "title": "Fence",
+      "kit": "survival",
+      "model": "assets/props/survival/fence.glb",
+      "scale": 2.9,
+      "size": [
+        1.45,
+        1.501,
+        0.124
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.663
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_fence-doorway",
+      "title": "Fence-doorway",
+      "kit": "survival",
+      "model": "assets/props/survival/fence-doorway.glb",
+      "scale": 2.9,
+      "size": [
+        1.45,
+        1.501,
+        0.14
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.663
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_fence-fortified",
+      "title": "Fence-fortified",
+      "kit": "survival",
+      "model": "assets/props/survival/fence-fortified.glb",
+      "scale": 2.9,
+      "size": [
+        1.45,
+        1.501,
+        0.154
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.648
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_metal-panel",
+      "title": "Metal-panel",
+      "kit": "survival",
+      "model": "assets/props/survival/metal-panel.glb",
+      "scale": 2.9,
+      "size": [
+        1.45,
+        1.45,
+        0.145
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_metal-panel-screws",
+      "title": "Metal-panel-screws",
+      "kit": "survival",
+      "model": "assets/props/survival/metal-panel-screws.glb",
+      "scale": 2.9,
+      "size": [
+        1.45,
+        1.45,
+        0.181
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.018
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_resource-planks",
+      "title": "Resource-planks",
+      "kit": "survival",
+      "model": "assets/props/survival/resource-planks.glb",
+      "scale": 2.9,
+      "size": [
+        1.082,
+        0.271,
+        1.815
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_resource-wood",
+      "title": "Resource-wood",
+      "kit": "survival",
+      "model": "assets/props/survival/resource-wood.glb",
+      "scale": 2.9,
+      "size": [
+        0.595,
+        0.181,
+        0.253
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_rock-a",
+      "title": "Rock-a",
+      "kit": "survival",
+      "model": "assets/props/survival/rock-a.glb",
+      "scale": 2.9,
+      "size": [
+        1.61,
+        1.139,
+        1.803
+      ],
+      "offset": [
+        0.065,
+        0.0,
+        -0.04
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_rock-b",
+      "title": "Rock-b",
+      "kit": "survival",
+      "model": "assets/props/survival/rock-b.glb",
+      "scale": 2.9,
+      "size": [
+        2.42,
+        1.214,
+        2.102
+      ],
+      "offset": [
+        -0.113,
+        0.0,
+        -0.021
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_rock-c",
+      "title": "Rock-c",
+      "kit": "survival",
+      "model": "assets/props/survival/rock-c.glb",
+      "scale": 2.9,
+      "size": [
+        2.273,
+        1.479,
+        1.641
+      ],
+      "offset": [
+        -0.031,
+        0.0,
+        0.018
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_signpost",
+      "title": "Signpost",
+      "kit": "survival",
+      "model": "assets/props/survival/signpost.glb",
+      "scale": 2.9,
+      "size": [
+        0.621,
+        1.334,
+        0.125
+      ],
+      "offset": [
+        0.015,
+        0.0,
+        -0.01
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_structure-metal-wall",
+      "title": "Structure-metal-wall",
+      "kit": "survival",
+      "model": "assets/props/survival/structure-metal-wall.glb",
+      "scale": 2.9,
+      "size": [
+        1.553,
+        1.45,
+        0.258
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.647
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_tent",
+      "title": "Tent",
+      "kit": "survival",
+      "model": "assets/props/survival/tent.glb",
+      "scale": 2.9,
+      "size": [
+        1.626,
+        1.425,
+        1.627
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.016
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_tent-canvas",
+      "title": "Tent-canvas",
+      "kit": "survival",
+      "model": "assets/props/survival/tent-canvas.glb",
+      "scale": 2.9,
+      "size": [
+        1.626,
+        1.425,
+        1.627
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.016
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_tree-log",
+      "title": "Tree-log",
+      "kit": "survival",
+      "model": "assets/props/survival/tree-log.glb",
+      "scale": 2.9,
+      "size": [
+        0.724,
+        0.804,
+        2.9
+      ],
+      "offset": [
+        -0.008,
+        0.306,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_workbench",
+      "title": "Workbench",
+      "kit": "survival",
+      "model": "assets/props/survival/workbench.glb",
+      "scale": 2.9,
+      "size": [
+        0.944,
+        0.831,
+        0.857
+      ],
+      "offset": [
+        -0.044,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-barrier-strong-damaged",
+      "title": "Detail-barrier-strong-damaged",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-barrier-strong-damaged.glb",
+      "scale": 2.75,
+      "size": [
+        1.826,
+        0.913,
+        0.685
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-barrier-strong-type-a",
+      "title": "Detail-barrier-strong-type-a",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-barrier-strong-type-a.glb",
+      "scale": 2.75,
+      "size": [
+        1.826,
+        0.913,
+        0.685
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-barrier-type-a",
+      "title": "Detail-barrier-type-a",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-barrier-type-a.glb",
+      "scale": 2.75,
+      "size": [
+        1.191,
+        1.1,
+        0.368
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-barrier-type-b",
+      "title": "Detail-barrier-type-b",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-barrier-type-b.glb",
+      "scale": 2.75,
+      "size": [
+        1.559,
+        0.825,
+        0.368
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-beam",
+      "title": "Detail-beam",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-beam.glb",
+      "scale": 2.75,
+      "size": [
+        0.688,
+        0.688,
+        2.75
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-bench",
+      "title": "Detail-bench",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-bench.glb",
+      "scale": 2.75,
+      "size": [
+        1.661,
+        1.125,
+        0.886
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-block",
+      "title": "Detail-block",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-block.glb",
+      "scale": 2.75,
+      "size": [
+        1.375,
+        1.375,
+        1.375
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-bricks-type-a",
+      "title": "Detail-bricks-type-a",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-bricks-type-a.glb",
+      "scale": 2.75,
+      "size": [
+        1.569,
+        0.55,
+        1.469
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-cables-type-a",
+      "title": "Detail-cables-type-a",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-cables-type-a.glb",
+      "scale": 2.75,
+      "size": [
+        2.75,
+        0.393,
+        0.0
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-dumpster-closed",
+      "title": "Detail-dumpster-closed",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-dumpster-closed.glb",
+      "scale": 2.75,
+      "size": [
+        1.65,
+        1.498,
+        1.248
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.074
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-dumpster-open",
+      "title": "Detail-dumpster-open",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-dumpster-open.glb",
+      "scale": 2.75,
+      "size": [
+        1.65,
+        1.511,
+        1.333
+      ],
+      "offset": [
+        0.064,
+        0.0,
+        0.053
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-light-double",
+      "title": "Detail-light-double",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-light-double.glb",
+      "scale": 2.75,
+      "size": [
+        0.237,
+        2.64,
+        1.216
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-light-single",
+      "title": "Detail-light-single",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-light-single.glb",
+      "scale": 2.75,
+      "size": [
+        0.237,
+        2.64,
+        0.727
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.245
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_detail-light-traffic",
+      "title": "Detail-light-traffic",
+      "kit": "urban",
+      "model": "assets/props/urban/detail-light-traffic.glb",
+      "scale": 2.75,
+      "size": [
+        0.43,
+        2.86,
+        1.606
+      ],
+      "offset": [
+        0.096,
+        0.0,
+        0.685
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_pallet",
+      "title": "Pallet",
+      "kit": "urban",
+      "model": "assets/props/urban/pallet.glb",
+      "scale": 2.75,
+      "size": [
+        2.75,
+        0.413,
+        2.75
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_pallet-small",
+      "title": "Pallet-small",
+      "kit": "urban",
+      "model": "assets/props/urban/pallet-small.glb",
+      "scale": 2.75,
+      "size": [
+        1.375,
+        0.413,
+        1.581
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_scaffolding-structure",
+      "title": "Scaffolding-structure",
+      "kit": "urban",
+      "model": "assets/props/urban/scaffolding-structure.glb",
+      "scale": 2.75,
+      "size": [
+        2.75,
+        2.75,
+        2.75
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_tree-park-large",
+      "title": "Tree-park-large",
+      "kit": "urban",
+      "model": "assets/props/urban/tree-park-large.glb",
+      "scale": 2.75,
+      "size": [
+        2.86,
+        4.015,
+        2.86
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_tree-park-pine-large",
+      "title": "Tree-park-pine-large",
+      "kit": "urban",
+      "model": "assets/props/urban/tree-park-pine-large.glb",
+      "scale": 2.75,
+      "size": [
+        2.86,
+        4.015,
+        2.86
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_tree-shrub",
+      "title": "Tree-shrub",
+      "kit": "urban",
+      "model": "assets/props/urban/tree-shrub.glb",
+      "scale": 2.75,
+      "size": [
+        2.145,
+        0.825,
+        2.145
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_truck-green",
+      "title": "Truck-green",
+      "kit": "urban",
+      "model": "assets/props/urban/truck-green.glb",
+      "scale": 2.75,
+      "size": [
+        2.283,
+        2.766,
+        4.519
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_truck-grey",
+      "title": "Truck-grey",
+      "kit": "urban",
+      "model": "assets/props/urban/truck-grey.glb",
+      "scale": 2.75,
+      "size": [
+        2.283,
+        2.766,
+        4.519
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "urban_truck-grey-cargo",
+      "title": "Truck-grey-cargo",
+      "kit": "urban",
+      "model": "assets/props/urban/truck-grey-cargo.glb",
+      "scale": 2.75,
+      "size": [
+        2.283,
+        2.03,
+        3.213
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    }
+  ]
+}

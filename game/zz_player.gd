@@ -1,0 +1,626 @@
+extends CharacterBody3D
+
+const ZzConfig := preload("zz_config.gd")
+const ZzController := preload("zz_controller.gd")
+const ZzFigure := preload("zz_figure.gd")
+const ZzAvatars := preload("zz_avatars.gd")
+
+## One survivor: how they move, how hurt they are, whether they are up, down, held or dead, and
+## what they are carrying.
+##
+## [b]Down is not dead, and the third time is.[/b] At zero health a survivor goes down instead of
+## dying: the same [DotHealth] is revived at once with a bleed-out pool for a maximum, the DOWN
+## modifier holds them where they fell, and they can still shoot what they hold. Damage while
+## down comes off the pool; the pool running out is death. Somebody holding E over them for
+## [member ZzConfig.revive_seconds] stands them up with a little temporary health. After
+## [member ZzConfig.max_incaps] downs the next zero is death, and the screen has been saying so
+## since the last one.
+##
+## [b]Temporary health is part of the health, and comes off first.[/b] What a bottle of pills or
+## a revive gives is added to [member DotHealth.health] and remembered in [member temp_health];
+## it drains by itself, and any damage taken comes off it before the real thing. One number for
+## dot-combat to subtract from, and one for this file to know how much of it is borrowed.
+##
+## [b]Pinned is a person, not a flag.[/b] [member pinned_by] is the entity id of the special
+## holding them and [member pin_kind] what it is doing (pounce, choke, carry, ride). The PINNED
+## modifier holds them on both ends; what frees them is the special dying, a teammate's shove,
+## or — for the ones that let go — the special deciding to.
+
+const EYE_HEIGHT := 1.6
+const EYE_DOWN := 0.45
+
+const BODY_RADIUS := 0.35
+const BODY_HEIGHT := 1.8
+const BODY_CROUCH := 0.95
+const BODY_STEP := 0.4
+
+## Where a survivor is in their life this map.
+enum Life { UP, DOWN, DEAD }
+
+@export var player_id: StringName = &"local"
+@export var display_name: String = "Player"
+@export var samples_input: bool = false
+@export var is_bot: bool = false
+
+## What this player looks like, as a dot-user-avatar document; null is the stock person.
+var avatar: DotAvatar = null
+
+var config: ZzConfig = null
+
+var controller: ZzController = null
+var sampler: DotFpsSampler = null
+var health: DotHealth = null
+var hitboxes: DotHitboxSet = null
+var weapons: ZeeWeaponRig = null
+
+## Always the survivors, today; kept so the scoreboard and the chat's team channel have a side.
+var team: int = 1
+
+var points: int = 0
+var ping_ms: int = -1
+var entity_id: int = 0
+
+## How many times the server has PUT this player somewhere. Replicated, so a watcher's
+## interpolator draws a teleport as one rather than as a flight across the map.
+var warps: int = 0
+
+## Sitting this map out, having joined after it started or died without a rescue.
+var watching: bool = false
+
+var life: int = Life.UP
+
+## Times down this map. At [member ZzConfig.max_incaps] the next one is death.
+var incaps: int = 0
+
+## Borrowed health, already inside [member DotHealth.health]. See the class notes.
+var temp_health: float = 0.0
+
+## The special holding them, as an entity id, and what it is doing. 0 / empty when free.
+var pinned_by: int = 0
+var pin_kind: StringName = &""
+
+## What they carry besides weapons.
+var medkits: int = 0
+var pills: int = 0
+
+## Holding E on something: what (`revive`, `heal`, `box`, `objective`, `item`), whom or which,
+## since when (simulated seconds) and for how long it takes. Server side; the fraction is
+## replicated to the owner and to whoever is being revived.
+var using: StringName = &""
+var use_target: int = -1
+var use_started: float = 0.0
+var use_needs: float = 0.0
+
+## 0..1 of the way through whatever they are holding E for, as the wire carries it.
+var use_fraction: float = 0.0
+
+## Being revived or healed by somebody, 0..1. For the downed person's own screen.
+var helped_fraction: float = 0.0
+
+## Simulated seconds when they may next shove, and how many they have shoved in a row.
+var shove_ready_at: float = 0.0
+var shove_streak: int = 0
+
+## Covered in bile until, and burning until, in simulated seconds. Server side; replicated as
+## two flags.
+var biled_until: float = -1.0
+var burning_until: float = -1.0
+
+## Replicated flags for the two above, on a client.
+var biled: bool = false
+var burning: bool = false
+
+## A box's flash: their screen white. Set from the box effects on the server, replicated.
+var box_blind: bool = false
+
+## When they died, for the rescue clock. Simulated seconds.
+var died_at: float = -1.0
+
+## What they did this map, for the scoreboard and the end-of-map card.
+var commons_killed: int = 0
+var specials_killed: int = 0
+var revives_done: int = 0
+var damage_taken_map: float = 0.0
+var friendly_damage: float = 0.0
+
+## Which weapon slot they have asked for, from this game's input message.
+var wanted_slot: int = 0
+
+## What their hands are doing this tick and did last tick: `ZzNetCommand.ACT_*` bits, and the
+## shove button. Server side; a press is the difference between the two.
+var actions: int = 0
+var previous_actions: int = 0
+var shove_held: bool = false
+var previous_shove: bool = false
+
+## An administrator's `blind` and `beacon`, as dot-moderation's tools set them.
+var blinded: bool = false
+var beacon: bool = false
+var beacon_marker: DotFxBeacon = null
+
+## Whether the end-of-map logic has them inside the end area right now.
+var in_end_area: bool = false
+
+## What other people see this player as. Client side.
+var figure: ZzFigure = null
+
+## Remote weapon state, for drawing a gun in a watched survivor's hand. See mg-deathrun.
+var mirrored: bool = false
+var dealt: Array[StringName] = []
+var dealt_round: int = -1
+var mirror_slot: int = 0
+var mirror_switching: bool = false
+var mirror_fired: int = 0
+var mirror_fire_kind: int = 0
+var _seen_fire_seq: int = -1
+static var _slots: Dictionary = {}
+
+var tick_rate: int = 64:
+	set(value):
+		tick_rate = value
+		if controller != null:
+			controller.tick_rate = value
+
+## The key dot-weapon's player bridge identifies this carrier by.
+var player_key: String:
+	get:
+		return String(player_id)
+
+
+func _ready() -> void:
+	controller = ZzController.new()
+	controller.name = "Controller"
+	controller.tick_rate = tick_rate
+	# EXTERNAL even offline: the world owns the tick, which is the shape a dedicated server
+	# needs and the one a predicting client replays.
+	controller.drive = DotFpsController.Drive.EXTERNAL
+	controller.tunables = tunables_for(config)
+	controller.admin_abilities = true
+	add_child(controller)
+
+	if samples_input:
+		sampler = DotFpsSampler.new(controller.tunables)
+		register_actions(sampler)
+
+
+## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
+## the two must agree.
+static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
+	var t := DotFpsTunables.new()
+	t.max_speed = p_config.run_speed if p_config != null else 6.2
+	t.gravity = p_config.gravity if p_config != null else 20.0
+	t.jump_height = p_config.jump_height if p_config != null else 1.1
+	t.auto_hop = false
+	t.walk_speed_scale = p_config.walk_speed_scale if p_config != null else 0.45
+	t.can_walk = true
+	t.can_sprint = false
+	t.can_crouch = true
+	t.crouch_speed_scale = 0.45
+	t.accelerate = 10.0
+	t.friction = 6.0
+	t.stop_speed = 2.5
+	t.air_accelerate = p_config.air_accelerate if p_config != null else 12.0
+	t.max_air_wish_speed = 1.2
+	t.coyote_time = 0.1
+	t.jump_buffer_time = 0.12
+	t.max_slope_angle = 46.0
+	t.radius = BODY_RADIUS
+	t.stand_height = BODY_HEIGHT
+	t.crouch_height = BODY_CROUCH
+	t.step_height = BODY_STEP
+	return t
+
+
+## The movement actions, and the slow walk on shift.
+static func register_actions(p_sampler: DotFpsSampler = null) -> void:
+	var _added := DotFpsSampler.register_default_actions(p_sampler)
+	var walk := &"dot_fps_walk"
+
+	if not InputMap.has_action(walk):
+		return
+
+	for event in InputMap.action_get_events(walk):
+		var key := event as InputEventKey
+		if key != null and key.physical_keycode == KEY_SHIFT:
+			return
+
+	var shift := InputEventKey.new()
+	shift.physical_keycode = KEY_SHIFT
+	InputMap.action_add_event(walk, shift)
+
+
+## One simulated tick. On the server and offline; a client predicts through its behaviour.
+func simulate(tick: int, delta: float) -> void:
+	if sampler != null:
+		controller.apply_command(sampler.sample(delta))
+
+	controller.simulate_tick(tick, delta)
+	global_position = controller.state.position
+
+
+func delta_for_tick() -> float:
+	return 1.0 / float(maxi(tick_rate, 1))
+
+
+# --- Life -------------------------------------------------------------------
+
+## Not dead. Down counts as alive: they are still in the map, and still a target.
+func is_alive() -> bool:
+	return life != Life.DEAD and (health == null or health.alive)
+
+
+func is_up() -> bool:
+	return life == Life.UP and is_alive()
+
+
+func is_down() -> bool:
+	return life == Life.DOWN
+
+
+func is_pinned() -> bool:
+	return pinned_by != 0
+
+
+## Up, free, and not holding E on anything: able to do things with their hands.
+func can_act() -> bool:
+	return is_up() and not is_pinned() and not watching
+
+
+## Whether the next down is death: what the black-and-white screen says.
+func on_last_life() -> bool:
+	return config != null and incaps >= config.max_incaps
+
+
+## Real health: what is left once the borrowed part is taken out.
+func real_health() -> float:
+	return maxf((health.health if health != null else 0.0) - temp_health, 0.0)
+
+
+## Health as the HUD shows it, 0..1 of the maximum, real and borrowed together.
+func health_fraction() -> float:
+	if health == null:
+		return 0.0
+
+	return clampf(health.health / maxf(health.max_health, 1.0), 0.0, 1.0)
+
+
+## Adds borrowed health, up to the maximum. Returns what landed.
+func grant_temp(amount: float) -> float:
+	if health == null or not is_up() or amount <= 0.0:
+		return 0.0
+
+	var landed := minf(amount, maxf(health.max_health - health.health, 0.0))
+
+	if landed <= 0.0:
+		return 0.0
+
+	health.health += landed
+	temp_health += landed
+	return landed
+
+
+## Heals real health: borrowed health it would push past the maximum is given back.
+func heal_real(amount: float) -> float:
+	if health == null or not is_up() or amount <= 0.0:
+		return 0.0
+
+	var room := health.max_health - real_health()
+	var landed := minf(amount, maxf(room, 0.0))
+	var total := real_health() + landed
+	temp_health = minf(temp_health, maxf(health.max_health - total, 0.0))
+	health.health = total + temp_health
+	return landed
+
+
+## A hit landed: the borrowed health goes first.
+func absorb_temp(lost: float) -> void:
+	temp_health = maxf(temp_health - lost, 0.0)
+
+	if health != null:
+		temp_health = minf(temp_health, health.health)
+
+
+## Borrowed health drains with time. Every tick on the authority.
+func decay_temp(amount: float) -> void:
+	if temp_health <= 0.0 or health == null or not is_up():
+		return
+
+	var drained := minf(amount, temp_health)
+	temp_health -= drained
+	health.health = maxf(health.health - drained, 1.0)
+
+
+# --- Bodies ----------------------------------------------------------------
+
+## Where this player's eyes are: standing, crouched, or on the floor.
+func eye_position() -> Vector3:
+	if is_down():
+		return controller.state.position + Vector3(0.0, EYE_DOWN, 0.0)
+
+	var crouch := controller.state.crouch_fraction if controller != null else 0.0
+	var height := lerpf(EYE_HEIGHT, BODY_CROUCH - 0.15, crouch)
+	return controller.state.position + Vector3(0.0, height, 0.0)
+
+
+## Which way they are looking, as a unit vector. From yaw and pitch, never a camera.
+func aim_direction() -> Vector3:
+	var view := Basis.from_euler(Vector3(
+		deg_to_rad(controller.state.pitch), deg_to_rad(controller.state.yaw), 0.0
+	))
+	return -view.z
+
+
+## Where they stand.
+func feet() -> Vector3:
+	return controller.state.position if controller != null else global_position
+
+
+## The hitboxes: a capsule and a head. A survivor on the floor is the same boxes, lowered.
+func build_hitboxes(combat: DotCombatManager) -> void:
+	hitboxes = DotHitboxSet.new()
+	hitboxes.name = "Hitboxes"
+	hitboxes.owner_ref = DotNodeRef.of_path(^"..")
+	hitboxes.bounds_offset = Vector3(0.0, 0.9, 0.0)
+	hitboxes.bounds_radius = 1.5
+	add_child(hitboxes)
+
+	var chest := DotHitbox.new()
+	chest.name = "Chest"
+	chest.group = DotHitGroup.CHEST
+	chest.shape = DotHitbox.Shape.CAPSULE
+	chest.radius = 0.34
+	chest.height = 1.25
+	chest.position = Vector3(0.0, 0.78, 0.0)
+	hitboxes.add_child(chest)
+
+	var head := DotHitbox.new()
+	head.name = "Head"
+	head.group = DotHitGroup.HEAD
+	head.shape = DotHitbox.Shape.SPHERE
+	head.radius = 0.19
+	head.position = Vector3(0.0, EYE_HEIGHT + 0.06, 0.0)
+	head.damage_scale = 2.0
+	head.precedence = 10
+	hitboxes.add_child(head)
+
+	hitboxes.refresh()
+	hitboxes.register_with(combat, entity_id)
+
+
+## Lowers the hitboxes onto the floor for a downed survivor and back up again.
+func fit_hitboxes() -> void:
+	if hitboxes == null or not is_instance_valid(hitboxes):
+		return
+
+	var down := is_down()
+	var chest := hitboxes.get_node_or_null(^"Chest") as DotHitbox
+	var head := hitboxes.get_node_or_null(^"Head") as DotHitbox
+
+	if chest != null:
+		chest.position = Vector3(0.0, 0.3 if down else 0.78, 0.0)
+		chest.height = 0.7 if down else 1.25
+	if head != null:
+		head.position = Vector3(0.0, 0.4 if down else EYE_HEIGHT + 0.06, 0.0)
+
+
+## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
+func component(type_name: StringName) -> Object:
+	match String(type_name):
+		"DotPlayerController", "DotFpsController":
+			return controller
+		"DotHealth":
+			return health
+		"ZeeWeaponRig":
+			return weapons
+		_:
+			return null
+
+
+## Puts a player somewhere, facing somewhere, with nothing carried over.
+func place_at(at: Vector3, yaw_degrees: float) -> void:
+	warps += 1
+	global_position = at
+	controller.teleport(at, yaw_degrees, 0.0)
+
+	if sampler != null:
+		sampler.look_at_angles(yaw_degrees, 0.0)
+
+	var facing := DotFpsCommand.new()
+	facing.yaw = yaw_degrees
+	controller.apply_command(facing)
+
+
+## Back to the start of a map: up, unhurt, nothing borrowed, nothing holding them.
+func reset_map() -> void:
+	watching = false
+	life = Life.UP
+	incaps = 0
+	temp_health = 0.0
+	pinned_by = 0
+	pin_kind = &""
+	using = &""
+	use_target = -1
+	use_fraction = 0.0
+	helped_fraction = 0.0
+	shove_streak = 0
+	shove_ready_at = 0.0
+	biled_until = -1.0
+	burning_until = -1.0
+	biled = false
+	burning = false
+	died_at = -1.0
+	in_end_area = false
+	commons_killed = 0
+	specials_killed = 0
+	revives_done = 0
+	damage_taken_map = 0.0
+	friendly_damage = 0.0
+
+	if controller != null:
+		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
+				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY]:
+			var _off := controller.remove_modifier(id)
+
+	fit_hitboxes()
+
+
+func retune() -> void:
+	if controller == null:
+		return
+
+	controller.tunables = tunables_for(config)
+
+	if sampler != null:
+		sampler.tunables = controller.tunables
+
+
+# --- Drawing (client side) --------------------------------------------------
+
+## Draws the beacon at [param at], from an admin's flag. Returns whether it pinged.
+func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) -> bool:
+	if not beacon or not is_alive():
+		if beacon_marker != null:
+			beacon_marker.queue_free()
+			beacon_marker = null
+		return false
+
+	if beacon_marker == null:
+		beacon_marker = DotFxBeacon.new()
+		beacon_marker.name = "Beacon"
+		beacon_marker.period = period
+		beacon_marker.colour = Color(0.98, 0.22, 0.86)
+		beacon_marker.column_base = BODY_HEIGHT + 0.4
+		add_child(beacon_marker)
+
+	beacon_marker.local_view = local_view
+	beacon_marker.global_position = at
+	return beacon_marker.advance(delta)
+
+
+## Draws this player for one frame at [param at]: standing, crouched, or on the floor. Returns
+## whether anything was shown.
+func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
+	var shown := not hidden and is_alive() and not watching
+
+	if figure == null:
+		if not shown:
+			return false
+		figure = ZzFigure.new()
+		figure.name = "Figure"
+		add_child(figure)
+
+	var atlas := _atlas()
+
+	if figure.atlas != atlas or not figure.team_colour.is_equal_approx(team_colour):
+		figure.build(BODY_HEIGHT, atlas, team_colour)
+
+	figure.visible = shown
+
+	if shown:
+		_present_held()
+		var velocity := controller.state.velocity
+		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())
+
+		# Down is on the floor: the figure tipped onto its back, the way the genre draws it.
+		if is_down():
+			figure.rotation = Vector3(-PI * 0.45, deg_to_rad(controller.state.yaw), 0.0)
+			figure.global_position = at + Vector3(0.0, 0.25, 0.0)
+
+	return shown
+
+
+## Breaks this player's body apart: torn up by a brute. Client side.
+func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value: int) -> DotPlayerBodyBreak:
+	if figure == null or not figure.visible or break_rules == null:
+		return null
+
+	var model := figure.body_node()
+
+	if model == null:
+		return null
+
+	return DotPlayerBodyBreak.break_apart(
+		model, get_parent(), break_rules, figure.global_position, direction, seed_value, true, true
+	)
+
+
+func note_dealt(weapon_id: StringName, round_number: int) -> void:
+	if round_number != dealt_round:
+		dealt.clear()
+		dealt_round = round_number
+
+	if not dealt.has(weapon_id):
+		dealt.append(weapon_id)
+
+
+func _present_held() -> void:
+	var rig := _rig()
+	var id := &""
+	var switching := false
+	var fired := 0
+	var kind := 0
+
+	if rig != null and rig.arsenal != null:
+		var def := rig.arsenal.current_def()
+		id = def.id if def != null else &""
+		switching = rig.arsenal.is_switching()
+		var seq := rig.fire_seq % ZeeWeaponNet.FIRE_SEQ_WRAP
+		fired = ZeeWeaponNet.uses_between(_seen_fire_seq, seq) if _seen_fire_seq >= 0 else 0
+		_seen_fire_seq = seq
+		kind = rig.fire_kind
+	elif mirrored:
+		id = held_by_slot(dealt, mirror_slot)
+		switching = mirror_switching
+		fired = mirror_fired
+		kind = mirror_fire_kind
+
+	mirror_fired = 0
+	figure.hold(id, switching)
+	figure.fired(fired, kind)
+
+
+static func held_by_slot(ids: Array[StringName], slot: int) -> StringName:
+	if slot <= 0 or ids.is_empty():
+		return &""
+
+	if _slots.is_empty():
+		for def in ZeeWeaponPack.weapons():
+			_slots[def.id] = def.slot
+
+	for id in ids:
+		if int(_slots.get(id, -1)) == slot:
+			return id
+
+	return &""
+
+
+func _rig() -> ZeeWeaponRig:
+	if weapons != null:
+		return weapons
+
+	return get_node_or_null(^"Weapons") as ZeeWeaponRig
+
+
+func _atlas() -> String:
+	var index := ZzAvatars.skin_index(avatar)
+
+	if index < 0 or index >= ZzFigure.ATLASES.size():
+		index = ZzAvatars.stock_index(player_id)
+
+	return str(ZzFigure.ATLASES[index])
+
+
+func describe() -> Dictionary:
+	return {
+		"id": String(player_id),
+		"life": Life.keys()[life],
+		"health": "%.0f (+%.0f temp)" % [real_health(), temp_health],
+		"incaps": incaps,
+		"pinned": "%s by %d" % [pin_kind, pinned_by] if is_pinned() else "-",
+		"using": "%s %.0f%%" % [using, use_fraction * 100.0] if using != &"" else "-",
+		"kits": "%d medkit, %d pills" % [medkits, pills],
+		"watching": watching,
+		"armed": weapons != null,
+		"points": points,
+		"kills": "%d commons, %d specials" % [commons_killed, specials_killed],
+	}
