@@ -129,9 +129,12 @@ zz_box_drops 1                 // whether zombies drop boxes
 zz_box_common 0.012            // chance a common drops a box
 zz_box_special 0.3             // chance a special drops a box
 zz_gravity 20                  // metres per second squared, for everything
-zz_min_players 4               // survivors the server keeps in the game with stand-ins
+bot_quota 4                    // players a round is kept at with bots; each person who joins replaces one
+bot_quota_mode fill            // fill (as above), fixed (that many bots), per_player (that many per person) or off
 zz_bots 1                      // 0 to turn the stand-ins off
 ```
+
+The bot cvars are the family's shared ones (dot-server's `DotBotQuota`). `zz_min_players` still works and sets `bot_quota`; it is deprecated.
 
 The second weapon pack is a config setting rather than a cvar, because a weapon rig reads its weapons once: `--zz-second-weapon-pack false` on the command line (or `second_weapon_pack` in the config file) runs the server with zee-dot-weapons alone.
 
