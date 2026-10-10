@@ -49,7 +49,7 @@ func _init() -> void:
 	app_namespace = APP_NAMESPACE
 	schema = schema_for()
 	config = DotMenuConfig.new()
-	config.brand_name = "Prop Hunt"
+	config.brand_name = "Zombie Zone"
 	# The keys are a table here (see [ZzBindings]), so the help screen has something to list.
 	config.show_help = true
 	config.show_leave = false

@@ -22,7 +22,7 @@ static func make() -> DotMatchRules:
 	# expression cuts Godot 4.7.2's exit teardown short. See docs/gdscript-hazards.md.
 	var rules := new()
 	rules.id = &"zombiezone"
-	rules.display_name = "Prop Hunt"
+	rules.display_name = "Zombie Zone"
 	rules.score_limit = 0
 	# The round keeps its own clock; this one is the BACKSTOP, set by [ZzGame] to the
 	# hiding, the seeking and a minute more. A round the game somehow never decided — a

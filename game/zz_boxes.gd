@@ -775,7 +775,7 @@ func effects_summary() -> Array:
 		var key := "%s|%s" % [e["what"], e["who"]]
 
 		if not grouped.has(key):
-			grouped[key] = {"title": e["title"], "stacks": 0, "seconds": 0.0, "who": e["who"], "scale": 1.0}
+			grouped[key] = {"title": e["title"], "stacks": 0, "seconds": 0.0, "who": _who_name(StringName(str(e["who"]))), "scale": 1.0}
 
 		var g: Dictionary = grouped[key]
 		g["stacks"] = int(g["stacks"]) + 1
@@ -783,6 +783,15 @@ func effects_summary() -> Array:
 		g["scale"] = float(g["scale"]) * float(e["scale"])
 
 	return grouped.values()
+
+
+## Who an effect is on, as the HUD prints it: a name, not a player key a person never sees.
+func _who_name(who: StringName) -> String:
+	if who == &"":
+		return "everybody"
+
+	var player = game.player_by_id(who)
+	return player.display_name if player != null else String(who)
 
 
 func describe() -> Dictionary:

@@ -6,22 +6,25 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 
 ## Every map the game can be sent, built the way a server builds it and looked over for the
 ## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
-## prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating
-## over the floor, too few things to hide as, and a document too big to send.
+## prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating,
+## an item out of reach, and — the one this game adds — ground the zombies cannot cross.
 ##
 ## [b]Why this exists apart from `headless_run`.[/b] The maps are generated in
-## zombie-zone-maps by `tools/build_maps.py`, a few hundred boxes and props each, and none of
-## those mistakes stops a round: a prop floating a hand's width over a table is a prop every
-## hunter shoots first, and a spawn inside a locker is a player stuck for the round. The
-## renders find the ugly ones; this finds the rest, on every map, every time.
+## zombie-zone-maps by `tools/build_maps.py`, and none of those mistakes stops a map: a
+## doorway the nav graph does not cross is a safe room no zombie ever enters, an objective
+## off the graph is a hold-out the horde never reaches, and a gate that does not cut the
+## graph is a barrier the horde walks through. The renders find the ugly ones; this finds the
+## rest, on every map, every time.
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 ## Adding a map adds a section and CHECKS_PER_MAP checks.
 
-const MAPS := ["zz_practice", "zz_school", "zz_house", "zz_office", "zz_woods"]
-const CHECKS_PER_MAP := 8
+const ZzNpcs := preload("../game/zz_npcs.gd")
 
-## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not
+const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel"]
+const CHECKS_PER_MAP := 10
+
+## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
 ## does: the delivered maps are checked wherever they are present, which is every machine
 ## that has run dot-bootstrap. Sections and checks are counted against this list.
@@ -31,12 +34,11 @@ var _maps: Array = []
 const RADIUS := 0.4
 const HEIGHT := 1.8
 
-## Fewest spawns of each kind a map may have: one per player up to these, laps after.
-const MIN_PROP_SPAWNS := 6
-const MIN_HUNTER_SPAWNS := 3
+## Fewest survivor spawns a map may have: a team of four starts apart.
+const MIN_SPAWNS := 4
 
-## Fewest different props a map must offer to hide as.
-const MIN_WEARABLE := 8
+## How far a point that matters (an objective, a route point) may be from the zombies' ground.
+const SNAP := 2.5
 
 var _passed := 0
 var _failed := 0
@@ -95,7 +97,7 @@ func _test_the_catalogue() -> void:
 	_maps = MAPS.duplicate() if linked else ["zz_practice"]
 
 	if not linked:
-		print("(no map directory: the built-in practice house only)")
+		print("(no map directory: the built-in practice street only)")
 
 	var missing: Array = []
 
@@ -122,30 +124,17 @@ func _test_map(id: StringName) -> void:
 	_check(missing.is_empty() and game.map.props.size() == (doc["props"] as Array).size(),
 		"every prop in it is one the catalogue has", ", ".join(missing))
 
-	var wearable := {}
-
-	for prop: Dictionary in game.map.props:
-		if game.props_catalogue.may_disguise(prop["id"]):
-			wearable[prop["id"]] = true
-
-	_check(wearable.size() >= MIN_WEARABLE, "it has enough different things to hide as", "%d" % wearable.size())
-
-	var spawns: Dictionary = doc.get("spawns", {})
-	var props_n := (spawns.get("props", []) as Array).size()
-	var hunters_n := (spawns.get("hunters", []) as Array).size()
-	_check(props_n >= MIN_PROP_SPAWNS and hunters_n >= MIN_HUNTER_SPAWNS, "it has enough spawns",
-		"%d props, %d hunters" % [props_n, hunters_n])
-
+	var seats := ((doc.get("spawns", {}) as Dictionary).get("survivors", []) as Array).size()
 	var bad_spawns: Array = []
 
-	for side: String in ["props", "hunters"]:
-		for seat in range((spawns.get(side, []) as Array).size()):
-			var at: Vector3 = game.map.spawn(side, seat)[0]
-			var why := _spawn_fault(game, at)
-			if why != "":
-				bad_spawns.append("%s %d at %s: %s" % [side, seat, at, why])
+	for seat in range(seats):
+		var at: Vector3 = game.map.spawn("survivors", seat)[0]
+		var why := _spawn_fault(game, at)
+		if why != "":
+			bad_spawns.append("%d at %s: %s" % [seat, at, why])
 
-	_check(bad_spawns.is_empty(), "every spawn stands on a floor with room for a person", "; ".join(bad_spawns))
+	_check(seats >= MIN_SPAWNS and bad_spawns.is_empty(), "%d spawns, each on a floor with room for a person" % seats,
+		"; ".join(bad_spawns))
 
 	var buried: Array = []
 	var floating: Array = []
@@ -159,16 +148,85 @@ func _test_map(id: StringName) -> void:
 		if _inside_world(game, centre):
 			buried.append("%s at %s" % [prop["id"], frame.origin])
 
-		# Hung from a ceiling, or floating on water (which is not solid), by design.
-		var hangs := String(prop["id"]).contains("ceiling") or String(prop["id"]).contains("lily")
-
-		if not hangs and not _rests_on_something(game, frame, size):
+		if not _rests_on_something(game, frame, size):
 			floating.append("%s at %s" % [prop["id"], frame.origin])
 
 	_check(buried.is_empty(), "no prop is sunk into a wall or a floor", "; ".join(buried.slice(0, 6)))
 	_check(floating.is_empty(), "every prop stands on something", "%d: %s" % [floating.size(), "; ".join(floating.slice(0, 6))])
+
+	# An item is picked up by looking at it from where a person stands: over a floor or a
+	# table, and not inside anything.
+	var lost: Array = []
+
+	for item: Dictionary in doc.get("items", []):
+		var at := ZzMapDoc.v3(item["at"])
+		if _inside_world(game, at + Vector3(0.0, 0.1, 0.0)) or not _over_something(game, at):
+			lost.append("%s at %s" % [item["kind"], at])
+
+	_check(lost.is_empty(), "every item lies where it can be picked up", "; ".join(lost.slice(0, 6)))
+
+	# The zombies' ground, every gate open: the first spawn reaches everything that matters.
+	var gates := PackedStringArray()
+
+	for box: Dictionary in doc.get("boxes", []):
+		if box.has("gate"):
+			gates.append(str(box["gate"]))
+
+	var props_size := func(pid: StringName) -> Vector3:
+		return game.props_catalogue.size_of(pid) if game.props_catalogue.has(pid) else Vector3.ZERO
+	var open := DotNpcNavGraph.new(ZzNpcs.nav_for(doc, props_size, gates))
+	var shut := DotNpcNavGraph.new(ZzNpcs.nav_for(doc, props_size))
+	var from: Vector3 = game.map.spawn("survivors", 0)[0]
+	var unreached: Array = []
+	var places: Array = []
+
+	for p: Array in doc.get("route", []):
+		places.append(["route", ZzMapDoc.v3(p)])
+	for o: Dictionary in doc.get("objectives", []):
+		places.append(["objective %s" % o["id"], ZzMapDoc.v3(o["at"])])
+	for s: Array in doc.get("sleepers", []):
+		places.append(["sleeper", ZzMapDoc.v3(s)])
+	for h: Array in doc.get("zombie_spawns", []):
+		places.append(["spawn hint", ZzMapDoc.v3(h)])
+	for area: Dictionary in (doc["areas"] as Dictionary).get("end", []):
+		places.append(["end area", ZzMapDoc.area_box(area).get_center() * Vector3(1.0, 0.0, 1.0)])
+
+	for place: Array in places:
+		var to: Vector3 = place[1]
+		to.y = 0.0
+		if not open.is_reachable(from, to, SNAP):
+			unreached.append("%s at %s" % [place[0], to])
+
+	_check(unreached.is_empty() and open.data.points.size() > 50, "the zombies' ground joins everything to the start",
+		"%d points; %s" % [open.data.points.size(), "; ".join(unreached.slice(0, 6))])
+
+	# With the gates shut, what lies past them is cut off: a gate the horde walks through is
+	# not one. A map without gates says so.
+	var past_gates: Array = []
+
+	if not gates.is_empty():
+		for area: Dictionary in (doc["areas"] as Dictionary).get("end", []):
+			var centre := ZzMapDoc.area_box(area).get_center() * Vector3(1.0, 0.0, 1.0)
+			if shut.is_reachable(from, centre, SNAP):
+				past_gates.append(str(centre))
+
+	_check(past_gates.is_empty(), "its gates shut the way" if not gates.is_empty() else "it has no gates to shut",
+		", ".join(gates))
+
+	var mode_ok: bool = doc["mode"] == ZzMapDoc.SURVIVAL or not (doc["areas"]["end"] as Array).is_empty()
+	var next := str(doc.get("next", ""))
+	_check(mode_ok and (next == "" or game.catalogue.maps.has(StringName(next))),
+		"a campaign map has an end, and its next map exists", next)
 	await _dispose(game)
 	_finished()
+
+
+## A ray down from just over [param at] finds a floor, a table or a prop within half a metre.
+func _over_something(game: ZzGame, at: Vector3) -> bool:
+	var space := game.get_world_3d().direct_space_state
+	var mask := game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+	var query := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.3, 0.0), at + Vector3(0.0, -0.5, 0.0), mask)
+	return not space.intersect_ray(query).is_empty()
 
 
 ## Why a person could not stand at [param at], or "" when they can.

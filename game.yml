@@ -15,8 +15,8 @@ content_id: gamemann/game-zombie-zone
 version: 0.0.0
 kind: pack
 
-name: Prop Hunt
-max_players: 24
+name: Zombie Zone
+max_players: 8
 
 scene: scenes/zz_server.tscn
 client_scene: game/zz.tscn
@@ -25,14 +25,13 @@ module: game/zz_module.gd
 # No maps pack is named here. Which maps a server runs is the server owner's choice, made in
 # their deployment's map config (dot-server-deploy's cfg/content.yml, gamemann/zombie-zone-maps
 # for the stock set); the module fetches what the server names. This game's own pack ships
-# only its built-in the practice map.
+# only its built-in practice map.
 
 cvars:
-  zz_round_seconds: "300"
-  zz_hide_seconds: "30"
-  zz_players_per_hunter: "3"
+  zz_difficulty: "1"
   zz_bots: "1"
-  zz_min_players: "3"
+  zz_friendly_fire: "1"
+  zz_box_drops: "1"
 
 # This game's maps are small documents the server sends each client, so a host fetches the
 # map packs its server owner names BEFORE the game loads (into the server-only packs)

@@ -439,8 +439,8 @@ func prop_from_hit(collider: Object, shape_index: int) -> int:
 	return int(node.get_meta(&"zz_prop"))
 
 
-## Which prop [param point] is on, within [constant HIT_MARGIN]: a hunter's shot that stopped
-## on a decoy. -1 for none.
+## Which prop [param point] is on, within [constant HIT_MARGIN]: a shot that stopped
+## on furniture. -1 for none.
 func prop_containing(point: Vector3) -> int:
 	for index in range(props.size()):
 		var prop: Dictionary = props[index]

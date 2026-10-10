@@ -323,7 +323,7 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.director_enabled = value > 0.5)
 	_tunable("zz_sleepers", 1.0 if config.sleepers_enabled else 0.0, "Whether the maps' sleepers are there (next map)",
 		func(value: float) -> void: config.sleepers_enabled = value > 0.5)
-	_tunable("zz_boxes", 1.0 if config.boxes_enabled else 0.0, "Whether zombies drop boxes",
+	_tunable("zz_box_drops", 1.0 if config.boxes_enabled else 0.0, "Whether zombies drop boxes",
 		func(value: float) -> void: config.boxes_enabled = value > 0.5)
 	_tunable("zz_box_common", config.box_drop_common, "Chance a common drops a box",
 		func(value: float) -> void: config.box_drop_common = clampf(value, 0.0, 1.0))
@@ -462,7 +462,7 @@ func _keep_the_round_full() -> void:
 	var short := wanted - humans - _bot_ids.size()
 
 	for _i in range(maxi(short, 0)):
-		var bot: ZzPlayer = bridge.call("add_bot", _bot_name())
+		var bot: ZzPlayer = bridge.call("add_bot", _bot_name(world))
 
 		if bot == null:
 			break
@@ -477,12 +477,26 @@ func _keep_the_round_full() -> void:
 		bridge.call("remove_player", ZzNetBridge.session_of(leaving))
 
 
-## Names for the stand-ins, so a scoreboard of four of them is readable.
-static func _bot_name() -> String:
+## Names for the stand-ins, so a scoreboard of four of them is readable: one nobody in
+## [param world] has yet. Drawn at random, it gave a dedicated run three called Odell.
+static func _bot_name(world: ZzGame) -> String:
 	var names := PackedStringArray([
 		"Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable", "Wren",
 	])
-	return String(names[randi() % names.size()])
+	var taken := {}
+
+	for id: StringName in world.players:
+		taken[(world.players[id] as ZzPlayer).display_name] = true
+
+	var start := randi() % names.size()
+
+	for i in names.size():
+		var name := names[(start + i) % names.size()]
+
+		if not taken.has(name):
+			return name
+
+	return "%s %d" % [names[start], world.players.size()]
 
 
 ## Joins the bridge's chat seam to the services layer's router.

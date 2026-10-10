@@ -129,7 +129,7 @@ var _seen_fire_seq: int = 0
 ## rather than stopping dead. The controller says the same of its own command.
 var last_move: DotFpsCommand = DotFpsCommand.new()
 
-## And the slot they last asked for, which is simulation state for a hunter: the arsenal is
+## And the slot they last asked for, which is simulation state for a survivor: the arsenal is
 ## edge-triggered against it.
 var last_slot: int = 0
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Render the game and look at it. The check no assertion in this repository makes.
 #
-#   tools/shot.sh --view=overview --zz-map-ids=zz_school         # a map, from above
-#   tools/shot.sh --view=room --at=0,1.7,-6 --look=0,1,-14 --zz-map-ids=zz_school
-#   tools/shot.sh --view=hunter                                   # a hunter's eyes, seeking
-#   tools/shot.sh --view=prop --as=furniture_chair                # a prop in third person, hidden
-#   tools/shot.sh --view=blind                                    # a hunter while the props hide
-#   tools/shot.sh --view=hunter --board                           # with the Tab scoreboard open
-#   tools/shot.sh --view=overview --out=res://screenshots/x.png   # any --zz-* is the game's config
+#   tools/shot.sh --view=overview                                  # the map, from above
+#   tools/shot.sh --view=room --at=0,1.7,-6 --look=0,1,-14          # a free camera
+#   tools/shot.sh --view=survivor --spawn=common:12,leaper:1        # your eyes, with a crowd coming
+#   tools/shot.sh --view=third --spawn=brute:1                       # third person
+#   tools/shot.sh --view=down --spawn=common:6                       # on the floor
+#   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
+#   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
+#   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
+#   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png
 #
 # xvfb-run because this needs a rendering context: `--headless` gives a null renderer and saves
 # a frame of nothing, which is worse than no screenshot because it looks like one.
@@ -15,10 +17,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p screenshots
 
-view="hunter"
+view="survivor"
 seconds="3"
 out=""
-config=("--zz-warmup-seconds=0" "--zz-hide-seconds=3")
+config=("--zz-warmup-seconds=0" "--zz-start-grace-seconds=0" "--zz-wanderer-density=0")
 extra=()
 
 for arg in "$@"; do
@@ -27,7 +29,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--as=*|--board|--name=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--pin=*|--box=*|--board|--name=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

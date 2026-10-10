@@ -4,28 +4,26 @@ const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
+const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
 ## reconciliation all run, in one process, in two physics worlds.
 ##
-## [b]What this suite is for is the two claims the game rests on over a wire.[/b] First, a
-## disguise is a HULL as well as a look: a prop's own client predicts itself with the prop's
-## capsule, so if the client and the server disagree about what somebody is wearing, the client
-## walks through a doorway the server's chair does not fit through and is pulled back every
-## tick. So this asserts the hull on both ends and the two ends agreeing after a run. Second,
-## the blindfold is true on the wire: a hunter's snapshots carry no prop while the props hide
-## (`ZzInterest`), so a client that skipped drawing the black screen would still see nothing.
-## Then everything else that crosses: the map document, the sides, turning, a taunt, a joiner
-## told what everybody is wearing, a decoy's charge, the result.
+## [b]What this suite is for is that a client sees the server's world.[/b] The zombies are
+## the server's alone (a client predicts only its own survivor), so every one of them has to
+## arrive, move where the server moves it, and go away when it dies; a down, a pin, a box, a
+## thing on the ground and a gate opening are each a state the HUD and the world view draw,
+## and each is a separate relay in the bridge that nothing else would notice missing.
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 12
-const CHECKS := 49
+const SECTIONS := 13
+const CHECKS := 53
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -34,9 +32,8 @@ const CLIENT_ENGINE_TICK_RATE := 30
 const SNAPSHOT_RATE := 30
 const INPUT_LEAD := 3
 
-## The practice house's kitchen chair, and a spot west of it to stand and look at it from.
-const CHAIR_AT := Vector3(3.6, 0.0, 1.2)
-const LOOK_FROM := Vector3(1.6, 0.05, 1.2)
+## Out on the practice street, past the start room's grace, short of the barrier.
+const STREET := Vector3(0.0, 0.05, 14.0)
 
 var _passed := 0
 var _failed := 0
@@ -74,13 +71,14 @@ func _run() -> void:
 	if await _build():
 		await _test_a_client_joins()
 		await _test_the_map_arrives()
-		await _test_the_blindfold_is_on_the_wire()
 		await _test_the_local_player_is_predicted()
-		await _test_a_disguise_is_a_hull_on_both_ends()
-		await _test_turning_and_taunting()
-		await _test_a_joiner_is_told_what_everybody_wears()
-		await _test_a_decoy_is_charged()
-		await _test_the_round_ends()
+		await _test_zombies_replicate()
+		await _test_a_down_reaches_the_client()
+		await _test_a_pin_reaches_the_client()
+		await _test_loot_reaches_the_client()
+		await _test_a_box_reaches_the_client()
+		await _test_a_gate_reaches_the_client()
+		await _test_the_map_ends()
 		await _test_leaving()
 
 	print("")
@@ -109,56 +107,68 @@ func _run() -> void:
 
 # --- The codec ------------------------------------------------------------------
 
+static func _r(bytes: PackedByteArray) -> DotNetReader:
+	return DotNetReader.new(bytes)
+
+
 ## Every encoder against its decoder. Nothing checks that two ends of a serialisation are
 ## inverses for you: dot-moderation once wrote "voice muted" and read back a warning.
 func _test_the_codec() -> void:
 	_section("every event decodes to what was encoded")
 
-	var hello := ZzEvents.read_hello(DotNetReader.new(ZzEvents.write_hello(SESSION, 64, 1234, 30.0, 300.0, 2.0, 60.0)))
-	_check(bool(hello["ok"]) and int(hello["player_id"]) == SESSION
-		and absf(float(hello["round_seconds"]) - 300.0) < 0.1 and absf(float(hello["hide_seconds"]) - 30.0) < 0.05
-		and absf(float(hello["beacon_period"]) - 2.0) < 0.02 and absf(float(hello["taunt_range"]) - 60.0) < 0.2,
+	var hello := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 64, 1234, 2, 3)))
+	_check(bool(hello["ok"]) and int(hello["player_id"]) == SESSION and int(hello["tick_rate"]) == 64
+		and int(hello["server_tick"]) == 1234 and int(hello["difficulty"]) == 2 and int(hello["max_incaps"]) == 3,
 		"HELLO", str(hello))
 
 	var doc := ZzCatalogue.practice()
-	var sent := ZzEvents.read_map(DotNetReader.new(ZzEvents.write_map(ZzMapDoc.encode(doc))))
+	var sent := ZzEvents.read_map(_r(ZzEvents.write_map(ZzMapDoc.encode(doc))))
 	var decoded := ZzMapDoc.decode(sent["encoded"]) if bool(sent["ok"]) else DotResult.fail(DotError.CODE_PARSE, "no map")
 	_check(decoded.ok and ZzMapDoc.digest(decoded.value) == ZzMapDoc.digest(doc), "MAP carries the document whole")
 
-	var join := ZzEvents.read_join(DotNetReader.new(ZzEvents.write_join(SESSION, 9, "Ada", ZzGame.HUNTERS, null)))
-	_check(bool(join["ok"]) and int(join["team"]) == ZzGame.HUNTERS, "JOIN carries the side", str(join.get("team")))
+	var join := ZzEvents.read_join(_r(ZzEvents.write_join(SESSION, 9, "Ada", ZzGame.SURVIVORS, null)))
+	_check(bool(join["ok"]) and int(join["team"]) == ZzGame.SURVIVORS and str(join["name"]) == "Ada", "JOIN", str(join))
 
-	var round_info := ZzEvents.read_round(DotNetReader.new(ZzEvents.write_round(3, false, ZzGame.PROPS, "the props held out")))
-	_check(bool(round_info["ok"]) and int(round_info["winner"]) == ZzGame.PROPS
-		and str(round_info["why"]) == "the props held out", "ROUND carries the winning side and the sentence")
+	var round_info := ZzEvents.read_round(_r(ZzEvents.write_round(3, false, false, "everybody is down")))
+	_check(bool(round_info["ok"]) and not bool(round_info["won"]) and str(round_info["why"]) == "everybody is down",
+		"ROUND carries the result and the sentence")
 
-	var worn := DotPropDisguise.new()
-	worn.prop_id = &"furniture_chair"
-	worn.size = Vector3(0.9, 1.8, 0.95)
-	worn.yaw = 135.0
-	worn.pitch = 15.0
-	worn.locked = true
-	var disguise := ZzEvents.read_disguise(DotNetReader.new(ZzEvents.write_disguise(SESSION, worn.to_wire(), true)))
-	var back := DotPropDisguise.from_wire(disguise.get("wire", {}))
-	_check(bool(disguise["ok"]) and bool(disguise["revealed"]) and back != null and back.prop_id == worn.prop_id
-		and back.locked and absf(back.yaw - 135.0) < 0.5 and absf(back.pitch - 15.0) < 0.5,
-		"DISGUISE carries the prop, how it is turned, the lock and the face", str(disguise))
+	var clock := ZzEvents.read_clock(_r(ZzEvents.write_clock(3, 2, 40.25, 12.5, 60.0, 4, true, 0, 1, 20.0)))
+	_check(bool(clock["ok"]) and int(clock["round"]) == 3 and absf(float(clock["elapsed"]) - 40.25) < 0.1
+		and absf(float(clock["held"]) - 12.5) < 0.1 and int(clock["alive"]) == 4 and int(clock["objective"]) == 0
+		and int(clock["objective_state"]) == 1, "CLOCK", str(clock))
 
-	var taunt := ZzEvents.read_taunt(DotNetReader.new(ZzEvents.write_taunt(SESSION, &"laugh", true)))
-	_check(bool(taunt["ok"]) and taunt["taunt_id"] == &"laugh" and bool(taunt["forced"]), "TAUNT", str(taunt))
+	var npc := ZzEvents.read_npc(_r(ZzEvents.write_npc(77, ZzNpcs.STRANGLER, 513, Vector3(3.5, 0.0, -12.25))))
+	_check(bool(npc["ok"]) and int(npc["net_id"]) == 77 and npc["kind"] == ZzNpcs.STRANGLER and int(npc["variant"]) == 513
+		and (npc["at"] as Vector3).distance_to(Vector3(3.5, 0.0, -12.25)) < 0.05, "NPC", str(npc))
 
-	var decoy := ZzEvents.read_decoy(DotNetReader.new(ZzEvents.write_decoy(4.5)))
-	_check(bool(decoy["ok"]) and absf(float(decoy["amount"]) - 4.5) < 0.1, "DECOY", str(decoy))
+	var gone := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(77, true)))
+	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]), "NPC_GONE")
 
-	var turned := ZzEvents.read_turn(DotNetReader.new(ZzEvents.write_turn(ZzGame.Turn.TILT_LEFT)))
-	var asked := ZzEvents.read_ask_taunt(DotNetReader.new(ZzEvents.write_ask_taunt(&"whistle")))
-	_check(bool(turned["ok"]) and int(turned["how"]) == ZzGame.Turn.TILT_LEFT and bool(asked["ok"]) and asked["taunt_id"] == &"whistle",
-		"TURN and a taunt request")
+	var pin := ZzEvents.read_pin(_r(ZzEvents.write_pin(SESSION, 77, &"choke")))
+	_check(bool(pin["ok"]) and int(pin["player_id"]) == SESSION and int(pin["npc"]) == 77 and pin["kind"] == &"choke", "PIN")
 
-	var clock := ZzEvents.read_clock(DotNetReader.new(ZzEvents.write_clock(2, 12.5, 40.25, ZzGame.Phase.SEEK, 3, 1, true)))
-	_check(bool(clock["ok"]) and int(clock["phase"]) == ZzGame.Phase.SEEK
-		and absf(float(clock["seek_elapsed"]) - 40.25) < 0.1 and int(clock["props"]) == 3
-		and int(clock["hunters"]) == 1, "CLOCK", str(clock))
+	var loot := ZzEvents.read_loot(_r(ZzEvents.write_loot(5, ZzLoot.WEAPON, &"shotgun", Vector3(1.0, 0.5, 2.0))))
+	_check(bool(loot["ok"]) and int(loot["id"]) == 5 and loot["kind"] == ZzLoot.WEAPON and loot["item"] == &"shotgun"
+		and (loot["at"] as Vector3).distance_to(Vector3(1.0, 0.5, 2.0)) < 0.05, "LOOT", str(loot))
+
+	var box := ZzEvents.read_box(_r(ZzEvents.write_box(SESSION, &"explosive", "Short fuse", "Ada opened it")))
+	_check(bool(box["ok"]) and box["type"] == &"explosive" and str(box["title"]) == "Short fuse"
+		and str(box["message"]) == "Ada opened it", "BOX")
+
+	var effects := ZzEvents.read_effects(_r(ZzEvents.write_effects([
+		{"title": "Glass cannon", "stacks": 2, "seconds": 14.25, "who": "everybody", "scale": 1.5},
+	])))
+	var rows: Array = effects["effects"]
+	_check(bool(effects["ok"]) and rows.size() == 1 and int(rows[0]["stacks"]) == 2 and str(rows[0]["title"]) == "Glass cannon",
+		"EFFECTS", str(rows))
+
+	var hazard := ZzEvents.read_hazard(_r(ZzEvents.write_hazard(9, &"acid", Vector3(2.0, 0.0, 3.0), 3.5, 7.0)))
+	_check(bool(hazard["ok"]) and hazard["kind"] == &"acid" and absf(float(hazard["radius"]) - 3.5) < 0.05
+		and absf(float(hazard["seconds"]) - 7.0) < 0.1, "HAZARD", str(hazard))
+
+	var blast := ZzEvents.read_blast(_r(ZzEvents.write_blast(Vector3(0.0, 1.0, 5.0), 6.0, &"pipe")))
+	_check(bool(blast["ok"]) and blast["kind"] == &"pipe" and absf(float(blast["radius"]) - 6.0) < 0.05, "BLAST")
 	_finished()
 
 
@@ -224,22 +234,38 @@ func _build() -> bool:
 
 	_client_bridge.map_received.connect(func(id: StringName) -> void:
 		_heard["map"] = id)
-	_client_bridge.disguise_received.connect(func(who: int, revealed: bool) -> void:
-		_heard["disguises"] = int(_heard.get("disguises", 0)) + 1
-		_heard["disguise"] = [who, revealed])
-	_client_bridge.taunt_received.connect(func(who: int, taunt_id: StringName, forced: bool) -> void:
-		_heard["taunt"] = [who, taunt_id, forced])
-	_client_bridge.decoy_received.connect(func(amount: float) -> void:
-		_heard["decoy"] = amount)
-	_client_bridge.round_changed.connect(func(n: int, began: bool, winner: int, why: String) -> void:
+	_client_bridge.npc_added.connect(func(net_id: int, kind: StringName, _variant: int, body: Node3D) -> void:
+		_heard["npc"] = [net_id, kind, body])
+	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, _body: Node3D) -> void:
+		_heard["npc_gone"] = [net_id, killed])
+	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
+		_heard["down"] = who)
+	_client_bridge.revived_received.connect(func(who: int, _by: int) -> void:
+		_heard["revive"] = who)
+	_client_bridge.pin_received.connect(func(who: int, npc: int, kind: StringName) -> void:
+		_heard["pin"] = [who, npc, kind])
+	_client_bridge.unpin_received.connect(func(who: int, _why: StringName) -> void:
+		_heard["unpin"] = who)
+	_client_bridge.loot_added.connect(func(id: int, kind: StringName, _item: StringName, at: Vector3) -> void:
+		_heard["loot"] = [id, kind, at])
+	_client_bridge.loot_removed.connect(func(id: int, by: int) -> void:
+		_heard["loot_gone"] = [id, by])
+	_client_bridge.box_received.connect(func(who: int, type_id: StringName, title: String, _message: String) -> void:
+		_heard["box"] = [who, type_id, title])
+	_client_bridge.effects_received.connect(func(rows: Array) -> void:
+		_heard["effects"] = rows)
+	_client_bridge.gate_received.connect(func(gate: String) -> void:
+		_heard["gate"] = gate)
+	_client_bridge.round_changed.connect(func(n: int, began: bool, won: bool, why: String) -> void:
 		if not began:
-			_heard["round_over"] = [n, winner, why])
+			_heard["round_over"] = [n, won, why])
 
 	_stand_in = _server_bridge.add_bot("Stand-in")
 	_check(_stand_in != null and _stand_in.is_bot, "a stand-in is seated before anybody joins")
-	# Seated as a stand-in, driven by the suite: a stand-in prop hides on its own, and this
+	# Seated as a stand-in, driven by the suite: a stand-in walks the route on its own, and this
 	# suite wants it where it puts it.
 	_stand_in.is_bot = false
+	_stand_in.health.invulnerable = true
 
 	# Started AFTER the bridge exists, which is what the module does: a map laid out before
 	# anything listened to `world_rebuilt` would be a map no client is ever sent.
@@ -250,7 +276,7 @@ func _build() -> bool:
 
 
 func _test_a_client_joins() -> void:
-	_section("a client joins, and is told its side")
+	_section("a client joins, and is told who it is")
 	var seated := _server_bridge.add_player(CLIENT_PEER, SESSION, "Ada")
 	_check(seated.ok, "the server seats them")
 	_client_bridge.ask_ready()
@@ -261,11 +287,8 @@ func _test_a_client_joins() -> void:
 	_check(_client_bridge.local_player_id == SESSION, "the client is told who it is")
 	_check(_client_game.tick_rate == SERVER_TICK_RATE, "it adopts the server's tick rate", "%d" % _client_game.tick_rate)
 	_check(_client_game.players.size() == 2, "it has a body for itself and for the stand-in", "%d" % _client_game.players.size())
-
-	await _hide_with(ZzGame.HUNTERS)
-	_check(_client_game.team_of(_me()) == ZzGame.HUNTERS and _client_game.team_of(_stand_in.player_id) == ZzGame.PROPS,
-		"the client knows who is hunting and who is hiding")
-	_check(_client_game.phase == ZzGame.Phase.HIDE, "and that the props are hiding")
+	_check(_client_game.team_of(_me()) == ZzGame.SURVIVORS and _client_game.team_of(_stand_in.player_id) == ZzGame.SURVIVORS,
+		"both are survivors")
 	_finished()
 
 
@@ -274,45 +297,18 @@ func _test_the_map_arrives() -> void:
 	_check(not _client_game.map_doc.is_empty(), "the client built a map")
 	_check(ZzMapDoc.digest(_client_game.map_doc) == ZzMapDoc.digest(_server_game.map_doc),
 		"the same document, to the byte", ZzMapDoc.digest(_client_game.map_doc))
-	_check(_client_game.map.props.size() == _server_game.map.props.size() and _client_game.map.props.size() > 0,
-		"every prop in it", "%d" % _client_game.map.props.size())
+	_check(_client_game.map.gate_is_shut("barrier"), "with its barrier down")
 	_check(_heard.has("map"), "and the client said so")
 	_finished()
 
 
-## The black screen is the HUD's; this is the wire's half of it.
-func _test_the_blindfold_is_on_the_wire() -> void:
-	_section("a hunter is told nothing about the props while they hide")
-	var copy: ZzPlayer = _client_game.players[_stand_in.player_id]
-	var was := copy.global_position
-	_stand_in.place_at(Vector3(-3.0, 0.05, -2.0), 0.0)
-	await _steps(20)
-	_check(copy.global_position.distance_to(was) < 0.05 and copy.global_position.distance_to(_stand_in.global_position) > 1.0,
-		"the prop moved on the server and the hunter's copy did not",
-		"%.2f m from where it was" % copy.global_position.distance_to(was))
-
-	# What it became is held back too, and told the moment the seek starts.
-	var heard_before := int(_heard.get("disguises", 0))
-	var _hid := _server_game.disguise_as(_stand_in.player_id, &"furniture_chair")
-	await _steps(4)
-	_check(_stand_in.is_disguised() and int(_heard.get("disguises", 0)) == heard_before and not copy.is_disguised(),
-		"nor what it became", "%d events" % (int(_heard.get("disguises", 0)) - heard_before))
-
-	_server_game._set_phase(ZzGame.Phase.SEEK)
-	await _steps(20)
-	_check(copy.is_disguised() and copy.disguise.prop_id == &"furniture_chair", "and is told as the seek starts")
-	_check(copy.global_position.distance_to(_stand_in.global_position) < 0.3,
-		"the moment the hunters are let go, the prop is where it is",
-		"%.2f m apart" % copy.global_position.distance_to(_stand_in.global_position))
-	_finished()
-
-
 func _test_the_local_player_is_predicted() -> void:
-	_section("a prop is predicted, and the server agrees")
-	await _hide_with(ZzGame.PROPS)
+	_section("a survivor is predicted, and the server agrees")
 	var mine := _mine()
 	var server_me := _server_me()
-	server_me.place_at(Vector3(-2.0, 0.05, 0.0), 0.0)
+	server_me.health.invulnerable = true
+	server_me.place_at(STREET, 0.0)
+	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
 	await _steps(20)
 	var before := mine.controller.state.position
 	var forward := DotFpsCommand.new()
@@ -327,128 +323,130 @@ func _test_the_local_player_is_predicted() -> void:
 	_finished()
 
 
-## The claim: what a prop wears is the capsule it is predicted with, on both ends.
-func _test_a_disguise_is_a_hull_on_both_ends() -> void:
-	_section("a disguise is the same hull on both ends, and the run still agrees")
+## The zombies are the server's: a client is told one exists, follows its snapshots, and is
+## told when it dies.
+func _test_zombies_replicate() -> void:
+	_section("a zombie arrives, moves as the server moves it, and dies on both ends")
 	var server_me := _server_me()
-	server_me.place_at(LOOK_FROM, 0.0)
-	await _steps(24)
-	var aim := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.6, 0.0))
-	await _steps(6, aim)
-
-	var heard_before := int(_heard.get("disguises", 0))
-	_client_bridge.ask_disguise()
-	await _steps(6, aim)
-	_check(server_me.is_disguised() and server_me.disguise.prop_id == &"furniture_chair",
-		"asking while looking at the chair makes the server's copy a chair",
-		String(server_me.disguise.prop_id) if server_me.disguise != null else "nothing")
-	_check(int(_heard.get("disguises", 0)) > heard_before, "and a DISGUISE event crossed")
-
-	var mine := _mine()
-	_check(mine.is_disguised() and mine.disguise.prop_id == &"furniture_chair", "the client's own player is the chair too")
-	_check(is_equal_approx(mine.controller.tunables.radius, server_me.controller.tunables.radius)
-		and is_equal_approx(mine.controller.tunables.stand_height, server_me.controller.tunables.stand_height),
-		"with the chair's capsule, on both ends",
-		"r %.2f / %.2f, h %.2f / %.2f" % [mine.controller.tunables.radius, server_me.controller.tunables.radius,
-			mine.controller.tunables.stand_height, server_me.controller.tunables.stand_height])
-	_check(absf(mine.health.max_health - server_me.health.max_health) < 0.1, "and the chair's health",
-		"%.1f / %.1f" % [mine.health.max_health, server_me.health.max_health])
-
-	var back := DotFpsCommand.new()
-	back.move = Vector2(-1.0, 0.0)
-	back.yaw = aim.yaw
-	await _steps(20, back)
-	await _steps(24)
-	var apart := mine.controller.state.position.distance_to(server_me.controller.state.position)
-	_check(apart < 0.25, "a chair that runs is where the server has it", "%.3f m" % apart)
-	_finished()
-
-
-func _test_turning_and_taunting() -> void:
-	_section("turning and taunting are asked for, and the server's answer comes back")
-	var server_me := _server_me()
-	_client_bridge.ask_turn(ZzGame.Turn.LOCK)
+	server_me.place_at(STREET, 0.0)
 	await _steps(4)
-	_check(server_me.disguise.locked and _mine().disguise.locked, "the lock is the server's, and the client is told")
-
-	_client_bridge.ask_turn(ZzGame.Turn.TILT_LEFT)
-	await _steps(4)
-	_check(absf(server_me.disguise.roll) > 1.0 and is_equal_approx(_mine().disguise.roll, server_me.disguise.roll),
-		"a tilt lands on both ends", "roll %.1f / %.1f" % [_mine().disguise.roll, server_me.disguise.roll])
-
-	# Paid only while the hunters are looking: into the seek, and past the cooldown of any
-	# taunt the hide's checks made.
-	_server_game._set_phase(ZzGame.Phase.SEEK)
-	await _steps(int(_server_game.config.taunt_cooldown * SERVER_TICK_RATE) + 4)
-	var points := server_me.points
-	_client_bridge.ask_taunt()
-	await _steps(4)
-	_check(_heard.has("taunt") and int(_heard["taunt"][0]) == SESSION and not bool(_heard["taunt"][2]),
-		"a taunt is played, and everybody is told who and which", str(_heard.get("taunt")))
-	_check(server_me.points - points == _server_game.config.taunt_points, "and is paid for",
-		"+%d" % (server_me.points - points))
-	_finished()
-
-
-## A client that asks to be told everything again is told what everybody is wearing.
-func _test_a_joiner_is_told_what_everybody_wears() -> void:
-	_section("a joiner is told what everybody is wearing")
-	var mine := _mine()
-	_client_game.apply_disguise_wire(mine.player_id, {})
-	_check(not mine.is_disguised(), "the client forgets (as a joiner never knew)")
-	_client_bridge.ask_ready()
-	_exchange()
-	_exchange()
-	await _steps(4)
-	_check(mine.is_disguised() and mine.disguise.prop_id == &"furniture_chair" and mine.disguise.locked,
-		"and READY is answered with the chair, locked")
-	_finished()
-
-
-func _test_a_decoy_is_charged() -> void:
-	_section("a hunter who shoots the furniture is told what it cost")
-	await _hide_with(ZzGame.HUNTERS)
-	# Armed as a round arms its hunters: the suite moved them to this side after it began.
-	_server_game._arm_hunters()
-	_server_game._set_phase(ZzGame.Phase.SEEK)
-	await _steps(4)
-	var server_me := _server_me()
-	server_me.place_at(LOOK_FROM, 0.0)
-	await _steps(20)
-	var aim := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.5, 0.0))
-	await _steps(6, aim)
-	var health := server_me.health.health
-	var fire := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.5, 0.0))
-	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
-	await _steps(SERVER_TICK_RATE * 2, fire)
-	await _steps(6, aim)
-	_check(server_me.health.health < health, "the server charged them for shooting a chair",
-		"%.1f -> %.1f, holding %s" % [health, server_me.health.health,
-			String(server_me.weapons.arsenal.current_def().id) if server_me.weapons != null and server_me.weapons.arsenal.current_def() != null else "nothing"])
-	_check(_heard.has("decoy") and float(_heard["decoy"]) > 0.0, "and the client was told, for its flash",
-		str(_heard.get("decoy")))
-	_finished()
-
-
-func _test_the_round_ends() -> void:
-	_section("the round ends, and the client is told who won and why")
-	var damage := DotDamage.make(_server_me().entity_id, _stand_in.entity_id, 10000.0, null)
-	damage.tick = _tick
-	var _applied := _server_game.combat.apply_damage(damage)
+	var npc := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test", Basis(Vector3.UP, PI))
 	await _steps(6)
-	_check(_heard.has("round_over") and int(_heard["round_over"][1]) == ZzGame.HUNTERS,
-		"the hunters won, and the client is told", str(_heard.get("round_over")))
-	_check(_heard.has("round_over") and str(_heard["round_over"][2]) != "", "with the server's own sentence",
-		str(_heard.get("round_over")))
+	_check(_heard.has("npc") and _heard["npc"][1] == ZzNpcs.COMMON, "the client is told a common is there")
+	var net_id: int = _heard["npc"][0] if _heard.has("npc") else 0
+	var mirror := _client_bridge.zombie_mirror(net_id)
+	_check(mirror != null and _client_bridge.zombie_count() == _server_bridge.zombie_count(),
+		"and draws it, and every other zombie the server has", "%d of %d" % [_client_bridge.zombie_count(), _server_bridge.zombie_count()])
+
+	npc.brain.call(&"force_target", server_me.player_id)
+	await _steps(SERVER_TICK_RATE)
+	var moved := npc.position().distance_to(STREET + Vector3(0.0, 0.0, -10.0))
+	var apart := mirror.global_position.distance_to(npc.position()) if mirror != null else INF
+	_check(moved > 1.0, "it comes for the survivor on the server", "%.1f m" % moved)
+	_check(apart < 0.6, "and the client's copy is where the server's is", "%.2f m apart" % apart)
+
+	_hurt_npc(npc, 100000.0)
+	await _steps(6)
+	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
+		"killed, and the client is told it died rather than went away")
+	_finished()
+
+
+func _test_a_down_reaches_the_client() -> void:
+	_section("a down and a revive reach the client")
+	var server_me := _server_me()
+	server_me.health.invulnerable = false
+	_hurt(server_me, 500.0)
+	server_me.health.invulnerable = true
+	await _steps(8)
+	_check(server_me.is_down(), "the server has them down")
+	_check(int(_heard.get("down", 0)) == SESSION, "the client is told")
+	_check(_mine().is_down() and _mine().incaps == 1, "and its own survivor is on the floor, on the first of its downs",
+		"life %d, incaps %d" % [_mine().life, _mine().incaps])
+
+	_server_game.stand_up(server_me)
+	await _steps(8)
+	_check(_mine().is_up() and not _mine().is_down(), "stood up on the server, up on the client")
+	_finished()
+
+
+func _test_a_pin_reaches_the_client() -> void:
+	_section("a pin reaches the client, and so does the release")
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	await _steps(4)
+	var strangler := _server_game.horde.spawner.spawn(ZzNpcs.STRANGLER, STREET + Vector3(0.0, 0.0, -10.0), &"test")
+	await _steps(4)
+	var _held := _server_game.pins.pin(_server_game.horde.entity_id_for(strangler), strangler, server_me.player_id, &"choke")
+	await _steps(10)
+	_check(_heard.has("pin") and int(_heard["pin"][0]) == SESSION and _heard["pin"][2] == &"choke"
+		and _client_bridge.zombie_mirror(int(_heard["pin"][1])) != null, "the client is told who holds them, and how")
+	_check(_mine().is_pinned() and _mine().pin_kind == &"choke", "and its own survivor is held")
+	_hurt_npc(strangler, 100000.0)
+	await _steps(10)
+	_check(int(_heard.get("unpin", 0)) == SESSION and not _mine().is_pinned(), "killed: free on both ends")
+	_finished()
+
+
+func _test_loot_reaches_the_client() -> void:
+	_section("what lies on the ground is told, and so is its going")
+	var at := STREET + Vector3(1.0, 0.0, -2.0)
+	var id := _server_game.loot.add(ZzLoot.MEDKIT, &"", at)
+	await _steps(3)
+	_check(_heard.has("loot") and int(_heard["loot"][0]) == id and _heard["loot"][1] == ZzLoot.MEDKIT, "a medkit appears")
+	_check(_heard.has("loot") and (_heard["loot"][2] as Vector3).distance_to(_server_game.loot.position_of(id)) < 0.05,
+		"where the server put it")
+	_server_game.loot.remove(id, _server_me().player_id)
+	await _steps(3)
+	_check(_heard.has("loot_gone") and int(_heard["loot_gone"][0]) == id and int(_heard["loot_gone"][1]) == SESSION,
+		"and goes, taken by them")
+	_finished()
+
+
+func _test_a_box_reaches_the_client() -> void:
+	_section("a box opened is told to everybody, with what it did")
+	_server_game.boxes.open(&"medical", _server_me(), STREET)
+	await _steps(4)
+	_check(_heard.has("box") and int(_heard["box"][0]) == SESSION and _heard["box"][1] == &"medical"
+		and str(_heard["box"][2]) != "", "who opened which, and the outcome's title",
+		str(_heard.get("box", [])))
+	_server_game.boxes.run([{"do": "damage_boost", "who": "opener", "scale": 1.5, "seconds": 20.0}],
+		{"opener": _server_me(), "at": STREET, "box": &"arsenal"})
+	await _steps(4)
+	var rows: Array = _heard.get("effects", [])
+	_check(rows.size() >= 1 and str(rows[0]["who"]) == "Ada", "and an effect that lasts is listed, on them by name", str(rows))
+	_finished()
+
+
+func _test_a_gate_reaches_the_client() -> void:
+	_section("a gate opened on the server opens on the client")
+	_server_game.open_gate("barrier")
+	await _steps(4)
+	_check(str(_heard.get("gate", "")) == "barrier", "the client is told")
+	_check(not _client_game.map.gate_is_shut("barrier"), "and its barrier is up: nobody walks into a wall that is not there")
+	_finished()
+
+
+func _test_the_map_ends() -> void:
+	_section("the map ends, and the client is told how and why")
+	_server_game._decide(false, "everybody is down")
+
+	for _i in range(SERVER_TICK_RATE * 4):
+		if _heard.has("round_over"):
+			break
+		await _step()
+
+	_check(_heard.has("round_over") and not bool(_heard["round_over"][1]), "lost")
+	_check(_heard.has("round_over") and str(_heard["round_over"][2]) == "everybody is down", "with the server's sentence")
 	_finished()
 
 
 func _test_leaving() -> void:
 	_section("leaving")
 	_server_bridge.remove_peer(CLIENT_PEER)
-	await _steps(4)
+	await _steps(8)
 	_check(not _server_game.players.has(_me()), "the server lets them go")
-	_check(_server_bridge.describe()["ready_peers"] == 0, "and stops talking to them")
+	_check(_server_game.players.has(_stand_in.player_id), "and keeps the stand-in")
 	_finished()
 
 
@@ -475,30 +473,33 @@ func _aim_at(player: ZzPlayer, target: Vector3) -> DotFpsCommand:
 	return command
 
 
-## Into a fresh round's hide, with the client on [param side] and the stand-in on the other,
-## everybody put back where the round puts them and wearing nothing.
-func _hide_with(side: int) -> void:
-	for _i in range(SERVER_TICK_RATE * 10):
-		if _server_game.phase == ZzGame.Phase.HIDE:
-			break
-		await _step()
+func _hurt(player: ZzPlayer, amount: float) -> void:
+	var hit := DotDamage.make(0, player.entity_id, amount, _server_game.combat.damage_type(&"strike"))
+	hit.tick = _server_game.current_tick()
+	var _applied := _server_game.combat.apply_damage(hit)
 
-	var other := ZzGame.PROPS if side == ZzGame.HUNTERS else ZzGame.HUNTERS
-	_server_game._set_side(_me(), side)
-	_server_game._set_side(_stand_in.player_id, other)
-	_server_game._set_phase(ZzGame.Phase.HIDE)
-	_server_game._place_everybody()
-	await _steps(8)
+
+func _hurt_npc(npc: DotNpcInstance, amount: float) -> void:
+	var hit := DotDamage.make(0, _server_game.horde.entity_id_for(npc), amount, _server_game.combat.damage_type(&"strike"))
+	hit.tick = _server_game.current_tick()
+	var _applied := _server_game.combat.apply_damage(hit)
 
 
 func _make_game(server: bool, parent: Node) -> ZzGame:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
-	config.hide_seconds = 60.0
 	config.minimum_players = 0
 	config.keep_progress = false
-	config.auto_taunt_seconds = 0.0
+	config.start_grace_seconds = 0.5
+	config.wanderer_density = 0.0
+	config.sleepers_enabled = false
+	config.specials_base = 0
+	config.mob_interval_min = 900.0
+	config.mob_interval_max = 900.0
+	config.brute_interval_min = 0.0
+	config.brute_interval_max = 0.0
+	config.box_drop_common = 0.0
 	config.map_ids = PackedStringArray(["zz_practice"])
 
 	var game := ZzGame.new()

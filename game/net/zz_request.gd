@@ -6,9 +6,9 @@ const ZzEvents := preload("zz_events.gd")
 ##
 ## [b]None of these is a per-tick intent.[/b] Firing is a BUTTON, because it has to be
 ## ordered against the movement it was made with; this is for the other kind — "my world
-## exists", "make me that lamp", "taunt", "I want to watch somebody else" — each of which
-## happens once and must not be lost. A disguise is the server's look, not the client's: the
-## request carries no prop, and the server casts the ray from where it has the player's eyes.
+## exists", "I am ready", "I want to watch somebody else" — each of which
+## happens once and must not be lost. Nothing here carries a position: the
+## server already has the player's eyes and casts any ray from them.
 
 const NAME := &"zz.request"
 const KIND_BITS := 4

@@ -29,6 +29,10 @@ const CHANNEL := "zz.bots"
 
 ## How far a bot sees a zombie, and how close a crowd has to be to be shoved.
 const SIGHT := 32.0
+
+## How near the line of fire a friend's middle may be before a stand-in holds its fire: a
+## body's half-width and a little more for a shotgun's spread.
+const FRIEND_CLEARANCE := 0.7
 const SHOVE_RANGE := 1.7
 
 ## How far a bot lets its leader get before it walks after them.
@@ -252,7 +256,35 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 		memory["target_since"] = game.now()
 		return false
 
-	return game.now() - float(memory["target_since"]) >= game.config.bot_reaction
+	if game.now() - float(memory["target_since"]) < game.config.bot_reaction:
+		return false
+
+	return not _friend_in_the_way(player, _aim_point(npc))
+
+
+## Whether another survivor stands in the line from [param player]'s eye to [param at].
+##
+## [b]Without it the stand-ins were their own worst enemy.[/b] Four of them bunched in the
+## start room's doorway shot through each other at the first crowd, and with friendly fire on
+## they lost the practice street three times in a minute; with it off, the same seed got them
+## to the switch. A person does not fire through a friend's back, so neither does a stand-in.
+func _friend_in_the_way(player, at: Vector3) -> bool:
+	var eye: Vector3 = player.eye_position()
+
+	for other in game.survivors():
+		if other == player or not other.is_alive() or other.watching:
+			continue
+
+		var middle: Vector3 = other.feet() + Vector3(0.0, 0.9, 0.0)
+
+		# Only somebody between the gun and the target, not behind either.
+		if (middle - eye).dot(at - eye) <= 0.0 or middle.distance_to(eye) > at.distance_to(eye):
+			continue
+
+		if Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle) < FRIEND_CLEARANCE:
+			return true
+
+	return false
 
 
 func _pinned_friend(player):

@@ -29,7 +29,7 @@
 # PACK is the game's id in dot-server-deploy (empty if it has no server), EXTRA_PACKS
 # are other packs it needs as id:repository pairs, and SUITES are the scenes in
 # examples/ that test it.
-GAME_NAME="Prop Hunt"
+GAME_NAME="Zombie Zone"
 PACK="zombiezone"
 EXTRA_PACKS="zombiezone_maps:zombie-zone-maps"
 SUITES="headless_run headless_maps headless_net dedicated"

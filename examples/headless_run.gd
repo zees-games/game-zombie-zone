@@ -27,7 +27,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const SECTIONS := 22
 
-const CHECKS := 94
+const CHECKS := 96
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -193,6 +193,24 @@ func _test_navigation() -> void:
 	_section("the zombies' ground")
 	var game := await _team(1)
 	var graph: DotNpcNavGraph = game.horde.spawner.nav
+
+	# Asked with the barrier shut and the survivor on the near side: every mob spawn must be
+	# somewhere it can walk to them from. The first dedicated run spawned its panic beyond it.
+	game.survivors()[0].place_at(STREET, 0.0)
+	await _sim(game, 0.1)
+	var stranded := 0
+	for i in 40:
+		var p: Vector3 = game.horde._spawn_point(8.0, 60.0, true)
+		if p != Vector3.INF and not graph.is_reachable(p, STREET, 3.0):
+			stranded += 1
+	_check(stranded == 0, "no mob is spawned where it cannot reach anybody", "%d of 40 behind the barrier" % stranded)
+
+	var in_rooms := 0
+	for p: Vector3 in game.horde.director.spawn_points:
+		if (p.z < -5.0 and absf(p.x) < 6.0) or (p.z > 79.0 and absf(p.x) < 6.0):
+			in_rooms += 1
+	_check(in_rooms == 0, "and none in a safe room", "%d spawn points in one" % in_rooms)
+
 	_check(graph != null and graph.is_ready() and game.horde.nav.point_count() > 1000,
 		"the street is walkable", "%d points" % game.horde.nav.point_count())
 	_check(not graph.find_path(Vector3(0, 0, -10), Vector3(0, 0, 30), 2.0).is_empty(),
@@ -299,7 +317,7 @@ func _test_the_room_wakes() -> void:
 
 func _test_downs() -> void:
 	_section("down, not dead, and the third time dead")
-	var game := await _team(2)
+	var game := await _team(2, _quiet)
 	var me := game.survivors()[0]
 	var friend := game.survivors()[1]
 	me.place_at(STREET, 0.0)
@@ -330,7 +348,7 @@ func _test_downs() -> void:
 
 func _test_borrowed_health() -> void:
 	_section("pills, a medkit, and borrowed health")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	_hurt(game, me, 70.0)
@@ -357,7 +375,7 @@ func _test_borrowed_health() -> void:
 
 func _test_the_shove() -> void:
 	_section("the shove")
-	var game := await _team(2)
+	var game := await _team(2, _quiet)
 	var me := game.survivors()[0]
 	var friend := game.survivors()[1]
 	me.place_at(STREET, 0.0)
@@ -396,7 +414,7 @@ func _test_the_shove() -> void:
 
 func _test_pins() -> void:
 	_section("held: the damage, the drag, and killing what holds you")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	var strangler := game.horde.spawner.spawn(ZzNpcs.STRANGLER, STREET + Vector3(0, 0, -12), &"test")
@@ -494,7 +512,7 @@ func _test_hazards() -> void:
 
 func _test_loot() -> void:
 	_section("what lies on the ground")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	var shotgun := game.loot.add(ZzLoot.WEAPON, &"shotgun", STREET + Vector3(0, 0, -1.5))
 	me.place_at(STREET, 0.0)
@@ -748,6 +766,17 @@ func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> 
 	game.start()
 	await _sim(game, 0.25)
 	return game
+
+
+## Nothing on the street but what a section puts there: no wanderers, no specials, no mob. A
+## wanderer's swing during a revive or a heal is a different number, and which spawn point a
+## wanderer is drawn at is the horde's business, not the section's.
+static func _quiet(c: ZzConfig) -> void:
+	c.wanderer_density = 0.0
+	c.specials_base = 0
+	c.mob_interval_min = 900.0
+	c.mob_interval_max = 900.0
+	c.sleepers_enabled = false
 
 
 func _dispose(game: ZzGame) -> void:

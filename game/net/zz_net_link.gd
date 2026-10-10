@@ -194,7 +194,7 @@ func _net_snapshot(payload: PackedByteArray) -> void:
 		bridge.receive_snapshot(payload)
 
 
-## Anything from the authority that must arrive: a map, a round beginning, a disguise.
+## Anything from the authority that must arrive: a map, a round beginning, a zombie.
 @rpc("authority", "reliable", "call_remote", CHANNEL_STATE)
 func _net_event(payload: PackedByteArray) -> void:
 	events_received += 1

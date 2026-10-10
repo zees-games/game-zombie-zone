@@ -26,7 +26,7 @@ static func make() -> DotMenuBindings:
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "H", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
-	keys.add(SHOVE, &"bind_shove", "Shove (also right mouse)", "V", "Hands")
+	keys.add(SHOVE, &"bind_shove", "Shove (also right mouse)", "F", "Hands")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")

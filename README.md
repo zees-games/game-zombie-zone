@@ -1,4 +1,4 @@
-This is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, most players are **props**: they hide by turning into a piece of furniture, a plant or a rock somewhere on the map and keeping still. The rest are **hunters**, who are blindfolded while the props hide and then have a few minutes to find them, with every wrong guess costing them health. This is inspired by the classic prop hunt game mode!
+This is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, a team of up to eight survivors fights through a city at night, from one safe room to the next, against a horde that is directed rather than random and against special infected that each have one nasty trick. Zombies drop boxes that do something random when you open them, good or very bad. This is inspired by the co-operative zombie shooters and the big community servers that ran them with twenty-odd players and a hundred kinds of party box!
 
 **This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with TMC, you will need to build and integrate your own back-end infrastructure.
 
@@ -10,18 +10,46 @@ This project, along with every asset it is built on, was built initially with **
 I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
 
 ## How it plays
-Each round starts with the **hide**. The props get 30 seconds to run off and pick a spot while the hunters stand at their spawn with a black screen (they can still see their HUD and menus, just not the map or anybody on it). Then the hunters are let go and have 5 minutes.
+There are two kinds of map.
 
-- **Props** look at something and press **E** to become it: a chair, a bin, a houseplant, a bookcase, a pumpkin. Bigger things have more health but are easier to spot, and you need room to become them: if you're too close to a wall you're moved a step away, and if there's no room at all (or no room to stand up when you show yourself) you're told so. Turn to fit in with the arrow keys, lock your rotation with **C** so looking around doesn't turn you, and stay still. Press **Q** to take the disguise off and show yourself as your avatar, which earns a point a second while you dare; it goes back on with **Q** again, and then you have to wait a little before you can do it again.
-- **Taunts.** Once the hunters are let go, press **T** to play a sound from where you are standing (or **F3** to pick one). Every taunt is worth points, but the hunters hear where it came from. Stand still for too long and the game taunts for you, with a meter on screen showing how close it is.
-- **Hunters** get an SMG, a shotgun and a hatchet. Shooting a prop hurts it. Shooting real furniture hurts **you**, so guess carefully. Run out of health and you blow apart.
-- **The beacon.** When only one prop is left, or with 30 seconds to go, every prop still hiding pings out a sound and a ring everybody can see, every two seconds.
+- **Campaign maps** go from a start safe room to an end safe room. On the way there is usually something to do: cut a lock, raise a shutter, radio a boat. Doing it is loud, and you have to hold out while everything that heard it comes for you. Get everybody who is still standing into the end room and the map is won, and the next one in the campaign starts. Lose and you play it again, a couple of times, before the server moves on.
+- **Survival maps** are a place to hold for a few minutes while the horde gets worse.
 
-The props win if any of them is still hidden when the clock runs out, or if every hunter is gone. The hunters win if they find every prop. Winning is worth 10 points to everyone on that side, finding a prop 5 and surviving a round 5. Points, rounds won, props found and the rest go to your stats and the leaderboards on TMC.
+**The horde.** Commons stand about the map, sit, feed and shamble. They see you, scream, and the scream wakes everybody near them. Every minute and a half to three minutes a mob comes from somewhere you cannot see, and the director paces it: it builds up, peaks, and gives you a breather. Only six of them swing at one survivor at a time; the rest circle round. They hit for a little on normal and for a lot on expert.
 
-A round draws the hunters fresh: one hunter for every three players by default. Say **!hunter** or **!prop** in chat to ask for a side. Anybody who is out watches the rest of the round. After a few rounds on a map, players vote for the next one (`!rtv`, `!nominate zz_house`).
+**The specials.** One trick each, and they wait for a good moment to use it.
 
-There are five maps: a small practice house built into the game, and **Maple Grove School**, **Willow Lane**, **Brightline Offices** and **Pinecrest Woods** from [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps).
+| Special | What it does |
+| --- | --- |
+| Leaper | Pounces from cover and pins you to the floor |
+| Strangler | Grabs you with a tongue from far away and drags you to it |
+| Bloater | Bursts when it dies (or when it gets close) and covers everybody near in bile, which draws the horde |
+| Ram | Charges through the team, carries one of you off and pounds you into the ground |
+| Spitter | Spits acid that pools on the floor and burns more the longer you stand in it |
+| Rider | Jumps on your back and steers you away from your friends |
+| Brute | Huge, slow to kill, throws rocks, and knocks people across the street |
+| Sleeper | Sits crying in the dark. Leave her alone. If you get too close she goes for whoever woke her |
+
+Anybody pinned needs a friend: shoot what holds them or shove it off.
+
+**Downs.** At zero health you go down, not out: you can still shoot your pistol while you bleed out, and a friend holding **E** on you gets you up on borrowed health that drains away. Go down a third time and you are dead. Dead survivors are rescued beside the team after a while. A medkit heals most of what is missing and clears your downs; pills give borrowed health now.
+
+**Boxes.** Zombies sometimes drop a box, and specials drop them more often. There are eight kinds and seventy-six things they can do: an airstrike on whoever is closest, a ring of fire, healing for the team, a bigger horde, a swarm of specials, a minigun, low gravity, swapping places with a friend, or a curse. Many of them last a while and stack with the same effect from another box, and the HUD lists what is running. The box file is `boxes/boxes.json` and a server owner can change or add to it.
+
+| Box | What to expect |
+| --- | --- |
+| Explosive | Airstrikes, booby traps, grenades, a big gun |
+| Incendiary | Fire on the zombies, or on you |
+| Med | Healing, medkits, getting people up, or poison |
+| Horde | More, bigger and faster mobs, or a calm |
+| Special | Specials, harder specials, a brute, or a cull |
+| Arsenal | Better weapons, ammo, hollow points |
+| Mystery | Anything: gravity, speed, teleports, invulnerability |
+| Cursed | Mostly bad, sometimes not |
+
+**Friendly fire is on**, at a tenth of the damage on normal and much more on expert. Stand-ins fill the team up to four when there are not enough people, and they shoot, revive, heal and pick things up, and they do not shoot through you.
+
+There are six maps: the **practice street** built into the game, the three-map **Blackout** campaign (Corner Shop, The Depot, The Pier), and two survival maps, **Parking Lot** and **Chapel Yard**, from [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps). At the end of a campaign the players vote for what is next.
 
 ## Controls
 
@@ -30,12 +58,12 @@ There are five maps: a small practice house built into the game, and **Maple Gro
 | **WASD** / mouse | Move and look |
 | **Space** | Jump |
 | **Ctrl** | Duck |
-| **E** | Become what you are looking at (props) |
-| **Q** | Show yourself / hide again (props) |
-| **C** | Lock your rotation (props) |
-| **Arrow keys** / **Z** | Tilt and lean / stand upright again (props) |
-| **T** / **F3** | Taunt / pick a taunt (props) |
-| **Mouse 1** / **R** / **1**-**3** | Fire / reload / weapons (hunters) |
+| **Mouse 1** / **R** | Fire / reload |
+| **1**-**5** / mouse wheel | Weapons |
+| **E** | Use, pick up, revive a friend (hold) |
+| **F** / **Mouse 2** | Shove |
+| **H** | Medkit: on yourself, or on the friend you are looking at (hold) |
+| **Q** | Take pills |
 | **V** | Talk (voice) |
 | **F5** | First or third person |
 | **Tab** | Scoreboard (hold) |
@@ -54,13 +82,13 @@ cd projects/game-zombie-zone
 
 On Windows, run `bootstrap.ps1` instead and open the project in Godot.
 
-The maps come from the zombie-zone-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice map, and the server owner picks the maps pack (`gamemann/zombie-zone-maps`, or their own) in dot-server-deploy's `cfg/content.yml`.
+The maps come from the zombie-zone-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice street, and the server owner picks the maps pack (`gamemann/zombie-zone-maps`, or their own) in dot-server-deploy's `cfg/content.yml`.
 
 `game.sh` does everything else:
 
 | Command | What it does |
 | --- | --- |
-| `./game.sh` | Play offline against bots (they hide when you hunt, and hunt when you hide) |
+| `./game.sh` | Play offline with three stand-ins |
 | `./game.sh online` | Start a local server and the browser client, and print the link to open |
 | `./game.sh online down` | Stop them |
 | `./game.sh server` | Start a local dedicated server only |
@@ -71,78 +99,82 @@ The maps come from the zombie-zone-maps checkout, which bootstrap links into `ma
 `online` and `server` use [dot-server-deploy](https://github.com/modcommunity/dot-server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
-Settings are cvars. Set them in the server's config, on the command line, or live from the console. Most of them take effect from the next round.
+Settings are cvars. Set them in the server's config, on the command line, or live from the console. Most of them take effect straight away; the ones about a map's layout take effect from the next map.
 
 ```
-zz_hide_seconds 30             // how long the props have to hide (a map may ask for less)
-zz_round_seconds 300           // how long the hunters have to find them (a map may ask for less)
-zz_timeout_winner 1            // who wins when the clock runs out: 0 nobody, 1 props, 2 hunters
-zz_players_per_hunter 3        // one hunter for every this many players
-zz_min_hunters 1               // never fewer than this many
-zz_max_hunters 8               // never more than this many
-zz_hunter_pick 0               // 0 random, 1 everybody gets an equal share, 2 the sides swap
-zz_side_choice 1               // 1 = !hunter and !prop count in the draw
-zz_auto_taunt_seconds 45       // a prop standing still this long is taunted for (0 never)
-zz_auto_taunt_radius 1.5       // metres a prop has to move for it to count as moving
-zz_taunt_points 2              // points for a taunt a prop chose
-zz_forced_taunt_points 0       // points for one the game forced
-zz_reveal_cooldown 10          // seconds before a prop can show itself again
-zz_reveal_points 1             // points a second while a prop shows itself
-zz_beacon_props_left 1         // beacon every prop once this few are left (0 never)
-zz_beacon_seconds_left 30      // beacon every prop with this many seconds left (0 never)
-zz_decoy_penalty 0.2           // share of a shot's damage a hunter takes for hitting furniture (0 off)
-zz_rounds_per_map 4            // rounds on a map before the next one
-zz_spectate_camera 0           // who the dead may watch: 0 anybody, 1 their own side, 2 nobody
-zz_autobhop 0                  // 1 = hold jump to keep hopping
-zz_min_players 4               // fill the round with bots up to this
-zz_bots 1                      // 0 = no bots
-zz_bot_suspicion 12            // how often a bot hunter shoots something it suspects
-zz_vote_after 20               // seconds into a map's last round before the vote opens
+zz_difficulty 1                // 0 easy, 1 normal, 2 advanced, 3 expert
+zz_friendly_fire 0.1           // a teammate's bullet as a share of what it does to a zombie, before difficulty
+zz_max_incaps 2                // downs before the next one is death
+zz_rescue_seconds 75           // seconds before a dead survivor is rescued beside the team (0 never)
+zz_start_grace 60              // seconds the start room holds the horde off unless somebody leaves it
+zz_survive_seconds 480         // how long a survival map is held when the map does not say
+zz_map_on_loss 0               // after a lost map: 0 play it again, 1 move on
+zz_retries 2                   // times a lost map is played again before moving on
+zz_commons 24                  // commons alive at once for one survivor
+zz_commons_per_survivor 6      // and for each survivor more
+zz_wanderers 0.55              // commons standing about a map, per 100 square metres
+zz_mob_min 90                  // seconds between mobs, from
+zz_mob_max 180                 // seconds between mobs, to
+zz_mob_size 14                 // commons in a mob, for one survivor
+zz_specials 2                  // specials alive at once for one survivor
+zz_special_min 18              // seconds between specials, from
+zz_special_max 40              // seconds between specials, to
+zz_brute_min 300               // seconds between brutes, from (0 with zz_brute_max 0: never)
+zz_brute_max 480               // seconds between brutes, to
+zz_director 1                  // whether the build-up, peak and relax pacing runs
+zz_sleepers 1                  // whether the maps' sleepers are there
+zz_box_drops 1                 // whether zombies drop boxes
+zz_box_common 0.012            // chance a common drops a box
+zz_box_special 0.3             // chance a special drops a box
+zz_gravity 20                  // metres per second squared, for everything
+zz_min_players 4               // survivors the server keeps in the game with stand-ins
+zz_bots 1                      // 0 to turn the stand-ins off
+zz_spectate_camera 0           // who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody
 ```
-
-`--zz-map-ids=<ids>` limits a server to some maps, and every other setting in `game/zz_config.gd` can be given the same way (`--zz-taunt-range=80`). The taunts are listed in `taunts/taunts.json`: edit it to add your own sounds. The vote's settings go in `user://cfg/zombiezone_vote.json` (`{"enabled": false}` turns it off); dot-vote's README lists them.
 
 Console commands:
 
-| Command | |
+| Command | What it does |
 | --- | --- |
-| `zz_status` | The round, the map, and who is hiding as what |
-| `zz_maps` | The maps the server has, and any it refused (with the reason) |
-| `zz_map <id>` | Play this map next |
-| `zz_taunts` | The taunts |
-| `zz_reload` | Read the map folder again, for the next map |
-| `zz_net` | What the network code is doing |
+| `zz_status` | What the map is doing: survivors, horde, director, objective |
+| `zz_maps` | Every map, and any file that was refused and why |
+| `zz_map <id>` | Play a map next, when this one ends |
+| `zz_reload` | Read the map directory again (from the next map) |
+| `zz_boxes` | Every box type and what it can do |
+| `zz_net` | What the netcode is doing |
+| `zz_say <text>` | Say something to everybody, as the server |
 
-### Admin commands
-These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
+Admin commands, for seeing what happens (they need the `z` flag):
+
+| Command | What it does |
+| --- | --- |
+| `zz_spawn <kind> [count]` | Spawn a zombie by your feet (or the team's): `common`, `leaper`, `strangler`, `bloater`, `ram`, `spitter`, `rider`, `brute`, `sleeper` |
+| `zz_box [type]` | Drop a box in front of you |
+| `zz_mob [size]` | Send a mob now |
+| `zz_panic [seconds]` | Mobs back to back |
 
 ## Writing a map
-A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](maps/README.md) describes the format. The server sends the map to each player when it changes, so players don't need the map files.
+Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps/blob/main/maps/README.md).
 
 ## Testing
+`./game.sh test` checks that every script parses and then runs every suite:
 
-```bash
-./game.sh test                      # every script parses, then every suite runs
-./game.sh test headless_maps        # one suite
-```
-
-| Suite | What it covers |
+| Suite | What it checks |
 | --- | --- |
-| `headless_run` | The game itself: the draw, hiding, disguises, taunts, decoys, the beacon, bots |
-| `headless_maps` | Every map: it fits on the wire, every spawn is clear, every prop stands on something |
-| `headless_net` | A server and a client in one process, over the network code: disguises, the blindfold, taunts |
-| `dedicated` | A real server: boots, loads the game, runs its commands, a round of bots, the map vote |
+| `headless_run` | The game itself: the horde noticing, chasing and hitting, shots and headshots, downs and revives, borrowed health, the shove, every special, acid and fire, loot, every box outcome, objectives and gates, winning and losing, the stand-ins, and that sixty zombies on one survivor fit in a tick |
+| `headless_maps` | Every map: it fits on the wire, every prop is known, every spawn has room, items can be picked up, the zombies can reach everything that matters, and a shut gate really is shut |
+| `headless_net` | A client and a server in one process: zombies, downs, pins, loot, boxes, gates and the end of a map all reach the client |
+| `dedicated` | The game as a real server runs it: the module, the console, a map played by stand-ins, the map vote, and a clean exit |
 
-[`CLAUDE.md`](CLAUDE.md) has the design decisions and the reasoning behind them.
+`xvfb-run -a godot --path . res://tools/audio_probe.tscn` checks that the game actually makes a noise, which a headless run cannot.
 
 ## Not done yet
-- The bots are simple: a bot prop walks to the nearest thing it can be and stays there, and a bot hunter wanders and shoots what moves.
-- Your own avatar from TMC is used when you show yourself, but the props themselves can't be customised.
-- The round sounds (not the taunts) are made in code and are placeholders.
-- Not yet tried in a browser.
+- **Molotovs, pipe bombs and bile jars.** The game knows how to throw them (the boxes do), but no weapon pack has them as something a survivor carries yet. They are what a second weapon pack is for.
+- **Finales with a rescue vehicle**, multi-floor maps with stairs, and more campaigns.
+- **Playing it with people.** How hard normal should be, how often a mob comes and how much a box should do are numbers only play settles.
 
 ## Credits
-The furniture is Kenney's Furniture Kit, the trees, plants and rocks his Nature Kit, the players his Blocky Characters, and the taunts come from his Voiceover Pack and Music Jingles ([kenney.nl](https://kenney.nl), CC0). The Nature Kit's colours are toned down when the game loads them. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons). Floors, walls and every other surface are drawn in code. Each kit's licence is next to its files.
+The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons). Floors, walls and every other surface are drawn in code. Each kit's licence is next to its files.
 
 ## License
-MIT. See [LICENSE](LICENSE). The Kenney art is CC0, which is public domain.
+MIT. See [LICENSE](LICENSE). The Kenney art and the OpenGameArt sounds are CC0, which is public domain.

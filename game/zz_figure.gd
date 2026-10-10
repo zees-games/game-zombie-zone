@@ -20,12 +20,12 @@ const ZzPaths := preload("zz_paths.gd")
 ## remote player, `render_state()` for one this process simulates — and nothing here
 ## computes one.
 ##
-## [b]A Kenney character rather than primitives,[/b] because a hunter is somebody to see coming and
+## [b]A Kenney character rather than primitives,[/b] because a survivor is somebody to see coming and
 ## a capsule does not say which way somebody is facing from forty metres; the kit's head,
 ## arms and a walk cycle do, for 113 KB. One mesh set and six atlases, the ones
 ## mg-buses-from-hell chose for being people; which one a player wears comes from their id,
 ## so every client dresses the same person the same way. [b]The side is on the torso[/b], as
-## a tint over the atlas: in a game with up to six teams the first thing anybody needs to
+## a tint over the atlas: in a game where friendly fire is on, the first thing anybody needs to
 ## read off a body is whether to shoot it, and the kit paints nobody in a team's colour.
 ##
 ## [b]Loaded by path and repainted by hand, for the pack.[/b] A delivered game is mounted

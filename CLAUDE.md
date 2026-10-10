@@ -1,114 +1,114 @@
 # game-zombie-zone
 
-Hide as the furniture. Most players are props, who look at something on the map and become it; the rest are hunters, blindfolded while the props hide and then given a few minutes to find them, paying in health for every piece of real furniture they shoot.
+A co-operative zombie shooter: a team of survivors crosses a map from safe room to safe room (or holds a survival map for its clock) against a directed horde, eight kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
 
-Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it. This file is only about what this game decides. The maps are in `maps/`, a link to [zombie-zone-maps](../zombie-zone-maps), written by its `tools/build_maps.py`; `maps/README.md` is the format.
+Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it (dot-npc, dot-npc-ai and dot-npc-ai-director most of all). This file is only about what this game decides. The maps are in `maps/`, a link to [zombie-zone-maps](../zombie-zone-maps), written by its `tools/build_maps.py`; `maps/README.md` there is the format.
 
-**Built 2026-10-09 from mg-deathrun's skeleton** (module, services, wire, client, HUD, spectate, progress, avatars, figure, vote, renamed `dr` → `ph` and then rewritten wherever they named a course, a trap or an activator). Where a comment says "mg-wipeout found…" or "mg-smash-copter found…", the finding is that game's and the line was kept because it is still true here.
+**Built 2026-10-10 from mg-prop-hunt's skeleton** (module, services, wire, client, HUD, spectate, progress, avatars, figure, vote, map documents and props, renamed `ph` → `zz` and then rewritten wherever they named a disguise, a hunter or a taunt). Where a comment says "mg-wipeout found…" or "another game in this family…", the finding is that game's and the line was kept because it is still true here.
 
-## What this game is, versus the others
-
-The third asymmetric one, after buses and deathrun, and the first where **one side's whole move is to stop moving**. A prop's skill is choosing what to be and where; a hunter's is reading a room for the thing that is slightly wrong, and the decoy charge is what makes that a skill rather than spraying every chair.
+The design brief was the genre's own: the four-player co-operative zombie campaigns, the specials that punish a team that splits up, and the big community servers that ran them with twenty-odd players, harder specials, more frequent hordes and a hundred kinds of "party box" that zombies dropped (gamemann's own l4d2-partyboxes plugin is one of them). None of that is named in a public file; see the family rule.
 
 ## Layout
 
 ```
 game/
-  zz_config.gd       every rule a round is played under (maps are documents)
-  zz_map_doc.gd      what a map IS: boxes, props by catalogue id, lights, spawns; validated
-  zz_map.gd          a document built: solid boxes, furniture shapes, drawn batches, spawns
-  zz_props.gd        the prop catalogue (props/catalogue.json): sizes, models, recolour, parts
-  zz_materials.gd    the surfaces a box is drawn with, textures made in code
-  zz_catalogue.gd    every map the server has, the built-in practice house, which is next
-  zz_controller.gd   DotFpsController with the blindfold modifier
-  zz_player.gd       one person: a body or a disguise, its hull, hitboxes, health, reveal, beacon
-  zz_game.gd         the simulation: the draw, hide/seek, disguises, taunts, decoys, beacons, bots
-  zz_rules.gd        a DotMatchRules whose outcome is whatever ZzGame decided
-  zz_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold
-  zz_audio.gd        the round's cues (made in code) and taunts played from a prop
-  zz_client.gd       one local player, alone or against a server; third person as a prop
-  zz_bindings.gd     every key, as dot-menu bindings; zz_settings.gd the Escape menu
-  zz_module.gd       the DotGameModule: cvars, zz_status / zz_maps / zz_taunts / zz_map, stand-ins
-  zz_services.gd     chat, voice and moderation over dot-game's base
-  zz_progress.gd     stats and achievements; zz_vote.gd the map vote; zz_spectate.gd who watches whom
-  net/               the codec (MAP, DISGUISE, TAUNT, DECOY…), the link, the player behaviour,
-                     the bridge, and ZzInterest (the blindfold on the wire)
+  zz_config.gd       every rule a map is played under: difficulty, downs, horde, specials, boxes, bots
+  zz_map_doc.gd      what a map IS: boxes, props, lights, spawns, safe areas, route, nav, items, objectives
+  zz_map.gd          a document built: solid boxes, gates as separate bodies, props, areas
+  zz_catalogue.gd    every map the server has, and the built-in practice street
+  zz_npcs.gd         the zombie catalogue (nine kinds), and the nav graph a map's document gives
+  zz_horde.gd        the horde: spawner, director, senses, squads, sounds; mobs, specials, brutes, sleepers
+  zz_pins.gd         being held: pounce, choke, carry, ride
+  zz_hazards.gd      acid, fire, healing zones; spit, rocks, pipe bombs, shells, molotovs in flight
+  zz_loot.gd         what lies on the ground and what using it does
+  zz_boxes.gd        the boxes: boxes/boxes.json read and checked, ~40 verbs, stacking effects
+  zz_weapons.gd      every weapon by tier, from every weapon pack (the seam for a second pack)
+  zz_bots.gd         stand-in survivors
+  zz_controller.gd   DotFpsController with the game's modifiers (pinned, down, limp, haste, knock...)
+  zz_player.gd       one survivor: life, downs, borrowed health, pin, hands, status, stats
+  zz_game.gd         the simulation: map flow, combat, hands (use/heal/pills/shove), downs, objectives
+  zz_hud.gd zz_world_view.gd zz_client.gd zz_audio.gd   what a person sees and hears
+  zz_module.gd       the DotGameModule: cvars, console and admin commands, stand-ins
+  net/               the codec (NPC, PIN, LOOT, BOX, HAZARD, BLAST...), player and zombie behaviours, the bridge
+npcs/                the zombie body, its view, and one brain script per kind (by path)
+boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
-assets/props/        the vendored furniture and nature models (Kenney, CC0)
-taunts/              the taunt sounds and taunts.json (Kenney, CC0); edit freely
-maps/                link to ../zombie-zone-maps/maps
-examples/            headless_run (78), headless_maps (41), headless_net (49), dedicated (39)
-tools/               shot.sh/.gd (render a view), measure_props.gd, audio_probe (xvfb only)
+sounds/              moans, specials, music; CREDITS.md
+examples/            headless_run (96), headless_maps (61), headless_net (53), dedicated (44)
+tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 
-## Decision 1: a disguise is a hull, not a look
+## Decision 1: the zombies are the server's, and a client draws them
 
-Becoming a chair changes what the controller sweeps, what the hitbox is and how much health there is, all as functions of the chair's measured size (`DotPropDisguise` in dot-props, under `DotPropDisguiseRules`): a footprint half as wide as the prop so a disguised player still fits through a door, a height clamped between 0.3 and 2.2 m, health `190 × volume^0.45` between 10 and 200, and a hurt prop that changes shape keeps its share of health. `ZzPlayer.apply_disguise` writes the hull **into the controller's tunables in place**, because the motor holds that object by reference and a new one would never reach it.
+dot-npc's reason, which is stronger here than anywhere: a zombie's position is a pathfinder, a steering pass and a crowd pushing on it, none of which is reproducible on two machines. So zombies are **not predicted**. Each one is a `DotNetIdentity` with `ZzNpcNet` (position, yaw, health, state, animation, flags) and is **always relevant**: a crowd half sent is a crowd with holes in it. A client is told a zombie exists (NPC, with its kind and variant so the body is chosen once), interpolates its snapshots, and is told when it is gone and whether it died (NPC_GONE), so a body can fall rather than vanish. `headless_net` spawns one, moves it on the server, and checks the client's copy is within 0.6 m and that its death arrives as a death.
 
-**Both ends must agree, so both ends compute it from the same number.** A client predicting itself as a chair with a different capsule from the server's walks through a doorway the server's chair does not fit and is pulled back every tick. The size comes from `props/catalogue.json`, measured once offline by `tools/measure_props.gd`, because a headless server has the meshes but no business loading 163 of them to read their bounds. A DISGUISE event carries the prop, its turn and its lock; the receiving end rebuilds the hull from the catalogue. `headless_net` asserts the capsule and health equal on both ends and a running chair within 2 mm of the server's.
+The survivors **are** predicted (dot-player-controller), and everything that changes how a survivor moves is a controller **modifier** (`ZzController`: PINNED, DOWN, LIMP, TAGGED, BUSY, HASTE, LOW_GRAVITY, HEAVY and eight KNOCK directions), because a modifier is replicated with the state and the client applies it on the same tick the server does. A pin or a knock written as a velocity on one end only is a survivor pulled back every tick.
 
-**A hull changes size where the player stands, so the server looks for room first** (`ZzGame._make_room`): the new capsule where they are, then a step of 0.3 or 0.6 m in eight directions, never through a wall and never off a floor, and otherwise a refusal ("There is no room…"). Without it a bottle by a wall that became a bookcase, or a small prop under a table that showed its face, was a capsule inside the wall or the table, which the motor resolves differently on each machine. Found in review (2026-10-09); `headless_run`'s "a bigger hull needs room" (armed by turning the check off: three fail).
+## Decision 2: the zombies' ground is the map's own floor plan
 
-**Turning** is yaw (free, or locked with C so looking around does not turn you), tilt and lean in 15° steps up to 90°, and upright again. A lock or a tilt is the server's, asked for and announced.
+A map document carries `nav.floors` (rectangles), and `ZzNpcs.nav_for` lays dot-npc's point graph over them and cuts out every solid box and every prop taller than half a metre, and every **shut gate**. Opening a gate rebuilds the graph without it (`ZzHorde.open_gate`), which is what lets a barrier hold the horde back and then let it through. zombie-zone-maps generates `nav.floors` from the same regions the walls come from, so the two plans cannot drift; `headless_maps` checks, on every map, that the graph joins every objective, sleeper, spawn hint and the end area to the start, and that the end is cut off while the gates are shut.
 
-## Decision 2: the blindfold is true on the wire
+**A mob is only spawned where it can reach somebody** (`ZzHorde._reaches_somebody`, by the graph's connected pieces), and **never inside a safe room** (`_keep_out_of_safe_rooms`). Both were found by `dedicated`: the hold-out's mob spawned behind the barrier the hold-out was opening (`headless_run` arms it: 40 of 40 spawns stranded without the check), and six wanderers stood waiting in the end room. Nothing errored; the stand-ins held the switch with nothing to shoot.
 
-The HUD paints a hunter's screen black during the hide, and a modifier (`ZzController.BLINDFOLD`) holds them still on exactly the ticks the server does. Neither stops a client that skips the paint. So `net/zz_interest.gd` sends a hunter's snapshots **no prop at all** during the hide, evaluated every snapshot with no linger: a prop that kept being sent for a second after the hide began would be a second of where everybody ran. `headless_net` moves a prop on the server during the hide and asserts the hunter's copy did not move, then that it is right the tick seeking starts. **What the props became is held back the same way**: a DISGUISE event goes to every peer except a hunter during the hide, and each hunter is sent all of them when the seek starts (`ZzNetBridge._on_disguise_changed`, `_on_phase_changed`). Without that a blindfolded client knew "two chairs and a plant", which is half of finding them; found in review, armed (`headless_net`'s "nor what it became").
+**dot-npc changed for this game**, and its CLAUDE.md has each: bucketed indexes for thousands of points, a binary-heap A*, de-duplication by distance (the old grid key split the graph at doorways and cut the start room off), partial paths that wait instead of repathing every tick (100 ms a tick with a crowd at a shut gate), connected-piece labels so an unreachable goal costs nothing, and `eye_height` (sight was cast from the feet, which start on the floor, so every NPC was blind).
 
-## Decision 3: a wrong guess costs, and the furniture decides what is wrong
+## Decision 3: the director paces, the commons crowd, the specials wait
 
-A shot whose impacts land inside a map prop's box, and not on a player, is a decoy: the hunter takes `decoy_penalty` (20%) of the shot's damage, at least `decoy_penalty_min` (1), per pellet that hit furniture (`ZzGame._charge_for_decoys`). Death by decoy blows the hunter apart (`hunter_break`, dot-player-char's `DotPlayerBodyBreak`). The client flashes on a DECOY event. **The first stand-in hunter killed itself this way in its first round**: it fired at a prop it could see through a sofa, every pellet hit the sofa, and `dedicated` reported "the hunters are gone" two seconds into the seek. A stand-in now needs a line of sight clear of furniture too, and stops guessing below 40% health.
+- **Commons** idle in kinds (stand, sit, feed, mill, shamble) with an alertness drawn per zombie; one that sees a survivor screams, and the scream wakes everything within earshot (`spread_alert`). Only `attackers_per_survivor` (6) take an attack slot on one survivor; the rest take a place on a ring round them, so a crowd surrounds instead of queueing in a line. A mob is a burst spread over a few seconds from points out of sight, ahead of the team along the map's `route` (dot-npc-ai-director's flow) and behind it.
+- **Specials** pick a victim by a score (alone, far from the team, already hurt, not already held) and wait up to six seconds for a good moment (`ready_to_strike`): a leaper from cover, a strangler with a clear line, a ram with a straight run. A special that attacks the moment it sees somebody is a special the team kills on sight.
+- **The brute** is its own event, with its own music and health scaled by the team.
+- **The sleeper** sits until somebody comes too close, then goes for that one person.
 
-## Decision 4: taunts are a choice with a price, and standing still is not free
+Every number is a cvar or a `zz_config.gd` field, and difficulty scales what a hit does (`damage_scale`: 0.35, 1, 2.5, 5) and friendly fire with it.
 
-`DotPropTaunts` (dot-props): **taunts start with the seek** (a taunt during the hide was no risk to the prop, and a hunter's client, told nothing about where the props are, played it from where it last saw them). A taunt plays from where the prop stands, to everybody within `taunt_range`, and pays `taunt_points`. A prop that has not moved `auto_taunt_radius` in `auto_taunt_seconds` is taunted for, at `forced_taunt_points`; the meter on the HUD fills toward it, and a voluntary taunt resets it. The list is `taunts/taunts.json`, which an owner edits.
+## Decision 4: down is not dead, and borrowed health is inside the health
 
-## Decision 5: the end of a round finds the last props
+At zero health a survivor goes **down** (a pool of 300 that bleeds out, a pistol, crawling pace) up to `max_incaps` times; the next is death. A revive or pills give **borrowed health**, which drains. It is kept **inside** `DotHealth.health` with `temp_health` saying how much of it is borrowed, so dot-combat's damage, hitboxes and replication see one number; a hit takes the borrowed part first (`absorb_temp`), and a medkit replaces it with real health. A dead survivor is rescued beside the team after `rescue_seconds`.
 
-With `beacon_props_left` props left or `beacon_seconds_left` seconds to go, every live prop pings: a sound and an expanding ring everybody sees (`DotFxBeacon`, dot-fx), every `beacon_period`.
+## Decision 5: a box is data, and an outcome is a list of verbs
 
-## Sides, points and stats
+`boxes/boxes.json` is the whole content: types, each with weighted outcomes, each a title, a message and a list of actions such as `{"do": "airstrike", "target": "nearest", "count": 3, "damage": 60}`. `ZzBoxes.load_text` refuses a file with a verb it does not have (so a typo is a refused file with a reason, not a box that silently does nothing), and `_do_<verb>` is one function per verb. `who` selects opener / team / nearest / random / downed / dead. **Lasting effects stack**: two "double the mobs" are four times, each wearing off on its own clock; the HUD lists them, grouped, by the name of who they are on. `headless_run` runs every outcome of every box once against a live map. The owner is meant to write most of the hundred kinds; the shipped 76 are a start and an example of every verb.
 
-`DotTeamRotation` (dot-team) draws the hunters: RANDOM (never the same person twice running when there is anybody else), QUEUE (everybody an equal share over time) or SWAP (last round's props hunt). `!hunter` / `!prop` / `!any` are wishes the draw honours where it can. Points: winning side 10, a find 5, surviving 5, taunts, and a point a second for a prop that shows its face (Q, `reveal_points_per_second`, paid for at most `reveal_paid_seconds`, then a `reveal_cooldown`). `ZzProgress` keeps fourteen stats and eight achievements through dot-stats and dot-achievements, keyed by the player's TMC profile, and reports them when `report_progress` is on.
+## Decision 6: a second weapon pack is a list, not a fork
 
-## Drawing a map
+`ZzWeapons` sorts every weapon into tiers by its **tags** (`sidearm`, `primary`, `heavy`, `melee`, `thrown`) and reads them from `all_defs()`, which today is zee-dot-weapons' pack. A second pack adds its defs there and nothing else changes: loot, the boxes' "upgrade" and "heavy weapon", and the stand-ins' "is this better" all go by tier. The maps already name `molotov` and `pipe` as throwables; until a pack defines them the loot draws a random throwable instead.
 
-A map is hundreds of boxes and props. Boxes are batched by material, tint and 12 m chunk into one mesh each, because the Compatibility renderer lights a mesh with at most eight omni lights and a school as one mesh would be lit by eight of its fifty-two. Props are one `MultiMeshInstance3D` per model part. Textures are 128 px images made in code, laid in world space so boxes of a material meet without a seam.
+## Decision 7: stand-ins play the map, and do not shoot through you
 
-**Kenney's Nature Kit is teal and coral by design**, and beside realistic rooms it read as a cartoon (the first school render had cyan trees with pink trunks). `props/kits.json` gives a kit a `recolour` table, material name to colour, which `ZzProps` applies to a copy of each mesh as it loads. Furniture keeps its own colours except the plant.
+`ZzBots` drives a survivor with the same commands a person sends, in priority order: a pinned friend, a downed friend, a threat (or a shove when crowded), pills or a medkit, reload, something better on the ground, the objective, then the route. **A stand-in holds its fire when a friend is in the line** (`_friend_in_the_way`): before that, four of them bunched in the start room's doorway shot each other down three times in a minute with friendly fire on. A semi-automatic is fired by pulsing the trigger, or a pistol fires once. They exist to fill a server and to let `headless_run` and `dedicated` play a map; they are not meant to be clever.
 
 ## What running it found
 
-- **Spawns inside sofas**: six, on three maps, because a spawn is written before a room is furnished. Found by `headless_maps`; zombie-zone-maps' builder now moves them itself.
-- **A pool of grass, a dark band round the gym, and washed-out daylight**: all three found by rendering, none by a check. The maps repo's CLAUDE.md has each.
-- **A chair's 98 health was 97.9 on the client**: 12 bits over 0..1000 for `net_max_health`. 14 now.
-- **`var rotation` on ZzGame** shadowed `Node3D.rotation` and broke every transform; it is `hunter_history`.
-- **dot-server-deploy had no `addons/dot_menu`** and a stale class cache, so the delivered game's client failed to parse; found by `zombiezone_client` there, fixed locally.
+- **Shots did no damage to zombies**: the hitboxes resolved their owner before the zombie's `DotHealth` existed. Health is created first now, then the hitboxes, then `refresh()`.
+- **Idle commons never noticed anybody**: sight from the feet (dot-npc's `eye_height` fix), and the brain overwrote `sight_scale` every tick (it is the character's `alertness` now).
+- **The start room had a hole in its side** a stand-in walked out of and fell; the frontage walls close it.
+- **The practice street's spawns were inside its tables**, found by `headless_maps`; and zombie-zone-maps' builder stretched door floors along the wrong axis, found the same way.
+- **A command and a cvar were both `zz_boxes`**; the cvar is `zz_box_drops`. **Push-to-talk and shove were both V**; shove is F.
+- **Three stand-ins called Odell**: names are drawn from the ones not taken.
 
 ## Validating
 
 ```bash
-./game.sh test                                         # parse, then all four suites
+./game.sh test                                          # parse, then all four suites
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
-tools/shot.sh --view=overview --zz-map-ids=zz_school
-tools/shot.sh --view=room --zz-map-ids=zz_school --at=-38,1.7,3.5 --look=-26,0.8,14
-tools/shot.sh --view=prop --as=furniture_chair_cushion --zz-map-ids=zz_house
-tools/shot.sh --view=blind
-tools/shot.sh --view=hunter --board --name=board
-godot --headless --path . --script tools/measure_props.gd -- --check   # catalogue matches the models
+tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
+tools/shot.sh --view=survivor --spawn=common:12
+tools/shot.sh --view=third --spawn=brute:1,leaper:1
+tools/shot.sh --view=pinned --pin=choke
+tools/shot.sh --view=down
+tools/shot.sh --view=survivor --box=mystery
 ```
 
-`headless_run`'s and `headless_net`'s totals were wrong when first written and both fired; `headless_maps` was armed with a spawn put inside the practice kitchen's chair. Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice house only, as mg-deathrun's headless_courses does, and says so.
+Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
 
 ## Delivery
 
-The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-maps): `maps/` here is a dot-bootstrap link (`.gitignore` names it), and `game.yml` does not name the pack: the server owner names `gamemann/zombie-zone-maps` (or their own) in their deployment's map config (dot-server-deploy's `cfg/content.yml`, which fills `DotGameDescriptor.maps`). `ZzModule._add_delivered_maps` asks dot-game's `DotGameContent.map_dirs(server, "maps")` for every pack the server names, fetched through dot-cloud, and adds each mount's `maps/` to the catalogue at load and after every `zz_reload`. The game's own pack carries only `zz_practice`. A client is sent the one document being played. dot-server-deploy has `content/zombiezone/`, `content/zombiezone_maps/` and `examples/zombiezone_client` (22 checks): the delivered pack boots, a real client joins over a real socket, the maps, prop catalogue and taunts are read from their mounts, and the client builds the server's map with every prop. No `class_name` anywhere in `game/`, because a mounted pack cannot register one.
-
-**Before publishing**: dot-props (API level 2), dot-team (2), dot-fx (2), dot-game (3) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
+The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-maps): `maps/` here is a dot-bootstrap link, and `game.yml` does not name the pack; the server owner names `gamemann/zombie-zone-maps` (or their own) in their deployment's map config, and `ZzModule` adds every mount's `maps/` to the catalogue at load and after every `zz_reload`. A client is sent the one document being played. No `class_name` anywhere in `game/` or `npcs/`, because a mounted pack cannot register one; the brains are named by path.
 
 ## Still to do
 
-1. **Put it live.** Create `gamemann/game-zombie-zone` and `gamemann/zombie-zone-maps`, tag the addons above, rebuild the shell, publish the maps pack before the game.
-2. **Try it in a browser**, with people: how long a hide should be and how much a decoy should cost are numbers only play settles.
-3. Better stand-ins: a bot prop picks something near, not something clever.
+1. **Put it live.** Create `gamemann/game-zombie-zone` and `gamemann/zombie-zone-maps`, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
+2. **A second weapon pack** with the genre's throwables (molotov, pipe bomb, bile jar) and more guns, registered through `ZzWeapons.all_defs`.
+3. **More box outcomes**, written by the owner, toward the hundred.
+4. **Play it with people**, and set normal's numbers from that.

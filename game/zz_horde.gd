@@ -232,8 +232,9 @@ func rebuild_navigation() -> DotResult:
 	if not applied.ok:
 		return applied
 
-	var kept := director.set_spawn_points_from_nav(nav, 6.0, DotNpcNavFilter.walking_only())
+	var _from_nav := director.set_spawn_points_from_nav(nav, 6.0, DotNpcNavFilter.walking_only())
 	_add_hinted_spawns()
+	var kept := _keep_out_of_safe_rooms()
 
 	DotLog.info(CHANNEL, "navigation built", {
 		"map": str(_doc.get("id", "")), "points": nav.point_count(), "edges": nav.edge_count(),
@@ -247,6 +248,67 @@ func rebuild_navigation() -> DotResult:
 func _add_hinted_spawns() -> void:
 	for p: Array in _doc.get("zombie_spawns", []):
 		director.spawn_points.append(ZzMapDoc.v3(p))
+
+
+## Drops every spawn point inside a start or end area, and a metre round it. The graph puts
+## points wherever there is floor, and a safe room is floor: the first dedicated run had six
+## wanderers standing in the end room, waiting for the survivors who made it.
+func _keep_out_of_safe_rooms() -> int:
+	var rooms: Array[AABB] = []
+	var areas: Dictionary = _doc.get("areas", {})
+
+	for side in ["start", "end"]:
+		for area: Dictionary in areas.get(side, []):
+			rooms.append(ZzMapDoc.area_box(area).grow(1.0))
+
+	var kept := PackedVector3Array()
+
+	for p: Vector3 in director.spawn_points:
+		var inside := false
+
+		for room in rooms:
+			if p.x >= room.position.x and p.x <= room.end.x and p.z >= room.position.z and p.z <= room.end.z:
+				inside = true
+				break
+
+		if not inside:
+			kept.append(p)
+
+	director.spawn_points = kept
+	return kept.size()
+
+
+## The graph's point at each survivor's feet, for "can a zombie from there reach anybody".
+func _survivor_nodes() -> PackedInt32Array:
+	var out := PackedInt32Array()
+
+	if spawner.nav == null or spawner.nav.data == null:
+		return out
+
+	for id in survivor_ids():
+		var index := spawner.nav.data.nearest_point(survivor_position(id), 3.0)
+
+		if index >= 0:
+			out.append(index)
+
+	return out
+
+
+## Whether a zombie at [param p] could walk to any survivor. A graph cut by a shut gate is two
+## pieces, and a mob spawned in the other one presses against the gate for the whole hold-out:
+## the first dedicated run's panic did exactly that, forty commons on the far side of the
+## barrier while the survivors held the switch with nothing to shoot.
+func _reaches_somebody(p: Vector3, nodes: PackedInt32Array) -> bool:
+	if nodes.is_empty():
+		return true
+
+	var index := spawner.nav.data.nearest_point(p, 3.0)
+
+	for node in nodes:
+		if spawner.nav.connected(index, node):
+			return true
+
+	return false
 
 
 ## Opens a gate: the graph is built again without it.
@@ -756,6 +818,7 @@ func _spawn_point(near: float, far: float, prefer_ahead: bool, around: StringNam
 
 	var best := Vector3.INF
 	var best_score := -INF
+	var nodes := _survivor_nodes()
 	# Sampled, not scanned: a few hundred candidates is a few hundred sight lines.
 	var tries := mini(points.size(), 90)
 
@@ -772,7 +835,7 @@ func _spawn_point(near: float, far: float, prefer_ahead: bool, around: StringNam
 		if nearest < near or nearest > far:
 			continue
 
-		if seen_by_survivors(p):
+		if seen_by_survivors(p) or not _reaches_somebody(p, nodes):
 			continue
 
 		var score := -absf(nearest - (near + far) * 0.5)

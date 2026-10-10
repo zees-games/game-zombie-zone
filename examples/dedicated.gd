@@ -14,12 +14,15 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 9
-const CHECKS := 42
+const CHECKS := 44
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
 const QUERY_PORT := 28932
 const TICK_RATE := 60
+
+## The practice street's end room.
+const END_ROOM := Vector3(0.0, 0.05, 85.0)
 
 var _passed := 0
 var _failed := 0
@@ -167,9 +170,9 @@ func _test_the_module_loads() -> void:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
-	config.hide_seconds = 3.0
-	config.round_seconds = 30.0
 	config.minimum_players = 3
+	config.end_hold_seconds = 0.5
+	config.start_grace_seconds = 2.0
 	config.map_ids = PackedStringArray(["zz_practice"])
 
 	game = ZzGame.new()
@@ -201,33 +204,45 @@ func _test_the_commands() -> void:
 	_section("the console")
 	_check(_said(_run_command("zz_status"), "zombiezone"), "zz_status says what the round is doing")
 	_check(_said(_run_command("zz_maps"), "zz_practice"), "zz_maps lists the maps")
-	_check(_said(_run_command("zz_taunts"), "You lose"), "zz_taunts lists the taunts")
+	_check(_said(_run_command("zz_boxes"), "explosive"), "zz_boxes lists the box types")
 	_check(_said(_run_command("zz_net"), "bridge"), "zz_net says what the netcode is doing")
 
 	# A cvar's default is the value the world was built with, and setting one writes through.
-	_check(_said(_run_command("zz_round_seconds"), "30"), "zz_round_seconds reports the world's own value")
-	var _set := _run_command("zz_round_seconds 45")
-	_check(is_equal_approx(game.config.round_seconds, 45.0), "and setting it writes through to the world",
-		"%.1f" % game.config.round_seconds)
-	var _back := _run_command("zz_max_hunters 0")
-	_check(game.config.max_hunters == 1, "a round with no hunter is not one: it is taken as one",
-		"%d" % game.config.max_hunters)
+	_check(_said(_run_command("zz_difficulty"), "1"), "zz_difficulty reports the world's own value")
+	var _set := _run_command("zz_difficulty 2")
+	_check(game.config.difficulty == 2 and game.config.damage_scale() > 1.0, "and setting it writes through to the world",
+		"%d" % game.config.difficulty)
+	var _back := _run_command("zz_max_incaps 99")
+	_check(game.config.max_incaps == 10, "a number past the end is clamped, not taken",
+		"%d" % game.config.max_incaps)
+	var _normal := _run_command("zz_difficulty 1")
 	_finished()
 
 
-## A whole round, played by the stand-ins the module seats on its own.
+## A map, played by the stand-ins the module seats on its own, then won by the map's own rule.
+##
+## [b]Not played to the end room by them.[/b] Crossing the practice street takes stand-ins
+## minutes and depends on how the horde goes, and a suite with a wall-clock limit cannot wait
+## for that. So they play for real until they have killed something, and then are put in the
+## end room, which is the rule that decides a campaign map; `headless_run` crosses the street.
 func _test_a_round_runs() -> void:
-	_section("a round, played by the stand-ins")
+	_section("a map, played by the stand-ins")
 	var rounds: Array = []
-	game.round_over.connect(func(n: int, winner: int, why: String) -> void: rounds.append([n, winner, why]))
+	game.round_over.connect(func(n: int, won: bool, why: String) -> void: rounds.append([n, won, why]))
 
-	# Real time: the server ticks itself. The module tops the server up every two seconds. A
-	# round is three seconds of hiding and at most forty-five of seeking here: the stand-in
-	# hunter finds a prop or the clock gives it to the props.
-	var until := Time.get_ticks_msec() + 75000
+	# Real time: the server ticks itself. The module tops the server up every two seconds.
+	var kills := 0
+	var until := Time.get_ticks_msec() + 45000
 
-	while Time.get_ticks_msec() < until and rounds.is_empty():
+	while Time.get_ticks_msec() < until:
 		await get_tree().physics_frame
+		kills = 0
+
+		for player in game.survivors():
+			kills += player.commons_killed + player.specials_killed
+
+		if kills > 0:
+			break
 
 	var bots := 0
 
@@ -236,8 +251,23 @@ func _test_a_round_runs() -> void:
 			bots += 1
 
 	_check(bots == game.config.minimum_players, "the module seated stand-ins up to the minimum", "%d" % bots)
-	_check(game.players_on(ZzGame.HUNTERS).size() == 1, "and drew one of them to hunt")
-	_check(not rounds.is_empty(), "and a round was decided", str(rounds))
+	_check(game.horde.count() > 0 or kills > 0, "the horde came", "%d out" % game.horde.count())
+	_check(kills > 0, "and the stand-ins shot it", "%d kills" % kills)
+	var names := {}
+	for player in game.survivors():
+		names[player.display_name] = true
+	_check(names.size() == game.survivors().size(), "each by a name of its own", ", ".join(names.keys()))
+
+	for player in game.survivors():
+		player.health.invulnerable = true
+		player.place_at(END_ROOM + Vector3(randf_range(-2.0, 2.0), 0.0, randf_range(-2.0, 2.0)), 0.0)
+
+	until = Time.get_ticks_msec() + 15000
+
+	while Time.get_ticks_msec() < until and rounds.is_empty():
+		await get_tree().physics_frame
+
+	_check(not rounds.is_empty() and bool(rounds[0][1]), "everybody in the end room: the map is won", str(rounds))
 	_check(not rounds.is_empty() and str(rounds[0][2]) != "", "with a sentence saying why", str(rounds))
 	_check(_said(_run_command("zz_status"), "round"), "and zz_status still answers")
 	_finished()
@@ -284,26 +314,26 @@ func _test_the_map_vote() -> void:
 	for choice: DotVoteChoice in (vote.get("source") as DotVoteListSource).entries:
 		ids.append(String(choice.id))
 
-	_check(ids.has("zz_school") and ids.has("zz_house"), "it offers the delivered maps", str(ids))
+	_check(ids.has("zz_blackout_1") and ids.has("zz_lot"), "it offers the delivered maps", str(ids))
 
 	vote.set("voters_fn", func() -> Array: return [&"7"])
 	var director: DotVoteDirector = vote.get("director")
 	var opened := director.open_vote(DotVoteClock.REASON_MANUAL)
 	_check(opened.ok and director.is_voting(), "a ballot opens", opened.error.message if not opened.ok else "")
 
-	var cast := director.cast_one(&"7", &"zz_house")
+	var cast := director.cast_one(&"7", &"zz_lot")
 	# Everybody has voted; the director closes on its next advance, which is the server's tick.
 	director.advance(0.05)
-	_check(cast.ok and director.pending_id() == &"zz_house", "one vote decides it, waiting for the round's end",
+	_check(cast.ok and director.pending_id() == &"zz_lot", "one vote decides it, waiting for the round's end",
 		"%s %s" % [cast.ok, director.pending_id()])
 
 	# No frame between these: the stand-ins' rounds are still running, and one that started in
 	# between would lay the voted map itself and leave this check reading the rotation's.
 	vote.call("note_round_end")
-	_check(game.next_map_id == &"zz_house", "the round's end hands it to the world", str(game.next_map_id))
+	_check(game.next_map_id == &"zz_lot", "the round's end hands it to the world", str(game.next_map_id))
 
 	game.call("_lay_out_map")
-	_check(str(game.map_doc.get("id", "")) == "zz_house" and game.next_map_id == &"",
+	_check(str(game.map_doc.get("id", "")) == "zz_lot" and game.next_map_id == &"",
 		"and the next map laid is the one voted for, once", "%s / %s" % [game.map_doc.get("id", ""), game.next_map_id])
 	_finished()
 
@@ -315,7 +345,7 @@ func _test_the_map_vote() -> void:
 ## deployment's map config (dot-server-deploy's cfg/content.yml), which a suite has neither of.
 func _test_a_reload_keeps_delivered_maps() -> void:
 	_section("a reload keeps the maps the server names")
-	var key := "dot-test/ph-delivered@1.0.0"
+	var key := "dot-test/zz-delivered@1.0.0"
 	var mount := DotGameContent.mount_of(key)
 	var dir := mount.path_join("maps")
 	var id := &"zz_delivered_check"
