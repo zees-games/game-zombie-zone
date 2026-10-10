@@ -287,6 +287,15 @@ func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 		&"molotov":
 			colour = Color(0.9, 0.5, 0.1)
 			size = 0.15
+		&"grenade":
+			colour = Color(0.22, 0.3, 0.16)
+			size = 0.16
+		&"rocket":
+			colour = Color(0.75, 0.75, 0.7)
+			size = 0.2
+		&"bile":
+			colour = Color(0.45, 0.65, 0.1)
+			size = 0.16
 
 	sphere.radius = size * 0.5
 	sphere.height = size
@@ -306,8 +315,9 @@ func land(id: int, kind: StringName, at: Vector3) -> void:
 	if entry == null:
 		return
 
-	# A pipe lies where it landed and beeps; everything else is gone.
-	if kind == &"pipe":
+	# A pipe (or a grenade on its fuse) lies where it landed, and a pipe beeps; everything else
+	# is gone.
+	if kind == &"pipe" or kind == &"grenade":
 		var node: Node3D = (entry as Dictionary)["node"]
 		node.global_position = at
 		(entry as Dictionary)["velocity"] = Vector3.ZERO
@@ -329,7 +339,7 @@ func blast(at: Vector3, radius: float, kind: StringName) -> void:
 	# A pipe that went off is no longer beeping.
 	for id: int in _flying.keys():
 		var entry: Dictionary = _flying[id]
-		if entry["kind"] == &"pipe" and (entry["node"] as Node3D).global_position.distance_to(at) < 1.5:
+		if (entry["kind"] == &"pipe" or entry["kind"] == &"grenade") and (entry["node"] as Node3D).global_position.distance_to(at) < 1.5:
 			(entry["node"] as Node3D).queue_free()
 			_flying.erase(id)
 
@@ -516,12 +526,15 @@ func _present_flying(delta: float) -> void:
 
 		if bool(entry.get("landed", false)):
 			# A pipe on the ground: a blink and a beep, faster as it goes.
-			entry["beep"] = float(entry["beep"]) + delta
-			node.visible = fmod(float(entry["beep"]) * 3.0, 1.0) < 0.6
+			if entry["kind"] == &"pipe":
+				entry["beep"] = float(entry["beep"]) + delta
+				node.visible = fmod(float(entry["beep"]) * 3.0, 1.0) < 0.6
 			continue
 
 		var velocity: Vector3 = entry["velocity"]
-		velocity.y -= GRAVITY * delta
+		# A rocket flies straight; everything else falls as the server's does.
+		if entry["kind"] != &"rocket":
+			velocity.y -= GRAVITY * delta
 		entry["velocity"] = velocity
 		node.global_position += velocity * delta
 

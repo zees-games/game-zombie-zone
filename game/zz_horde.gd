@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the
@@ -37,6 +38,9 @@ const ALERT_RADIUS := 9.0
 
 ## Bile calls every common this far away.
 const BILE_RADIUS := 45.0
+
+## How far a broken bile jar splashes.
+const BILE_SPLASH := 4.0
 
 ## A mob is spawned at most this many at a time, a few ticks apart, so a crowd pours out of a
 ## doorway rather than appearing in it.
@@ -699,6 +703,18 @@ func _advance_lures() -> void:
 
 
 ## A survivor is covered in bile: every common in reach comes for them, and a mob is called.
+## A bile jar broken at [param at]: every common within [param radius] comes to it for
+## [param seconds], and the ones it splashed are drawn covered in it. Commons turning on the
+## splashed ones (the genre's half of a bile jar) is not here yet: a common's brain only ever
+## targets survivors.
+func bile_at(at: Vector3, seconds: float, radius: float) -> void:
+	lure(at, seconds, radius)
+
+	for npc in spawner.npcs_near(at, BILE_SPLASH):
+		if npc.def.id == ZzNpcs.COMMON and npc.node is ZzZombieBody:
+			(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_BILED, true)
+
+
 func bile_on(victim: StringName, seconds: float) -> void:
 	var at := survivor_position(victim)
 
@@ -1215,6 +1231,12 @@ func _on_damage_applied(damage: DotDamage) -> void:
 
 	if npc.brain != null:
 		(npc.brain as DotNpcBrain).damaged(damage.health_lost, by)
+
+	# A weapon that says it burns (zed-dot-weapons' flamethrower) sets what it hits alight.
+	if damage.weapon_id != &"" and game.hazards != null:
+		var def := ZzWeapons.def_of(damage.weapon_id)
+		if def != null and def.tags.has(&"incendiary"):
+			game.hazards.ignite(npc)
 
 	if npc.def.id == ZzNpcs.COMMON and damage.amount >= 24.0 and damage.distance < 5.0 \
 			and npc.brain != null and npc.brain.has_method(&"stagger"):

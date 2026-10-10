@@ -19,6 +19,7 @@ const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
+const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
@@ -193,6 +194,7 @@ func _ready() -> void:
 		return
 
 	_round_seed = config.seed_value
+	ZzWeapons.use_packs(config.second_weapon_pack)
 
 	_build_physics()
 	_apply_gravity()
@@ -1882,6 +1884,46 @@ func _advance_weapons() -> void:
 				var quiet := def != null and def.tags.has(&"silenced")
 				horde.sounds.emit(DotNpcAiSounds.Kind.COMBAT, shot.origin,
 					config.gunfire_radius * (0.35 if quiet else 1.0), horde.now(), 0.5, id)
+
+		if authoritative and hazards != null:
+			for spawn in outcome.spawns:
+				_throw(player, spawn)
+
+
+## What a weapon put into the world, as one of [ZzHazards]' projectiles.
+##
+## [b]dot-weapon spawns nothing; it says what should exist.[/b] Until this was here every
+## grenade, sticky charge and rocket in the game was a use that cost ammunition and did
+## nothing at all: `_advance_weapons` resolved `outcome.shots` and dropped `outcome.spawns`.
+## A pack says what a throwable is by its tags (`molotov`, `pipe_bomb`, `bile`, as
+## zed-dot-weapons' are), so a pack the game has never heard of still throws the right thing;
+## anything else explosive is a grenade on its fuse, or on contact without one.
+func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
+	var def := ZzWeapons.def_of(spawn.id)
+	var tags: Array = def.tags if def != null else []
+	var amount := spawn.splash_damage if spawn.splash_damage > 0.0 else spawn.damage
+	var kind := ZzHazards.GRENADE
+
+	if tags.has(&"molotov"):
+		kind = ZzHazards.MOLOTOV
+		amount = maxf(amount, 8.0)
+	elif tags.has(&"pipe_bomb"):
+		kind = ZzHazards.PIPE
+		amount = maxf(amount, 300.0)
+	elif tags.has(&"bile"):
+		kind = ZzHazards.BILE
+
+	# A launcher's shell that barely drops is drawn and flown as a rocket: straight, on both
+	# ends (a client is told only the start and the velocity, and falls by full gravity).
+	var gravity := spawn.gravity_scale
+
+	if kind == ZzHazards.GRENADE and spawn.gravity_scale < 0.5:
+		kind = ZzHazards.ROCKET
+		gravity = 0.0
+
+	var fuse := float(spawn.fuse_ticks) / float(maxi(tick_rate, 1)) if kind == ZzHazards.GRENADE else -1.0
+	var _id: int = hazards.launch(kind, spawn.origin, spawn.velocity, player.entity_id, amount,
+		fuse, spawn.splash_radius, gravity)
 
 
 func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:

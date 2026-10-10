@@ -14,6 +14,23 @@ static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
 
 
+## Puts the packs the server carries on zee's catalogue: zee-dot-weapons always, and
+## zed-dot-weapons (the second pack) when [param second] is on. Called by the world before
+## any rig is built, because a rig reads its catalogue once.
+##
+## [b]A second pack is one line here[/b] because zee builds every rig's catalogue, every world
+## model's art and every report from its own tables, and `ZedWeaponPack.install()` adds to
+## those (zee's `add_source`). Nothing else in the game names a pack.
+static func use_packs(second: bool) -> void:
+	if second:
+		ZedWeaponPack.install()
+	else:
+		ZedWeaponPack.uninstall()
+
+	_defs.clear()
+	_by_id.clear()
+
+
 ## Every weapon from every pack, once.
 static func all_defs() -> Array[DotWeaponDef]:
 	if _defs.is_empty():

@@ -25,9 +25,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 22
+const SECTIONS := 23
 
-const CHECKS := 96
+const CHECKS := 103
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -73,6 +73,7 @@ func _run() -> void:
 	await _test_every_special()
 	await _test_hazards()
 	await _test_loot()
+	await _test_both_packs()
 	await _test_every_box_outcome()
 	await _test_effects_stack()
 	await _test_objectives()
@@ -258,7 +259,7 @@ func _test_start_area() -> void:
 
 func _test_a_common() -> void:
 	_section("a common notices, chases and hits")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	# Facing the survivor: one with its back to them would not see them, which is the point of
@@ -279,7 +280,7 @@ func _test_a_common() -> void:
 
 func _test_shots() -> void:
 	_section("shots kill zombies and the kill is credited")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
@@ -297,7 +298,7 @@ func _test_shots() -> void:
 
 func _test_the_room_wakes() -> void:
 	_section("one scream wakes the room")
-	var game := await _team(1)
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET + Vector3(0, 0, 30), 180.0)
 	var crowd: Array[DotNpcInstance] = []
@@ -543,6 +544,83 @@ func _test_loot() -> void:
 	me.actions = 0
 	_check(game.loot.exists(kit), "a second medkit is refused while you carry one")
 	_finished()
+
+
+## Both weapon packs are carried, and everything a weapon puts into the world does something.
+## Until `_throw` existed every grenade and rocket in the game cost ammunition and did nothing.
+func _test_both_packs() -> void:
+	_section("both weapon packs, and what they throw")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.health.invulnerable = true
+	me.place_at(STREET, 0.0)
+	_check(ZzWeapons.exists(&"pistol") and ZzWeapons.exists(&"pump_shotgun") and ZzWeapons.ids_of(&"thrown").has(&"molotov")
+		and ZzWeapons.ids_of(&"thrown").has(&"frag"), "zee's weapons and the second pack's are both handed out")
+
+	var ahead := STREET + Vector3(0.0, 0.0, -8.0)
+	var fires_before := game.hazards.areas.size()
+	game._throw(me, _spawn(&"molotov", me, ahead))
+	await _sim(game, 1.5)
+	var fire := false
+	for a: Dictionary in game.hazards.areas.values():
+		fire = fire or (a["kind"] == ZzHazards.FIRE and (a["at"] as Vector3).distance_to(ahead) < 4.0)
+	_check(game.hazards.areas.size() > fires_before and fire, "a molotov starts a fire where it lands")
+
+	var crowd: Array[DotNpcInstance] = []
+	for i in 4:
+		crowd.append(game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-3.0 + i * 2.0, 0.0, -22.0), &"test"))
+	game._throw(me, _spawn(&"pipe_bomb", me, ahead))
+	await _sim(game, 3.0)
+	var drawn := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive() and n.position().distance_to(ahead) < 9.0).size()
+	_check(drawn >= 2, "a pipe bomb draws the commons to it", "%d of 4 within 9 m" % drawn)
+	await _sim(game, 5.0)
+	var left := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive()).size()
+	_check(left < 4, "and goes off among them", "%d of 4 standing" % left)
+
+	var frag := game.horde.spawner.spawn(ZzNpcs.COMMON, ahead, &"test")
+	(frag.brain as Object).set(&"idle_kind", 0)
+	var thrown := _spawn(&"frag", me, ahead)
+	thrown.fuse_ticks = TICK_RATE * 2
+	thrown.splash_radius = 5.0
+	thrown.splash_damage = 200.0
+	game._throw(me, thrown)
+	await _sim(game, 3.0)
+	_check(not frag.is_alive(), "zee's frag goes off on its fuse")
+
+	var target := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -12.0), &"test")
+	await _sim(game, 0.1)
+	var rocket := DotWeaponSpawn.make(&"rocket_launcher", me.eye_position(), (target.position() + Vector3(0, 1.0, 0) - me.eye_position()).normalized() * 36.0, me.entity_id)
+	rocket.splash_radius = 6.5
+	rocket.splash_damage = 240.0
+	rocket.gravity_scale = 0.0
+	game._throw(me, rocket)
+	await _sim(game, 1.0)
+	_check(not target.is_alive(), "a rocket goes off on the zombie it meets")
+
+	var burner := game.horde.spawner.spawn(ZzNpcs.BRUTE, STREET + Vector3(0.0, 0.0, -5.0), &"test")
+	await _sim(game, 0.1)
+	var flame := DotShot.make(&"flamethrower", me.entity_id, game.current_tick(), 0)
+	flame.origin = me.eye_position()
+	flame.direction = (burner.position() + Vector3(0, 1.2, 0) - flame.origin).normalized()
+	flame.damage = 5.0
+	flame.damage_type = game.combat.damage_type(&"strike")
+	flame.max_range = 9.0
+	flame.scatter()
+	var _burnt := game.combat.resolve_shot(flame)
+	_check(game.hazards._burning.has(burner.instance_id), "the flamethrower sets what it hits alight")
+	_finished()
+
+
+func _spawn(id: StringName, from: ZzPlayer, at: Vector3) -> DotWeaponSpawn:
+	var origin := from.eye_position()
+	var flat := Vector3(at.x - origin.x, 0.0, at.z - origin.z)
+	# A lob that lands at [param at]: up at 45 degrees, at the speed that range needs.
+	var speed := sqrt(flat.length() * ZzHazards.GRAVITY)
+	var velocity := flat.normalized() * speed * 0.707 + Vector3.UP * speed * 0.707
+	var spawn := DotWeaponSpawn.make(id, origin, velocity, from.entity_id)
+	spawn.gravity_scale = 1.0
+	spawn.fuse_ticks = TICK_RATE * 10
+	return spawn
 
 
 ## Every outcome in the shipped box file, run once against a live map: none of them may error.

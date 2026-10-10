@@ -1,5 +1,6 @@
 extends CharacterBody3D
 
+const ZzWeapons := preload("zz_weapons.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzFigure := preload("zz_figure.gd")
@@ -584,7 +585,7 @@ static func held_by_slot(ids: Array[StringName], slot: int) -> StringName:
 		return &""
 
 	if _slots.is_empty():
-		for def in ZeeWeaponPack.weapons():
+		for def in ZzWeapons.all_defs():
 			_slots[def.id] = def.slot
 
 	for id in ids:

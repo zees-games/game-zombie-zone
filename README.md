@@ -49,6 +49,8 @@ Anybody pinned needs a friend: shoot what holds them or shove it off.
 
 **Friendly fire is on**, at a tenth of the damage on normal and much more on expert. Stand-ins fill the team up to four when there are not enough people, and they shoot, revive, heal and pick things up, and they do not shoot through you.
 
+**Two weapon packs.** The server carries [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons) (blasters, melee weapons, grenades) and [zed-dot-weapons](https://github.com/gamemann/zed-dot-weapons) (real-world pistols, shotguns, a hunting rifle, a machine gun, launchers, a flamethrower, and the molotov, pipe bomb and bile jar) side by side, and the maps, the boxes and the stand-ins hand out weapons from both. A molotov sets the ground on fire, a pipe bomb beeps and pulls the horde to it before it goes off, a bile jar brings every zombie nearby to where it broke, and the flamethrower sets whatever it touches alight.
+
 There are six maps: the **practice street** built into the game, the three-map **Blackout** campaign (Corner Shop, The Depot, The Pier), and two survival maps, **Parking Lot** and **Chapel Yard**, from [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps). At the end of a campaign the players vote for what is next.
 
 ## Controls
@@ -129,6 +131,11 @@ zz_box_special 0.3             // chance a special drops a box
 zz_gravity 20                  // metres per second squared, for everything
 zz_min_players 4               // survivors the server keeps in the game with stand-ins
 zz_bots 1                      // 0 to turn the stand-ins off
+```
+
+The second weapon pack is a config setting rather than a cvar, because a weapon rig reads its weapons once: `--zz-second-weapon-pack false` on the command line (or `second_weapon_pack` in the config file) runs the server with zee-dot-weapons alone.
+
+```
 zz_spectate_camera 0           // who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody
 ```
 
@@ -169,12 +176,12 @@ Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps
 `xvfb-run -a godot --path . res://tools/audio_probe.tscn` checks that the game actually makes a noise, which a headless run cannot.
 
 ## Not done yet
-- **Molotovs, pipe bombs and bile jars.** The game knows how to throw them (the boxes do), but no weapon pack has them as something a survivor carries yet. They are what a second weapon pack is for.
+- **Bile that turns the horde on itself.** A bile jar draws the zombies today; the commons it splashes are not yet attacked by the others.
 - **Finales with a rescue vehicle**, multi-floor maps with stairs, and more campaigns.
 - **Playing it with people.** How hard normal should be, how often a mob comes and how much a box should do are numbers only play settles.
 
 ## Credits
-The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons). Floors, walls and every other surface are drawn in code. Each kit's licence is next to its files.
+The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons) and [zed-dot-weapons](https://github.com/gamemann/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Floors, walls and every other surface are drawn in code. Each kit's licence is next to its files.
 
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney art and the OpenGameArt sounds are CC0, which is public domain.

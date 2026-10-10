@@ -34,7 +34,7 @@ npcs/                the zombie body, its view, and one brain script per kind (b
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (96), headless_maps (61), headless_net (53), dedicated (44)
+examples/            headless_run (103), headless_maps (61), headless_net (53), dedicated (44)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 
@@ -71,7 +71,9 @@ At zero health a survivor goes **down** (a pool of 300 that bleeds out, a pistol
 
 ## Decision 6: a second weapon pack is a list, not a fork
 
-`ZzWeapons` sorts every weapon into tiers by its **tags** (`sidearm`, `primary`, `heavy`, `melee`, `thrown`) and reads them from `all_defs()`, which today is zee-dot-weapons' pack. A second pack adds its defs there and nothing else changes: loot, the boxes' "upgrade" and "heavy weapon", and the stand-ins' "is this better" all go by tier. The maps already name `molotov` and `pipe` as throwables; until a pack defines them the loot draws a random throwable instead.
+The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for this game, 2026-10-10). zee builds every rig's catalogue, every world model's art and every report from its own tables, so a second pack registers into those (`ZeeWeaponPack.add_source` and friends, added to zee for this) and `ZzWeapons.use_packs` is the one line here that names it, called by the world before any rig is built because a rig reads its catalogue once. `ZzConfig.second_weapon_pack` turns it off. `ZzWeapons` sorts everything into tiers by **tag** (`sidearm`, `primary`, `heavy`, `melee`, `thrown`), so loot, the boxes' "upgrade" and "heavy weapon", and the stand-ins' "is this better" mix both packs without a list.
+
+**What a weapon puts into the world goes through `ZzGame._throw`**, and until it existed nothing did: `_advance_weapons` resolved `outcome.shots` and dropped `outcome.spawns`, so every frag, sticky charge and launcher shell in zee cost ammunition and did nothing. A spawn becomes one of `ZzHazards`' projectiles by its weapon's tags: `molotov` a fire, `pipe_bomb` a beeping lure that goes off, `bile` a jar the horde comes to, anything else a GRENADE on its fuse (resting where it lands), or a ROCKET when it barely drops (flown straight on both ends; the client is told only a start and a velocity). A weapon tagged `incendiary` (the flamethrower) sets what it hits alight (`ZzHorde._on_damage_applied`). `headless_run`'s "both weapon packs, and what they throw" throws each one at commons.
 
 ## Decision 7: stand-ins play the map, and do not shoot through you
 
@@ -108,7 +110,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Still to do
 
-1. **Put it live.** Create `gamemann/game-zombie-zone` and `gamemann/zombie-zone-maps`, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
-2. **A second weapon pack** with the genre's throwables (molotov, pipe bomb, bile jar) and more guns, registered through `ZzWeapons.all_defs`.
+1. **Put it live.** Create `gamemann/game-zombie-zone`, `gamemann/zombie-zone-maps` and `gamemann/zed-dot-weapons`, tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
+2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no common's brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.

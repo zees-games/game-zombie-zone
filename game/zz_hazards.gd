@@ -19,6 +19,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## pipe      a beeping charge. Every common near it goes to it; then it goes off.
 ## shell     falls out of the sky where it was called, a second later, and goes off.
 ## molotov   a bottle; fire where it lands.
+## grenade   a thrown or fired explosive: off on its fuse (resting where it landed), or on contact
+##           when it has none, which is a rocket.
+## bile      a jar; every common near where it breaks comes to it, for a while.
 ## [/codeblock]
 
 const ACID := &"acid"
@@ -30,6 +33,14 @@ const ROCK := &"rock"
 const PIPE := &"pipe"
 const SHELL := &"shell"
 const MOLOTOV := &"molotov"
+const GRENADE := &"grenade"
+## A grenade that flies straight and goes off on contact: what a launcher fires.
+const ROCKET := &"rocket"
+const BILE := &"bile"
+
+## A bile jar draws the horde this far, for this long.
+const BILE_LURE := 35.0
+const BILE_SECONDS := 15.0
 
 const GRAVITY := 18.0
 
@@ -81,11 +92,15 @@ func add(kind: StringName, at: Vector3, radius: float, seconds: float, amount: f
 	return id
 
 
-func launch(kind: StringName, from: Vector3, velocity: Vector3, owner: int, amount: float) -> int:
+## [param fuse] seconds until a GRENADE goes off whatever it is doing (0 or less: on contact),
+## [param radius] its blast, [param gravity] a multiple of [constant GRAVITY] (0 flies straight).
+func launch(kind: StringName, from: Vector3, velocity: Vector3, owner: int, amount: float,
+		fuse: float = -1.0, radius: float = 0.0, gravity: float = 1.0) -> int:
 	var id := _next_id
 	_next_id += 1
 	flying[id] = {"kind": kind, "at": from, "velocity": velocity, "owner": owner, "amount": amount,
-		"since": game.now(), "fuse": -1.0}
+		"since": game.now(), "fuse": -1.0, "detonate_at": game.now() + fuse if fuse > 0.0 else -1.0,
+		"radius": radius if radius > 0.0 else 4.0, "gravity": gravity, "rest": false}
 	launched.emit(id, kind, from, velocity)
 	return id
 
@@ -106,6 +121,15 @@ func _advance_flying(delta: float) -> void:
 	for id: int in flying.keys():
 		var p: Dictionary = flying[id]
 
+		# A fused grenade goes off on time, in the air or on the ground.
+		if float(p.get("detonate_at", -1.0)) >= 0.0 and game.now() >= float(p["detonate_at"]):
+			flying.erase(id)
+			game.explode(p["at"], float(p["radius"]), float(p["amount"]), int(p["owner"]), p["kind"], 0.5)
+			continue
+
+		if bool(p.get("rest", false)):
+			continue
+
 		# A pipe on the ground: beeping, then a bang.
 		if float(p["fuse"]) >= 0.0:
 			p["fuse"] = float(p["fuse"]) - delta
@@ -117,7 +141,7 @@ func _advance_flying(delta: float) -> void:
 
 		var from: Vector3 = p["at"]
 		var velocity: Vector3 = p["velocity"]
-		velocity.y -= GRAVITY * delta
+		velocity.y -= GRAVITY * float(p.get("gravity", 1.0)) * delta
 		var to := from + velocity * delta
 		p["velocity"] = velocity
 
@@ -129,6 +153,12 @@ func _advance_flying(delta: float) -> void:
 				game.rock_hit(victim, to, float(p["amount"]), int(p["owner"]))
 				landed.emit(id, ROCK, to)
 				continue
+
+		# A rocket goes off on the first zombie it meets, not on the wall behind the crowd: the
+		# world ray does not see zombies.
+		if p["kind"] == ROCKET and game.horde != null and not game.horde.spawner.npcs_near(to + Vector3(0.0, -1.0, 0.0), 1.1).is_empty():
+			_land(id, p, to)
+			continue
 
 		var hit: Vector3 = game.ray_hit(from, to)
 
@@ -156,6 +186,17 @@ func _land(id: int, p: Dictionary, at: Vector3) -> void:
 		SHELL:
 			flying.erase(id)
 			game.explode(at, 7.0, float(p["amount"]), int(p["owner"]), SHELL, 0.6)
+		GRENADE, ROCKET:
+			if float(p["detonate_at"]) >= 0.0:
+				p["at"] = at + Vector3(0.0, 0.1, 0.0)
+				p["velocity"] = Vector3.ZERO
+				p["rest"] = true
+			else:
+				flying.erase(id)
+				game.explode(at, float(p["radius"]), float(p["amount"]), int(p["owner"]), p["kind"], 0.5)
+		BILE:
+			flying.erase(id)
+			game.horde.bile_at(at, BILE_SECONDS, BILE_LURE)
 		PIPE:
 			p["at"] = at + Vector3(0.0, 0.1, 0.0)
 			p["velocity"] = Vector3.ZERO
