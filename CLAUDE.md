@@ -109,6 +109,8 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 
 The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-maps): `maps/` here is a dot-bootstrap link, and `game.yml` does not name the pack; the server owner names `gamemann/zombie-zone-maps` (or their own) in their deployment's map config, and `ZzModule` adds every mount's `maps/` to the catalogue at load and after every `zz_reload`. A client is sent the one document being played. No `class_name` anywhere in `game/` or `npcs/`, because a mounted pack cannot register one; the brains are named by path.
 
+**The map vote** (`game/zz_vote.gd`, MANUAL, applied at a round's end): under MANUAL `ZzVote` opens a passed rock-the-vote itself (dot-vote does not; `rtv_delay_sec` 0), and `_game_load` refreshes the map list after `_add_delivered_maps`. Without either, `!rtv` answers "Rocked. 1 of 1." and nothing opens, or a delivered server's ballot holds only the practice map and never opens. `examples/dedicated` arms both.
+
 ## Still to do
 
 1. **Put it live.** Create `gamemann/game-zombie-zone`, `gamemann/zombie-zone-maps` and `gamemann/zed-dot-weapons`, tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
