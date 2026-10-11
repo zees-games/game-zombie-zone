@@ -279,7 +279,17 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 ## is then well off the line while their head and chest are on it: with the middle-only test
 ## four stand-ins dealt each other 200 to 500 points in every minute measured. A friend whose
 ## hitbox holds the eye itself is skipped, because the shot passes through them (zz_trace.gd).
+##
+## [b]Under the server's `mp_teammate_passthrough`.[/b] At 2 every shot passes through every
+## survivor, so nobody is in the way and a stand-in that held fire for a friend in the line
+## stood behind them doing nothing while the horde arrived. At 0 a friend holding the muzzle
+## is hit like anybody, so that friend is in the way after all.
 func _friend_in_the_way(player, at: Vector3) -> bool:
+	var level := _pass_through_level()
+
+	if level >= DotDamageRules.PASS_THROUGH_ALWAYS:
+		return false
+
 	var eye: Vector3 = player.eye_position()
 	var reach := eye.distance_to(at)
 	var cone := tan(deg_to_rad(FRIEND_CONE_DEGREES))
@@ -297,7 +307,10 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 
 		var set_node: DotHitboxSet = other.hitboxes
 
-		if set_node == null or not is_instance_valid(set_node) or ZzTrace.survivor_around(set_node, eye):
+		if set_node == null or not is_instance_valid(set_node):
+			continue
+
+		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and ZzTrace.survivor_around(set_node, eye):
 			continue
 
 		for box in set_node.hitboxes():
@@ -314,6 +327,13 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 				return true
 
 	return false
+
+
+## The level the server's combat manager judges shots under (its `mp_teammate_passthrough`).
+func _pass_through_level() -> int:
+	if game == null or game.combat == null or game.combat.rules == null:
+		return DotDamageRules.PASS_THROUGH_AT_MUZZLE
+	return game.combat.rules.pass_through_level()
 
 
 func _pinned_friend(player):

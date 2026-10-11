@@ -34,7 +34,7 @@ npcs/                the zombie body, its view, and one brain script per kind (b
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (104), headless_maps (61), headless_net (54), dedicated (51)
+examples/            headless_run (112), headless_maps (61), headless_net (54), dedicated (55)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 

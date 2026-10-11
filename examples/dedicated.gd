@@ -14,7 +14,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 9
-const CHECKS := 54
+const CHECKS := 55
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -231,6 +231,16 @@ func _test_the_commands() -> void:
 			and game.combat.trace.get(&"rules") == game.combat.rules,
 		"and 0 turns both pass-through rules off, zz_trace's with them", str(game.combat.rules.describe()))
 	var _default := _run_command("mp_teammate_passthrough 1")
+	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
+	# every change, so a client's own combat manager (following its link) predicts tracers
+	# under the server's level rather than its default.
+	var shared := server.console.find_cvar("mp_teammate_passthrough")
+	var _two := _run_command("mp_teammate_passthrough 2")
+	_check(shared != null and shared.has_flag(DotConVar.FLAG_REPLICATED)
+			and server.console.replicated_values().get("mp_teammate_passthrough", "") == "2",
+		"mp_teammate_passthrough is replicated: a client is sent the server's level",
+		str(server.console.replicated_values()))
+	var _one := _run_command("mp_teammate_passthrough 1")
 	_finished()
 
 

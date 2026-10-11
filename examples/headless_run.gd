@@ -25,9 +25,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 23
+const SECTIONS := 24
 
-const CHECKS := 104
+const CHECKS := 112
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -79,6 +79,7 @@ func _run() -> void:
 	await _test_objectives()
 	await _test_winning_and_losing()
 	await _test_stand_ins()
+	await _test_stand_ins_and_the_pass_through_level()
 	await _test_a_crowd_is_cheap()
 
 	for world in _worlds.duplicate():
@@ -781,6 +782,46 @@ func _test_stand_ins() -> void:
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
 	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
 	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)
+	_finished()
+
+
+## The stand-ins' "friend in the line" check under the server's `mp_teammate_passthrough`.
+## At 2 every shot passes through every survivor, so a stand-in that still held fire for a
+## friend in front stood there doing nothing; at 0 a friend holding the muzzle is hit, so that
+## one is in the way after all.
+func _test_stand_ins_and_the_pass_through_level() -> void:
+	_section("stand-ins hold fire for a friend only when the shot would hit them")
+	var game := await _team(2, _quiet, true)
+	var me := game.survivors()[0]
+	var friend := game.survivors()[1]
+	me.place_at(STREET, 0.0)
+	friend.place_at(STREET + Vector3(0, 0, -3), 0.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -9), &"test")
+	(npc.brain as Object).set(&"idle_kind", 0)
+	await _sim(game, 0.1)
+	var aim := game.bots._aim_point(npc)
+	var reacted := {"target": npc.instance_id, "target_since": game.now() - 60.0}
+
+	_check(game.combat.rules.pass_through_level() == 1, "the default level is 1")
+	_check(game.bots._friend_in_the_way(me, aim) and not game.bots._fire_ok(me, reacted, npc),
+		"at 1 a friend in the line holds a stand-in's fire")
+
+	_check(game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2"), "the server goes to 2")
+	_check(not game.bots._friend_in_the_way(me, aim) and game.bots._fire_ok(me, reacted, npc),
+		"at 2 the stand-in fires through the friend")
+	var before := friend.health.health
+	var shot := _shot(game, me, aim, 30.0)
+	_check(shot.damages.size() == 1 and DotEntity.is_kind(shot.damages[0].victim, DotEntity.KIND_NPC),
+		"and the shot goes through them to the zombie", str(shot.damages.map(func(d: DotDamage) -> int: return d.victim)))
+	_check(friend.health.health == before, "leaving the friend unhurt")
+
+	# A friend standing inside the stand-in: at 1 the shot passes through them, at 0 it does not.
+	friend.place_at(STREET, 0.0)
+	await _sim(game, 0.05)
+	var _zero := game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "0")
+	_check(game.bots._friend_in_the_way(me, aim), "at 0 a friend holding the muzzle holds a stand-in's fire")
+	var _two := game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2")
+	_check(not game.bots._friend_in_the_way(me, aim), "and at 2 even that one does not")
 	_finished()
 
 
