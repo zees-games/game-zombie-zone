@@ -115,6 +115,8 @@ tools/shot.sh --view=survivor --box=mystery
 
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
 
+**`project.godot` carries no comments**: the editor drops them, and any key left at its default, the first time it saves the file, so the reasons for its settings live here. Gravity is left at the engine default and nothing reads it: `ZzConfig.gravity` is written onto the world's own physics space, because a project setting does not travel inside a delivered pack. The renderer is `gl_compatibility` because that is what the delivered client runs, and lighting is tuned under it. The canvas texture filter is Nearest so the prototype grid reads as discrete squares at distance. Texture imports keep `detect_3d/compress_to=0` (and `[importer_defaults]` starts new ones that way) so the editor never re-imports one VRAM-compressed on a first open.
+
 ## Delivery
 
 The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-maps): `maps/` here is a dot-bootstrap link, and `game.yml` does not name the pack; the server owner names `gamemann/zombie-zone-maps` (or their own) in their deployment's map config, and `ZzModule` adds every mount's `maps/` to the catalogue at load and after every `zz_reload`. A client is sent the one document being played. No `class_name` anywhere in `game/` or `npcs/`, because a mounted pack cannot register one; the brains are named by path.
