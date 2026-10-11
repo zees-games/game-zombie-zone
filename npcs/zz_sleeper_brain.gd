@@ -24,7 +24,7 @@ var _quarry_down_at: float = -1.0
 
 
 func _build() -> void:
-	character = DotNpcAiCharacter.preset(&"hard").with_seed(npc.instance_id if npc != null else 0)
+	character = DotNpcAiCharacter.preset(&"hard").with_seed(npc.seed if npc != null else 0)
 	character.reaction_time = 0.05
 	character.view_turn_deg = 900.0
 	go(SITTING)

@@ -60,7 +60,7 @@ var _woken_at: float = INF
 
 
 func _build() -> void:
-	var seed_id := npc.instance_id if npc != null else 0
+	var seed_id := npc.seed if npc != null else 0
 	var roll := DotNpcAiNode.deterministic_unit(seed_id, 4111)
 
 	# Mostly standing and milling; a few sitting against things; fewer feeding on the floor.
@@ -303,9 +303,9 @@ func _idle(b: ZzZombieBody) -> void:
 
 			if _mill_goal == Vector3.INF or flat_distance(npc.position(), _mill_goal) < 0.8:
 				if _mill_goal != Vector3.INF:
-					_mill_wait_until = now() + lerpf(1.5, 6.0, DotNpcAiNode.deterministic_unit(npc.instance_id, int(now() * 10.0)))
-				var angle := DotNpcAiNode.deterministic_unit(npc.instance_id, int(now() * 3.0) + 77) * TAU
-				var far := lerpf(1.5, wander, DotNpcAiNode.deterministic_unit(npc.instance_id, int(now() * 5.0) + 91))
+					_mill_wait_until = now() + lerpf(1.5, 6.0, DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 10.0)))
+				var angle := DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 3.0) + 77) * TAU
+				var far := lerpf(1.5, wander, DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 5.0) + 91))
 				_mill_goal = home + Vector3(cos(angle), 0.0, sin(angle)) * far
 				var h := horde()
 				if h != null:

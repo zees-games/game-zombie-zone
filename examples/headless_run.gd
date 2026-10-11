@@ -27,7 +27,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const SECTIONS := 23
 
-const CHECKS := 103
+const CHECKS := 104
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -744,15 +744,43 @@ func _test_stand_ins() -> void:
 	var game := await _team(4, func(c: ZzConfig) -> void: c.start_grace_seconds = 2.0, true)
 	for player in game.survivors():
 		player.health.invulnerable = false
-	await _sim(game, 60.0)
+
+	# Measured over the FIRST ROUND, sampled every second, never as one snapshot at 60 s. Four
+	# stand-ins can lose the street to the horde (a spitter's pool at the switch, a ram, a
+	# crowd), and the round that starts after it resets every counter and puts them back in the
+	# start room: a snapshot then read "0 kills, z 7" from a team that had killed thirty and
+	# reached the switch. Losing is the game; what this checks is that they played it.
+	var first_round := game.round_number
 	var kills := 0
 	var furthest := -INF
-	for player in game.survivors():
-		kills += player.commons_killed + player.specials_killed
-		furthest = maxf(furthest, player.feet().z)
-	_check(kills > 0, "they shoot what comes at them", "%d kills" % kills)
-	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f" % furthest)
-	_check(game.loot.count_of(ZzLoot.WEAPON) < 3, "picking up what was left for them", "%d left" % game.loot.count_of(ZzLoot.WEAPON))
+	var weapons_left := game.loot.count_of(ZzLoot.WEAPON)
+	var played := 0.0
+	var friendly := 0.0
+
+	while played < 60.0:
+		await _sim(game, 1.0)
+		played += 1.0
+
+		if game.round_number != first_round:
+			break
+
+		kills = 0
+		friendly = 0.0
+		for player in game.survivors():
+			kills += player.commons_killed + player.specials_killed
+			furthest = maxf(furthest, player.feet().z)
+			friendly += player.friendly_damage
+		weapons_left = game.loot.count_of(ZzLoot.WEAPON)
+
+	var over := "" if played >= 60.0 else ", round over by %.0f s" % played
+	_check(kills > 0, "they shoot what comes at them", "%d kills%s" % [kills, over])
+	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f%s" % [furthest, over])
+	_check(weapons_left < 3, "picking up what was left for them", "%d left" % weapons_left)
+	# Survivors do not collide, so stand-ins stack up shoulder to shoulder or inside each other.
+	# Before zz_trace.gd and the hitbox-based friend check, every shot from inside a friend hit
+	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
+	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
+	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)
 	_finished()
 
 

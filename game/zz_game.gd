@@ -19,6 +19,7 @@ const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
+const ZzTrace := preload("zz_trace.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
@@ -326,8 +327,10 @@ func _build_combat() -> void:
 	settings.lag_compensation = true
 	combat.config = settings
 
-	# A shot stops on a wall and on the furniture: shooting through a car is not a thing.
-	var trace := DotTracePhysics.for_world(get_world_3d())
+	# A shot stops on a wall and on the furniture: shooting through a car is not a thing. And a
+	# shot that starts inside a team-mate is not aimed at them (see zz_trace.gd).
+	var trace: DotTracePhysics = ZzTrace.new()
+	trace.bind(get_world_3d())
 	trace.collision_mask = world_mask()
 
 	combat.trace = trace

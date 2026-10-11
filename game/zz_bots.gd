@@ -4,6 +4,7 @@ const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzTrace := preload("zz_trace.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 
 ## The stand-in survivors: what a server fills a team with, and what a suite plays with.
@@ -33,6 +34,10 @@ const SIGHT := 32.0
 ## How near the line of fire a friend's middle may be before a stand-in holds its fire: a
 ## body's half-width and a little more for a shotgun's spread.
 const FRIEND_CLEARANCE := 0.7
+
+## The cone a stand-in's shot may land in around its aim: its own aim wobble plus a moving
+## shotgun's spread. A friend's hitbox inside it is a friend in the line.
+const FRIEND_CONE_DEGREES := 14.0
 const SHOVE_RANGE := 1.7
 
 ## How far a bot lets its leader get before it walks after them.
@@ -268,8 +273,16 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 ## start room's doorway shot through each other at the first crowd, and with friendly fire on
 ## they lost the practice street three times in a minute; with it off, the same seed got them
 ## to the switch. A person does not fire through a friend's back, so neither does a stand-in.
+##
+## [b]Against the friend's hitboxes, not only their middle.[/b] Survivors do not collide, so a
+## friend is often right beside the gun, shoulder to shoulder or half inside it. Their middle
+## is then well off the line while their head and chest are on it: with the middle-only test
+## four stand-ins dealt each other 200 to 500 points in every minute measured. A friend whose
+## hitbox holds the eye itself is skipped, because the shot passes through them (zz_trace.gd).
 func _friend_in_the_way(player, at: Vector3) -> bool:
 	var eye: Vector3 = player.eye_position()
+	var reach := eye.distance_to(at)
+	var cone := tan(deg_to_rad(FRIEND_CONE_DEGREES))
 
 	for other in game.survivors():
 		if other == player or not other.is_alive() or other.watching:
@@ -278,11 +291,27 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		var middle: Vector3 = other.feet() + Vector3(0.0, 0.9, 0.0)
 
 		# Only somebody between the gun and the target, not behind either.
-		if (middle - eye).dot(at - eye) <= 0.0 or middle.distance_to(eye) > at.distance_to(eye):
+		if (middle - eye).dot(at - eye) > 0.0 and middle.distance_to(eye) <= reach \
+				and Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle) < FRIEND_CLEARANCE:
+			return true
+
+		var set_node: DotHitboxSet = other.hitboxes
+
+		if set_node == null or not is_instance_valid(set_node) or ZzTrace.survivor_around(set_node, eye):
 			continue
 
-		if Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle) < FRIEND_CLEARANCE:
-			return true
+		for box in set_node.hitboxes():
+			if not box.enabled:
+				continue
+
+			var half := maxf(0.0, box.height * 0.5 - box.radius) if box.shape == DotHitbox.Shape.CAPSULE else 0.0
+			var low: Vector3 = box.global_transform * Vector3(0.0, -half, 0.0)
+			var high: Vector3 = box.global_transform * Vector3(0.0, half, 0.0)
+			var near := Geometry3D.get_closest_points_between_segments(eye, at, low, high)
+			var along: float = eye.distance_to(near[0])
+
+			if near[0].distance_to(near[1]) < box.radius + 0.1 + along * cone:
+				return true
 
 	return false
 

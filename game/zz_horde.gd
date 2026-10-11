@@ -143,6 +143,10 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	spawner.smooth_paths = true
 	spawner.allow_partial_paths = true
 	spawner.occlusion_mask = game.world_mask()
+	# Every zombie's own seed (`npc.seed`, what the brains draw their idle, pace and wander from)
+	# comes from the session's seed and its spawn count, so a server given the same seed plays
+	# the same zombies. Never their object id: see dot-npc's docs/runtime.md.
+	spawner.seed_base = config.seed_value
 	# Before add_child: DotNpcSpawner._ready makes its own senses when it finds none.
 	spawner.senses = senses
 	squads.attach(spawner)

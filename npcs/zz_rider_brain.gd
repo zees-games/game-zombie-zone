@@ -95,7 +95,7 @@ func _holding(_delta: float) -> void:
 		pull += to_harm.normalized() * 1.5
 
 	# A wobble, so it is not a straight line a teammate can predict and cut off.
-	var wobble := DotNpcAiNode.deterministic_unit(npc.instance_id, int(now() * 2.0)) * TAU
+	var wobble := DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 2.0)) * TAU
 	pull += Vector3(cos(wobble), 0.0, sin(wobble)) * 0.6
 
 	if pull.length() < 0.01:

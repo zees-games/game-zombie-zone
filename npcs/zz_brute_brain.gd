@@ -121,7 +121,7 @@ func _special(_delta: float) -> void:
 
 	if cooled_down() and has_reacted() and (throwable or unreachable) \
 			and clear_line(npc.position() + Vector3(0.0, 2.8, 0.0), at + Vector3(0.0, 1.2, 0.0)) \
-			and (gap > 18.0 or unreachable or DotNpcAiNode.deterministic_unit(npc.instance_id, int(now())) < 0.02):
+			and (gap > 18.0 or unreachable or DotNpcAiNode.deterministic_unit(npc.seed, int(now())) < 0.02):
 		_throw_target = victim
 		_throw_at = now() + 1.5
 		go(THROW)
