@@ -50,7 +50,7 @@ A map document carries `nav.floors` (rectangles), and `ZzNpcs.nav_for` lays dot-
 
 **A mob is only spawned where it can reach somebody** (`ZzHorde._reaches_somebody`, by the graph's connected pieces), and **never inside a safe room** (`_keep_out_of_safe_rooms`). Both were found by `dedicated`: the hold-out's mob spawned behind the barrier the hold-out was opening (`headless_run` arms it: 40 of 40 spawns stranded without the check), and six wanderers stood waiting in the end room. Nothing errored; the stand-ins held the switch with nothing to shoot.
 
-**dot-npc changed for this game**, and its CLAUDE.md has each: bucketed indexes for thousands of points, a binary-heap A*, de-duplication by distance (the old grid key split the graph at doorways and cut the start room off), partial paths that wait instead of repathing every tick (100 ms a tick with a crowd at a shut gate), connected-piece labels so an unreachable goal costs nothing, and `eye_height` (sight was cast from the feet, which start on the floor, so every NPC was blind).
+**dot-npc changed for this game**, and its [navigation](../dot-npc/docs/navigation.md) and [history](../dot-npc/docs/history.md) docs have each: bucketed indexes for thousands of points, a binary-heap A*, de-duplication by distance (the old grid key split the graph at doorways and cut the start room off), partial paths that wait instead of repathing every tick (100 ms a tick with a crowd at a shut gate), connected-piece labels so an unreachable goal costs nothing, and `eye_height` (sight was cast from the feet, which start on the floor, so every NPC was blind).
 
 ## Decision 3: the director paces, the commons crowd, the specials wait
 
