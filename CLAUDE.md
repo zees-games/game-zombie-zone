@@ -106,6 +106,8 @@ tools/shot.sh --view=down
 tools/shot.sh --view=survivor --box=mystery
 ```
 
+**Look**: building surfaces are Kenney's grid under dusted pastels (`ZzMaterials.PASTELS`, `DUST`), so a dark zombie reads against a pale wall; light is a dot-lighting document from the map's `environment` (`ZzMap.light_document`), the map's own moon or low sun without the rig's 0.35 daylight floor, fill at `FILL` x `ambient_energy`. Night maps stay night; check both renderers with `tools/shot.sh` before changing either number.
+
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
 
 ## Delivery

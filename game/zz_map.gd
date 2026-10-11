@@ -355,43 +355,108 @@ func _build_lights() -> void:
 		_drawn.add_child(omni)
 
 
+## The sky, the moon or the low sun, and the fill: a dot-lighting document made from the map's
+## `environment` ([method light_document]), so every map has the family's light (filmic tone
+## map, soft shadows, glow only from the lamps) while keeping its own hour: the blackout
+## streets, the depot, the chapel and the lot stay night under a blue moon, the pier stays
+## dusk under an orange sun on the horizon.
 func _build_environment() -> void:
 	var env_doc: Dictionary = doc["environment"]
-	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = ZzMapDoc.colour(env_doc["sky_top"])
-	sky_material.sky_horizon_color = ZzMapDoc.colour(env_doc["sky_horizon"])
-	sky_material.ground_horizon_color = ZzMapDoc.colour(env_doc["sky_horizon"]).darkened(0.2)
-	sky_material.ground_bottom_color = ZzMapDoc.colour(env_doc["ground"])
+	var lighting := Node3D.new()
+	lighting.name = "Lighting"
+	add_child(lighting)
+	_sun = DotLightRig.apply(lighting, DotLightDocument.from_dictionary(light_document(env_doc)),
+		light_profile(float(env_doc["ambient_energy"])))
 
-	var sky := Sky.new()
-	sky.sky_material = sky_material
+	if _sun != null:
+		# The map's own angle, in Godot's degrees as the map document has always written it,
+		# rather than through dot-lighting's source convention.
+		_sun.rotation_degrees = Vector3(float(env_doc["sun_pitch"]), float(env_doc["sun_yaw"]), 0.0)
+		_sun.shadow_blur = 1.5
+		_sun.directional_shadow_max_distance = 60.0
+		# The rig never draws a sun under 0.35, a floor for daylight worlds; a night map's
+		# moon there lit every street like an overcast afternoon. The map's own strength, on
+		# the rig's curve, without the floor.
+		var profile := light_profile(float(env_doc["ambient_energy"]))
+		var brightness := float(light_document(env_doc)["sun"]["brightness"])
+		_sun.light_energy = clampf(sqrt(brightness / profile.brightness_reference), 0.0, 2.0)
 
-	var environment := Environment.new()
-	environment.background_mode = Environment.BG_SKY
-	environment.sky = sky
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = ZzMapDoc.colour(env_doc["ambient"])
-	environment.ambient_light_energy = float(env_doc["ambient_energy"])
-	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	for node in lighting.get_children():
+		if node is WorldEnvironment:
+			_environment = node as WorldEnvironment
+			var sky := (node as WorldEnvironment).environment.sky
+			if sky != null and sky.sky_material is ProceduralSkyMaterial:
+				# The map's own zenith (the rig draws it in the fill colour, a pale grey chosen
+				# for the shade, which turned the night sky to dusk) and its ground below.
+				var material := sky.sky_material as ProceduralSkyMaterial
+				material.sky_top_color = ZzMapDoc.colour(env_doc["sky_top"])
+				material.ground_bottom_color = ZzMapDoc.colour(env_doc["ground"])
 
-	if float(env_doc["fog"]) > 0.0:
-		environment.fog_enabled = true
-		environment.fog_density = float(env_doc["fog"])
-		environment.fog_light_color = ZzMapDoc.colour(env_doc["sky_horizon"])
 
-	_environment = WorldEnvironment.new()
-	_environment.name = "Environment"
-	_environment.environment = environment
-	add_child(_environment)
+## The dot-lighting document a map's `environment` describes.
+##
+## [b]The sun is the map's, at the map's strength[/b]: 380 (game-arena's daylight) times the
+## square of `sun_energy`, which for a night map's 0.12 is a faint moon (drawn below the rig's
+## floor, see [method _build_environment]) and leaves the lamps to light the street. [b]The fill is the map's
+## ambient hue taken halfway to neutral and brought up to a pale value[/b]: a night map's
+## ambient is a deep blue that, at the strength the dark needs to stay readable, tinted
+## everything navy and lost every zombie against every wall; halfway keeps the moonlit cool
+## (and the pier's dusk rose) without the cast. [b]The fog is the map's own darkness from
+## 14 m[/b]: its horizon colour, reaching full at about 2 / `fog` metres further on and never
+## quite opaque, so what comes out of the dark comes out of it at a distance a survivor can
+## still shoot, and the map's `fog` (the chapel's 0.05 is twice the street's) still says how
+## thick. Source units (metres / 0.01905), as the rig reads them.
+static func light_document(env_doc: Dictionary) -> Dictionary:
+	var sun := ZzMapDoc.colour(env_doc["sun_colour"])
+	var horizon := ZzMapDoc.colour(env_doc["sky_horizon"])
+	var ambient := ZzMapDoc.colour(env_doc["ambient"])
+	var peak := maxf(maxf(ambient.r, ambient.g), maxf(ambient.b, 0.01))
+	var fill := Color(ambient.r / peak, ambient.g / peak, ambient.b / peak).lerp(Color(1.0, 1.0, 1.0), 0.5) * 0.9
+	var energy := float(env_doc["sun_energy"])
+	var fog := maxf(float(env_doc["fog"]), 0.01)
+	var start := 14.0
+	return {
+		"sun": {
+			"colour": [sun.r, sun.g, sun.b],
+			"brightness": 380.0 * energy * energy,
+			"spread_degrees": 1.0,
+			"ambient_colour": [fill.r, fill.g, fill.b],
+		},
+		"fog": {
+			"enabled": true,
+			"colour": [horizon.r, horizon.g, horizon.b],
+			"start": start / 0.01905,
+			"end": (start + 2.0 / fog) / 0.01905,
+			"max_density": clampf(fog * 20.0, 0.35, 0.85),
+		},
+	}
 
-	_sun = DirectionalLight3D.new()
-	_sun.name = "Sun"
-	_sun.rotation_degrees = Vector3(float(env_doc["sun_pitch"]), float(env_doc["sun_yaw"]), 0.0)
-	_sun.light_energy = float(env_doc["sun_energy"])
-	_sun.light_color = ZzMapDoc.colour(env_doc["sun_colour"])
-	_sun.shadow_enabled = float(env_doc["sun_energy"]) > 0.05
-	_sun.directional_shadow_max_distance = 60.0
-	add_child(_sun)
+
+## What this machine draws of a map's light.
+##
+## [b]Shadows stay on in the browser[/b], unlike dot-lighting's `web()`: a moonlit street
+## without them is every face lit alike, and the boxes are batched into a few dozen meshes.
+## [b]The Compatibility renderer, which this game and the client shell use, has no headroom
+## above white[/b], so under `gl_compatibility` the sun is divided by 700 instead of 200 and
+## the fill is turned down, game-arena's ratio.
+##
+## [b]The fill is the map's `ambient_energy` times [constant FILL][/b], chosen from rendered
+## frames in both renderers: at 2.6 (and with the rig's 0.35 moon) a night street read as an
+## overcast afternoon under a black sky; at 1.2 it is dusky, the lamps still pool, and a
+## zombie is a dark figure against a lighter wall rather than the old dark-on-dark brick.
+const FILL := 1.2
+
+static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
+	var p := DotLightProfile.web() if OS.has_feature("web") else DotLightProfile.high()
+	p.sun_shadows = true
+	p.ambient_energy = ambient_energy * FILL
+	# Glow only from what is brighter than white (the lamps, the fires), not from every
+	# pale wall.
+	p.glow_threshold = 1.0
+	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
+		p.brightness_reference = 700.0
+		p.ambient_energy = ambient_energy * FILL * 0.62
+	return p
 
 
 # --- Asking ----------------------------------------------------------------
