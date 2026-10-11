@@ -19,6 +19,13 @@ extends DotTracePhysics
 
 const ZzPlayer := preload("zz_player.gd")
 
+## The rules the combat manager judges with. With
+## [member DotDamageRules.pass_through_team_mate_at_muzzle] off (the server's
+## `mp_teammate_passthrough 0`) this trace drops nothing, so the operator's setting is not
+## undone here. Null keeps the rule on. dot-combat now applies the same rule itself in
+## `DotCombatManager.pass_through_sets`; this file stays until every host has that.
+var rules: DotDamageRules = null
+
 
 func ray(
 	from: Vector3,
@@ -26,6 +33,9 @@ func ray(
 	max_distance: float,
 	sets: Array[DotHitboxSet] = []
 ) -> DotHitbox.Hit:
+	if rules != null and not rules.pass_through_team_mate_at_muzzle:
+		return super.ray(from, direction, max_distance, sets)
+
 	var kept: Array[DotHitboxSet] = []
 
 	for set_node in sets:
