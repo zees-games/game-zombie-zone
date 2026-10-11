@@ -49,9 +49,9 @@ Anybody pinned needs a friend: shoot what holds them or shove it off.
 
 **Friendly fire is on**, at a tenth of the damage on normal and much more on expert. Stand-ins fill the team up to four when there are not enough people, and they shoot, revive, heal and pick things up, and they do not shoot through you.
 
-**Two weapon packs.** The server carries [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons) (blasters, melee weapons, grenades) and [zed-dot-weapons](https://github.com/gamemann/zed-dot-weapons) (real-world pistols, shotguns, a hunting rifle, a machine gun, launchers, a flamethrower, and the molotov, pipe bomb and bile jar) side by side, and the maps, the boxes and the stand-ins hand out weapons from both. A molotov sets the ground on fire, a pipe bomb beeps and pulls the horde to it before it goes off, a bile jar brings every zombie nearby to where it broke, and the flamethrower sets whatever it touches alight.
+**Two weapon packs.** The server carries [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) (blasters, melee weapons, grenades) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (real-world pistols, shotguns, a hunting rifle, a machine gun, launchers, a flamethrower, and the molotov, pipe bomb and bile jar) side by side, and the maps, the boxes and the stand-ins hand out weapons from both. A molotov sets the ground on fire, a pipe bomb beeps and pulls the horde to it before it goes off, a bile jar brings every zombie nearby to where it broke, and the flamethrower sets whatever it touches alight.
 
-There are six maps: the **practice street** built into the game, the three-map **Blackout** campaign (Corner Shop, The Depot, The Pier), and two survival maps, **Parking Lot** and **Chapel Yard**, from [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps). At the end of a campaign the players vote for what is next.
+There are six maps: the **practice street** built into the game, the three-map **Blackout** campaign (Corner Shop, The Depot, The Pier), and two survival maps, **Parking Lot** and **Chapel Yard**, from [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps). At the end of a campaign the players vote for what is next.
 
 ## Controls
 
@@ -164,7 +164,7 @@ Admin commands, for seeing what happens (they need the `z` flag):
 | `zz_panic [seconds]` | Mobs back to back |
 
 ## Writing a map
-Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/gamemann/zombie-zone-maps/blob/main/maps/README.md).
+Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps/blob/main/maps/README.md).
 
 ## Testing
 `./game.sh test` checks that every script parses and then runs every suite:
@@ -184,7 +184,7 @@ Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps
 - **Playing it with people.** How hard normal should be, how often a mob comes and how much a box should do are numbers only play settles.
 
 ## Credits
-The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons) and [zed-dot-weapons](https://github.com/gamemann/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Floors, walls and roofs are his Prototype Textures under a dusty pastel; the remaining surfaces (metal, glass, water, lines) are drawn in code. Each kit's licence is next to its files.
+The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Floors, walls and roofs are his Prototype Textures under a dusty pastel; the remaining surfaces (metal, glass, water, lines) are drawn in code. Each kit's licence is next to its files.
 
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney art and the OpenGameArt sounds are CC0, which is public domain.

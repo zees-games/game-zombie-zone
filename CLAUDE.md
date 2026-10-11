@@ -118,7 +118,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Still to do
 
-1. **Put it live.** Create `gamemann/game-zombie-zone`, `gamemann/zombie-zone-maps` and `gamemann/zed-dot-weapons`, tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
+1. **Put it live.** The GitHub repositories (`zees-games/game-zombie-zone`, `zees-games/zombie-zone-maps`, `zees-games/zed-dot-weapons`) exist; tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no common's brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.
