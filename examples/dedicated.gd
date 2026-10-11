@@ -14,7 +14,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 9
-const CHECKS := 51
+const CHECKS := 54
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -216,6 +216,20 @@ func _test_the_commands() -> void:
 	_check(game.config.max_incaps == 10, "a number past the end is clamped, not taken",
 		"%d" % game.config.max_incaps)
 	var _normal := _run_command("zz_difficulty 1")
+
+	# Shooting through team-mates is the operator's: dot-combat's cvar, bound by the module to
+	# the world's own combat rules, live from the next shot.
+	var passthrough := server.console.find_cvar("mp_teammate_passthrough")
+	_check(passthrough != null and passthrough.get_string() == "1" and game.combat.rules.pass_through_level() == 1,
+		"mp_teammate_passthrough is registered, at 1 (through a team-mate at the muzzle)",
+		passthrough.get_string() if passthrough != null else "missing")
+	var _always := _run_command("mp_teammate_passthrough 2")
+	_check(game.combat.rules.pass_through_team_mates and game.combat.resolver.rules.pass_through_team_mates,
+		"and 2 reaches the rules the resolver judges with", str(game.combat.rules.describe()))
+	var _never := _run_command("mp_teammate_passthrough 0")
+	_check(not game.combat.rules.pass_through_team_mate_at_muzzle and not game.combat.rules.pass_through_team_mates,
+		"and 0 turns both pass-through rules off", str(game.combat.rules.describe()))
+	var _default := _run_command("mp_teammate_passthrough 1")
 	_finished()
 
 
