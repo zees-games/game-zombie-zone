@@ -23,7 +23,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 13
-const CHECKS := 53
+const CHECKS := 54
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -338,11 +338,24 @@ func _test_zombies_replicate() -> void:
 	_check(mirror != null and _client_bridge.zombie_count() == _server_bridge.zombie_count(),
 		"and draws it, and every other zombie the server has", "%d of %d" % [_client_bridge.zombie_count(), _server_bridge.zombie_count()])
 
+	# A common told who to chase screams first, for a time drawn off its seed (0.5 to 1.05 s
+	# when forced), and that seed is the body's Godot object id, which moves whenever anything
+	# earlier in the process allocates one more object. A fixed second from the order counted
+	# the scream into the run: this check passed or failed by which seed an unrelated change
+	# handed it. So: wait out the scream, then time the run, from where it stood (the spawner
+	# moves it off the asked-for point onto the floor plan).
 	npc.brain.call(&"force_target", server_me.player_id)
+	var screamed := 0
+	while npc.brain.state != &"chase" and screamed < SERVER_TICK_RATE * 2:
+		await _step()
+		screamed += 1
+	_check(npc.brain.state == &"chase", "told who to chase, it screams and then runs",
+		"%.2f s, %s" % [float(screamed) / SERVER_TICK_RATE, npc.brain.state])
+	var from := npc.position()
 	await _steps(SERVER_TICK_RATE)
-	var moved := npc.position().distance_to(STREET + Vector3(0.0, 0.0, -10.0))
+	var moved := npc.position().distance_to(from)
 	var apart := mirror.global_position.distance_to(npc.position()) if mirror != null else INF
-	_check(moved > 1.0, "it comes for the survivor on the server", "%.1f m" % moved)
+	_check(moved > 1.0, "it comes for the survivor on the server", "%.1f m in a second" % moved)
 	_check(apart < 0.6, "and the client's copy is where the server's is", "%.2f m apart" % apart)
 
 	_hurt_npc(npc, 100000.0)

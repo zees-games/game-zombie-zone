@@ -34,7 +34,7 @@ npcs/                the zombie body, its view, and one brain script per kind (b
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (103), headless_maps (61), headless_net (53), dedicated (44)
+examples/            headless_run (103), headless_maps (61), headless_net (54), dedicated (51)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 
@@ -88,6 +88,8 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 - **A command and a cvar were both `zz_boxes`**; the cvar is `zz_box_drops`. **Push-to-talk and shove were both V**; shove is F.
 - **Three stand-ins called Odell**: names are drawn from the ones not taken.
 - **A delivered server always played the practice street first**: the world lays a map out in `_ready`, before the module adds the delivered maps, and `start()` rebuilt that one. It re-picks now when the map it holds is not one the server would choose. And **`zz_server.gd` logged `config.round_seconds`**, a prop-hunt field, as a SCRIPT ERROR no suite here loads that scene to see. Both found by dot-server-deploy's `zombiezone_client`, which joins a real client to the delivered pack.
+
+- **A suite must not time a zombie's choice off its seed**: every brain seeds its scream, pace and idle off `npc.instance_id`, which is the body's Godot object id and moves whenever anything earlier allocates one more object. Wait for the state, then time it ([docs/history.md](docs/history.md)).
 
 ## Validating
 
