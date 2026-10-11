@@ -6,6 +6,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzHazards := preload("../game/zz_hazards.gd")
+const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
@@ -25,9 +26,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 24
+const SECTIONS := 25
 
-const CHECKS := 112
+const CHECKS := 121
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -81,6 +82,7 @@ func _run() -> void:
 	await _test_stand_ins()
 	await _test_stand_ins_and_the_pass_through_level()
 	await _test_a_crowd_is_cheap()
+	await _test_the_hud()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -871,6 +873,90 @@ func _check(ok: bool, what: String, detail: String = "") -> void:
 
 ## A world on the practice street, stepped by hand. The previous one is freed first: every world
 ## here shares ONE physics space, and every map is built at the origin.
+## The HUD draws health, the clock, the kits and confirmed hits through dot-ui's glance
+## pieces, from this world's numbers. A headless viewport is 64 x 64, so the layout is checked
+## as arithmetic and looked at with `tools/shot.sh --view=hit` and `--view=down`.
+func _test_the_hud() -> void:
+	_section("the HUD: dot-ui's vitals, clock, kits, and hits the server confirmed")
+	var game := await _team(1)
+	var me: ZzPlayer = game.survivors()[0]
+	var hud := ZzHud.new()
+	add_child(hud)
+	hud.bind(game, me)
+
+	me.health.health = 55.0
+	me.temp_health = 25.0
+	me.medkits = 1
+	hud._process(0.0)
+	_check(
+		hud.vitals.number_text() == "30" and is_equal_approx(hud.vitals.bonus, 25.0) and hud.vitals.status == "",
+		"DotVitals: real health as the number, borrowed health as its bonus", str(hud.vitals.describe())
+	)
+	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit" and str(hud.kits.rows[0][1]) != "",
+		"the medkit is a DotKeyHints row with its key", str(hud.kits.rows))
+
+	_hurt(game, me, 500.0)
+	await _sim(game, 0.1)
+	hud._process(0.0)
+	_check(me.is_down() and hud.vitals.status == "DOWN" and hud.vitals.is_low(),
+		"down, DOWN replaces the number and it is all in the low colour", str(hud.vitals.describe()))
+
+	# A hold-out's clock is the strip's.
+	var objectives: Array = game.map_doc.get("objectives", [])
+	if objectives.is_empty():
+		_check(false, "the practice street has an objective to hold")
+	else:
+		game.objective_states[0] = &"holding"
+		game.objective_progress[0] = game.now() + 42.2
+		hud._process(0.0)
+		_check(hud.strip.clock == DotScoreStrip.clock_text(42.2) and hud.strip.under_text().ends_with("hold out"),
+			"a hold-out's time left is DotScoreStrip's clock", str(hud.strip.describe()))
+
+	# A survivor's hit, as dot-combat applies it, is confirmed by the world, and the HUD draws
+	# the marker and the number from that confirmation.
+	var confirmed: Array = []
+	game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+		confirmed.append([id, victim, amount, killed])
+		hud.confirm_hit(victim, amount, point, killed, headshot))
+	# On the street: nothing spawns in a safe room, which is where the team starts.
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
+	await _sim(game, 0.1)
+	var shot := DotDamage.make(me.entity_id, game.horde.entity_id_for(npc), 7.0, null)
+	shot.tick = game.current_tick()
+	var _applied := game.combat.apply_damage(shot)
+	_check(confirmed.size() == 1 and confirmed[0][0] == me.player_id and absf(float(confirmed[0][2]) - 7.0) < 0.01
+		and not bool(confirmed[0][3]), "a survivor's hit on a zombie is confirmed, by whom and how much", str(confirmed))
+	_check(hud.hit_marker.alpha() > 0.0 and hud.damage_numbers.texts().size() == 1,
+		"and the HUD flashes DotHitMarker and puts up a DotDamageNumbers number", str(hud.damage_numbers.texts()))
+	_hurt_npc(game, npc, 7.0)
+	_check(confirmed.size() == 1, "the world's damage confirms nothing", str(confirmed))
+
+	# Both bottom-anchored, so the arithmetic holds at any height.
+	var chat := DotGameChatClient.new()
+	add_child(chat)
+	var w: DotChatWindow = chat.window
+	var log_top := w.margin_bottom + w.entry_height + float(w.max_lines) * (w.line_height + w.line_gap)
+	_check(ZzHud.PLATE_BOTTOM >= log_top and is_equal_approx(-hud.vitals.offset_bottom, ZzHud.PLATE_BOTTOM),
+		"the health plate stays above a full chat log",
+		"log reaches %.0f px off the bottom, the plate ends %.0f off it" % [log_top, -hud.vitals.offset_bottom])
+	chat.queue_free()
+	_check_requires()
+
+	hud.queue_free()
+	_finished()
+
+
+## A pack naming dot-ui's glance pieces does not parse on a shell whose dot-ui predates them,
+## so the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+func _check_requires() -> void:
+	var asks := DotAddonApi.derive()
+	_check(
+		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		"the pack asks a shell for dot-ui level 4, the glance pieces",
+		str(asks.get("dot_ui"))
+	)
+
+
 func _world(configure: Callable = Callable()) -> ZzGame:
 	for old in _worlds.duplicate():
 		await _dispose(old)

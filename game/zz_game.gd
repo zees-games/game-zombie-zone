@@ -113,6 +113,12 @@ signal exploded(at: Vector3, radius: float, kind: StringName)
 ## rig has to be told, or it predicts an empty magazine the server has refilled.
 signal ammo_given(player_id: StringName)
 
+## A survivor's shot (or blast, or fire) took health off a zombie: the confirmation the
+## shooter's hit marker and damage numbers are drawn from. The authority's decision, never a
+## client's prediction; the bridge sends it to the shooter alone. [param victim] is the
+## zombie's entity id, which only groups hits on one body; [param point] is where it landed.
+signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
+
 @export var config: ZzConfig = null
 @export var authoritative: bool = true
 @export_range(1, 240, 1) var tick_rate: int = 64
@@ -348,6 +354,7 @@ func _build_combat() -> void:
 		combat.register_damage_type(type)
 
 	add_child(combat)
+	combat.damage_applied.connect(_on_hit_landed)
 
 
 static func _type(id: StringName, armour_share: float) -> DotDamageType:
@@ -360,6 +367,23 @@ static func _type(id: StringName, armour_share: float) -> DotDamageType:
 ## What a box's damage boost does, and nothing else: the difficulty is applied where a zombie's
 ## hit is made (see [method zombie_hit]), because it scales what zombies do, not what anybody
 ## does to them.
+## Turns dot-combat's applied damage into [signal hit_landed] for a survivor hitting a zombie.
+## Friendly fire is not a confirmation anybody wants a marker for, and a hit that took nothing
+## (a dead body, an immune zombie) did not land.
+func _on_hit_landed(damage: DotDamage) -> void:
+	if not authoritative or damage.refused or damage.health_lost <= 0.0 \
+			or not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
+		return
+
+	var by := key_for_entity(damage.attacker)
+
+	if by == &"":
+		return
+
+	hit_landed.emit(by, damage.victim, damage.health_lost, damage.point, damage.lethal,
+		damage.hit_group == DotHitGroup.HEAD)
+
+
 func _adjust_damage(damage: DotDamage) -> void:
 	if not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
 		return

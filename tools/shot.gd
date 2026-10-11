@@ -111,6 +111,38 @@ func _run() -> void:
 			var _applied = game.combat.apply_damage(hit)
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
+		"hit":
+			# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
+			# through dot-combat as a shot would go: the marker and the numbers the client draws
+			# for them. Hurt, with borrowed health over the real, and an objective being held, so
+			# the vitals' bonus and the hold-out clock are in the frame too.
+			await _seconds_of(maxf(_seconds - 0.5, 0.5))
+			# The one nearest the line of sight (straight ahead is -Z), so the number is on screen.
+			var nearest: DotNpcInstance = null
+			var off := INF
+			for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+				var to := npc.position() - stand
+				if npc.is_alive() and to.z < -1.0 and absf(to.x / to.z) < off:
+					off = absf(to.x / to.z)
+					nearest = npc
+			if nearest != null:
+				var victim: int = game.horde.entity_id_for(nearest)
+				var first := DotDamage.make(local.entity_id, victim, 18.0, null)
+				first.point = nearest.position() + Vector3(0.0, 1.2, 0.0)
+				var _a = game.combat.apply_damage(first)
+				var second := DotDamage.make(local.entity_id, victim, 400.0, null)
+				second.point = nearest.position() + Vector3(0.0, 1.6, 0.0)
+				second.hit_group = DotHitGroup.HEAD
+				var _b = game.combat.apply_damage(second)
+			local.health.invulnerable = false
+			local.health.health = 55.0
+			local.temp_health = 25.0
+			var objectives: Array = game.map_doc.get("objectives", [])
+			if not objectives.is_empty():
+				var index := maxi(game.current_objective(), 0)
+				game.objective_states[index] = &"holding"
+				game.objective_progress[index] = game.now() + 45.0
+			await _seconds_of(0.12)
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
 			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM, &"ride": ZzNpcs.RIDER}.get(kind, ZzNpcs.LEAPER)

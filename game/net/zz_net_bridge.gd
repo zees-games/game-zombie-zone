@@ -118,6 +118,8 @@ signal gate_received(gate: String)
 signal effects_received(rows: Array)
 signal hurt_received(amount: float, from: Vector3)
 signal ammo_received()
+## Your hit landed (see [signal ZzGame.hit_landed]); only ever to the shooter.
+signal hit_received(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 
 ## Client side: a zombie mirror was built, or let go. [param body] is its scene, already in the
 ## world; the client hangs a [ZzZombieView] off it.
@@ -285,6 +287,11 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
 				_tell(peer_id, ZzEvents.Kind.HURT, ZzEvents.write_hurt(amount, from)))
+		# To the one who hit: their marker and numbers are drawn from this, never predicted.
+		game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+			var peer_id := peer_for_player(session_of(id))
+			if peer_id > 0:
+				_tell(peer_id, ZzEvents.Kind.HIT, ZzEvents.write_hit(victim, amount, point, killed, headshot)))
 		game.ammo_given.connect(func(id: StringName) -> void:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
@@ -1334,6 +1341,11 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				hurt_received.emit(float(hurt["amount"]), hurt["from"])
 		ZzEvents.Kind.AMMO:
 			ammo_received.emit()
+		ZzEvents.Kind.HIT:
+			var hit := ZzEvents.read_hit(reader)
+			if bool(hit["ok"]):
+				hit_received.emit(int(hit["victim"]), float(hit["amount"]), hit["point"],
+					bool(hit["killed"]), bool(hit["headshot"]))
 
 
 # --- Zombies -----------------------------------------------------------------

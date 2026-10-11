@@ -239,6 +239,7 @@ func _build_netcode() -> DotResult:
 		if hud != null:
 			hud.set_effects(rows))
 	bridge.hurt_received.connect(_on_hurt)
+	bridge.hit_received.connect(_on_hit)
 	bridge.notice_received.connect(_on_notice)
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
 		_on_zombie(kind, true)
@@ -327,6 +328,9 @@ func _hear_the_world() -> void:
 	game.player_hurt.connect(func(id: StringName, amount: float, from: Vector3) -> void:
 		if id == &"local":
 			_on_hurt(amount, from))
+	game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+		if id == &"local":
+			_on_hit(victim, amount, point, killed, headshot))
 	game.notice.connect(_on_notice)
 	game.refused.connect(func(id: StringName, why: String) -> void:
 		if id == &"local":
@@ -603,6 +607,12 @@ func _on_hurt(amount: float, from: Vector3) -> void:
 
 	if hud != null and player != null:
 		hud.hurt_from(from, amount)
+
+
+## A hit the server confirmed: the marker and the number on the body.
+func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+	if hud != null:
+		hud.confirm_hit(victim, amount, point, killed, headshot)
 
 
 func _on_zombie(kind: StringName, appeared: bool) -> void:

@@ -7,6 +7,7 @@
 #   tools/shot.sh --view=third --spawn=brute:1                       # third person
 #   tools/shot.sh --view=down --spawn=common:6                       # on the floor
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
+#   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png

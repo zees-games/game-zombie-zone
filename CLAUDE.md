@@ -34,7 +34,7 @@ npcs/                the zombie body, its view, and one brain script per kind (b
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (112), headless_maps (61), headless_net (54), dedicated (55)
+examples/            headless_run (121), headless_maps (61), headless_net (58), dedicated (59)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 
@@ -79,6 +79,10 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 
 `ZzBots` drives a survivor with the same commands a person sends, in priority order: a pinned friend, a downed friend, a threat (or a shove when crowded), pills or a medkit, reload, something better on the ground, the objective, then the route. **A stand-in holds its fire when a friend is in the line** (`_friend_in_the_way`): before that, four of them bunched in the start room's doorway shot each other down three times in a minute with friendly fire on. A semi-automatic is fired by pulsing the trigger, or a pistol fires once. They exist to fill a server and to let `headless_run` and `dedicated` play a map; they are not meant to be clever.
 
+## The HUD: dot-ui's glance pieces
+
+`zz_hud.gd` draws health as a `DotVitals` (borrowed health as its `bonus`, white after the real fill; DOWN and DEAD as its `status`, all in the low colour; red at the limp line), the weapon as a `DotAmmoCounter` (an endless reserve as ∞, low at a quarter of a magazine), a hold-out's time left or a survival map's time held as a `DotScoreStrip` clock under the title, the medkit and pills as `DotKeyHints` rows with their bound keys, and confirmed hits as `DotHitMarker` and `DotDamageNumbers`. **The number is real health, not real plus borrowed**: borrowed health drains, and a number that included it would fall while nobody was hitting you; the white length says what is borrowed. **A hit is drawn only from the server's confirmation**: `ZzGame.hit_landed` (a survivor's damage applied to a zombie; never friendly fire, never the world's), sent to the shooter alone as a HIT event, connected straight to the world offline. The health plate ends 206 pixels off the bottom, above the chat box's full eight-row log (202). Colours from `ZzHud.piece_theme()`; `tools/shot.sh --view=hit --spawn=common:6` renders the marker, a number, borrowed health and a hold-out clock. Naming these classes makes the pack need a client shell with dot-ui API level 4; the derived `requires.json` asks for it and `headless_run` checks it.
+
 ## What running it found
 
 - **Shots did no damage to zombies**: the hitboxes resolved their owner before the zombie's `DotHealth` existed. Health is created first now, then the hitboxes, then `refresh()`.
@@ -89,6 +93,7 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 - **Three stand-ins called Odell**: names are drawn from the ones not taken.
 - **A delivered server always played the practice street first**: the world lays a map out in `_ready`, before the module adds the delivered maps, and `start()` rebuilt that one. It re-picks now when the map it holds is not one the server would choose. And **`zz_server.gd` logged `config.round_seconds`**, a prop-hunt field, as a SCRIPT ERROR no suite here loads that scene to see. Both found by dot-server-deploy's `zombiezone_client`, which joins a real client to the delivered pack.
 
+- **Every `ZzEvents.Kind` must fit `ZzEvent.KIND_BITS`** (6 bits, 64 kinds); at 5, HURT and AMMO went out as HELLO and MAP for a day. `headless_net` checks it ([history](docs/history.md)).
 - **A brain seeds from `npc.seed`, never `npc.instance_id`** (an object id moves with every allocation); `seed_base` is `config.seed_value`. Suites wait for a zombie's state, never time its seeded choice ([history](docs/history.md)).
 - **A shot starting inside a survivor skips them** (`zz_trace.gd`); stand-ins test a friend's hitboxes, and `headless_run` measures them over the first round, not at 60 s ([history](docs/history.md)).
 
@@ -118,7 +123,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Still to do
 
-1. **Put it live.** The GitHub repositories (`zees-games/game-zombie-zone`, `zees-games/zombie-zone-maps`, `zees-games/zed-dot-weapons`) exist; tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
+1. **Put it live.** The client shell needs dot-ui API level 4 (the HUD names its glance pieces). The GitHub repositories (`zees-games/game-zombie-zone`, `zees-games/zombie-zone-maps`, `zees-games/zed-dot-weapons`) exist; tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no common's brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.

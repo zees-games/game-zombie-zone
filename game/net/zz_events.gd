@@ -87,6 +87,8 @@ enum Kind {
 	HURT,
 	## To one survivor: your ammunition was filled.
 	AMMO,
+	## To one survivor: your hit landed on a zombie, this much, there, and whether it killed.
+	HIT,
 }
 
 enum Ask {
@@ -664,6 +666,28 @@ static func read_hurt(r: DotNetReader) -> Dictionary:
 	var amount := r.read_float_range(0.0, 500.0, 12)
 	var from := _read_pos(r)
 	return {"amount": amount, "from": from, "ok": r.ok()}
+
+
+## Your hit landed: on which zombie (its entity serial, which only groups hits on one body: a
+## whole entity id is a kind times 10^12 and does not fit the field), how
+## much, where, and whether it was a kill or a head. For the shooter's hit marker and damage
+## numbers, which are drawn from this and never from the local prediction.
+static func write_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(victim % DotEntity.STRIDE, 0, 0xFFFFFFFF), 32)
+	w.write_float_range(clampf(amount, 0.0, 1000.0), 0.0, 1000.0, 14)
+	_pos(w, point)
+	w.write_uint((1 if killed else 0) | (2 if headshot else 0), 2)
+	return w.to_bytes()
+
+
+static func read_hit(r: DotNetReader) -> Dictionary:
+	var victim := r.read_uint(32)
+	var amount := r.read_float_range(0.0, 1000.0, 14)
+	var point := _read_pos(r)
+	var flags := r.read_uint(2)
+	return {"victim": victim, "amount": amount, "point": point, "killed": flags & 1 != 0,
+		"headshot": flags & 2 != 0, "ok": r.ok()}
 
 
 # --- Chat ------------------------------------------------------------------

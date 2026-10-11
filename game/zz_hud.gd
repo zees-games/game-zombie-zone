@@ -22,9 +22,44 @@ const ZzWeapons := preload("zz_weapons.gd")
 ##
 ## [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the
 ## action is on NOW, from the same table the menu's Controls page edits.
+##
+## [b]The glance pieces are dot-ui's[/b]: health is a [DotVitals] (borrowed health as its
+## `bonus`, DOWN and DEAD as its `status`), the weapon a [DotAmmoCounter] (an endless reserve
+## as ∞), a hold-out's or a survival map's clock a [DotScoreStrip] under the title, the
+## medkit and pills [DotKeyHints], and every hit the server confirms a [DotHitMarker] and a
+## [DotDamageNumbers] number on the body. The number on the health plate is real health; the
+## borrowed part is the white length after it, which drains, and a number that included it
+## would fall on its own while nobody was hitting you.
 
 const BLIND_FADE_SEC := 0.25
 const HURT_SECONDS := 1.2
+
+## Seconds left of a hold-out at which its clock turns red.
+const LOW_CLOCK_SEC := 10.0
+
+const HEALTH_COLOUR := Color(0.35, 0.85, 0.35)
+const BLEED_COLOUR := Color(0.85, 0.12, 0.1)
+
+## Where the health plate ends, pixels off the bottom: above the chat box's full eight-row
+## log, which reaches 202 (checked in headless_run).
+const PLATE_BOTTOM := 206.0
+
+## The boxes' amber, which is also the glance pieces' highlight.
+const AMBER := Color(0.98, 0.84, 0.5)
+
+
+## The glance pieces' colours in this game's palette: a near-black plate for a dark street,
+## the boxes' amber as highlight, the health bar's green as "good". Static so a render tool
+## can use it.
+static func piece_theme() -> Theme:
+	var t := Theme.new()
+	var type := DotHudPiece.THEME_TYPE
+	t.set_color(&"plate", type, Color(0.04, 0.05, 0.06, 0.62))
+	t.set_color(&"plate_edge", type, Color(1.0, 1.0, 1.0, 0.12))
+	t.set_color(&"highlight", type, AMBER)
+	t.set_color(&"good", type, HEALTH_COLOUR)
+	t.set_color(&"low", type, Color(0.95, 0.3, 0.22))
+	return t
 
 var game: ZzGame = null
 var player: ZzPlayer = null
@@ -42,14 +77,19 @@ var _banner_line: Label = null
 var _banner_for: float = 0.0
 var _top: Label = null
 var _top_sub: Label = null
-var _health_back: ColorRect = null
-var _health_real: ColorRect = null
-var _health_temp: ColorRect = null
-var _health_label: Label = null
+## Health: real, borrowed (its bonus), and DOWN or DEAD in place of the number.
+var vitals: DotVitals = null
+## What is in hand and how much is in it.
+var ammo: DotAmmoCounter = null
+## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
+var strip: DotScoreStrip = null
+## The medkit and pills, each with its key.
+var kits: DotKeyHints = null
+## Four ticks round the crosshair on a hit the server confirmed.
+var hit_marker: DotHitMarker = null
+## The confirmed hits' numbers, on the bodies they landed on.
+var damage_numbers: DotDamageNumbers = null
 var _status: Label = null
-var _kits: Label = null
-var _ammo: Label = null
-var _weapon: Label = null
 var _team: Label = null
 var _effects: Label = null
 var _prompt: Label = null
@@ -91,6 +131,10 @@ func _build() -> void:
 	_grey = _cover("LastLife", Color(0.12, 0.12, 0.12))
 	_blind = _cover("Blind", Color(0.97, 0.97, 0.94))
 
+	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
+	# the root, every piece under it inherits them. See [method piece_theme].
+	_root.theme = piece_theme()
+
 	_top = _label(24)
 	_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	_top.offset_top = 14.0
@@ -103,6 +147,15 @@ func _build() -> void:
 	_top_sub.offset_bottom = 70.0
 	_top_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_top_sub.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
+
+	# Under the title, where the objective line is when there is no clock: a hold-out's time
+	# left, or how long a survival map has been held, with what it is under it.
+	strip = DotScoreStrip.new()
+	strip.name = "Clock"
+	strip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	strip.offset_top = 50.0
+	strip.offset_bottom = 130.0
+	_root.add_child(strip)
 
 	_shout = _label(36)
 	_shout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
@@ -129,32 +182,29 @@ func _build() -> void:
 	_banner_line.offset_right = 640.0
 	_banner_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# Bottom left, above the chat box: health, status, kits.
-	_health_back = _rect(Color(0.0, 0.0, 0.0, 0.5), Control.PRESET_BOTTOM_LEFT, 24.0, -262.0, 300.0, 18.0)
-	_health_real = _rect(Color(0.35, 0.85, 0.35), Control.PRESET_BOTTOM_LEFT, 24.0, -262.0, 0.0, 18.0)
-	_health_temp = _rect(Color(0.92, 0.92, 0.92, 0.85), Control.PRESET_BOTTOM_LEFT, 24.0, -262.0, 0.0, 18.0)
+	# Bottom left, above the chat box: the health plate, the kits over it, the downs over them.
+	vitals = DotVitals.new()
+	vitals.name = "Vitals"
+	vitals.bar_end = 300.0
+	vitals.fill_colour = HEALTH_COLOUR
+	vitals.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	vitals.offset_left = 22.0
+	vitals.offset_right = 22.0 + 420.0
+	vitals.offset_top = -PLATE_BOTTOM - 56.0
+	vitals.offset_bottom = -PLATE_BOTTOM
+	_root.add_child(vitals)
 
-	_health_label = _label(22)
-	_health_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_health_label.offset_left = 330.0
-	_health_label.offset_right = 520.0
-	_health_label.offset_top = -268.0
-	_health_label.offset_bottom = -238.0
+	kits = DotKeyHints.new()
+	kits.name = "Kits"
+	kits.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	kits.offset_left = 24.0
+	kits.offset_right = 24.0 + 300.0
+	_root.add_child(kits)
 
 	_status = _label(16)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_status.offset_left = 24.0
 	_status.offset_right = 600.0
-	_status.offset_top = -292.0
-	_status.offset_bottom = -266.0
-
-	_kits = _label(16)
-	_kits.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_kits.offset_left = 24.0
-	_kits.offset_right = 600.0
-	_kits.offset_top = -240.0
-	_kits.offset_bottom = -216.0
-	_kits.add_theme_color_override("font_color", Color(0.85, 0.95, 0.85))
 
 	# The team, top left.
 	_team = _label(15)
@@ -164,22 +214,15 @@ func _build() -> void:
 	_team.offset_right = 380.0
 	_team.offset_bottom = 300.0
 
-	# Weapon and ammunition, bottom right.
-	_weapon = _label(16)
-	_weapon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_weapon.offset_left = -420.0
-	_weapon.offset_right = -26.0
-	_weapon.offset_top = -98.0
-	_weapon.offset_bottom = -74.0
-	_weapon.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-
-	_ammo = _label(30)
-	_ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_ammo.offset_left = -420.0
-	_ammo.offset_right = -26.0
-	_ammo.offset_top = -74.0
-	_ammo.offset_bottom = -32.0
-	_ammo.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	# Weapon and ammunition, bottom right: the counter right-aligns to its own right edge.
+	ammo = DotAmmoCounter.new()
+	ammo.name = "Ammo"
+	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	ammo.offset_left = -420.0
+	ammo.offset_right = -24.0
+	ammo.offset_top = -100.0
+	ammo.offset_bottom = -24.0
+	_root.add_child(ammo)
 
 	# What the boxes are doing, right side.
 	_effects = _label(15)
@@ -230,6 +273,17 @@ func _build() -> void:
 	_held.offset_bottom = -80.0
 	_held.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_held.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+
+	# Full rect, centred on the crosshair; both draw only what the server confirmed.
+	damage_numbers = DotDamageNumbers.new()
+	damage_numbers.name = "DamageNumbers"
+	damage_numbers.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(damage_numbers)
+
+	hit_marker = DotHitMarker.new()
+	hit_marker.name = "HitMarker"
+	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_root.add_child(hit_marker)
 
 	watching_label = _label(20)
 	watching_label.name = "Watching"
@@ -322,6 +376,16 @@ func set_prompt(text: String) -> void:
 		_prompt.text = text
 
 
+## A hit of this survivor's that the server confirmed: the marker round the crosshair, and
+## the number rising off the body. Never called from the local prediction.
+func confirm_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
+	if hit_marker == null:
+		return
+
+	hit_marker.flash(killed, headshot)
+	damage_numbers.add(victim, amount, point, headshot)
+
+
 ## A hit from [param from]: a red mark on that side of the crosshair.
 func hurt_from(from: Vector3, amount: float) -> void:
 	if player == null or _hurt_marks.is_empty():
@@ -370,13 +434,21 @@ func _draw_top() -> void:
 	var lines := PackedStringArray()
 	var sub := ""
 
+	# A clock, when there is one, is the strip's, with what it is counting as its line.
+	var clock := ""
+	var clock_low := false
+	var under := ""
+
 	if game.phase == ZzGame.Phase.READY:
 		lines.append("Leave the safe room when you are ready")
 	elif game.is_survival():
 		var held := game.survival_elapsed
-		lines.append("Held %s" % _clock(held))
+		lines.append(str(game.map_doc.get("name", "")))
+		# Counting up: whole seconds held, never one ahead of them.
+		clock = DotScoreStrip.clock_text(floorf(held))
+		under = "held"
 		if game.survival_goal > 0.0:
-			sub = "until rescue: %s" % _clock(maxf(game.survival_goal - held, 0.0))
+			under = "held — rescue in %s" % DotScoreStrip.clock_text(maxf(game.survival_goal - held, 0.0))
 	else:
 		lines.append(str(game.map_doc.get("name", "")))
 
@@ -386,56 +458,66 @@ func _draw_top() -> void:
 		var o: Dictionary = (game.map_doc["objectives"] as Array)[index]
 
 		if game.objective_states[index] == &"holding":
-			sub = "%s — hold out %s" % [str(o["label"]), _clock(maxf(game.objective_progress[index] - game.now(), 0.0))]
-		elif sub == "":
+			var left := maxf(game.objective_progress[index] - game.now(), 0.0)
+			clock = DotScoreStrip.clock_text(left)
+			clock_low = left <= LOW_CLOCK_SEC
+			under = "%s — hold out" % str(o["label"])
+		elif sub == "" and clock == "":
 			sub = "Objective: %s" % str(o["label"])
 	elif not game.is_survival() and game.phase == ZzGame.Phase.PLAY and sub == "":
 		sub = "Get to the safe room"
 
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
+	strip.show_clock(clock, clock_low, under if clock != "" else "")
 
 
 func _draw_health() -> void:
 	var health := player.health
-	var full := 300.0
 
 	if health == null:
 		return
 
+	var max_health := maxf(health.max_health, 1.0)
+
 	if player.is_down():
-		var bleed := clampf(health.health / maxf(health.max_health, 1.0), 0.0, 1.0)
-		_health_real.color = Color(0.85, 0.12, 0.1)
-		_set_width(_health_real, full * bleed)
-		_set_width(_health_temp, 0.0)
-		_health_label.text = "DOWN"
+		# The bleed-out pool, in red, with DOWN where the number was.
+		# All of it in the low colour, the cross too: a green cross over a bleed-out reads as fine.
+		vitals.fill_colour = BLEED_COLOUR
+		vitals.low_fraction = 1.0
+		vitals.show_vitals(health.health, max_health)
+		vitals.show_status("DOWN")
 		_status.text = "Down — hold on for help" if player.helped_fraction <= 0.0 else "Getting up…"
 	elif not player.is_alive():
-		_set_width(_health_real, 0.0)
-		_set_width(_health_temp, 0.0)
-		_health_label.text = "DEAD"
+		vitals.low_fraction = 1.0
+		vitals.show_vitals(0.0, max_health)
+		vitals.show_status("DEAD")
 		_status.text = "Dead. Wait to be rescued." if game.config.rescue_seconds > 0.0 else "Dead."
 	else:
-		var real := player.real_health()
-		var temp := player.temp_health
-		var max_health := maxf(health.max_health, 1.0)
-		var low := real + temp < game.config.limp_health
-		_health_real.color = Color(0.85, 0.3, 0.2) if low else Color(0.35, 0.85, 0.35)
-		_set_width(_health_real, full * clampf(real / max_health, 0.0, 1.0))
-		_health_temp.offset_left = _health_real.offset_right
-		_set_width(_health_temp, full * clampf(temp / max_health, 0.0, 1.0))
-		_health_label.text = "%d" % int(ceilf(real + temp))
+		# Red at the limp: the bar and the number go to the theme's low colour where the
+		# controller starts limping, which is the line that matters here.
+		vitals.fill_colour = HEALTH_COLOUR
+		vitals.low_fraction = clampf(game.config.limp_health / max_health, 0.0, 1.0)
+		vitals.show_vitals(player.real_health(), max_health, 0.0, 100.0, player.temp_health)
+		vitals.show_status("")
 
 		var downs_left := game.config.max_incaps - player.incaps
 		_status.text = "LAST LIFE — the next down is death" if downs_left <= 0 \
 			else ("%d down%s left" % [downs_left, "" if downs_left == 1 else "s"])
 
-	var kits := PackedStringArray()
+	var rows: Array = []
 	if player.medkits > 0:
-		kits.append("[%s] medkit" % _key(ZzBindings.HEAL))
+		rows.append(["medkit", _key(ZzBindings.HEAL)])
 	if player.pills > 0:
-		kits.append("[%s] pills" % _key(ZzBindings.PILLS))
-	_kits.text = "   ".join(kits)
+		rows.append(["pills", _key(ZzBindings.PILLS)])
+	kits.show_hints(rows)
+
+	# Stacked upward from the plate: the kits' rows, then the line about downs.
+	var plate_top := -PLATE_BOTTOM - 56.0
+	kits.offset_bottom = plate_top - 4.0
+	kits.offset_top = kits.offset_bottom - kits.row_height * rows.size()
+	_status.offset_bottom = kits.offset_top - 2.0
+	_status.offset_top = _status.offset_bottom - 26.0
 
 
 func _set_width(rect: ColorRect, width: float) -> void:
@@ -475,18 +557,19 @@ func _draw_weapon() -> void:
 	var rig := player.get_node_or_null(^"Weapons") as ZeeWeaponRig
 
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
-		_weapon.text = ""
-		_ammo.text = ""
+		ammo.clear()
 		return
 
 	var slot := rig.arsenal.current()
-	_weapon.text = ZzWeapons.title_of(slot.def.id)
+	var title := ZzWeapons.title_of(slot.def.id)
 
 	if slot.def.magazine > 0:
 		var reserve := rig.arsenal.ammo().count(slot.def.ammo_type) if slot.def.ammo_type != &"" else 0
-		_ammo.text = "%d / %s" % [slot.magazine, "∞" if slot.def.infinite_reserve else str(reserve)]
+		# Low at a quarter of a magazine: the reload worth starting before the crowd arrives.
+		ammo.show_ammo(title, slot.magazine, reserve, float(slot.magazine) <= float(slot.def.magazine) * 0.25,
+			slot.def.infinite_reserve)
 	else:
-		_ammo.text = ""
+		ammo.show_ammo(title, -1, -1)
 
 
 func _draw_use() -> void:
@@ -539,7 +622,7 @@ func _draw_effects() -> void:
 			tag = " x%s" % (str(snappedf(scale, 0.01)) if scale < 10.0 else str(int(scale)))
 		elif stacks > 1:
 			tag = " x%d" % stacks
-		lines.append("%s%s  %s" % [str(row["title"]), tag, _clock(left)])
+		lines.append("%s%s  %s" % [str(row["title"]), tag, DotScoreStrip.clock_text(left)])
 
 	_effects.text = "\n".join(lines)
 
@@ -590,10 +673,6 @@ func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 	rect.offset_top = at.y
 	rect.offset_right = at.x + size.x
 	rect.offset_bottom = at.y + size.y
-
-
-static func _clock(seconds: float) -> String:
-	return "%d:%02d" % [int(seconds) / 60, int(seconds) % 60]
 
 
 func is_blind() -> bool:

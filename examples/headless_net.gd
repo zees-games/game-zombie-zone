@@ -2,6 +2,7 @@ extends Node
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
+const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
@@ -23,7 +24,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 13
-const CHECKS := 54
+const CHECKS := 58
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -156,6 +157,15 @@ func _test_the_codec() -> void:
 	_check(bool(box["ok"]) and box["type"] == &"explosive" and str(box["title"]) == "Short fuse"
 		and str(box["message"]) == "Ada opened it", "BOX")
 
+	# Every kind fits the event's kind field: at 5 bits HURT and AMMO wrapped to HELLO and MAP.
+	_check(ZzEvent.fits(), "every event kind fits the kind field",
+		"%d kinds in %d bits" % [ZzEvents.Kind.size(), ZzEvent.KIND_BITS])
+
+	var hit := ZzEvents.read_hit(_r(ZzEvents.write_hit(DotEntity.make_id(DotEntity.KIND_NPC, 4321), 17.5, Vector3(1.0, 1.4, -6.0), true, true)))
+	_check(bool(hit["ok"]) and int(hit["victim"]) == 4321 and absf(float(hit["amount"]) - 17.5) < 0.1
+		and bool(hit["killed"]) and bool(hit["headshot"]) and (hit["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
+		"HIT (the victim's entity serial, so a whole entity id never overflows the field)", str(hit))
+
 	var effects := ZzEvents.read_effects(_r(ZzEvents.write_effects([
 		{"title": "Glass cannon", "stacks": 2, "seconds": 14.25, "who": "everybody", "scale": 1.5},
 	])))
@@ -236,6 +246,8 @@ func _build() -> bool:
 		_heard["map"] = id)
 	_client_bridge.npc_added.connect(func(net_id: int, kind: StringName, _variant: int, body: Node3D) -> void:
 		_heard["npc"] = [net_id, kind, body])
+	_client_bridge.hit_received.connect(func(victim: int, amount: float, _point: Vector3, killed: bool, _head: bool) -> void:
+		(_heard.get_or_add("hits", []) as Array).append([victim, amount, killed]))
 	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, _body: Node3D) -> void:
 		_heard["npc_gone"] = [net_id, killed])
 	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
@@ -358,8 +370,20 @@ func _test_zombies_replicate() -> void:
 	_check(moved > 1.0, "it comes for the survivor on the server", "%.1f m in a second" % moved)
 	_check(apart < 0.6, "and the client's copy is where the server's is", "%.2f m apart" % apart)
 
+	# A hit of this survivor's, confirmed by the server, reaches this survivor's client: what
+	# its hit marker and damage numbers are drawn from.
+	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 5.0, null)
+	shot.tick = _server_game.current_tick()
+	var _landed := _server_game.combat.apply_damage(shot)
+	await _steps(4)
+	var hits: Array = _heard.get("hits", [])
+	_check(hits.size() == 1 and absf(float(hits[0][1]) - 5.0) < 0.1 and not bool(hits[0][2]),
+		"a survivor's hit on it is confirmed to that survivor's client", str(hits))
+
 	_hurt_npc(npc, 100000.0)
 	await _steps(6)
+	_check((_heard.get("hits", []) as Array).size() == 1,
+		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
 	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
 		"killed, and the client is told it died rather than went away")
 	_finished()

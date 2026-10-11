@@ -5,7 +5,11 @@ const ZzEvents := preload("zz_events.gd")
 ## Anything the authority tells a client that is not a snapshot. Reliable, to clients.
 
 const NAME := &"zz.event"
-const KIND_BITS := 5
+## Room for 64 kinds. It was 5 bits while [enum ZzEvents.Kind] grew to 34, so HURT (32) and
+## AMMO (33) went out as kinds 0 and 1, HELLO and MAP, from the first commit: an online
+## survivor was never shown which way a hit came from, and each hit re-ran HELLO's decoder
+## on the wrong bytes. headless_net checks the enum fits ([method fits]).
+const KIND_BITS := 6
 const MAX_BODY := 4096
 
 var kind: int = 0
@@ -43,6 +47,11 @@ func _validate() -> DotResult:
 		return DotResult.fail(DotError.CODE_INVALID, "Unknown event kind %d." % kind)
 
 	return DotResult.success(true)
+
+
+## Whether every [enum ZzEvents.Kind] fits in [constant KIND_BITS]. What a check reads.
+static func fits() -> bool:
+	return ZzEvents.Kind.size() <= (1 << KIND_BITS)
 
 
 func reader() -> DotNetReader:
