@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://game/zz_client.gd" id="1_client"]
 
-[node name="PropHunt" type="Node"]
+[node name="ZombieZone" type="Node"]
 script = ExtResource("1_client")

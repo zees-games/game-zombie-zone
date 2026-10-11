@@ -14,7 +14,7 @@ const ZzNetLink := preload("zz_net_link.gd")
 ##
 ## [codeblock]
 ## Server            <- DotServer, or DotClientLink named to match
-##   PropHunt          <- this, on both
+##   ZombieZone        <- this, on both
 ## [/codeblock]
 ##
 ## The symptom of getting it wrong is not an error. It is a client that connects, goes
@@ -23,7 +23,12 @@ const ZzNetLink := preload("zz_net_link.gd")
 const CHANNEL := "zz.link"
 
 ## The node name both ends must use. It is the routing, so it is a constant.
-const NODE_NAME := &"PropHunt"
+##
+## This game's own name, never one copied from the game this file was copied from (it said
+## "PropHunt" until 2026-10-11): every game parents its link under the same `Server` node, so
+## two games with one name meet whenever a dot-server leaves the last game's link behind, and
+## the newcomer is renamed `@Node@<n>` and hears nothing.
+const NODE_NAME := &"ZombieZone"
 
 ## Everything here rides [constant DotTransport.Channel.STATE], which dot-server reserves
 ## for exactly this and uses for nothing itself. Sharing chat's channel would make a burst
