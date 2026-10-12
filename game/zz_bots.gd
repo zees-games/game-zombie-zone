@@ -23,10 +23,20 @@ const ZzWeapons := preload("zz_weapons.gd")
 ## [/codeblock]
 ##
 ## It walks the zombies' own navigation graph (`ZzHorde.nav`), so it goes round a car rather
-## than into it, and it reacts no faster than [member ZzConfig.bot_reaction] — a stand-in that
-## turns and fires on the tick a leaper lands is a stand-in a player can tell is a machine.
+## than into it.
+##
+## [b]It aims and shoots like the family's bots[/b]: dot-bot's [DotBotAim], one per stand-in, on
+## the game's [DotBotSettings] (`bot_difficulty` and every `bot_*` setting, the same names as
+## every game's). So its view turns at `bot_turn_rate` rather than snapping, its first shots at
+## a new zombie miss by `bot_aim_error` and settle, and it fires only `bot_reaction` after it
+## first saw that zombie -- a stand-in that turns and fires on the tick a leaper lands is a
+## stand-in a player can tell is a machine.
 
 const CHANNEL := "zz.bots"
+
+## The survivors stand-ins are named after, solo and on a server; past the end of the list
+## dot-bot's [DotBotNames] numbers them.
+const BOT_NAMES := ["Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable", "Wren"]
 
 ## How far a bot sees a zombie, and how close a crowd has to be to be shoved.
 const SIGHT := 32.0
@@ -47,7 +57,7 @@ const FOLLOW_FAR := 6.0
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
 
-## player id -> {path, path_at, goal, target_npc, target_since, stuck_at, stuck_tick}
+## player id -> {path, path_at, goal, aim (DotBotAim), now, target_at, stuck_at, stuck_tick}
 var _state: Dictionary = {}
 
 var _rng := RandomNumberGenerator.new()
@@ -55,6 +65,9 @@ var _rng := RandomNumberGenerator.new()
 ## Whether this tick's command has been aimed at something: walking then must not turn the view
 ## toward where it is going, or a stand-in fleeing a crowd shoots the way it runs.
 var _aiming: bool = false
+
+## Seconds since this stand-in last thought, for its aim's turn.
+var _dt: float = 0.0
 
 
 func _init(p_game: Object) -> void:
@@ -66,11 +79,17 @@ func forget(id: StringName) -> void:
 	_state.erase(id)
 
 
+## A stand-in's aim draws from its own stream, seeded from its id, never from the object.
+static func _seed_of(player) -> int:
+	return hash(String(player.player_id))
+
+
 func _memory(player) -> Dictionary:
 	if not _state.has(player.player_id):
 		_state[player.player_id] = {
-			"path": PackedVector3Array(), "path_at": -100.0, "goal": Vector3.INF, "target": -1,
-			"target_since": 0.0, "stuck_at": Vector3.INF, "stuck_time": 0.0, "use_until": -1.0,
+			"path": PackedVector3Array(), "path_at": -100.0, "goal": Vector3.INF,
+			"aim": DotBotAim.new(_seed_of(player), DotBotSettings.of(game)), "now": NAN,
+			"target_at": Vector3.INF, "stuck_at": Vector3.INF, "stuck_time": 0.0, "use_until": -1.0,
 		}
 
 	return _state[player.player_id]
@@ -89,6 +108,13 @@ func drive(_delta: float) -> void:
 		player.shove_held = false
 		_aiming = false
 
+		var memory := _memory(player)
+		var aim: DotBotAim = memory["aim"]
+		aim.view_from(command.yaw, command.pitch)
+		var last_now := float(memory["now"])
+		_dt = clampf(game.now() - last_now, 0.0, 0.25) if not is_nan(last_now) else 0.0
+		memory["now"] = game.now()
+
 		if game.phase != game.Phase.IDLE:
 			_decide(player, command)
 			_pulse_trigger(player, command)
@@ -106,7 +132,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 	if player.is_down():
 		var threat := _threat(player)
 		if threat != null:
-			_aim(player, command, _aim_point(threat))
+			_aim_at(player, command, threat)
 			command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, threat))
 		return
 
@@ -126,7 +152,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 				player.shove_held = (game.current_tick() % 8) < 2
 			else:
 				if _sees(player, _aim_point(holder)):
-					_aim(player, command, _aim_point(holder))
+					_aim_at(player, command, holder)
 					command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, holder))
 				_walk_to(player, command, holder.position(), memory)
 			return
@@ -148,8 +174,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 
 	# 3. Threats.
 	if danger != null:
-		var at := _aim_point(danger)
-		_aim(player, command, at)
+		_aim_at(player, command, danger)
 		var crowd := _crowd_within(player, SHOVE_RANGE)
 
 		if crowd >= 2 or (danger.def.id == ZzNpcs.COMMON and danger.position().distance_to(player.feet()) < 1.3):
@@ -254,17 +279,19 @@ func _crowd_within(player, reach: float) -> int:
 	return n
 
 
-## Fires only once it has had its reaction time on this target.
+## Fires only once it has had its reaction time on this target, with its view on its aim and
+## in bursts at range ([DotBotAim.trigger]), and never through a friend.
 func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
-	if int(memory["target"]) != npc.instance_id:
-		memory["target"] = npc.instance_id
-		memory["target_since"] = game.now()
+	var aim: DotBotAim = memory["aim"]
+	if aim.target_id != npc.instance_id:
 		return false
-
-	if game.now() - float(memory["target_since"]) < game.config.bot_reaction:
+	var at := _aim_point(npc)
+	if not aim.trigger(game.now(), player.eye_position().distance_to(at)):
 		return false
-
-	return not _friend_in_the_way(player, _aim_point(npc))
+	if _friend_in_the_way(player, at):
+		return false
+	aim.note_shot(player.eye_position(), at, game.now())
+	return true
 
 
 ## Whether another survivor stands in the line from [param player]'s eye to [param at].
@@ -374,13 +401,32 @@ func _sleeper_near(player, reach: float) -> Vector3:
 
 # --- Moving -----------------------------------------------------------------------------------
 
+## Aims at a zombie the way a person would: engaged with it from the first tick it is aimed at
+## (its reaction starts), the view turned onto it at the settings' speed, off by the aim error
+## of this engagement.
+func _aim_at(player, command: DotFpsCommand, npc: DotNpcInstance) -> void:
+	_aiming = true
+	var memory := _memory(player)
+	var aim: DotBotAim = memory["aim"]
+	var eye: Vector3 = player.eye_position()
+	var at := _aim_point(npc)
+	var was: Vector3 = memory["target_at"]
+	var velocity := (at - was) / _dt if aim.target_id == npc.instance_id and was != Vector3.INF and _dt > 0.0 else Vector3.ZERO
+	memory["target_at"] = at
+	var _new := aim.engage(npc.instance_id, eye, at, game.now())
+	var view := aim.track(eye, at, velocity, game.now(), _dt)
+	command.yaw = view.x
+	command.pitch = clampf(view.y, -89.0, 89.0)
+
+
+## Turns toward [param at] (a friend to revive, a door, a box): looking, not shooting, but
+## still no faster than the settings turn a view.
 func _aim(player, command: DotFpsCommand, at: Vector3) -> void:
 	_aiming = true
-	var toward: Vector3 = at - player.eye_position()
-	var spread: float = game.config.bot_aim_spread_degrees
-	var wobble := sin(game.now() * 2.3 + float(player.entity_id % 97)) * spread
-	command.yaw = rad_to_deg(atan2(-toward.x, -toward.z)) + wobble
-	command.pitch = clampf(rad_to_deg(asin(clampf(toward.normalized().y, -1.0, 1.0))) + wobble * 0.4, -89.0, 89.0)
+	var aim: DotBotAim = _memory(player)["aim"]
+	var view := aim.look_at_point(player.eye_position(), at, _dt)
+	command.yaw = view.x
+	command.pitch = clampf(view.y, -89.0, 89.0)
 
 
 ## Moves along [param direction] (world space), whatever the bot is aiming at.
@@ -421,10 +467,13 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 		break
 
 	if not _aiming:
-		# Not aiming at anything: look where it is going.
-		var toward := next - here
-		command.yaw = rad_to_deg(atan2(-toward.x, -toward.z))
-		command.pitch = 0.0
+		# Not aiming at anything: look where it is going, turning there as a person would
+		# rather than snapping round at every corner of the path.
+		var aim: DotBotAim = memory["aim"]
+		var eye: Vector3 = player.eye_position()
+		var view := aim.look_at_point(eye, Vector3(next.x, eye.y, next.z), _dt)
+		command.yaw = view.x
+		command.pitch = view.y
 
 	var heading := next - here
 	heading.y = 0.0

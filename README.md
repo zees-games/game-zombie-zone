@@ -133,10 +133,12 @@ zz_gravity 20                  // metres per second squared, for everything
 mp_teammate_passthrough 1      // shots and team-mates: 0 a team-mate is hit and blocks, 1 through one at the muzzle, 2 through every team-mate
 bot_quota 4                    // players a round is kept at with bots; each person who joins replaces one
 bot_quota_mode fill            // fill (as above), fixed (that many bots), per_player (that many per person) or off
+bot_difficulty medium          // how the stand-ins aim and shoot: easy, medium, hard or nightmare
+bot_reaction 0.3               // any single setting of the preset, e.g. seconds before a stand-in fires at a new zombie
 zz_bots 1                      // 0 to turn the stand-ins off
 ```
 
-The bot cvars are the family's shared ones (dot-server's `DotBotQuota`). `zz_min_players` still works and sets `bot_quota`; it is deprecated.
+The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 

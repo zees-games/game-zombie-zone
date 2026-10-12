@@ -239,11 +239,8 @@ extends DotConfig
 ## How many survivors the server keeps in the game by adding stand-ins.
 @export_range(0, 24, 1) var minimum_players: int = 4
 
-## How far a stand-in's aim is off, in degrees.
-@export_range(0.0, 45.0, 0.5) var bot_aim_spread_degrees: float = 3.0
-
-## Seconds a stand-in takes to notice and turn to a zombie.
-@export_range(0.0, 3.0, 0.05) var bot_reaction: float = 0.25
+# How a stand-in aims and how quickly it reacts are dot-bot's `bot_*` settings, shared by every
+# game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...), not numbers of this file.
 
 # --- Watching --------------------------------------------------------------
 

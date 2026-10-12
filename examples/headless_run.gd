@@ -804,7 +804,13 @@ func _test_stand_ins_and_the_pass_through_level() -> void:
 	(npc.brain as Object).set(&"idle_kind", 0)
 	await _sim(game, 0.1)
 	var aim := game.bots._aim_point(npc)
-	var reacted := {"target": npc.instance_id, "target_since": game.now() - 60.0}
+	# A stand-in that has been on this zombie for a minute, its view settled onto it.
+	var reacted: Dictionary = game.bots._memory(me)
+	var settled: DotBotAim = reacted["aim"]
+	settled.forget()
+	var _seen := settled.engage(npc.instance_id, me.eye_position(), aim, game.now() - 60.0)
+	for _i in range(256):
+		var _v := settled.track(me.eye_position(), aim, Vector3.ZERO, game.now(), 1.0 / 64.0)
 
 	_check(game.combat.rules.pass_through_level() == 1, "the default level is 1")
 	_check(game.bots._friend_in_the_way(me, aim) and not game.bots._fire_ok(me, reacted, npc),

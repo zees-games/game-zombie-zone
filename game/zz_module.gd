@@ -3,6 +3,7 @@ extends DotGameModule
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzServices := preload("zz_services.gd")
 
+const ZzBots := preload("zz_bots.gd")
 const ZzGame := preload("zz_game.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzAvatars := preload("zz_avatars.gd")
@@ -374,8 +375,16 @@ func _add_tunables(world: ZzGame) -> void:
 			config.minimum_players = clampi(int(value), 0, 24)
 			if _quota != null and _quota.quota_cvar != null:
 				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
-	_tunable("zz_bot_reaction", config.bot_reaction, "Seconds a stand-in takes to react to a zombie",
-		func(value: float) -> void: config.bot_reaction = clampf(value, 0.0, 3.0))
+	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` (easy, medium, hard,
+	# nightmare; medium by default) and every `bot_*` setting it bundles, the names every game in
+	# the family uses. On the game as metadata, where ZzBots reads it; never the registry, since
+	# two servers in one process must not share it. `zz_bot_reaction` stays as the old name for
+	# `bot_reaction`, so a server config that set it still means what it meant.
+	var bot_settings := DotBotSettings.of(game)
+	var _bot_cvars := bot_settings.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
+	_tunable("zz_bot_reaction", bot_settings.profile.reaction, "Deprecated, sets bot_reaction. Seconds a stand-in takes to react to a zombie",
+		func(value: float) -> void:
+			var _set := bot_settings.set_value("reaction", str(value)))
 
 	# How clever and how quick the zombies are, as dot-npc-ai's server skill: `npc_skill`
 	# (-1..1 or a level), `npc_reaction_scale`, `npc_reaction_min`.
@@ -520,25 +529,16 @@ func _keep_the_round_full() -> void:
 
 
 ## Names for the stand-ins, so a scoreboard of four of them is readable: one nobody in
-## [param world] has yet. Drawn at random, it gave a dedicated run three called Odell.
+## [param world] has yet, from this game's own survivors through dot-bot's [DotBotNames] (which
+## never doubles one up and is the same from run to run). Drawn at random, it once gave a
+## dedicated run three called Odell.
 static func _bot_name(world: ZzGame) -> String:
-	var names := PackedStringArray([
-		"Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable", "Wren",
-	])
-	var taken := {}
+	var taken: Array = []
 
 	for id: StringName in world.players:
-		taken[(world.players[id] as ZzPlayer).display_name] = true
+		taken.append((world.players[id] as ZzPlayer).display_name)
 
-	var start := randi() % names.size()
-
-	for i in names.size():
-		var name := names[(start + i) % names.size()]
-
-		if not taken.has(name):
-			return name
-
-	return "%s %d" % [names[start], world.players.size()]
+	return DotBotNames.pick(taken, world.players.size(), ZzBots.BOT_NAMES)
 
 
 ## Joins the bridge's chat seam to the services layer's router.

@@ -14,7 +14,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 10
-const CHECKS := 59
+const CHECKS := 63
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -217,6 +217,21 @@ func _test_the_commands() -> void:
 	_check(game.config.max_incaps == 10, "a number past the end is clamped, not taken",
 		"%d" % game.config.max_incaps)
 	var _normal := _run_command("zz_difficulty 1")
+
+	# How the stand-ins aim and shoot is dot-bot's, the family's names: bot_difficulty sets the
+	# bundle, a single setting overrides it, and the old zz_bot_reaction still means bot_reaction.
+	var bots := DotBotSettings.of(game)
+	_check(server.console.get_string("bot_difficulty", "") == "medium" and bots.difficulty() == "medium",
+		"bot_difficulty is the module's and medium is the default")
+	var _hard := _run_command("bot_difficulty hard")
+	_check(bots.difficulty() == "hard" and is_equal_approx(server.console.get_float("bot_aim_error"), DotBotProfile.preset_value("hard", "aim_error")),
+		"bot_difficulty hard writes every bot_* setting", server.console.get_string("bot_aim_error"))
+	var _old := _run_command("zz_bot_reaction 0.4")
+	_check(is_equal_approx(bots.profile.reaction, 0.4) and server.console.get_string("bot_reaction") == "0.4",
+		"zz_bot_reaction still sets bot_reaction", server.console.get_string("bot_reaction"))
+	var _reset := _run_command("bot_settings_reset")
+	var _medium := _run_command("bot_difficulty medium")
+	_check(is_equal_approx(bots.profile.reaction, DotBotProfile.preset_value("medium", "reaction")), "and bot_settings_reset puts the preset back")
 
 	# Shooting through team-mates is the operator's: dot-combat's cvar, bound by the module to
 	# the world's own combat rules, live from the next shot.
