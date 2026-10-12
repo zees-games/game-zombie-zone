@@ -34,7 +34,7 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 const SECTIONS := 31
 
-const CHECKS := 166
+const CHECKS := 168
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1067,6 +1067,25 @@ func _test_help_and_menu() -> void:
 		"the Escape menu has Help & commands and Leave")
 	settings.close()
 	settings.queue_free()
+	await get_tree().process_frame
+
+	# A document saved when the medkit was on H and the shove on V: they follow their new
+	# defaults, help keeps H, and a key the player chose stays where they put it.
+	var old_doc := DotSettingsStoreMemory.new()
+	var _saved := old_doc.save_document(ZzSettings.APP_NAMESPACE, &"local", {"version": 1, "values": {
+		"bind_heal": "H", "bind_help": "H", "bind_shove": "V", "bind_use": "J",
+	}})
+	var returning := ZzSettings.new()
+	add_child(returning)
+	var _r := returning.setup(old_doc, false)
+	var rk: DotMenuBindings = returning.bindings
+	_check(rk.key_for(ZzBindings.HEAL) == "G" and rk.key_for(DotMenuBindings.HELP_ACTION) == "H",
+		"an old settings file with the medkit on H: the medkit moves to G, help keeps H",
+		"%s %s" % [rk.key_for(ZzBindings.HEAL), rk.key_for(DotMenuBindings.HELP_ACTION)])
+	_check(rk.key_for(ZzBindings.SHOVE) == "F" and rk.key_for(ZzBindings.USE) == "J",
+		"the shove leaves V for push to talk, and a key the player chose is kept",
+		"%s %s" % [rk.key_for(ZzBindings.SHOVE), rk.key_for(ZzBindings.USE)])
+	returning.queue_free()
 	await get_tree().process_frame
 	_finished()
 

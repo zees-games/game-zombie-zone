@@ -51,4 +51,7 @@ static func make() -> DotMenuBindings:
 	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
+	# Defaults that moved under saved documents: the medkit left H for help, the shove left V
+	# for push to talk. A player who never touched them follows; a key they chose stays.
+	var _r := keys.renamed(&"bind_heal", ["H"]).renamed(&"bind_shove", ["V"])
 	return keys
