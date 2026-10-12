@@ -1358,11 +1358,10 @@ func _key_event(event: InputEvent) -> bool:
 		get_tree().create_timer(0.1).timeout.connect(func() -> void: _shoving = false)
 		return true
 
-	var key := (event as InputEventKey).physical_keycode
-
-	if key >= KEY_1 and key <= KEY_5:
-		_slot = key - KEY_1 + 1
-		return true
+	for i in range(ZzBindings.SLOTS.size()):
+		if event.is_action_pressed(ZzBindings.SLOTS[i]):
+			_slot = i + 1
+			return true
 
 	return false
 

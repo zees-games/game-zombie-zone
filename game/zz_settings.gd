@@ -50,9 +50,9 @@ func _init() -> void:
 	schema = schema_for()
 	config = DotMenuConfig.new()
 	config.brand_name = "Zombie Zone"
-	# The keys are a table here (see [ZzBindings]), so the help screen has something to list.
-	config.show_help = true
-	config.show_leave = false
+	# Help and Leave are dot-menu's stock: H opens help, Leave leaves the server or quits a
+	# solo game. Every game in the family has both (the first play test found this one without
+	# Leave).
 	bindings = ZzBindings.make()
 	var _layered := config.load_layered()
 
@@ -66,3 +66,12 @@ static func schema_for() -> DotSettingsSchema:
 		DotSettingsDef.Scope.SERVER_CLAMPED
 	))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
+
+
+## The help screen's goal and rules; the keys come from [ZzBindings].
+func _fill_help(help: DotMenuHelp) -> void:
+	help.about = "Get the team from the safe room at the start to the one at the end, or hold a survival map for its clock. Stay together: the specials go for whoever is alone."
+	help.add_text("Maps", "A route map is crossed safe room to safe room, opening gates and finishing objectives on the way. A survival map is held where you stand until the clock runs out.")
+	help.add_text("Staying alive", "At no health you go down, not out: a friend holds Use on you to get you up. After two downs the next one is death, and the dead are rescued beside the team a little later. Pills and revives give borrowed health, the white part of the bar, which drains away. Friendly fire is on.")
+	help.add_section("Mouse", [["Left", "Fire"], ["Right", "Shove"], ["Wheel", "Next or previous weapon"]], &"keys")
+	help.add_text("Boxes", "Zombies sometimes drop a box. Open it with Use and something random happens to you, your team or the horde; the HUD lists what is still in effect.")

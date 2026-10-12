@@ -13,6 +13,7 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzProps := preload("../game/zz_props.gd")
+const ZzSettings := preload("../game/zz_settings.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
@@ -26,9 +27,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 25
+const SECTIONS := 26
 
-const CHECKS := 121
+const CHECKS := 126
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -83,6 +84,7 @@ func _run() -> void:
 	await _test_stand_ins_and_the_pass_through_level()
 	await _test_a_crowd_is_cheap()
 	await _test_the_hud()
+	await _test_help_and_menu()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -849,6 +851,36 @@ func _test_a_crowd_is_cheap() -> void:
 
 
 # --- Helpers -----------------------------------------------------------------------
+
+## The family's rule since the first play test: H opens help in every game, nothing else in
+## the table is on H, and the Escape menu has Help & commands and Leave.
+func _test_help_and_menu() -> void:
+	_section("H opens help, and the Escape menu has Help and Leave")
+	var settings := ZzSettings.new()
+	add_child(settings)
+	var built := settings.setup(DotSettingsStoreMemory.new())
+	var keys := settings.bindings
+	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
+	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H (the medkit is on G)",
+		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	var h := InputEventKey.new()
+	h.physical_keycode = KEY_H
+	h.keycode = KEY_H
+	h.pressed = true
+	_check(settings.menu.handle_event(h) and settings.menu.help.is_open(), "H opens the help screen")
+	_check(settings.menu.help.about != "" and settings.menu.help.heading() == "How to play Zombie Zone",
+		"which says what the game is before the keys")
+	settings.menu.help.close()
+	settings.open()
+	var help_button := settings.menu.screen.find_child("Action_help", true, false) as Button
+	var leave_button := settings.menu.screen.find_child("Action_leave", true, false) as Button
+	_check(help_button != null and leave_button != null and leave_button.visible,
+		"the Escape menu has Help & commands and Leave")
+	settings.close()
+	settings.queue_free()
+	await get_tree().process_frame
+	_finished()
+
 
 func _section(name: String) -> void:
 	_sections_entered += 1

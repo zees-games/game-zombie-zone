@@ -93,6 +93,7 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 - **Three stand-ins called Odell**: names are drawn from the ones not taken.
 - **A delivered server always played the practice street first**: the world lays a map out in `_ready`, before the module adds the delivered maps, and `start()` rebuilt that one. It re-picks now when the map it holds is not one the server would choose. And **`zz_server.gd` logged `config.round_seconds`**, a prop-hunt field, as a SCRIPT ERROR no suite here loads that scene to see. Both found by dot-server-deploy's `zombiezone_client`, which joins a real client to the delivered pack.
 
+- **H is help** (dot-menu's stock key; `ZzSettings._fill_help` writes the goal and rules), so nothing in `ZzBindings` may default to H; the medkit moved to G on 2026-10-11 and `headless_run` checks it.
 - **Every `ZzEvents.Kind` must fit `ZzEvent.KIND_BITS`** (6 bits, 64 kinds); at 5, HURT and AMMO went out as HELLO and MAP for a day. `headless_net` checks it ([history](docs/history.md)).
 - **A brain seeds from `npc.seed`, never `npc.instance_id`** (an object id moves with every allocation); `seed_base` is `config.seed_value`. Suites wait for a zombie's state, never time its seeded choice ([history](docs/history.md)).
 - **A shot starting inside a survivor skips them** (`zz_trace.gd`); stand-ins test a friend's hitboxes, and `headless_run` measures them over the first round, not at 60 s ([history](docs/history.md)).

@@ -64,12 +64,13 @@ There are six maps: the **practice street** built into the game, the three-map *
 | **1**-**5** / mouse wheel | Weapons |
 | **E** | Use, pick up, revive a friend (hold) |
 | **F** / **Mouse 2** | Shove |
-| **H** | Medkit: on yourself, or on the friend you are looking at (hold) |
+| **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
 | **Q** | Take pills |
 | **V** | Talk (voice) |
 | **F5** | First or third person |
 | **Tab** | Scoreboard (hold) |
-| **Esc** | Settings, including every key above |
+| **H** | Help: the goal, the rules and every key as you have it bound |
+| **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
 ## Getting started
 You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:
