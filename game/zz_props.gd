@@ -142,7 +142,16 @@ func shapes_of(id: StringName) -> Array:
 		cube.size = size
 		out.append([cube, Transform3D(Basis.IDENTITY, Vector3(0.0, size.y * 0.5, 0.0))])
 	else:
-		for shape in DotPropPieces.shapes(pieces):
+		# Not a piece that is a flat plate on the floor (the measured mesh's base, no thickness):
+		# the floor is there already, and a hull with no volume pressed into the floor gives a
+		# body standing on it a contact pointing anywhere, down included (zz-mall-floor-falls-1).
+		var solid: Array = []
+		for piece: PackedVector3Array in pieces:
+			var box := DotPropPieces.bounds([piece])
+			if box.size.y < 0.03 and box.end.y < 0.05:
+				continue
+			solid.append(piece)
+		for shape in DotPropPieces.shapes(solid):
 			out.append([shape, Transform3D.IDENTITY])
 
 	_shapes[id] = out

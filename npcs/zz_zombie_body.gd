@@ -73,6 +73,14 @@ var height: float = 1.75
 const PUSH_DECAY := 6.0
 
 const GRAVITY := 20.0
+## The fastest a zombie falls, m/s. Gravity used to add up for as long as a body was off the
+## floor: one wedged beside a prop for half a minute carried hundreds of metres a second down,
+## and two left the school's car park through its floor (zz-mall-floor-falls-1).
+const FALL_FASTEST := 25.0
+## Ticks a leap may last before the body walks again whether or not it has landed: a leaper
+## or a hopping common resting on something too steep to be a floor stayed `flying` (no
+## steering) for 1804 ticks, then fell out of the map.
+const LEAP_LONGEST := 64 * 3
 
 var _shape: CollisionShape3D = null
 
@@ -166,7 +174,7 @@ func advance(delta: float, ticks: int = 1) -> void:
 		return
 
 	if flying:
-		velocity.y -= GRAVITY * delta
+		velocity.y = maxf(velocity.y - GRAVITY * delta, -FALL_FASTEST)
 		var _hit := _sweep(ticks)
 
 		if is_on_floor() and velocity.y <= 0.0:
@@ -174,6 +182,8 @@ func advance(delta: float, ticks: int = 1) -> void:
 			flying = false
 			landed_this_tick = true
 			velocity = Vector3.ZERO
+		elif ticks_since_leap > LEAP_LONGEST:
+			flying = false
 
 		return
 
@@ -192,7 +202,7 @@ func advance(delta: float, ticks: int = 1) -> void:
 	if is_on_floor():
 		velocity.y = minf(velocity.y, 0.0)
 	else:
-		velocity.y -= GRAVITY * delta
+		velocity.y = maxf(velocity.y - GRAVITY * delta, -FALL_FASTEST)
 
 	var _moved := _sweep(ticks)
 

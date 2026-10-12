@@ -57,6 +57,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - Zombies and stand-ins ask `ZzHorde.zombies_near` (a grid built once a tick), never the spawner's `npcs_near`.
 - A wave's speed is `ZzZombieBody.speed_scale`, never written onto the wish (it compounded between thoughts). [history](docs/history.md)
 - A zombie below `kill_y` is removed and a wave's owed again (`ZzHorde._fell_out`, which records where it left the floor). [history](docs/history.md)
+- A ground slab collides `ZzMap.GROUND_DEPTH` deeper than drawn, a prop's flat floor plates are not collided, a leap ends after `LEAP_LONGEST` ticks and a fall is capped at `FALL_FASTEST`: each was a way through the floor. [history](docs/history.md)
 - A special breaks off hurt only when hurt further than at its last retreat. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
 
 **Survivors, downs, boxes, weapons** ([design](docs/design.md#decision-4-down-is-not-dead-and-borrowed-health-is-inside-the-health))

@@ -42,6 +42,9 @@ const CHUNK := 12.0
 ## surface, and a point exactly on a face is outside a strict test half the time.
 const HIT_MARGIN := 0.06
 
+## How much deeper than drawn a ground slab collides (see `_build_boxes`).
+const GROUND_DEPTH := 1.8
+
 signal built()
 
 var physics: DotPhysicsLayout = null
@@ -185,6 +188,14 @@ func _build_boxes() -> void:
 			cube.size = size
 			shape.shape = cube
 			shape.transform = frame
+
+			# A ground slab (its top at the ground, thin) collides GROUND_DEPTH deep, drawn as
+			# it is: a body pushed into a 0.2 m slab past its middle was pushed out of the
+			# bottom, and nothing is under the ground (zz-mall-floor-falls-1).
+			var top := at.y + size.y * 0.5
+			if absf(top) < 0.05 and size.y <= 0.5:
+				cube.size.y = size.y + GROUND_DEPTH
+				shape.transform.origin.y -= GROUND_DEPTH * 0.5
 			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "asphalt" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
