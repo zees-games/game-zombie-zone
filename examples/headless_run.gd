@@ -27,9 +27,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 26
+const SECTIONS := 27
 
-const CHECKS := 126
+const CHECKS := 131
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -85,6 +85,7 @@ func _run() -> void:
 	await _test_a_crowd_is_cheap()
 	await _test_the_hud()
 	await _test_help_and_menu()
+	await _test_the_map_menu()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -883,6 +884,55 @@ func _test_help_and_menu() -> void:
 	_check(help_button != null and leave_button != null and leave_button.visible,
 		"the Escape menu has Help & commands and Leave")
 	settings.close()
+	settings.queue_free()
+	await get_tree().process_frame
+	_finished()
+
+
+## The family's rule since the first play test: M opens the map list, and solo a choice
+## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and dot-vote.
+func _test_the_map_menu() -> void:
+	_section("M opens the map list, and solo a choice changes it")
+	var game := await _world(func(c: ZzConfig) -> void: c.map_ids = PackedStringArray())
+	var _a := game.add_player(&"u1", "Ada")
+	var _b := game.add_player(&"u2", "Bo")
+	game.start()
+	for _i in 4:
+		game.simulate(TICK)
+		await get_tree().physics_frame
+	var settings := ZzSettings.new()
+	add_child(settings)
+	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
+	var keys: DotMenuBindings = settings.bindings
+	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
+		"the map menu is on M, and nothing else in the table defaults to M",
+		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	var rows: Array = game.map_rows()
+	_check(rows.size() > 1 and rows.filter(func(r: Dictionary) -> bool: return bool(r["current"])).size() == 1,
+		"there is more than one to choose, the one playing marked", "%d" % rows.size())
+	var _maps := settings.use_maps(game.map_rows, game.change_map_now)
+	var m := InputEventKey.new()
+	m.physical_keycode = KEY_M
+	m.keycode = KEY_M
+	m.pressed = true
+	_check(settings.menu.handle_event(m) and settings.menu.picker.is_open(), "M opens the picker")
+	var wanted: StringName = &""
+	var key := KEY_NONE
+	for row in range(1, DotMenuPicker.PAGE_SIZE + 1):
+		var it: Variant = settings.menu.picker.at_row(row)
+		if it is Dictionary and not bool((it as Dictionary)["current"]):
+			wanted = StringName(str((it as Dictionary)["id"]))
+			key = KEY_0 + row
+			break
+	var digit := InputEventKey.new()
+	digit.physical_keycode = key
+	digit.keycode = key
+	digit.pressed = true
+	var _k := settings.menu.handle_event(digit)
+	for _i in 4:
+		await get_tree().physics_frame
+	_check(wanted != &"" and game.map.id() == wanted, "choosing one changes to it now", "%s, now %s" % [wanted, game.map.id()])
+	_check(not settings.menu.picker.is_open(), "and the picker is closed")
 	settings.queue_free()
 	await get_tree().process_frame
 	_finished()

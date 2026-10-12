@@ -806,6 +806,18 @@ func _key(action: StringName) -> String:
 
 # --- The Tab board ---------------------------------------------------------
 
+## M: the map list (dot-menu's map menu). Solo a choice changes the map here at once;
+## connected the server decides, by the owner's `sv_map_menu_flag`, and anybody without it
+## gets a vote instead (dot-vote's map menu, wired in [ZzModule]). By name, so a client shell
+## older than the map menu still runs the game without it.
+func _wire_maps() -> void:
+	if not settings.has_method(&"use_maps"):
+		return
+	var _maps: Variant = settings.call(&"use_maps",
+		func() -> Array: return game.map_rows() if game != null else [],
+		func(id: StringName) -> DotResult: return game.change_map_now(id))
+
+
 func _wire_board() -> void:
 	if settings == null or settings.menu == null:
 		return
@@ -981,6 +993,7 @@ func _build_settings() -> void:
 		console = DotConsoleKit.build(self, settings.settings, settings.menu)
 		_bind_bot_console()
 		_wire_board()
+		_wire_maps()
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
