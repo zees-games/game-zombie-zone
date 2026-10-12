@@ -83,6 +83,10 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 
 `zz_hud.gd` draws health as a `DotVitals` (borrowed health as its `bonus`, white after the real fill; DOWN and DEAD as its `status`, all in the low colour; red at the limp line), the weapon as a `DotAmmoCounter` (an endless reserve as ∞, low at a quarter of a magazine), a hold-out's time left or a survival map's time held as a `DotScoreStrip` clock under the title, the medkit and pills as `DotKeyHints` rows with their bound keys, and confirmed hits as `DotHitMarker` and `DotDamageNumbers`. **The number is real health, not real plus borrowed**: borrowed health drains, and a number that included it would fall while nobody was hitting you; the white length says what is borrowed. **A hit is drawn only from the server's confirmation**: `ZzGame.hit_landed` (a survivor's damage applied to a zombie; never friendly fire, never the world's), sent to the shooter alone as a HIT event, connected straight to the world offline. The health plate ends 206 pixels off the bottom, above the chat box's full eight-row log (202). Colours from `ZzHud.piece_theme()`; `tools/shot.sh --view=hit --spawn=common:6` renders the marker, a number, borrowed health and a hold-out clock. Naming these classes makes the pack need a client shell with dot-ui API level 4; the derived `requires.json` asks for it and `headless_run` checks it.
 
+## Cameras and bodies
+
+From the first play test (survivor bots' faces filling the screen): `mp_solidplayers` (dot-player-controller, 1) puts the player layer in every survivor's motor mask through `DotPlayerBodyRules.apply_to` and gives each body a standing `SolidHull` (`ZzGame._apply_body_mask`, again on every change), so a stand-in stops at your shoulder; `mp_forceview` decides whether F5 may switch to third person. Both bound REPLICATED by the module and followed through the link. The third-person camera is a dot-core `DotCameraBoom` swept from the eye with `CHASE_UP` as `lift`, stopping against `world_mask()`; a `DotCameraFade` on the camera is handed the other survivors and finds zombies on their layer, hiding one at the lens; dot-spectate is handed the level for its chase and death cameras. `tools/camera_check.sh [--render]` flies both cameras round every spawn and route point (armed), walks the player into another with the rule on and off, and draws both views and the walk-in before and after.
+
 ## What running it found
 
 - **Shots did no damage to zombies**: the hitboxes resolved their owner before the zombie's `DotHealth` existed. Health is created first now, then the hitboxes, then `refresh()`.
@@ -107,6 +111,7 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
+tools/camera_check.sh --render                          # cameras round the street (armed), mp_solidplayers both ways, views
 tools/shot.sh --view=survivor --spawn=common:12
 tools/shot.sh --view=third --spawn=brute:1,leaper:1
 tools/shot.sh --view=pinned --pin=choke

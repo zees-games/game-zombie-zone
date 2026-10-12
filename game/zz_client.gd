@@ -74,7 +74,8 @@ var _offline: bool = true
 var _sampler: DotFpsSampler = null
 var _watch_id: int = -1
 var _captured: bool = false
-var _arm: SpringArm3D = null
+var _arm: DotCameraBoom = null
+var _fade: DotCameraFade = null
 var _rig_height: float = 0.0
 var _started_msec: int = Time.get_ticks_msec()
 
@@ -188,6 +189,11 @@ func _build_netcode() -> DotResult:
 	# opposite. An older shell's link cannot say, and the manager keeps its default.
 	if game.combat != null and link != null:
 		var _following := game.combat.follow_cvars(link)
+	# The server's mp_forceview and mp_solidplayers: this end places its own camera and
+	# predicts its own player.
+	if link != null:
+		var _view := game.view_rules.follow_cvars(link)
+		var _solid := game.body_rules.follow_cvars(link)
 
 	net = DotNetManager.new()
 	net.name = "Net"
@@ -735,6 +741,20 @@ func _build_camera() -> void:
 	camera.fov = 90.0
 	camera.current = true
 	camera.far = 400.0
+
+	# Survivors and stand-ins, handed over (their hulls are off while players pass through
+	# each other), and zombies, found on their layer: hidden at the lens, faded in third
+	# person between the camera and you. It rides the camera wherever the camera goes.
+	_fade = DotCameraFade.new()
+	_fade.name = "Fade"
+	_fade.bodies_fn = _other_players
+	if game.physics != null:
+		_fade.collision_mask = game.physics.layer_mask(&"zombie")
+	camera.add_child(_fade)
+
+	if not game.view_rules.changed.is_connected(_on_view_rules_changed):
+		game.view_rules.changed.connect(_on_view_rules_changed)
+	third_person = game.view_rules.resolve(third_person)
 	_place_camera()
 
 
@@ -760,30 +780,67 @@ func _place_camera() -> void:
 		if view_model != null and is_instance_valid(view_model):
 			view_model.visible = true
 
+		if _fade != null:
+			_fade.focus = null
+
 		return
 
-	_arm = SpringArm3D.new()
+	# dot-core's boom, swept from the eye with the height above it added in the world's up:
+	# a pivot raised above the head can itself be inside a beam, and the spring arm it
+	# replaced cast a ray from there and snapped to whatever it hit.
+	_arm = DotCameraBoom.new()
 	_arm.name = "Chase"
 	_arm.spring_length = CHASE_BACK
 	_arm.collision_mask = game.world_mask()
 	_arm.add_excluded_object(player.get_rid())
 	_arm.margin = 0.15
-	_rig_height = eye.y + CHASE_UP
+	_arm.lift = CHASE_UP
+	_rig_height = eye.y
 	player.add_child(_arm)
 	_arm.add_child(camera)
 	camera.position = Vector3.ZERO
 	camera.rotation = Vector3.ZERO
 
+	if _fade != null:
+		_fade.focus = _arm
+
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = false
 
 
+## Swaps the view, where the server's `mp_forceview` allows.
 func toggle_view() -> void:
-	third_person = not third_person
+	var wanted := game.view_rules.toggled(third_person)
+	if wanted == third_person:
+		if hud != null and game.view_rules.refusal() != "":
+			hud.shout(game.view_rules.refusal(), 1.6)
+		return
+	third_person = wanted
 	_place_camera()
 
 	if audio != null:
 		var _heard := audio.click()
+
+
+## Everybody but this player, for the camera fade.
+func _other_players() -> Array:
+	var out: Array = []
+	if game == null:
+		return out
+	for id in game.players:
+		var other: Node3D = game.players[id]
+		if other != player and is_instance_valid(other):
+			out.append(other)
+	return out
+
+
+## The server changed `mp_forceview`: the view it allows now.
+func _on_view_rules_changed() -> void:
+	var allowed := game.view_rules.resolve(third_person)
+	if allowed != third_person:
+		third_person = allowed
+		if not is_spectating():
+			_place_camera()
 
 
 func _build_hud() -> void:
@@ -1242,6 +1299,12 @@ func _drive_spectator_camera() -> bool:
 
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = false
+
+	# Chase and death cameras pulled out of the street by dot-spectate, given the level.
+	var manager: DotSpectatorManager = game.spectate.manager
+	if manager != null and manager.camera_world == null:
+		manager.camera_world = camera.get_world_3d()
+		manager.camera_mask = game.world_mask()
 
 	var where := game.spectate.camera_for(player.player_id)
 

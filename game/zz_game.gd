@@ -150,6 +150,12 @@ var bots: ZzBots = null
 ## player id -> [ZzPlayer].
 var players: Dictionary = {}
 
+## dot-player-controller's `mp_forceview` (may a player switch to third person) and
+## `mp_solidplayers` (do survivors and stand-ins block each other). Bound by the module
+## (REPLICATED) and followed by a client through its link.
+var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
+var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
 
@@ -204,6 +210,8 @@ func _ready() -> void:
 	ZzWeapons.use_packs(config.second_weapon_pack)
 
 	_build_physics()
+	if not body_rules.changed.is_connected(_on_body_rules_changed):
+		body_rules.changed.connect(_on_body_rules_changed)
 	_apply_gravity()
 	_build_random()
 	_build_props()
@@ -272,6 +280,22 @@ func _build_physics() -> void:
 
 
 ## The mask of everything a sight line stops on: the world and the furniture.
+## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at
+## (a player's body has no shape of its own). With the rule on, a stand-in survivor stops at
+## your shoulder instead of filling the screen with its face (the first play test).
+func _apply_body_mask(player: ZzPlayer) -> void:
+	if physics == null or player == null or player.controller == null:
+		return
+	body_rules.apply_to(player.controller, physics.collision_mask(&"player"), physics.layer_mask(&"player"))
+	var tunables := player.controller.tunables
+	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
+
+
+func _on_body_rules_changed() -> void:
+	for id in players:
+		_apply_body_mask(players[id] as ZzPlayer)
+
+
 func world_mask() -> int:
 	if physics == null:
 		return 1
@@ -542,7 +566,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		if not applied.ok:
 			DotLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
 
-		player.controller.set_collision_mask(physics.collision_mask(&"player"))
+		_apply_body_mask(player)
 
 	var opened := entities.open(DotEntity.KIND_PLAYER, player, &"", player_id, now())
 	player.entity_id = (opened.value as DotEntityHandle).id if opened.ok else 0
