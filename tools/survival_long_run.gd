@@ -39,12 +39,19 @@ var _watch_detail := false
 ## Microseconds spent in each part of a tick, over the run (`--profile`).
 var _parts: Dictionary = {}
 var _worst_parts: Dictionary = {}
+## This tick's parts, and the slowest ticks' (`--profile`): [cost, wave time, parts], worst first.
+var _tick_parts: Dictionary = {}
+var _spikes: Array = []
+const SPIKES_KEPT := 6
 
 var _game: ZzGame = null
 var _waves: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _result: Array = []
 var _broken := 0
+## Spawns the spawner refused since the last watch line, by reason (`--watch`).
+var _refusals: Dictionary = {}
+var _fallen_before := 0
 var _finished_waves := 0
 
 
@@ -120,6 +127,11 @@ func _run() -> void:
 		if not intact:
 			_current["broken"] = int(_current.get("broken", 0)) + 1)
 
+	if _game.horde != null and _game.horde.spawner != null:
+		_game.horde.spawner.refused.connect(func(owner: StringName, npc_id: StringName, reason: String) -> void:
+			var key := "%s for %s: %s" % [npc_id, owner, reason]
+			_refusals[key] = int(_refusals.get(key, 0)) + 1)
+
 	var team := 0
 	_game.next_map_id = _map
 	# The map's team, as a server with zz_team_from_map fills it.
@@ -152,8 +164,14 @@ func _run() -> void:
 			else:
 				_game.simulate(TICK)
 			var cost := Time.get_ticks_usec() - before
+			# Not the map's first tick (the round starting: the nav graph, the map built).
+			if _profile and _result.is_empty() and t >= 1.0:
+				_keep_spike(cost, t + float(i) * TICK)
 			spent += cost
-			worst = maxi(worst, cost)
+			# Not the tick the hold ended in: a decided round loads the next map in it (one to
+			# two seconds), which is a map start, not the crowd's cost.
+			if _result.is_empty():
+				worst = maxi(worst, cost)
 			ticks += 1
 		t += 32.0 * TICK
 		await get_tree().physics_frame
@@ -208,6 +226,15 @@ func _run() -> void:
 		for part: String in _parts:
 			print("  %-10s %5.1f %%  %.2f ms a tick, worst %.1f ms" % [part, 100.0 * float(_parts[part]) / float(maxi(total, 1)),
 				float(_parts[part]) / 1000.0 / maxf(t * float(TICK_RATE), 1.0), float(_worst_parts[part]) / 1000.0])
+		# The slowest ticks part by part: one part far over its mean is the game's (a crowd
+		# repathing, a spawn burst); every part slow at once is the machine (another process
+		# had the core), which no change here can fix.
+		for spike: Array in _spikes:
+			var line := ""
+			for part: String in spike[2]:
+				if int(spike[2][part]) >= 1000:
+					line += " %s %.0f" % [part, float(spike[2][part]) / 1000.0]
+			print("  spike %.1f ms at %.0f s:%s" % [float(spike[0]) / 1000.0, spike[1], line])
 	print("RESULT %s" % JSON.stringify({"map": String(_map), "team": team, "seed": _seed, "difficulty": _difficulty,
 		"sets": _sets, "won": won, "why": _result[1] if not _result.is_empty() else "", "cleared": cleared,
 		"held": snappedf(t, 0.1), "waves": _waves}))
@@ -318,8 +345,30 @@ func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
 				_game.clear_between(eye, chest), _game.clear_between(eye, head), npc.brain.get(&"state") if npc.brain != null else "-",
 				npc.brain.get(&"bashing") if npc.brain != null else "-", npc.target_id,
 				_game.horde.barricade_in_way(npc.position(), (nearest.feet() - npc.position()).normalized())])
+		# And a few of the far ones, still: what a stalled wave is doing out there.
+		var far_shown := 0
+		for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+			if not npc.is_alive() or far_shown >= 4 or npc.brain == null:
+				continue
+			var best := INF
+			for player in _game.survivors():
+				if player.is_alive() and not player.watching:
+					best = minf(best, player.feet().distance_to(npc.position()))
+			var body = npc.node
+			if best < 25.0 or body == null or (body as CharacterBody3D).velocity.length() >= 0.2:
+				continue
+			far_shown += 1
+			var path: DotNpcPath = npc.brain.get(&"path")
+			print("      far %s at %s, %.1f m from anybody; state %s forced '%s' target '%s' wish %s floor %s; path %d points%s, next %s, ends %s" % [
+				npc.def.id, npc.position().snappedf(0.1), best, npc.brain.get(&"state"), npc.brain.get(&"forced"), npc.target_id,
+				(body.get(&"wish") as Vector3).snappedf(0.1), (body as CharacterBody3D).is_on_floor(), path.points.size() if path != null else -1,
+				" partial" if path != null and path.partial else "", path.current(Vector3.INF).snappedf(0.1) if path != null else "-",
+				path.points[path.points.size() - 1].snappedf(0.1) if path != null and not path.points.is_empty() else "-"])
 	print("  %5.0f s  %s %d  sent %d/%d alive %d: near %d, 6-25 m %d, 25-60 m %d, further %d; bashing %d, targeted %d, still %d | up %d down %d" % [
 		t, w.stage_name(), w.index, w.sent, w.budget, _game.horde.wave_alive(), near, mid, far, lost, bashing, targeted, still, up, down])
+	if not _refusals.is_empty():
+		print("      refused %s" % _refusals)
+		_refusals.clear()
 
 
 ## ZzHorde.tick, part by part (the same order).
@@ -344,9 +393,9 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	at = _part("h.reclaim", at)
 	var speed: float = h.zombie_speed_scale * h.wave_speed_scale
 	for npc: DotNpcInstance in h.spawner.all_npcs():
-		if npc.is_alive() and npc.node != null and npc.node.has_method(&"advance"):
-			npc.node.wish *= speed
-			npc.node.advance(delta)
+		if npc.is_alive() and npc.node != null and npc.node.has_method(&"tick"):
+			npc.node.speed_scale = speed
+			npc.node.tick(delta)
 	at = _part("h.bodies", at)
 	h.squads.prune()
 	h._release_pending()
@@ -368,8 +417,21 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	return _part("h.pacing", at)
 
 
+func _keep_spike(cost: int, at: float) -> void:
+	var parts := _tick_parts
+	_tick_parts = {}
+
+	if _spikes.size() >= SPIKES_KEPT and cost <= int(_spikes[_spikes.size() - 1][0]):
+		return
+
+	_spikes.append([cost, at, parts])
+	_spikes.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) > int(b[0]))
+	_spikes.resize(mini(_spikes.size(), SPIKES_KEPT))
+
+
 func _part(part: String, since: int) -> int:
 	var now := Time.get_ticks_usec()
+	_tick_parts[part] = now - since
 	_parts[part] = int(_parts.get(part, 0)) + now - since
 	_worst_parts[part] = maxi(int(_worst_parts.get(part, 0)), now - since)
 	return now
@@ -381,13 +443,14 @@ func _close_wave(index: int, seconds: float, w: DotNpcDirectorWaves, peak: int, 
 	for player in _game.survivors():
 		if player.is_up():
 			up += 1
-	var fallen := 0
+	# Fell out of the map during the wave (the horde takes them out below kill_y and says where
+	# each last stood on the floor).
+	var fallen: int = _game.horde.fallen_count - _fallen_before
+	_fallen_before = _game.horde.fallen_count
 	var alive := 0
 	for npc: DotNpcInstance in _game.horde.spawner.all_npcs():
 		if npc.is_alive():
 			alive += 1
-			if npc.position().y < _game.map.kill_height():
-				fallen += 1
 	var row := {
 		"overtime": w.overtime, "left_alive": alive, "fallen": fallen,
 		"index": index, "twist": _current.get("twist", ""), "seconds": snappedf(seconds, 0.1),
@@ -405,4 +468,6 @@ func _close_wave(index: int, seconds: float, w: DotNpcDirectorWaves, peak: int, 
 		"overtime, " if w.overtime else "", alive, fallen])
 	if not (row["causes"] as Dictionary).is_empty():
 		print("        downed by %s" % row["causes"])
+	if fallen > 0:
+		print("        fell out from %s, %s" % [_game.horde.fallen_from.slice(-mini(fallen, 8)), _game.horde.fallen_how.slice(-mini(fallen, 8))])
 	_current = {}

@@ -280,7 +280,9 @@ func _unstick(b: ZzZombieBody, toward: Vector3) -> void:
 		return
 
 	if now() - _stuck_since >= STUCK_SECONDS:
-		var forward := (toward - here)
+		# Up and the way it was trying to go (its path's next corner), not straight at its
+		# target, which from a doorway is often into the wall beside it.
+		var forward := b.wish if b.wish.length() > 0.1 else (toward - here)
 		forward.y = 0.0
 		b.leap(forward.normalized() * 3.0 + Vector3(0.0, 7.0, 0.0))
 		b.anim = ZzZombieBody.Anim.LEAP

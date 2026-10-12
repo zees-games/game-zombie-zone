@@ -156,7 +156,10 @@ func _release(horde) -> void:
 		refused_spawns += horde.refused_wave
 		horde.refused_wave = 0
 
-	var room: int = game.config.commons_cap(_team()) - horde.commons()
+	# What is queued counts against the room: without it each tick took the room again while the
+	# last tick's were still queued, the spawner refused the extra, and the wave's 'sent' fell
+	# back by what it owed again (thirty-six on the ballpark).
+	var room: int = game.config.commons_cap(_team()) - horde.commons() - horde.pending_commons()
 	var n := waves.take(room)
 
 	if n > 0:
@@ -247,6 +250,7 @@ func _begin_wave(index: int) -> void:
 
 	_brutes_owed = _brutes_this_wave
 	horde.start_waves()
+	var _called_in: int = horde.send_map_commons()
 
 	var title := "Wave %d of %d" % [index, waves.count] if not waves.is_last() else "The last wave"
 	game.notice.emit("%s%s" % [title, (" — %s" % str(TWISTS[twist]["title"])) if twist != &"" else ""])

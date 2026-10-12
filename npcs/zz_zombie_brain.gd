@@ -67,6 +67,10 @@ const THINK_CLOSE := 6.0
 const THINK_NEAR := 20.0
 const THINK_FAR := 45.0
 
+## Metres from the nearest survivor past which its body moves every second tick, twice as far
+## (`ZzZombieBody.stride`). The mall at wave 10 had a third of its crowd past this.
+const BODY_STRIDE_FROM := 30.0
+
 
 func _npc_ready() -> void:
 	super()
@@ -364,18 +368,22 @@ func _think_every() -> int:
 	if now_s - _nearest_at >= 0.3:
 		_nearest_at = now_s
 		_nearest = float(h.call(&"nearest_survivor_distance", npc.position()))
+		var b := body()
+		if b != null:
+			b.set_stride(1 if _nearest < BODY_STRIDE_FROM else 2)
 
 	# Within reach of a swing or the ring round somebody, every tick; a run at somebody from
-	# further off, every second tick (its body still moves every tick). At wave 10 on the school
-	# seventy-eight zombies all within twenty metres thought every tick, nine of a tick's
-	# sixteen milliseconds (tools/survival_long_run --profile).
+	# further off, every second tick (its body still moves every tick), every third past twenty
+	# metres and every fourth past forty-five. At wave 10 on the school seventy-eight zombies
+	# all within twenty metres thought every tick, nine of a tick's sixteen milliseconds
+	# (tools/survival_long_run --profile).
 	if _nearest < THINK_CLOSE:
 		return 1
 
 	if _nearest < THINK_NEAR:
 		return 2
 
-	return 2 if _nearest < THINK_FAR else 4
+	return 3 if _nearest < THINK_FAR else 4
 
 
 ## A kind's own machine. Called every think after sensing, unless staggered.

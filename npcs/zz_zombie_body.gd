@@ -111,8 +111,54 @@ func configure(def: DotNpcDef) -> void:
 		_shape.position = Vector3(0.0, capsule.height * 0.5, 0.0)
 
 
-## One tick of movement. On the server only.
-func advance(delta: float) -> void:
+## Ticks between moves (set by the brain): 1 near anybody, more far from everybody, where a
+## zombie moving twice as far every second tick looks the same from thirty metres and costs
+## half the sweeps. [method tick] keeps the time owed and moves it in one go.
+var stride: int = 1
+var _waited: int = 0
+
+## What the horde multiplies the wish by when it moves (a sprinters wave, a box that slows the
+## horde). Kept apart from [member wish]: written onto the wish each tick, it compounded on a
+## zombie that thinks only every second or fourth tick (a sprinters wave's far zombies ran at
+## three times the pace by their next thought).
+var speed_scale: float = 1.0
+
+## Where it last stood on the floor, for the horde to say where one that fell out left the map.
+var last_floor_at: Vector3 = Vector3.INF
+
+## Ticks since it last leapt (a special's jump, a common's climb), for the same question.
+var ticks_since_leap: int = 1 << 30
+
+
+## Sets [member stride], spreading the strided bodies over the ticks rather than all moving on
+## the same one.
+func set_stride(ticks: int) -> void:
+	ticks = maxi(ticks, 1)
+
+	if ticks != stride:
+		stride = ticks
+		_waited = variant % ticks
+
+
+## The horde's call every tick: moves now, or counts the tick toward the next strided move. A
+## body in the air or being shoved moves every tick whatever its stride.
+func tick(delta: float) -> void:
+	_waited += 1
+	ticks_since_leap += 1
+
+	if _waited < stride and not flying and push.length_squared() < 0.0004:
+		landed_this_tick = false
+		return
+
+	var ticks := _waited
+	_waited = 0
+	advance(delta * float(ticks), ticks)
+
+
+## One move of [param ticks] ticks' worth ([param delta] is their whole time). On the server
+## only. move_and_slide moves by the engine's own tick, so a strided move scales the velocity
+## for the sweep and puts it back after.
+func advance(delta: float, ticks: int = 1) -> void:
 	landed_this_tick = false
 
 	if mirror or anchored:
@@ -121,16 +167,17 @@ func advance(delta: float) -> void:
 
 	if flying:
 		velocity.y -= GRAVITY * delta
-		var _hit := move_and_slide()
+		var _hit := _sweep(ticks)
 
 		if is_on_floor() and velocity.y <= 0.0:
+			last_floor_at = global_position
 			flying = false
 			landed_this_tick = true
 			velocity = Vector3.ZERO
 
 		return
 
-	var horizontal := wish + push
+	var horizontal := wish * speed_scale + push
 
 	# Standing still on the floor (tearing at a barricade, swinging, waiting its turn on the
 	# ring): nothing to move, so no sweep. Half a big wave stands at the windows, and a
@@ -147,12 +194,27 @@ func advance(delta: float) -> void:
 	else:
 		velocity.y -= GRAVITY * delta
 
-	var _moved := move_and_slide()
+	var _moved := _sweep(ticks)
+
+	if is_on_floor():
+		last_floor_at = global_position
+
 	push = push.move_toward(Vector3.ZERO, PUSH_DECAY * delta * maxf(push.length(), 1.0))
 
 
 ## Starts a leap with [param launch] as its velocity.
+func _sweep(ticks: int) -> bool:
+	if ticks <= 1:
+		return move_and_slide()
+
+	velocity *= float(ticks)
+	var hit := move_and_slide()
+	velocity /= float(ticks)
+	return hit
+
+
 func leap(launch: Vector3) -> void:
+	ticks_since_leap = 0
 	flying = true
 	velocity = launch
 	wish = Vector3.ZERO

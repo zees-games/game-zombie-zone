@@ -54,6 +54,9 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - A brain seeds from `npc.seed`, never `npc.instance_id`; suites wait for a zombie's state, never time its seeded choice. [history](docs/history.md)
 - A brain checks its body still exists after its kind's decision (a bloater that bursts is gone by then).
 - Zombies and stand-ins ask `ZzHorde.zombies_near` (a grid built once a tick), never the spawner's `npcs_near`.
+- A wave's speed is `ZzZombieBody.speed_scale`, never written onto the wish (it compounded between thoughts). [history](docs/history.md)
+- A zombie below `kill_y` is removed and a wave's owed again (`ZzHorde._fell_out`, which records where it left the floor). [history](docs/history.md)
+- A special breaks off hurt only when hurt further than at its last retreat. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
 
 **Survivors, downs, boxes, weapons** ([design](docs/design.md#decision-4-down-is-not-dead-and-borrowed-health-is-inside-the-health))
 - Borrowed health lives inside `DotHealth.health` with `temp_health` saying how much; a hit takes it first.
@@ -67,7 +70,8 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 
 **Survival** ([survival](docs/survival.md))
 - The hold is `DotNpcDirectorWaves`, never the director's stress cycle; a wave is released by `take()` within `commons_cap`, refused spawns are owed again, it ends cleared or on `overtime`.
-- A wave comes from the map's `zombie_spawns` first (`ZzHorde._wave_origin`).
+- A wave comes from the map's `zombie_spawns` first (`ZzHorde._wave_origin`); a release leaves room for what is queued (`pending_commons`).
+- A survival map's wanderers take at most a fifth of the cap and are sent in as each wave begins. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
 - A barricade's boxes are `"nav": false` and `nav_for` skips them: the horde paths INTO a barricade to bash it; `headless_maps` checks both faces are on the graph.
 - Nobody mends a barricade torn at in the last `ZzGame.MEND_LOCKOUT` (1.5 s); without it no wave was ever cleared. [survival](docs/survival.md#barricades)
 - Barricade state goes to clients in sixteenths (BARRICADE) and at every round start; the hold as SURVIVAL every clock and on every stage change; `headless_net` follows both through the bridge.
@@ -121,8 +125,8 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 
 ## Still to do
 
-1. **Put it live.** The client shell needs dot-ui API level 4. Tag zee-dot-weapons (`add_source`) and zed, dot-npc and dot-npc-ai-director (API level 2, `DotNpcDirectorWaves`) and anything else changed, add `content/zombiezone/` and a client example to dot-server-deploy, rebuild the shell; then the game, and the maps pack after it (its Blackout maps say `exodus`, which an older game refuses).
+1. **Put it live.** The client shell needs dot-ui API level 4. Tag zee-dot-weapons (`add_source`) and zed, dot-npc (native search, `warm()`, `go_rough`), dot-npc-ai (the shared surround, rough corners) and dot-npc-ai-director (API level 2, `DotNpcDirectorWaves`) and anything else changed, add `content/zombiezone/` and a client example to dot-server-deploy, rebuild the shell; then the game, and the maps pack after it (its Blackout maps say `exodus`, which an older game refuses).
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
-4. **Wave 10 under the tick budget on a loaded machine**, and the ballpark's stalled waves (see [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)).
+4. **Retune the waves from continuous holds**: they are harder on every map since the cap went to the waves (see [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)).
 5. **Play it with people**, and set normal's numbers from that.

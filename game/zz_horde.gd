@@ -186,6 +186,9 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	spawner.world_ref = DotNodeRef.of_path(NodePath("../Zombies"))
 	spawner.smooth_paths = true
 	spawner.allow_partial_paths = true
+	# Smooth only a path's first metres: a zombie repaths every second and a half and never
+	# walks the rest. Through `set` so an older dot-npc without it is simply not told.
+	spawner.set(&"smooth_horizon", 16)
 	spawner.occlusion_mask = game.world_mask()
 	# Every zombie's own seed (`npc.seed`, what the brains draw their idle, pace and wander from)
 	# comes from the session's seed and its spawn count, so a server given the same seed plays
@@ -198,6 +201,10 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	skill.attach(spawner)
 	spawner.set_meta(HORDE_META, self)
 	add_child(spawner)
+	# Every kind's brain compiled now, while the map loads, rather than as a 30 ms hitch the
+	# first time each special comes (an older dot-npc has no warm()).
+	if spawner.has_method(&"warm"):
+		var _warmed = spawner.call(&"warm")
 
 	spawner.spawned.connect(_on_spawned)
 	spawner.removed.connect(_on_removed)
@@ -448,6 +455,14 @@ func _place_sleepers() -> void:
 			DotLog.warn(CHANNEL, "a sleeper could not be placed", {"at": str(at)})
 
 
+## The share of the commons cap a survival map's wanderers may take. The waves are the hold;
+## the ballpark's floor area put sixty-five wanderers on it, idle in the far stands, and a wave
+## had seventeen places left under the cap: its spawns were refused for minutes ("sent" fell
+## back) and the team stood about. What is left of them each wave is sent in
+## ([method send_map_commons]).
+const SURVIVAL_WANDERER_SHARE := 0.2
+
+
 ## Commons standing about: clusters on the graph, never near where the team starts.
 func _place_wanderers() -> void:
 	if nav == null or config.wanderer_density <= 0.0:
@@ -457,7 +472,8 @@ func _place_wanderers() -> void:
 	for f: Array in (_doc.get("nav", {}) as Dictionary).get("floors", []):
 		area += (float(f[2]) - float(f[0])) * (float(f[3]) - float(f[1]))
 
-	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(_planned_team()) * 0.8))
+	var share := SURVIVAL_WANDERER_SHARE if str(_doc.get("mode", "")) == "survival" else 0.8
+	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(_planned_team()) * share))
 	var starts := _start_points()
 	var candidates := director.spawn_points.duplicate()
 	var placed := 0
@@ -530,8 +546,8 @@ func tick(delta: float) -> void:
 	for npc in spawner.all_npcs():
 		if npc.is_alive() and npc.node is ZzZombieBody:
 			var b := npc.node as ZzZombieBody
-			b.wish *= speed
-			b.advance(delta)
+			b.speed_scale = speed
+			b.tick(delta)
 
 	squads.prune()
 	_release_pending()
@@ -640,12 +656,19 @@ func survivor_ids() -> Array[StringName]:
 func _rebuild_grid() -> void:
 	_grid.clear()
 	_grid_pos.clear()
+	var kill_y := float(_doc.get("kill_y", -30.0))
+	var fell: Array[DotNpcInstance] = []
 
 	for npc in spawner.all_npcs():
 		if not npc.is_alive():
 			continue
 
 		var p := npc.position()
+
+		if p.y < kill_y or not p.is_finite():
+			fell.append(npc)
+			continue
+
 		_grid_pos[npc.instance_id] = p
 		var key := Vector2i(floori(p.x / GRID), floori(p.z / GRID))
 		var cell: Variant = _grid.get(key)
@@ -654,6 +677,45 @@ func _rebuild_grid() -> void:
 			_grid[key] = [npc]
 		else:
 			(cell as Array).append(npc)
+
+	for npc in fell:
+		_fell_out(npc)
+
+
+## Where zombies that fell out of the map last stood on its floor, newest last (a few kept), for
+## a tool or a console asking how they got there.
+var fallen_from: Array[Vector3] = []
+## How each of [member fallen_from] left the floor: "leapt N ticks before", or "walked".
+var fallen_how: PackedStringArray = PackedStringArray()
+var fallen_count: int = 0
+const FALLEN_KEPT := 16
+
+
+## A zombie below the map's kill_y (or somewhere not a number) is taken out of the world, and a
+## wave's is owed again. Nothing used to: one that fell through the mall's floor fell for the rest
+## of the hold, its brain facing it at survivors from ever further down, and a body far enough
+## out made `look_at` refuse once a think (sixty-five errors in one run, zz-mall-lookat-errors-1).
+func _fell_out(npc: DotNpcInstance) -> void:
+	var b := npc.node as ZzZombieBody
+	var from: Vector3 = b.last_floor_at if b != null else Vector3.INF
+	var how := "walked"
+	if b != null and b.ticks_since_leap < 64 * 60:
+		how = "%s %s, leapt %d ticks before" % [npc.def.id if npc.def != null else "?", "flying" if b.flying else "falling", b.ticks_since_leap]
+	fallen_from.append(from)
+	fallen_how.append(how)
+	fallen_count += 1
+
+	if fallen_from.size() > FALLEN_KEPT:
+		fallen_from.remove_at(0)
+		fallen_how.remove_at(0)
+
+	DotLog.warn(CHANNEL, "a zombie fell out of the map", {"kind": String(npc.def.id) if npc.def != null else "?",
+		"last_on_floor": str(from.snappedf(0.1)), "at": str(npc.position().snappedf(0.1)), "how": how})
+
+	if npc.owner_id == WAVE:
+		refused_wave += 1
+
+	var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
 
 
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
@@ -1007,11 +1069,10 @@ func _spawn_point(near: float, far: float, prefer_ahead: bool, around: StringNam
 		for id in survivor_ids():
 			party_flow = maxf(party_flow, director.flow.flow_of(survivor_position(id)))
 
-	var best := Vector3.INF
-	var best_score := -INF
 	var nodes := _survivor_nodes()
 	# Sampled, not scanned: a few hundred candidates is a few hundred sight lines.
 	var tries := mini(points.size(), 90)
+	var scored: Array = []
 
 	for i in tries:
 		var p: Vector3 = points[_rng.randi_range(0, points.size() - 1)]
@@ -1026,19 +1087,28 @@ func _spawn_point(near: float, far: float, prefer_ahead: bool, around: StringNam
 		if nearest < near or nearest > far:
 			continue
 
-		if seen_by_survivors(p) or not _reaches_somebody(p, nodes):
-			continue
-
 		var score := -absf(nearest - (near + far) * 0.5)
 
 		if has_flow and prefer_ahead:
 			score += clampf(director.flow.flow_of(p) - party_flow, -30.0, 30.0) * 0.5
 
-		if score > best_score:
-			best_score = score
-			best = p
+		scored.append([score, i, p])
 
-	return best
+	# [b]Scored first, looked at in order, the first unseen one kept.[/b] The same answer as
+	# testing every candidate's sight and keeping the best, without the sight lines: scanned,
+	# a special's spot was up to ninety candidates times a dozen survivors' eyes, over a
+	# thousand rays and a 35 ms tick every time a wave sent a special (tools/survival_long_run
+	# --profile). Ties keep the order they were drawn in, as the scan did.
+	scored.sort_custom(func(a: Array, b: Array) -> bool:
+		return float(a[0]) > float(b[0]) or (float(a[0]) == float(b[0]) and int(a[1]) < int(b[1])))
+
+	for entry: Array in scored:
+		var p: Vector3 = entry[2]
+
+		if _reaches_somebody(p, nodes) and not seen_by_survivors(p):
+			return p
+
+	return Vector3.INF
 
 
 # --- Waves ------------------------------------------------------------------------------------
@@ -1102,6 +1172,37 @@ func _wave_origin() -> Vector3:
 		return p
 
 	return _spawn_point(15.0, 90.0, false)
+
+
+## The map's own commons (its wanderers) still alive are sent at the team, spread round it. A
+## survival wave calls it as it begins: a wanderer left idle in the far stands holds a place
+## under the cap the wave needs. Returns how many were sent.
+func send_map_commons() -> int:
+	var ids := survivor_ids()
+	var sent := 0
+
+	if ids.is_empty():
+		return 0
+
+	for npc in spawner.npcs_of(&"map"):
+		if not npc.is_alive() or npc.def == null or npc.def.id != ZzNpcs.COMMON or npc.brain == null:
+			continue
+
+		npc.brain.call(&"force_target", ids[_rng.randi_range(0, ids.size() - 1)])
+		sent += 1
+
+	return sent
+
+
+## Commons queued to spawn and not yet out: what a release must leave room for.
+func pending_commons() -> int:
+	var n := 0
+
+	for entry: Array in _pending:
+		if entry[0] == ZzNpcs.COMMON:
+			n += 1
+
+	return n
 
 
 ## Wave zombies still alive, queued, or about to be.
@@ -1204,8 +1305,14 @@ func barricade_in_way(at: Vector3, wish: Vector3) -> String:
 		if dx * dx + dz * dz > BASH_REACH * BASH_REACH or at.y > box.end.y or at.y + 1.8 < box.position.y:
 			continue
 
-		var toward: Vector3 = (entry["centre"] as Vector3) - at
-		toward.y = 0.0
+		# Toward the nearest point of the boards, not their middle: a zombie in the corner of a
+		# four-metre window, pressed along it by the crowd, wished away from the middle and never
+		# bashed (the ballpark's tunnels: a wave's last few stood there until its overtime).
+		var toward := Vector3(clampf(at.x, box.position.x, box.end.x) - at.x, 0.0, clampf(at.z, box.position.z, box.end.z) - at.z)
+
+		if toward.length_squared() < 0.0001:
+			toward = (entry["centre"] as Vector3) - at
+			toward.y = 0.0
 
 		if wish.dot(toward) > 0.0:
 			return id

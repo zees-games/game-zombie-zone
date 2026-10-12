@@ -54,3 +54,12 @@ Profiling the first big survival map with twelve stand-ins: a tick was 19 to 21 
 ## 2026-10-12: every map that did not name its team was built for four
 
 Adding `survivors` to the map document with a default of 4 raised the practice street's stand-ins from the server's 3 to 4, and `dedicated` ("the module seated stand-ins up to the minimum") caught it. A map that does not say is 0 now, and only a number a map writes raises the team.
+
+## 2026-10-12: a sprinters wave's far zombies ran at three times the pace
+
+`ZzHorde.tick` multiplied each body's wish by the wave's speed every tick (`b.wish *= speed`), and the wish is written only when the brain thinks: a zombie thinking every second or fourth tick had its wish multiplied two or four times before the next thought (1.33⁴ is 3.1 on a sprinters wave, and a box's slow decayed far zombies toward standing still). The speed is `ZzZombieBody.speed_scale` now, applied in the move and never written onto the wish.
+
+## 2026-10-12: zombies fell out of the mall, and `look_at` said so sixty-five times
+
+Nothing took a zombie out below the map's `kill_y`. One that fell through the mall's floor kept falling and kept thinking, and dot-npc's `face()` handed `look_at` a position a metre could not change. The horde now removes any zombie below `kill_y` (or not at a finite position), owes a wave's again, and remembers where it last stood on the floor and whether it had just leapt (`fallen_from`, `fallen_how`; `survival_long_run` prints them per wave); dot-npc's `face()` skips such a position. One was caught falling in four mall runs, from beside a bench in the main walk; how it got through the floor (a climb onto the bench, recovery pushing it through a 0.2 m slab) is not proven.
+

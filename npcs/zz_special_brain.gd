@@ -36,6 +36,9 @@ var _hide_spot: Vector3 = Vector3.INF
 var _hide_for: StringName = &""
 var _hide_at_time: float = -INF
 var _retreat_until: float = -1.0
+
+## Its health when it last broke off hurt: it breaks off again only once hurt below that.
+var _retreated_at_health: float = 1.0
 var _cooldown_until: float = 0.0
 var _waited_since: float = -1.0
 
@@ -252,7 +255,13 @@ func _decide(delta: float) -> void:
 		_holding(delta)
 		return
 
-	if npc.health_fraction() < RETREAT_HEALTH and state != CLAW and _may_retreat():
+	# Hurt again since the last time, not merely still hurt. Checked on health alone, a hurt
+	# special broke off, came back, and broke off again on its next thought, for ever: the
+	# ballpark's waves went to overtime on screamers and leapers pressed against the outfield
+	# wall (tools/survival_long_run --watch --detail).
+	var health := npc.health_fraction()
+	if health < RETREAT_HEALTH and health < _retreated_at_health - 0.05 and state != CLAW and _may_retreat():
+		_retreated_at_health = health
 		begin_retreat()
 		return
 
