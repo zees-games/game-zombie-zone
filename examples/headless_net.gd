@@ -10,6 +10,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
+const ZzRequest := preload("../game/net/zz_request.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
@@ -24,7 +25,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 13
-const CHECKS := 58
+const CHECKS := 60
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -179,6 +180,14 @@ func _test_the_codec() -> void:
 
 	var blast := ZzEvents.read_blast(_r(ZzEvents.write_blast(Vector3(0.0, 1.0, 5.0), 6.0, &"pipe")))
 	_check(bool(blast["ok"]) and blast["kind"] == &"pipe" and absf(float(blast["radius"]) - 6.0) < 0.05, "BLAST")
+
+	# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a
+	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
+	_check(ZzRequest.fits(), "every request kind fits the request's kind field",
+		"%d kinds in %d bits" % [ZzEvents.Ask.size(), ZzRequest.KIND_BITS])
+	_check(ZzEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
+		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), ZzEvents.CHAT_KIND_BITS])
+
 	_finished()
 
 
