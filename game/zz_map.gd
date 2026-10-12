@@ -75,6 +75,8 @@ var _furniture: StaticBody3D = null
 var _drawn: Node3D = null
 var _environment: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
+## dot-lighting's fill (painted()), turned with the sun; blended with it by set_daylight.
+var _fill: DirectionalLight3D = null
 
 ## A map held by nights draws its day as well: the light at night (the map's own) and by day,
 ## captured once as the properties [method set_daylight] blends between. Empty: no day.
@@ -144,6 +146,7 @@ func clear() -> void:
 	_drawn = null
 	_environment = null
 	_sun = null
+	_fill = null
 	_night_light = {}
 	_day_light = {}
 	_daylight = 0.0
@@ -527,6 +530,7 @@ func _build_environment() -> void:
 		# The map's own angle, in Godot's degrees as the map document has always written it,
 		# rather than through dot-lighting's source convention.
 		_sun.rotation_degrees = Vector3(float(env_doc["sun_pitch"]), float(env_doc["sun_yaw"]), 0.0)
+		_fill = _aim_fill(lighting, env_doc, _sun)
 		_sun.shadow_blur = 1.5
 		_sun.directional_shadow_max_distance = 60.0
 		# The rig never draws a sun under 0.35, a floor for daylight worlds; a night map's
@@ -559,6 +563,7 @@ const LIGHT_KEYS := [
 	"env:ambient_light_color", "env:ambient_light_energy", "env:fog_light_color", "env:fog_depth_begin",
 	"env:fog_depth_end", "env:fog_density", "sky:sky_top_color", "sky:sky_horizon_color",
 	"sky:ground_horizon_color", "sky:ground_bottom_color", "sky:sky_cover_modulate", "sky:sun_angle_max",
+	"fill:light_energy", "fill:light_color", "fill:rotation",
 ]
 
 
@@ -679,7 +684,7 @@ func _capture_day() -> void:
 	if _sun == null or _environment == null:
 		return
 
-	_night_light = _light_values(_sun, _environment)
+	_night_light = _light_values(_sun, _environment, _fill)
 	var day_doc: Dictionary = doc.get("day_environment", ZzMapDoc.DEFAULT_ENV)
 	var scratch := Node3D.new()
 	var day_sun := DotLightRig.apply(scratch, DotLightDocument.from_dictionary(light_document(day_doc)),
@@ -699,22 +704,37 @@ func _capture_day() -> void:
 			# cover at no strength, and a dawn blends between the two.
 			(sky.sky_material as ProceduralSkyMaterial).sky_cover_modulate = Color(1.0, 1.0, 1.0, 0.0)
 		day_sun.rotation_degrees = Vector3(float(day_doc["sun_pitch"]), float(day_doc["sun_yaw"]), 0.0)
+		var day_fill := _aim_fill(scratch, day_doc, day_sun)
 		var profile := light_profile(float(day_doc["ambient_energy"]))
 		var brightness := float(light_document(day_doc)["sun"]["brightness"])
 		day_sun.light_energy = clampf(sqrt(brightness / profile.brightness_reference), 0.0, 2.0)
-		_day_light = _light_values(day_sun, day_env)
+		_day_light = _light_values(day_sun, day_env, day_fill)
 
 	scratch.free()
 
 
-static func _light_values(sun: DirectionalLight3D, world: WorldEnvironment) -> Dictionary:
+## The rig's Fill under [param lighting], aimed away from [param sun] as the map turned it: the
+## rig aimed it opposite the sun it was given, and the map's own angle is set after, so left
+## alone the fill lights the faces the sun already does. Null when the profile has no fill.
+static func _aim_fill(lighting: Node, env_doc: Dictionary, sun: DirectionalLight3D) -> DirectionalLight3D:
+	var fill := lighting.get_node_or_null("Fill") as DirectionalLight3D
+	if fill == null:
+		return null
+	var aimed := DotLightRig.fill(DotLightDocument.from_dictionary(light_document(env_doc)), sun.rotation,
+		light_profile(float(env_doc["ambient_energy"])))
+	fill.rotation = aimed.rotation
+	aimed.free()
+	return fill
+
+
+static func _light_values(sun: DirectionalLight3D, world: WorldEnvironment, fill: DirectionalLight3D) -> Dictionary:
 	var out := {}
 	var env := world.environment
 	var sky_mat: Object = env.sky.sky_material if env.sky != null else null
 
 	for key: String in LIGHT_KEYS:
 		var parts := key.split(":")
-		var holder: Object = sun if parts[0] == "sun" else env if parts[0] == "env" else sky_mat
+		var holder: Object = sun if parts[0] == "sun" else env if parts[0] == "env" else fill if parts[0] == "fill" else sky_mat
 		if holder != null:
 			out[key] = holder.get(parts[1])
 
@@ -740,7 +760,7 @@ func set_daylight(amount: float) -> void:
 		if not _night_light.has(key) or not _day_light.has(key):
 			continue
 		var parts := key.split(":")
-		var holder: Object = _sun if parts[0] == "sun" else env if parts[0] == "env" else sky_mat
+		var holder: Object = _sun if parts[0] == "sun" else env if parts[0] == "env" else _fill if parts[0] == "fill" else sky_mat
 		if holder == null:
 			continue
 		var a: Variant = _night_light[key]
@@ -796,30 +816,35 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 	}
 
 
-## What this machine draws of a map's light.
+## What this machine draws of a map's light: dot-lighting's `painted()` (API level 3), the
+## family's profile for hand-built worlds, with the map's ambient and fill.
 ##
 ## [b]Shadows stay on in the browser[/b], unlike dot-lighting's `web()`: a moonlit street
 ## without them is every face lit alike, and the boxes are batched into a few dozen meshes.
-## [b]The Compatibility renderer, which this game and the client shell use, has no headroom
-## above white[/b], so under `gl_compatibility` the sun is divided by 700 instead of 200 and
-## the fill is turned down, game-arena's ratio.
+## `painted()` matches its light to the renderer (the Compatibility renderer this game and the
+## client shell use has no headroom above white), lowers the exposure, grades, and trades
+## ambient for a shadowless fill from the side the sun is not on, turned with the map's sun
+## ([method _aim_fill]) and blended between night and day with it ([method set_daylight]).
 ##
-## [b]The fill is the map's `ambient_energy` times [constant FILL][/b], chosen from rendered
-## frames in both renderers: at 2.6 (and with the rig's 0.35 moon) a night street read as an
-## overcast afternoon under a black sky; at 1.2 it is dusky, the lamps still pool, and a
-## zombie is a dark figure against a lighter wall rather than the old dark-on-dark brick.
-const FILL := 1.2
+## [b]The ambient is the map's `ambient_energy` times [constant AMBIENT] of `painted()`'s, the
+## fill times [constant FILL][/b], chosen from rendered frames under Compatibility (the
+## family's 4 and 2.8 scaled by this game's old 1.2 against their 1.4): a night street stays
+## dusky with the lamps pooling and a zombie a dark figure against a lighter wall, and the
+## school by day loses the glare that washed its field white.
+const AMBIENT := 3.4
+const FILL := 2.4
 
 static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
-	var p := DotLightProfile.web() if OS.has_feature("web") else DotLightProfile.high()
+	var p := DotLightProfile.painted()
 	p.sun_shadows = true
-	p.ambient_energy = ambient_energy * FILL
+	p.ambient_energy *= ambient_energy * AMBIENT
+	p.fill_energy *= ambient_energy * FILL
+	# Less contrast than painted()'s 1.12: the grade pivots at mid grey, and dark props and
+	# zombies in shade went to black at 1.12.
+	p.contrast = 1.04
 	# Glow only from what is brighter than white (the lamps, the fires), not from every
 	# pale wall.
 	p.glow_threshold = 1.0
-	if RenderingServer.get_current_rendering_method() == "gl_compatibility":
-		p.brightness_reference = 700.0
-		p.ambient_energy = ambient_energy * FILL * 0.62
 	return p
 
 

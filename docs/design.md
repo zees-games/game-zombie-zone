@@ -81,7 +81,7 @@ From the first play test (survivor bots' faces filling the screen): `mp_solidpla
 
 ## Look, and project.godot
 
-**Look**: building surfaces are Kenney's grid under dusted pastels (`ZzMaterials.PASTELS`, `DUST`), so a dark zombie reads against a pale wall; light is a dot-lighting document from the map's `environment` (`ZzMap.light_document`), the map's own moon or low sun without the rig's 0.35 daylight floor, fill at `FILL` x `ambient_energy`. Night maps stay night; check both renderers with `tools/shot.sh` before changing either number.
+**Look**: building surfaces are Kenney's grid under dusted pastels (`ZzMaterials.PASTELS`, `DUST`), so a dark zombie reads against a pale wall; light is a dot-lighting document from the map's `environment` (`ZzMap.light_document`), the map's own moon or low sun without the rig's 0.35 daylight floor, drawn through dot-lighting's `painted()` (`ZzMap.light_profile`: ambient `AMBIENT` x and fill `FILL` x `ambient_energy`, contrast 1.04 because the grade crushed dark zombies in shade at 1.12, glow only above white). The Fill light is re-aimed after the map turns its sun (`_aim_fill`) and blended with the sun in `set_daylight`, or night would get a day-strength fill. Measured under Compatibility (2026-10-12, school and mall, day and night): the school's sunlit court 3.0 % → 2.5 % blown, its night ground 0.44 → 0.50 mean with nothing crushed, the mall 0.55 → 0.60 by day, 0.39 → 0.42 by night. Night maps stay night; check both renderers with `tools/shot.sh` before changing a number.
 
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
 
