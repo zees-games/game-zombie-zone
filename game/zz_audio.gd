@@ -79,6 +79,11 @@ const SPECIAL_VOICES := {
 
 var manager: DotAudioManager = null
 
+## Everybody's footsteps by what they stand on, and the bed under the whole game: dot-audio's
+## stock (Kenney's footsteps, generated beds, all CC0; the addon's stock/CREDITS.md).
+var steps: DotAudioFootsteps = null
+var ambience: DotAudioAmbience = null
+
 
 static func ids() -> Array[StringName]:
 	return sound_catalogue().ids()
@@ -90,6 +95,9 @@ static func _file(name: String) -> String:
 
 static func sound_catalogue() -> DotAudioCatalogue:
 	var c := DotAudioCatalogue.new()
+
+	# Footsteps and ambience beds, the family's stock.
+	DotAudioStock.add_to(c)
 
 	c.add(_flat(MAP_START, &"UI", 1, 85, ""))
 	c.add(_flat(HORDE, &"SFX", 1, 90, "horde_distant"))
@@ -253,6 +261,9 @@ func setup() -> DotResult:
 	manager.mixer = DotAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 32
+	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in run
+	# read -22.4 LUFS with the beds, the steps and the limiter in; -20.6 at +4.
+	manager.loudness_trim_db = 6.0
 	add_child(manager)
 
 	var ready_now := manager.setup()
@@ -260,12 +271,73 @@ func setup() -> DotResult:
 	if not ready_now.ok:
 		return ready_now.wrap("zombiezone audio")
 
+	steps = DotAudioFootsteps.new()
+	steps.name = "Footsteps"
+	steps.manager = manager
+	steps.default_surface = &"concrete"
+	add_child(steps)
+	ambience = DotAudioAmbience.new()
+	ambience.name = "Ambience"
+	ambience.manager = manager
+	ambience.fallback_bed = &"amb_night"
+	add_child(ambience)
+	ambience.set_map_bed(&"amb_night")
+
 	var godot_sink := manager.sink as DotAudioSinkGodot
 
 	if godot_sink != null:
 		godot_sink.bank = DotAudioSynth.bank(manager.catalogue, sound_recipes())
 
 	return DotResult.success(null)
+
+
+## Each map's bed outdoors and the ground nobody named, for a document that says neither
+## (`"ambience"` and `"surface"` in a map document win). Indoors is found, not listed: see
+## [method on_map_doc].
+const MAP_SOUND := {
+	&"zz_blackout_1": [&"amb_night", &"concrete"],
+	&"zz_blackout_2": [&"amb_industrial", &"concrete"],
+	&"zz_blackout_3": [&"amb_wind", &"wood"],
+	&"zz_chapel": [&"amb_eerie", &"grass"],
+	&"zz_high_school": [&"amb_outdoor", &"concrete"],
+	&"zz_lot": [&"amb_city", &"concrete"],
+	&"zz_mall": [&"amb_city", &"concrete"],
+	&"zz_relief_camp": [&"amb_night", &"grass"],
+	&"zz_stadium": [&"amb_outdoor", &"concrete"],
+}
+
+
+## A map arrived. Its bed and ground, and an indoor zone under every ceiling or roof box: the
+## room tone plays where there is something over your head, and no map lists its rooms twice.
+func on_map_doc(id: StringName, doc: Dictionary) -> void:
+	var row: Array = MAP_SOUND.get(id, [&"amb_night", &"concrete"])
+	on_map(StringName(str(doc.get("ambience", row[0]))), StringName(str(doc.get("surface", row[1]))))
+	if ambience == null:
+		return
+	ambience.clear_zones()
+	for box: Variant in doc.get("boxes", []):
+		if not (box is Dictionary) or not (str(box.get("mat", "")) in ["ceiling", "roof"]):
+			continue
+		var at: Array = box.get("at", [0, 0, 0])
+		var size: Array = box.get("size", [0, 0, 0])
+		var top := float(at[1]) + float(size[1]) * 0.5
+		var low := top - 6.0
+		ambience.add_zone(AABB(Vector3(float(at[0]) - float(size[0]) * 0.5, low, float(at[2]) - float(size[2]) * 0.5),
+			Vector3(float(size[0]), top - low, float(size[2]))), &"amb_indoor")
+
+
+## Everybody this client knows steps, once a frame: players and bots alike.
+func keep_walkers(bodies: Array) -> void:
+	if steps != null:
+		steps.keep(bodies)
+
+
+## A map arrived: its bed and its ground. Empty keeps what is playing.
+func on_map(bed: StringName, surface: StringName = &"") -> void:
+	if ambience != null and bed != &"":
+		ambience.set_map_bed(bed)
+	if steps != null and surface != &"":
+		steps.default_surface = surface
 
 
 func listen_from(at: Vector3) -> void:

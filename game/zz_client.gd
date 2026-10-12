@@ -489,7 +489,10 @@ func _on_phase(phase: int) -> void:
 			var _flashed := game.effects.flash(&"go")
 
 
-func _on_map(_map_id: StringName) -> void:
+func _on_map(map_id: StringName) -> void:
+	if audio != null:
+		audio.on_map_doc(map_id, game.map_doc)
+
 	var name_of := str(game.map_doc.get("name", ""))
 	world_view.clear()
 
@@ -1326,6 +1329,7 @@ func _prompt() -> String:
 func _present_effects(delta: float) -> void:
 	if audio != null:
 		audio.listen_from(camera.global_position)
+		audio.keep_walkers(game.players.values())
 
 	if game.effects != null:
 		game.effects.viewer_position = camera.global_position
