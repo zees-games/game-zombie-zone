@@ -44,6 +44,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 **The split and the wire** ([design](docs/design.md#decision-1-the-zombies-are-the-servers-and-a-client-draws-them))
 - **Sound follows the map document**: each box's `mat` is its collision shape's `surface` meta (survivors' footsteps by surface, dot-audio's `DotAudioFootsteps`), every `ceiling`/`roof` box is an indoor ambience zone, and the outdoor bed and ground come from `ZzAudio.MAP_SOUND` or the document's `ambience`/`surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` (−17 LUFS band, `loudness_trim_db`).
 - Zombies are the server's, never predicted, always relevant; a client interpolates them and is told a death (NPC_GONE) so a body falls.
+- **A READY before the player is seated is kept** (`_ready_unseated` in the bridge) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](docs/history.md)
 - Everything that changes how a survivor moves is a `ZzController` modifier, never a velocity written on one end.
 - Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits); `headless_net` checks it. [history](docs/history.md)
 - No `class_name` in `game/` or `npcs/` (a mounted pack cannot register one); brains are named by path.
