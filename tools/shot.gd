@@ -20,6 +20,9 @@ var _spawn: Array = []
 var _pin := &""
 var _pin_me := false
 var _box := &""
+## --aim=DEG: every stand-in but you holds this view pitch (up positive), so a frame from the
+## side shows the figures' spines and gun arms following it (`"aim"` in ZzPlayer's set_motion).
+var _aim := INF
 ## --alone: the stand-ins stay in the start room, out of a close-up.
 var _alone := false
 var _client: Node = null
@@ -52,6 +55,8 @@ func _ready() -> void:
 			_alone = true
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
+		elif arg.begins_with("--aim="):
+			_aim = arg.trim_prefix("--aim=").to_float()
 		elif arg.begins_with("--box="):
 			_box = StringName(arg.trim_prefix("--box="))
 
@@ -97,6 +102,16 @@ func _run() -> void:
 	if _look != Vector3.INF:
 		_face(local, _look)
 
+	if _aim != INF:
+		# Written before anything else runs each frame: the stand-ins' empty commands would
+		# put their pitch back to level.
+		var holder := Node.new()
+		holder.process_priority = -1000000
+		holder.set_script(_AimHolder)
+		holder.set(&"players", game.survivors().filter(func(p) -> bool: return p != local))
+		holder.set(&"pitch", _aim)
+		add_child(holder)
+
 	await _seconds_of(0.4)
 
 	for entry: Array in _spawn:
@@ -119,7 +134,11 @@ func _run() -> void:
 			_free_camera().look_at_from_position(centre + Vector3(reach * 0.45, reach * 0.6, reach * 0.55), centre)
 		"room":
 			await _seconds_of(_seconds)
-			_free_camera().look_at_from_position(_at, _look)
+			if _aim != INF:
+				# --at is where everybody stands: look along the stand-ins' row from the side.
+				_free_camera().look_at_from_position(stand + Vector3(4.5, 0.4, 1.8), stand + Vector3(0.0, 1.0, 1.8))
+			else:
+				_free_camera().look_at_from_position(_at, _look)
 		"third":
 			_client.call("toggle_view")
 			await _seconds_of(_seconds)
@@ -321,6 +340,8 @@ func _until_a_round(game: ZzGame) -> void:
 
 func _free_camera() -> Camera3D:
 	var camera := Camera3D.new()
+	camera.set_script(_ShotCamera)
+	camera.set(&"client", _client)
 	camera.fov = 75.0
 	camera.far = 600.0
 	add_child(camera)
@@ -340,3 +361,8 @@ func _seconds_of(seconds: float) -> void:
 	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
 	while Time.get_ticks_msec() < until:
 		await get_tree().process_frame
+
+
+## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.
+const _AimHolder := preload("shot_aim_holder.gd")
+const _ShotCamera := preload("shot_camera.gd")
