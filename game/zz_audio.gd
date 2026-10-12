@@ -261,9 +261,11 @@ func setup() -> DotResult:
 	manager.mixer = DotAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 32
-	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in run
-	# read -22.4 LUFS with the beds, the steps and the limiter in; -20.6 at +4.
-	manager.loudness_trim_db = 6.0
+	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): at +6 two 40 s runs
+	# read -19.4 LUFS; at +8 two runs whose camera went over 100 m read -16.1 and -16.9. A run
+	# where the player is cornered or dead most of the time (camera under 40 m) reads about
+	# 2 LU lower, so read the capture's camera line before believing a number.
+	manager.loudness_trim_db = 8.0
 	add_child(manager)
 
 	var ready_now := manager.setup()
