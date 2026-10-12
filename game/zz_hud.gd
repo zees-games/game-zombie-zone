@@ -509,15 +509,17 @@ static func survival_lines(hold: Dictionary) -> Array:
 					title += " · %s" % twist.capitalize()
 				return [title, "%d" % maxi(int(hold.get("remaining", 0)), 0), "left", "", false]
 			if stage == DotNpcDirectorWaves.Stage.QUIET:
+				# The hint goes under the clock, not under the title: the title's second line is
+				# where the strip's clock sits, and the two were drawn over each other.
 				var opening := index <= 1
-				return ["Get ready" if opening else "Breather", clock, "until wave %d" % index,
-					"Find the doors and the caches" if opening else "Mend the barricades, restock at the caches", low]
+				return ["Get ready" if opening else "Breather", clock,
+					"until wave %d · %s" % [index, "find the doors and the caches" if opening else "mend the barricades, restock"], "", low]
 			return ["All %d waves held" % count, "", "", "", false]
 		DotNpcDirectorWaves.Style.CYCLE:
 			if stage == DotNpcDirectorWaves.Stage.HORDE:
 				return [("Night %d of %d" % [index, count]) if index < count else "The last night", clock, "until dawn", "", low]
 			if stage == DotNpcDirectorWaves.Stage.QUIET:
-				return ["Day %d" % index, clock, "until dark", "Mend the barricades, restock at the caches", low]
+				return ["Day %d" % index, clock, "until dark · mend the barricades, restock", "", low]
 			return ["Morning", "", "", "", false]
 
 	return ["Hold out", clock, "left" if clock != "" else "", "", low]

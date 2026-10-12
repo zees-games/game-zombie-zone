@@ -22,7 +22,7 @@ dot-npc-ai-director's `DotNpcDirectorWaves` is the schedule: quiet stretches and
 
 **From the map's edges.** A wave comes from the map's `zombie_spawns` (the car park, the outfield, the tree line), out of sight, fifteen metres or more from everybody, and on ground that reaches somebody; only when no hint will do, from the graph's own points. Drawn from anywhere out of sight, the first school wave came out of the gym's back corner, which nobody was looking at.
 
-**Cleared means dead, with a backstop.** A wave ends when all of it is out and none is alive, or 150 s after its last release (`overtime`); then what is left far from everybody is tidied away and the rest are sent at the team. One straggler stuck behind a bus would otherwise hold the breather off for ever.
+**Cleared means dead, with a backstop.** A wave ends when all of it is out and none is alive, 30 s after its last release once three or fewer are left, or 150 s after it whatever is left (`overtime`); then what is left far from everybody is tidied away and the rest are sent at the team. Two commons bashing at a door nobody could see through held a camp's breather off past the minute.
 
 ## What makes it ours
 
