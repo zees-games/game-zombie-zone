@@ -1,5 +1,6 @@
 extends Node
 
+const ZzBindings := preload("../game/zz_bindings.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
@@ -29,7 +30,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const SECTIONS := 27
 
-const CHECKS := 131
+const CHECKS := 132
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -870,6 +871,11 @@ func _test_help_and_menu() -> void:
 	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H (the medkit is on G)",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# Chat is two rows, so help lists Y and U and the Controls page moves them.
+	var _t := settings.settings.set_value(&"bind_chat", "T")
+	_check(keys.key_for(ZzBindings.CHAT) == "T" and DotInputBinding.describe_action(ZzBindings.CHAT) == "T"
+		and keys.key_for(ZzBindings.CHAT_TEAM) == "U", "chat (Y) and team chat (U) are rows: rebinding one moves its key",
+		"%s %s" % [keys.key_for(ZzBindings.CHAT), keys.key_for(ZzBindings.CHAT_TEAM)])
 	var h := InputEventKey.new()
 	h.physical_keycode = KEY_H
 	h.keycode = KEY_H

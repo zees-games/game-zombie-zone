@@ -17,6 +17,10 @@ extends RefCounted
 ##
 ## [b]The slots are rows[/b], read through their actions, so the Controls page can move them
 ## and the help screen lists them; they were keycodes in the client, which no page could show.
+##
+## [b]Chat is two rows[/b] on dot-ui's chat window's own actions (Y to all, U to your side), so
+## the help screen lists them and the Controls page moves them; until 2026-10-12 they were the
+## window's defaults, on no page.
 
 const USE := &"zz_use"
 const HEAL := &"zz_heal"
@@ -25,6 +29,9 @@ const SHOVE := &"zz_shove"
 const RELOAD := &"zz_reload"
 const VIEW := &"zz_view"
 const SCOREBOARD := &"zz_scoreboard"
+## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
+const CHAT := &"chat_open"
+const CHAT_TEAM := &"chat_open_team"
 ## Slots 1 to 5, the weapon pack's: melee, sidearm, primary, heavy, thrown.
 const SLOTS: Array[StringName] = [&"zz_slot_1", &"zz_slot_2", &"zz_slot_3", &"zz_slot_4", &"zz_slot_5"]
 const SLOT_NAMES: Array[String] = ["melee", "sidearm", "primary", "heavy", "thrown"]
@@ -40,6 +47,8 @@ static func make() -> DotMenuBindings:
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Slot %d: %s" % [i + 1, SLOT_NAMES[i]], str(i + 1), "Weapons")
+	keys.add(CHAT, &"bind_chat", "Chat", "Y", "Communication")
+	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	return keys
