@@ -288,9 +288,10 @@ func is_pinned() -> bool:
 	return pinned_by != 0
 
 
-## Pinned, or using something with both hands: the gun does nothing (down, you still shoot).
+## Pinned, or using something with both hands: the gun does nothing (down, you still shoot; and
+## grabbed by the ankle, too, which is the one pin you fight your own way out of).
 func is_held() -> bool:
-	return is_pinned() or using != &""
+	return (is_pinned() and pin_kind != &"grab") or using != &""
 
 
 ## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig

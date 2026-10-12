@@ -355,6 +355,35 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.special_interval_min = clampf(value, 1.0, config.special_interval_max))
 	_tunable("zz_special_max", config.special_interval_max, "Seconds between specials, to",
 		func(value: float) -> void: config.special_interval_max = clampf(value, config.special_interval_min, 300.0))
+	# The specials added with the animated models. Each writes the configuration (the next map's
+	# catalogue) and the live catalogue's definition (the next one spawned), because a brain
+	# reads its numbers from its definition.
+	_tunable("zz_screamer_mob", float(config.screamer_mob), "Commons a screamer's scream sends at whoever it saw",
+		func(value: float) -> void:
+			config.screamer_mob = clampi(int(value), 0, 100)
+			_set_meta(world, ZzNpcs.SCREAMER, "scream_mob", float(config.screamer_mob)))
+	_tunable("zz_screamer_cooldown", config.screamer_cooldown, "Seconds between one screamer's screams",
+		func(value: float) -> void:
+			config.screamer_cooldown = clampf(value, 4.0, 120.0)
+			_set_meta(world, ZzNpcs.SCREAMER, "scream_cooldown", config.screamer_cooldown))
+	_tunable("zz_crawler_grab_dps", config.crawler_grab_dps, "What a crawler's hold on an ankle does a second, on normal",
+		func(value: float) -> void:
+			config.crawler_grab_dps = clampf(value, 0.0, 50.0)
+			_set_meta(world, ZzNpcs.CRAWLER, "pin_dps", config.crawler_grab_dps))
+	_tunable("zz_riot_shield", config.riot_shield, "Share of a hit on a riot zombie's shield that gets through (0..1)",
+		func(value: float) -> void:
+			config.riot_shield = clampf(value, 0.0, 1.0)
+			_set_meta(world, ZzNpcs.RIOT, "shield", config.riot_shield))
+	var kinds := add_cvar("zz_special_kinds", ",".join(config.special_kinds),
+		"Which specials the director sends, comma separated (empty: all of %s)" % ", ".join(ZzNpcs.SPECIALS))
+	if kinds != null:
+		kinds.changed.connect(func(_old: String, now: String) -> void:
+			var wanted := PackedStringArray()
+			for part in now.split(",", false):
+				if ZzNpcs.SPECIALS.has(StringName(part.strip_edges())):
+					wanted.append(part.strip_edges())
+			config.special_kinds = wanted
+			log_info("a tunable changed", {"cvar": "zz_special_kinds", "now": ",".join(wanted)}))
 	_tunable("zz_brute_min", config.brute_interval_min, "Seconds between brutes, from (0 with zz_brute_max 0: never)",
 		func(value: float) -> void: config.brute_interval_min = clampf(value, 0.0, config.brute_interval_max))
 	_tunable("zz_brute_max", config.brute_interval_max, "Seconds between brutes, to",
@@ -401,6 +430,17 @@ func _add_tunables(world: ZzGame) -> void:
 	# (-1..1 or a level), `npc_reaction_scale`, `npc_reaction_min`.
 	if world.horde != null:
 		var _bound := world.horde.skill.bind_cvars(add_cvar)
+
+
+## Writes [param key] into the live catalogue's definition of [param kind], if there is one yet.
+func _set_meta(world: ZzGame, kind: StringName, key: String, value: float) -> void:
+	if world.horde == null or world.horde.catalogue == null:
+		return
+
+	var def := world.horde.catalogue.get_npc(kind)
+
+	if def != null:
+		def.meta[key] = value
 
 
 func _apply_friendly_fire(world: ZzGame) -> void:

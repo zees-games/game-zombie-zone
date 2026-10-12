@@ -49,8 +49,16 @@ var _flying: Dictionary = {}
 ## [node, seconds left, light]
 var _blasts: Array = []
 
-## victim player node -> {holder: Node3D, line: MeshInstance3D}
+## victim player node -> {holder: Node3D, segments: [MeshInstance3D], knot: MeshInstance3D}
 var _tongues: Dictionary = {}
+
+## Pieces a tongue is drawn in, along its sag.
+const TONGUE_SEGMENTS := 10
+
+## The special holding the person whose eyes these are, drawn in front of them (see [method pin]).
+var _lens_holder: Node3D = null
+var _lens_victim: Node3D = null
+var _lens_view: Node3D = null
 
 var _rng := RandomNumberGenerator.new()
 var _materials: Dictionary = {}
@@ -102,6 +110,9 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	if not killed or view == null or not is_instance_valid(view):
 		if body != null and is_instance_valid(body):
 			body.queue_free()
+		# A holder drawn at the lens hangs off this node, not the body, and goes with it.
+		if view != null and is_instance_valid(view) and view.get_parent() == self:
+			view.queue_free()
 		return
 
 	if audio != null and old_body != null and is_instance_valid(old_body):
@@ -110,10 +121,19 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	# The view outlives the body: offline the server's body is freed this frame, so the view is
 	# moved out to here and left playing its death.
 	var keep := view.global_transform
+	var death: Variant = old_body.get(&"death") if old_body != null and is_instance_valid(old_body) else null
 	view.get_parent().remove_child(view)
 	add_child(view)
 	view.global_transform = keep
 	_corpses.append([view, CORPSE_SECONDS])
+
+	# The server's pick of how it falls (dot-player-char's reactions); a body nobody was told
+	# about drops where it stands.
+	if death is DotPlayerDeath:
+		var d := death as DotPlayerDeath
+		view.die(d.reaction, d.direction * clampf(d.damage / 40.0, 0.6, 2.2), d.roll_seed)
+	else:
+		view.die(&"limp", Vector3.ZERO, 0)
 
 	if body != null and is_instance_valid(body):
 		body.queue_free()
@@ -373,8 +393,14 @@ func blast(at: Vector3, radius: float, kind: StringName) -> void:
 
 # --- Tongues ------------------------------------------------------------------
 
-## [param victim] is held by [param holder]: a choke draws a tongue between them.
-func pin(victim: Node3D, holder: Node3D, kind: StringName) -> void:
+## [param victim] is held by [param holder]: a choke draws a tongue between them, and a holder
+## on the person whose eyes these are ([param at_lens]) is drawn in front of them.
+##
+## [b]A leaper or a rider on you is drawn where you can see it.[/b] The server puts it on top of
+## you, which is right for everybody else and puts its body round your camera: the first play
+## test saw "two black polygons" (the inside of its mesh) and never knew what had it. So for the
+## victim alone its picture stands just in front of the lens, facing them, clawing.
+func pin(victim: Node3D, holder: Node3D, kind: StringName, at_lens: bool = false) -> void:
 	unpin(victim)
 
 	if victim == null or holder == null:
@@ -383,27 +409,71 @@ func pin(victim: Node3D, holder: Node3D, kind: StringName) -> void:
 	if audio != null:
 		var _call := audio.at(ZzAudio.CALL_HELP, victim.global_position)
 
+	if at_lens and (kind == &"pounce" or kind == &"ride"):
+		_lens_holder = holder
+		_lens_victim = victim
+		# Out from under the body: the camera fade hides whatever hangs off a collider at the
+		# lens, and the body is exactly there.
+		_lens_view = holder.get_node_or_null(^"View") as Node3D
+		if _lens_view != null:
+			_lens_view.reparent(self, true)
+
 	if kind != &"choke":
 		return
 
-	var line := MeshInstance3D.new()
-	line.name = "Tongue"
-	var cylinder := CylinderMesh.new()
-	cylinder.top_radius = 0.035
-	cylinder.bottom_radius = 0.035
-	cylinder.height = 1.0
-	line.mesh = cylinder
-	line.material_override = _material(Color(0.55, 0.12, 0.15))
-	add_child(line)
-	_tongues[victim] = {"holder": holder, "line": line}
+	var segments: Array[MeshInstance3D] = []
+	var flesh := _material(Color(0.86, 0.36, 0.44))
+
+	for i in TONGUE_SEGMENTS:
+		var piece := MeshInstance3D.new()
+		piece.name = "Tongue%d" % i
+		var cylinder := CylinderMesh.new()
+		var f := float(i) / float(TONGUE_SEGMENTS)
+		cylinder.top_radius = lerpf(0.08, 0.045, f)
+		cylinder.bottom_radius = lerpf(0.085, 0.05, f)
+		cylinder.height = 1.0
+		cylinder.radial_segments = 6
+		cylinder.rings = 1
+		piece.mesh = cylinder
+		piece.material_override = flesh
+		add_child(piece)
+		segments.append(piece)
+
+	# The tip wrapped round them: a knot of tongue at their chest.
+	var knot := MeshInstance3D.new()
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.2
+	torus.outer_radius = 0.28
+	torus.rings = 10
+	torus.ring_segments = 6
+	knot.mesh = torus
+	knot.material_override = flesh
+	add_child(knot)
+	_tongues[victim] = {"holder": holder, "segments": segments, "knot": knot}
 
 
 func unpin(victim: Node3D) -> void:
 	var entry: Variant = _tongues.get(victim)
 	_tongues.erase(victim)
 
-	if entry != null and is_instance_valid((entry as Dictionary)["line"]):
-		((entry as Dictionary)["line"] as Node).queue_free()
+	if entry != null:
+		for piece: Node in (entry as Dictionary)["segments"]:
+			if is_instance_valid(piece):
+				piece.queue_free()
+		if is_instance_valid((entry as Dictionary)["knot"]):
+			((entry as Dictionary)["knot"] as Node).queue_free()
+
+	if victim != _lens_victim:
+		return
+
+	if _lens_view != null and is_instance_valid(_lens_view) and _lens_view.get_parent() == self:
+		if _lens_holder != null and is_instance_valid(_lens_holder):
+			_lens_view.reparent(_lens_holder, false)
+			_lens_view.transform = Transform3D.IDENTITY
+
+	_lens_holder = null
+	_lens_victim = null
+	_lens_view = null
 
 
 # --- The frame ---------------------------------------------------------------------
@@ -416,6 +486,7 @@ func present(delta: float, listener: Vector3) -> void:
 	_present_flying(delta)
 	_present_blasts(delta)
 	_present_tongues()
+	_present_lens_holder()
 
 
 func _present_zombies(delta: float, listener: Vector3) -> void:
@@ -430,6 +501,14 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 
 		var anim := int(body.get(&"anim"))
 		var flags := int(body.get(&"flags"))
+
+		# Hit: a flinch over whatever it is doing, from the health the snapshot carries.
+		var health := float(body.get(&"health"))
+		var was := float(entry.get("health", health))
+		entry["health"] = health
+		if health < was - 0.5 and health > 0.0:
+			view.flinch(-1.0 if (int(health) & 1) == 0 else 1.0)
+
 		view.present(delta, anim, flags)
 
 		if audio == null:
@@ -455,7 +534,8 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 				ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.PIN:
 					var _c := audio.at(ZzAudio.CLAW, at)
 				ZzZombieBody.Anim.LEAP, ZzZombieBody.Anim.CHARGE, ZzZombieBody.Anim.VOMIT, \
-						ZzZombieBody.Anim.SPIT, ZzZombieBody.Anim.TONGUE, ZzZombieBody.Anim.THROW:
+						ZzZombieBody.Anim.SPIT, ZzZombieBody.Anim.TONGUE, ZzZombieBody.Anim.THROW, \
+						ZzZombieBody.Anim.SCREAM, ZzZombieBody.Anim.GRAB:
 					var _v := audio.special_voice(entry["kind"], at)
 
 		entry["next_moan"] = float(entry["next_moan"]) - delta
@@ -563,23 +643,75 @@ func _present_tongues() -> void:
 	for victim: Node3D in _tongues.keys():
 		var entry: Dictionary = _tongues[victim]
 		var holder: Node3D = entry["holder"]
-		var line: MeshInstance3D = entry["line"]
 
-		if not is_instance_valid(victim) or not is_instance_valid(holder) or not is_instance_valid(line):
+		if not is_instance_valid(victim) or not is_instance_valid(holder):
 			unpin(victim)
 			continue
 
-		var from := holder.global_position + Vector3(0.0, 1.7, 0.0)
-		var to := victim.global_position + Vector3(0.0, 1.2, 0.0)
+		var view := holder.get_node_or_null(^"View")
+		var from: Vector3 = view.call(&"mouth") if view != null and view.has_method(&"mouth") else holder.global_position + Vector3(0.0, 1.7, 0.0)
+		var to := victim.global_position + Vector3(0.0, 1.15, 0.0)
 		var length := from.distance_to(to)
 
 		if length < 0.05:
 			continue
 
-		line.global_position = (from + to) * 0.5
-		var up := (to - from) / length
-		var side := up.cross(Vector3.FORWARD) if absf(up.dot(Vector3.FORWARD)) < 0.95 else up.cross(Vector3.RIGHT)
-		line.global_basis = Basis(side.normalized(), up, side.normalized().cross(up)).scaled(Vector3(1.0, length, 1.0))
+		# A tongue sags between the two, more the slacker it is (a short one is pulled tight).
+		var sag := clampf(length * 0.06, 0.05, 0.9)
+		var points: Array[Vector3] = []
+		var count: int = (entry["segments"] as Array).size()
+
+		for i in count + 1:
+			var f := float(i) / float(count)
+			points.append(from.lerp(to, f) + Vector3.DOWN * sag * 4.0 * f * (1.0 - f))
+
+		for i in count:
+			var piece: MeshInstance3D = entry["segments"][i]
+			_stretch(piece, points[i], points[i + 1])
+
+		var knot: MeshInstance3D = entry["knot"]
+		knot.global_position = to + Vector3.DOWN * 0.1
+
+
+## Lays a unit-tall cylinder from [param a] to [param b].
+static func _stretch(piece: MeshInstance3D, a: Vector3, b: Vector3) -> void:
+	var length := a.distance_to(b)
+
+	if length < 0.001:
+		return
+
+	var up := (b - a) / length
+	var side := up.cross(Vector3.FORWARD) if absf(up.dot(Vector3.FORWARD)) < 0.95 else up.cross(Vector3.RIGHT)
+	piece.global_transform = Transform3D(Basis(side.normalized(), up, side.normalized().cross(up)).scaled(Vector3(1.0, length * 1.08, 1.0)), (a + b) * 0.5)
+
+
+## The holder at the lens, put where the victim can see it: a step in front, facing them.
+func _present_lens_holder() -> void:
+	if _lens_holder == null:
+		return
+
+	if not is_instance_valid(_lens_holder) or _lens_view == null or not is_instance_valid(_lens_view) \
+			or _lens_view.get_parent() != self:
+		_lens_holder = null
+		return
+
+	var view := _lens_view
+	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
+
+	if view == null or camera == null:
+		return
+
+	var forward := -camera.global_basis.z
+	forward.y = 0.0
+
+	if forward.length() < 0.01:
+		return
+
+	forward = forward.normalized()
+	var tall := float((view.call(&"describe") as Dictionary).get("height", 1.6)) if view.has_method(&"describe") else 1.6
+	var at := camera.global_position + forward * 1.15 + Vector3.DOWN * tall * 0.82
+	view.global_position = at
+	view.look_at(Vector3(camera.global_position.x, at.y, camera.global_position.z), Vector3.UP)
 
 
 # --- Making things ----------------------------------------------------------------
@@ -648,6 +780,8 @@ func clear() -> void:
 	_flying.clear()
 	for victim: Node3D in _tongues.keys():
 		unpin(victim)
+	if _lens_victim != null:
+		unpin(_lens_victim)
 
 
 func describe() -> Dictionary:

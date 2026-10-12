@@ -27,7 +27,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 14
-const CHECKS := 67
+const CHECKS := 69
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -148,7 +148,13 @@ func _test_the_codec() -> void:
 		and (npc["at"] as Vector3).distance_to(Vector3(3.5, 0.0, -12.25)) < 0.05, "NPC", str(npc))
 
 	var gone := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(77, true)))
-	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]), "NPC_GONE")
+	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]) and gone["death"] == null, "NPC_GONE")
+	var fall := DotPlayerDeath.decide(DotPlayerDeathReactions.stock(), true, 120.0, Vector3(0, 0, -1), 4242)
+	var fell := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(78, true, fall)))
+	var told: DotPlayerDeath = fell["death"]
+	_check(bool(fell["ok"]) and told != null and told.reaction == fall.reaction and told.roll_seed == 4242
+		and told.direction.distance_to(Vector3(0, 0, -1)) < 0.05 and told.headshot,
+		"NPC_GONE with how it fell", String(told.reaction) if told != null else "-")
 
 	var pin := ZzEvents.read_pin(_r(ZzEvents.write_pin(SESSION, 77, &"choke")))
 	_check(bool(pin["ok"]) and int(pin["player_id"]) == SESSION and int(pin["npc"]) == 77 and pin["kind"] == &"choke", "PIN")
@@ -266,8 +272,8 @@ func _build() -> bool:
 		_heard["npc"] = [net_id, kind, body])
 	_client_bridge.hit_received.connect(func(victim: int, amount: float, _point: Vector3, killed: bool, _head: bool) -> void:
 		(_heard.get_or_add("hits", []) as Array).append([victim, amount, killed]))
-	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, _body: Node3D) -> void:
-		_heard["npc_gone"] = [net_id, killed])
+	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
+		_heard["npc_gone"] = [net_id, killed, body.get(&"death") if body != null else null])
 	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
 		_heard["down"] = who)
 	_client_bridge.revived_received.connect(func(who: int, _by: int) -> void:
@@ -506,6 +512,8 @@ func _test_zombies_replicate() -> void:
 		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
 	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
 		"killed, and the client is told it died rather than went away")
+	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
+		"and how it fell, for its body to fall that way")
 	_finished()
 
 

@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://chw8q20ib0s75"
-path="res://.godot/imported/body_small.glb-0d0245f623176bd1658bd10b19a4f092.scn"
+uid="uid://euigt1qcd3cg"
+path="res://.godot/imported/zombie_lis.glb-b9712cd1139c10bea61c899c98207e63.scn"
 
 [deps]
 
-source_file="res://assets/zombies/body_small.glb"
-dest_files=["res://.godot/imported/body_small.glb-0d0245f623176bd1658bd10b19a4f092.scn"]
+source_file="res://assets/zombies/zombie_lis.glb"
+dest_files=["res://.godot/imported/zombie_lis.glb-b9712cd1139c10bea61c899c98207e63.scn"]
 
 [params]
 
@@ -41,5 +41,5 @@ materials/extract_format=0
 materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
-gltf/embedded_image_handling=1
+gltf/embedded_image_handling=0
 gltf/texture_map_mode=1

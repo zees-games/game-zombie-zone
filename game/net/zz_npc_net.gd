@@ -63,6 +63,7 @@ func _net_state_applied(_tick: int) -> void:
 	if body != null and identity != null and not identity.is_authoritative:
 		body.anim = net_anim
 		body.flags = net_flags
+		body.health = float(net_health)
 
 
 func _net_interpolated(_tick: int) -> void:

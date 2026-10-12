@@ -1265,7 +1265,7 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 		ZzEvents.Kind.NPC_GONE:
 			var gone := ZzEvents.read_npc_gone(reader)
 			if bool(gone["ok"]):
-				_drop_zombie_mirror(int(gone["net_id"]), bool(gone["killed"]))
+				_drop_zombie_mirror(int(gone["net_id"]), bool(gone["killed"]), gone["death"])
 		ZzEvents.Kind.DOWN:
 			var down := ZzEvents.read_death(reader)
 			if bool(down["ok"]):
@@ -1408,7 +1408,9 @@ func _on_zombie_removed(npc: DotNpcInstance, _reason: StringName) -> void:
 
 	var net_id := behaviour.identity.net_id
 	_unregister(net_id)
-	_broadcast(ZzEvents.Kind.NPC_GONE, ZzEvents.write_npc_gone(net_id, killed))
+	var body := npc.node as ZzZombieBody
+	var death: DotPlayerDeath = body.death if killed and body != null and is_instance_valid(body) else null
+	_broadcast(ZzEvents.Kind.NPC_GONE, ZzEvents.write_npc_gone(net_id, killed, death))
 
 
 ## A client's copy of a zombie: the same scene, no brain, moved by its net behaviour.
@@ -1459,7 +1461,7 @@ func _mirror_zombie(info: Dictionary) -> void:
 	npc_added.emit(net_id, body.kind, body.variant, body)
 
 
-func _drop_zombie_mirror(net_id: int, killed: bool) -> void:
+func _drop_zombie_mirror(net_id: int, killed: bool, death: DotPlayerDeath = null) -> void:
 	var behaviour: ZzNpcNet = _zombie_mirrors.get(net_id)
 	_zombie_mirrors.erase(net_id)
 
@@ -1474,6 +1476,7 @@ func _drop_zombie_mirror(net_id: int, killed: bool) -> void:
 	# A killed zombie's body stays a moment, for the client to drop it; the client frees it.
 	if body != null and is_instance_valid(body):
 		behaviour.queue_free()
+		body.death = death
 		npc_removed.emit(net_id, killed, body)
 
 		if not killed:

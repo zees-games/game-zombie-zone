@@ -594,7 +594,8 @@ func _draw_use() -> void:
 	_use_label.text = text
 
 	if player.is_pinned():
-		_held.text = {&"pounce": "POUNCED", &"choke": "TONGUED", &"carry": "CARRIED", &"ride": "RIDDEN"}.get(player.pin_kind, "HELD") \
+		_held.text = "GRABBED — shoot it, or a friend can shove it off" if player.pin_kind == &"grab" \
+			else {&"pounce": "POUNCED", &"choke": "TONGUED", &"carry": "CARRIED", &"ride": "RIDDEN"}.get(player.pin_kind, "HELD") \
 			+ " — your team has to free you"
 		_held.visible = true
 	else:

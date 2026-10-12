@@ -1,6 +1,6 @@
 # game-zombie-zone
 
-A co-operative zombie shooter: a team of survivors crosses a map from safe room to safe room (or holds a survival map for its clock) against a directed horde, eight kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
+A co-operative zombie shooter: a team of survivors crosses a map from safe room to safe room (or holds a survival map for its clock) against a directed horde, eleven kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
 
 Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it (dot-npc, dot-npc-ai and dot-npc-ai-director most of all). This file is only about what this game decides. The maps are in `maps/`, a link to [zombie-zone-maps](../zombie-zone-maps), written by its `tools/build_maps.py`; `maps/README.md` there is the format.
 
@@ -16,9 +16,9 @@ game/
   zz_map_doc.gd      what a map IS: boxes, props, lights, spawns, safe areas, route, nav, items, objectives
   zz_map.gd          a document built: solid boxes, gates as separate bodies, props, areas
   zz_catalogue.gd    every map the server has, and the built-in practice street
-  zz_npcs.gd         the zombie catalogue (nine kinds), and the nav graph a map's document gives
+  zz_npcs.gd         the zombie catalogue (twelve kinds), and the nav graph a map's document gives
   zz_horde.gd        the horde: spawner, director, senses, squads, sounds; mobs, specials, brutes, sleepers
-  zz_pins.gd         being held: pounce, choke, carry, ride
+  zz_pins.gd         being held: pounce, choke, carry, ride, grab
   zz_hazards.gd      acid, fire, healing zones; spit, rocks, pipe bombs, shells, molotovs in flight
   zz_loot.gd         what lies on the ground and what using it does
   zz_boxes.gd        the boxes: boxes/boxes.json read and checked, ~40 verbs, stacking effects
@@ -30,12 +30,14 @@ game/
   zz_hud.gd zz_world_view.gd zz_client.gd zz_audio.gd   what a person sees and hears
   zz_module.gd       the DotGameModule: cvars, console and admin commands, stand-ins
   net/               the codec (NPC, PIN, LOOT, BOX, HAZARD, BLAST...), player and zombie behaviours, the bridge
-npcs/                the zombie body, its view, and one brain script per kind (by path)
+npcs/                the zombie body, its view (the animated models), and one brain script per kind (by path)
+assets/zombies/      the seven animated bodies (built by tools/build_zombie_models.py) and the kit's three atlases
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured), pieces.json (each prop's collision pieces, dot-props' DotPropPieces; tools/measure_props.gd writes both, about four minutes)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (126), headless_maps (61), headless_net (67), headless_weapons (17), dedicated (59)
-tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
+examples/            headless_run (154), headless_maps (61), headless_net (69), headless_weapons (17), dedicated (66)
+tools/               shot.sh/.gd (render a view), zombie_rack.gd (contact sheets, horde cost), zombie_palette.gd,
+                     build_zombie_models.py (Blender), audio_probe
 ```
 
 ## Decision 1: the zombies are the server's, and a client draws them
@@ -79,6 +81,17 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 
 `ZzBots` drives a survivor with the same commands a person sends, in priority order: a pinned friend, a downed friend, a threat (or a shove when crowded), pills or a medkit, reload, something better on the ground, the objective, then the route. **A stand-in holds its fire when a friend is in the line** (`_friend_in_the_way`): before that, four of them bunched in the start room's doorway shot each other down three times in a minute with friendly fire on. A semi-automatic is fired by pulsing the trigger, or a pistol fires once. They exist to fill a server and to let `headless_run` and `dedicated` play a map; they are not meant to be clever. **How they aim and shoot is dot-bot's `DotBotAim`** (one per stand-in, on `DotBotSettings.of(game)`): the view turns at `bot_turn_rate` (walking too), a new zombie is engaged with `bot_reaction` before the first shot and `bot_aim_error` that settles, and `bot_difficulty` moves them with every other game's bots. Never set `command.yaw` straight onto a target.
 
+## Decision 8: the zombies are an animated kit, shaped and dressed in the view
+
+Every zombie is one of seven skinned bodies from Quaternius' CC0 Zombie Apocalypse Kit (`assets/zombies/`, built by `tools/build_zombie_models.py`, which is the source: download the kit, run it in Blender), drawn by `npcs/zz_zombie_view.gd` from the body's replicated `kind`, `variant`, `anim`, `flags` and `health`. A common's variant picks body, skin, clothes, height and where its blood is; a special is a body reshaped by its bones (own-size scales, `shape_scales`) and wearing what nobody else does. One surface and one draw call per zombie, a material per look shared by every zombie with it, animation stepped less often with distance, LOD bias 0.4, culled past 120 m. A death is a dot-player-char reaction the server picks (`ZzHorde.decide_death`, sent last in NPC_GONE) and the view animates. Reasoning and the traps: [docs/zombies.md](docs/zombies.md).
+
+- After rebuilding a GLB run `godot --headless --path . --import` before anything renders it: a stale import drew every zombie in the old mesh, without its vertex colours. [history](docs/history.md)
+- The palette shader samples like a StandardMaterial3D (`source_color`) and matches a swap in both colour spaces; converting by hand drew every zombie near black at night. [history](docs/history.md)
+- A survivor body plays zombie_basic's clips through `_retarget` (onto its own rest pose); played raw they bend it double. [zombies](docs/zombies.md#one-rig-two-rest-poses)
+- An attachment's offset is in the body's axes from the bone's joint (`_attach`), never the bone's own axes. [zombies](docs/zombies.md#what-a-special-wears)
+- `ZzZombieBody.Anim` is replicated in 5 bits: append, never insert, and stop at 31.
+- `WEARS` colours come from `tools/zombie_palette.gd`, measured in Godot against the body's own atlas (the kit ships three).
+
 ## The HUD: dot-ui's glance pieces
 
 `zz_hud.gd` draws health as a `DotVitals` (borrowed health as its `bonus`, white after the real fill; DOWN and DEAD as its `status`, all in the low colour; red at the limp line), the weapon as a `DotAmmoCounter` (an endless reserve as ∞, low at a quarter of a magazine), a hold-out's time left or a survival map's time held as a `DotScoreStrip` clock under the title, the medkit and pills as `DotKeyHints` rows with their bound keys, and confirmed hits as `DotHitMarker` and `DotDamageNumbers`. **The number is real health, not real plus borrowed**: borrowed health drains, and a number that included it would fall while nobody was hitting you; the white length says what is borrowed. **A hit is drawn only from the server's confirmation**: `ZzGame.hit_landed` (a survivor's damage applied to a zombie; never friendly fire, never the world's), sent to the shooter alone as a HIT event, connected straight to the world offline. The health plate ends 206 pixels off the bottom, above the chat box's full eight-row log (202). Colours from `ZzHud.piece_theme()`; `tools/shot.sh --view=hit --spawn=common:6` renders the marker, a number, borrowed health and a hold-out clock. Naming these classes makes the pack need a client shell with dot-ui API level 4; the derived `requires.json` asks for it and `headless_run` checks it.
@@ -115,6 +128,11 @@ tools/camera_check.sh --render                          # cameras round the stre
 tools/shot.sh --view=survivor --spawn=common:12
 tools/shot.sh --view=third --spawn=brute:1,leaper:1
 tools/shot.sh --view=pinned --pin=choke
+tools/shot.sh --view=pinned --pin=ride --pin-me                  # a holder drawn in front of its victim's lens
+xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --kinds=screamer,crawler,riot   # contact sheet: idle/walk/run/attack/stagger/death
+xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=commons --first=0          # five common variants
+xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=deaths --at=2              # every death reaction over time
+xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=horde --at=5               # sixty commons: draw calls, frame, per-zombie cost
 tools/shot.sh --view=down
 tools/shot.sh --view=survivor --box=mystery
 tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # a fire-and-reload sheet per gun, HUD count on each tile

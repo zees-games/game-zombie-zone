@@ -125,7 +125,14 @@ func drive(_delta: float) -> void:
 func _decide(player, command: DotFpsCommand) -> void:
 	var memory := _memory(player)
 
+	if player.is_pinned() and player.pin_kind != &"grab":
+		return
+
+	# Grabbed by the ankle: shoot what holds you.
 	if player.is_pinned():
+		var holder = _threat(player)
+		if holder != null:
+			_aim_at(player, command, holder)
 		return
 
 	# Down: shoot whatever is closest, which is all a downed survivor can do.

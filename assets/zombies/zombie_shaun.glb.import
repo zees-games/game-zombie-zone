@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://uaiw67aouiqe"
-path="res://.godot/imported/body_male.glb-bb56659f3d4eaafcf94e48f583e97e7d.scn"
+uid="uid://df2orma2kk2uf"
+path="res://.godot/imported/zombie_shaun.glb-992b425439178cb722ca3a6240defd7c.scn"
 
 [deps]
 
-source_file="res://assets/zombies/body_male.glb"
-dest_files=["res://.godot/imported/body_male.glb-bb56659f3d4eaafcf94e48f583e97e7d.scn"]
+source_file="res://assets/zombies/zombie_shaun.glb"
+dest_files=["res://.godot/imported/zombie_shaun.glb-992b425439178cb722ca3a6240defd7c.scn"]
 
 [params]
 
@@ -41,5 +41,5 @@ materials/extract_format=0
 materials/extract_path=""
 _subresources={}
 gltf/naming_version=2
-gltf/embedded_image_handling=1
+gltf/embedded_image_handling=0
 gltf/texture_map_mode=1

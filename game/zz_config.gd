@@ -178,6 +178,18 @@ extends DotConfig
 ## Which specials may spawn, by id. Empty means all of them.
 @export var special_kinds: PackedStringArray = PackedStringArray()
 
+## Commons a screamer's scream sends at whoever it saw (before survival's growth).
+@export_range(0, 100, 1) var screamer_mob: int = 10
+
+## Seconds between one screamer's screams.
+@export_range(4.0, 120.0, 1.0) var screamer_cooldown: float = 20.0
+
+## What a crawler's hold on an ankle does a second, on normal.
+@export_range(0.0, 50.0, 0.5) var crawler_grab_dps: float = 6.0
+
+## The share of a hit on a riot zombie's shield that gets through (0 none, 1 all of it).
+@export_range(0.0, 1.0, 0.01) var riot_shield: float = 0.1
+
 ## Seconds between brutes, from and to, on a campaign map. 0 never.
 @export_range(0.0, 3600.0, 10.0) var brute_interval_min: float = 300.0
 @export_range(0.0, 3600.0, 10.0) var brute_interval_max: float = 480.0

@@ -561,11 +561,11 @@ func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
 	var who := _player_of(session_id)
 
 	if who != null and world_view != null:
-		world_view.pin(who, holder, kind)
+		world_view.pin(who, holder, kind, session_id == _watch_id and not third_person)
 
 	if session_id == _watch_id and hud != null:
 		hud.shout({&"pounce": "POUNCED — SHOVE IT OFF", &"choke": "TONGUED — HELP!", &"carry": "CARRIED — HELP!",
-			&"ride": "RIDDEN — HELP!"}.get(kind, "HELD"), 2.0)
+			&"ride": "RIDDEN — HELP!", &"grab": "GRABBED — SHOOT IT!"}.get(kind, "HELD"), 2.0)
 
 
 func _on_unpin(session_id: int, _why: StringName) -> void:
@@ -1200,7 +1200,7 @@ func _process(delta: float) -> void:
 		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != DotFpsState.Mode.AIR, state.crouch_fraction > 0.5)
 
 	if view_model != null and is_instance_valid(view_model):
-		view_model.visible = not third_person and not player.is_pinned() and player.using == &""
+		view_model.visible = not third_person and not player.is_held()
 
 	if hud != null:
 		hud.set_prompt(_prompt())

@@ -51,6 +51,9 @@ const SPITTER := &"spitter"
 const RIDER := &"rider"
 const BRUTE := &"brute"
 const SLEEPER := &"sleeper"
+const SCREAMER := &"screamer"
+const CRAWLER := &"crawler"
+const RIOT := &"riot"
 const EXPLOSION := &"explosion"
 const SPLAT := &"splat"
 const ROCK := &"rock"
@@ -71,6 +74,7 @@ const MUSIC_BRUTE := &"music_brute"
 const SPECIAL_VOICES := {
 	&"leaper": LEAPER, &"strangler": STRANGLER, &"bloater": BLOATER, &"ram": RAM,
 	&"spitter": SPITTER, &"rider": RIDER, &"brute": BRUTE, &"sleeper": SLEEPER,
+	&"screamer": SCREAMER, &"crawler": CRAWLER, &"riot": RIOT,
 }
 
 var manager: DotAudioManager = null
@@ -133,6 +137,10 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	c.add(_placed(SPITTER, 45.0, 6.0, 2, 80, 1.0, 1.2, "slime_2"))
 	c.add(_placed(RIDER, 45.0, 6.0, 2, 80, 1.0, 1.1, "rider_laugh"))
 	c.add(_placed(BRUTE, 120.0, 14.0, 1, 95, 0.95, 1.0, "brute_roar"))
+	# The screamer is heard further than anything but the brute: its scream is the warning.
+	c.add(_placed(SCREAMER, 90.0, 10.0, 1, 90, 0.95, 1.05, "screamer_shriek"))
+	c.add(_placed(CRAWLER, 22.0, 3.0, 2, 75, 0.9, 1.1, "crawler_gurgle"))
+	c.add(_placed(RIOT, 45.0, 6.0, 2, 80, 0.9, 1.05, "riot_clank"))
 	var cry := _placed(SLEEPER, 28.0, 3.0, 1, 90, 0.95, 1.05, "sleeper_cry")
 	cry.looping = true
 	c.add(cry)

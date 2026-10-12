@@ -6,8 +6,8 @@ const ZzPaths := preload("zz_paths.gd")
 
 ## What can come at you, and the ground it walks on.
 ##
-## [b]Nine kinds, and only one is the crowd.[/b] The common infected are most of what is ever
-## alive; the eight specials are each a different answer to "what does a team that sticks
+## [b]Twelve kinds, and only one is the crowd.[/b] The common infected are most of what is ever
+## alive; the eleven specials are each a different answer to "what does a team that sticks
 ## together and shoots straight still have to fear", which is the genre's whole design:
 ##
 ## [codeblock]
@@ -21,6 +21,12 @@ const ZzPaths := preload("zz_paths.gd")
 ## rider      leaps onto a head and steers its victim away from help.
 ## brute      the boss. Throws a rock, then a car's worth of fists; you shoot it together.
 ## sleeper    sits crying in the dark. Leave her alone.
+## screamer   keeps its distance and screams: a mob comes for whoever it saw. Thin, quick to kill,
+##            and the one to shoot first.
+## crawler    no legs, flat on the ground, slow; grabs the ankle of whoever walks past and holds
+##            them in place, gnawing, until somebody shoves it off (the victim can still shoot).
+## riot       a common in riot gear: a shield in front that a bullet barely gets through, so it
+##            walks into the team's fire. Shot from the side or behind, or shoved round.
 ## [/codeblock]
 ##
 ## [b]Every number here is a default the catalogue carries in `meta`.[/b] A brain reads its
@@ -41,10 +47,13 @@ const SPITTER := &"spitter"
 const RIDER := &"rider"
 const BRUTE := &"brute"
 const SLEEPER := &"sleeper"
+const SCREAMER := &"screamer"
+const CRAWLER := &"crawler"
+const RIOT := &"riot"
 
 ## The specials the director chooses between. Not the brute (its own clock) or the sleeper
 ## (placed by the map).
-const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER]
+const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT]
 
 const FACTION := &"infected"
 
@@ -58,6 +67,9 @@ static var SPITTER_BRAIN := ZzPaths.rebase("res://npcs/zz_spitter_brain.gd")
 static var RIDER_BRAIN := ZzPaths.rebase("res://npcs/zz_rider_brain.gd")
 static var BRUTE_BRAIN := ZzPaths.rebase("res://npcs/zz_brute_brain.gd")
 static var SLEEPER_BRAIN := ZzPaths.rebase("res://npcs/zz_sleeper_brain.gd")
+static var SCREAMER_BRAIN := ZzPaths.rebase("res://npcs/zz_screamer_brain.gd")
+static var CRAWLER_BRAIN := ZzPaths.rebase("res://npcs/zz_crawler_brain.gd")
+static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
 
 
 static func is_special(kind: StringName) -> bool:
@@ -70,7 +82,7 @@ static func catalogue(config: ZzConfig = null) -> DotNpcCatalogue:
 	out.meta = {"game": "zombiezone"}
 
 	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c)]:
+			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)]:
 		var added := out.add(_eyes(def))
 
 		if not added.ok:
@@ -262,6 +274,50 @@ static func _sleeper(c: ZzConfig) -> DotNpcDef:
 		"damage": 100.0, "reach": 1.7, "attack_interval": 1.0,
 		"startle_near": 7.0, "startle_seconds": 3.0, "flee_seconds": 10.0,
 		"body": "sleeper", "radius": 0.3, "height": 1.6,
+	}
+	return def
+
+
+## Thin and quick to kill; what it does is call the horde. Health is low on purpose: it is the
+## special a team wins by noticing, not by emptying a magazine into.
+static func _screamer(c: ZzConfig) -> DotNpcDef:
+	var def := _def(SCREAMER, "Screamer", SCREAMER_BRAIN, 90.0 * c.special_health_scale(), 5.4, 3, DotNpcDef.Weight.LIGHT)
+	def.sight_range = 55.0
+	def.sight_half_angle_deg = 100.0
+	def.hearing_range = 20.0
+	def.meta = {
+		"damage": 3.0, "reach": 1.5, "attack_interval": 1.0,
+		"scream_range": 35.0, "scream_min": 9.0, "scream_seconds": 1.6, "scream_cooldown": c.screamer_cooldown,
+		"scream_mob": c.screamer_mob,
+		"body": "screamer", "radius": 0.28, "height": 2.0,
+	}
+	return def
+
+
+## Low enough that a shot over the crowd's heads misses it, and slow; its danger is where it
+## lies, not how fast it comes.
+static func _crawler(c: ZzConfig) -> DotNpcDef:
+	var def := _def(CRAWLER, "Crawler", CRAWLER_BRAIN, 150.0 * c.special_health_scale(), 2.6, 3, DotNpcDef.Weight.LIGHT)
+	def.sight_range = 25.0
+	def.sight_half_angle_deg = 120.0
+	def.hearing_range = 14.0
+	def.meta = {
+		"damage": 4.0, "reach": 1.3, "attack_interval": 1.0,
+		"grab_reach": 1.5, "pin_dps": c.crawler_grab_dps, "grab_cooldown": 6.0, "lunge_speed": 4.5,
+		"body": "crawler", "radius": 0.34, "height": 0.75,
+	}
+	return def
+
+
+## Walks into fire behind a shield (`shield` is the share of a frontal hit that gets through).
+static func _riot(c: ZzConfig) -> DotNpcDef:
+	var def := _def(RIOT, "Riot", RIOT_BRAIN, 260.0 * c.special_health_scale(), 4.4, 3, DotNpcDef.Weight.HEAVY)
+	def.sight_range = 40.0
+	def.sight_half_angle_deg = 90.0
+	def.hearing_range = 18.0
+	def.meta = {
+		"damage": 9.0, "reach": 1.6, "attack_interval": 1.1, "shield": c.riot_shield,
+		"body": "riot", "radius": 0.36, "height": 1.85,
 	}
 	return def
 

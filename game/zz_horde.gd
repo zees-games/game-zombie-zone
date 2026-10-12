@@ -89,6 +89,13 @@ var zombie_speed_scale: float = 1.0
 ## Gates opened this map, so the graph is rebuilt without them.
 var open_gates: PackedStringArray = PackedStringArray()
 
+## How a zombie falls when it dies: dot-player-char's reactions, picked here on the server from
+## the killing hit and sent with the zombie's end (NPC_GONE), so every screen draws the same fall.
+var death_reactions: DotPlayerDeathReactions = DotPlayerDeathReactions.stock()
+
+## Screams heard this map, for a suite and `describe`.
+var screams: int = 0
+
 var _world: Node3D = null
 var _by_entity: Dictionary = {}
 var _candidates: Array = []
@@ -659,6 +666,28 @@ func spread_alert(npc: DotNpcInstance, who: StringName, where: Vector3) -> void:
 		_alerts.append([other.instance_id, _time + 0.12 + gap * 0.05 + _rng.randf() * 0.25, who, where])
 
 
+## A screamer screamed: everything idle within twice the alert radius wakes, and a mob of
+## [param size] comes for [param victim] from out of sight. Returns the mob's size.
+func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
+	if spawner == null or npc == null or not npc.is_alive():
+		return 0
+
+	screams += 1
+
+	for other in spawner.npcs_near(npc.position(), ALERT_RADIUS * 2.0):
+		if other != npc and other.def.id == ZzNpcs.COMMON and other.brain != null:
+			var gap := other.position().distance_to(npc.position())
+			_alerts.append([other.instance_id, _time + 0.1 + gap * 0.03, victim, survivor_position(victim)])
+
+	var grown := size
+
+	if survival_elapsed >= 0.0:
+		grown = int(round(float(size) * (1.0 + survival_elapsed / 480.0)))
+
+	DotLog.debug(CHANNEL, "a scream", {"victim": String(victim), "mob": grown})
+	return spawn_mob(maxi(int(round(float(grown) * mob_size_scale)), 0), victim)
+
+
 func _land_alerts() -> void:
 	if _alerts.is_empty():
 		return
@@ -1150,6 +1179,20 @@ func _register_combat(npc: DotNpcInstance) -> void:
 	chest.position = Vector3(0.0, height * 0.41, 0.0)
 	set_node.add_child(chest)
 
+	# A riot zombie's shield: a hitbox of its own in front of it, nearer the gun than its body,
+	# so a frontal shot stops there (nearest entry wins in dot-combat) and does `shield` of its
+	# damage. From the side or behind, the body is nearer and takes it all.
+	if def.meta.has("shield"):
+		var shield := DotHitbox.new()
+		shield.name = "Shield"
+		shield.group = DotHitGroup.CHEST
+		shield.shape = DotHitbox.Shape.BOX
+		shield.half_extents = Vector3(0.36, height * 0.3, 0.05)
+		shield.position = Vector3(0.0, height * 0.5, -(radius + 0.16))
+		shield.damage_scale = clampf(float(def.meta["shield"]), 0.0, 1.0)
+		shield.precedence = 20
+		set_node.add_child(shield)
+
 	npc.node.add_child(set_node)
 	# Not optional: a set gathers its boxes on refresh, and one never refreshed has none — a
 	# zombie every shot passed through, stopped instead by its own movement capsule.
@@ -1198,7 +1241,31 @@ func _on_removed(npc: DotNpcInstance, _reason: StringName) -> void:
 func _on_died(npc: DotNpcInstance, by: StringName) -> void:
 	var health: DotHealth = npc.node.get_node_or_null(^"Health") if npc.node != null else null
 	var fatal: DotDamage = health.last_fatal if health != null else null
+	var b := npc.node as ZzZombieBody
+
+	if b != null:
+		b.death = decide_death(npc, fatal)
 	zombie_died.emit(npc, by, fatal)
+
+
+## How [param npc] falls, from the hit that killed it: a headshot or a heavy weapon may throw it,
+## anything else drops it. Seeded from the zombie and the tick, never `randf()`, so a test can
+## say what it will be.
+func decide_death(npc: DotNpcInstance, fatal: DotDamage) -> DotPlayerDeath:
+	var weapon: Object = null
+	var direction := Vector3.ZERO
+	var headshot := false
+	var amount := 0.0
+
+	if fatal != null:
+		weapon = ZzWeapons.def_of(fatal.weapon_id) if fatal.weapon_id != &"" else null
+		direction = fatal.direction
+		headshot = fatal.is_headshot()
+		amount = fatal.amount
+
+	var tick: int = game.current_tick() if game != null else 0
+	return DotPlayerDeath.decide(death_reactions, headshot, amount, direction,
+		DotPlayerDeath.seed_of(npc.seed, tick), weapon)
 
 
 ## dot-combat decided a death; dot-npc has to be told, so the brain hears it and the budget
@@ -1229,6 +1296,8 @@ func _on_damage_applied(damage: DotDamage) -> void:
 	var health: DotHealth = npc.node.get_node_or_null(^"Health")
 	if health != null:
 		npc.health = health.health
+		if npc.node is ZzZombieBody:
+			(npc.node as ZzZombieBody).health = health.health
 
 	var by: StringName = game.key_for_entity(damage.attacker)
 	npc.engaged_at = spawner.now()

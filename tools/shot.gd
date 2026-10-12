@@ -18,6 +18,7 @@ var _at := Vector3.INF
 var _look := Vector3.INF
 var _spawn: Array = []
 var _pin := &""
+var _pin_me := false
 var _box := &""
 var _client: Node = null
 var _weapons: PackedStringArray = PackedStringArray()
@@ -43,6 +44,8 @@ func _ready() -> void:
 				_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
 		elif arg.begins_with("--pin="):
 			_pin = StringName(arg.trim_prefix("--pin="))
+		elif arg == "--pin-me":
+			_pin_me = true
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--box="):
@@ -153,10 +156,13 @@ func _run() -> void:
 			return
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
-			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM, &"ride": ZzNpcs.RIDER}.get(kind, ZzNpcs.LEAPER)
-			var friend = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
-			friend.place_at(stand + Vector3(0.0, 0.0, -4.0), 180.0)
-			var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -14.0 if kind == &"choke" else -5.0)), &"shot")
+			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
+				&"ride": ZzNpcs.RIDER, &"grab": ZzNpcs.CRAWLER}.get(kind, ZzNpcs.LEAPER)
+			# --pin-me: the special takes you, which is what the lens drawing is for.
+			var friend = local if _pin_me else (game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0])
+			if not _pin_me:
+				friend.place_at(stand + Vector3(0.0, 0.0, -4.0), 180.0)
+			var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + (Vector3(3.5, 0.0, -14.0) if kind == &"choke" else Vector3(0.0, 0.0, -5.0))), &"shot")
 			await _seconds_of(0.3)
 			var _held := game.pins.pin(game.horde.entity_id_for(npc), npc, friend.player_id, kind)
 			await _seconds_of(_seconds)

@@ -32,3 +32,13 @@ Christian's first play test (video, 2:39) showed "Dart Pistol 15 / 60" from star
 - **Nothing ever corrected the drawn rig.** Connected, its count was the client's own sum for the rest of the map: an ammo pile, a box, a refused shot or the next map's fresh rig (whose reserve `arsenal.clear()` left on top of the old one: 15 / 105 against the server's 15 / 60) all left it wrong. `ZzPlayer.correct_view_rig` writes the server's count onto it once it has been quiet for `VIEW_RIG_SETTLE_SEC`, from the owner's snapshot (`ZzPlayerNet`) or, offline, from the world's rig.
 
 No suite saw it because every suite drives the world's commands itself. `headless_weapons` presses the client's own buttons (armed: without the stamp eight of its checks fail), and `headless_net`'s "a shot spends the server's magazine" builds the drawn rig a client builds (armed: without the correction three fail).
+
+## 2026-10-12: the new zombies drew red, then black, and neither was the model
+
+Replacing the Kenney bodies with the Quaternius kit, three bugs looked like art problems and were not.
+
+- **Every zombie a uniform dark red.** The palette shader puts blood where the vertex-colour noise is high, and the meshes Godot drew had no vertex colours at all, so `COLOR` read white and every pixel was blood. The GLBs had them; the import was stale (`--script` runs do not reliably re-import a changed GLB first). After it was re-imported, one body was still all blood: the kit's chubby mesh carries a white colour layer of its own, which the exporter wrote instead of the painted one. The build now removes every colour layer before painting, and `CLAUDE.md` says to `--import` after a rebuild.
+- **No colour swap ever matched.** The swap colours went in as a `vec3` array, which the GPU pads to four floats, so a `PackedVector3Array` was read skewed; and the shader compared against linear colours while the compatibility renderer handed back the atlas's stored sRGB values. The arrays are `vec4`, and a swap is matched in both spaces.
+- **Every zombie near black on a night map**, beside lit walls. The shader then converted the atlas to linear by hand, which is not what a StandardMaterial3D does on that renderer. An A/B with a StandardMaterial3D on the same bodies showed it in one frame. The shader samples with `source_color`, like the standard material, and is lit the same.
+
+And one that was an animation problem: the four survivor bodies, driven by the zombie's clips, were bent double at the waist, because a clip stores where a bone is and their rest pose is not the zombie's. `_retarget` moves each key from one rest onto the other.

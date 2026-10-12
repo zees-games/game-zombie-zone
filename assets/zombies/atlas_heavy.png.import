@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://vgbmt6cm8ydw"
-path="res://.godot/imported/skin_a.png-7992160653c23e13f83b2220e7d1e4d1.ctex"
+uid="uid://ns0bnfhfojfl"
+path="res://.godot/imported/atlas_heavy.png-d8270d701841680904ba37aad6611505.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/zombies/skin_a.png"
-dest_files=["res://.godot/imported/skin_a.png-7992160653c23e13f83b2220e7d1e4d1.ctex"]
+source_file="res://assets/zombies/atlas_heavy.png"
+dest_files=["res://.godot/imported/atlas_heavy.png-d8270d701841680904ba37aad6611505.ctex"]
 
 [params]
 

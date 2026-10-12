@@ -19,6 +19,8 @@ extends CharacterBody3D
 enum Anim {
 	IDLE, WALK, RUN, ATTACK, STAGGER, SIT, FEED, CROUCH, LEAP, PIN, VOMIT, SPIT, CHARGE, CARRY,
 	THROW, CRY, RAGE, TONGUE, DEAD, SHAMBLE,
+	# Appended, never inserted: the value is replicated in 5 bits (ZzNpcNet), so 31 is the last.
+	CRAWL, SCREAM, GRAB, BLOCK,
 }
 
 ## Bits of [member flags].
@@ -39,6 +41,14 @@ var variant: int = 0
 
 var anim: int = Anim.IDLE
 var flags: int = 0
+
+## Its health as last heard: the server's own, or a client's from the snapshot. A client's view
+## flinches when it drops.
+var health: float = -1.0
+
+## How it fell, once it is dead: decided by the server (`ZzHorde.decide_death`), sent with
+## NPC_GONE, and read by the view. Null until then, and on a client that was not told.
+var death: DotPlayerDeath = null
 
 ## The horizontal velocity the brain wants this tick.
 var wish: Vector3 = Vector3.ZERO

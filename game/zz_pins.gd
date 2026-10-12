@@ -17,6 +17,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##                                                   Freed ONLY by the ram dying.
 ## ride     the rider on their head, steering them away from help.
 ##                                                   Freed by a shove, or the rider dying.
+## grab     a crawler holding an ankle: rooted, but the gun still works.
+##                                                   Freed by a shove, or the crawler dying.
 ## [/codeblock]
 ##
 ## [b]The victim is moved by velocity, not by teleport.[/b] On the server, before the victim's
@@ -34,9 +36,10 @@ const POUNCE := &"pounce"
 const CHOKE := &"choke"
 const CARRY := &"carry"
 const RIDE := &"ride"
+const GRAB := &"grab"
 
 ## Damage over time, per kind, per second, on normal. A brain may override it in its meta.
-const DAMAGE_PER_SECOND := {POUNCE: 10.0, CHOKE: 5.0, CARRY: 13.0, RIDE: 4.0}
+const DAMAGE_PER_SECOND := {POUNCE: 10.0, CHOKE: 5.0, CARRY: 13.0, RIDE: 4.0, GRAB: 6.0}
 
 ## How close a choked survivor ends up to the strangler, and how fast they are dragged.
 const CHOKE_GAP := 1.2
@@ -199,6 +202,12 @@ func advance(delta: float) -> void:
 				body.anchored = true
 			RIDE:
 				body.global_position = at + Vector3(0.0, 1.05, 0.0)
+				body.anchored = true
+			GRAB:
+				# On the ground at their feet, facing them.
+				var toward := Vector3(at.x - body.global_position.x, 0.0, at.z - body.global_position.z)
+				if toward.length() > 0.9:
+					body.global_position = at - toward.normalized() * 0.9
 				body.anchored = true
 			CARRY:
 				pass

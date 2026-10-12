@@ -434,18 +434,31 @@ static func read_npc(r: DotNetReader) -> Dictionary:
 
 
 ## A zombie gone: [param killed] says it died rather than being tidied away, so a client can
-## leave a body.
-static func write_npc_gone(net_id: int, killed: bool) -> PackedByteArray:
+## leave a body, and [param death] (dot-player-char's, the server's pick) how that body falls.
+## The death is last and behind a flag, so a client that predates it reads the rest.
+static func write_npc_gone(net_id: int, killed: bool, death: DotPlayerDeath = null) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(net_id)
 	w.write_bool(killed)
+	w.write_bool(death != null)
+
+	if death != null:
+		death.write_to(w)
+
 	return w.to_bytes()
 
 
 static func read_npc_gone(r: DotNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	var killed := r.read_bool()
-	return {"net_id": net_id, "killed": killed, "ok": r.ok()}
+	var death: DotPlayerDeath = null
+
+	# The flag reads false off a message's zero padding, so an older server's NPC_GONE is a death
+	# with no reaction rather than a misread.
+	if r.bits_remaining() > 0 and r.read_bool():
+		death = DotPlayerDeath.read_from(r)
+
+	return {"net_id": net_id, "killed": killed, "death": death, "ok": r.ok()}
 
 
 ## A survivor held: who, by which zombie (its net id), how.

@@ -29,8 +29,13 @@ There are two kinds of map.
 | Rider | Jumps on your back and steers you away from your friends |
 | Brute | Huge, slow to kill, throws rocks, and knocks people across the street |
 | Sleeper | Sits crying in the dark. Leave her alone. If you get too close she goes for whoever woke her |
+| Screamer | Keeps its distance and screams when it sees you, and a mob comes for whoever it saw. Easy to kill, if you notice it first |
+| Crawler | Drags itself along the ground with no legs and grabs the ankle of whoever walks past. You cannot move, but you can shoot it |
+| Riot | A zombie in riot gear behind a shield that stops most of a bullet. Shoot it from the side or behind, or shove it round |
 
-Anybody pinned needs a friend: shoot what holds them or shove it off.
+Anybody pinned needs a friend: shoot what holds them or shove it off. Every special has its own shape, so you can tell what is coming from its outline, and its own sound.
+
+**The zombies are animated models**: they walk, shamble, run with their arms out, swing, flinch when hit, stagger, crawl, jump down from ledges, and fall when they die (thrown back by a headshot, folded up, or launched by something heavy). The crowd is five different bodies in different skin, clothes, height and blood, so a horde is not one person repeated.
 
 **Downs.** At zero health you go down, not out: you can still shoot your pistol while you bleed out, and a friend holding **E** on you gets you up on borrowed health that drains away. Go down a third time and you are dead. Dead survivors are rescued beside the team after a while. A medkit heals most of what is missing and clears your downs; pills give borrowed health now.
 
@@ -122,6 +127,11 @@ zz_mob_size 14                 // commons in a mob, for one survivor
 zz_specials 2                  // specials alive at once for one survivor
 zz_special_min 18              // seconds between specials, from
 zz_special_max 40              // seconds between specials, to
+zz_special_kinds ""            // which specials the director sends, comma separated (empty: all eleven)
+zz_screamer_mob 10             // commons a screamer's scream sends at whoever it saw
+zz_screamer_cooldown 20        // seconds between one screamer's screams
+zz_crawler_grab_dps 6          // what a crawler's hold on an ankle does a second, on normal
+zz_riot_shield 0.1             // share of a hit on a riot zombie's shield that gets through
 zz_brute_min 300               // seconds between brutes, from (0 with zz_brute_max 0: never)
 zz_brute_max 480               // seconds between brutes, to
 zz_director 1                  // whether the build-up, peak and relax pacing runs
@@ -164,7 +174,7 @@ Admin commands, for seeing what happens (they need the `z` flag):
 
 | Command | What it does |
 | --- | --- |
-| `zz_spawn <kind> [count]` | Spawn a zombie by your feet (or the team's): `common`, `leaper`, `strangler`, `bloater`, `ram`, `spitter`, `rider`, `brute`, `sleeper` |
+| `zz_spawn <kind> [count]` | Spawn a zombie by your feet (or the team's): `common`, `leaper`, `strangler`, `bloater`, `ram`, `spitter`, `rider`, `brute`, `sleeper`, `screamer`, `crawler`, `riot` |
 | `zz_box [type]` | Drop a box in front of you |
 | `zz_mob [size]` | Send a mob now |
 | `zz_panic [seconds]` | Mobs back to back |
@@ -190,7 +200,7 @@ Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps
 - **Playing it with people.** How hard normal should be, how often a mob comes and how much a box should do are numbers only play settles.
 
 ## Credits
-The zombies are Kenney's Animated Characters, re-skinned. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them; the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Floors, walls and roofs are his Prototype Textures under a dusty pastel; the remaining surfaces (metal, glass, water, lines) are drawn in code. Each kit's licence is next to its files.
+The zombies are from [Quaternius](https://quaternius.com)' [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html) (CC0): its three zombies and its four survivors, turned into zombies, with the kit's animations, simplified and recoloured by `tools/build_zombie_models.py`. The cars, street furniture, crates, gravestones and furniture are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit and Furniture Kit, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them (the riot zombie's with one of Kenney's metal impacts); the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Floors, walls and roofs are his Prototype Textures under a dusty pastel; the remaining surfaces (metal, glass, water, lines) are drawn in code. Each kit's licence is next to its files.
 
 ## License
-MIT. See [LICENSE](LICENSE). The Kenney art and the OpenGameArt sounds are CC0, which is public domain.
+MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.

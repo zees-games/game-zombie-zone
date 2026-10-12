@@ -17,6 +17,7 @@ const ZzProps := preload("../game/zz_props.gd")
 const ZzSettings := preload("../game/zz_settings.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 ## The simulation, headless: the documents, the navigation, the horde and every special, the
 ## downs and the hands, the boxes, the objectives and how a map is won and lost.
@@ -28,9 +29,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 27
+const SECTIONS := 30
 
-const CHECKS := 132
+const CHECKS := 154
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -74,6 +75,9 @@ func _run() -> void:
 	await _test_the_shove()
 	await _test_pins()
 	await _test_every_special()
+	await _test_the_new_specials()
+	await _test_how_zombies_fall()
+	_test_what_zombies_look_like()
 	await _test_hazards()
 	await _test_loot()
 	await _test_both_packs()
@@ -446,7 +450,8 @@ func _test_every_special() -> void:
 	_section("every special uses what it has")
 	var results := {}
 
-	for kind in [ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM, ZzNpcs.SPITTER, ZzNpcs.RIDER, ZzNpcs.BRUTE]:
+	for kind in [ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM, ZzNpcs.SPITTER, ZzNpcs.RIDER, ZzNpcs.BRUTE,
+			ZzNpcs.SCREAMER, ZzNpcs.CRAWLER, ZzNpcs.RIOT]:
 		var game := await _team(2, func(c: ZzConfig) -> void:
 			c.wanderer_density = 0.0
 			c.director_enabled = false)
@@ -470,6 +475,10 @@ func _test_every_special() -> void:
 					used = acid_seen
 				ZzNpcs.BRUTE:
 					used = me.health.health < 100.0 or me.is_down() or not game.hazards.flying.is_empty() or acid_seen
+				ZzNpcs.SCREAMER:
+					used = game.horde.screams > 0
+				ZzNpcs.RIOT:
+					used = me.health.health < 100.0 or friend.health.health < 100.0 or me.is_down()
 				_:
 					used = me.is_pinned() or friend.is_pinned() or me.is_down()
 			if used or npc == null or not npc.is_alive():
@@ -482,6 +491,168 @@ func _test_every_special() -> void:
 
 	for kind: StringName in results:
 		_check(results[kind], "a %s does its thing" % String(kind))
+	_finished()
+
+
+## The three specials added with the animated models (2026-10-12): what each one is for, one
+## at a time and close up, where `_test_every_special` only asks that each does something.
+func _test_the_new_specials() -> void:
+	_section("the screamer calls a mob, the crawler holds an ankle, the riot shield stops a shot")
+
+	# The screamer: in sight of somebody, it screams, and a mob comes for them.
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 180.0)
+	var screamer := game.horde.spawn_special(ZzNpcs.SCREAMER, STREET + Vector3(0, 0, -16))
+	var mob_before: int = game.horde.commons()
+	var screamed_at := -1.0
+
+	for i in 30 * 4:
+		await _sim(game, 0.25)
+		if game.horde.screams > 0:
+			screamed_at = float(i) * 0.25
+			break
+
+	_check(screamer != null and game.horde.screams == 1, "a screamer in sight of you screams", "%.1f s" % screamed_at)
+	_check(screamer != null and screamer.node.get(&"anim") == ZzZombieBody.Anim.SCREAM or game.horde.screams > 0,
+		"and is drawn screaming")
+	await _sim(game, 3.0)
+	_check(game.horde.commons() > mob_before, "and a mob comes", "%d commons" % game.horde.commons())
+
+	# The crawler: from behind, it gets hold of an ankle; you can still shoot, a shove frees you.
+	game = await _team(2, _quiet)
+	me = game.survivors()[0]
+	var friend := game.survivors()[1]
+	me.place_at(STREET, 0.0)
+	friend.place_at(STREET + Vector3(0, 0, -1.6), 0.0)
+	var crawler := game.horde.spawn_special(ZzNpcs.CRAWLER, STREET + Vector3(0, 0, 7))
+
+	for i in 30 * 4:
+		await _sim(game, 0.25)
+		if me.is_pinned() or friend.is_pinned():
+			break
+		if me.health.health < 30.0:
+			me.health.health = 100.0
+
+	var held := me if me.is_pinned() else friend
+	_check(held.is_pinned() and held.pin_kind == &"grab", "a crawler grabs an ankle", String(held.pin_kind))
+	_check(held.controller.has_modifier(ZzController.PINNED) and not held.is_held(),
+		"which roots you but leaves you your gun")
+	var helper := friend if held == me else me
+	helper.shove_ready_at = 0.0
+	helper.previous_shove = false
+	helper.place_at(held.feet() + Vector3(0, 0, 0.9), 0.0)
+	_aim(helper, crawler.position() + Vector3(0, 0.3, 0))
+	helper.shove_held = true
+	await _sim(game, 0.1)
+	helper.shove_held = false
+	_check(not held.is_pinned(), "and a friend's shove frees you")
+	_check(crawler.def.meta.get("height", 9.0) < 1.0, "it is low enough to miss over", "%.2f m" % float(crawler.def.meta.get("height", 0.0)))
+
+	# The riot zombie: a shot into its shield does a tenth, the same shot into its back all of it.
+	game = await _team(1, _quiet)
+	me = game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var riot := game.horde.spawner.spawn(ZzNpcs.RIOT, STREET + Vector3(0, 0, -6), &"test")
+	riot.brain = null
+	var body := riot.node as Node3D
+	body.look_at(Vector3(STREET.x, body.global_position.y, STREET.z), Vector3.UP)
+	await _sim(game, 0.1)
+	var full: float = riot.health
+	var _front := _shot(game, me, body.global_position + Vector3(0, 0.9, 0), 100.0)
+	await _sim(game, 0.05)
+	var through_front: float = full - riot.health
+	body.rotate_y(PI)
+	await _sim(game, 0.1)
+	var before_back: float = riot.health
+	var _back := _shot(game, me, body.global_position + Vector3(0, 0.9, 0), 100.0)
+	await _sim(game, 0.05)
+	var through_back: float = before_back - riot.health
+	_check(through_front > 0.0 and through_front <= 100.0 * game.config.riot_shield + 1.0,
+		"a riot shield takes most of a frontal shot", "%.0f of 100" % through_front)
+	_check(through_back >= 90.0, "and none of one from behind", "%.0f of 100" % through_back)
+	_check(ZzNpcs.SPECIALS.has(ZzNpcs.SCREAMER) and ZzNpcs.SPECIALS.has(ZzNpcs.CRAWLER) and ZzNpcs.SPECIALS.has(ZzNpcs.RIOT),
+		"the director may send all three")
+	_finished()
+
+
+## A zombie's death is decided where it dies, with a reaction a client draws.
+func _test_how_zombies_fall() -> void:
+	_section("a killed zombie carries how it falls")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -5), &"test")
+	await _sim(game, 0.1)
+	var seen: Array = []
+	game.horde.zombie_died.connect(func(dead: DotNpcInstance, _by: StringName, _hit: DotDamage) -> void:
+		if dead == npc and dead.node is ZzZombieBody:
+			seen.append((dead.node as ZzZombieBody).death))
+	var _shot_dead := _shot(game, me, npc.position() + Vector3(0, 1.0, 0), 10000.0)
+	await _sim(game, 0.05)
+	var death: DotPlayerDeath = seen[0] if not seen.is_empty() else null
+	_check(not npc.is_alive() and death != null, "the server decides the fall")
+	_check(death != null and game.horde.death_reactions.has(death.reaction), "as one of dot-player-char's reactions",
+		String(death.reaction) if death != null else "-")
+	_check(death != null and death.direction.dot(Vector3(0, 0, -1)) > 0.5, "pushed the way the shot went",
+		str(death.direction) if death != null else "-")
+	_finished()
+
+
+## The view, without a renderer: every kind builds an animated model, commons differ, states
+## pick the right clips, and a death plays the death clip.
+func _test_what_zombies_look_like() -> void:
+	_section("every zombie is an animated model, and a crowd is not one person")
+	var kinds := [ZzNpcs.COMMON, ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM, ZzNpcs.SPITTER,
+		ZzNpcs.RIDER, ZzNpcs.BRUTE, ZzNpcs.SLEEPER, ZzNpcs.SCREAMER, ZzNpcs.CRAWLER, ZzNpcs.RIOT]
+	var animated := 0
+	var outlines := {}
+	var root := Node3D.new()
+	add_child(root)
+
+	for kind: StringName in kinds:
+		var view := ZzZombieView.new()
+		root.add_child(view)
+		view.build(kind, 77)
+		var player := view.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		var clips := ["idle", "walk", "attack", "hit", "death"].filter(func(c: String) -> bool:
+			return player != null and player.has_animation("zz/" + c))
+		if clips.size() == 5:
+			animated += 1
+		var look := ZzZombieView.look_for(kind, 77)
+		outlines["%s|%.2f|%.2f|%s" % [look["body"], float(look["height"]), float(look["girth"]), str(look.get("bones", {}).keys())]] = true
+
+	_check(animated == kinds.size(), "every kind has idle, walk, attack, hit and death", "%d of %d" % [animated, kinds.size()])
+	_check(outlines.size() == kinds.size(), "and every kind has its own outline", "%d distinct" % outlines.size())
+
+	var bodies := {}
+	var looks := {}
+	for v in 40:
+		var look := ZzZombieView.look_for(ZzNpcs.COMMON, (v * 7919 + 13) & 0xFFFF)
+		bodies[look["body"]] = true
+		looks["%s|%s|%s" % [look["body"], look["skin"], look["top"]]] = true
+	_check(bodies.size() >= 5 and looks.size() >= 30, "forty commons: five bodies, and hardly two dressed alike",
+		"%d bodies, %d looks" % [bodies.size(), looks.size()])
+
+	var common := ZzZombieView.new()
+	root.add_child(common)
+	common.build(ZzNpcs.COMMON, 5)
+	var crawler := ZzZombieView.new()
+	root.add_child(crawler)
+	crawler.build(ZzNpcs.CRAWLER, 5)
+	var picked := []
+	for state in [ZzZombieBody.Anim.WALK, ZzZombieBody.Anim.RUN, ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.STAGGER]:
+		common.present(0.05, state, 0)
+		picked.append(String(common.clip()))
+	crawler.present(0.05, ZzZombieBody.Anim.RUN, 0)
+	_check(picked == ["walk", "run_arms", "attack", "hit"], "a state picks its clip", ", ".join(picked))
+	_check(crawler.clip() == &"crawl", "and a crawler crawls whatever it is doing", String(crawler.clip()))
+	common.die(&"headshot_launch", Vector3(0, 0, -1.5), 3)
+	for i in 30:
+		common.present(1.0 / 30.0, ZzZombieBody.Anim.DEAD, 0)
+	_check(common.clip() == &"death" and common.position.z < -0.5, "a headshot throws it back as it dies",
+		"%s, %.2f m" % [common.clip(), -common.position.z])
+	root.free()
 	_finished()
 
 
