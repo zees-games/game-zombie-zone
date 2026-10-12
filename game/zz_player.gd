@@ -603,12 +603,16 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	if shown:
 		_present_held()
 		var velocity := controller.state.velocity
+		# Down is on the floor, crawling: the person's crawl clip (the zombies' own, same rig),
+		# slowed to the crawling pace. It used to be the standing figure tipped onto its back,
+		# which slid along the ground lying flat (the first play test, 1:44).
+		figure.set_motion({
+			"on_floor": controller.state.mode == DotFpsState.Mode.GROUND,
+			"vertical": velocity.y,
+			"crouched": controller.state.crouch_fraction > 0.5,
+			"downed": is_down(),
+		})
 		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())
-
-		# Down is on the floor: the figure tipped onto its back, the way the genre draws it.
-		if is_down():
-			figure.rotation = Vector3(-PI * 0.45, deg_to_rad(controller.state.yaw), 0.0)
-			figure.global_position = at + Vector3(0.0, 0.25, 0.0)
 
 	return shown
 

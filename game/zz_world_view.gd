@@ -63,9 +63,23 @@ var _lens_view: Node3D = null
 var _rng := RandomNumberGenerator.new()
 var _materials: Dictionary = {}
 
+## Where killed zombies fall as skeletal ragdolls: dot-player-char's yard, the same bodies and
+## reactions every player in the family falls with (a skinned body falls by its bones). Its
+## cap is the machine's (four in a browser tab) and the server's `max_count`; a death past the
+## cap, or with `sv_ragdoll 0`, is the view's animated fall instead (`ZzZombieView.die`), so a
+## horde dying at once is a few ragdolls and the rest falling by the clip.
+var ragdolls: DotPlayerRagdolls = null
+
+## What a ragdoll lands on: the level's world and prop layers (`ZzGame.world_mask`).
+var ragdoll_mask: int = 1
+
 
 func _ready() -> void:
 	_rng.seed = Time.get_ticks_usec()
+	ragdolls = DotPlayerRagdolls.new()
+	ragdolls.name = "Ragdolls"
+	ragdolls.rules.lifetime = CORPSE_SECONDS
+	add_child(ragdolls)
 
 
 # --- Zombies -----------------------------------------------------------------
@@ -118,6 +132,15 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	if audio != null and old_body != null and is_instance_valid(old_body):
 		var _died := audio.at(ZzAudio.ZOMBIE_DIE, old_body.global_position)
 
+	# A skeletal ragdoll when there is room for one: copied from the view where it stands, so
+	# the view and the server's body go now.
+	var picked: Variant = old_body.get(&"death") if old_body != null and is_instance_valid(old_body) else null
+	if picked is DotPlayerDeath and _ragdoll(view, picked as DotPlayerDeath):
+		view.queue_free()
+		if body != null and is_instance_valid(body):
+			body.queue_free()
+		return
+
 	# The view outlives the body: offline the server's body is freed this frame, so the view is
 	# moved out to here and left playing its death.
 	var keep := view.global_transform
@@ -137,6 +160,17 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 
 	if body != null and is_instance_valid(body):
 		body.queue_free()
+
+
+## Drops [param view] as a ragdoll the way [param death] says, or false when this machine is
+## at its cap or the server turned ragdolls off (the caller draws the animated fall instead).
+func _ragdoll(view: ZzZombieView, death: DotPlayerDeath) -> bool:
+	if ragdolls == null or not ragdolls.rules.enabled or ragdolls.standing_count() >= ragdolls.cap():
+		return false
+	if not view.is_inside_tree() or not view.visible:
+		return false
+	ragdolls.rules.collision_mask = ragdoll_mask
+	return ragdolls.spawn(view, death) != null
 
 
 func zombie_count() -> int:
@@ -769,6 +803,8 @@ func _particles(colour: Color, radius: float, amount: int) -> CPUParticles3D:
 
 
 func clear() -> void:
+	if ragdolls != null:
+		ragdolls.clear()
 	for id: int in _loot.keys():
 		remove_loot(id)
 	for id: int in _hazards.keys():
