@@ -26,8 +26,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 14
-const CHECKS := 69
+const SECTIONS := 15
+const CHECKS := 78
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -84,6 +84,7 @@ func _run() -> void:
 		await _test_a_box_reaches_the_client()
 		await _test_a_gate_reaches_the_client()
 		await _test_the_map_ends()
+		await _test_a_hold_reaches_the_client()
 		await _test_leaving()
 
 	print("")
@@ -296,7 +297,7 @@ func _build() -> bool:
 		_heard["ammo"] = int(_heard.get("ammo", 0)) + 1)
 	_client_bridge.round_changed.connect(func(n: int, began: bool, won: bool, why: String) -> void:
 		if not began:
-			_heard["round_over"] = [n, won, why])
+			_heard["round_over"] = [n, won, why, _client_game.next_round_seconds(), _client_game.next_round_map()])
 
 	_stand_in = _server_bridge.add_bot("Stand-in")
 	_check(_stand_in != null and _stand_in.is_bot, "a stand-in is seated before anybody joins")
@@ -603,6 +604,93 @@ func _test_the_map_ends() -> void:
 
 	_check(_heard.has("round_over") and not bool(_heard["round_over"][1]), "lost")
 	_check(_heard.has("round_over") and str(_heard["round_over"][2]) == "everybody is down", "with the server's sentence")
+	_check(_heard.has("round_over") and float(_heard["round_over"][3]) == _server_game.match_node.rules.intermission_sec
+		and StringName(_heard["round_over"][4]) == _server_game.next_map_id,
+		"and how long until the next map, and which, for its countdown", str(_heard.get("round_over")))
+	_finished()
+
+
+## A survival hold through the bridge (zz-survival-net-check-1): the stage, wave and clock a
+## client is told, the daylight of a hold kept by nights, and a barricade broken and mended
+## reaching the client's map, its collision and its picture. Until this, both events were
+## checked only as codec round trips and solo play reads the world directly.
+func _test_a_hold_reaches_the_client() -> void:
+	_section("a survival hold, its daylight and a barricade, over the wire")
+	var doc := ZzCatalogue.practice().duplicate(true)
+	doc["id"] = "zz_net_hold"
+	doc["mode"] = ZzMapDoc.SURVIVAL
+	doc["objectives"] = []
+	# Boards across the west alley's mouth, on the street side.
+	(doc["boxes"] as Array).append({"at": [-9.2, 1.0, 16.0], "size": [0.3, 2.0, 3.6], "mat": "wood",
+		"barricade": "alley_w", "nav": false})
+	var checked := ZzMapDoc.validate(doc)
+	_check(checked.ok and _server_game.catalogue._add(checked.value, "test"), "the server has a hold with a barricade",
+		checked.error.message if not checked.ok else "")
+	_server_game.catalogue._rebuild_order()
+
+	# Nights, short: a warm-up that is a day (dawn and dusk), then a night.
+	var config := _server_game.config
+	config.map_ids = PackedStringArray(["zz_practice", "zz_net_hold"])
+	config.survival_style = 1
+	config.nights = 2
+	config.survival_warmup_seconds = 4.0
+	config.night_seconds = 3.0
+	config.day_seconds = 3.0
+	config.wave_size = 2
+	config.wave_size_per_survivor = 0
+	config.wave_twists = false
+	config.brute_every_waves = 0
+	# The client draws this map, so the barricade's picture is there to follow.
+	_client_game.draw_world = true
+	_client_game.map.draw_world = true
+	_heard.erase("map")
+	var changed := _server_game.change_map_now(&"zz_net_hold")
+	for _i in range(SERVER_TICK_RATE * 2):
+		if _heard.get("map", &"") == &"zz_net_hold":
+			break
+		await _step()
+	_check(changed.ok and _client_game.map.id() == &"zz_net_hold" and _client_game.is_survival(),
+		"the client is sent the hold and builds it", "%s %s" % [_client_game.map.id(), changed.error.message if not changed.ok else ""])
+
+	# Mid warm-up: what the hold says, and the light it is at.
+	await _steps(int(SERVER_TICK_RATE * 2.0))
+	var served := _server_game.survival_state()
+	var told := _client_game.survival_state()
+	_check(not told.is_empty() and int(told.get("style", -1)) == int(served["style"])
+		and int(told.get("stage", -1)) == int(served["stage"]) and int(told.get("index", -1)) == int(served["index"])
+		and absf(float(told.get("left", -9.0)) - float(served["left"])) < 0.75,
+		"the client is told the style, the stage, the night and the clock", "%s / %s" % [told, served])
+	_check(float(told.get("daylight", -1.0)) > 0.3 and absf(float(told["daylight"]) - float(served["daylight"])) < 0.1,
+		"and the daylight of the warm-up's day", "%.2f / %.2f" % [float(told.get("daylight", -1.0)), float(served["daylight"])])
+
+	for _i in range(SERVER_TICK_RATE * 4):
+		if int(_client_game.survival_state().get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE:
+			break
+		await _step()
+	told = _client_game.survival_state()
+	_check(int(told.get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE and int(told.get("index", 0)) == 1
+		and float(told.get("daylight", -1.0)) >= 0.0 and float(told.get("daylight", 1.0)) < 0.02,
+		"night 1 falls on the client, in the dark (daylight is sent in 255ths)", str(told))
+
+	# The barricade: broken on the server, on the client's ground and in its picture.
+	var entry: Dictionary = _client_game.map._barricades.get("alley_w", {})
+	var drawn: Array = entry.get("drawn", [])
+	var shapes: Array = entry.get("shapes", [])
+	_server_game.bash_barricade("alley_w", 100000.0)
+	await _steps(4)
+	_check(not _client_game.map.barricade_intact("alley_w") and not bool(_client_game.barricades["alley_w"]["intact"]),
+		"a barricade broken on the server is broken on the client")
+	_check(not shapes.is_empty() and shapes.all(func(c: CollisionShape3D) -> bool: return c.disabled)
+		and not drawn.is_empty() and drawn.all(func(m: MeshInstance3D) -> bool: return not m.visible),
+		"its collision is off and its boards are gone from the picture", "%d shapes, %d meshes" % [shapes.size(), drawn.size()])
+
+	var _mended := _server_game.mend_barricade(0, null)
+	await _steps(4)
+	var fraction := float(_client_game.barricades["alley_w"]["health"]) / float(_client_game.barricades["alley_w"]["max"])
+	_check(_client_game.map.barricade_intact("alley_w") and shapes.all(func(c: CollisionShape3D) -> bool: return not c.disabled)
+		and drawn.all(func(m: MeshInstance3D) -> bool: return m.visible)
+		and absf(fraction - float(_server_game.barricades["alley_w"]["health"]) / float(_server_game.barricades["alley_w"]["max"])) < 0.07,
+		"mended, it stands again on the client, as strong as the server says", "%.2f" % fraction)
 	_finished()
 
 
