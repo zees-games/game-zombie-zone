@@ -1,6 +1,6 @@
 # game-zombie-zone
 
-A co-operative zombie shooter: a team of survivors crosses a map from safe room to safe room (or holds a survival map for its clock) against a directed horde, eleven kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
+A co-operative zombie shooter: a team of survivors crosses an **exodus** map from shelter to shelter, or a team of a dozen or more holds a big **survival** map (ten escalating waves by default; days and nights or a clock by `zz_survival`) behind barricades it mends, against a directed horde, eleven kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
 
 Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it (dot-npc, dot-npc-ai and dot-npc-ai-director most of all). This file is only about what this game decides. The maps are in `maps/`, a link to [zombie-zone-maps](../zombie-zone-maps), written by its `tools/build_maps.py`; `maps/README.md` there is the format.
 
@@ -23,7 +23,8 @@ game/
   zz_loot.gd         what lies on the ground and what using it does
   zz_boxes.gd        the boxes: boxes/boxes.json read and checked, ~40 verbs, stacking effects
   zz_weapons.gd      every weapon by tier, from every weapon pack (the seam for a second pack)
-  zz_bots.gd         stand-in survivors
+  zz_survival.gd     a survival map held: dot-npc-ai-director's DotNpcDirectorWaves, the breather, twists, caches
+  zz_bots.gd         stand-in survivors (posts, mending and restocking on a survival map)
   zz_controller.gd   DotFpsController with the game's modifiers (pinned, down, limp, haste, knock...)
   zz_player.gd       one survivor: life, downs, borrowed health, pin, hands, status, stats
   zz_game.gd         the simulation: map flow, combat, hands (use/heal/pills/shove), downs, objectives
@@ -35,7 +36,8 @@ assets/zombies/      the seven animated bodies (built by tools/build_zombie_mode
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured), pieces.json (each prop's collision pieces, dot-props' DotPropPieces; tools/measure_props.gd writes both, about four minutes)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (154), headless_maps (61), headless_net (69), headless_weapons (17), dedicated (66)
+examples/            headless_run (154), headless_maps (121), headless_net (69), headless_weapons (17), dedicated (66),
+                     headless_survival (67: the styles, a wipe, barricades, team size, a wave on each big map)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd (contact sheets, horde cost), zombie_palette.gd,
                      build_zombie_models.py (Blender), audio_probe
 ```
@@ -92,6 +94,18 @@ Every zombie is one of seven skinned bodies from Quaternius' CC0 Zombie Apocalyp
 - `ZzZombieBody.Anim` is replicated in 5 bits: append, never insert, and stop at 31.
 - `WEARS` colours come from `tools/zombie_palette.gd`, measured in Godot against the body's own atlas (the kit ships three).
 
+## Decision 9: survival is a schedule, barricades are on the zombies' ground, the team is the map's
+
+[docs/survival.md](docs/survival.md) has the reasoning; the rules:
+
+- The hold is `DotNpcDirectorWaves` (`zz_survival.gd`), never the director's stress cycle: its relax waits for distance a holding team never travels. A wave is released by `take()` within `commons_cap` and refused spawns are owed again; it ends cleared or on `overtime`.
+- A wave comes from the map's `zombie_spawns` first (`ZzHorde._wave_origin`); a wave from "anywhere out of sight" came out of the back of the room the team held.
+- A barricade's boxes are `"nav": false` and `nav_for` skips them: the horde must path INTO a barricade to bash it (`_bash_if_barred`, checked after every kind's decision). `headless_maps` checks both faces are on the graph.
+- Barricade state goes to clients in sixteenths (BARRICADE) and again at every round start; the hold as SURVIVAL every clock and on every stage change. `ZzEvents.Kind` is at 37 of 64.
+- `survivors` in a map raises the stand-ins to that team (`team_size()`, `zz_team_from_map`); unsaid is 0, never 4 (`dedicated` caught a default raising the practice street's quota). The spawner's limits are sized per map.
+- Zombies and stand-ins ask `ZzHorde.zombies_near` (a grid built once a tick), never the spawner's `npcs_near`, which walks every zombie; far zombies think every 2nd/4th tick. Measured costs are in the doc; `headless_survival` fails a big map whose mean tick is over 15.6 ms.
+- Suites read a map's result from `round_over`: with no intermission the next round has cleared `_decided` before a section looks. [history](docs/history.md)
+
 ## The HUD: dot-ui's glance pieces
 
 `zz_hud.gd` draws health as a `DotVitals` (borrowed health as its `bonus`, white after the real fill; DOWN and DEAD as its `status`, all in the low colour; red at the limp line), the weapon as a `DotAmmoCounter` (an endless reserve as ∞, low at a quarter of a magazine), a hold-out's time left or a survival map's time held as a `DotScoreStrip` clock under the title, the medkit and pills as `DotKeyHints` rows with their bound keys, and confirmed hits as `DotHitMarker` and `DotDamageNumbers`. **The number is real health, not real plus borrowed**: borrowed health drains, and a number that included it would fall while nobody was hitting you; the white length says what is borrowed. **A hit is drawn only from the server's confirmation**: `ZzGame.hit_landed` (a survivor's damage applied to a zombie; never friendly fire, never the world's), sent to the shooter alone as a HIT event, connected straight to the world offline. The health plate ends 206 pixels off the bottom, above the chat box's full eight-row log (202). Colours from `ZzHud.piece_theme()`; `tools/shot.sh --view=hit --spawn=common:6` renders the marker, a number, borrowed health and a hold-out clock. Naming these classes makes the pack need a client shell with dot-ui API level 4; the derived `requires.json` asks for it and `headless_run` checks it.
@@ -124,6 +138,8 @@ From the first play test (survivor bots' faces filling the screen): `mp_solidpla
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
+tools/shot.sh --view=wave --zz-map-ids=zz_high_school --zz-survival-warmup-seconds=3 --seconds=60 --at=-3,0.05,11 --look=-3,1,16   # a wave, your eyes, the HUD
+tools/shot.sh --view=wave_cam --zz-map-ids=zz_relief_camp --zz-survival-style=1 --zz-survival-warmup-seconds=60 --seconds=25 --at=-20,7,-40 --look=10,0,10   # by day
 tools/camera_check.sh --render                          # cameras round the street (armed), mp_solidplayers both ways, views
 tools/shot.sh --view=survivor --spawn=common:12
 tools/shot.sh --view=third --spawn=brute:1,leaper:1
@@ -152,7 +168,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Still to do
 
-1. **Put it live.** The client shell needs dot-ui API level 4 (the HUD names its glance pieces). The GitHub repositories (`zees-games/game-zombie-zone`, `zees-games/zombie-zone-maps`, `zees-games/zed-dot-weapons`) exist; tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc (and anything else changed) and rebuild the shell, publish the maps pack before the game.
+1. **Put it live.** The client shell needs dot-ui API level 4 (the HUD names its glance pieces). The GitHub repositories (`zees-games/game-zombie-zone`, `zees-games/zombie-zone-maps`, `zees-games/zed-dot-weapons`) exist; tag zee-dot-weapons (its `add_source`) and zed, add `content/zombiezone/` and a client example to dot-server-deploy, tag dot-npc and dot-npc-ai-director (API level 2: `DotNpcDirectorWaves`, which `zz_survival.gd` and the HUD name, so the derived `requires.json` asks for it) and anything else changed, and rebuild the shell; then the game, and the maps pack after it (its Blackout maps say `exodus`, which an older game refuses).
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no common's brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.

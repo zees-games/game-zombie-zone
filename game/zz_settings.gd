@@ -70,8 +70,8 @@ static func schema_for() -> DotSettingsSchema:
 
 ## The help screen's goal and rules; the keys come from [ZzBindings].
 func _fill_help(help: DotMenuHelp) -> void:
-	help.about = "Get the team from the safe room at the start to the one at the end, or hold a survival map for its clock. Stay together: the specials go for whoever is alone."
-	help.add_text("Maps", "A route map is crossed safe room to safe room, opening gates and finishing objectives on the way. A survival map is held where you stand until the clock runs out.")
+	help.about = "Get the team from the shelter at the start to the one at the end, or hold a survival map through its waves. Stay together: the specials go for whoever is alone."
+	help.add_text("Maps", "An exodus map is crossed shelter to shelter, opening gates and finishing objectives on the way. A survival map is held where you start: by default ten waves, each bigger than the last, with a breather between in which the downed get up, the dead come back and the caches restock. Hold Use on a damaged door or window to mend it, or to rebuild one that is down.")
 	help.add_text("Staying alive", "At no health you go down, not out: a friend holds Use on you to get you up. After two downs the next one is death, and the dead are rescued beside the team a little later. Pills and revives give borrowed health, the white part of the bar, which drains away. Friendly fire is on.")
 	help.add_section("Mouse", [["Left", "Fire"], ["Right", "Shove"], ["Wheel", "Next or previous weapon"]], &"keys")
 	help.add_text("Boxes", "Zombies sometimes drop a box. Open it with Use and something random happens to you, your team or the horde; the HUD lists what is still in effect.")

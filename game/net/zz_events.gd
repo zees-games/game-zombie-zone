@@ -89,6 +89,11 @@ enum Kind {
 	AMMO,
 	## To one survivor: your hit landed on a zombie, this much, there, and whether it killed.
 	HIT,
+	## A survival map's hold: the style, the stage, which wave or night of how many, the
+	## stage's seconds, the wave's zombies left, its twist, and the daylight.
+	SURVIVAL,
+	## A barricade's strength and whether it stands.
+	BARRICADE,
 }
 
 enum Ask {
@@ -665,6 +670,54 @@ static func write_gate(gate: String) -> PackedByteArray:
 static func read_gate(r: DotNetReader) -> Dictionary:
 	var gate := r.read_string(ID_BYTES)
 	return {"gate": gate, "ok": r.ok()}
+
+
+## A survival map's hold, as [method ZzGame.survival_state] says it. `left` and `remaining` are
+## -1 for none, sent one up; the twist is its index in [constant TWIST_NAMES] (0 none).
+const TWIST_NAMES := ["", "sprinters", "swarm", "heavies", "hunters"]
+
+static func write_survival(state: Dictionary) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(int(state.get("style", 0)), 0, 3), 2)
+	w.write_uint(clampi(int(state.get("stage", 0)), 0, 3), 2)
+	w.write_uint(clampi(int(state.get("index", 0)), 0, 255), 8)
+	w.write_uint(clampi(int(state.get("count", 0)), 0, 255), 8)
+	w.write_float_range(clampf(float(state.get("left", -1.0)) + 1.0, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_varint(maxi(int(state.get("remaining", -1)) + 1, 0))
+	w.write_uint(maxi(TWIST_NAMES.find(str(state.get("twist", ""))), 0), 3)
+	w.write_float_range(clampf(float(state.get("daylight", -1.0)) + 1.0, 0.0, 2.0), 0.0, 2.0, 8)
+	return w.to_bytes()
+
+
+static func read_survival(r: DotNetReader) -> Dictionary:
+	var style := r.read_uint(2)
+	var stage := r.read_uint(2)
+	var index := r.read_uint(8)
+	var count := r.read_uint(8)
+	var left := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS) - 1.0
+	var remaining := r.read_varint() - 1
+	var twist := r.read_uint(3)
+	var daylight := r.read_float_range(0.0, 2.0, 8) - 1.0
+	return {
+		"style": style, "stage": stage, "index": index, "count": count, "left": left if left > -0.5 else -1.0,
+		"remaining": remaining, "twist": TWIST_NAMES[twist] if twist < TWIST_NAMES.size() else "",
+		"daylight": daylight if daylight > -0.5 else -1.0, "ok": r.ok(),
+	}
+
+
+static func write_barricade(id: String, fraction: float, intact: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_string(id, ID_BYTES)
+	w.write_uint(clampi(int(round(clampf(fraction, 0.0, 1.0) * 255.0)), 0, 255), 8)
+	w.write_bool(intact)
+	return w.to_bytes()
+
+
+static func read_barricade(r: DotNetReader) -> Dictionary:
+	var id := r.read_string(ID_BYTES)
+	var fraction := float(r.read_uint(8)) / 255.0
+	var intact := r.read_bool()
+	return {"id": id, "fraction": fraction, "intact": intact, "ok": r.ok()}
 
 
 ## You were hurt: how much, from where. For the red edge of the screen that says which way.

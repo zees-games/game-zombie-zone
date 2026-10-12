@@ -69,6 +69,13 @@ func _run() -> void:
 	await _until_a_round(game)
 	var local = _client.get("player")
 
+	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
+	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
+	# or from a free camera at --at (`wave_cam`).
+	if _view == "wave" or _view == "wave_cam":
+		await _survival_frame(game, local)
+		return
+
 	# Out of the start room, so the horde is running, and the stand-ins held where they are put.
 	for player in game.survivors():
 		player.is_bot = false
@@ -256,6 +263,37 @@ func _tile(label: Label, id: StringName, what: String) -> Image:
 	var image := get_viewport().get_texture().get_image()
 	image.convert(Image.FORMAT_RGB8)
 	return image
+
+
+func _survival_frame(game: ZzGame, local) -> void:
+	local.health.invulnerable = true
+
+	if _at != Vector3.INF and _view == "wave":
+		local.place_at(_at, 0.0)
+
+	var until := Time.get_ticks_msec() + int(_seconds * 1000.0)
+
+	while Time.get_ticks_msec() < until:
+		if _view == "wave" and _at != Vector3.INF and local.feet().distance_to(_at) > 1.5:
+			local.place_at(_at, 0.0)
+		if _view == "wave" and _look != Vector3.INF:
+			_face(local, _look)
+		await get_tree().process_frame
+
+	if _view == "wave_cam":
+		_free_camera().look_at_from_position(_at, _look if _look != Vector3.INF else _at + Vector3(0, 0, -10))
+	elif _look != Vector3.INF:
+		_face(local, _look)
+
+	await _frames(3)
+	print("hold: %s" % str(game.survival_state()))
+	print("zombies: %d, wave alive %d" % [game.horde.count(), game.horde.wave_alive()])
+	var image := get_viewport().get_texture().get_image()
+	var path := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var saved := image.save_png(path)
+	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
+	get_tree().quit(0 if saved == OK else 1)
 
 
 func _face(player, target: Vector3) -> void:

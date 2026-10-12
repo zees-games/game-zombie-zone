@@ -134,6 +134,13 @@
       "scale": 1.8,
       "credit": "Kenney Graveyard Kit (CC0)",
       "fixed": []
+    },
+    {
+      "id": "market",
+      "dir": "assets/props/market",
+      "scale": 2.4,
+      "credit": "Kenney Mini Market (CC0)",
+      "fixed": []
     }
   ],
   "titles": {

@@ -19,6 +19,7 @@ const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
+const ZzSurvival := preload("zz_survival.gd")
 const ZzTrace := preload("zz_trace.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -27,9 +28,10 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## [b]A round is a map.[/b] Everybody starts in the start area, where nothing comes for them
 ## until somebody leaves it (or [member ZzConfig.start_grace_seconds] pass). Then the horde
-## runs: a campaign map is won when every survivor still standing is inside the end area, a
-## survival map when the clock runs out with anybody alive. It is lost when nobody is left on
-## their feet and free. A won campaign map moves on to the map it names as `next`; a lost one is
+## runs: an exodus map is won when every survivor still standing is inside the end shelter, a
+## survival map when its hold is over ([ZzSurvival]: the last wave cleared, the last night
+## lived through, or the clock run out) with anybody alive. It is lost when nobody is left on
+## their feet and free. A won exodus map moves on to the map it names as `next`; a lost one is
 ## played again, [member ZzConfig.retries] times.
 ##
 ## [b]What it owns and what it borrows.[/b] The round and the scoreboard are dot-match's
@@ -119,6 +121,13 @@ signal ammo_given(player_id: StringName)
 ## zombie's entity id, which only groups hits on one body; [param point] is where it landed.
 signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 
+## A barricade took damage, broke, or was mended: its strength as a share, and whether it stands.
+signal barricade_changed(id: String, fraction: float, intact: bool)
+
+## The survival hold moved on (a wave began or was cleared, a night fell): the bridge tells
+## every client at once rather than at the next clock.
+signal survival_changed()
+
 @export var config: ZzConfig = null
 @export var authoritative: bool = true
 @export_range(1, 240, 1) var tick_rate: int = 64
@@ -168,9 +177,19 @@ var phase_elapsed: float = 0.0
 var map_doc: Dictionary = {}
 var entities := DotEntityTable.new()
 
-## Survival: seconds held, and the goal. A campaign map leaves them at zero.
+## Survival: seconds held, and the clock style's goal. An exodus map leaves them at zero.
 var survival_elapsed: float = 0.0
 var survival_goal: float = 0.0
+
+## Server: the survival map's hold, while one is being held. See [ZzSurvival].
+var survival: ZzSurvival = null
+
+## What a client was told of the hold, the shape of [method ZzSurvival.state]; empty for none.
+var remote_survival: Dictionary = {}
+
+## Every barricade of the map in play: id -> {health, max, intact, label}. Both ends keep it:
+## the server decides, a client is told (BARRICADE) and draws it.
+var barricades: Dictionary = {}
 
 ## Each objective's state: `waiting`, `holding` (the holdout is running), `done`.
 var objective_states: Array[StringName] = []
@@ -812,6 +831,8 @@ func _on_round_started(number: int) -> void:
 	end_hold = 0.0
 	survival_elapsed = 0.0
 	survival_goal = _survival_goal()
+	_stop_survival()
+	_reset_barricades()
 
 	if pins != null:
 		pins.clear()
@@ -846,6 +867,7 @@ func _on_round_started(number: int) -> void:
 
 func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 	_set_phase(Phase.IDLE)
+	_stop_survival()
 
 	if horde != null:
 		horde.stop_pacing()
@@ -880,8 +902,9 @@ func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 
 
 ## Every map this server plays, as the map menu (M) lists them: `{id, name, mode, detail,
-## current}`, campaign or survival as the mode and the blurb under it. Solo the client's list,
-## online the server's (the module hands it to dot-vote's map menu), so both say the same.
+## current}`, exodus or survival as the mode and the blurb under it, with the team it is built
+## for. Solo the client's list, online the server's (the module hands it to dot-vote's map
+## menu), so both say the same.
 func map_rows() -> Array:
 	var out: Array = []
 	if catalogue == null:
@@ -890,7 +913,9 @@ func map_rows() -> Array:
 	for id in catalogue.playable(config.map_ids):
 		var doc: Dictionary = catalogue.maps.get(id, {})
 		var row := {"id": String(id), "name": str(doc.get("name", id)), "current": id == now,
-			"mode": str(doc.get("mode", "")).capitalize(), "detail": str(doc.get("blurb", ""))}
+			"mode": str(doc.get("mode", "")).capitalize(),
+			"detail": str(doc.get("blurb", "")) if int(doc.get("survivors", 0)) <= 0 \
+				else "%s (%d survivors)" % [str(doc.get("blurb", "")), int(doc["survivors"])]}
 		if doc.has("thumbnail"):
 			row["thumbnail"] = str(doc["thumbnail"])
 		out.append(row)
@@ -957,6 +982,7 @@ func build_map(doc: Dictionary) -> DotResult:
 		return built
 
 	map_doc = map.doc
+	_reset_barricades()
 
 	if spectate != null:
 		spectate.set_overviews(map.overview(), map.overview())
@@ -1031,7 +1057,17 @@ func _set_phase(to: int) -> void:
 
 
 func is_survival() -> bool:
-	return str(map_doc.get("mode", ZzMapDoc.CAMPAIGN)) == ZzMapDoc.SURVIVAL
+	return str(map_doc.get("mode", ZzMapDoc.EXODUS)) == ZzMapDoc.SURVIVAL
+
+
+## The team the map in play is built for, or the configured minimum: what stand-ins fill to.
+func team_size() -> int:
+	var wanted := config.minimum_players
+
+	if config.team_from_map and not map_doc.is_empty():
+		wanted = maxi(wanted, int(map_doc.get("survivors", 0)))
+
+	return wanted
 
 
 func _survival_goal() -> float:
@@ -1055,11 +1091,13 @@ func _advance_phase(delta: float) -> void:
 			else:
 				_check_round()
 		Phase.PLAY:
-			# A survival map's clock starts with its first objective, when it has one.
-			if is_survival() and (objective_states.is_empty() or objective_states[0] == &"done"):
-				survival_elapsed += delta
-				if horde != null:
-					horde.survival_elapsed = survival_elapsed
+			# A survival map's hold starts with its first objective, when it has one.
+			if is_survival() and authoritative and (objective_states.is_empty() or objective_states[0] == &"done"):
+				if survival == null:
+					_start_survival()
+				if survival != null:
+					survival.tick(delta)
+					survival_elapsed = survival.waves.elapsed if survival.waves != null else survival_elapsed + delta
 
 			_advance_objectives(delta)
 			_check_round()
@@ -1081,10 +1119,57 @@ func _anybody_left_start() -> bool:
 func _begin_play() -> void:
 	_set_phase(Phase.PLAY)
 
-	if horde != null:
-		horde.start_pacing(is_survival())
+	# A survival map's horde is the hold's (it starts on the next tick); an exodus map's is the
+	# director's, from now.
+	if horde != null and not is_survival():
+		horde.start_pacing(false)
 
-	notice.emit("Here they come." if is_survival() else "Get to the safe room.")
+	if not is_survival():
+		notice.emit("Make for the shelter.")
+
+
+## Server: the hold begins. Its schedule's first stage sets the horde going.
+func _start_survival() -> void:
+	if not authoritative or horde == null:
+		return
+
+	survival = ZzSurvival.new(self)
+	var begun := survival.begin()
+
+	if not begun.ok:
+		survival = null
+		horde.start_pacing(true)
+		return
+
+	survival_changed.emit()
+	if not survival.waves.stage_changed.is_connected(_on_survival_stage):
+		survival.waves.stage_changed.connect(_on_survival_stage)
+
+
+func _on_survival_stage(_stage: int, _index: int) -> void:
+	survival_changed.emit()
+
+
+func _stop_survival() -> void:
+	if survival != null:
+		survival.stop()
+		survival = null
+
+	remote_survival = {}
+
+
+## The hold is over and held: the last wave, the last night, the clock.
+func survival_finished(why: String) -> void:
+	_decide(true, why)
+
+
+## The hold as the HUD and the bridge read it (see [method ZzSurvival.state]): the server's own,
+## or what a client was told. Empty on an exodus map or before the hold begins.
+func survival_state() -> Dictionary:
+	if authoritative:
+		return survival.state() if survival != null else {}
+
+	return remote_survival
 
 
 ## Lost, won, or neither yet.
@@ -1122,11 +1207,10 @@ func _check_round() -> void:
 		return
 
 	if is_survival():
-		if survival_goal > 0.0 and survival_elapsed >= survival_goal:
-			_decide(true, "held out for %s" % _clock(survival_goal))
+		# Decided by the hold itself (survival_finished), whichever style it is held by.
 		return
 
-	# A campaign map: every survivor on their feet inside the end area, for a moment.
+	# An exodus map: every survivor on their feet inside the end shelter, for a moment.
 	var everyone_in := true
 	var anybody := false
 
@@ -1145,7 +1229,7 @@ func _check_round() -> void:
 		end_hold += delta_for_tick()
 
 		if end_hold >= config.end_hold_seconds:
-			_decide(true, "made it to the safe room")
+			_decide(true, "made it to the shelter")
 	else:
 		end_hold = 0.0
 
@@ -1176,7 +1260,7 @@ static func _clock(seconds: float) -> String:
 	return "%d:%02d" % [int(seconds) / 60, int(seconds) % 60]
 
 
-## Seconds left on a survival map's clock; -1 on a campaign map or an endless hold.
+## Seconds left on a survival map's clock; -1 on an exodus map or an endless hold.
 func seconds_left() -> float:
 	if not authoritative:
 		return remote_seconds_left
@@ -1273,6 +1357,153 @@ func open_gate(gate: String) -> void:
 	gate_opened.emit(gate)
 
 
+# --- Barricades --------------------------------------------------------------------------------
+
+## Every barricade back to full, from the map document: at a round's start on the server, and
+## whenever a client builds a map (it is told any that are not full straight after).
+func _reset_barricades() -> void:
+	barricades.clear()
+
+	if map == null:
+		return
+
+	for entry: Dictionary in map_doc.get("barricades", []):
+		var id := str(entry["id"])
+		var strength := float(entry.get("health", config.barricade_health))
+		barricades[id] = {"health": strength, "max": strength, "intact": true, "label": str(entry.get("label", "a barricade"))}
+		map.set_barricade(id, true, 1.0)
+
+		# A map played again keeps its document, so nothing tells a client it is new: every
+		# barricade it saw broken last round is told it stands.
+		if authoritative:
+			barricade_changed.emit(id, 1.0, true)
+
+	_tell_horde_barricades()
+
+
+func _tell_horde_barricades() -> void:
+	if horde == null:
+		return
+
+	var standing := {}
+
+	for id: String in barricades:
+		if bool((barricades[id] as Dictionary)["intact"]):
+			standing[id] = map.barricade_bounds(id)
+
+	horde.set_barricades(standing)
+
+
+## The horde tore [param amount] off barricade [param id]. Server only. At nothing it breaks:
+## gone, and the way in is open until somebody mends it.
+func bash_barricade(id: String, amount: float) -> void:
+	var entry: Variant = barricades.get(id)
+
+	if entry == null or not bool((entry as Dictionary)["intact"]) or amount <= 0.0:
+		return
+
+	var e := entry as Dictionary
+	var before := float(e["health"]) / float(e["max"])
+	e["health"] = maxf(float(e["health"]) - amount, 0.0)
+	var after := float(e["health"]) / float(e["max"])
+
+	if float(e["health"]) <= 0.0:
+		e["intact"] = false
+		map.set_barricade(id, false, 0.0)
+		_tell_horde_barricades()
+		barricade_changed.emit(id, 0.0, false)
+		notice.emit("They are through %s!" % str(e["label"]))
+		DotLog.info(CHANNEL, "a barricade broke", {"id": id})
+		return
+
+	# Told in steps of a sixteenth: a crowd at a window is a hit every tick, and a message per
+	# hit to every client is the whole wire.
+	if floori(before * 16.0) != floori(after * 16.0):
+		map.set_barricade(id, true, after)
+		barricade_changed.emit(id, after, true)
+
+
+## The barricade [param player] is close enough to mend, as its index in the map's list, or -1:
+## one within reach of their eyes that is not at full strength.
+func barricade_to_mend(player: ZzPlayer) -> int:
+	var list: Array = map_doc.get("barricades", [])
+	var best := -1
+	var best_gap := config.use_reach + 0.6
+	var eye := player.eye_position()
+
+	for i in list.size():
+		var id := str((list[i] as Dictionary)["id"])
+		var entry: Variant = barricades.get(id)
+
+		if entry == null or float((entry as Dictionary)["health"]) >= float((entry as Dictionary)["max"]):
+			continue
+
+		var box := map.barricade_bounds(id)
+		var nearest := Vector3(clampf(eye.x, box.position.x, box.end.x), clampf(eye.y, box.position.y, box.end.y),
+			clampf(eye.z, box.position.z, box.end.z))
+		var gap := nearest.distance_to(eye)
+
+		if gap < best_gap:
+			best = i
+			best_gap = gap
+
+	return best
+
+
+## One mend done on the barricade at [param index]: its strength back by
+## [member ZzConfig.barricade_repair], and a broken one standing again unless a zombie is in the
+## gap, which is where it would stand.
+func mend_barricade(index: int, by: ZzPlayer) -> bool:
+	var list: Array = map_doc.get("barricades", [])
+
+	if index < 0 or index >= list.size():
+		return false
+
+	var id := str((list[index] as Dictionary)["id"])
+	var e: Dictionary = barricades.get(id, {})
+
+	if e.is_empty():
+		return false
+
+	if not bool(e["intact"]) and horde != null:
+		var box := map.barricade_bounds(id).grow(0.4)
+
+		for npc in horde.spawner.npcs_near(box.get_center(), box.size.length() * 0.5 + 0.5):
+			var p := npc.position()
+			if npc.is_alive() and p.x >= box.position.x and p.x <= box.end.x and p.z >= box.position.z and p.z <= box.end.z:
+				if by != null:
+					refused.emit(by.player_id, "Something is in the gap.")
+				return false
+
+	e["health"] = minf(float(e["health"]) + config.barricade_repair, float(e["max"]))
+	var was_broken := not bool(e["intact"])
+	e["intact"] = true
+	var fraction := float(e["health"]) / float(e["max"])
+	map.set_barricade(id, true, fraction)
+
+	if was_broken:
+		_tell_horde_barricades()
+
+	barricade_changed.emit(id, fraction, true)
+
+	if by != null:
+		by.points += 1
+
+	return true
+
+
+## A client was told barricade [param id] is at [param fraction] and standing or not.
+func apply_barricade(id: String, fraction: float, intact: bool) -> void:
+	var e: Dictionary = barricades.get(id, {})
+
+	if e.is_empty():
+		return
+
+	e["health"] = float(e["max"]) * fraction
+	e["intact"] = intact
+	map.set_barricade(id, intact, fraction)
+
+
 # --- Hands: use, heal, pills, shove ------------------------------------------------------------
 
 ## Everything a survivor does with their hands this tick. Server side.
@@ -1339,6 +1570,11 @@ func _begin_use(player: ZzPlayer) -> void:
 			_start(player, &"objective", index, float(o["seconds"]))
 			return
 
+	var mend := barricade_to_mend(player)
+
+	if mend >= 0:
+		_start(player, &"repair", mend, config.barricade_repair_seconds)
+
 
 func _begin_heal(player: ZzPlayer) -> void:
 	var friend := _looked_at_survivor(player, config.use_reach, false)
@@ -1381,6 +1617,8 @@ func _use_still_valid(player: ZzPlayer) -> bool:
 				and loot.position_of(player.use_target).distance_to(player.eye_position()) <= config.use_reach + 0.8
 		&"objective":
 			return current_objective() == player.use_target and objective_states[player.use_target] == &"waiting"
+		&"repair":
+			return barricade_to_mend(player) == player.use_target
 
 	return false
 
@@ -1409,6 +1647,8 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 			loot.use(target, player)
 		&"objective":
 			_objective_used(target)
+		&"repair":
+			var _mended := mend_barricade(target, player)
 
 
 func cancel_use(player: ZzPlayer) -> void:
@@ -2198,6 +2438,8 @@ func describe() -> Dictionary:
 
 	if is_survival():
 		out["held"] = "%s of %s" % [_clock(survival_elapsed), _clock(survival_goal) if survival_goal > 0.0 else "endless"]
+		if survival != null:
+			out["survival"] = survival.describe()
 
 	var index := current_objective()
 	if index >= 0:

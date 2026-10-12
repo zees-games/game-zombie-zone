@@ -302,6 +302,12 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_broadcast(ZzEvents.Kind.OBJECTIVE, ZzEvents.write_objective(index, _objective_code(state))))
 		game.gate_opened.connect(func(gate: String) -> void:
 			_broadcast(ZzEvents.Kind.GATE, ZzEvents.write_gate(gate)))
+		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
+			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
+		game.survival_changed.connect(func() -> void:
+			var held: Dictionary = game.survival_state()
+			if not held.is_empty():
+				_broadcast(ZzEvents.Kind.SURVIVAL, ZzEvents.write_survival(held)))
 		game.exploded.connect(func(at: Vector3, radius: float, kind: StringName) -> void:
 			_broadcast(ZzEvents.Kind.BLAST, ZzEvents.write_blast(at, radius, kind)))
 		# Here and not in the module: the net suite has no module, and mg-deathrun found a handout
@@ -729,6 +735,9 @@ func server_tick(tick: int) -> void:
 
 	if tick % CLOCK_EVERY == 0:
 		_broadcast(ZzEvents.Kind.CLOCK, _clock_body())
+		var held: Dictionary = game.survival_state()
+		if not held.is_empty():
+			_broadcast(ZzEvents.Kind.SURVIVAL, ZzEvents.write_survival(held))
 
 
 func _clock_body() -> PackedByteArray:
@@ -814,6 +823,10 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, actions: int 
 
 		if game.remote_seconds_left > 0.0:
 			game.remote_seconds_left = maxf(game.remote_seconds_left - net.clock.tick_duration(), 0.0)
+
+		# The hold's stage clock, the same way.
+		if float(game.remote_survival.get("left", -1.0)) > 0.0:
+			game.remote_survival["left"] = maxf(float(game.remote_survival["left"]) - net.clock.tick_duration(), 0.0)
 
 
 # --- Receiving -------------------------------------------------------------
@@ -1046,6 +1059,15 @@ func _tell_the_world(peer_id: int) -> void:
 	if game.horde != null:
 		for gate in game.horde.open_gates:
 			_tell(peer_id, ZzEvents.Kind.GATE, ZzEvents.write_gate(gate))
+
+	for id: String in game.barricades:
+		var b: Dictionary = game.barricades[id]
+		if float(b["health"]) < float(b["max"]) or not bool(b["intact"]):
+			_tell(peer_id, ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, float(b["health"]) / float(b["max"]), bool(b["intact"])))
+
+	var held: Dictionary = game.survival_state()
+	if not held.is_empty():
+		_tell(peer_id, ZzEvents.Kind.SURVIVAL, ZzEvents.write_survival(held))
 
 	if game.boxes != null:
 		_tell(peer_id, ZzEvents.Kind.EFFECTS, ZzEvents.write_effects(game.boxes.effects_summary()))
@@ -1331,6 +1353,15 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			if bool(g["ok"]):
 				game.map.open_gate(str(g["gate"]))
 				gate_received.emit(str(g["gate"]))
+		ZzEvents.Kind.BARRICADE:
+			var bar := ZzEvents.read_barricade(reader)
+			if bool(bar["ok"]):
+				game.apply_barricade(str(bar["id"]), float(bar["fraction"]), bool(bar["intact"]))
+		ZzEvents.Kind.SURVIVAL:
+			var held := ZzEvents.read_survival(reader)
+			if bool(held["ok"]):
+				held.erase("ok")
+				game.remote_survival = held
 		ZzEvents.Kind.EFFECTS:
 			var fx := ZzEvents.read_effects(reader)
 			if bool(fx["ok"]):

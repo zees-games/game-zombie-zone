@@ -50,6 +50,22 @@ var _next_swing: float = 0.0
 
 var _horde: Object = null
 
+## Thinking less often far from everybody (see [method _npc_think]): seconds of thought owed,
+## the ticks since the last, and how far the nearest survivor was when last asked.
+var _owed_delta: float = 0.0
+var _since_thought: int = 0
+var _nearest: float = 0.0
+var _nearest_at: float = -INF
+
+## Whether its last thought ended tearing at a barricade: one at the boards thinks every other
+## tick, because all it decides there is to keep tearing.
+var bashing: bool = false
+
+## Metres from the nearest survivor past which a zombie thinks every second tick, and every
+## fourth. Its body still moves every tick on the wish it last had.
+const THINK_NEAR := 20.0
+const THINK_FAR := 45.0
+
 
 func _npc_ready() -> void:
 	super()
@@ -108,6 +124,18 @@ func halt() -> void:
 
 	if b != null:
 		b.wish = Vector3.ZERO
+
+
+## The crowd round this zombie, from the horde's grid of the tick rather than the spawner's
+## walk over every zombie (see `ZzHorde.zombies_near`). The same answer, measured from where
+## each was when the tick began.
+func neighbours(radius: float) -> Array:
+	var h := horde()
+
+	if h == null or npc == null or not npc.is_alive():
+		return super(radius)
+
+	return h.call(&"neighbour_positions", npc, radius * 2.0)
 
 
 ## Walks the graph to [param to], kept apart from the crowd.
@@ -248,6 +276,22 @@ func lure_to(at: Vector3) -> void:
 # --- The tick --------------------------------------------------------------------------------
 
 func _npc_think(delta: float) -> void:
+	# [b]A horde far off thinks less often, and nothing can tell.[/b] A zombie forty metres away
+	# that re-plans its run every fourth tick instead of every tick is the same zombie on every
+	# screen: its body moves every tick on the wish it last had, and it is told everything it
+	# missed as one longer step. Measured on the school with twelve stand-ins and ninety
+	# commons: thinking was ten of the sixteen milliseconds a tick took, against a 64 Hz
+	# server's 15.6.
+	var every := _think_every()
+	_since_thought += 1
+	_owed_delta += delta
+
+	if _since_thought < every:
+		return
+
+	delta = _owed_delta
+	_owed_delta = 0.0
+	_since_thought = 0
 	super(delta)
 
 	if npc == null or not npc.is_alive() or body() == null:
@@ -267,6 +311,60 @@ func _npc_think(delta: float) -> void:
 		return
 
 	_decide(delta)
+	_bash_if_barred(delta)
+
+
+## Pressed against a barricade it was walking into: stop, face it, and tear at it. Checked
+## after the kind's own decision, so every kind does it whatever it was doing (chasing,
+## circling, coming to a lure) and none of them has to know barricades exist. The horde
+## answers from a grid, so asking costs a dictionary lookup for a zombie nowhere near one.
+func _bash_if_barred(delta: float) -> void:
+	var b := body()
+	var h := horde()
+
+	bashing = false
+
+	if h == null or b.wish.length() < 0.5 or b.flying:
+		return
+
+	var barred: String = h.call(&"barricade_in_way", npc.position(), b.wish)
+
+	if barred == "":
+		return
+
+	bashing = true
+
+	halt()
+	face(h.call(&"barricade_centre", barred) - npc.position())
+	b.anim = ZzZombieBody.Anim.ATTACK
+	h.call(&"bash", barred, npc, delta)
+
+
+## 1, 2 or 4: how many ticks this zombie's thought spans, by how far the nearest survivor is
+## (asked a few times a second, not every tick). A zombie with somebody to hit, swinging, or
+## staggered always thinks every tick.
+func _think_every() -> int:
+	if bashing:
+		return 2
+
+	if npc == null or not npc.is_alive() or swinging() or staggered() or (forced == &"" and npc.has_target() and _nearest < THINK_NEAR):
+		return 1
+
+	var h := horde()
+
+	if h == null:
+		return 1
+
+	var now_s := now()
+
+	if now_s - _nearest_at >= 0.3:
+		_nearest_at = now_s
+		_nearest = float(h.call(&"nearest_survivor_distance", npc.position()))
+
+	if _nearest < THINK_NEAR:
+		return 1
+
+	return 2 if _nearest < THINK_FAR else 4
 
 
 ## A kind's own machine. Called every think after sensing, unless staggered.

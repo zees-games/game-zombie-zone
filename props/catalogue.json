@@ -3106,6 +3106,222 @@
       "disguise": true
     },
     {
+      "id": "market_bottle-return",
+      "title": "Bottle-return",
+      "kit": "market",
+      "model": "assets/props/market/bottle-return.glb",
+      "scale": 2.4,
+      "size": [
+        1.08,
+        2.622,
+        1.154
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.068
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_cash-register",
+      "title": "Cash-register",
+      "kit": "market",
+      "model": "assets/props/market/cash-register.glb",
+      "scale": 2.4,
+      "size": [
+        2.04,
+        1.428,
+        2.04
+      ],
+      "offset": [
+        -0.06,
+        0.0,
+        -0.06
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_column",
+      "title": "Column",
+      "kit": "market",
+      "model": "assets/props/market/column.glb",
+      "scale": 2.4,
+      "size": [
+        1.742,
+        2.4,
+        1.742
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_display-bread",
+      "title": "Display-bread",
+      "kit": "market",
+      "model": "assets/props/market/display-bread.glb",
+      "scale": 2.4,
+      "size": [
+        1.68,
+        1.2,
+        1.44
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_display-fruit",
+      "title": "Display-fruit",
+      "kit": "market",
+      "model": "assets/props/market/display-fruit.glb",
+      "scale": 2.4,
+      "size": [
+        1.44,
+        1.238,
+        1.44
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_freezer",
+      "title": "Freezer",
+      "kit": "market",
+      "model": "assets/props/market/freezer.glb",
+      "scale": 2.4,
+      "size": [
+        1.92,
+        0.84,
+        1.44
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_freezers-standing",
+      "title": "Freezers-standing",
+      "kit": "market",
+      "model": "assets/props/market/freezers-standing.glb",
+      "scale": 2.4,
+      "size": [
+        2.4,
+        2.16,
+        1.2
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.6
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_shelf-bags",
+      "title": "Shelf-bags",
+      "kit": "market",
+      "model": "assets/props/market/shelf-bags.glb",
+      "scale": 2.4,
+      "size": [
+        1.92,
+        2.142,
+        1.68
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_shelf-boxes",
+      "title": "Shelf-boxes",
+      "kit": "market",
+      "model": "assets/props/market/shelf-boxes.glb",
+      "scale": 2.4,
+      "size": [
+        1.92,
+        2.04,
+        1.68
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_shelf-end",
+      "title": "Shelf-end",
+      "kit": "market",
+      "model": "assets/props/market/shelf-end.glb",
+      "scale": 2.4,
+      "size": [
+        1.92,
+        2.52,
+        0.96
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.483
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_shopping-basket",
+      "title": "Shopping-basket",
+      "kit": "market",
+      "model": "assets/props/market/shopping-basket.glb",
+      "scale": 2.4,
+      "size": [
+        0.84,
+        0.6,
+        0.84
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "market_shopping-cart",
+      "title": "Shopping-cart",
+      "kit": "market",
+      "model": "assets/props/market/shopping-cart.glb",
+      "scale": 2.4,
+      "size": [
+        0.72,
+        0.937,
+        1.149
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.035
+      ],
+      "disguise": true
+    },
+    {
       "id": "nature_cactus_tall",
       "title": "Cactus tall",
       "kit": "nature",

@@ -268,8 +268,8 @@ static func practice() -> Dictionary:
 		"id": String(PRACTICE),
 		"name": "Practice Street",
 		"author": "game-zombie-zone",
-		"blurb": "One street at night. Get from one safe room to the other.",
-		"mode": ZzMapDoc.CAMPAIGN,
+		"blurb": "One street at night. Get from one shelter to the other.",
+		"mode": ZzMapDoc.EXODUS,
 		"kill_y": -20.0,
 		"environment": {
 			"sky_top": [0.02, 0.025, 0.05], "sky_horizon": [0.08, 0.08, 0.11], "ground": [0.03, 0.03, 0.03],

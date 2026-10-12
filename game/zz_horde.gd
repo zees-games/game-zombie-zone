@@ -19,8 +19,16 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## specials   one at a time up to a cap, each from where it is most dangerous
 ## the brute  on its own long clock, with a warning
 ## panic      while an objective is held: mobs back to back until it is done
-## survival   a clock that only makes everything above come faster
+## survival   held by nights or a clock: everything above, faster and bigger by `intensity`
+## waves      held by waves: the director and the clocks are off, and the survival runtime
+##            (`zz_survival.gd`) releases each wave through [method spawn_wave]
 ## [/codeblock]
+##
+## [b]Barricades are on the zombies' ground on purpose.[/b] A shut gate is cut out of the graph
+## so the horde goes round; a barricade is left in, so the horde paths straight at it, is
+## stopped by its boxes, and breaks it down ([method barricade_in_way], [method bash]). A
+## barricade cut out of the graph would leave a school with no way in, every wave spawned
+## "where it cannot reach anybody", and nothing at the windows.
 ##
 ## [b]Server only.[/b] A client never builds one; it draws what the bridge tells it about.
 ##
@@ -76,8 +84,37 @@ var catalogue: DotNpcCatalogue = null
 ## Whether the pacing runs: false in a start area, between maps, in warmup.
 var pacing: bool = false
 
-## Survival: seconds since the hold began, which is what makes everything come faster.
-var survival_elapsed: float = -1.0
+## Whether this is a survival map's hold (bigger mobs, quicker specials, a quicker brute).
+var survival: bool = false
+
+## How much harder the hold is than its start: 1 at first, the survival runtime raises it with
+## each night or with the clock. Mobs grow by it, come more often by it, specials by its root.
+var intensity: float = 1.0
+
+## Whether the waves drive the spawning (the director, mobs, specials and brute clocks off).
+var waves_mode: bool = false
+
+## What the wave in play does to everything spawned in it: its twist.
+var wave_speed_scale: float = 1.0
+var wave_health_scale: float = 1.0
+
+## Barricades this map has: id -> {bounds: AABB, centre: Vector3}. Filled by the game.
+var barricades: Dictionary = {}
+
+## Every living zombie by four-metre cell, and where it was, built once a tick before anything
+## thinks ([method _rebuild_grid]). What a zombie's crowd spacing and a stand-in's threat scan
+## ask instead of the spawner's `npcs_near`, which walks every zombie: ninety commons each
+## asking it for their neighbours every tick was eight thousand position reads, and most of a
+## big map's tick.
+var _grid: Dictionary = {}
+var _grid_pos: Dictionary = {}
+const GRID := 4.0
+
+## Grid cell -> barricade ids near it, so a zombie asks only about the ones beside it.
+var _barricade_cells: Dictionary = {}
+const BARRICADE_CELL := 4.0
+## How far past a barricade's face a zombie bashes it from: its radius and an arm.
+const BASH_REACH := 0.75
 
 ## Multipliers boxes stack: how often mobs come, how hard specials are, how big mobs are.
 var mob_rate_scale: float = 1.0
@@ -211,6 +248,9 @@ func build_for_map(doc: Dictionary) -> DotResult:
 	clear()
 	_doc = doc
 	open_gates = PackedStringArray()
+	# Sized for the team the map is built for: a dozen survivors' cap on four survivors' budget
+	# had the spawner refuse two of every three of a wave.
+	spawner.limits = ZzNpcs.limits(config, _planned_team())
 
 	var built := rebuild_navigation()
 
@@ -344,7 +384,11 @@ func clear() -> void:
 	_lures.clear()
 	_bile.clear()
 	_panic_until = -1.0
-	survival_elapsed = -1.0
+	survival = false
+	intensity = 1.0
+	waves_mode = false
+	wave_speed_scale = 1.0
+	wave_health_scale = 1.0
 	pacing = false
 	mob_rate_scale = 1.0
 	special_rate_scale = 1.0
@@ -356,10 +400,11 @@ func clear() -> void:
 		director.enabled = false
 
 
-## Starts the clocks: the team has left the start area.
-func start_pacing(survival: bool) -> void:
+## Starts the clocks: the team has left the start area, or a night fell.
+func start_pacing(p_survival: bool) -> void:
 	pacing = true
-	survival_elapsed = 0.0 if survival else -1.0
+	waves_mode = false
+	survival = p_survival
 	_next_mob = _time + _rng.randf_range(config.mob_interval_min, config.mob_interval_max) * (0.5 if survival else 1.0)
 	_next_special = _time + _rng.randf_range(8.0, 20.0)
 
@@ -372,8 +417,21 @@ func start_pacing(survival: bool) -> void:
 	DotLog.info(CHANNEL, "the horde is coming", {"survival": survival})
 
 
+## A wave is on: perception, brains and panic run, and nothing spawns but what the survival
+## runtime releases through [method spawn_wave], [method spawn_special] and [method spawn_brute].
+func start_waves() -> void:
+	pacing = true
+	waves_mode = true
+	survival = true
+	director.enabled = false
+	_next_mob = INF
+	_next_special = INF
+	_next_brute = INF
+
+
 func stop_pacing() -> void:
 	pacing = false
+	waves_mode = false
 	director.enabled = false
 
 
@@ -399,7 +457,7 @@ func _place_wanderers() -> void:
 	for f: Array in (_doc.get("nav", {}) as Dictionary).get("floors", []):
 		area += (float(f[2]) - float(f[0])) * (float(f[3]) - float(f[1]))
 
-	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(4) * 0.8))
+	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(_planned_team()) * 0.8))
 	var starts := _start_points()
 	var candidates := director.spawn_points.duplicate()
 	var placed := 0
@@ -436,6 +494,12 @@ func _place_wanderers() -> void:
 	DotLog.debug(CHANNEL, "wanderers placed", {"wanted": wanted, "placed": placed})
 
 
+## The team the map in play is built for, or the survivors there are, whichever is more.
+func _planned_team() -> int:
+	var team: int = game.team_size() if game != null and game.has_method(&"team_size") else 4
+	return maxi(team, game.survivors().size() if game != null else 1)
+
+
 func _start_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
 
@@ -454,22 +518,29 @@ func tick(delta: float) -> void:
 
 	_time += delta
 	_rebuild_candidates()
+	_rebuild_grid()
 	spawner.set_candidates(_candidates)
 	_land_alerts()
 	_advance_lures()
 	_advance_bile()
 	spawner.tick(delta)
 
+	var speed := zombie_speed_scale * wave_speed_scale
+
 	for npc in spawner.all_npcs():
 		if npc.is_alive() and npc.node is ZzZombieBody:
 			var b := npc.node as ZzZombieBody
-			b.wish *= zombie_speed_scale
+			b.wish *= speed
 			b.advance(delta)
 
 	squads.prune()
 	_release_pending()
 
 	if not pacing:
+		return
+
+	if waves_mode:
+		_advance_panic()
 		return
 
 	for id: StringName in _survivors:
@@ -480,9 +551,6 @@ func tick(delta: float) -> void:
 
 	director.rules.absolute_cap = config.commons_cap(_survivor_count())
 	director.tick(delta)
-
-	if survival_elapsed >= 0.0:
-		survival_elapsed += delta
 
 	_advance_mobs()
 	_advance_specials()
@@ -567,6 +635,74 @@ func survivor_ids() -> Array[StringName]:
 			out.append(id)
 
 	return out
+
+
+func _rebuild_grid() -> void:
+	_grid.clear()
+	_grid_pos.clear()
+
+	for npc in spawner.all_npcs():
+		if not npc.is_alive():
+			continue
+
+		var p := npc.position()
+		_grid_pos[npc.instance_id] = p
+		var key := Vector2i(floori(p.x / GRID), floori(p.z / GRID))
+		var cell: Variant = _grid.get(key)
+
+		if cell == null:
+			_grid[key] = [npc]
+		else:
+			(cell as Array).append(npc)
+
+
+## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
+func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
+	var out: Array[DotNpcInstance] = []
+	var reach := radius * radius
+	var x0 := floori((point.x - radius) / GRID)
+	var x1 := floori((point.x + radius) / GRID)
+	var z0 := floori((point.z - radius) / GRID)
+	var z1 := floori((point.z + radius) / GRID)
+
+	for cx in range(x0, x1 + 1):
+		for cz in range(z0, z1 + 1):
+			var cell: Variant = _grid.get(Vector2i(cx, cz))
+
+			if cell == null:
+				continue
+
+			for npc: DotNpcInstance in cell:
+				if npc.is_alive() and (_grid_pos[npc.instance_id] as Vector3).distance_squared_to(point) <= reach:
+					out.append(npc)
+
+	return out
+
+
+## Where the zombies round [param npc] are, for its crowd spacing (dot-npc-ai's `neighbours`).
+func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
+	var out: Array = []
+	var here: Vector3 = _grid_pos.get(npc.instance_id, npc.position())
+
+	for other in zombies_near(here, radius):
+		if other.instance_id != npc.instance_id:
+			out.append(_grid_pos[other.instance_id])
+
+	return out
+
+
+## Metres from [param at] to the nearest living survivor, flat; INF with nobody.
+func nearest_survivor_distance(at: Vector3) -> float:
+	var best := INF
+
+	for id: StringName in _survivors:
+		var info: Dictionary = _survivors[id]
+
+		if bool(info["alive"]):
+			var p: Vector3 = info["position"]
+			best = minf(best, Vector2(p.x - at.x, p.z - at.z).length())
+
+	return best
 
 
 ## How many survivors are within [param radius] of [param at], up and on their feet.
@@ -681,8 +817,8 @@ func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
 
 	var grown := size
 
-	if survival_elapsed >= 0.0:
-		grown = int(round(float(size) * (1.0 + survival_elapsed / 480.0)))
+	if survival:
+		grown = int(round(float(size) * intensity))
 
 	DotLog.debug(CHANNEL, "a scream", {"victim": String(victim), "mob": grown})
 	return spawn_mob(maxi(int(round(float(grown) * mob_size_scale)), 0), victim)
@@ -781,9 +917,9 @@ func is_biled(id: StringName) -> bool:
 func _mob_size() -> int:
 	var size := float(config.mob_size + config.mob_size_per_survivor * maxi(_survivor_count() - 1, 0))
 
-	if survival_elapsed >= 0.0:
-		# Survival: half as big again every four minutes held.
-		size *= 1.0 + survival_elapsed / 480.0
+	if survival:
+		# Survival: as much bigger as the hold is harder (the runtime's intensity).
+		size *= intensity
 
 	return maxi(int(round(size * mob_size_scale)), 1)
 
@@ -794,8 +930,8 @@ func _advance_mobs() -> void:
 
 	var interval := _rng.randf_range(config.mob_interval_min, config.mob_interval_max)
 
-	if survival_elapsed >= 0.0:
-		interval *= clampf(1.0 - survival_elapsed / 900.0, 0.35, 1.0) * 0.6
+	if survival:
+		interval *= clampf(1.0 / maxf(intensity, 0.01), 0.35, 1.0) * 0.6
 
 	_next_mob = _time + interval / maxf(mob_rate_scale, 0.05)
 	spawn_mob(_mob_size())
@@ -839,12 +975,18 @@ func _release_pending() -> void:
 	for i in mini(MOB_BURST, _pending.size()):
 		var entry: Array = _pending.pop_front()
 		var at: Vector3 = entry[1]
-		var npc := spawner.spawn(entry[0], nav.snap(at + Vector3(_rng.randf_range(-2.0, 2.0), 0.0, _rng.randf_range(-2.0, 2.0)), 2.5), &"mob")
+		var owner: StringName = entry[4] if entry.size() > 4 else &"mob"
+		var npc := spawner.spawn(entry[0], nav.snap(at + Vector3(_rng.randf_range(-2.0, 2.0), 0.0, _rng.randf_range(-2.0, 2.0)), 2.5), owner)
 
 		if npc == null:
+			if owner == WAVE:
+				refused_wave += 1
 			continue
 
 		(npc.node as ZzZombieBody).set_flag(int(entry[3]), true)
+
+		if owner == WAVE and wave_health_scale != 1.0:
+			_rescale_health(npc, wave_health_scale)
 
 		if npc.brain != null and entry[2] != &"":
 			npc.brain.call(&"force_target", entry[2])
@@ -899,6 +1041,193 @@ func _spawn_point(near: float, far: float, prefer_ahead: bool, around: StringNam
 	return best
 
 
+# --- Waves ------------------------------------------------------------------------------------
+
+## The owner a wave's zombies are spawned under, which is how the wave counts what is left.
+const WAVE := &"wave"
+
+## Wave commons the spawner refused (no room, no ground), for the runtime to owe again.
+var refused_wave: int = 0
+
+## [param size] commons of a wave, released a few at a time from the map's edges (its
+## `zombie_spawns`, out of sight and able to reach somebody) or, failing those, from the
+## graph's own points, each sent at a survivor round the team. Returns how many were queued.
+##
+## [b]From the map's hints first.[/b] A survival map's hints are where the horde comes from:
+## the car park, the outfield, the loading bays. Spawned anywhere out of sight instead, a wave
+## came from inside the gym the team was holding, because the gym's back corner was out of
+## everybody's sight.
+func spawn_wave(size: int) -> int:
+	var ids := survivor_ids()
+
+	if ids.is_empty() or size <= 0:
+		return 0
+
+	var origins: Array[Vector3] = []
+
+	for i in mini(1 + size / 8, 4):
+		var spot := _wave_origin()
+
+		if spot != Vector3.INF:
+			origins.append(spot)
+
+	if origins.is_empty():
+		return 0
+
+	for i in size:
+		_pending.append([ZzNpcs.COMMON, origins[i % origins.size()], ids[(i + _rng.randi()) % ids.size()],
+			ZzZombieBody.FLAG_MOB, WAVE])
+
+	return size
+
+
+## A hint the wave can come from: out of sight, at least fifteen metres from everybody, and on
+## ground that reaches somebody. INF when no hint will do and no point of the graph either.
+func _wave_origin() -> Vector3:
+	var nodes := _survivor_nodes()
+	var hints: Array = _doc.get("zombie_spawns", [])
+	var order: Array = range(hints.size())
+	order.shuffle()
+
+	for i: int in order:
+		var p := ZzMapDoc.v3(hints[i])
+		var nearest := INF
+
+		for id in survivor_ids():
+			nearest = minf(nearest, p.distance_to(survivor_position(id)))
+
+		if nearest < 15.0 or seen_by_survivors(p) or not _reaches_somebody(p, nodes):
+			continue
+
+		return p
+
+	return _spawn_point(15.0, 90.0, false)
+
+
+## Wave zombies still alive, queued, or about to be.
+func wave_alive() -> int:
+	var n := 0
+
+	for npc in spawner.npcs_of(WAVE):
+		if npc.is_alive():
+			n += 1
+
+	for entry: Array in _pending:
+		if entry.size() > 4 and entry[4] == WAVE:
+			n += 1
+
+	return n
+
+
+## The wave ended on its overtime: what is left of it a long way from everybody (stuck, lost)
+## is tidied away, and the rest are sent at the team. Returns how many were tidied.
+func clear_wave_stragglers(far: float = 30.0) -> int:
+	var tidied := 0
+	var ids := survivor_ids()
+
+	for npc in spawner.npcs_of(WAVE):
+		if not npc.is_alive():
+			continue
+
+		var nearest := INF
+		for id in ids:
+			nearest = minf(nearest, npc.position().distance_to(survivor_position(id)))
+
+		if nearest > far:
+			var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+			tidied += 1
+		elif npc.brain != null and not ids.is_empty():
+			npc.brain.call(&"force_target", ids[_rng.randi_range(0, ids.size() - 1)])
+
+	return tidied
+
+
+## At dawn the dark's own leave: every zombie further than [param far] from every survivor and
+## chasing nobody goes back to wherever they go by day. Returns how many.
+func dawn(far: float = 30.0) -> int:
+	var gone := 0
+	var ids := survivor_ids()
+
+	for npc in spawner.all_npcs():
+		if not npc.is_alive() or npc.owner_id == &"map":
+			continue
+
+		var nearest := INF
+		for id in ids:
+			nearest = minf(nearest, npc.position().distance_to(survivor_position(id)))
+
+		if nearest > far:
+			var _removed := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+			gone += 1
+
+	return gone
+
+
+# --- Barricades --------------------------------------------------------------------------------
+
+## The barricades of the map in play, as the game holds them: `{id: AABB}` of the intact ones.
+## Called by the game whenever one breaks or is mended.
+func set_barricades(bounds: Dictionary) -> void:
+	barricades.clear()
+	_barricade_cells.clear()
+
+	for id: String in bounds:
+		var box: AABB = bounds[id]
+		barricades[id] = {"bounds": box, "centre": box.get_center()}
+		var grown := box.grow(BASH_REACH + 0.5)
+		for cx in range(floori(grown.position.x / BARRICADE_CELL), floori(grown.end.x / BARRICADE_CELL) + 1):
+			for cz in range(floori(grown.position.z / BARRICADE_CELL), floori(grown.end.z / BARRICADE_CELL) + 1):
+				var key := Vector2i(cx, cz)
+				if not _barricade_cells.has(key):
+					_barricade_cells[key] = []
+				(_barricade_cells[key] as Array).append(id)
+
+
+## The intact barricade a zombie at [param at] wanting to go [param wish] is pressed against,
+## or "". Against its face (within [constant BASH_REACH] of its box, horizontally) and heading
+## into it, not along it or away.
+func barricade_in_way(at: Vector3, wish: Vector3) -> String:
+	if _barricade_cells.is_empty():
+		return ""
+
+	var ids: Variant = _barricade_cells.get(Vector2i(floori(at.x / BARRICADE_CELL), floori(at.z / BARRICADE_CELL)))
+
+	if ids == null:
+		return ""
+
+	for id: String in ids:
+		var entry: Dictionary = barricades[id]
+		var box: AABB = entry["bounds"]
+		var dx := maxf(maxf(box.position.x - at.x, at.x - box.end.x), 0.0)
+		var dz := maxf(maxf(box.position.z - at.z, at.z - box.end.z), 0.0)
+
+		if dx * dx + dz * dz > BASH_REACH * BASH_REACH or at.y > box.end.y or at.y + 1.8 < box.position.y:
+			continue
+
+		var toward: Vector3 = (entry["centre"] as Vector3) - at
+		toward.y = 0.0
+
+		if wish.dot(toward) > 0.0:
+			return id
+
+	return ""
+
+
+func barricade_centre(id: String) -> Vector3:
+	var entry: Variant = barricades.get(id)
+	return (entry as Dictionary)["centre"] if entry != null else Vector3.INF
+
+
+## A zombie spent [param delta] seconds tearing at barricade [param id]. Through the game, which
+## owns its strength. A brute's arms are ten of a common's; a special's two.
+func bash(id: String, npc: DotNpcInstance, delta: float) -> void:
+	if game == null or npc == null or not npc.is_alive():
+		return
+
+	var arms := 10.0 if npc.def.id == ZzNpcs.BRUTE else 2.0 if ZzNpcs.is_special(npc.def.id) else 1.0
+	game.bash_barricade(id, config.barricade_bash * arms * delta)
+
+
 # --- Specials ---------------------------------------------------------------------------------
 
 func _allowed_specials() -> Array[StringName]:
@@ -926,8 +1255,8 @@ func _advance_specials() -> void:
 
 	var interval := _rng.randf_range(config.special_interval_min, config.special_interval_max)
 
-	if survival_elapsed >= 0.0:
-		interval *= clampf(1.0 - survival_elapsed / 1200.0, 0.4, 1.0)
+	if survival:
+		interval *= clampf(1.0 / sqrt(maxf(intensity, 0.01)), 0.4, 1.0)
 
 	_next_special = _time + interval / maxf(special_rate_scale, 0.05)
 
@@ -950,8 +1279,9 @@ func _advance_specials() -> void:
 	var _made := spawn_special(pool[_rng.randi_range(0, pool.size() - 1)])
 
 
-## One special, from wherever is worst for the team. Returns it, or null.
-func spawn_special(kind: StringName, at: Vector3 = Vector3.INF) -> DotNpcInstance:
+## One special, from wherever is worst for the team. Returns it, or null. [param owner] is
+## `wave` for a wave's own, which the wave counts as left until it is dead.
+func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"special") -> DotNpcInstance:
 	var where := at
 
 	if where == Vector3.INF:
@@ -962,13 +1292,13 @@ func spawn_special(kind: StringName, at: Vector3 = Vector3.INF) -> DotNpcInstanc
 	if where == Vector3.INF:
 		return null
 
-	var npc := spawner.spawn(kind, where, &"special")
+	var npc := spawner.spawn(kind, where, owner)
 
 	if npc == null:
 		return null
 
-	if special_health_scale != 1.0:
-		_rescale_health(npc, special_health_scale)
+	if special_health_scale * wave_health_scale != 1.0:
+		_rescale_health(npc, special_health_scale * wave_health_scale)
 
 	special_spawned.emit(npc)
 	DotLog.debug(CHANNEL, "a special", {"kind": String(kind), "at": str(where)})
@@ -981,7 +1311,7 @@ func _advance_brute() -> void:
 
 	var gap := _rng.randf_range(config.brute_interval_min, config.brute_interval_max)
 
-	if survival_elapsed >= 0.0:
+	if survival:
 		gap *= 0.6
 
 	_next_brute = _time + maxf(gap, 30.0)
@@ -990,13 +1320,16 @@ func _advance_brute() -> void:
 		var _b := spawn_brute()
 
 
-func spawn_brute(at: Vector3 = Vector3.INF) -> DotNpcInstance:
+func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
 	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
+
+	if where == Vector3.INF and owner == WAVE:
+		where = _wave_origin()
 
 	if where == Vector3.INF:
 		return null
 
-	var npc := spawner.spawn(ZzNpcs.BRUTE, where, &"brute")
+	var npc := spawner.spawn(ZzNpcs.BRUTE, where, owner)
 
 	if npc == null:
 		return null

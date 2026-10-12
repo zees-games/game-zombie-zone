@@ -16,7 +16,7 @@ version: 0.0.0
 kind: pack
 
 name: Zombie Zone
-max_players: 8
+max_players: 24
 
 scene: scenes/zz_server.tscn
 client_scene: game/zz.tscn

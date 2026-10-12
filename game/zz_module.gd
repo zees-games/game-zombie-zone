@@ -406,6 +406,45 @@ func _add_tunables(world: ZzGame) -> void:
 			config.spectate_camera = clampi(int(value), 0, 2)
 			if world.spectate != null:
 				world.spectate.set_force_camera(config.spectate_camera))
+	# How a survival map is held: `zz_survival waves|nights|clock` (by name or 0/1/2), and its
+	# numbers. Read when a hold begins, so a change takes from the next survival map.
+	var style := add_cvar("zz_survival", config.survival_style_name(),
+		"How survival maps are held: waves (the default: waves to clear), nights (days to get ready, nights to live through) or clock")
+	if style != null:
+		style.changed.connect(func(_old: String, now: String) -> void:
+			var picked := DotNpcDirectorWaves.style_from(now)
+			if picked >= 0:
+				config.survival_style = picked
+			log_info("survival style", {"now": config.survival_style_name()}))
+	_tunable("zz_waves", float(config.waves), "Waves a survival map is held for (zz_survival waves)",
+		func(value: float) -> void: config.waves = clampi(int(value), 1, 50))
+	_tunable("zz_nights", float(config.nights), "Nights a survival map is held for (zz_survival nights)",
+		func(value: float) -> void: config.nights = clampi(int(value), 1, 20))
+	_tunable("zz_breather", config.breather_seconds, "Seconds of breather between waves",
+		func(value: float) -> void: config.breather_seconds = clampf(value, 0.0, 300.0))
+	_tunable("zz_survival_warmup", config.survival_warmup_seconds, "Seconds before the first wave or night",
+		func(value: float) -> void: config.survival_warmup_seconds = clampf(value, 0.0, 300.0))
+	_tunable("zz_day_seconds", config.day_seconds, "Seconds of day between nights",
+		func(value: float) -> void: config.day_seconds = clampf(value, 10.0, 900.0))
+	_tunable("zz_night_seconds", config.night_seconds, "Seconds a night lasts",
+		func(value: float) -> void: config.night_seconds = clampf(value, 10.0, 1800.0))
+	_tunable("zz_wave_size", float(config.wave_size), "The first wave's commons for one survivor",
+		func(value: float) -> void: config.wave_size = clampi(int(value), 1, 400))
+	_tunable("zz_wave_size_per_survivor", float(config.wave_size_per_survivor), "And for each survivor more",
+		func(value: float) -> void: config.wave_size_per_survivor = clampi(int(value), 0, 50))
+	_tunable("zz_wave_growth", config.wave_growth, "How much bigger each wave is than the first, as a share of it",
+		func(value: float) -> void: config.wave_growth = clampf(value, 0.0, 2.0))
+	_tunable("zz_wave_twists", 1.0 if config.wave_twists else 0.0, "1: waves from the third draw a twist (sprinters, swarm, heavies, hunters)",
+		func(value: float) -> void: config.wave_twists = value >= 0.5)
+	_tunable("zz_brute_every", float(config.brute_every_waves), "Every this many waves a brute comes (and two with the last); 0 never",
+		func(value: float) -> void: config.brute_every_waves = clampi(int(value), 0, 50))
+	_tunable("zz_barricade_health", config.barricade_health, "A barricade's strength when the map does not say",
+		func(value: float) -> void: config.barricade_health = clampf(value, 10.0, 10000.0))
+	_tunable("zz_barricade_bash", config.barricade_bash, "What one zombie's bashing takes off a barricade a second",
+		func(value: float) -> void: config.barricade_bash = clampf(value, 0.0, 200.0))
+	_tunable("zz_team_from_map", 1.0 if config.team_from_map else 0.0,
+		"1: stand-ins fill to the team a map is built for (its survivors) when that is more than bot_quota",
+		func(value: float) -> void: config.team_from_map = value >= 0.5)
 	# [b]Deprecated: the count is `bot_quota` now[/b], and this forwards to it. Kept rather than
 	# removed because every shipped server config sets it; left as its own number it would be
 	# a second cvar deciding the same count, and whichever was read last would win.
@@ -563,6 +602,14 @@ func _keep_the_round_full() -> void:
 	if _bots == null or _bots.get_bool():
 		var slots: int = server.config.max_players if server != null and server.config != null else -1
 		wanted = _quota.wanted(humans, slots)
+
+		# A map built for a dozen raises the count to a dozen, in fill mode (the default): the
+		# school with four people in it is a school with forty windows nobody is at. The
+		# operator's bot_quota still wins when it is higher, and `zz_team_from_map 0` turns
+		# this off.
+		if _quota.mode() == DotBotQuota.Mode.FILL and world.team_size() > _quota.quota():
+			wanted = DotBotQuota.compute(DotBotQuota.Mode.FILL, world.team_size(), humans, slots,
+				_quota.empty_cvar == null or _quota.empty_cvar.get_bool())
 
 	for _i in range(maxi(wanted - _bot_ids.size(), 0)):
 		var bot: ZzPlayer = bridge.call("add_bot", _bot_name(world))

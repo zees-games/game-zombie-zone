@@ -22,6 +22,12 @@ const ZzWeapons := preload("zz_weapons.gd")
 ##                          end area when nobody human is leading; work the objective
 ## [/codeblock]
 ##
+## [b]On a survival map the team is a set of posts[/b] (the map's `posts`): each stand-in holds
+## its own, spread over them by seat, fights from it, mends the barricade nearest it when
+## nothing is in sight, and in a breather walks to a cache when it is short of ammunition, a
+## medkit or a proper gun. A dozen stand-ins following one leader round a school was a dozen
+## stand-ins in one corridor and forty windows nobody was at.
+##
 ## It walks the zombies' own navigation graph (`ZzHorde.nav`), so it goes round a car rather
 ## than into it.
 ##
@@ -36,7 +42,10 @@ const CHANNEL := "zz.bots"
 
 ## The survivors stand-ins are named after, solo and on a server; past the end of the list
 ## dot-bot's [DotBotNames] numbers them.
-const BOT_NAMES := ["Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable", "Wren"]
+## Twenty-four, because a survival map is built for a dozen or more.
+const BOT_NAMES := ["Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable", "Wren",
+	"Cass", "Dmitri", "Ines", "Booker", "Tamsin", "Okafor", "Lupe", "Gideon",
+	"Mireille", "Shaw", "Noor", "Vance", "Ottilie", "Rafferty", "Keiko", "Bram"]
 
 ## How far a bot sees a zombie, and how close a crowd has to be to be shoved.
 const SIGHT := 32.0
@@ -188,9 +197,12 @@ func _decide(player, command: DotFpsCommand) -> void:
 			player.shove_held = (game.current_tick() % 10) < 2
 
 		command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, danger))
-		# Backpedal from anything in its face; otherwise keep with the team while shooting.
+		# Backpedal from anything in its face; otherwise keep with the team (or its post) while
+		# shooting.
 		if danger.position().distance_to(player.feet()) < 2.5:
 			_move_world(player, command, player.feet() - danger.position())
+		elif game.is_survival():
+			_hold_post(player, command, memory)
 		else:
 			_follow(player, command, memory)
 		return
@@ -212,11 +224,208 @@ func _decide(player, command: DotFpsCommand) -> void:
 	if _pick_up(player, command, memory):
 		return
 
+	# A survival map: mend, restock, hold.
+	if game.is_survival():
+		if _mend(player, command, memory) or _restock(player, command, memory):
+			return
+		if not _objective(player, command, memory):
+			_hold_post(player, command, memory)
+		return
+
 	# 5. The team, or the objective.
 	if _objective(player, command, memory):
 		return
 
 	_follow(player, command, memory)
+
+
+# --- Holding a survival map ------------------------------------------------------------------
+
+## This stand-in's post: the map's posts shared out by seat (its place among the stand-ins,
+## sorted by id, so it does not change while it plays), a ring round the post when there are
+## more stand-ins than posts. The spawns when the map has no posts.
+func _post_of(player) -> Vector3:
+	var posts: Array = game.map_doc.get("posts", [])
+
+	if posts.is_empty():
+		var spot: Array = game.map.spawn("survivors", _seat(player))
+		return spot[0]
+
+	var seat := _seat(player)
+	var at := ZzMapDoc.v3(posts[seat % posts.size()])
+	var lap := seat / posts.size()
+
+	if lap > 0:
+		var angle := float(lap) * 2.39996
+		at += Vector3(cos(angle), 0.0, sin(angle)) * 1.4
+
+	return at
+
+
+func _seat(player) -> int:
+	var memory := _memory(player)
+	var roster: int = game.players.size()
+
+	if int(memory.get("seat_roster", -1)) == roster:
+		return int(memory["seat"])
+
+	var ids: Array = []
+
+	for other in game.survivors():
+		if other.is_bot:
+			ids.append(String(other.player_id))
+
+	ids.sort()
+	memory["seat"] = maxi(ids.find(String(player.player_id)), 0)
+	memory["seat_roster"] = roster
+	return int(memory["seat"])
+
+
+func _hold_post(player, command: DotFpsCommand, memory: Dictionary) -> void:
+	var post := _post_of(player)
+
+	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > 2.0:
+		_walk_to(player, command, post, memory)
+
+
+## Mends the weakest barricade near its post when nothing is in sight: walks to its inside face
+## and holds E until it is whole. A broken one is rebuilt first.
+func _mend(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	var list: Array = game.map_doc.get("barricades", [])
+
+	if list.is_empty():
+		return false
+
+	var post := _post_of(player)
+	var best := int(memory.get("mend", -1))
+
+	# Which barricade is chosen twice a second, not every tick: the walk there is every tick.
+	if game.now() >= float(memory.get("mend_until", -1.0)):
+		best = _barricade_to_tend(list, post)
+		memory["mend"] = best
+		memory["mend_until"] = game.now() + 0.5
+	elif best >= 0 and (best >= list.size() or _needs_mending(list[best]) < 0.0):
+		best = -1
+
+	if best < 0:
+		return false
+
+	if game.barricade_to_mend(player) == best:
+		var box: AABB = game.map.barricade_bounds(str((list[best] as Dictionary)["id"]))
+		_aim(player, command, box.get_center())
+		# Held through a mend, let go for a tick between: a mend starts on the press, and a key
+		# held from the last one is no press.
+		if player.using == &"repair" or game.current_tick() % 4 != 0:
+			player.actions |= ZzNetCommand.ACT_USE
+		return true
+
+	# Its inside face: the nearest point of the box to the post, a metre back toward the post.
+	var box: AABB = game.map.barricade_bounds(str((list[best] as Dictionary)["id"]))
+	var face := Vector3(clampf(post.x, box.position.x, box.end.x), 0.0, clampf(post.z, box.position.z, box.end.z))
+	var back := post - face
+	back.y = 0.0
+	var stand := face + (back.normalized() * 1.1 if back.length() > 0.1 else Vector3.ZERO)
+	_walk_to(player, command, stand, memory)
+	return true
+
+
+## The weakest barricade near [param post] that wants mending (broken, or under three
+## quarters), as its index; -1 for none.
+func _barricade_to_tend(list: Array, post: Vector3) -> int:
+	var best := -1
+	var best_score := INF
+
+	for i in list.size():
+		var share := _needs_mending(list[i])
+
+		if share < 0.0:
+			continue
+
+		var box: AABB = game.map.barricade_bounds(str((list[i] as Dictionary)["id"]))
+		var gap := box.get_center().distance_to(post)
+
+		if gap > 22.0:
+			continue
+
+		var score := gap + share * 20.0
+
+		if score < best_score:
+			best = i
+			best_score = score
+
+	return best
+
+
+## How whole a barricade is (0 broken .. 0.75), or -1 when it does not want mending.
+func _needs_mending(entry: Dictionary) -> float:
+	var held: Dictionary = game.barricades.get(str(entry["id"]), {})
+
+	if held.is_empty():
+		return -1.0
+
+	var share := float(held["health"]) / maxf(float(held["max"]), 1.0)
+
+	if not bool(held["intact"]):
+		return 0.0
+
+	return share if share <= 0.75 else -1.0
+
+
+## In a breather, short of ammunition, a medkit or a primary: to the nearest cache that has
+## something on it.
+func _restock(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	if game.survival == null or game.survival.waves == null or game.loot == null \
+			or game.survival.waves.stage != DotNpcDirectorWaves.Stage.QUIET:
+		return false
+
+	var wants: bool = _low_on_ammo(player) or player.medkits == 0 \
+		or (player.weapons != null and player.weapons.arsenal != null and not _has_primary(player))
+
+	if not wants:
+		return false
+
+	var best := Vector3.INF
+	var best_gap := 70.0
+
+	for raw: Array in game.map_doc.get("caches", []):
+		var at := ZzMapDoc.v3(raw)
+		var stocked := false
+
+		for id: int in game.loot.entries:
+			if (game.loot.position_of(id) as Vector3).distance_to(at) < 1.6:
+				stocked = true
+				break
+
+		var gap := at.distance_to(player.feet())
+
+		if stocked and gap < best_gap:
+			best = at
+			best_gap = gap
+
+	if best == Vector3.INF:
+		return false
+
+	_walk_to(player, command, best, memory)
+	return true
+
+
+## The slots a primary or heavy gun goes in, worked out once: asked every tick by every
+## stand-in, the weapon tables are too long to walk each time.
+var _primary_slots: Array = []
+
+
+func _has_primary(player) -> bool:
+	if _primary_slots.is_empty():
+		for id in ZzWeapons.ids_of(&"primary") + ZzWeapons.ids_of(&"heavy"):
+			var def: DotWeaponDef = ZzWeapons.def_of(id)
+			if def != null and not _primary_slots.has(def.slot):
+				_primary_slots.append(def.slot)
+
+	for slot: int in _primary_slots:
+		if player.weapons.arsenal.has_slot(slot):
+			return true
+
+	return false
 
 
 ## A semi-automatic weapon fires on the press, not while held: the trigger is let go every
@@ -234,15 +443,26 @@ func _pulse_trigger(player, command: DotFpsCommand) -> void:
 # --- Seeing -----------------------------------------------------------------------------------
 
 ## The most dangerous zombie this bot can see: a special within reach first, then the nearest.
+##
+## [b]Scored first, looked at in order, and the first one seen wins[/b]: a sight line is a
+## raycast, and a stand-in in front of a crowd of forty that tested each one it might prefer
+## cast forty a tick. Asked again only every few ticks while the one it has is alive.
 func _threat(player) -> DotNpcInstance:
 	if game.horde == null:
 		return null
 
-	var eye: Vector3 = player.eye_position()
-	var best: DotNpcInstance = null
-	var best_score := INF
+	var memory := _memory(player)
+	var held: Variant = memory.get("threat")
 
-	for npc in game.horde.spawner.npcs_near(player.feet(), SIGHT):
+	# Nobody in sight is an answer too: kept as long as a sighting is.
+	if game.current_tick() < int(memory.get("threat_until", 0)) \
+			and (held == null or (held is DotNpcInstance and (held as DotNpcInstance).is_alive())):
+		return held
+
+	var eye: Vector3 = player.eye_position()
+	var scored: Array = []
+
+	for npc in game.horde.zombies_near(player.feet(), SIGHT):
 		if not npc.is_alive():
 			continue
 
@@ -250,17 +470,27 @@ func _threat(player) -> DotNpcInstance:
 		if npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting":
 			continue
 
-		var at := _aim_point(npc)
-		var gap := at.distance_to(eye)
-		var score := gap
+		var score := _aim_point(npc).distance_to(eye)
 
 		if ZzNpcs.is_special(npc.def.id):
 			score -= 12.0
 
-		if score < best_score and _sees(player, at):
-			best_score = score
-			best = npc
+		scored.append([score, npc])
 
+	scored.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	var best: DotNpcInstance = null
+
+	# The ten it would rather shoot, at most: past those, a crowd behind a wall is a crowd
+	# behind a wall.
+	for n in mini(scored.size(), 10):
+		var npc: DotNpcInstance = scored[n][1]
+		if _sees(player, _aim_point(npc)):
+			best = npc
+			break
+
+	memory["threat"] = best
+	# Staggered by the stand-in's own seat, so a dozen do not all look on the same tick.
+	memory["threat_until"] = game.current_tick() + 3 + (hash(String(player.player_id)) & 1)
 	return best
 
 
@@ -279,7 +509,7 @@ func _crowd_within(player, reach: float) -> int:
 
 	var n := 0
 
-	for npc in game.horde.spawner.npcs_near(player.feet(), reach):
+	for npc in game.horde.zombies_near(player.feet(), reach):
 		if npc.is_alive() and npc.def.id == ZzNpcs.COMMON:
 			n += 1
 
@@ -333,11 +563,16 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 			continue
 
 		var middle: Vector3 = other.feet() + Vector3(0.0, 0.9, 0.0)
+		var off := Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle)
 
 		# Only somebody between the gun and the target, not behind either.
-		if (middle - eye).dot(at - eye) > 0.0 and middle.distance_to(eye) <= reach \
-				and Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle) < FRIEND_CLEARANCE:
+		if (middle - eye).dot(at - eye) > 0.0 and middle.distance_to(eye) <= reach and off < FRIEND_CLEARANCE:
 			return true
+
+		# Nowhere near the line: no hitbox of theirs can be on it. A dozen stand-ins each
+		# testing every friend's every hitbox every shot was most of what they cost.
+		if off > 2.5 + reach * cone:
+			continue
 
 		var set_node: DotHitboxSet = other.hitboxes
 
@@ -399,7 +634,7 @@ func _sleeper_near(player, reach: float) -> Vector3:
 	if game.horde == null:
 		return Vector3.INF
 
-	for npc in game.horde.spawner.npcs_near(player.feet(), reach):
+	for npc in game.horde.zombies_near(player.feet(), reach):
 		if npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting":
 			return npc.position()
 

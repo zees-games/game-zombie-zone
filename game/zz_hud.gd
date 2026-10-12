@@ -439,8 +439,17 @@ func _draw_top() -> void:
 	var clock_low := false
 	var under := ""
 
+	var hold := game.survival_state()
+
 	if game.phase == ZzGame.Phase.READY:
-		lines.append("Leave the safe room when you are ready")
+		lines.append("Leave the shelter when you are ready" if not game.is_survival() else str(game.map_doc.get("name", "")))
+	elif game.is_survival() and not hold.is_empty():
+		var top := survival_lines(hold)
+		lines.append(top[0])
+		clock = top[1]
+		under = top[2]
+		sub = top[3]
+		clock_low = top[4]
 	elif game.is_survival():
 		var held := game.survival_elapsed
 		lines.append(str(game.map_doc.get("name", "")))
@@ -465,11 +474,53 @@ func _draw_top() -> void:
 		elif sub == "" and clock == "":
 			sub = "Objective: %s" % str(o["label"])
 	elif not game.is_survival() and game.phase == ZzGame.Phase.PLAY and sub == "":
-		sub = "Get to the safe room"
+		sub = "Make for the shelter"
 
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
 	strip.show_clock(clock, clock_low, under if clock != "" else "")
+
+
+## What the top of the screen says about a survival hold: `[title, clock, under the clock,
+## line under the title, clock low]`. Static, so a suite can read it without a screen.
+##
+## [codeblock]
+## waves    Wave 3 of 10 · Sprinters        42 left          (in a wave)
+##          Breather — wave 4 next          0:24 to wave 4   mend the barricades, restock
+## nights   Night 2 of 5                    1:40 until dawn
+##          Day 2                           0:40 until dark
+## clock    the map's name                  3:12 held
+## [/codeblock]
+static func survival_lines(hold: Dictionary) -> Array:
+	var style := int(hold.get("style", 0))
+	var stage := int(hold.get("stage", 0))
+	var index := int(hold.get("index", 0))
+	var count := int(hold.get("count", 0))
+	var left := float(hold.get("left", -1.0))
+	var twist := str(hold.get("twist", ""))
+	var low := left >= 0.0 and left <= LOW_CLOCK_SEC
+	var clock := DotScoreStrip.clock_text(ceilf(left)) if left >= 0.0 else ""
+
+	match style:
+		DotNpcDirectorWaves.Style.ROUNDS:
+			if stage == DotNpcDirectorWaves.Stage.HORDE:
+				var title := ("Wave %d of %d" % [index, count]) if index < count else "The last wave"
+				if twist != "":
+					title += " · %s" % twist.capitalize()
+				return [title, "%d" % maxi(int(hold.get("remaining", 0)), 0), "left", "", false]
+			if stage == DotNpcDirectorWaves.Stage.QUIET:
+				var opening := index <= 1
+				return ["Get ready" if opening else "Breather", clock, "until wave %d" % index,
+					"Find the doors and the caches" if opening else "Mend the barricades, restock at the caches", low]
+			return ["All %d waves held" % count, "", "", "", false]
+		DotNpcDirectorWaves.Style.CYCLE:
+			if stage == DotNpcDirectorWaves.Stage.HORDE:
+				return [("Night %d of %d" % [index, count]) if index < count else "The last night", clock, "until dawn", "", low]
+			if stage == DotNpcDirectorWaves.Stage.QUIET:
+				return ["Day %d" % index, clock, "until dark", "Mend the barricades, restock at the caches", low]
+			return ["Morning", "", "", "", false]
+
+	return ["Hold out", clock, "left" if clock != "" else "", "", low]
 
 
 func _draw_health() -> void:
@@ -582,7 +633,7 @@ func _draw_use() -> void:
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…"}.get(player.using, "")
+		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…"}.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"

@@ -21,8 +21,8 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
-const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel"]
-const CHECKS_PER_MAP := 10
+const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp"]
+const CHECKS_PER_MAP := 12
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -216,7 +216,48 @@ func _test_map(id: StringName) -> void:
 	var mode_ok: bool = doc["mode"] == ZzMapDoc.SURVIVAL or not (doc["areas"]["end"] as Array).is_empty()
 	var next := str(doc.get("next", ""))
 	_check(mode_ok and (next == "" or game.catalogue.maps.has(StringName(next))),
-		"a campaign map has an end, and its next map exists", next)
+		"an exodus map has an end, and its next map exists", next)
+
+	# A survival map is held by a team: a seat for each of the team it is built for, and posts
+	# and caches on the ground the team walks (the zombies' ground, which is the stand-ins' too).
+	var held_ok := true
+	var held_why: Array = []
+	if doc["mode"] == ZzMapDoc.SURVIVAL:
+		if seats < int(doc.get("survivors", 0)):
+			held_ok = false
+			held_why.append("%d spawns for a team of %d" % [seats, int(doc.get("survivors", 0))])
+		for p: Array in doc.get("posts", []) + doc.get("caches", []):
+			var at := ZzMapDoc.v3(p) * Vector3(1.0, 0.0, 1.0)
+			if not open.is_reachable(from, at, SNAP):
+				held_ok = false
+				held_why.append("post or cache at %s" % at)
+				continue
+			# The short way, not round the outside: a door whose floor does not join its two
+			# rooms leaves them joined only through some other door, and the school's gym was
+			# reached from the hallway beside it through the kitchen, the loading bay and the
+			# car park, which is where the stand-ins went (and the horde came in).
+			var route := open.find_path(from, at, SNAP, false)
+			var walked := 0.0
+			for i in range(1, route.size()):
+				walked += route[i - 1].distance_to(route[i])
+			var straight := Vector2(at.x - from.x, at.z - from.z).length()
+			if walked > straight * 1.8 + 12.0:
+				held_ok = false
+				held_why.append("%s is %.0f m away the long way round (%.0f straight)" % [at, walked, straight])
+	_check(held_ok, "a survival map seats its team, its posts and caches on the ground" if doc["mode"] == ZzMapDoc.SURVIVAL \
+		else "it is not a survival map", "; ".join(held_why.slice(0, 6)))
+
+	# Every barricade is ON the zombies' ground, both faces of it: they come to it, and once it
+	# is down they come through. One cut out of the graph is a window nobody ever attacks.
+	var cut: Array = []
+	for entry: Dictionary in doc.get("barricades", []):
+		var box: AABB = game.map.barricade_bounds(str(entry["id"]))
+		var across := Vector3(0.0, 0.0, 1.2) if box.size.z < box.size.x else Vector3(1.2, 0.0, 0.0)
+		var centre := box.get_center() * Vector3(1.0, 0.0, 1.0)
+		if not open.is_reachable(from, centre + across, SNAP) or not open.is_reachable(from, centre - across, SNAP):
+			cut.append(str(entry["id"]))
+	_check(cut.is_empty(), "%d barricades, the horde's ground on both sides of each" % (doc.get("barricades", []) as Array).size(),
+		", ".join(cut))
 	await _dispose(game)
 	_finished()
 

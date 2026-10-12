@@ -17,7 +17,9 @@ const ZzMaterials := preload("zz_materials.gd")
 ## what makes it a zombie map rather than a room:
 ##
 ## [codeblock]
-## mode          "campaign" (get from the start area to the end area) or "survival" (hold out)
+## mode          "exodus" (get from the start shelter to the end one) or "survival" (hold out)
+## survivors     the team the map is built for; stand-ins fill to it (ZzConfig.team_from_map);
+##               unsaid (0), the server's own number
 ## areas         {start: [area], end: [area]}: the safe rooms, each {min, max}
 ## route         the critical path the director spawns AHEAD along, start to end
 ## nav           {spacing, floors: [[x0, z0, x1, z1, y]], links: [[from xyz, to xyz]]}
@@ -25,6 +27,11 @@ const ZzMaterials := preload("zz_materials.gd")
 ## objectives    things to do on the way: press a button, hold out while the horde comes
 ## gates         a box with a "gate" id is a door an objective opens
 ## sleepers      where the crying one sits, waiting for somebody to come too close
+## posts         survival: where a team holds; stand-ins spread over them
+## caches        survival: where supplies are restocked in every breather, better each wave
+## barricades    survival: [{id, label, health}]; a box with a "barricade" id is part of one:
+##               solid, but on the zombies' ground, so they come to it and break it down
+## day_environment  survival by nights: the sky by day (the map's `environment` is its night)
 ## [/codeblock]
 ##
 ## Every length is metres, every angle degrees. A box's `at` is its CENTRE; a prop's `at` is the
@@ -61,9 +68,16 @@ const MAX_NAV_LINKS := 600
 const MAX_SLEEPERS := 16
 const MAX_AREAS := 8
 
-## The two ways a map is played.
-const CAMPAIGN := "campaign"
+## The two ways a map is played. Exodus was called "campaign" until the first play test asked
+## for a name of its own; a document that still says "campaign" is read as exodus.
+const EXODUS := "exodus"
 const SURVIVAL := "survival"
+const LEGACY_CAMPAIGN := "campaign"
+
+const MAX_TEAM := 64
+const MAX_POSTS := 64
+const MAX_CACHES := 32
+const MAX_BARRICADES := 96
 
 ## What a mapper may leave lying about. `box` is one of the random boxes (by `id`, or any).
 const ITEM_KINDS: Array[String] = ["weapon", "ammo", "medkit", "pills", "box", "throwable"]
@@ -129,12 +143,17 @@ static func validate(source: Dictionary) -> DotResult:
 		"survive_seconds": maxf(float(source.get("survive_seconds", 0.0)), 0.0),
 	}
 
-	var mode := str(source.get("mode", CAMPAIGN))
+	var mode := str(source.get("mode", EXODUS))
 
-	if mode != CAMPAIGN and mode != SURVIVAL:
-		return _refuse("mode is '%s'; it is campaign or survival" % mode, source)
+	if mode == LEGACY_CAMPAIGN:
+		mode = EXODUS
+
+	if mode != EXODUS and mode != SURVIVAL:
+		return _refuse("mode is '%s'; it is exodus or survival" % mode, source)
 
 	doc["mode"] = mode
+	# 0: the map does not say, and the server's own number stands.
+	doc["survivors"] = clampi(int(source.get("survivors", 0)), 0, MAX_TEAM)
 
 	var env := DEFAULT_ENV.duplicate(true)
 	var given: Variant = source.get("environment", {})
@@ -146,6 +165,17 @@ static func validate(source: Dictionary) -> DotResult:
 				env[key] = _floats(value, 3) if DEFAULT_ENV[key] is Array else float(value)
 
 	doc["environment"] = env
+
+	# The day of a map held by nights: the same fields, over the map's own night.
+	var day: Variant = source.get("day_environment", null)
+
+	if day is Dictionary:
+		var day_env := DEFAULT_ENV.duplicate(true)
+		for key: String in DEFAULT_ENV:
+			if (day as Dictionary).has(key):
+				var value: Variant = (day as Dictionary)[key]
+				day_env[key] = _floats(value, 3) if DEFAULT_ENV[key] is Array else float(value)
+		doc["day_environment"] = day_env
 
 	var boxes: Array = []
 	for raw: Variant in source.get("boxes", []):
@@ -222,8 +252,8 @@ static func validate(source: Dictionary) -> DotResult:
 			if (areas[side] as Array).size() > MAX_AREAS:
 				return _refuse("%d %s areas; the most is %d" % [(areas[side] as Array).size(), side, MAX_AREAS], source)
 
-	if mode == CAMPAIGN and (areas["end"] as Array).is_empty():
-		return _refuse("a campaign map needs an end area to reach", source)
+	if mode == EXODUS and (areas["end"] as Array).is_empty():
+		return _refuse("an exodus map needs an end shelter to reach", source)
 
 	doc["areas"] = areas
 
@@ -319,6 +349,37 @@ static func validate(source: Dictionary) -> DotResult:
 		hints.append(_floats(raw, 3))
 	doc["zombie_spawns"] = hints
 
+	# --- Holding a survival map ----------------------------------------------------
+	var posts: Array = []
+	for raw: Variant in source.get("posts", []):
+		posts.append(_floats(raw, 3))
+	var caches: Array = []
+	for raw: Variant in source.get("caches", []):
+		caches.append(_floats(raw, 3))
+	if posts.size() > MAX_POSTS or caches.size() > MAX_CACHES:
+		return _refuse("%d posts and %d caches; the most is %d and %d" % [posts.size(), caches.size(), MAX_POSTS, MAX_CACHES], source)
+	doc["posts"] = posts
+	doc["caches"] = caches
+
+	var barricades: Array = []
+	var named := {}
+	for raw: Variant in source.get("barricades", []):
+		if not (raw is Dictionary) or not _is_id(str((raw as Dictionary).get("id", ""))):
+			return _refuse("barricade %d has no id" % barricades.size(), source)
+		var b := raw as Dictionary
+		var entry := {"id": str(b["id"]), "label": str(b.get("label", "a barricade"))}
+		if b.has("health"):
+			entry["health"] = clampf(float(b["health"]), 10.0, 100000.0)
+		named[entry["id"]] = true
+		barricades.append(entry)
+	for box: Dictionary in boxes:
+		if box.has("barricade") and not named.has(box["barricade"]):
+			named[box["barricade"]] = true
+			barricades.append({"id": box["barricade"], "label": "a barricade"})
+	if barricades.size() > MAX_BARRICADES:
+		return _refuse("%d barricades; the most is %d" % [barricades.size(), MAX_BARRICADES], source)
+	doc["barricades"] = barricades
+
 	return DotResult.success(doc)
 
 
@@ -360,6 +421,11 @@ static func _box(raw: Variant) -> Dictionary:
 	# A door an objective opens: removed, collision and all, when it does.
 	if b.has("gate"):
 		out["gate"] = str(b["gate"])
+
+	# Part of a barricade: solid while it stands, gone while it is broken, and never cut out of
+	# the zombies' ground, because the horde is meant to come to it.
+	if b.has("barricade") and _is_id(str(b["barricade"])) and not b.has("gate"):
+		out["barricade"] = str(b["barricade"])
 
 	# Whether the zombies treat it as something in the way. A floor, a kerb or a roof is not;
 	# unsaid, anything taller than a step is.

@@ -38,8 +38,60 @@ extends DotConfig
 ## How many times a lost map is played again before the server moves on regardless.
 @export_range(0, 20, 1) var retries: int = 2
 
-## Seconds a survival map is held for, when the map does not say. 0: as long as you can.
+## Seconds a survival map is held for in the `clock` style, when the map does not say. 0: as
+## long as you can.
 @export_range(0.0, 7200.0, 10.0) var survive_seconds: float = 480.0
+
+# --- Survival ----------------------------------------------------------------
+
+@export_group("Survival")
+
+## How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]):
+## [codeblock]
+## waves    a breather, then wave after wave, each a crowd to kill and bigger than the last
+## nights   a day to get ready, then a night to live through, harder every night
+## clock    one stretch of time that gets worse the longer it runs (the old survival)
+## [/codeblock]
+@export_enum("waves", "nights", "clock") var survival_style: int = 0
+
+## Waves to clear, or nights to live through.
+@export_range(1, 50, 1) var waves: int = 10
+@export_range(1, 20, 1) var nights: int = 5
+
+## Seconds of quiet before the first wave or night: time to find the doors and the caches.
+@export_range(0.0, 300.0, 5.0) var survival_warmup_seconds: float = 30.0
+
+## Seconds of breather between waves: the downed are up, the dead are back, the caches
+## restock, and the barricades want mending.
+@export_range(0.0, 300.0, 5.0) var breather_seconds: float = 30.0
+
+## Seconds of day between nights, and of a night.
+@export_range(10.0, 900.0, 5.0) var day_seconds: float = 60.0
+@export_range(10.0, 1800.0, 10.0) var night_seconds: float = 150.0
+
+## The first wave's commons for one survivor, and how many more for each further survivor.
+@export_range(1, 400, 1) var wave_size: int = 16
+@export_range(0, 50, 1) var wave_size_per_survivor: int = 4
+
+## How much bigger each wave (or harder each night) is than the first, as a share of it, and
+## the square term that makes the last waves a wall (see [DotNpcDirectorWaves.strength_of]).
+@export_range(0.0, 2.0, 0.01) var wave_growth: float = 0.25
+@export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.02
+
+## Every this many waves a brute comes with the wave (and two with the last). 0 never.
+@export_range(0, 50, 1) var brute_every_waves: int = 5
+
+## Whether waves from the third on draw a twist (sprinters, a swarm, heavies, hunters).
+@export var wave_twists: bool = true
+
+## A barricade's strength, when the map does not say, and what one zombie's bashing takes off
+## it a second (a brute's is ten times that).
+@export_range(10.0, 10000.0, 10.0) var barricade_health: float = 500.0
+@export_range(0.0, 200.0, 0.5) var barricade_bash: float = 6.0
+
+## What one repair (holding E on a barricade) puts back, and how long it takes.
+@export_range(1.0, 2000.0, 5.0) var barricade_repair: float = 120.0
+@export_range(0.2, 10.0, 0.1) var barricade_repair_seconds: float = 2.0
 
 # --- Difficulty ------------------------------------------------------------
 
@@ -251,6 +303,10 @@ extends DotConfig
 ## How many survivors the server keeps in the game by adding stand-ins.
 @export_range(0, 24, 1) var minimum_players: int = 4
 
+## Whether a map that says how big a team it is built for (its `survivors`) raises that number
+## to it: a high school wants a dozen, a street four.
+@export var team_from_map: bool = true
+
 # How a stand-in aims and how quickly it reacts are dot-bot's `bot_*` settings, shared by every
 # game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...), not numbers of this file.
 
@@ -297,9 +353,15 @@ func friendly_fire_scale() -> float:
 	return friendly_fire * [0.0, 1.0, 3.0, 8.0][clampi(difficulty, 0, 3)]
 
 
-## Commons alive at once, for [param survivors].
+## Commons alive at once, for [param survivors]: [member commons_per_survivor] more for each of
+## the first eight, half that for each past them. A dozen survivors meet 78 at once and sixteen
+## 90, which is what a server's 64 Hz tick carries with the stand-ins (measured on the big
+## survival maps; see docs/survival.md); a wave's total is not capped, only how many are up at
+## once.
 func commons_cap(survivors: int) -> int:
-	return commons_base + commons_per_survivor * maxi(survivors - 1, 0)
+	var first := mini(maxi(survivors - 1, 0), 7)
+	var past := maxi(survivors - 8, 0)
+	return commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 2
 
 
 ## Specials alive at once, for [param survivors].
@@ -321,10 +383,28 @@ func validate() -> DotResult:
 		return DotResult.fail(DotError.CODE_INVALID,
 			"difficulty is %d; it is 0 (easy), 1 (normal), 2 (advanced) or 3 (expert)." % difficulty)
 
+	if survival_style < 0 or survival_style > 2:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"survival_style is %d; it is 0 (waves), 1 (nights) or 2 (clock)." % survival_style)
+
 	if start_weapons.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "Survivors have to start holding something.")
 
 	return DotResult.success(null)
+
+
+## The survival style's name, as the cvar and the HUD say it.
+func survival_style_name() -> String:
+	return ["waves", "nights", "clock"][clampi(survival_style, 0, 2)]
+
+
+func survival_description() -> String:
+	match survival_style:
+		0:
+			return "%d waves, %.0f s breathers" % [waves, breather_seconds]
+		1:
+			return "%d nights of %.0f s, %.0f s days" % [nights, night_seconds, day_seconds]
+	return "a clock" if survive_seconds <= 0.0 else "%.0f s clock" % survive_seconds
 
 
 func difficulty_name() -> String:
@@ -341,7 +421,8 @@ func describe() -> Dictionary:
 		"downs": "%d, then death; rescue %s" % [max_incaps, "off" if rescue_seconds <= 0.0 else "%.0f s" % rescue_seconds],
 		"boxes": "off" if not boxes_enabled else "%.1f%% common, %.0f%% special" % [box_drop_common * 100.0, box_drop_special * 100.0],
 		"maps": "all" if map_ids.is_empty() else ",".join(map_ids),
-		"bots": minimum_players,
+		"bots": "%d%s" % [minimum_players, ", or the map's team" if team_from_map else ""],
+		"survival": survival_description(),
 	}
 
 

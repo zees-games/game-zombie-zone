@@ -42,3 +42,15 @@ Replacing the Kenney bodies with the Quaternius kit, three bugs looked like art 
 - **Every zombie near black on a night map**, beside lit walls. The shader then converted the atlas to linear by hand, which is not what a StandardMaterial3D does on that renderer. An A/B with a StandardMaterial3D on the same bodies showed it in one frame. The shader samples with `source_color`, like the standard material, and is lit the same.
 
 And one that was an animation problem: the four survivor bodies, driven by the zombie's clips, were bent double at the waist, because a clip stores where a bone is and their rest pose is not the zombie's. `_retarget` moves each key from one rest onto the other.
+
+## 2026-10-12: ninety zombies each walked the whole horde for their neighbours
+
+Profiling the first big survival map with twelve stand-ins: a tick was 19 to 21 ms against a 64 Hz server's 15.6, two thirds of it zombies thinking, and 8 of the 10 ms of thinking was `go_to`. dot-npc-ai's crowd spacing asks its host's `npcs_near`, and dot-npc's spawner answers by walking every NPC and reading each one's position: ninety chasing commons asking every tick is eight thousand engine position reads. Nothing in the practice street's sixty-on-one suite showed it, because sixty commons standing round one survivor mostly hold the ring rather than steer. `ZzHorde` now keeps a four-metre grid of the zombies, built once a tick, and the brains (`neighbours`) and the stand-ins ask that. The stand-ins had the same shape twice: a threat scan that cast a sight line to every zombie it might prefer, and a scan with nobody in sight that was never remembered, so it ran in full every tick. Both remembered now, see [survival](survival.md#the-cost-of-a-crowd).
+
+## 2026-10-12: a survival suite with no intermission read the next round's blank decision
+
+`headless_survival`'s first run failed "clearing the last wave wins the map" while the log said "held through 3 waves". With `intermission_seconds` 0, dot-match ends the round and starts the next in the same tick, and the next round's `_on_round_started` clears `_decided` before the section looks. The suites read a map's result from `round_over` now, never from the world's fields after the fact.
+
+## 2026-10-12: every map that did not name its team was built for four
+
+Adding `survivors` to the map document with a default of 4 raised the practice street's stand-ins from the server's 3 to 4, and `dedicated` ("the module seated stand-ins up to the minimum") caught it. A map that does not say is 0 now, and only a number a map writes raises the team.

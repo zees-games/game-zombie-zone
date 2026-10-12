@@ -76,7 +76,7 @@ var net_kits: int = 0
 var net_status: int = 0
 
 const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride"]
-const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective"]
+const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair"]
 
 ## Points this match and the server's ping for the player, for everybody's Tab board.
 var net_points: int = 0

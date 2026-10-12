@@ -28,7 +28,9 @@ const ZzProps := preload("zz_props.gd")
 ## a zombie still paths round the prop's box, which only keeps it further off.
 ##
 ## [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an
-## objective opening a gate takes it away whole.
+## objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`),
+## which come and go: broken by the horde, mended by the survivors ([method set_barricade]),
+## and drawn darker as they weaken so a defender sees which window is about to go.
 
 const CHANNEL := "zz.map"
 
@@ -60,11 +62,21 @@ var props: Array[Dictionary] = []
 ## from the rest so they can be taken away whole.
 var _gates: Dictionary = {}
 
+## barricade id -> {body, shapes: Array[CollisionShape3D], drawn: Array[MeshInstance3D], bounds:
+## AABB, mat, tint, intact, fraction}.
+var _barricades: Dictionary = {}
+
 var _solid: StaticBody3D = null
 var _furniture: StaticBody3D = null
 var _drawn: Node3D = null
 var _environment: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
+
+## A map held by nights draws its day as well: the light at night (the map's own) and by day,
+## captured once as the properties [method set_daylight] blends between. Empty: no day.
+var _night_light: Dictionary = {}
+var _day_light: Dictionary = {}
+var _daylight: float = 0.0
 var _bounds: AABB = AABB()
 var _missing: PackedStringArray = PackedStringArray()
 
@@ -119,6 +131,7 @@ func clear() -> void:
 
 	props.clear()
 	_gates.clear()
+	_barricades.clear()
 	_missing.clear()
 	_bounds = AABB()
 	_solid = null
@@ -126,6 +139,9 @@ func clear() -> void:
 	_drawn = null
 	_environment = null
 	_sun = null
+	_night_light = {}
+	_day_light = {}
+	_daylight = 0.0
 
 
 func _put_on(body: CollisionObject3D, layer: StringName) -> void:
@@ -155,6 +171,10 @@ func _build_boxes() -> void:
 
 		if box.has("gate"):
 			_add_gate_box(str(box["gate"]), box, frame, size)
+			continue
+
+		if box.has("barricade"):
+			_add_barricade_box(str(box["barricade"]), box, frame, size, corner)
 			continue
 
 		if bool(box.get("solid", true)):
@@ -220,6 +240,88 @@ func _add_gate_box(gate: String, box: Dictionary, frame: Transform3D, size: Vect
 		mesh.material_override = ZzMaterials.material(str(box["mat"]), ZzMapDoc.colour(box.get("tint", [1, 1, 1])))
 		_drawn.add_child(mesh)
 		(entry["drawn"] as Array).append(mesh)
+
+
+## A box that belongs to a barricade: its own body (one per barricade) and its own mesh.
+func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: Vector3, bounds: AABB) -> void:
+	if not _barricades.has(id):
+		var body := StaticBody3D.new()
+		body.name = "Barricade_%s" % id
+		add_child(body)
+		_put_on(body, &"world")
+		_barricades[id] = {"body": body, "shapes": [], "drawn": [], "bounds": bounds, "intact": true, "fraction": 1.0}
+
+	var entry: Dictionary = _barricades[id]
+	entry["bounds"] = (entry["bounds"] as AABB).merge(bounds)
+	var shape := CollisionShape3D.new()
+	var cube := BoxShape3D.new()
+	cube.size = size
+	shape.shape = cube
+	shape.transform = frame
+	(entry["body"] as StaticBody3D).add_child(shape)
+	(entry["shapes"] as Array).append(shape)
+
+	if draw_world and bool(box.get("visible", true)):
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_add_box(tool, frame, size)
+		var mesh := MeshInstance3D.new()
+		mesh.name = "Barricade_%s" % id
+		mesh.mesh = tool.commit()
+		var tint := ZzMapDoc.colour(box.get("tint", [1, 1, 1]))
+		mesh.material_override = ZzMaterials.material(str(box["mat"]), tint)
+		mesh.set_meta(&"zz_mat", str(box["mat"]))
+		mesh.set_meta(&"zz_tint", tint)
+		_drawn.add_child(mesh)
+		(entry["drawn"] as Array).append(mesh)
+
+
+## Every barricade's id, in the order the map lists its boxes.
+func barricade_ids() -> PackedStringArray:
+	return PackedStringArray(_barricades.keys())
+
+
+## The space a barricade's boxes fill, or an empty AABB.
+func barricade_bounds(id: String) -> AABB:
+	var entry: Variant = _barricades.get(id)
+	return (entry as Dictionary)["bounds"] if entry != null else AABB()
+
+
+func barricade_intact(id: String) -> bool:
+	var entry: Variant = _barricades.get(id)
+	return entry != null and bool((entry as Dictionary)["intact"])
+
+
+## Puts a barricade up or takes it down, collision and picture, and shades what stands by
+## [param fraction] of its strength: whole is the wood's own colour, a quarter is near black.
+## Collision is switched deferred: this is called from inside the physics tick.
+func set_barricade(id: String, intact: bool, fraction: float) -> void:
+	var entry: Variant = _barricades.get(id)
+
+	if entry == null:
+		return
+
+	var e := entry as Dictionary
+	var was := bool(e["intact"])
+	e["intact"] = intact
+	e["fraction"] = fraction
+
+	if was != intact:
+		for shape: CollisionShape3D in e["shapes"]:
+			if is_instance_valid(shape):
+				shape.set_deferred(&"disabled", not intact)
+
+	var shade := lerpf(0.3, 1.0, clampf(fraction, 0.0, 1.0))
+
+	for mesh: MeshInstance3D in e["drawn"]:
+		if not is_instance_valid(mesh):
+			continue
+		mesh.visible = intact
+		var tint: Color = mesh.get_meta(&"zz_tint", Color.WHITE)
+		# Three steps, not a material per percent: a few shared materials, never one per hit.
+		var step := snappedf(shade, 0.233)
+		mesh.material_override = ZzMaterials.material(str(mesh.get_meta(&"zz_mat", "wood")),
+			Color(tint.r * step, tint.g * step, tint.b * step))
 
 
 ## Takes a gate's boxes away: collision and picture.
@@ -396,6 +498,99 @@ func _build_environment() -> void:
 				var material := sky.sky_material as ProceduralSkyMaterial
 				material.sky_top_color = ZzMapDoc.colour(env_doc["sky_top"])
 				material.ground_bottom_color = ZzMapDoc.colour(env_doc["ground"])
+
+	if str(doc.get("mode", "")) == ZzMapDoc.SURVIVAL:
+		_capture_day()
+
+
+## What [method set_daylight] blends: the sun, the fill, the fog and the sky.
+const LIGHT_KEYS := [
+	"sun:light_energy", "sun:light_color", "sun:rotation_degrees",
+	"env:ambient_light_color", "env:ambient_light_energy", "env:fog_light_color", "env:fog_depth_begin",
+	"env:fog_depth_end", "env:fog_density", "sky:sky_top_color", "sky:sky_horizon_color",
+	"sky:ground_horizon_color", "sky:ground_bottom_color",
+]
+
+
+## The day of a map held by nights: its `day_environment`, or a plain overcast morning over
+## the same ground. Built beside the night once, so a dawn is a blend and never a rebuild.
+func _capture_day() -> void:
+	if _sun == null or _environment == null:
+		return
+
+	_night_light = _light_values(_sun, _environment)
+	var day_doc: Dictionary = doc.get("day_environment", ZzMapDoc.DEFAULT_ENV)
+	var scratch := Node3D.new()
+	var day_sun := DotLightRig.apply(scratch, DotLightDocument.from_dictionary(light_document(day_doc)),
+		light_profile(float(day_doc["ambient_energy"])))
+	var day_env: WorldEnvironment = null
+
+	for node in scratch.get_children():
+		if node is WorldEnvironment:
+			day_env = node as WorldEnvironment
+
+	if day_sun != null and day_env != null:
+		var sky := day_env.environment.sky
+		if sky != null and sky.sky_material is ProceduralSkyMaterial:
+			(sky.sky_material as ProceduralSkyMaterial).sky_top_color = ZzMapDoc.colour(day_doc["sky_top"])
+			(sky.sky_material as ProceduralSkyMaterial).ground_bottom_color = ZzMapDoc.colour(day_doc["ground"])
+		day_sun.rotation_degrees = Vector3(float(day_doc["sun_pitch"]), float(day_doc["sun_yaw"]), 0.0)
+		var profile := light_profile(float(day_doc["ambient_energy"]))
+		var brightness := float(light_document(day_doc)["sun"]["brightness"])
+		day_sun.light_energy = clampf(sqrt(brightness / profile.brightness_reference), 0.0, 2.0)
+		_day_light = _light_values(day_sun, day_env)
+
+	scratch.free()
+
+
+static func _light_values(sun: DirectionalLight3D, world: WorldEnvironment) -> Dictionary:
+	var out := {}
+	var env := world.environment
+	var sky_mat: Object = env.sky.sky_material if env.sky != null else null
+
+	for key: String in LIGHT_KEYS:
+		var parts := key.split(":")
+		var holder: Object = sun if parts[0] == "sun" else env if parts[0] == "env" else sky_mat
+		if holder != null:
+			out[key] = holder.get(parts[1])
+
+	return out
+
+
+## How much of the light is day, 0 (the map's own night) to 1. Nothing happens on a map that
+## has no day captured, or on a server, which draws no light.
+func set_daylight(amount: float) -> void:
+	if _day_light.is_empty() or _sun == null or _environment == null:
+		return
+
+	amount = clampf(amount, 0.0, 1.0)
+
+	if is_equal_approx(amount, _daylight):
+		return
+
+	_daylight = amount
+	var env := _environment.environment
+	var sky_mat: Object = env.sky.sky_material if env.sky != null else null
+
+	for key: String in LIGHT_KEYS:
+		if not _night_light.has(key) or not _day_light.has(key):
+			continue
+		var parts := key.split(":")
+		var holder: Object = _sun if parts[0] == "sun" else env if parts[0] == "env" else sky_mat
+		if holder == null:
+			continue
+		var a: Variant = _night_light[key]
+		var b: Variant = _day_light[key]
+		if a is Color:
+			holder.set(parts[1], (a as Color).lerp(b as Color, amount))
+		elif a is Vector3:
+			holder.set(parts[1], (a as Vector3).lerp(b as Vector3, amount))
+		else:
+			holder.set(parts[1], lerpf(float(a), float(b), amount))
+
+
+func daylight() -> float:
+	return _daylight
 
 
 ## The dot-lighting document a map's `environment` describes.

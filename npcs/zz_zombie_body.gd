@@ -131,6 +131,14 @@ func advance(delta: float) -> void:
 		return
 
 	var horizontal := wish + push
+
+	# Standing still on the floor (tearing at a barricade, swinging, waiting its turn on the
+	# ring): nothing to move, so no sweep. Half a big wave stands at the windows, and a
+	# move_and_slide for each of them every tick was a quarter of the horde's tick.
+	if horizontal.length_squared() < 0.0004 and is_on_floor() and absf(velocity.y) < 0.01:
+		velocity = Vector3.ZERO
+		return
+
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 

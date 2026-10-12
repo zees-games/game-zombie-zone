@@ -156,12 +156,11 @@ func _read_box_colours() -> void:
 # --- Offline ---------------------------------------------------------------
 
 func _start_offline() -> void:
-	for i in range(offline_bots):
-		var bot := game.add_player(StringName("u%d" % (ZzNetBridge.FIRST_BOT_SESSION + i)), _bot_name(i))
-		bot.is_bot = true
-
+	_fill_offline_team()
 	_adopt(game.add_player(&"local", "You", 0, true))
 	_hear_the_world()
+	# Each map brings the team it is built for: a dozen at the school, four on the street.
+	game.world_rebuilt.connect(_fill_offline_team)
 
 	game.achievement_earned.connect(func(id: StringName, title: String, points: int) -> void:
 		if player != null and id == player.player_id and chat != null:
@@ -169,6 +168,32 @@ func _start_offline() -> void:
 	)
 	game.start()
 	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
+
+
+## Solo stand-ins: [member offline_bots], or the team the map is built for less you, whichever
+## is more ([method ZzGame.team_size]); the last ones in leave first on a smaller map.
+func _fill_offline_team() -> void:
+	var wanted := maxi(offline_bots, game.team_size() - 1) if offline_bots > 0 else 0
+	var have: Array[StringName] = []
+
+	for id: StringName in game.players:
+		if (game.players[id] as ZzPlayer).is_bot:
+			have.append(id)
+
+	have.sort_custom(func(a: StringName, b: StringName) -> bool: return int(String(a).substr(1)) < int(String(b).substr(1)))
+
+	while have.size() > wanted:
+		game.remove_player(have.pop_back())
+
+	var next := have.size()
+
+	while have.size() < wanted:
+		var id := StringName("u%d" % (ZzNetBridge.FIRST_BOT_SESSION + next))
+		if not game.players.has(id):
+			var bot := game.add_player(id, _bot_name(next))
+			bot.is_bot = true
+			have.append(id)
+		next += 1
 
 
 ## A solo stand-in's name: the server's list, through dot-bot's pick, so solo and a server
@@ -486,7 +511,7 @@ func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 		if audio != null:
 			audio.music(&"")
 		if hud != null:
-			hud.shout("SURVIVE" if game.is_survival() else "GET TO THE SAFE ROOM", 3.0)
+			hud.shout("HOLD ON" if game.is_survival() else "MAKE FOR THE SHELTER", 3.0)
 		return
 
 	if audio != null:
@@ -1173,6 +1198,8 @@ func _process(delta: float) -> void:
 	if world_view != null:
 		world_view.present(delta, camera.global_position)
 
+	_follow_daylight(delta)
+
 	if _drive_spectator_camera():
 		_present_effects(delta)
 		return
@@ -1209,6 +1236,22 @@ func _process(delta: float) -> void:
 
 
 ## What E would do now, for the HUD: who you would revive, what you would pick up.
+## The light of a map held by nights, eased toward what the hold says (it ramps through dawn
+## and dusk itself; this only smooths the half-second steps a client is told it in).
+func _follow_daylight(delta: float) -> void:
+	if game == null or game.map == null:
+		return
+
+	var hold: Dictionary = game.survival_state()
+	var wanted := maxf(float(hold.get("daylight", -1.0)), 0.0) if not hold.is_empty() else 0.0
+	var now_light: float = game.map.daylight()
+
+	if is_equal_approx(now_light, wanted):
+		return
+
+	game.map.set_daylight(move_toward(now_light, wanted, delta * 0.35))
+
+
 func _prompt() -> String:
 	if player == null or not player.can_act():
 		return ""
@@ -1246,6 +1289,17 @@ func _prompt() -> String:
 		var o: Dictionary = (game.map_doc["objectives"] as Array)[index]
 		if o["kind"] == "use" and eye.distance_to(ZzMapDoc.v3(o["at"])) <= float(o["radius"]) + 0.6:
 			return "%s — %s" % [_key(ZzBindings.USE), str(o["label"])]
+
+	# A barricade within reach that is not whole: the same test the server mends by.
+	var mend := game.barricade_to_mend(player)
+
+	if mend >= 0:
+		var entry: Dictionary = (game.map_doc["barricades"] as Array)[mend]
+		var held: Dictionary = game.barricades.get(str(entry["id"]), {})
+		if not held.is_empty():
+			var share := int(round(100.0 * float(held["health"]) / float(held["max"])))
+			return "%s — %s %s (%d%%)" % [_key(ZzBindings.USE), "mend" if bool(held["intact"]) else "rebuild",
+				str(entry.get("label", "the barricade")), share]
 
 	return ""
 

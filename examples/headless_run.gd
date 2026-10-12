@@ -147,8 +147,8 @@ func _test_documents() -> void:
 	_section("map documents")
 	var doc := ZzCatalogue.practice()
 	_check(not doc.is_empty(), "the built-in practice street validates")
-	_check(doc["mode"] == ZzMapDoc.CAMPAIGN and (doc["areas"]["end"] as Array).size() == 1 and (doc["objectives"] as Array).size() == 1,
-		"a campaign with an end room and an objective")
+	_check(doc["mode"] == ZzMapDoc.EXODUS and (doc["areas"]["end"] as Array).size() == 1 and (doc["objectives"] as Array).size() == 1,
+		"an exodus map with an end shelter and an objective")
 
 	var bad := doc.duplicate(true)
 	bad["mode"] = "deathmatch"
@@ -156,7 +156,7 @@ func _test_documents() -> void:
 
 	bad = doc.duplicate(true)
 	bad["areas"] = {"start": doc["areas"]["start"], "end": []}
-	_check(not ZzMapDoc.validate(bad).ok, "a campaign with nowhere to reach is refused")
+	_check(not ZzMapDoc.validate(bad).ok, "an exodus map with nowhere to reach is refused")
 
 	bad = doc.duplicate(true)
 	bad["nav"] = {"floors": [[5, 5, 1, 1, 0]]}
@@ -895,6 +895,7 @@ func _test_winning_and_losing() -> void:
 
 	# The practice street as a survival map: the same ground, held rather than crossed.
 	game = await _world(func(c: ZzConfig) -> void:
+		c.survival_style = 2
 		c.survive_seconds = 3.0
 		c.wanderer_density = 0.0
 		c.intermission_seconds = 30.0
