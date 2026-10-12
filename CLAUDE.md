@@ -32,7 +32,7 @@ game/
   net/               the codec (NPC, PIN, LOOT, BOX, HAZARD, BLAST...), player and zombie behaviours, the bridge
 npcs/                the zombie body, its view, and one brain script per kind (by path)
 boxes/boxes.json     the box types and every outcome; an owner edits it
-props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
+props/               kits.json (which Kenney models, at what scale), catalogue.json (measured), pieces.json (each prop's collision pieces, dot-props' DotPropPieces; tools/measure_props.gd writes both, about four minutes)
 sounds/              moans, specials, music; CREDITS.md
 examples/            headless_run (126), headless_maps (61), headless_net (67), headless_weapons (17), dedicated (59)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
