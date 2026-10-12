@@ -3,6 +3,7 @@ extends Node3D
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
+const ZzFixtures := preload("zz_fixtures.gd")
 
 ## A map document, built: the building, the furniture, the lights and the sky.
 ##
@@ -109,6 +110,7 @@ func build(p_doc: Dictionary) -> DotResult:
 	_build_props()
 
 	if draw_world:
+		_build_objective_props()
 		_build_lights()
 		_build_environment()
 
@@ -188,6 +190,10 @@ func _build_boxes() -> void:
 		if not draw_world or not bool(box.get("visible", true)):
 			continue
 
+		if str(box.get("look", "")) == "chain_link":
+			_drawn.add_child(ZzFixtures.chain_link(frame, size))
+			continue
+
 		var tint := ZzMapDoc.colour(box.get("tint", [1, 1, 1]))
 		var cell := Vector2i(floori(at.x / CHUNK), floori(at.z / CHUNK))
 		var key := "%s|%s|%d|%d" % [str(box["mat"]), tint.to_html(), cell.x, cell.y]
@@ -231,15 +237,43 @@ func _add_gate_box(gate: String, box: Dictionary, frame: Transform3D, size: Vect
 		(entry["body"] as StaticBody3D).add_child(shape)
 
 	if draw_world and bool(box.get("visible", true)):
-		var tool := SurfaceTool.new()
-		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-		_add_box(tool, frame, size)
-		var mesh := MeshInstance3D.new()
-		mesh.name = "Gate_%s" % gate
-		mesh.mesh = tool.commit()
-		mesh.material_override = ZzMaterials.material(str(box["mat"]), ZzMapDoc.colour(box.get("tint", [1, 1, 1])))
-		_drawn.add_child(mesh)
-		(entry["drawn"] as Array).append(mesh)
+		var drawn: Node3D = null
+		if str(box.get("look", "")) == "chain_link":
+			drawn = ZzFixtures.chain_link(frame, size)
+		else:
+			var tool := SurfaceTool.new()
+			tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+			_add_box(tool, frame, size)
+			var mesh := MeshInstance3D.new()
+			mesh.mesh = tool.commit()
+			mesh.material_override = ZzMaterials.material(str(box["mat"]), ZzMapDoc.colour(box.get("tint", [1, 1, 1])))
+			drawn = mesh
+		drawn.name = "Gate_%s" % gate
+		_drawn.add_child(drawn)
+		(entry["drawn"] as Array).append(drawn)
+
+
+## The objectives' pictures ([ZzFixtures]): a padlock hangs on the gate its objective opens and
+## goes with it, a lever or a radio stands where the objective is.
+func _build_objective_props() -> void:
+	for o: Dictionary in doc.get("objectives", []):
+		var gate_id := ""
+		var gate_box := {}
+		for opens: String in (o.get("opens", PackedStringArray()) as PackedStringArray):
+			for box: Dictionary in doc["boxes"]:
+				if str(box.get("gate", "")) == opens:
+					gate_id = opens
+					gate_box = box
+					break
+			if gate_id != "":
+				break
+
+		var drawn := ZzFixtures.objective_prop(o, gate_box if str(o.get("prop", "")) == "padlock" else {})
+		if drawn == null:
+			continue
+		_drawn.add_child(drawn)
+		if str(o.get("prop", "")) == "padlock" and _gates.has(gate_id):
+			((_gates[gate_id] as Dictionary)["drawn"] as Array).append(drawn)
 
 
 ## A box that belongs to a barricade: its own body (one per barricade) and its own mesh.
@@ -498,6 +532,8 @@ func _build_environment() -> void:
 				var material := sky.sky_material as ProceduralSkyMaterial
 				material.sky_top_color = ZzMapDoc.colour(env_doc["sky_top"])
 				material.ground_bottom_color = ZzMapDoc.colour(env_doc["ground"])
+				if is_night(env_doc):
+					_dress_night_sky(material, _sun)
 
 	if str(doc.get("mode", "")) == ZzMapDoc.SURVIVAL:
 		_capture_day()
@@ -508,8 +544,119 @@ const LIGHT_KEYS := [
 	"sun:light_energy", "sun:light_color", "sun:rotation_degrees",
 	"env:ambient_light_color", "env:ambient_light_energy", "env:fog_light_color", "env:fog_depth_begin",
 	"env:fog_depth_end", "env:fog_density", "sky:sky_top_color", "sky:sky_horizon_color",
-	"sky:ground_horizon_color", "sky:ground_bottom_color",
+	"sky:ground_horizon_color", "sky:ground_bottom_color", "sky:sky_cover_modulate", "sky:sun_angle_max",
 ]
+
+
+## A map's sky is night when its zenith is this dark (every blackout street, the holds' nights).
+const NIGHT_SKY_LUMINANCE := 0.12
+
+## The night sky's zenith and horizon as drawn. The map's own (0.02 and 0.07) are right for
+## the fog and the fill, which they still set, but drawn they are black: the first play test
+## (2026-10-11) saw "a black void above the alley" in every frame, the walls' tops cut against
+## nothing. Drawn here: a deep blue overhead, the glow of a dead city low down, so a roofline
+## reads, and stars and a moon in it.
+const NIGHT_ZENITH := Color(0.035, 0.05, 0.12)
+const NIGHT_HORIZON := Color(0.15, 0.15, 0.22)
+
+## How many stars, and the cover's size (equirectangular: the top half is the sky).
+const STARS := 1400
+const STAR_MAP := Vector2i(2048, 1024)
+
+static var _star_maps: Dictionary = {}
+
+
+static func is_night(env_doc: Dictionary) -> bool:
+	return ZzMapDoc.colour(env_doc["sky_top"]).get_luminance() < NIGHT_SKY_LUMINANCE \
+		and float(env_doc["sun_energy"]) < 0.4
+
+
+## Stars and the moon on the sky's cover. Only what is drawn: the fog keeps the map's horizon
+## and the fill its ambient. The moon is painted where the map's (dim) sun shines from: the
+## sky's own disc is the light's colour times its energy, and a moon at a twelfth of a sun's
+## energy drew nothing at all.
+func _dress_night_sky(material: ProceduralSkyMaterial, moon: DirectionalLight3D) -> void:
+	material.sky_top_color = NIGHT_ZENITH.lerp(material.sky_top_color, 0.3)
+	material.sky_horizon_color = NIGHT_HORIZON
+	material.ground_horizon_color = NIGHT_HORIZON
+	material.sky_curve = 0.12
+	material.sun_angle_max = 0.0
+	var towards := Vector3.ZERO if moon == null else moon.global_transform.basis.z.normalized()
+	if moon != null and not moon.is_inside_tree():
+		towards = moon.transform.basis.z.normalized()
+	material.sky_cover = star_map(towards)
+	material.sky_cover_modulate = Color(1.0, 1.0, 1.0, 0.9)
+
+
+## The stars (seeded, so every machine draws the same sky; brighter ones rarer, a few two
+## pixels wide) and a moon towards [param moon_from] (none when zero), built once per moon
+## direction per process.
+static func star_map(moon_from: Vector3 = Vector3.ZERO) -> ImageTexture:
+	var key := "%.2f,%.2f,%.2f" % [moon_from.x, moon_from.y, moon_from.z]
+	if _star_maps.has(key):
+		return _star_maps[key]
+
+	var image := Image.create(STAR_MAP.x, STAR_MAP.y, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261011
+
+	for i in STARS:
+		var x := rng.randi_range(0, STAR_MAP.x - 2)
+		# The top 44 % of the map, which is above the horizon, thinning towards it.
+		var y := int(pow(rng.randf(), 1.4) * float(STAR_MAP.y) * 0.44)
+		var bright := pow(rng.randf(), 3.0) * 0.85 + 0.15
+		var tint := Color(0.85, 0.9, 1.0).lerp(Color(1.0, 0.92, 0.8), rng.randf())
+		var star := Color(tint.r, tint.g, tint.b, bright)
+		image.set_pixel(x, y, star)
+		if bright > 0.7:
+			image.set_pixel(x + 1, y, Color(star, bright * 0.6))
+			image.set_pixel(x, mini(y + 1, STAR_MAP.y - 1), Color(star, bright * 0.6))
+
+	if moon_from.y > 0.05:
+		_paint_moon(image, moon_from.normalized())
+
+	var texture := ImageTexture.create_from_image(image)
+	_star_maps[key] = texture
+	return texture
+
+
+## Where a direction lands on the equirectangular cover, in pixels. Measured from frames (a
+## disc painted by the textbook `atan2(x, -z)` came out on the opposite side of the sky).
+static func sky_pixel(direction: Vector3) -> Vector2:
+	var u := atan2(-direction.x, direction.z) / TAU + 0.5
+	var v := acos(clampf(direction.y, -1.0, 1.0)) / PI
+	return Vector2(u * float(STAR_MAP.x), v * float(STAR_MAP.y))
+
+
+## A pale disc a degree and a half across, a little shading on one side, in a wide faint halo.
+static func _paint_moon(image: Image, direction: Vector3) -> void:
+	var centre := sky_pixel(direction)
+	var per_degree := float(STAR_MAP.x) / 360.0
+	# A row of the map is a circle of latitude: shorter towards the top, so the disc is
+	# drawn wider in pixels by 1 / cos(latitude) to stay round.
+	var widen := 1.0 / maxf(cos(asin(clampf(direction.y, -1.0, 1.0))), 0.2)
+	var disc := 1.6 * per_degree
+	var halo := 9.0 * per_degree
+
+	for dy in range(-int(halo), int(halo) + 1):
+		for dx in range(-int(halo * widen), int(halo * widen) + 1):
+			var px := int(centre.x) + dx
+			var py := int(centre.y) + dy
+			if py < 0 or py >= STAR_MAP.y:
+				continue
+			px = posmod(px, STAR_MAP.x)
+			var r := Vector2(float(dx) / widen, float(dy)).length()
+			var colour := Color(0.0, 0.0, 0.0, 0.0)
+			if r <= disc:
+				var shade := 1.0 - 0.18 * clampf((float(dx) / widen + float(dy) * 0.4) / disc, 0.0, 1.0)
+				colour = Color(0.93 * shade, 0.95 * shade, 1.0 * shade, 1.0)
+			elif r <= halo:
+				var t := 1.0 - (r - disc) / (halo - disc)
+				colour = Color(0.7, 0.78, 1.0, 0.22 * t * t)
+			else:
+				continue
+			image.set_pixel(px, py, colour)
 
 
 ## The day of a map held by nights: its `day_environment`, or a plain overcast morning over
@@ -534,6 +681,9 @@ func _capture_day() -> void:
 		if sky != null and sky.sky_material is ProceduralSkyMaterial:
 			(sky.sky_material as ProceduralSkyMaterial).sky_top_color = ZzMapDoc.colour(day_doc["sky_top"])
 			(sky.sky_material as ProceduralSkyMaterial).ground_bottom_color = ZzMapDoc.colour(day_doc["ground"])
+			# The stars fade out by day rather than switching off: the day is the night's
+			# cover at no strength, and a dawn blends between the two.
+			(sky.sky_material as ProceduralSkyMaterial).sky_cover_modulate = Color(1.0, 1.0, 1.0, 0.0)
 		day_sun.rotation_degrees = Vector3(float(day_doc["sun_pitch"]), float(day_doc["sun_yaw"]), 0.0)
 		var profile := light_profile(float(day_doc["ambient_energy"]))
 		var brightness := float(light_document(day_doc)["sun"]["brightness"])

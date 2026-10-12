@@ -668,7 +668,8 @@ func _on_round_began(number: int, _map_id: StringName) -> void:
 
 
 func _on_round_over(number: int, won: bool, why: String) -> void:
-	_broadcast(ZzEvents.Kind.ROUND, ZzEvents.write_round(number, false, won, why))
+	var next_in := game.match_node.rules.intermission_sec if game.match_node != null and game.match_node.rules != null else -1.0
+	_broadcast(ZzEvents.Kind.ROUND, ZzEvents.write_round(number, false, won, why, next_in, String(game.next_map_id)))
 
 
 func _on_phase_changed(phase: int) -> void:
@@ -823,6 +824,9 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, actions: int 
 
 		if game.remote_seconds_left > 0.0:
 			game.remote_seconds_left = maxf(game.remote_seconds_left - net.clock.tick_duration(), 0.0)
+
+		if game.remote_next_round > 0.0:
+			game.remote_next_round = maxf(game.remote_next_round - net.clock.tick_duration(), 0.0)
 
 		# The hold's stage clock, the same way.
 		if float(game.remote_survival.get("left", -1.0)) > 0.0:
@@ -1208,6 +1212,9 @@ func _on_event(message: DotNetMessage) -> void:
 
 			if bool(round_info["ok"]):
 				game.round_number = int(round_info["round"])
+
+				game.remote_next_round = -1.0 if bool(round_info["began"]) else float(round_info["next_in"])
+				game.remote_next_map = &"" if bool(round_info["began"]) else StringName(str(round_info["next_map"]))
 
 				if bool(round_info["began"]):
 					game.phase_elapsed = 0.0

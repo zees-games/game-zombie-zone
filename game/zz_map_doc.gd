@@ -1,6 +1,7 @@
 extends RefCounted
 
 const ZzMaterials := preload("zz_materials.gd")
+const ZzFixtures := preload("zz_fixtures.gd")
 
 ## What a map IS: a JSON document, checked here before anything is built.
 ##
@@ -331,6 +332,11 @@ static func validate(source: Dictionary) -> DotResult:
 			"opens": opens,
 			"message": str(o.get("message", "")),
 		})
+		# What it is, drawn: "padlock" (on the gate it opens), "lever", "radio". Unsaid or
+		# unknown draws nothing.
+		if ZzFixtures.PROPS.has(str(o.get("prop", ""))):
+			(objectives.back() as Dictionary)["prop"] = str(o["prop"])
+			(objectives.back() as Dictionary)["yaw"] = _r(float(o.get("yaw", 0.0)))
 	if objectives.size() > MAX_OBJECTIVES:
 		return _refuse("%d objectives; the most is %d" % [objectives.size(), MAX_OBJECTIVES], source)
 	doc["objectives"] = objectives
@@ -421,6 +427,11 @@ static func _box(raw: Variant) -> Dictionary:
 	# A door an objective opens: removed, collision and all, when it does.
 	if b.has("gate"):
 		out["gate"] = str(b["gate"])
+
+	# How it is drawn, when not as a box: "chain_link" (a see-through fence). An unknown look
+	# is dropped, so a newer map's look on this game is a box rather than a refused map.
+	if b.has("look") and ZzFixtures.LOOKS.has(str(b["look"])):
+		out["look"] = str(b["look"])
 
 	# Part of a barricade: solid while it stands, gone while it is broken, and never cut out of
 	# the zombies' ground, because the horde is meant to come to it.

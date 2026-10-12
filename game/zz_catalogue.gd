@@ -310,7 +310,8 @@ static func practice() -> Dictionary:
 		],
 		"objectives": [
 			{"id": "barrier", "kind": "use", "at": [6.5, 1.0, 36.0], "label": "Lower the barrier", "seconds": 2.0,
-				"holdout": 40.0, "opens": ["barrier"], "message": "The barrier is coming down. Hold them off!"},
+				"holdout": 40.0, "opens": ["barrier"], "message": "The barrier is coming down. Hold them off!",
+				"prop": "lever", "yaw": -90.0},
 		],
 		"sleepers": [[-7.4, 0.0, 26.0, 90.0]],
 		"zombie_spawns": [[-14.0, 0.0, 16.0], [14.0, 0.0, 16.0], [-14.0, 0.0, 56.0], [14.0, 0.0, 56.0]],

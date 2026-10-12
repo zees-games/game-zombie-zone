@@ -20,6 +20,8 @@ var _spawn: Array = []
 var _pin := &""
 var _pin_me := false
 var _box := &""
+## --alone: the stand-ins stay in the start room, out of a close-up.
+var _alone := false
 var _client: Node = null
 var _weapons: PackedStringArray = PackedStringArray()
 
@@ -46,6 +48,8 @@ func _ready() -> void:
 			_pin = StringName(arg.trim_prefix("--pin="))
 		elif arg == "--pin-me":
 			_pin_me = true
+		elif arg == "--alone":
+			_alone = true
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--box="):
@@ -88,7 +92,7 @@ func _run() -> void:
 	for player in game.survivors():
 		if player != local:
 			i += 1
-			player.place_at(stand + Vector3(-1.6 + float(i) * 1.1, 0.0, 1.8), 0.0)
+			player.place_at(game.map.spawn("survivors", i)[0] if _alone else stand + Vector3(-1.6 + float(i) * 1.1, 0.0, 1.8), 0.0)
 
 	if _look != Vector3.INF:
 		_face(local, _look)

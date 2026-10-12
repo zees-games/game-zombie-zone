@@ -3,6 +3,7 @@
 #
 #   tools/shot.sh --view=overview                                  # the map, from above
 #   tools/shot.sh --view=room --at=0,1.7,-6 --look=0,1,-14          # a free camera
+#   tools/shot.sh --view=room --alone --zz-map-ids=zz_blackout_1 --at=16.6,1.6,65.4 --look=18,1.1,66   # a close-up, stand-ins left in the start room
 #   tools/shot.sh --view=survivor --spawn=common:12,leaper:1        # your eyes, with a crowd coming
 #   tools/shot.sh --view=third --spawn=brute:1                       # third person
 #   tools/shot.sh --view=down --spawn=common:6                       # on the floor
@@ -31,7 +32,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--box=*|--board|--name=*|--weapons=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--alone|--box=*|--board|--name=*|--weapons=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

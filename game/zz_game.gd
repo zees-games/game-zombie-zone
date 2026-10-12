@@ -201,6 +201,11 @@ var end_hold: float = 0.0
 ## What a client is told rather than works out.
 var remote_alive: int = -1
 var remote_seconds_left: float = -1.0
+
+## A client's copy of how long until the next map begins after a decided one, and which map
+## (from ROUND); -1 while a map is being played. See [method next_round_seconds].
+var remote_next_round: float = -1.0
+var remote_next_map: StringName = &""
 var remote_playable: bool = false
 
 ## How many times this map has been lost in a row.
@@ -1258,6 +1263,23 @@ func _decide(won: bool, why: String) -> void:
 
 static func _clock(seconds: float) -> String:
 	return "%d:%02d" % [int(seconds) / 60, int(seconds) % 60]
+
+
+## Seconds until the next map begins, between a decided map and the next; -1 otherwise. The
+## first play test ended on "YOU DIED", then ten seconds of "nobody left to watch" with nothing
+## saying a new round was coming, and he quit at four: the HUD counts this down.
+func next_round_seconds() -> float:
+	if not authoritative:
+		return remote_next_round
+	if match_node == null or match_node.state != DotMatch.State.INTERMISSION:
+		return -1.0
+	return match_node.seconds_remaining(_tick)
+
+
+## The map that [method next_round_seconds] counts down to (this one again after a loss, a
+## campaign's next after a win, or the rotation's).
+func next_round_map() -> StringName:
+	return next_map_id if authoritative else remote_next_map
 
 
 ## Seconds left on a survival map's clock; -1 on an exodus map or an endless hold.

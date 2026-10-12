@@ -3,12 +3,15 @@ extends Node
 const ZzBindings := preload("../game/zz_bindings.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
+const ZzClient := preload("../game/zz_client.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzHazards := preload("../game/zz_hazards.gd")
+const ZzFixtures := preload("../game/zz_fixtures.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
+const ZzMap := preload("../game/zz_map.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
@@ -29,9 +32,9 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 30
+const SECTIONS := 31
 
-const CHECKS := 154
+const CHECKS := 166
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -91,6 +94,7 @@ func _run() -> void:
 	await _test_the_hud()
 	await _test_help_and_menu()
 	await _test_the_map_menu()
+	await _test_the_first_play_test()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1209,6 +1213,112 @@ func _test_the_hud() -> void:
 	_check_requires()
 
 	hud.queue_free()
+	_finished()
+
+
+## Christian's first play test (2026-10-11): the team list's missing-glyph boxes, "You is down",
+## the fence lock a black slab, the black void over the street, ten silent seconds after a
+## wipe, and a HUD that should be darker and follow the menu's theme.
+func _test_the_first_play_test() -> void:
+	_section("the first play test: glyphs, the feed, the fence and its lock, the sky, the wipe, the theme")
+
+	# Every character the game writes is in the HUD's font. The team bars were "▮▯", which the
+	# embedded font lacks and Windows' fallback does not have either.
+	var font: Font = ThemeDB.fallback_font
+	var missing := PackedStringArray()
+	for folder in ["res://game", "res://game/net", "res://npcs"]:
+		for file in DirAccess.get_files_at(folder):
+			if not file.ends_with(".gd"):
+				continue
+			for line in FileAccess.get_file_as_string(folder.path_join(file)).split("\n"):
+				if line.strip_edges().begins_with("#"):
+					continue
+				var code := line.split("#")[0] if line.count("\"") % 2 == 0 else line
+				for c in code:
+					if c.unicode_at(0) > 127 and not font.has_char(c.unicode_at(0)):
+						missing.append("%s %s" % [file, c])
+	_check(missing.is_empty(), "every character the game writes is in the HUD's font", ", ".join(missing))
+
+	var game := await _team(3, func(c: ZzConfig) -> void:
+		_quiet(c)
+		c.intermission_seconds = 3.0)
+	var me: ZzPlayer = game.survivors()[0]
+	var hud := ZzHud.new()
+	add_child(hud)
+	hud.bind(game, me)
+	var other: ZzPlayer = game.survivors()[1]
+	other.health.health = other.health.max_health * 0.5
+	_hurt(game, game.survivors()[2], 500.0)
+	await _sim(game, 0.1)
+	hud._process(0.0)
+	var rows := hud.team_lines()
+	_check(rows.size() == 2 and rows[0] == "%s|%d|0.50" % [other.display_name, int(ceilf(other.health.health))]
+		and rows[1].ends_with("|DOWN|0.00"), "the team list is a drawn bar per survivor, not typed blocks", str(rows))
+
+	_check(ZzClient.feed_line("You", "is down", "", &"", &"strangler", true) == "You are down (strangler)"
+		and ZzClient.feed_line("You", "died", "", &"", &"common", true) == "You died (common)"
+		and ZzClient.feed_line("Odell", "is down", "", &"", &"strangler") == "Odell is down (strangler)"
+		and ZzClient.feed_line("You", "was picked up", "", &"", &"", true) == "You were picked up",
+		"the feed says \"You are down\", and somebody else \"is down\"",
+		ZzClient.feed_line("You", "is down", "", &"", &"strangler", true))
+
+	# Christian asked for a darker HUD by default that the menu's theme restyles.
+	var settings := ZzSettings.new()
+	add_child(settings)
+	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
+	hud.follow_menu(settings.menu)
+	var plate := hud.vitals.colour(&"plate")
+	_check(plate.get_luminance() < 0.1 and plate.a >= 0.7, "the HUD is dark by default, in the menu's theme", str(plate))
+	var _t := settings.settings.set_value(&"ui_theme", &"contrast")
+	var contrast: DotMenuPalette = settings.menu.palette()
+	_check(contrast.id == &"contrast" and hud.vitals.colour(&"plate") == contrast.hud_plate and hud.strip.colour(&"text") == contrast.hud_text,
+		"a theme picked in the menu reaches every piece at once")
+	_check(hud.vitals.colour(&"highlight") == ZzHud.AMBER and hud._top.get_theme_color(&"font_color") == contrast.hud_text,
+		"keeping this game's amber, and the HUD's own lines follow it too")
+	_t = settings.settings.set_value(&"ui_theme", &"midnight")
+	settings.queue_free()
+
+	# A wipe counts down to the next round, on the strip, instead of ten silent seconds.
+	for player in game.survivors():
+		_hurt(game, player, 5000.0)
+		_hurt(game, player, 5000.0)
+		_hurt(game, player, 5000.0)
+	await _sim(game, 2.6)
+	hud._process(0.0)
+	_check(game._decided and game.next_round_seconds() > 0.0 and game.next_round_seconds() <= 3.0
+		and hud._top.text == "Trying again" and hud.strip.clock != "",
+		"after a wipe the HUD counts down to the map again", "%.1f s, '%s' %s" % [game.next_round_seconds(), hud._top.text, hud.strip.clock])
+	var number := game.round_number
+	await _sim(game, 3.2)
+	_check(game.round_number > number and game.next_round_seconds() < 0.0, "and the map starts again when it reaches nothing")
+	hud.queue_free()
+
+	# The fence and its lock, and the sky, as a client draws them.
+	var doc := ZzCatalogue.practice().duplicate(true)
+	for box: Dictionary in doc["boxes"]:
+		if str(box.get("gate", "")) == "barrier":
+			box["look"] = "chain_link"
+	(doc["objectives"][0] as Dictionary)["prop"] = "padlock"
+	var checked := ZzMapDoc.validate(doc)
+	_check(checked.ok and str((checked.value["objectives"][0] as Dictionary).get("prop", "")) == "padlock",
+		"a map may say what its objective is (a padlock) and how a gate looks (chain-link)")
+	var drawn := ZzMap.new()
+	drawn.physics = game.physics
+	drawn.catalogue = game.props_catalogue
+	drawn.draw_world = true
+	add_child(drawn)
+	var _b := drawn.build(checked.value)
+	var fence := drawn.find_child("Gate_barrier", true, false)
+	var lock := drawn.find_child("Objective_barrier", true, false)
+	_check(fence != null and fence.find_child("ChainLink", true, false) == null and fence.get_child_count() > 3 and lock != null
+		and lock.get_child_count() >= 10, "the gate is drawn as posts, rails and mesh, with a chain and padlock on it",
+		"%s, %s" % [fence, lock])
+	drawn.open_gate("barrier")
+	_check(not is_instance_valid(lock) or lock.is_queued_for_deletion(), "and opening the gate takes the lock with it")
+	var sky := (drawn._environment.environment.sky.sky_material as ProceduralSkyMaterial) if drawn._environment != null else null
+	_check(ZzMap.is_night(checked.value["environment"]) and sky != null and sky.sky_cover != null
+		and sky.sky_horizon_color.get_luminance() > 0.1, "a night map has a sky: stars, a moon, a lit horizon, not a black void")
+	drawn.free()
 	_finished()
 
 

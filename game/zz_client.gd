@@ -533,7 +533,7 @@ func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName) -
 		var _heard := audio.play(ZzAudio.YOU_ARE_DEAD)
 
 	if chat != null:
-		chat.say_locally(_feed_line(_name_of(session_id), "died", by, why, by_kind), Color(0.95, 0.5, 0.45))
+		chat.say_locally(_feed_line(_name_of(session_id), "died", by, why, by_kind, mine), Color(0.95, 0.5, 0.45))
 
 	if who != null and world_view != null:
 		world_view.unpin(who)
@@ -553,19 +553,31 @@ func _on_down(session_id: int, by: int, why: StringName, by_kind: StringName) ->
 		hud.shout("YOU ARE DOWN", 2.0)
 
 	if chat != null:
-		chat.say_locally(_feed_line(_name_of(session_id), "is down", by, why, by_kind), Color(0.98, 0.7, 0.4))
+		chat.say_locally(_feed_line(_name_of(session_id), "is down", by, why, by_kind, mine), Color(0.98, 0.7, 0.4))
 
 
-func _feed_line(name_of: String, what: String, by: int, why: StringName, by_kind: StringName) -> String:
+## One line of the feed. [param mine]: it is about the person reading it, whose name is
+## "You" and whose verb agrees with it ("You are down", "You bled out"); the first play test
+## read "You is down (strangler)". The killer's kind is said as a name ("a strangler").
+static func feed_line(name_of: String, what: String, by_name: String, why: StringName, by_kind: StringName,
+		mine: bool = false) -> String:
+	var who := "You" if mine else name_of
+	var verb := what
+	if mine:
+		verb = {"is down": "are down", "is back": "are back", "was picked up": "were picked up"}.get(what, what)
 	if by_kind != &"":
-		return "%s %s (%s)" % [name_of, what, String(by_kind)]
-	if by != 0:
-		return "%s %s (%s)" % [name_of, what, _name_of(by)]
+		return "%s %s (%s)" % [who, verb, String(by_kind).replace("_", " ")]
+	if by_name != "":
+		return "%s %s (%s)" % [who, verb, by_name]
 	if why == ZzGame.BY_FELL:
-		return "%s fell" % name_of
+		return "%s fell" % who
 	if why == ZzGame.BY_BLED:
-		return "%s bled out" % name_of
-	return "%s %s" % [name_of, what]
+		return "%s bled out" % who
+	return "%s %s" % [who, verb]
+
+
+func _feed_line(name_of: String, what: String, by: int, why: StringName, by_kind: StringName, mine: bool = false) -> String:
+	return feed_line(name_of, what, _name_of(by) if by != 0 else "", why, by_kind, mine)
 
 
 func _on_revive(session_id: int, by: int) -> void:
@@ -573,13 +585,15 @@ func _on_revive(session_id: int, by: int) -> void:
 		var _up := audio.play(ZzAudio.YOU_ARE_UP)
 
 	if chat != null:
-		chat.say_locally("%s was picked up%s" % [_name_of(session_id), " by %s" % _name_of(by) if by != 0 else ""],
-			Color(0.6, 0.95, 0.6))
+		var mine := session_id == _watch_id
+		chat.say_locally("%s%s" % [feed_line(_name_of(session_id), "was picked up", "", &"", &"", mine),
+			" by %s" % _name_of(by) if by != 0 else ""], Color(0.6, 0.95, 0.6))
 
 
 func _on_rescue(session_id: int) -> void:
 	if chat != null:
-		chat.say_locally("%s is back" % _name_of(session_id), Color(0.6, 0.95, 0.6))
+		chat.say_locally(feed_line(_name_of(session_id), "is back", "", &"", &"", session_id == _watch_id),
+			Color(0.6, 0.95, 0.6))
 
 
 func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
@@ -1073,6 +1087,9 @@ func _build_settings() -> void:
 		# the server's console when one runs in this process. One of the menu's overlays, so
 		# opening it stops the player and frees the pointer exactly as the menu does.
 		console = DotConsoleKit.build(self, settings.settings, settings.menu)
+		# The HUD in the menu's theme and at the player's HUD size, live.
+		if hud != null:
+			hud.follow_menu(settings.menu)
 		_bind_bot_console()
 		_wire_board()
 		_wire_maps()

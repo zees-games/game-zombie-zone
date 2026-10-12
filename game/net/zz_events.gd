@@ -352,12 +352,17 @@ static func read_clock(r: DotNetReader) -> Dictionary:
 
 ## A map began or ended. [param won] whether the survivors made it, and [param why] the
 ## server's sentence, which is what the HUD prints.
-static func write_round(number: int, began: bool, won: bool, why: String = "") -> PackedByteArray:
+## A map began or was decided. A decided one also says how long until the next begins (tenths
+## of a second) and which map that is, so a client can count it down.
+static func write_round(number: int, began: bool, won: bool, why: String = "", next_in: float = -1.0,
+		next_map: String = "") -> PackedByteArray:
 	var w := _w()
 	w.write_varint(number)
 	w.write_bool(began)
 	w.write_bool(won)
 	w.write_string(why, TEXT_BYTES)
+	w.write_varint(clampi(int(round(next_in * 10.0)) + 1, 0, 36000))
+	w.write_string(next_map, TEXT_BYTES)
 	return w.to_bytes()
 
 
@@ -366,7 +371,10 @@ static func read_round(r: DotNetReader) -> Dictionary:
 	var began := r.read_bool()
 	var won := r.read_bool()
 	var why := r.read_string(TEXT_BYTES)
-	return {"round": number, "began": began, "won": won, "why": why, "ok": r.ok()}
+	var next_in := float(r.read_varint() - 1) / 10.0
+	var next_map := r.read_string(TEXT_BYTES)
+	return {"round": number, "began": began, "won": won, "why": why, "next_in": maxf(next_in, -1.0),
+		"next_map": next_map, "ok": r.ok()}
 
 
 static func write_phase(phase: int) -> PackedByteArray:

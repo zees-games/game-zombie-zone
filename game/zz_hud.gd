@@ -48,18 +48,34 @@ const PLATE_BOTTOM := 206.0
 const AMBER := Color(0.98, 0.84, 0.5)
 
 
-## The glance pieces' colours in this game's palette: a near-black plate for a dark street,
-## the boxes' amber as highlight, the health bar's green as "good". Static so a render tool
-## can use it.
+## This game's accent over whichever theme the player picked in the menu: the boxes' amber as
+## the glance pieces' highlight, the health bar's green as "good". The plates, the words and
+## their outline are the theme's (dark by default), so a light or high-contrast theme can
+## change them. Static so a render tool can use it.
 static func piece_theme() -> Theme:
 	var t := Theme.new()
 	var type := DotHudPiece.THEME_TYPE
-	t.set_color(&"plate", type, Color(0.04, 0.05, 0.06, 0.62))
-	t.set_color(&"plate_edge", type, Color(1.0, 1.0, 1.0, 0.12))
 	t.set_color(&"highlight", type, AMBER)
 	t.set_color(&"good", type, HEALTH_COLOUR)
-	t.set_color(&"low", type, Color(0.95, 0.3, 0.22))
 	return t
+
+
+## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the
+## theme on the HUD's root now and at every theme change, and applies the player's HUD size.
+## Christian's first play test (2026-10-11) asked for a darker HUD a player can restyle in the
+## menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
+var _menu: Object = null
+
+
+func follow_menu(menu: Object) -> void:
+	_menu = menu
+	_follow()
+
+
+func _follow() -> void:
+	if _root != null and _menu != null and _menu.has_method(&"follow_hud"):
+		_menu.call(&"follow_hud", _root, piece_theme())
+
 
 var game: ZzGame = null
 var player: ZzPlayer = null
@@ -90,7 +106,11 @@ var hit_marker: DotHitMarker = null
 ## The confirmed hits' numbers, on the bodies they landed on.
 var damage_numbers: DotDamageNumbers = null
 var _status: Label = null
-var _team: Label = null
+## The team, top left: a row per other survivor (name, a health bar, the number or DOWN /
+## HELD / dead). The bar is drawn, not typed: as a row of block characters it came out as
+## missing-glyph boxes on Windows, whose fallback fonts lack them (first play test).
+var _team: Control = null
+var _team_rows: Array[Dictionary] = []
 var _effects: Label = null
 var _prompt: Label = null
 var _use_back: ColorRect = null
@@ -134,6 +154,7 @@ func _build() -> void:
 	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
 	# the root, every piece under it inherits them. See [method piece_theme].
 	_root.theme = piece_theme()
+	_follow()
 
 	_top = _label(24)
 	_top.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -206,13 +227,16 @@ func _build() -> void:
 	_status.offset_left = 24.0
 	_status.offset_right = 600.0
 
-	# The team, top left.
-	_team = _label(15)
+	# The team, top left; rows are made as survivors appear (see [method _team_row]).
+	_team = Control.new()
+	_team.name = "Team"
+	_team.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_team.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	_team.offset_left = 22.0
 	_team.offset_top = 18.0
 	_team.offset_right = 380.0
-	_team.offset_bottom = 300.0
+	_team.offset_bottom = 18.0 + TEAM_ROW * float(TEAM_ROWS)
+	_root.add_child(_team)
 
 	# Weapon and ammunition, bottom right: the counter right-aligns to its own right edge.
 	ammo = DotAmmoCounter.new()
@@ -332,8 +356,9 @@ func _rect(colour: Color, preset: int, left: float, top: float, width: float, he
 func _label(size: int) -> Label:
 	var label := Label.new()
 	label.add_theme_font_size_override("font_size", size)
-	label.add_theme_color_override("font_color", Color(1, 1, 1))
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	# An outline rather than a panel: readable over a lamp-lit wall and the night alike. Its
+	# colour and the words' are the menu's theme's (a Label under the root takes them), so a
+	# player's theme reaches these lines; only the accent lines (a shout, the boxes) set their own.
 	label.add_theme_constant_override("outline_size", 6)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(label)
@@ -450,6 +475,13 @@ func _draw_top() -> void:
 		under = top[2]
 		sub = top[3]
 		clock_low = top[4]
+	elif game.phase == ZzGame.Phase.IDLE and game.next_round_seconds() >= 0.0:
+		# Between a decided map and the next: when, and on what.
+		var next := next_round_lines(game.next_round_seconds(), game.next_round_map(), game.map.id() if game.map != null else &"",
+			_map_name(game.next_round_map()))
+		lines.append(next[0])
+		clock = next[1]
+		under = next[2]
 	elif game.is_survival():
 		var held := game.survival_elapsed
 		lines.append(str(game.map_doc.get("name", "")))
@@ -479,6 +511,20 @@ func _draw_top() -> void:
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
 	strip.show_clock(clock, clock_low, under if clock != "" else "")
+
+
+## What the top says between a decided map and the next: `[title, clock, under the clock]`.
+## Static, so a suite can read it without a screen.
+static func next_round_lines(seconds: float, next_map: StringName, this_map: StringName, next_name: String) -> Array:
+	var again := next_map == &"" or next_map == this_map
+	return ["Trying again" if again else "Next: %s" % next_name, DotScoreStrip.clock_text(ceilf(seconds)),
+		"until this map starts again" if again else "until the next map"]
+
+
+func _map_name(id: StringName) -> String:
+	if game != null and game.catalogue != null and game.catalogue.maps.has(id):
+		return str((game.catalogue.maps[id] as Dictionary).get("name", id))
+	return String(id)
 
 
 ## What the top of the screen says about a survival hold: `[title, clock, under the clock,
@@ -578,14 +624,24 @@ func _set_width(rect: ColorRect, width: float) -> void:
 	rect.visible = width > 0.5
 
 
+## Pixels per team row, how many rows at most (a survival map's dozen, and a few more), and
+## where the bar sits in a row.
+const TEAM_ROW := 22.0
+const TEAM_ROWS := 16
+const TEAM_NAME_WIDTH := 150.0
+const TEAM_BAR_WIDTH := 110.0
+const TEAM_BAR_HEIGHT := 8.0
+
+
 func _draw_team() -> void:
-	var lines := PackedStringArray()
+	var shown := 0
 
 	for other in game.survivors():
-		if other == player:
+		if other == player or shown >= TEAM_ROWS:
 			continue
 
 		var state := ""
+		var fraction := -1.0
 
 		if other.watching or not other.is_alive():
 			state = "dead"
@@ -593,17 +649,87 @@ func _draw_team() -> void:
 			state = "HELD (%s)" % String(other.pin_kind)
 		elif other.is_down():
 			state = "DOWN"
-		else:
-			state = "%d" % int(ceilf(other.health.health)) if other.health != null else ""
+		elif other.health != null:
+			state = "%d" % int(ceilf(other.health.health))
+			fraction = clampf(other.health.health / maxf(other.health.max_health, 1.0), 0.0, 1.0)
 
-		var bar := ""
-		if other.is_alive() and not other.is_down() and other.health != null:
-			var filled := int(round(clampf(other.health.health / maxf(other.health.max_health, 1.0), 0.0, 1.0) * 10.0))
-			bar = "▮".repeat(filled) + "▯".repeat(10 - filled)
+		var row := _team_row(shown)
+		(row["name"] as Label).text = other.display_name.substr(0, 16)
+		(row["state"] as Label).text = state
+		var back: ColorRect = row["back"]
+		var fill: ColorRect = row["fill"]
+		back.visible = fraction >= 0.0
+		_set_width(fill, TEAM_BAR_WIDTH * maxf(fraction, 0.0))
+		fill.color = _piece_colour(&"good" if fraction > 0.4 else &"low", HEALTH_COLOUR)
+		(row["state"] as Label).add_theme_color_override(&"font_color",
+			_piece_colour(&"low", Color(0.95, 0.3, 0.22)) if fraction < 0.0 else _piece_colour(&"text", Color.WHITE))
+		for part: String in ["name", "state"]:
+			(row[part] as Label).visible = true
+		shown += 1
 
-		lines.append("%-14s %s %s" % [other.display_name.substr(0, 14), bar, state])
+	for i in range(shown, _team_rows.size()):
+		var row: Dictionary = _team_rows[i]
+		for part: String in ["name", "state", "back", "fill"]:
+			(row[part] as CanvasItem).visible = false
 
-	_team.text = "\n".join(lines)
+
+## Row [param index] of the team list, made the first time it is needed.
+func _team_row(index: int) -> Dictionary:
+	while _team_rows.size() <= index:
+		var top := TEAM_ROW * float(_team_rows.size())
+		var name_label := Label.new()
+		name_label.add_theme_font_size_override("font_size", 15)
+		name_label.add_theme_constant_override("outline_size", 6)
+		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_label.clip_text = true
+		name_label.position = Vector2(0.0, top)
+		name_label.size = Vector2(TEAM_NAME_WIDTH, TEAM_ROW)
+		_team.add_child(name_label)
+
+		var bar_top := top + (TEAM_ROW - TEAM_BAR_HEIGHT) * 0.5
+		var back := ColorRect.new()
+		back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		back.color = Color(0.0, 0.0, 0.0, 0.55)
+		back.position = Vector2(TEAM_NAME_WIDTH + 6.0, bar_top)
+		back.size = Vector2(TEAM_BAR_WIDTH, TEAM_BAR_HEIGHT)
+		_team.add_child(back)
+
+		var fill := ColorRect.new()
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		fill.position = back.position
+		fill.size = Vector2(TEAM_BAR_WIDTH, TEAM_BAR_HEIGHT)
+		_team.add_child(fill)
+
+		var state := Label.new()
+		state.add_theme_font_size_override("font_size", 15)
+		state.add_theme_constant_override("outline_size", 6)
+		state.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		state.position = Vector2(TEAM_NAME_WIDTH + TEAM_BAR_WIDTH + 14.0, top)
+		state.size = Vector2(120.0, TEAM_ROW)
+		_team.add_child(state)
+
+		_team_rows.append({"name": name_label, "back": back, "fill": fill, "state": state})
+
+	return _team_rows[index]
+
+
+## One of the glance pieces' colours from the theme the root has now (this game's, or the
+## menu's when it follows one), or [param fallback] when the theme does not say.
+func _piece_colour(colour: StringName, fallback: Color) -> Color:
+	if _root != null and _root.has_theme_color(colour, DotHudPiece.THEME_TYPE):
+		return _root.get_theme_color(colour, DotHudPiece.THEME_TYPE)
+	return fallback
+
+
+## What the team list says, row by row, for a suite: `"name|state|bar fraction"`.
+func team_lines() -> PackedStringArray:
+	var out := PackedStringArray()
+	for row: Dictionary in _team_rows:
+		if (row["name"] as Label).visible:
+			var fill: ColorRect = row["fill"]
+			out.append("%s|%s|%.2f" % [(row["name"] as Label).text, (row["state"] as Label).text,
+				(fill.size.x / TEAM_BAR_WIDTH) if fill.visible else 0.0])
+	return out
 
 
 func _draw_weapon() -> void:
