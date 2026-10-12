@@ -93,6 +93,15 @@ Tuned from it: `wave_growth` 0.25 → 0.22 and `wave_growth_accel` 0.02 → 0.01
 
 After, from wave 7 on seed 1: the whole wave is sent with no refusals of its own, the horde reaches the posts (thirty to sixty within six metres), and wave 7 took 16 downs and 16 deaths, wave 8 (swarm) 8 and 6, against 0 to 4 before. Wave 7 still ended on its overtime with the team nearly all down and a few left far off.
 
-**Waves are harder everywhere since.** The wanderer share and the queue fix give every map's waves the room under the cap they were meant to have (before, most of the school's and mall's cap was wanderers too). From wave 1 on seed 1 the school was lost at 6 (sprinters) and on seed 2 the mall at 5 (hunters); `--from=10` was lost on all three big maps. A gentler `wave_growth` (0.18) on the same school seed was lost at 2, so one seed says little; the numbers want the continuous runs (zz-survival-continuous-run-1) before they are retuned.
+**Waves are harder everywhere since.** The wanderer share and the queue fix give every map's waves the room under the cap they were meant to have (before, most of the school's and mall's cap was wanderers too). Continuous holds from wave 1, no `--from` (zz-survival-continuous-run-1, normal, sixteen to ten stand-ins; each ended in under ten minutes because it was lost), wave reached:
+
+| Map | Seed 1 | Seed 2 |
+| --- | --- | --- |
+| School (12) | lost in 6 (sprinters: spitters, commons) | lost in 5 (hunters) |
+| Mall (14) | lost in 6 (heavies) | lost in 5 (hunters) |
+| Ballpark (16) | lost in 7 | lost in 4 (rams, leapers, a hazard) |
+| Camp (10) | lost in 5 (heavies) | lost in 6 (swarm) |
+
+Waves 1 to 3 still go by with 0 to 5 downs; the loss comes in one wave, as before, but at 4 to 7 rather than 7 or 8. So the tuning is not confirmed: the aim (a stand-in team usually reaches 7 or 8, a clear is rare) wants gentler numbers now that the waves fill the cap. One trial of `wave_growth` 0.18 / `wave_growth_accel` 0.014 on the school's seed 1 was lost at 2, which says one seed says little; the retune wants several seeds a setting (queued).
 
 **The tick at wave 10, the crowd at the cap, before the work above** (`--from=10 --profile`, on a VM shared with other sessions at load 7 to 11): school 18.8 ms mean, mall 18.2, ballpark 16.4, camp 10.6, against 15.6; alone at load 3 the school was 15.0 ms at the old cap. The zombies' brains are 6 to 7 ms of it (the chase, the ring and the crowd spacing in dot-npc-ai's steering, not perception, which is 1 ms) and their bodies 3 to 4; the worst ticks, 165 to 175 ms, are brains (a crowd repathing at once). Thinking every second tick from 6 m out instead of 20 changed the brains by half a millisecond. It is now under budget (above).
