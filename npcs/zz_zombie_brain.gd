@@ -63,6 +63,7 @@ var bashing: bool = false
 
 ## Metres from the nearest survivor past which a zombie thinks every second tick, and every
 ## fourth. Its body still moves every tick on the wish it last had.
+const THINK_CLOSE := 6.0
 const THINK_NEAR := 20.0
 const THINK_FAR := 45.0
 
@@ -324,7 +325,9 @@ func _bash_if_barred(delta: float) -> void:
 
 	bashing = false
 
-	if h == null or b.wish.length() < 0.5 or b.flying:
+	# The kind's own decision may have ended it (a bloater that bursts is gone by now): its body
+	# is freed with it. Found by tools/survival_long_run, as a script error a few times a hold.
+	if h == null or b == null or npc == null or not npc.is_alive() or b.wish.length() < 0.5 or b.flying:
 		return
 
 	var barred: String = h.call(&"barricade_in_way", npc.position(), b.wish)
@@ -344,11 +347,12 @@ func _bash_if_barred(delta: float) -> void:
 ## (asked a few times a second, not every tick). A zombie with somebody to hit, swinging, or
 ## staggered always thinks every tick.
 func _think_every() -> int:
-	if bashing:
-		return 2
-
-	if npc == null or not npc.is_alive() or swinging() or staggered() or (forced == &"" and npc.has_target() and _nearest < THINK_NEAR):
+	if npc == null or not npc.is_alive() or swinging() or staggered():
 		return 1
+
+	# Tearing at boards is a halt, a face and a blow paid by the time owed: a quarter as often.
+	if bashing:
+		return 4
 
 	var h := horde()
 
@@ -361,8 +365,15 @@ func _think_every() -> int:
 		_nearest_at = now_s
 		_nearest = float(h.call(&"nearest_survivor_distance", npc.position()))
 
-	if _nearest < THINK_NEAR:
+	# Within reach of a swing or the ring round somebody, every tick; a run at somebody from
+	# further off, every second tick (its body still moves every tick). At wave 10 on the school
+	# seventy-eight zombies all within twenty metres thought every tick, nine of a tick's
+	# sixteen milliseconds (tools/survival_long_run --profile).
+	if _nearest < THINK_CLOSE:
 		return 1
+
+	if _nearest < THINK_NEAR:
+		return 2
 
 	return 2 if _nearest < THINK_FAR else 4
 

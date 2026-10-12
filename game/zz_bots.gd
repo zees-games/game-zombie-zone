@@ -365,6 +365,10 @@ func _needs_mending(entry: Dictionary) -> float:
 
 	var share := float(held["health"]) / maxf(float(held["max"]), 1.0)
 
+	# Being torn at: a mend would be refused, and whoever stood there would be the one in reach.
+	if game.barricade_torn(str(entry["id"])):
+		return -1.0
+
 	if not bool(held["intact"]):
 		return 0.0
 
@@ -484,7 +488,7 @@ func _threat(player) -> DotNpcInstance:
 	# behind a wall.
 	for n in mini(scored.size(), 10):
 		var npc: DotNpcInstance = scored[n][1]
-		if _sees(player, _aim_point(npc)):
+		if _sees(player, _aim_point(npc)) or _sees(player, _head_point(npc)):
 			best = npc
 			break
 
@@ -497,6 +501,22 @@ func _threat(player) -> DotNpcInstance:
 func _aim_point(npc: DotNpcInstance) -> Vector3:
 	var height := float(npc.def.meta.get("height", 1.7))
 	return npc.position() + Vector3(0.0, height * 0.72, 0.0)
+
+
+func _head_point(npc: DotNpcInstance) -> Vector3:
+	var height := float(npc.def.meta.get("height", 1.7))
+	return npc.position() + Vector3(0.0, height * 0.9, 0.0)
+
+
+## Where to shoot [param npc] from [param player]'s eye: the chest, or the head when only the
+## head shows (over a window's boards, a person aims there; aimed at the chest, every shot
+## went into the planks and the crowd at the window was never thinned).
+func _shot_point(player, npc: DotNpcInstance) -> Vector3:
+	var chest := _aim_point(npc)
+	if _sees(player, chest):
+		return chest
+	var head := _head_point(npc)
+	return head if _sees(player, head) else chest
 
 
 func _sees(player, at: Vector3) -> bool:
@@ -522,7 +542,7 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 	var aim: DotBotAim = memory["aim"]
 	if aim.target_id != npc.instance_id:
 		return false
-	var at := _aim_point(npc)
+	var at: Vector3 = memory["target_at"] if memory.get("target_at", Vector3.INF) != Vector3.INF else _aim_point(npc)
 	if not aim.trigger(game.now(), player.eye_position().distance_to(at)):
 		return false
 	if _friend_in_the_way(player, at):
@@ -651,7 +671,7 @@ func _aim_at(player, command: DotFpsCommand, npc: DotNpcInstance) -> void:
 	var memory := _memory(player)
 	var aim: DotBotAim = memory["aim"]
 	var eye: Vector3 = player.eye_position()
-	var at := _aim_point(npc)
+	var at := _shot_point(player, npc)
 	var was: Vector3 = memory["target_at"]
 	var velocity := (at - was) / _dt if aim.target_id == npc.instance_id and was != Vector3.INF and _dt > 0.0 else Vector3.ZERO
 	memory["target_at"] = at

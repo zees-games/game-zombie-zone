@@ -75,8 +75,8 @@ extends DotConfig
 
 ## How much bigger each wave (or harder each night) is than the first, as a share of it, and
 ## the square term that makes the last waves a wall (see [DotNpcDirectorWaves.strength_of]).
-@export_range(0.0, 2.0, 0.01) var wave_growth: float = 0.25
-@export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.02
+@export_range(0.0, 2.0, 0.01) var wave_growth: float = 0.22
+@export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.018
 
 ## Every this many waves a brute comes with the wave (and two with the last). 0 never.
 @export_range(0, 50, 1) var brute_every_waves: int = 5
@@ -354,14 +354,14 @@ func friendly_fire_scale() -> float:
 
 
 ## Commons alive at once, for [param survivors]: [member commons_per_survivor] more for each of
-## the first eight, half that for each past them. A dozen survivors meet 78 at once and sixteen
-## 90, which is what a server's 64 Hz tick carries with the stand-ins (measured on the big
-## survival maps; see docs/survival.md); a wave's total is not capped, only how many are up at
-## once.
+## the first eight, a third of that for each past them. A dozen survivors meet 74 at once and
+## sixteen 82, which is what a server's 64 Hz tick carries at wave 10 with the stand-ins (half
+## past eight, 78 and 90, measured 16 and 18 ms a tick at the cap; see docs/survival.md); a
+## wave's total is not capped, only how many are up at once.
 func commons_cap(survivors: int) -> int:
 	var first := mini(maxi(survivors - 1, 0), 7)
 	var past := maxi(survivors - 8, 0)
-	return commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 2
+	return commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 3
 
 
 ## Specials alive at once, for [param survivors].

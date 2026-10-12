@@ -27,7 +27,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 15
-const CHECKS := 78
+const CHECKS := 79
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -684,8 +684,13 @@ func _test_a_hold_reaches_the_client() -> void:
 		and not drawn.is_empty() and drawn.all(func(m: MeshInstance3D) -> bool: return not m.visible),
 		"its collision is off and its boards are gone from the picture", "%d shapes, %d meshes" % [shapes.size(), drawn.size()])
 
+	# Nobody mends what is being torn at (ZzGame.MEND_LOCKOUT): refused straight after the blow,
+	# taken once the lockout has passed.
+	var refused_now := not _server_game.mend_barricade(0, null)
+	await _steps(int(SERVER_TICK_RATE * (ZzGame.MEND_LOCKOUT + 0.2)))
 	var _mended := _server_game.mend_barricade(0, null)
 	await _steps(4)
+	_check(refused_now and _mended, "a mend is refused while the boards are being torn at, and taken after")
 	var fraction := float(_client_game.barricades["alley_w"]["health"]) / float(_client_game.barricades["alley_w"]["max"])
 	_check(_client_game.map.barricade_intact("alley_w") and shapes.all(func(c: CollisionShape3D) -> bool: return not c.disabled)
 		and drawn.all(func(m: MeshInstance3D) -> bool: return m.visible)

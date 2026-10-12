@@ -1425,6 +1425,7 @@ func bash_barricade(id: String, amount: float) -> void:
 		return
 
 	var e := entry as Dictionary
+	e["torn_at"] = now()
 	var before := float(e["health"]) / float(e["max"])
 	e["health"] = maxf(float(e["health"]) - amount, 0.0)
 	var after := float(e["health"]) / float(e["max"])
@@ -1443,6 +1444,20 @@ func bash_barricade(id: String, amount: float) -> void:
 	if floori(before * 16.0) != floori(after * 16.0):
 		map.set_barricade(id, true, after)
 		barricade_changed.emit(id, after, true)
+
+
+## Seconds after the last blow on a barricade before it can be mended. A mend under attack
+## outran any crowd at a window (120 every two seconds against 6 a second a zombie), so a team
+## behind boards it could not see through mended forever and no wave was ever cleared, only
+## timed out (zz-survival-long-run-1). The boards are held by killing what tears at them;
+## mending is the breather's job, or a lull's.
+const MEND_LOCKOUT := 1.5
+
+
+## Whether something has torn at barricade [param id] in the last [constant MEND_LOCKOUT] s.
+func barricade_torn(id: String) -> bool:
+	var e: Dictionary = barricades.get(id, {})
+	return not e.is_empty() and now() - float(e.get("torn_at", -INF)) < MEND_LOCKOUT
 
 
 ## The barricade [param player] is close enough to mend, as its index in the map's list, or -1:
@@ -1485,6 +1500,11 @@ func mend_barricade(index: int, by: ZzPlayer) -> bool:
 	var e: Dictionary = barricades.get(id, {})
 
 	if e.is_empty():
+		return false
+
+	if barricade_torn(id):
+		if by != null:
+			refused.emit(by.player_id, "They are tearing at it. Clear them off first.")
 		return false
 
 	if not bool(e["intact"]) and horde != null:
