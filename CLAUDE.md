@@ -94,7 +94,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - The HUD follows the menu's theme (`ZzHud.follow_menu`, dot-menu's `follow_hud` by name); `piece_theme()` is accent only (amber, health green); Labels set no colour of their own except accent lines.
 - Every character the game writes is in the HUD's font (`headless_run` scans `game/` and `npcs/`); bars are drawn, never block characters. [design](docs/design.md#what-the-first-play-test-changed-2026-10-11)
 - Feed lines go through `ZzClient.feed_line`: "You are down", never "You is down".
-- A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`); the health number is real health, borrowed is the white length.
+- A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`): the marker, the number and zee's red burst on the zombie (`ZzClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`; a zombie has no physics body the presentation ray meets); the health number is real health, borrowed is the white length.
 - The health plate ends 206 px off the bottom, above a full chat log (202); `headless_run` checks the arithmetic.
 - Between a decided map and the next the strip counts down (`next_round_seconds`, sent in ROUND).
 - `mp_solidplayers` and `mp_forceview` are REPLICATED and followed through the link; third-person and spectate cameras stop against the world. [design](docs/design.md#cameras-and-bodies)
