@@ -357,6 +357,10 @@ func _adopt() -> void:
 
 	_apply_weapons()
 
+	# The owner's own counts (owner_only), put onto the gun it draws once that has gone quiet.
+	if player.view_rig != null:
+		var _corrected := player.correct_view_rig(net_magazine, net_reserve, net_slot, net_reloading or net_switching)
+
 
 ## What a watcher does with somebody else's weapon state.
 ##

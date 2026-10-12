@@ -8,6 +8,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzWeapons := preload("../game/zz_weapons.gd")
 
 var _view := "survivor"
 var _seconds := 3.0
@@ -19,6 +20,7 @@ var _spawn: Array = []
 var _pin := &""
 var _box := &""
 var _client: Node = null
+var _weapons: PackedStringArray = PackedStringArray()
 
 
 func _ready() -> void:
@@ -41,6 +43,8 @@ func _ready() -> void:
 				_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
 		elif arg.begins_with("--pin="):
 			_pin = StringName(arg.trim_prefix("--pin="))
+		elif arg.begins_with("--weapons="):
+			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--box="):
 			_box = StringName(arg.trim_prefix("--box="))
 
@@ -143,6 +147,10 @@ func _run() -> void:
 				game.objective_states[index] = &"holding"
 				game.objective_progress[index] = game.now() + 45.0
 			await _seconds_of(0.12)
+		"weapons":
+			await _weapon_sheets(game, local)
+			get_tree().quit(0)
+			return
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
 			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM, &"ride": ZzNpcs.RIDER}.get(kind, ZzNpcs.LEAPER)
@@ -165,6 +173,83 @@ func _run() -> void:
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	get_tree().quit(0 if saved == OK else 1)
+
+
+## One contact sheet per weapon, through the real client and the real buttons: at the hip, two
+## and six frames into a shot, and the reload at 15/25/40/50/57/75/88% by the drawn rig's own fraction,
+## each tile labelled with the HUD's count. `_out` is the directory (`sheet_<id>.png` in it).
+## What `--view=weapons --weapons=all` is for: a counter that never moves and a reload that is
+## a single tilt are both things only a picture says.
+func _weapon_sheets(game: ZzGame, local) -> void:
+	var ids: Array[StringName] = []
+	if _weapons.is_empty() or _weapons[0] == "all":
+		for def in ZzWeapons.all_defs():
+			if def.uses_magazine():
+				ids.append(def.id)
+	else:
+		for id in _weapons:
+			ids.append(StringName(id))
+
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var label := Label.new()
+	label.position = Vector2(24.0, 70.0)
+	label.add_theme_font_size_override(&"font_size", 34)
+	label.add_theme_color_override(&"font_outline_color", Color.BLACK)
+	label.add_theme_constant_override(&"outline_size", 8)
+	layer.add_child(label)
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+
+	for id in ids:
+		var def := ZzWeapons.def_of(id)
+		if def == null or not game.arm(local, id):
+			print("skipped %s: not armed" % id)
+			continue
+		_client.set("_slot", def.slot)
+		var rig: ZeeWeaponRig = local.view_rig
+		var tiles: Array[Image] = []
+		await _seconds_of(1.2)
+		tiles.append(await _tile(label, id, "hip"))
+		_client.set("_firing", true)
+		await _frames(2)
+		tiles.append(await _tile(label, id, "fire +2"))
+		await _frames(4)
+		tiles.append(await _tile(label, id, "fire +6"))
+		_client.set("_firing", false)
+		await _seconds_of(0.6)
+		# Down to one round on both rigs, so the reload is a whole one (a shell-at-a-time gun loads
+		# several), not the one round the shots above spent.
+		for held in [local.weapons, rig]:
+			if held != null and held.arsenal.current() != null:
+				held.arsenal.current().magazine = mini(1, held.arsenal.current().magazine)
+		_client.set("_reloading", true)
+		await _frames(2)
+		_client.set("_reloading", false)
+		for target in [0.15, 0.25, 0.4, 0.5, 0.57, 0.75, 0.88]:
+			var waited := 0
+			while rig != null and rig.arsenal.is_reloading() and rig._reload_fraction(rig._last_tick) < target and waited < 2000:
+				await get_tree().process_frame
+				waited += 1
+			tiles.append(await _tile(label, id, "reload %d%%%s" % [int(target * 100.0), "" if rig.arsenal.is_reloading() else " (not reloading)"]))
+		var sheet := Image.create(640 * 5, 360 * 2, false, Image.FORMAT_RGB8)
+		for n in tiles.size():
+			var tile := tiles[n]
+			tile.resize(640, 360, Image.INTERPOLATE_BILINEAR)
+			sheet.blit_rect(tile, Rect2i(0, 0, 640, 360), Vector2i((n % 5) * 640, (n / 5) * 360))
+		var path := dir.path_join("sheet_%s.png" % id)
+		print("saved %s: %s" % [path, error_string(sheet.save_png(path))])
+
+
+func _tile(label: Label, id: StringName, what: String) -> Image:
+	var hud = _client.get("hud")
+	label.text = "%s · %s · HUD %s" % [id, what, hud.ammo.count_text() if hud != null else "?"]
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	image.convert(Image.FORMAT_RGB8)
+	return image
 
 
 func _face(player, target: Vector3) -> void:

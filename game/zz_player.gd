@@ -156,6 +156,27 @@ var mirror_fire_kind: int = 0
 var _seen_fire_seq: int = -1
 static var _slots: Dictionary = {}
 
+## The rig the client playing this survivor draws their gun with (`ZzClient.weapons`); null on
+## every other machine and for everybody else. Its magazine is what the HUD counts, so it is
+## corrected from the server's (see [method correct_view_rig]).
+var view_rig: ZeeWeaponRig = null
+
+## Simulated seconds [member view_rig] has gone without a trigger, a reload or a switch.
+var _view_rig_quiet: float = 0.0
+
+## How long the drawn gun must be quiet before the server's count may overwrite it: longer than
+## a shot takes to reach the server and its snapshot to come back, so a correction never undoes
+## a shot the server has not heard of yet.
+const VIEW_RIG_SETTLE_SEC := 0.6
+
+## Offline only: puts the client's buttons on the command [member sampler] has just made.
+##
+## [b]Stamped after sampling, inside [method simulate], never on the command before it.[/b] The
+## client used to stamp `controller.current_command` from its own physics frame, and then this
+## file's [method simulate] replaced that command with a fresh sample: fire and reload never
+## reached the world's rig, so offline the HUD's 15 / 60 never moved and nothing you shot was hit.
+var command_stamp: Callable = Callable()
+
 var tick_rate: int = 64:
 	set(value):
 		tick_rate = value
@@ -233,7 +254,12 @@ static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 ## One simulated tick. On the server and offline; a client predicts through its behaviour.
 func simulate(tick: int, delta: float) -> void:
 	if sampler != null:
-		controller.apply_command(sampler.sample(delta))
+		var sampled := sampler.sample(delta)
+
+		if command_stamp.is_valid():
+			command_stamp.call(sampled)
+
+		controller.apply_command(sampled)
 
 	controller.simulate_tick(tick, delta)
 	global_position = controller.state.position
@@ -260,6 +286,62 @@ func is_down() -> bool:
 
 func is_pinned() -> bool:
 	return pinned_by != 0
+
+
+## Pinned, or using something with both hands: the gun does nothing (down, you still shoot).
+func is_held() -> bool:
+	return is_pinned() or using != &""
+
+
+## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig
+## follows (`ZzWeapons.command_for`). [param delta] is the tick's simulated length.
+func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float) -> DotWeaponOutcome:
+	if view_rig == null or view_rig.arsenal == null:
+		return DotWeaponOutcome.nothing("No drawn rig.")
+
+	var state := controller.state if controller != null else null
+	var command := ZzWeapons.command_for(fire, reload, is_held(), state.yaw if state != null else 0.0,
+		state.pitch if state != null else 0.0, slot, view_rig.arsenal)
+	var outcome := view_rig.simulate_tick(command, tick)
+	var arsenal := view_rig.arsenal
+
+	if command.is_pressed(DotWeaponCommand.BUTTON_ATTACK) or command.is_pressed(DotWeaponCommand.BUTTON_RELOAD) \
+			or arsenal.is_reloading() or arsenal.is_switching():
+		_view_rig_quiet = 0.0
+	else:
+		_view_rig_quiet += maxf(delta, 0.0)
+
+	return outcome
+
+
+## Brings [member view_rig]'s count to the server's, once the drawn gun has been quiet long
+## enough that the server has heard every shot it fired. True when it changed anything.
+##
+## [b]The drawn gun predicts, so it can be wrong, and nothing used to put it right.[/b] Shots
+## the server refused, an ammo pile, a box, a map's fresh rig: each left the counter on the drawn
+## gun's own sum for the rest of the map. Correcting on every snapshot instead would undo the
+## shots still in flight and make the counter flicker up while you fire.
+func correct_view_rig(magazine: int, reserve: int, slot: int, server_busy: bool) -> bool:
+	if view_rig == null or view_rig.arsenal == null or server_busy:
+		return false
+
+	var arsenal := view_rig.arsenal
+	var held := arsenal.current()
+
+	if held == null or slot != arsenal.current_slot() or _view_rig_quiet < VIEW_RIG_SETTLE_SEC:
+		return false
+
+	var changed := false
+
+	if held.def.uses_magazine() and held.magazine != magazine:
+		held.magazine = clampi(magazine, 0, held.def.magazine)
+		changed = true
+
+	if held.def.ammo_type != &"" and not held.def.infinite_reserve and arsenal.ammo().count(held.def.ammo_type) != reserve:
+		arsenal.ammo().set_count(held.def.ammo_type, reserve)
+		changed = true
+
+	return changed
 
 
 ## Up, free, and not holding E on anything: able to do things with their hands.

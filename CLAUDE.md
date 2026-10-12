@@ -34,7 +34,7 @@ npcs/                the zombie body, its view, and one brain script per kind (b
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
 sounds/              moans, specials, music; CREDITS.md
-examples/            headless_run (121), headless_maps (61), headless_net (58), dedicated (59)
+examples/            headless_run (126), headless_maps (61), headless_net (67), headless_weapons (17), dedicated (59)
 tools/               shot.sh/.gd (render a view), zombie_rack.gd, convert_bodies.gd, audio_probe
 ```
 
@@ -96,12 +96,13 @@ The server carries two packs: zee-dot-weapons and zed-dot-weapons (built for thi
 - **H is help** (dot-menu's stock key; `ZzSettings._fill_help` writes the goal and rules), so nothing in `ZzBindings` may default to H; the medkit moved to G on 2026-10-11 and `headless_run` checks it.
 - **Every `ZzEvents.Kind` must fit `ZzEvent.KIND_BITS`** (6 bits, 64 kinds); at 5, HURT and AMMO went out as HELLO and MAP for a day. `headless_net` checks it ([history](docs/history.md)).
 - **A brain seeds from `npc.seed`, never `npc.instance_id`** (an object id moves with every allocation); `seed_base` is `config.seed_value`. Suites wait for a zombie's state, never time its seeded choice ([history](docs/history.md)).
+- **Your gun is two rigs**: the world's (`ZzPlayer.weapons`, decides) and the client's drawn one (`ZzPlayer.view_rig`, what the HUD counts and the view model plays). Both take `ZzWeapons.command_for` (held hands, an empty magazine reloading itself); offline the buttons go onto the world's sample through `ZzPlayer.command_stamp`, never onto `controller.current_command` (sampled over); the drawn rig is corrected by `correct_view_rig` once quiet. `headless_weapons` presses the client's buttons ([history](docs/history.md)).
 - **A shot starting inside a survivor skips them** (`zz_trace.gd`); stand-ins test a friend's hitboxes, and `headless_run` measures them over the first round, not at 60 s ([history](docs/history.md)).
 
 ## Validating
 
 ```bash
-./game.sh test                                          # parse, then all four suites
+./game.sh test                                          # parse, then all five suites
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
@@ -110,6 +111,7 @@ tools/shot.sh --view=third --spawn=brute:1,leaper:1
 tools/shot.sh --view=pinned --pin=choke
 tools/shot.sh --view=down
 tools/shot.sh --view=survivor --box=mystery
+tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # a fire-and-reload sheet per gun, HUD count on each tile
 ```
 
 **Look**: building surfaces are Kenney's grid under dusted pastels (`ZzMaterials.PASTELS`, `DUST`), so a dark zombie reads against a pale wall; light is a dot-lighting document from the map's `environment` (`ZzMap.light_document`), the map's own moon or low sun without the rig's 0.35 daylight floor, fill at `FILL` x `ambient_energy`. Night maps stay night; check both renderers with `tools/shot.sh` before changing either number.

@@ -5,8 +5,10 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
@@ -24,8 +26,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 13
-const CHECKS := 60
+const SECTIONS := 14
+const CHECKS := 67
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -74,6 +76,7 @@ func _run() -> void:
 		await _test_a_client_joins()
 		await _test_the_map_arrives()
 		await _test_the_local_player_is_predicted()
+		await _test_shots_count_online()
 		await _test_zombies_replicate()
 		await _test_a_down_reaches_the_client()
 		await _test_a_pin_reaches_the_client()
@@ -283,6 +286,8 @@ func _build() -> bool:
 		_heard["effects"] = rows)
 	_client_bridge.gate_received.connect(func(gate: String) -> void:
 		_heard["gate"] = gate)
+	_client_bridge.ammo_received.connect(func() -> void:
+		_heard["ammo"] = int(_heard.get("ammo", 0)) + 1)
 	_client_bridge.round_changed.connect(func(n: int, began: bool, won: bool, why: String) -> void:
 		if not began:
 			_heard["round_over"] = [n, won, why])
@@ -348,6 +353,106 @@ func _test_the_local_player_is_predicted() -> void:
 	var apart := mine.controller.state.position.distance_to(server_me.controller.state.position)
 	_check(apart < 0.25, "and after running, the two ends agree", "%.3f m" % apart)
 	_finished()
+
+
+## Your gun, connected: the server's rig decides, the client draws its own from the same buttons
+## (`ZzPlayer.drive_view_rig`, what `ZzClient` calls), and the HUD counts the drawn one, which the
+## owner's snapshot corrects once it has gone quiet. The first play test's counter never moved.
+func _test_shots_count_online() -> void:
+	_section("a shot spends the server's magazine, and the client's gun and HUD agree")
+	var mine := _mine()
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	await _steps(4)
+	_check(server_me.weapons != null and server_me.weapons.arsenal.current() != null, "the server armed the survivor")
+
+	# What `ZzClient._arm_locally` builds, minus the view model a headless run cannot draw.
+	var rig := ZeeWeaponRig.new()
+	rig.name = "Weapons"
+	rig.role = ZeeWeaponRig.Role.LOCAL
+	rig.authority = false
+	rig.tick_rate = Engine.physics_ticks_per_second
+	rig.player_ref = DotNodeRef.of_path(mine.get_path())
+	mine.add_child(rig)
+	var _set := rig.setup()
+	mine.view_rig = rig
+	var held_id := server_me.weapons.current_def().id
+	var _given := rig.give(held_id)
+	var slot := server_me.weapons.arsenal.current_slot()
+	var hud := ZzHud.new()
+	add_child(hud)
+	hud.bind(_client_game, mine)
+
+	var before := server_me.weapons.arsenal.current().magazine
+	for _pull in range(3):
+		await _armed_steps(2, true, false, slot)
+		await _armed_steps(10, false, false, slot)
+	await _armed_steps(30, false, false, slot)
+	var server_mag := server_me.weapons.arsenal.current().magazine
+	hud._draw_weapon()
+	_check(before - server_mag == 3, "three pulls spend three of the server's rounds", "%d -> %d" % [before, server_mag])
+	_check(rig.arsenal.current().magazine == server_mag and hud.ammo.magazine == server_mag,
+		"the drawn gun and the HUD say the same", "drawn %d, HUD %s" % [rig.arsenal.current().magazine, hud.ammo.count_text()])
+
+	# The server takes rounds the client never spent (what any refusal or box does): the owner's
+	# snapshot puts the drawn gun right once it has been quiet.
+	var pool := server_me.weapons.current_def().ammo_type
+	server_me.weapons.arsenal.ammo().set_count(pool, 7)
+	await _armed_steps(int(ceilf(ZzPlayer.VIEW_RIG_SETTLE_SEC * CLIENT_ENGINE_TICK_RATE)) + 12, false, false, slot)
+	hud._draw_weapon()
+	_check(hud.ammo.reserve == 7, "a reserve the server changed reaches the HUD", hud.ammo.count_text())
+
+	# R, online: the server reloads and fills from the 7; the client shows it.
+	var missing := server_me.weapons.current_def().magazine - server_mag
+	await _armed_steps(2, false, true, slot)
+	var drawn_reloading := rig.arsenal.is_reloading()
+	var waited := 0
+	while not server_me.weapons.arsenal.is_reloading() and waited < INPUT_LEAD * 4:
+		await _armed_steps(1, false, false, slot)
+		waited += 1
+	_check(drawn_reloading and server_me.weapons.arsenal.is_reloading(), "R reloads the drawn gun at once and the server's when it arrives",
+		"%d ticks later" % waited)
+	var takes := rig.arsenal.ticks_for(rig.current_def(), rig.current_def().reload_ticks)
+	await _armed_steps(takes + int(ceilf(ZzPlayer.VIEW_RIG_SETTLE_SEC * CLIENT_ENGINE_TICK_RATE)) + 12, false, false, slot)
+	hud._draw_weapon()
+	var filled := mini(missing, 7)
+	_check(server_me.weapons.arsenal.current().magazine == server_mag + filled and hud.ammo.magazine == server_mag + filled
+		and hud.ammo.reserve == 7 - filled, "and refills from the reserve after its time, on the HUD too", hud.ammo.count_text())
+
+	# An ammo pile, used on the server, is told to its owner as AMMO (it went out as MAP while
+	# the kind field was five bits), and the counter follows the server's reserve.
+	var heard_before := int(_heard.get("ammo", 0))
+	var pile := _server_game.loot.add(ZzLoot.AMMO, &"", STREET)
+	_server_game.loot.use(pile, server_me)
+	await _armed_steps(int(ceilf(ZzPlayer.VIEW_RIG_SETTLE_SEC * CLIENT_ENGINE_TICK_RATE)) + 12, false, false, slot)
+	hud._draw_weapon()
+	var reserve := server_me.weapons.arsenal.ammo().count(pool)
+	_check(int(_heard.get("ammo", 0)) == heard_before + 1 and reserve > 7 and hud.ammo.reserve == reserve,
+		"an ammo pile is told to its owner as AMMO, and the HUD shows the server's reserve",
+		"heard %d, server %d, HUD %s" % [int(_heard.get("ammo", 0)) - heard_before, reserve, hud.ammo.count_text()])
+
+	mine.view_rig = null
+	mine.remove_child(rig)
+	rig.queue_free()
+	hud.queue_free()
+	_finished()
+
+
+## Steps with the trigger and R as the client's buttons, sent to the server and given to the
+## client's drawn gun: what `ZzClient._physics_process` does each frame.
+func _armed_steps(count: int, fire: bool, reload: bool, slot: int) -> void:
+	for _i in range(count):
+		var move := DotFpsCommand.new()
+		move.set_button(ZzNetCommand.BUTTON_FIRE, fire)
+		move.set_button(ZzNetCommand.BUTTON_RELOAD, reload)
+		_tick += 1
+		var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
+		_server_bridge.server_tick(_tick)
+		_flush()
+		_client_bridge.client_tick(_tick + INPUT_LEAD, move, slot)
+		var _drawn := _mine().drive_view_rig(fire, reload, slot, _tick, 1.0 / float(CLIENT_ENGINE_TICK_RATE))
+		_flush()
+		await get_tree().physics_frame
 
 
 ## The zombies are the server's: a client is told one exists, follows its snapshots, and is

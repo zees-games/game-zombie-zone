@@ -10,6 +10,7 @@
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
+#   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
 #   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png
 #
 # xvfb-run because this needs a rendering context: `--headless` gives a null renderer and saves
@@ -30,7 +31,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--pin=*|--box=*|--board|--name=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--pin=*|--box=*|--board|--name=*|--weapons=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

@@ -303,6 +303,11 @@ func _adopt(candidate: ZzPlayer) -> void:
 	player = candidate
 	_build_camera()
 
+	# Offline the world samples this player's movement itself, so the buttons go onto that
+	# sample (see `ZzPlayer.command_stamp`); connected, they go onto the command sent.
+	if _offline:
+		player.command_stamp = _stamp
+
 	if settings != null:
 		settings.bind_camera(camera)
 		if player.sampler != null:
@@ -675,7 +680,10 @@ func _arm_locally(weapon_id: StringName) -> void:
 		weapons.name = "Weapons"
 		weapons.role = ZeeWeaponRig.Role.LOCAL
 		weapons.authority = false
-		weapons.tick_rate = game.tick_rate
+		# Ticked once a physics frame (`_drive_view_model`), so timed by that rate: at the
+		# server's 64 against a 60 Hz client every reload here ran 7% long, and the counter
+		# sat empty after the server's gun had filled.
+		weapons.tick_rate = Engine.physics_ticks_per_second
 		weapons.view_model_ref = DotNodeRef.of_path(view_model.get_path())
 		weapons.player_ref = DotNodeRef.of_path(player.get_path())
 		player.add_child(weapons)
@@ -690,6 +698,8 @@ func _arm_locally(weapon_id: StringName) -> void:
 		weapons.used.connect(func(outcome: DotWeaponOutcome) -> void:
 			if audio != null and camera != null:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
+
+	player.view_rig = weapons
 
 	if not weapons.give(weapon_id).ok:
 		return
@@ -709,6 +719,9 @@ func _strip_locally() -> void:
 
 	if weapons != null and weapons.arsenal != null:
 		weapons.arsenal.clear()
+		# The pools too: `clear` keeps them, and the next map's fresh pistol added its reserve to
+		# what was left (15 / 105 against the server's 15 / 60).
+		weapons.arsenal.ammo().clear()
 
 
 # --- The camera ------------------------------------------------------------
@@ -1046,12 +1059,21 @@ func _drive_offline() -> void:
 	var pending := player.controller.current_command
 
 	if pending != null:
-		_stamp(pending)
 		player.wanted_slot = _slot
 		player.actions = _actions()
 		player.shove_held = _shoving
 
 	_drive_view_model(pending)
+
+	# The world's rig is the truth offline; the drawn one catches up with it the same way a
+	# connected client's catches up with the server's snapshot.
+	var truth := player.weapons
+
+	if truth != null and truth.arsenal != null and truth.arsenal.current() != null:
+		var held := truth.arsenal.current()
+		var _corrected := player.correct_view_rig(held.magazine,
+			truth.arsenal.ammo().count(held.def.ammo_type) if held.def.ammo_type != &"" else 0,
+			truth.arsenal.current_slot(), truth.arsenal.is_reloading() or truth.arsenal.is_switching())
 
 
 func _stamp(command: DotFpsCommand) -> void:
@@ -1063,23 +1085,13 @@ func _stamp(command: DotFpsCommand) -> void:
 	command.set_button(ZzNetCommand.BUTTON_RELOAD, _reloading)
 
 
-func _drive_view_model(command: DotFpsCommand) -> void:
+## One tick of the gun you see, from the same buttons the server's gun is given this tick.
+func _drive_view_model(_command: DotFpsCommand) -> void:
 	if weapons == null or player == null:
 		return
 
-	var weapon_command := DotWeaponCommand.new()
-	var held := player.is_pinned() or player.using != &""
-
-	if command != null and not held:
-		weapon_command.set_button(DotWeaponCommand.BUTTON_ATTACK, command.is_pressed(ZzNetCommand.BUTTON_FIRE))
-		weapon_command.set_button(DotWeaponCommand.BUTTON_RELOAD, command.is_pressed(ZzNetCommand.BUTTON_RELOAD))
-
-	if command != null:
-		weapon_command.yaw = command.yaw
-		weapon_command.pitch = command.pitch
-
-	weapon_command.slot = _slot
-	var _outcome := weapons.simulate_tick(weapon_command, game.round_number * 100000 + Engine.get_physics_frames())
+	var _outcome := player.drive_view_rig(_firing, _reloading, _slot,
+		game.round_number * 100000 + Engine.get_physics_frames(), 1.0 / float(maxi(Engine.physics_ticks_per_second, 1)))
 
 
 func _process(delta: float) -> void:

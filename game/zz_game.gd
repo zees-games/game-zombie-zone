@@ -1906,8 +1906,7 @@ func _advance_weapons() -> void:
 		if player.weapons == null or not player.is_alive() or player.watching:
 			continue
 
-		var held := player.is_pinned() or player.using != &""
-		var command := weapon_command_for(player) if not held else DotWeaponCommand.new()
+		var command := weapon_command_for(player)
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
 		var outcome := player.weapons.simulate_tick(command, _tick)
@@ -1964,19 +1963,18 @@ func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
 		fuse, spawn.splash_radius, gravity)
 
 
+## The command [param player]'s gun simulates this tick, from the buttons on their movement
+## command. `ZzWeapons.command_for` is the rule, shared with the gun a client draws.
 func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
-	var command := DotWeaponCommand.new()
 	var pending := player.controller.current_command
+	var arsenal := player.weapons.arsenal if player.weapons != null else null
 
 	if pending == null:
-		return command
+		return ZzWeapons.command_for(false, false, player.is_held(), 0.0, 0.0, player.wanted_slot, arsenal)
 
-	command.set_button(DotWeaponCommand.BUTTON_ATTACK, pending.is_pressed(ZzNetCommand.BUTTON_FIRE))
-	command.set_button(DotWeaponCommand.BUTTON_RELOAD, pending.is_pressed(ZzNetCommand.BUTTON_RELOAD))
-	command.yaw = pending.yaw
-	command.pitch = pending.pitch
-	command.slot = player.wanted_slot
-	return command
+	return ZzWeapons.command_for(pending.is_pressed(ZzNetCommand.BUTTON_FIRE),
+		pending.is_pressed(ZzNetCommand.BUTTON_RELOAD), player.is_held(), pending.yaw, pending.pitch,
+		player.wanted_slot, arsenal)
 
 
 # --- The tick ------------------------------------------------------------------------------------

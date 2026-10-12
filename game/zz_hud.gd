@@ -554,7 +554,11 @@ func _draw_team() -> void:
 
 
 func _draw_weapon() -> void:
-	var rig := player.get_node_or_null(^"Weapons") as ZeeWeaponRig
+	# The gun you see, whose reload you watch, corrected from the server's count. By the node's
+	# name this read the world's rig offline, a second rig beside the drawn one (which Godot had
+	# renamed), and showed whatever that one had.
+	var rig: ZeeWeaponRig = player.view_rig if player.view_rig != null and is_instance_valid(player.view_rig) \
+		else player.get_node_or_null(^"Weapons") as ZeeWeaponRig
 
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()

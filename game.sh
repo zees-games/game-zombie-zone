@@ -32,7 +32,7 @@
 GAME_NAME="Zombie Zone"
 PACK="zombiezone"
 EXTRA_PACKS="zombiezone_maps:zombie-zone-maps"
-SUITES="headless_run headless_maps headless_net dedicated"
+SUITES="headless_run headless_maps headless_net headless_weapons dedicated"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail

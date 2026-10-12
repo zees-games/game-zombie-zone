@@ -104,3 +104,45 @@ static func tier_of(id: StringName) -> StringName:
 static func title_of(id: StringName) -> String:
 	var def := def_of(id)
 	return def.display_name if def != null and def.display_name != "" else String(id).capitalize()
+
+
+## The weapon command a survivor's buttons make, on every end that simulates their gun: the
+## server's rig, and the rig a client draws (offline and connected).
+##
+## [b]One function, because the two rigs count the same magazine.[/b] A rule written on one end
+## only (hands that are busy, a magazine that reloads itself) is a client whose drawn gun and
+## counter say one thing while the server's gun does another. [param held] is the server's own
+## test: pinned, or using something with both hands. Down, you still shoot.
+static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch: float, slot: int,
+		arsenal: DotWeaponArsenal) -> DotWeaponCommand:
+	var command := DotWeaponCommand.new()
+
+	if not held:
+		command.set_button(DotWeaponCommand.BUTTON_ATTACK, fire)
+		command.set_button(DotWeaponCommand.BUTTON_RELOAD, reload or wants_reload(arsenal))
+
+	command.yaw = yaw
+	command.pitch = pitch
+	command.slot = slot
+	return command
+
+
+## Whether the gun in hand is empty and has something to reload from.
+##
+## [b]An empty magazine reloads itself, trigger held or not.[/b] dot-weapon starts a reload only
+## on a dry pull (`auto_reload`), so a survivor who let go on the last round stood with an empty
+## gun until the next pull clicked: with a horde coming, that click is the reload starting a
+## second late. A weapon with `auto_reload` off (a minigun, a beam) is left to the R key.
+static func wants_reload(arsenal: DotWeaponArsenal) -> bool:
+	if arsenal == null or arsenal.is_reloading() or arsenal.is_switching():
+		return false
+
+	var slot := arsenal.current()
+
+	if slot == null or not slot.def.uses_magazine() or not slot.def.auto_reload:
+		return false
+
+	if slot.magazine >= maxi(slot.def.cost_per_use, 1):
+		return false
+
+	return slot.def.ammo_type == &"" or slot.def.infinite_reserve or arsenal.ammo().has(slot.def.ammo_type, 1)
