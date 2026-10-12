@@ -452,7 +452,9 @@ func _test_big_map(id: StringName) -> void:
 			torn += 1
 
 	var held := game.survival_state()
-	_check(int(held.get("index", 0)) >= 1 and game.survival.waves.sent > 0,
+	# Wave 1 may already be over: since a wave down to its stragglers ends 30 s after its last
+	# release (zz-survival-retune-1) the minute can reach the breather, where `sent` is zero.
+	_check(int(held.get("index", 0)) >= 1 and (game.survival.waves.sent > 0 or game.survival.cleared >= 1),
 		"the hold begins and wave 1 is released", str(held))
 	_check(kills > 5, "the stand-ins kill what comes", "%d kills" % kills)
 	_check(torn > 0 or kills > 20, "the horde reaches the barricades", "%d barricades hit, %d kills" % [torn, kills])

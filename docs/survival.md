@@ -28,9 +28,9 @@ dot-npc-ai-director's `DotNpcDirectorWaves` is the schedule: quiet stretches and
 
 - **The breather is a patch-up, not a shop.** The downed get up, the dead come back beside the team, everybody standing gets 30 health, and every cache (`caches` in the map) is cleared and restocked: ammunition, a medkit or pills, a gun from the tier the hold has reached (primaries, heavies past the middle), a throwable from wave 3. No money and no menu: what is on the table goes to whoever walks over.
 - **The barricades are the clock that matters** (below). Mending is the breather's other job.
-- **Twists** from wave 3, never the same twice running and one wave in three straight: sprinters (a third faster), swarm (half as many again, each at 60 % health), heavies (fewer, 180 % health), hunters (twice the specials). Announced with the wave and on the HUD.
+- **Twists** from wave 3, never the same twice running and one wave in three straight: sprinters (a quarter faster), swarm (half as many again, each at 60 % health), heavies (fewer, 180 % health), hunters (half as many specials again). A brute's wave draws none. Announced with the wave and on the HUD.
 - **A brute every fifth wave, two with the last** (`zz_brute_every`), each arriving once another third of the wave is out.
-- **Specials per wave**: 0.6 more per wave from the second, scaled by team size, spread over the wave.
+- **Specials per wave**: one from the second wave and 0.6 more each wave after, for every six survivors, spread over the wave.
 
 ## Barricades
 
@@ -102,6 +102,29 @@ After, from wave 7 on seed 1: the whole wave is sent with no refusals of its own
 | Ballpark (16) | lost in 7 | lost in 4 (rams, leapers, a hazard) |
 | Camp (10) | lost in 5 (heavies) | lost in 6 (swarm) |
 
-Waves 1 to 3 still go by with 0 to 5 downs; the loss comes in one wave, as before, but at 4 to 7 rather than 7 or 8. So the tuning is not confirmed: the aim (a stand-in team usually reaches 7 or 8, a clear is rare) wants gentler numbers now that the waves fill the cap. One trial of `wave_growth` 0.18 / `wave_growth_accel` 0.014 on the school's seed 1 was lost at 2, which says one seed says little; the retune wants several seeds a setting (queued).
+Waves 1 to 3 still go by with 0 to 5 downs; the loss comes in one wave, as before, but at 4 to 7 rather than 7 or 8. So the tuning is not confirmed: the aim (a stand-in team usually reaches 7 or 8, a clear is rare) wants gentler numbers now that the waves fill the cap. One trial of `wave_growth` 0.18 / `wave_growth_accel` 0.014 on the school's seed 1 was lost at 2, which says one seed says little; the retune wants several seeds a setting (done below).
+
+## Retuned from continuous holds (zz-survival-retune-1, 2026-10-12)
+
+Continuous holds from wave 1 (no `--from`), normal, the map's full team of stand-ins, seeds 3 to 8; each run was capped at ten minutes of a shared VM's time (load 6 to 13, eight at once), so a hold still going then is written "reached N". Before the changes, seeds 3 and 4: school lost in 4 and 3, the camp in 7 and 6, the mall and the ballpark still in waves 5 and 4 at the limit.
+
+What the runs showed, in order of weight:
+
+- **Mobs ignored the wave's room.** A bile splash (a mob of 0.8 × 14 + 3 a survivor, about forty for a dozen), a screamer and a box's mob were spawned on top of the wave, up to the server's whole cap: third waves peaked at 74 to 82 alive while the release itself held 40, and those were the holds lost in wave 2 or 3. A survival wave now sets `ZzHorde.wave_room` and `spawn_mob` fits under it.
+- **The whole cap from wave 1.** A wave may have `wave_alive_share` (0.4) of the commons cap up at once in its first wave, growing on a square curve to all of it by the last (half of it by wave 6, four fifths by wave 8): the middle waves, where holds ended, are gentler and the last one is still the wall.
+- **Too many specials.** One more each wave past the first for every six survivors, not four (`survivors_per_wave_special`): a dozen met thirteen specials in a wave-3 hunters twist. Hunters bring half as many again, not twice.
+- **A brute on top of a twist.** Wave 5 (brute plus sprinters or a swarm) was where most of the first tuned runs ended; a brute's wave now draws no twist. Sprinters are a quarter faster, not a third.
+- **Every wave ran to its overtime** with four to eight commons left somewhere far off. A wave down to half the team's number in stragglers (`wave_straggler_share`, never under three) ends 30 s after its last release, as three did; the breather's tidy-up then clears them.
+
+After (the defaults now), wave reached or lost in:
+
+| Map (team) | 3 | 4 | 5 | 6 | 7 | 8 | Median |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| School (12) | reached 8 | reached 8 | lost in 6 (swarm) | lost in 6 (sprinters) | lost in 6 (heavies) | lost in 6 (hunters) | 6 |
+| Mall (14) | reached 7 | lost in 4 | reached 7 | reached 8 | lost in 4 | reached 8 | 7 |
+| Ballpark (16) | reached 9 | lost in 6 (swarm) | lost in 6 (heavies) | reached 9 | lost in 6 (heavies) | lost in 7 | 6.5 |
+| Camp (10) | lost in 8 (sprinters) | lost in 5 | lost in 5 | **won** | lost in 9 (heavies) | lost in 9 (heavies) | 8.5 |
+
+Over all 24 the median team reaches wave 7 and one cleared all ten, which is the aim; the spread on one map is as wide as between maps, so a single seed says little. The school and the ballpark still most often go down in wave 6, a twist wave right after the brute's; that is the next thing to look at (queued as zz-survival-retune-2). A trial at `wave_alive_share` 0.35 (seeds 3 and 4) was not clearly easier and was not kept. `wave_growth` (0.22), `wave_growth_accel` (0.018), the release rate, the breather (30 s, `breather_heal` 30) and the barricade numbers stay.
 
 **The tick at wave 10, the crowd at the cap, before the work above** (`--from=10 --profile`, on a VM shared with other sessions at load 7 to 11): school 18.8 ms mean, mall 18.2, ballpark 16.4, camp 10.6, against 15.6; alone at load 3 the school was 15.0 ms at the old cap. The zombies' brains are 6 to 7 ms of it (the chase, the ring and the crowd spacing in dot-npc-ai's steering, not perception, which is 1 ms) and their bodies 3 to 4; the worst ticks, 165 to 175 ms, are brains (a crowd repathing at once). Thinking every second tick from 6 m out instead of 20 changed the brains by half a millisecond. It is now under budget (above).

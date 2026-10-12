@@ -94,6 +94,12 @@ var intensity: float = 1.0
 ## Whether the waves drive the spawning (the director, mobs, specials and brute clocks off).
 var waves_mode: bool = false
 
+## The most commons a survival wave lets be up at once (`ZzSurvival._release` sets it each
+## tick; -1 none). A mob (a scream, bile, a box) fits under it: uncapped, one bile mob of
+## forty on a third wave filled the server's whole cap and was where most holds ended
+## (zz-survival-retune-1).
+var wave_room: int = -1
+
 ## What the wave in play does to everything spawned in it: its twist.
 var wave_speed_scale: float = 1.0
 var wave_health_scale: float = 1.0
@@ -394,6 +400,7 @@ func clear() -> void:
 	survival = false
 	intensity = 1.0
 	waves_mode = false
+	wave_room = -1
 	wave_speed_scale = 1.0
 	wave_health_scale = 1.0
 	pacing = false
@@ -1003,6 +1010,9 @@ func _advance_mobs() -> void:
 ## [param target] chooses whom they all go for; empty spreads them over the team.
 func spawn_mob(size: int, target: StringName = &"") -> int:
 	var ids := survivor_ids()
+
+	if waves_mode and wave_room >= 0:
+		size = mini(size, maxi(wave_room - commons() - pending_commons(), 0))
 
 	if ids.is_empty() or size <= 0:
 		return 0

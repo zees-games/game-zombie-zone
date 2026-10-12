@@ -78,6 +78,25 @@ extends DotConfig
 @export_range(0.0, 2.0, 0.01) var wave_growth: float = 0.22
 @export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.018
 
+## Specials a wave brings: one from the second wave plus this many for each wave past the
+## first, for every [member survivors_per_wave_special] survivors (never fewer than one share).
+## At 0.6 and four a share a team of twelve met thirteen specials in a third-wave hunters twist
+## and lost (zz-survival-retune-1; docs/survival.md).
+@export_range(0.0, 5.0, 0.05) var wave_specials_growth: float = 0.6
+@export_range(1.0, 32.0, 0.5) var survivors_per_wave_special: float = 6.0
+
+## A wave down to this share of the team in stragglers (never fewer than three) ends 30 s after
+## its last release: a few commons lost in a far corner held every wave to its overtime.
+@export_range(0.0, 2.0, 0.05) var wave_straggler_share: float = 0.5
+
+## The share of the commons cap a wave may have up at once in its first wave, growing to the
+## whole cap by the last: a crowd as big as the server carries from wave 1 made every later wave
+## a wall (zz-survival-retune-1; docs/survival.md).
+@export_range(0.1, 1.0, 0.05) var wave_alive_share: float = 0.4
+
+## Health everybody standing gets back in a breather.
+@export_range(0.0, 100.0, 5.0) var breather_heal: float = 30.0
+
 ## Every this many waves a brute comes with the wave (and two with the last). 0 never.
 @export_range(0, 50, 1) var brute_every_waves: int = 5
 

@@ -29,9 +29,9 @@ const ZzWeapons := preload("zz_weapons.gd")
 ##   windows and break them down, and mending them (hold E) is the breather's other job. A
 ##   team that spends the breather looting comes back to open windows.
 ## - [b]From the third wave on, each wave draws a twist[/b] (never the same twice running):
-##   sprinters (a third faster), a swarm (half as many again, each weaker), heavies (fewer,
-##   much tougher), hunters (twice the specials). It is announced as the wave starts.
-## - [b]Every fifth wave brings a brute, and the last two.[/b]
+##   sprinters (a quarter faster), a swarm (half as many again, each weaker), heavies (fewer,
+##   much tougher), hunters (half as many specials again). It is announced as the wave starts.
+## - [b]Every fifth wave brings a brute, and the last two.[/b] A brute's wave draws no twist.
 ##
 ## [b]Server only.[/b] A client is told the stage, the wave, the clock and the twist by the
 ## bridge (SURVIVAL), and draws the light from the daylight it is sent.
@@ -41,15 +41,11 @@ const CHANNEL := "zz.survival"
 ## Twists a wave may draw, with what each does: size, health and speed of its commons, and how
 ## many times the specials. `title` is what the HUD says.
 const TWISTS := {
-	&"sprinters": {"title": "Sprinters", "size": 1.0, "health": 1.0, "speed": 1.33, "specials": 1.0},
+	&"sprinters": {"title": "Sprinters", "size": 1.0, "health": 1.0, "speed": 1.25, "specials": 1.0},
 	&"swarm": {"title": "Swarm", "size": 1.5, "health": 0.6, "speed": 1.0, "specials": 1.0},
 	&"heavies": {"title": "Heavies", "size": 0.7, "health": 1.8, "speed": 0.9, "specials": 1.0},
-	&"hunters": {"title": "Hunters", "size": 0.85, "health": 1.0, "speed": 1.0, "specials": 2.0},
+	&"hunters": {"title": "Hunters", "size": 0.85, "health": 1.0, "speed": 1.0, "specials": 1.5},
 }
-
-## Health everybody standing gets back at a breather, and the share of the missing kept by
-## those who were down.
-const BREATHER_HEAL := 30.0
 
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
@@ -93,6 +89,7 @@ func begin() -> DotResult:
 	waves.wave_per_player = c.wave_size_per_survivor
 	waves.growth = c.wave_growth
 	waves.growth_accel = c.wave_growth_accel
+	waves.straggler_count = maxi(3, int(round(float(_team()) * c.wave_straggler_share)))
 
 	var valid := waves.validate()
 
@@ -159,7 +156,12 @@ func _release(horde) -> void:
 	# What is queued counts against the room: without it each tick took the room again while the
 	# last tick's were still queued, the spawner refused the extra, and the wave's 'sent' fell
 	# back by what it owed again (thirty-six on the ballpark).
-	var room: int = game.config.commons_cap(_team()) - horde.commons() - horde.pending_commons()
+	# And a wave may have only part of the cap up at once, growing to all of it by the last, on
+	# a curve: slow through the middle waves (where holds were lost), a wall at the end.
+	var ramp := clampf(float(waves.index - 1) / maxf(float(waves.count - 1), 1.0), 0.0, 1.0)
+	var share := lerpf(clampf(game.config.wave_alive_share, 0.1, 1.0), 1.0, ramp * ramp)
+	horde.wave_room = int(float(game.config.commons_cap(_team())) * share)
+	var room: int = horde.wave_room - horde.commons() - horde.pending_commons()
 	var n := waves.take(room)
 
 	if n > 0:
@@ -232,14 +234,18 @@ func _on_stage(stage: int, index: int) -> void:
 func _begin_wave(index: int) -> void:
 	var c = game.config
 	var horde = game.horde
-	_set_twist(_draw_twist(index) if c.wave_twists and index >= 3 else &"")
+	# A brute's wave plays straight: a brute on top of sprinters or a swarm downed half a team
+	# at once, and wave 5 was where most holds ended (zz-survival-retune-1).
+	var brute_wave: bool = c.brute_every_waves > 0 and (index % c.brute_every_waves == 0 or waves.is_last())
+	_set_twist(_draw_twist(index) if c.wave_twists and index >= 3 and not brute_wave else &"")
 	var t: Dictionary = TWISTS.get(twist, {"size": 1.0, "specials": 1.0})
 
 	# The twist's size is the wave's own: written back into the budget the schedule just set.
 	waves.budget = maxi(int(round(float(waves.budget) * float(t["size"]))), 1)
 
 	var team := _team()
-	_specials_owed = int(round((float(index - 1) * 0.6 + (1.0 if index >= 2 else 0.0)) * maxf(float(team) / 4.0, 1.0) * float(t["specials"])))
+	_specials_owed = int(round((float(index - 1) * c.wave_specials_growth + (1.0 if index >= 2 else 0.0))
+		* maxf(float(team) / c.survivors_per_wave_special, 1.0) * float(t["specials"])))
 	_next_special = _time + 6.0
 	_brutes_this_wave = 0
 
@@ -293,7 +299,7 @@ func _breather() -> void:
 			var _back: bool = game.rescue(player)
 
 		if player.is_up():
-			player.health.health = minf(player.health.health + BREATHER_HEAL, player.health.max_health)
+			player.health.health = minf(player.health.health + float(game.config.breather_heal), player.health.max_health)
 
 	restock()
 
