@@ -1,8 +1,8 @@
 # game-zombie-zone
 
-A co-operative zombie shooter: a team of survivors crosses an **exodus** map from shelter to shelter, or a team of a dozen or more holds a big **survival** map (ten escalating waves by default; days and nights or a clock by `zz_survival`) behind barricades it mends, against a directed horde, eleven kinds of special infected with one trick each, and boxes the zombies drop that do something random. Hardcore by default: friendly fire on, three downs and you are dead, a horde that circles you rather than queueing.
+A co-operative zombie shooter: survivors cross an **exodus** map from shelter to shelter, or a dozen or more hold a big **survival** map (ten waves by default; `zz_survival`) behind barricades they mend, against a directed horde, eleven specials with one trick each, and boxes the zombies drop. Hardcore by default: friendly fire on, three downs and you are dead.
 
-Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it (dot-npc, dot-npc-ai and dot-npc-ai-director most of all). This file is what the game decides now; the reasoning is in `docs/`. The maps are in `maps/`, a link to [zombie-zone-maps](../zombie-zone-maps), written by its `tools/build_maps.py`; `maps/README.md` there is the format. The genre the brief came from is never named in a public file (family rule).
+Read the family [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's `CLAUDE.md` before working in it (dot-npc, dot-npc-ai, dot-npc-ai-director most of all). This file is the rules now; the reasoning is in `docs/`. `maps/` links [zombie-zone-maps](../zombie-zone-maps) (its `tools/build_maps.py`, `maps/README.md` the format). The genre the brief came from is never named in a public file.
 
 | Read | Before |
 | --- | --- |
@@ -27,7 +27,7 @@ game/
   zz_bots.gd         stand-in survivors (posts, mending and restocking on a survival map)
   zz_controller.gd zz_player.gd   DotFpsController with the game's modifiers; one survivor
   zz_game.gd         the simulation: map flow, combat, hands (use/heal/pills/shove), downs, objectives, barricades
-  zz_hud.gd zz_world_view.gd zz_client.gd zz_audio.gd   what a person sees and hears
+  zz_hud.gd zz_world_view.gd zz_client.gd zz_audio.gd zz_figure.gd   what a person sees and hears (survivors: dot-player-char people)
   zz_module.gd       the DotGameModule: cvars, console and admin commands, stand-ins
   net/               the codec (NPC, PIN, LOOT, BOX, HAZARD, BLAST, ROUND...), behaviours, the bridge
 npcs/                the zombie body, its view (the animated models), one brain script per kind (by path)
@@ -42,9 +42,9 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 ## Rules
 
 **The split and the wire** ([design](docs/design.md#decision-1-the-zombies-are-the-servers-and-a-client-draws-them))
-- **Sound follows the map document**: each box's `mat` is its collision shape's `surface` meta (survivors' footsteps by surface, dot-audio's `DotAudioFootsteps`), every `ceiling`/`roof` box is an indoor ambience zone, and the outdoor bed and ground come from `ZzAudio.MAP_SOUND` or the document's `ambience`/`surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` (−17 LUFS band, `loudness_trim_db`).
+- **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `ZzAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [design](docs/design.md#sound)
 - Zombies are the server's, never predicted, always relevant; a client interpolates them and is told a death (NPC_GONE) so a body falls.
-- **A READY before the player is seated is kept** (`_ready_unseated` in the bridge) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](docs/history.md)
+- **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - Everything that changes how a survivor moves is a `ZzController` modifier, never a velocity written on one end.
 - Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits); `headless_net` checks it. [history](docs/history.md)
 - No `class_name` in `game/` or `npcs/` (a mounted pack cannot register one); brains are named by path.
@@ -75,7 +75,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - The hold is `DotNpcDirectorWaves`, never the director's stress cycle; a wave is released by `take()` within `commons_cap`, refused spawns are owed again, it ends cleared or on `overtime`.
 - A wave comes from the map's `zombie_spawns` first (`ZzHorde._wave_origin`); a release leaves room for what is queued (`pending_commons`).
 - A survival map's wanderers take at most a fifth of the cap and are sent in as each wave begins. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
-- A wave has `wave_alive_share` of the cap up at once, growing to all of it by the last, and every mob (scream, bile, box) fits under that room (`ZzHorde.wave_room`); uncapped, one bile mob filled the server's cap on wave 3. A brute's wave draws no twist. [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12)
+- A wave has `wave_alive_share` of the cap up at once (all of it by the last), and every mob fits under that room (`ZzHorde.wave_room`); a brute's wave draws no twist. [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12)
 - A barricade's boxes are `"nav": false` and `nav_for` skips them: the horde paths INTO a barricade to bash it; `headless_maps` checks both faces are on the graph.
 - Nobody mends a barricade torn at in the last `ZzGame.MEND_LOCKOUT` (1.5 s); without it no wave was ever cleared. [survival](docs/survival.md#barricades)
 - Barricade state goes to clients in sixteenths (BARRICADE) and at every round start; the hold as SURVIVAL every clock and on every stage change; `headless_net` follows both through the bridge.
@@ -87,16 +87,16 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - After rebuilding a GLB run `godot --headless --path . --import` before anything renders it. [history](docs/history.md)
 - The palette shader samples like a StandardMaterial3D (`source_color`); a survivor body plays zombie clips through `_retarget`; an attachment's offset is in the body's axes from the joint.
 - `ZzZombieBody.Anim` is replicated in 5 bits: append, never insert, stop at 31. `WEARS` colours come from `tools/zombie_palette.gd`.
-- Survivors are dot-player-char's people (`DotHumanoidFigure` through `ZzFigure`, the zombies' kit and rig); a killed zombie falls as a skeletal ragdoll (`ZzWorldView.ragdolls`, capped per machine, the animated fall past the cap or under `sv_ragdoll 0`), which needs dot-player-char API level 3. [zombies](docs/zombies.md#how-it-moves-and-falls)
-- A dead survivor falls into the same yard: the server picks the fall (`ZzGame.decide_death`, on `player.death`), it rides DEATH last and optional, the client copies it from the figure (`ZzClient._fall`). `sv_ragdoll*` is one set for both (`ZzGame.ragdoll_rules`), bound REPLICATED in the module, followed by the client, read by the horde's pick; the death sounds are in `ZzAudio`'s catalogue. `headless_run` and `dedicated` check it; `tools/shot.sh --view=ragdoll` renders it.
+- Survivors are dot-player-char's people (`ZzFigure`, the zombies' kit and rig); a killed zombie falls as a skeletal ragdoll (`ZzWorldView.ragdolls`; the animated fall past the machine's cap or under `sv_ragdoll 0`); needs dot-player-char API 3. [zombies](docs/zombies.md#how-it-moves-and-falls)
+- A dead survivor falls into the same yard: `ZzGame.decide_death` picks it, DEATH carries it (last, optional), `ZzClient._fall` copies the figure. One `sv_ragdoll*` set for both (`ZzGame.ragdoll_rules`, REPLICATED, followed, read by the horde). `tools/shot.sh --view=ragdoll`. [zombies](docs/zombies.md#how-it-moves-and-falls)
 
 **The HUD and the screen** ([design](docs/design.md#the-hud-dot-uis-glance-pieces))
 - Glance pieces are dot-ui's (vitals, ammo, strip, key hints, hit marker, damage numbers); naming them needs a shell with dot-ui API level 4, which `headless_run` checks.
 - The HUD follows the menu's theme (`ZzHud.follow_menu`, dot-menu's `follow_hud` by name); `piece_theme()` is accent only (amber, health green); Labels set no colour of their own except accent lines.
 - Every character the game writes is in the HUD's font (`headless_run` scans `game/` and `npcs/`); bars are drawn, never block characters. [design](docs/design.md#what-the-first-play-test-changed-2026-10-11)
 - Feed lines go through `ZzClient.feed_line`: "You are down", never "You is down".
-- A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`): the marker, the number and zee's red burst on the zombie (`ZzClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`; a zombie has no physics body the presentation ray meets); the health number is real health, borrowed is the white length.
-- Right mouse aims down the sights (`ZzBindings.AIM`): zee's `aim`, the lens zoomed from `ZzClient.base_fov` (the menu's field of view binds there, never to the camera), the dot faded by `DotCrosshair.opacity_for_aim` and a scope from `ZeeScopeOverlay`; presentation only. The shove is F alone. `tools/shot.sh --view=ads` frames it. [design](docs/design.md#down-the-sights)
+- A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`): marker, number, zee's red burst (`ZzClient._draw_body_hit`); the number is real health, borrowed is the white length. [design](docs/design.md#the-hud-dot-uis-glance-pieces)
+- Right mouse aims down the sights (`ZzBindings.AIM`), presentation only; the lens zooms from `ZzClient.base_fov` (where the menu's field of view binds, never the camera); the shove is F alone. `tools/shot.sh --view=ads`. [design](docs/design.md#down-the-sights)
 - The health plate ends 206 px off the bottom, above a full chat log (202); `headless_run` checks the arithmetic.
 - Between a decided map and the next the strip counts down (`next_round_seconds`, sent in ROUND).
 - `mp_solidplayers` and `mp_forceview` are REPLICATED and followed through the link; third-person and spectate cameras stop against the world. [design](docs/design.md#cameras-and-bodies)
@@ -117,7 +117,6 @@ godot --headless --path . res://tools/survival_long_run.tscn -- --map=zz_high_sc
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
 tools/shot.sh --view=room --alone --zz-map-ids=zz_blackout_1 --at=16.6,1.6,65.4 --look=18,1.1,66   # the fence and its padlock
-tools/shot.sh --view=room --zz-map-ids=zz_blackout_1 --at=0,1.7,20 --look=0,9,50                     # the night sky
 tools/shot.sh --view=wave --zz-map-ids=zz_high_school --zz-survival-warmup-seconds=3 --seconds=60 --at=-3,0.05,11 --look=-3,1,16
 tools/shot.sh --view=hit --spawn=common:6               # team bars, marker, number, borrowed health, a hold-out clock
 tools/camera_check.sh --render
@@ -133,8 +132,8 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 
 ## Still to do
 
-1. **Put it live.** The client shell needs dot-ui API level 4. Tag zee-dot-weapons (`add_source`) and zed, dot-npc (native search, `warm()`, `go_rough`), dot-npc-ai (the shared surround, rough corners) and dot-npc-ai-director (API level 2, `DotNpcDirectorWaves`) and anything else changed, add `content/zombiezone/` and a client example to dot-server-deploy, rebuild the shell; then the game, and the maps pack after it (its Blackout maps say `exodus`, which an older game refuses).
+1. **Put it live**: the tag and shell order is in [design](docs/design.md#putting-it-live).
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
-4. **The school and the ballpark still go down in wave 6** most often (median 6 against 7 overall); see [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12).
+4. **The school and the ballpark still go down in wave 6** most often. [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12)
 5. **Play it with people**, and set normal's numbers from that.
