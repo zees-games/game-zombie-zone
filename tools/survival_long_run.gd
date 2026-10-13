@@ -12,7 +12,9 @@ extends Node
 ##
 ## Per wave: how long it took, how many it sent and the most alive at once, downs and deaths
 ## in it, barricades broken in it, how many of the team were up at its end, and the tick's
-## mean and worst cost. A line `RESULT {...}` at the end is the whole run as JSON.
+## mean and worst cost; under it what downed them and the post nearest each down (an index into
+## the map's `posts`), and which barricades broke. A line `RESULT {...}` at the end is the whole
+## run as JSON.
 ##
 ## Simulated time is the game's own clock; the run takes as long as the ticks cost (a school's
 ## ten waves are about 25 minutes of play and 5 to 10 of a desktop's time).
@@ -120,12 +122,20 @@ func _run() -> void:
 		_current["downs"] = int(_current.get("downs", 0)) + 1
 		var cause := "friend" if String(by).begins_with("u") else String(by) if by != &"" else String(why)
 		var causes: Dictionary = _current.get_or_add("causes", {})
-		causes[cause] = int(causes.get(cause, 0)) + 1)
+		causes[cause] = int(causes.get(cause, 0)) + 1
+		# Where: the post nearest the survivor downed (its index in the map's posts).
+		var who = _game.players.get(_id)
+		if who != null:
+			var spots: Dictionary = _current.get_or_add("down_posts", {})
+			var post := _nearest_post(who.feet())
+			spots[post] = int(spots.get(post, 0)) + 1)
 	_game.player_died.connect(func(_id: StringName, _by: StringName, _why: StringName) -> void:
 		_current["deaths"] = int(_current.get("deaths", 0)) + 1)
 	_game.barricade_changed.connect(func(_id: String, _fraction: float, intact: bool) -> void:
 		if not intact:
-			_current["broken"] = int(_current.get("broken", 0)) + 1)
+			_current["broken"] = int(_current.get("broken", 0)) + 1
+			var which: Dictionary = _current.get_or_add("broke", {})
+			which[_id] = int(which.get(_id, 0)) + 1)
 
 	if _game.horde != null and _game.horde.spawner != null:
 		_game.horde.spawner.refused.connect(func(owner: StringName, npc_id: StringName, reason: String) -> void:
@@ -467,7 +477,24 @@ func _close_wave(index: int, seconds: float, w: DotNpcDirectorWaves, peak: int, 
 		row["sent"], peak, row["downs"], row["deaths"], row["broken"], up, row["team"], row["tick_mean"], row["tick_worst"], row["wall"],
 		"overtime, " if w.overtime else "", alive, fallen])
 	if not (row["causes"] as Dictionary).is_empty():
-		print("        downed by %s" % row["causes"])
+		print("        downed by %s, by post %s" % [row["causes"], _current.get("down_posts", {})])
+	if not (_current.get("broke", {}) as Dictionary).is_empty():
+		print("        broke %s" % _current["broke"])
 	if fallen > 0:
 		print("        fell out from %s, %s" % [_game.horde.fallen_from.slice(-mini(fallen, 8)), _game.horde.fallen_how.slice(-mini(fallen, 8))])
 	_current = {}
+
+
+## The index of the map's post nearest [param at] ("-" for a map without posts): where a
+## survivor was downed, by the post that covers it.
+func _nearest_post(at: Vector3) -> String:
+	var posts: Array = _game.map_doc.get("posts", [])
+	var best := -1
+	var gap := INF
+	for i in posts.size():
+		var p: Array = posts[i]
+		var d := Vector2(float(p[0]) - at.x, float(p[2]) - at.z).length()
+		if d < gap:
+			gap = d
+			best = i
+	return "-" if best < 0 else str(best)

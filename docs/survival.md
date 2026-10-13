@@ -29,7 +29,7 @@ dot-npc-ai-director's `DotNpcDirectorWaves` is the schedule: quiet stretches and
 - **The breather is a patch-up, not a shop.** The downed get up, the dead come back beside the team, everybody standing gets 30 health, and every cache (`caches` in the map) is cleared and restocked: ammunition, a medkit or pills, a gun from the tier the hold has reached (primaries, heavies past the middle), a throwable from wave 3. No money and no menu: what is on the table goes to whoever walks over.
 - **The barricades are the clock that matters** (below). Mending is the breather's other job.
 - **Twists** from wave 3, never the same twice running and one wave in three straight: sprinters (a quarter faster), swarm (half as many again, each at 60 % health), heavies (fewer, 180 % health), hunters (half as many specials again). A brute's wave draws none. Announced with the wave and on the HUD.
-- **A brute every fifth wave, two with the last** (`zz_brute_every`), each arriving once another third of the wave is out.
+- **A brute every fifth wave, two with the last** (`zz_brute_every`), each arriving once another third of the wave is out; its wave is not over while it stands, and one left at the overtime leaves rather than carry on into the next.
 - **Specials per wave**: one from the second wave and 0.6 more each wave after, for every six survivors, spread over the wave.
 
 ## Barricades
@@ -128,3 +128,24 @@ After (the defaults now), wave reached or lost in:
 Over all 24 the median team reaches wave 7 and one cleared all ten, which is the aim; the spread on one map is as wide as between maps, so a single seed says little. The school and the ballpark still most often go down in wave 6, a twist wave right after the brute's; that is the next thing to look at (queued as zz-survival-retune-2). A trial at `wave_alive_share` 0.35 (seeds 3 and 4) was not clearly easier and was not kept. `wave_growth` (0.22), `wave_growth_accel` (0.018), the release rate, the breather (30 s, `breather_heal` 30) and the barricade numbers stay.
 
 **The tick at wave 10, the crowd at the cap, before the work above** (`--from=10 --profile`, on a VM shared with other sessions at load 7 to 11): school 18.8 ms mean, mall 18.2, ballpark 16.4, camp 10.6, against 15.6; alone at load 3 the school was 15.0 ms at the old cap. The zombies' brains are 6 to 7 ms of it (the chase, the ring and the crowd spacing in dot-npc-ai's steering, not perception, which is 1 ms) and their bodies 3 to 4; the worst ticks, 165 to 175 ms, are brains (a crowd repathing at once). Thinking every second tick from 6 m out instead of 20 changed the brains by half a millisecond. It is now under budget (above).
+
+## The brute that outlived its wave (zz-survival-retune-2, 2026-10-13)
+
+The same holds (continuous from wave 1, normal, the map's full team, seeds 3 to 8), now one at a time and in the background, so a hold runs to its end rather than to a ten-minute limit. The long run's wave rows now also say which barricades broke (`broke`) and the post nearest each survivor downed (`by post`, an index into the map's `posts`).
+
+**What the rows showed.** Before any change, at the tree's state that morning (toys, the deeper ground slabs and the rest landed since retune-1), the school and the mall had a median of 7, the camp 8 and the ballpark 9: the school no longer ended in 6 most often, and the ballpark had become the easy one. But the waves lost after a brute's were lost to a brute: over the 24 holds, 52 downs by a brute in waves that bring none (seed 8's school lost wave 6, hunters, with eight of its twelve downs by a brute). A wave down to its stragglers ends 30 s after its last release, and the brute was one of the stragglers; the overtime tidy-up then sent everything near the team at it, so the brute went on through the breather into the twist wave after.
+
+**What changed.** A wave is not down to its stragglers while its brute stands (`ZzHorde.wave_brutes`; the overtime still ends it), and a brute still standing when its wave ends leaves with the far stragglers (`clear_wave_stragglers`). After, 7 downs by a brute outside a brute's wave in 24 holds.
+
+| Map (team) | 3 | 4 | 5 | 6 | 7 | 8 | Median | Before |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| School (12) | lost in 8 (sprinters) | lost in 7 | lost in 7 | lost in 8 (hunters) | lost in 6 (heavies) | lost in 9 (hunters) | 7.5 | 5, 7, 7, 7, 9, 6: 7 |
+| Mall (14) | lost in 7 | lost in 7 | lost in 7 | lost in 6 (hunters) | lost in 10 | lost in 8 (heavies) | 7 | 9, 7, 9, 7, 6, 6: 7 |
+| Ballpark (16) | lost in 6 (heavies) | lost in 8 (heavies) | lost in 9 (swarm) | **won** | lost in 9 (heavies) | lost in 8 (hunters) | 8.5 | won, 8, 9, 10, 9, 8: 9 |
+| Camp (10) | lost in 8 (sprinters) | lost in 8 (swarm) | lost in 5 | lost in 7 | lost in 9 (heavies) | lost in 9 (sprinters) | 8 | 10, 8, 8, 7, 9, 5: 8 |
+
+Every map's median is in the 7 to 8 band the aim asks for (the ballpark at its top), the camp and the mall where they were, and over all 24 the median is still 8 with one hold cleared. One seed moves a map's row by two waves either way (the ballpark's seed 3 went from a clear to a loss in 6 with nothing on that map changed but the brute), so read a map's median, never a cell.
+
+**Tried and not kept: posts that cover the barricades.** The school's twelve stand-ins take the first twelve of its sixteen posts, which leaves the main doors, the west doors and the loading door with nobody, and those are the barricades broken most (`broke`). Choosing the twelve posts that leave the fewest barricades unseen (a classroom post that faced no window and a second gym post went, the doors were held) made it worse: seeds 3 to 6 lost in 8, 5, 4 and 6 against 5, 7, 7 and 7. Spread to the ends of an 80 m hall, the stand-ins were too far apart to help each other; bunched in the middle they hold the hall, and the doors breaking is the horde coming to them.
+
+**Seen, not changed: the whole team goes to one friend.** A stand-in goes to any friend pinned (from anywhere) or down (within 40 m), so on the ballpark one ram at a dugout downed the whole team as it came across the field, seventeen downs at one post in a wave, and the same at the school's library and the camp's posts. It is what decides most ballpark and camp losses; answering with the nearest two would make every map easier, so it waits for a retune of its own (queued as zz-bots-helpers-1).

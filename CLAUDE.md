@@ -76,7 +76,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - The hold is `DotNpcDirectorWaves`, never the director's stress cycle; a wave is released by `take()` within `commons_cap`, refused spawns are owed again, it ends cleared or on `overtime`.
 - A wave comes from the map's `zombie_spawns` first (`ZzHorde._wave_origin`); a release leaves room for what is queued (`pending_commons`).
 - A survival map's wanderers take at most a fifth of the cap and are sent in as each wave begins. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
-- A wave has `wave_alive_share` of the cap up at once (all of it by the last), and every mob fits under that room (`ZzHorde.wave_room`); a brute's wave draws no twist. [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12)
+- A wave has `wave_alive_share` of the cap up at once (all of it by the last), and every mob fits under that room (`ZzHorde.wave_room`); a brute's wave draws no twist, is not down to stragglers while its brute stands, and a brute left at its overtime leaves. [survival](docs/survival.md#the-brute-that-outlived-its-wave-zz-survival-retune-2-2026-10-13)
 - A barricade's boxes are `"nav": false` and `nav_for` skips them: the horde paths INTO a barricade to bash it; `headless_maps` checks both faces are on the graph.
 - Nobody mends a barricade torn at in the last `ZzGame.MEND_LOCKOUT` (1.5 s); without it no wave was ever cleared. [survival](docs/survival.md#barricades)
 - Barricade state goes to clients in sixteenths (BARRICADE) and at every round start; the hold as SURVIVAL every clock and on every stage change; `headless_net` follows both through the bridge.
@@ -136,5 +136,4 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 1. **Put it live**: the tag and shell order is in [design](docs/design.md#putting-it-live).
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
-4. **The school and the ballpark still go down in wave 6** most often. [survival](docs/survival.md#retuned-from-continuous-holds-zz-survival-retune-1-2026-10-12)
-5. **Play it with people**, and set normal's numbers from that.
+4. **Play it with people**, and set normal's numbers from that.

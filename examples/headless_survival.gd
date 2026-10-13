@@ -461,11 +461,15 @@ func _test_big_map(id: StringName) -> void:
 
 	var standing := 0
 	var at_post := 0
+	# In a breather a stand-in short of ammunition walks to a cache, so only standing counts
+	# then: the camp's minute ended 2 s into wave 1's breather with four of ten at their posts.
+	var in_breather: bool = game.survival != null and game.survival.waves != null \
+		and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET
 	for player in game.survivors():
 		if player.is_up():
 			standing += 1
 			var post: Vector3 = game.bots._post_of(player)
-			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0:
+			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather:
 				at_post += 1
 	_check(standing >= int(ceil(team * 0.7)) and at_post >= int(ceil(standing * 0.5)),
 		"most of the team is standing, most of them near their posts", "%d of %d up, %d near their post" % [standing, team, at_post])

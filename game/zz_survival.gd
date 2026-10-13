@@ -133,6 +133,12 @@ func tick(delta: float) -> void:
 	_time += delta
 	var horde = game.horde
 	var alive: int = horde.wave_alive()
+	# A wave is not down to its stragglers while its brute stands: ended early, the brute was sent
+	# at the team through the breather and into the next wave, a twist on top, and that sixth
+	# wave was where the school and the ballpark went down (zz-survival-retune-2). The overtime
+	# still ends it.
+	if waves.style == DotNpcDirectorWaves.Style.ROUNDS and waves.stage == DotNpcDirectorWaves.Stage.HORDE and horde.wave_brutes() > 0:
+		alive = maxi(alive, waves.straggler_count + 1)
 	waves.tick(delta, alive, _team())
 
 	if waves.stage != DotNpcDirectorWaves.Stage.HORDE:

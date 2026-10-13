@@ -1230,8 +1230,21 @@ func wave_alive() -> int:
 	return n
 
 
+## The brutes of the wave still standing.
+func wave_brutes() -> int:
+	var n := 0
+
+	for npc in spawner.npcs_of(WAVE):
+		if npc.is_alive() and npc.def != null and npc.def.id == ZzNpcs.BRUTE:
+			n += 1
+
+	return n
+
+
 ## The wave ended on its overtime: what is left of it a long way from everybody (stuck, lost)
-## is tidied away, and the rest are sent at the team. Returns how many were tidied.
+## is tidied away, and the rest are sent at the team. Returns how many were tidied. A brute
+## still standing leaves with the far ones wherever it is: sent at the team, it went on through
+## the breather into the next wave (zz-survival-retune-2).
 func clear_wave_stragglers(far: float = 30.0) -> int:
 	var tidied := 0
 	var ids := survivor_ids()
@@ -1244,7 +1257,7 @@ func clear_wave_stragglers(far: float = 30.0) -> int:
 		for id in ids:
 			nearest = minf(nearest, npc.position().distance_to(survivor_position(id)))
 
-		if nearest > far:
+		if nearest > far or (npc.def != null and npc.def.id == ZzNpcs.BRUTE):
 			var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
 			tidied += 1
 		elif npc.brain != null and not ids.is_empty():
