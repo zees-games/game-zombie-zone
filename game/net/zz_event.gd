@@ -10,7 +10,11 @@ const NAME := &"zz.event"
 ## survivor was never shown which way a hit came from, and each hit re-ran HELLO's decoder
 ## on the wrong bytes. headless_net checks the enum fits ([method fits]).
 const KIND_BITS := 6
-const MAX_BODY := 4096
+## Room for the largest MAP a reader accepts ([constant ZzEvents.MAP_BYTES]) and its length.
+## It was 4096, and a body past the cap is read as EMPTY with no error: game-hide-n-seek's
+## hs_park grew to 4100 bytes with its toys and every delivered client got a MAP of nothing and
+## built no map. headless_net round-trips a MAP of the largest size through this message.
+const MAX_BODY := ZzEvents.MAP_BYTES + 8
 
 var kind: int = 0
 var body: PackedByteArray = PackedByteArray()

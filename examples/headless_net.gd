@@ -27,7 +27,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 16
-const CHECKS := 84
+const CHECKS := 85
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -181,6 +181,19 @@ func _test_the_codec() -> void:
 		and str(box["message"]) == "Ada opened it", "BOX")
 
 	# Every kind fits the event's kind field: at 5 bits HURT and AMMO wrapped to HELLO and MAP.
+	# The largest MAP a reader accepts survives the event's own body cap. At 4096 a 4100-byte map
+	# went out whole and was read back as no bytes, silently (hs_park with its toys).
+	var biggest := PackedByteArray()
+	biggest.resize(ZzEvents.MAP_BYTES)
+	var outgoing := ZzEvent.new(ZzEvents.Kind.MAP, ZzEvents.write_map(biggest))
+	var wire := DotNetWriter.new()
+	outgoing._write(wire)
+	var incoming := ZzEvent.new()
+	incoming._read(DotNetReader.new(wire.to_bytes()))
+	var carried := ZzEvents.read_map(incoming.reader())
+	_check(bool(carried["ok"]) and (carried["encoded"] as PackedByteArray).size() == ZzEvents.MAP_BYTES,
+		"a MAP as large as a reader accepts fits in an event", "%d of %d bytes" % [(carried["encoded"] as PackedByteArray).size(), ZzEvents.MAP_BYTES])
+
 	_check(ZzEvent.fits(), "every event kind fits the kind field",
 		"%d kinds in %d bits" % [ZzEvents.Kind.size(), ZzEvent.KIND_BITS])
 

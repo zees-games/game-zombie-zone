@@ -46,7 +46,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - Zombies are the server's, never predicted, always relevant; a client interpolates them and is told a death (NPC_GONE) so a body falls.
 - **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - Everything that changes how a survivor moves is a `ZzController` modifier, never a velocity written on one end.
-- Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits); `headless_net` checks it. [history](docs/history.md)
+- Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits), and `ZzEvent.MAX_BODY` holds the largest MAP (`ZzEvents.MAP_BYTES`): a longer body reads as empty, silently; `headless_net` checks both.
 - Map toys are loose only (dot-props; walked through, pushed by survivors, shot along the ray without stopping the shot); a client registers every toy mirror on TOYS before its map is built. [design](docs/design.md#toys-loose-ones-only)
 - No `class_name` in `game/` or `npcs/` (a mounted pack cannot register one); brains are named by path.
 
