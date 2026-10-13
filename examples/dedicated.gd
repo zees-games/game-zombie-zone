@@ -14,7 +14,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 10
-const CHECKS := 66
+const CHECKS := 67
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -257,6 +257,20 @@ func _test_the_commands() -> void:
 		"mp_teammate_passthrough is replicated: a client is sent the server's level",
 		str(server.console.replicated_values()))
 	var _one := _run_command("mp_teammate_passthrough 1")
+
+	# Dead bodies are the owner's too: dot-player-char's sv_ragdoll* set, REPLICATED (a client
+	# draws the bodies), on the world's own rules, and the horde picks a zombie's fall from them.
+	var ragdoll := server.console.find_cvar("sv_ragdoll")
+	var _crumple := _run_command("sv_ragdoll_reactions limp=0,face_plant=0,crumple=1,headshot_launch=0,power_launch=0")
+	var _off := _run_command("sv_ragdoll 0")
+	_check(ragdoll != null and ragdoll.has_flag(DotConVar.FLAG_REPLICATED) and not game.ragdoll_rules.enabled
+			and server.console.replicated_values().get("sv_ragdoll", "") == "0"
+			and game.horde != null and game.horde.death_reactions.find(&"limp").weight == 0.0
+			and game.horde.death_reactions.find(&"crumple").weight == 1.0,
+		"sv_ragdoll* are registered, replicated, and reach the world's rules and the horde's pick",
+		str(game.ragdoll_rules.describe()))
+	var _on := _run_command("sv_ragdoll 1")
+	server.console.find_cvar("sv_ragdoll_reactions").reset()
 	_finished()
 
 

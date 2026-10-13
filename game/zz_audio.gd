@@ -185,6 +185,16 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	var brute_music := _flat(MUSIC_BRUTE, &"Music", 1, 60, "music_brute")
 	brute_music.looping = true
 	c.add(brute_music)
+
+	# A body landing, survivor or zombie: dot-player-char's stock death sounds (Kenney, CC0),
+	# shipped in the addon.
+	for row: Dictionary in DotPlayerDeathSounds.rows():
+		var fall := _placed(row["id"], 45.0, 8.0, 3, 50, float(row["pitch_min"]), float(row["pitch_max"]), "")
+		fall.path = row["path"]
+		fall.variants = row["variants"]
+		fall.gain_db = float(row["gain_db"])
+		fall.cooldown_ms = int(row["cooldown_ms"])
+		c.add(fall)
 	return c
 
 
@@ -207,6 +217,11 @@ static func sound_recipes() -> Dictionary:
 		WEAPON_LAUNCH: DotAudioSynth.Voice.SHOT_HEAVY,
 		WEAPON_BEAM: DotAudioSynth.Voice.SHOT_TIGHT,
 		WEAPON_THROW: DotAudioSynth.Voice.CLICK,
+		# Stand-ins only for a build without dot-player-char's files.
+		DotPlayerDeathReactions.SOUND_THUD: DotAudioSynth.Voice.IMPACT,
+		DotPlayerDeathReactions.SOUND_FACE_PLANT: DotAudioSynth.Voice.IMPACT,
+		DotPlayerDeathReactions.SOUND_SLUMP: DotAudioSynth.Voice.STEP,
+		DotPlayerDeathReactions.SOUND_WHOOSH: DotAudioSynth.Voice.SPAWN,
 	}
 
 

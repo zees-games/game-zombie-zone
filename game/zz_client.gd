@@ -149,6 +149,7 @@ func _build_world_view() -> void:
 	world_view.name = "WorldView"
 	world_view.audio = audio
 	world_view.ragdoll_mask = game.world_mask()
+	world_view.ragdoll_rules = game.ragdoll_rules
 	game.add_child(world_view)
 
 
@@ -226,6 +227,8 @@ func _build_netcode() -> DotResult:
 	if link != null:
 		var _view := game.view_rules.follow_cvars(link)
 		var _solid := game.body_rules.follow_cvars(link)
+		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
+		var _dead := game.ragdoll_rules.follow_cvars(link)
 
 	net = DotNetManager.new()
 	net.name = "Net"
@@ -547,6 +550,20 @@ func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName) -
 
 	if who != null and world_view != null:
 		world_view.unpin(who)
+
+	_fall(who)
+
+
+## [param who]'s body falls the way the server picked ([member ZzPlayer.death]), copied from the
+## figure this client draws (a downed survivor's crawl included); the figure itself stays hidden
+## while they are dead ([method ZzPlayer.present_body]). Nobody's figure, nothing: a
+## first-person survivor never had one drawn here. Called from [method _on_death], solo and
+## connected alike, before the next frame hides the figure.
+func _fall(who: ZzPlayer) -> void:
+	if who == null or world_view == null or who.figure == null or not who.figure.visible:
+		return
+	var velocity := who.controller.state.velocity if who.controller != null else Vector3.ZERO
+	var _body := world_view.drop_survivor(who.figure, who.death, velocity)
 
 
 func _on_down(session_id: int, by: int, why: StringName, by_kind: StringName) -> void:

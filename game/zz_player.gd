@@ -145,6 +145,10 @@ var in_end_area: bool = false
 ## What other people see this player as. Client side.
 var figure: ZzFigure = null
 
+## How this survivor's body falls on their death: the server's pick ([method ZzGame.decide_death]),
+## carried on DEATH and set here before anybody hears of it. Null before a first death.
+var death: DotPlayerDeath = null
+
 ## Remote weapon state, for drawing a gun in a watched survivor's hand. See mg-deathrun.
 var mirrored: bool = false
 var dealt: Array[StringName] = []

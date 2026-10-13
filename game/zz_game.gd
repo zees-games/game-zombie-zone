@@ -76,6 +76,9 @@ enum Phase {
 }
 
 ## Why somebody went down or died.
+## Seconds a dead body lies before it fades, unless the owner sets `sv_ragdoll_time`.
+const CORPSE_SECONDS := 6.0
+
 const BY_ZOMBIE := &"zombie"
 const BY_SPECIAL := &"special"
 const BY_FRIEND := &"friend"
@@ -164,6 +167,12 @@ var players: Dictionary = {}
 ## (REPLICATED) and followed by a client through its link.
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+
+## What a dead body does, survivor or zombie, and which death reactions the server allows:
+## dot-player-char's `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a
+## client through its link, because the client draws the bodies. One set for both: an owner who
+## turns ragdolls off means every body. A body lies [constant CORPSE_SECONDS] by default.
+var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
@@ -552,6 +561,21 @@ func _build_progress() -> void:
 	)
 
 
+## The stock rules with the game's corpse time: a horde dies by the dozen, and a body lying ten
+## seconds (dot-player-char's default) kept the floor of a survival wave covered.
+static func _corpse_rules() -> DotPlayerRagdollRules:
+	var rules := DotPlayerRagdollRules.new()
+	rules.lifetime = CORPSE_SECONDS
+	return rules
+
+
+## The horde picks a zombie's fall from the server's `sv_ragdoll_reactions` weights, as a
+## survivor's is picked; kept in step when an owner changes them.
+func _follow_ragdoll_reactions() -> void:
+	if horde != null:
+		horde.death_reactions = ragdoll_rules.reactions()
+
+
 func _build_horde() -> void:
 	horde = ZzHorde.new()
 	horde.name = "Horde"
@@ -565,6 +589,9 @@ func _build_horde() -> void:
 		return
 
 	horde.zombie_died.connect(_on_zombie_died)
+	_follow_ragdoll_reactions()
+	if not ragdoll_rules.changed.is_connected(_follow_ragdoll_reactions):
+		ragdoll_rules.changed.connect(_follow_ragdoll_reactions)
 
 
 # --- Players --------------------------------------------------------------------------------
@@ -1989,7 +2016,7 @@ func _on_health_zero(player: ZzPlayer, damage: DotDamage) -> void:
 	if player.life == ZzPlayer.Life.UP and player.incaps < config.max_incaps and why != BY_FELL:
 		_go_down(player, by, why)
 	else:
-		_die(player, by, why)
+		_die(player, by, why, damage)
 
 
 func _blame(damage: DotDamage) -> StringName:
@@ -2058,7 +2085,7 @@ func stand_up(player: ZzPlayer) -> void:
 	_revive(player, null)
 
 
-func _die(player: ZzPlayer, by: StringName, why: StringName) -> void:
+func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage = null) -> void:
 	if player.life == ZzPlayer.Life.DEAD:
 		return
 
@@ -2084,8 +2111,45 @@ func _die(player: ZzPlayer, by: StringName, why: StringName) -> void:
 	if match_node != null:
 		match_node.report_kill(String(by), String(player.player_id), why, _tick)
 
+	# How the body falls, picked once, here, and carried on DEATH to every client.
+	player.death = decide_death(player, damage)
+
 	player_died.emit(player.player_id, by, why)
 	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
+
+
+## The fall a survivor's death gets: dot-player-char's reaction rule over the server's weights,
+## seeded from the player and the tick. The killing hit's direction when it had one, else away
+## from whoever did it (a zombie's claw carries none); bleeding out and falling push nothing.
+## A friend's gun is a weapon def, so a heavy one may launch the body as it would a zombie.
+func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
+	var direction := Vector3.ZERO
+	var headshot := false
+	var amount := 0.0
+	var weapon: Object = null
+
+	if damage != null:
+		direction = damage.direction
+		headshot = damage.is_headshot()
+		amount = damage.amount
+		weapon = ZzWeapons.def_of(damage.weapon_id) if damage.weapon_id != &"" else null
+
+		if direction.length_squared() < 0.0001 and damage.attacker != 0:
+			var from := Vector3.INF
+			var attacker := player_for_entity(damage.attacker)
+			if attacker != null and attacker != player:
+				from = attacker.feet()
+			elif horde != null:
+				var npc := horde.npc_for_entity(damage.attacker)
+				if npc != null:
+					from = npc.position()
+			if from != Vector3.INF:
+				direction = (player.feet() - from) * Vector3(1, 0, 1)
+
+	return DotPlayerDeath.decide(
+		ragdoll_rules.reactions(), headshot, amount, direction,
+		DotPlayerDeath.seed_of(player.entity_id, _tick), weapon
+	)
 
 
 ## A dead survivor back in, beside whoever is furthest along. A box's, or the rescue clock's.

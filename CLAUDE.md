@@ -87,7 +87,8 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - After rebuilding a GLB run `godot --headless --path . --import` before anything renders it. [history](docs/history.md)
 - The palette shader samples like a StandardMaterial3D (`source_color`); a survivor body plays zombie clips through `_retarget`; an attachment's offset is in the body's axes from the joint.
 - `ZzZombieBody.Anim` is replicated in 5 bits: append, never insert, stop at 31. `WEARS` colours come from `tools/zombie_palette.gd`.
-- Survivors are dot-player-char's `DotHumanoidFigure` (`ZzFigure`, the same kit and rig); a killed zombie ragdolls by its bones (`ZzWorldView.ragdolls`, capped per machine, off under `sv_ragdoll 0`), which needs dot-player-char API level 3.
+- Survivors are dot-player-char's people (`DotHumanoidFigure` through `ZzFigure`, the zombies' kit and rig); a killed zombie falls as a skeletal ragdoll (`ZzWorldView.ragdolls`, capped per machine, the animated fall past the cap or under `sv_ragdoll 0`), which needs dot-player-char API level 3. [zombies](docs/zombies.md#how-it-moves-and-falls)
+- A dead survivor falls into the same yard: the server picks the fall (`ZzGame.decide_death`, on `player.death`), it rides DEATH last and optional, the client copies it from the figure (`ZzClient._fall`). `sv_ragdoll*` is one set for both (`ZzGame.ragdoll_rules`), bound REPLICATED in the module, followed by the client, read by the horde's pick; the death sounds are in `ZzAudio`'s catalogue. `headless_run` and `dedicated` check it; `tools/shot.sh --view=ragdoll` renders it.
 
 **The HUD and the screen** ([design](docs/design.md#the-hud-dot-uis-glance-pieces))
 - Glance pieces are dot-ui's (vitals, ammo, strip, key hints, hit marker, damage numbers); naming them needs a shell with dot-ui API level 4, which `headless_run` checks.
@@ -125,6 +126,7 @@ tools/shot.sh --view=pinned --pin=ride --pin-me
 xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=horde --at=5    # also --kinds=..., --set=commons, --set=deaths
 tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons
 tools/shot.sh --view=ads --out=res://screenshots/ads              # hip, raising, aimed: an iron sight and a scope
+tools/shot.sh --view=ragdoll --reaction=face_plant --seconds=2.5   # a stand-in killed and its fall
 ```
 
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.

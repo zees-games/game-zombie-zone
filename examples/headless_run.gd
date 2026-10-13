@@ -21,6 +21,8 @@ const ZzSettings := preload("../game/zz_settings.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzEvents := preload("../game/net/zz_events.gd")
+const ZzWorldView := preload("../game/zz_world_view.gd")
 
 ## The simulation, headless: the documents, the navigation, the horde and every special, the
 ## downs and the hands, the boxes, the objectives and how a map is won and lost.
@@ -32,9 +34,9 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 31
+const SECTIONS := 32
 
-const CHECKS := 170
+const CHECKS := 177
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -80,6 +82,7 @@ func _run() -> void:
 	await _test_every_special()
 	await _test_the_new_specials()
 	await _test_how_zombies_fall()
+	await _test_how_survivors_fall()
 	_test_what_zombies_look_like()
 	await _test_hazards()
 	await _test_loot()
@@ -600,6 +603,75 @@ func _test_how_zombies_fall() -> void:
 		String(death.reaction) if death != null else "-")
 	_check(death != null and death.direction.dot(Vector3(0, 0, -1)) > 0.5, "pushed the way the shot went",
 		str(death.direction) if death != null else "-")
+	_finished()
+
+
+## A survivor's death: the server picks the fall, it rides DEATH, and a client copies a ragdoll
+## from the figure it draws into the same yard (and under the same sv_ragdoll* rules) as the
+## zombies'.
+func _test_how_survivors_fall() -> void:
+	_section("a dead survivor falls as dot-player-char's ragdoll")
+	var game := await _team(2, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -1.2), &"test")
+	await _sim(game, 0.1)
+	var claw := 0
+	for entity: int in game.horde._by_entity:
+		if game.horde._by_entity[entity] == npc:
+			claw = entity
+
+	# Owner's weights reach the pick: crumple alone.
+	var _set := game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", "limp=0,face_plant=0,crumple=1,headshot_launch=0,power_launch=0")
+	_check(game.horde.death_reactions.find(&"limp").weight == 0.0, "sv_ragdoll_reactions reaches the horde's pick")
+
+	# The figure drawn, as a client draws a third-person survivor, then a death on the last life.
+	var view := ZzWorldView.new()
+	view.ragdoll_rules = game.ragdoll_rules
+	view.ragdoll_mask = game.world_mask()
+	game.add_child(view)
+	var _shown := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
+	me.incaps = game.config.max_incaps
+	var hit := DotDamage.make(claw, me.entity_id, me.health.health * 50.0 + 500.0, game.combat.damage_type(&"strike"))
+	hit.tick = game.current_tick()
+	var _applied: Variant = game.combat.apply_damage(hit)
+	await _sim(game, 0.05)
+	var death := me.death
+	_check(not me.is_alive() and death != null and death.reaction == &"crumple",
+		"the server picked the fall, from the owner's weights", str(death.describe()) if death != null else "none")
+	_check(death != null and death.direction.dot(Vector3(0, 0, 1)) > 0.5,
+		"pushed away from the zombie that did it", str(death.direction) if death != null else "-")
+	var _reset := game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", "")
+
+	# Laid down from the figure, in the zombies' yard.
+	var body := view.drop_survivor(me.figure, death, Vector3.ZERO)
+	_check(body != null and view.ragdolls.live().has(body) and view.ragdolls.rules == game.ragdoll_rules,
+		"a client copies the body from the figure into the zombies' yard, under the game's rules")
+	for i in 90:
+		await get_tree().physics_frame
+	var down := body != null and is_instance_valid(body)
+	_check(down and body.centre().y < STREET.y + 0.8 and body.lowest_point() > STREET.y - 0.25,
+		"a second and a half on, it lies on the street: not standing, not through it",
+		str(body.describe()) if down else "gone")
+
+	# The fall rides DEATH last and optional, so a death from an older server still reads.
+	var fall := DotPlayerDeath.new()
+	fall.reaction = &"face_plant"
+	fall.roll_seed = 1234
+	fall.direction = Vector3(1, 0, 0)
+	var died := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common", fall)))
+	var carried: DotPlayerDeath = died.get("death")
+	var bare := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common")))
+	_check(bool(died["ok"]) and carried != null and carried.reaction == &"face_plant" and carried.roll_seed == 1234
+		and died["by_kind"] == &"common" and bool(bare["ok"]) and not bare.has("death"),
+		"a DEATH carries the fall the server picked, and one without a fall still reads")
+
+	var catalogue: DotAudioCatalogue = (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue")
+	var listed := not DotPlayerDeathSounds.rows().is_empty()
+	for row: Dictionary in DotPlayerDeathSounds.rows():
+		listed = listed and catalogue.find(row["id"]) != null
+	_check(listed, "the death sounds are in the game's catalogue")
+	view.queue_free()
 	_finished()
 
 

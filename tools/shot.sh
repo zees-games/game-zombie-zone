@@ -8,6 +8,7 @@
 #   tools/shot.sh --view=third --spawn=brute:1                       # third person
 #   tools/shot.sh --view=room --aim=40 --at=0,0.05,12          # the stand-ins aiming 40 degrees up, from the side
 #   tools/shot.sh --view=down --spawn=common:6                       # on the floor
+#   tools/shot.sh --view=ragdoll --seconds=0.6 --reaction=face_plant  # a stand-in killed, its body 0.6 s into the fall
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
@@ -34,7 +35,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--alone|--box=*|--board|--name=*|--weapons=*|--aim=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--alone|--box=*|--board|--name=*|--weapons=*|--aim=*|--reaction=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

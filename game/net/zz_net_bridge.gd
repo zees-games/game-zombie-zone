@@ -688,8 +688,10 @@ func _on_phase_changed(phase: int) -> void:
 
 
 func _on_player_died(player_id: StringName, by: StringName, why: StringName) -> void:
+	var who: ZzPlayer = game.players.get(player_id) if game != null else null
 	_broadcast(ZzEvents.Kind.DEATH, ZzEvents.write_death(
-		session_of(player_id), _session_or_zero(by), why, _kind_or_empty(by)
+		session_of(player_id), _session_or_zero(by), why, _kind_or_empty(by),
+		who.death if who != null else null
 	))
 
 
@@ -1254,6 +1256,12 @@ func _on_event(message: DotNetMessage) -> void:
 			var death := ZzEvents.read_death(reader)
 
 			if bool(death["ok"]):
+				# The fall goes on the player before anybody hears of the death, so the client
+				# that draws it reads the server's pick.
+				var fell: ZzPlayer = game.players.get(player_key(int(death["player_id"]))) \
+					if game != null else null
+				if fell != null and death.has("death"):
+					fell.death = death["death"]
 				death_received.emit(
 					int(death["player_id"]), int(death["by"]), death["why"], death["by_kind"]
 				)

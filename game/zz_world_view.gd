@@ -22,7 +22,7 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 const CHANNEL := "zz.world_view"
 
-## Seconds a killed zombie's body stays before it sinks away.
+## Seconds a killed zombie's body stays before it sinks away, when nothing gave the rules.
 const CORPSE_SECONDS := 6.0
 
 ## Seconds a blast's flash lasts.
@@ -73,13 +73,36 @@ var ragdolls: DotPlayerRagdolls = null
 ## What a ragdoll lands on: the level's world and prop layers (`ZzGame.world_mask`).
 var ragdoll_mask: int = 1
 
+## The server's `sv_ragdoll*` rules (`ZzGame.ragdoll_rules`, followed through the link), set
+## before this enters the tree. Null: the stock rules with [constant CORPSE_SECONDS].
+var ragdoll_rules: DotPlayerRagdollRules = null
+
 
 func _ready() -> void:
 	_rng.seed = Time.get_ticks_usec()
 	ragdolls = DotPlayerRagdolls.new()
 	ragdolls.name = "Ragdolls"
-	ragdolls.rules.lifetime = CORPSE_SECONDS
+	if ragdoll_rules != null:
+		ragdolls.rules = ragdoll_rules
+	else:
+		ragdolls.rules.lifetime = CORPSE_SECONDS
+	ragdolls.sound_fn = _ragdoll_sound
 	add_child(ragdolls)
+
+
+## A dead body's landing (dot-player-char's stock death sounds), where it landed.
+func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
+	if audio != null:
+		var _played := audio.at(id, at, clampf(volume, 0.3, 1.0))
+
+
+## Drops a survivor's [param figure] the way [param death] says: the same yard and rules as the
+## zombies, so the cap counts both and the oldest body (a zombie, as a rule) makes room.
+func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> DotPlayerRagdoll:
+	if ragdolls == null or figure == null or not figure.is_inside_tree():
+		return null
+	ragdolls.rules.collision_mask = ragdoll_mask
+	return ragdolls.spawn(figure, death if death != null else DotPlayerDeath.new(), velocity)
 
 
 # --- Zombies -----------------------------------------------------------------
@@ -135,6 +158,12 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	# A skeletal ragdoll when there is room for one: copied from the view where it stands, so
 	# the view and the server's body go now.
 	var picked: Variant = old_body.get(&"death") if old_body != null and is_instance_valid(old_body) else null
+	# `sv_ragdoll_style hide`: the body goes at once, ragdoll or not.
+	if ragdolls != null and ragdolls.rules.effective_style() == DotPlayerRagdollRules.Style.HIDE:
+		view.queue_free()
+		if body != null and is_instance_valid(body):
+			body.queue_free()
+		return
 	if picked is DotPlayerDeath and _ragdoll(view, picked as DotPlayerDeath):
 		view.queue_free()
 		if body != null and is_instance_valid(body):
@@ -148,7 +177,7 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	view.get_parent().remove_child(view)
 	add_child(view)
 	view.global_transform = keep
-	_corpses.append([view, CORPSE_SECONDS])
+	_corpses.append([view, maxf(ragdolls.rules.lifetime, 1.0) if ragdolls != null else CORPSE_SECONDS])
 
 	# The server's pick of how it falls (dot-player-char's reactions); a body nobody was told
 	# about drops where it stands.

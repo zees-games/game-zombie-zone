@@ -25,6 +25,8 @@ var _box := &""
 var _aim := INF
 ## --alone: the stand-ins stay in the start room, out of a close-up.
 var _alone := false
+## `--reaction=<id>`: the ragdoll view forces that death reaction (sv_ragdoll_reactions).
+var _reaction := &""
 var _client: Node = null
 var _weapons: PackedStringArray = PackedStringArray()
 
@@ -51,6 +53,8 @@ func _ready() -> void:
 			_pin = StringName(arg.trim_prefix("--pin="))
 		elif arg == "--pin-me":
 			_pin_me = true
+		elif arg.begins_with("--reaction="):
+			_reaction = StringName(arg.trim_prefix("--reaction="))
 		elif arg == "--alone":
 			_alone = true
 		elif arg.begins_with("--weapons="):
@@ -188,6 +192,36 @@ func _run() -> void:
 			await _weapon_sheets(game, local)
 			get_tree().quit(0)
 			return
+		"ragdoll":
+			# A stand-in on their last life killed in front of a free camera, and [member _seconds]
+			# of the fall: `--seconds=0.15`, `0.6` and `2` are the start, the drop and the body at
+			# rest. `--reaction=face_plant` forces one; the push is away from the camera. `--at` is where.
+			var victim = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+			var feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+			victim.place_at(feet, 180.0)
+			await _seconds_of(0.3)
+			feet = victim.feet()
+			if _reaction != &"":
+				var weights := PackedStringArray()
+				for id: StringName in DotPlayerDeathReactions.stock().ids():
+					weights.append("%s=%d" % [id, 1 if id == _reaction else 0])
+				var _forced: bool = game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", ",".join(weights))
+			# Your own eyes (and the gun drawn at them) out of the frame, behind the camera.
+			local.place_at(feet + Vector3(0.0, 0.0, 9.0), 0.0)
+			var camera := _free_camera()
+			camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
+			victim.health.invulnerable = false
+			victim.incaps = game.config.max_incaps
+			var slay := DotDamage.make(0, victim.entity_id, 5000.0, game.combat.damage_type(&"strike"))
+			slay.tick = game.current_tick()
+			slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
+			var _killed = game.combat.apply_damage(slay)
+			print("killed %s at %s: %s" % [victim.display_name, feet.snapped(Vector3.ONE * 0.1),
+				victim.death.describe() if victim.death != null else "no fall"])
+			await _seconds_of(_seconds)
+			var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
+			for body: DotPlayerRagdoll in yard.live():
+				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
 			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
