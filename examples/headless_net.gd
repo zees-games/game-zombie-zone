@@ -27,7 +27,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 16
-const CHECKS := 83
+const CHECKS := 84
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -67,6 +67,9 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	var errors := EngineErrors.new()
+	OS.add_logger(errors)
+
 	print("zombiezone over the wire")
 	print("")
 
@@ -88,6 +91,13 @@ func _run() -> void:
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
 		await _test_the_toys_reach_the_client()
 		await _test_leaving()
+
+	OS.remove_logger(errors)
+	# Engine errors go to stderr and change no exit code: a toy pulled out of the tree after a
+	# mid-tick rebuild (dot-net history #30) printed `!is_inside_tree()` on green runs elsewhere.
+	var seen := errors.seen()
+	_check(seen.is_empty(), "the engine reported no error over the whole run",
+		"%d: %s" % [seen.size(), ", ".join(seen.slice(0, 3))])
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -889,3 +899,27 @@ func _check(ok: bool, what: String, detail: String = "") -> void:
 	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
 	_failures.append(line)
 	print("  FAIL  %s" % line)
+
+
+## Counts the engine's own errors while installed (mg-smash-copter's dedicated suite has the
+## same class): they go to stderr and change no exit code, so only this makes one fail a run.
+class EngineErrors extends Logger:
+	var _lock := Mutex.new()
+	var _seen := PackedStringArray()
+
+	func _log_error(
+		function: String, _file: String, _line: int, code: String, _rationale: String,
+		_editor_notify: bool, _error_type: int, _script_backtraces: Array[ScriptBacktrace]
+	) -> void:
+		_lock.lock()
+		_seen.append("%s (%s)" % [code, function])
+		_lock.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
+	func seen() -> PackedStringArray:
+		_lock.lock()
+		var out := _seen.duplicate()
+		_lock.unlock()
+		return out
