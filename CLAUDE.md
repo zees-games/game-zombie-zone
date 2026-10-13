@@ -95,6 +95,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - Every character the game writes is in the HUD's font (`headless_run` scans `game/` and `npcs/`); bars are drawn, never block characters. [design](docs/design.md#what-the-first-play-test-changed-2026-10-11)
 - Feed lines go through `ZzClient.feed_line`: "You are down", never "You is down".
 - A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`): the marker, the number and zee's red burst on the zombie (`ZzClient._draw_body_hit`, `ZeeShotFx.play_body_hit` by `has_method`; a zombie has no physics body the presentation ray meets); the health number is real health, borrowed is the white length.
+- Right mouse aims down the sights (`ZzBindings.AIM`): zee's `aim`, the lens zoomed from `ZzClient.base_fov` (the menu's field of view binds there, never to the camera), the dot faded by `DotCrosshair.opacity_for_aim` and a scope from `ZeeScopeOverlay`; presentation only. The shove is F alone. `tools/shot.sh --view=ads` frames it. [design](docs/design.md#down-the-sights)
 - The health plate ends 206 px off the bottom, above a full chat log (202); `headless_run` checks the arithmetic.
 - Between a decided map and the next the strip counts down (`next_round_seconds`, sent in ROUND).
 - `mp_solidplayers` and `mp_forceview` are REPLICATED and followed through the link; third-person and spectate cameras stop against the world. [design](docs/design.md#cameras-and-bodies)
@@ -123,6 +124,7 @@ tools/shot.sh --view=third --spawn=brute:1,leaper:1
 tools/shot.sh --view=pinned --pin=ride --pin-me
 xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=horde --at=5    # also --kinds=..., --set=commons, --set=deaths
 tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons
+tools/shot.sh --view=ads --out=res://screenshots/ads              # hip, raising, aimed: an iron sight and a scope
 ```
 
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.

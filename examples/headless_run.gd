@@ -34,7 +34,7 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 const SECTIONS := 31
 
-const CHECKS := 168
+const CHECKS := 170
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1047,6 +1047,10 @@ func _test_help_and_menu() -> void:
 	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H (the medkit is on G)",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# The right mouse button aims down the sights (the family's Aim row); the shove kept F.
+	_check(keys.key_for(ZzBindings.AIM) == "Mouse 2" and keys.defaults_on("Mouse 2").size() == 1
+		and keys.key_for(ZzBindings.SHOVE) == "F", "aim is the only row on the right mouse button, the shove is on F",
+		"%s %s %d" % [keys.key_for(ZzBindings.AIM), keys.key_for(ZzBindings.SHOVE), keys.defaults_on("Mouse 2").size()])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "T")
 	_check(keys.key_for(ZzBindings.CHAT) == "T" and DotInputBinding.describe_action(ZzBindings.CHAT) == "T"
@@ -1229,6 +1233,18 @@ func _test_the_hud() -> void:
 		"the health plate stays above a full chat log",
 		"log reaches %.0f px off the bottom, the plate ends %.0f off it" % [log_top, -hud.vitals.offset_bottom])
 	chat.queue_free()
+
+	# Down the sights the dot fades with the aim (dot-ui's curve), and a scope hides it.
+	hud.set_aim(0.0, false)
+	var hip := hud._crosshair.modulate.a
+	hud.set_aim(1.0, false)
+	var aimed := hud._crosshair.modulate.a
+	hud.set_aim(1.0, true)
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or DotAddonApi.build_level("dot_ui") < 5)
+		and hud._crosshair.modulate.a == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
+		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
+		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
+	hud.set_aim(0.0, false)
 	_check_requires()
 
 	hud.queue_free()

@@ -12,6 +12,7 @@
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
+#   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope
 #   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
 #   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png
 #

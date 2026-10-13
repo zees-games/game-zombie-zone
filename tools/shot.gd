@@ -180,6 +180,10 @@ func _run() -> void:
 				game.objective_states[index] = &"holding"
 				game.objective_progress[index] = game.now() + 45.0
 			await _seconds_of(0.12)
+		"ads":
+			await _ads_frames(game, local)
+			get_tree().quit(0)
+			return
 		"weapons":
 			await _weapon_sheets(game, local)
 			get_tree().quit(0)
@@ -276,6 +280,62 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 			sheet.blit_rect(tile, Rect2i(0, 0, 640, 360), Vector2i((n % 5) * 640, (n / 5) * 360))
 		var path := dir.path_join("sheet_%s.png" % id)
 		print("saved %s: %s" % [path, error_string(sheet.save_png(path))])
+
+
+## Down the sights, through the real client and its Aim key: per gun the hip, the gun coming up
+## and fully aimed (`ads_<id>_<stage>.png` in the `_out` directory), with a line per frame of the
+## crosshair's alpha, the scope's fraction and the lens. Defaults to one iron-sighted gun and one
+## scoped one; `--weapons=` names others.
+func _ads_frames(game: ZzGame, local) -> void:
+	var ids: Array[StringName] = []
+	if _weapons.is_empty():
+		var iron := &""
+		var scoped := &""
+		for def in ZzWeapons.all_defs():
+			var art := ZeeWeaponArtTable.get_art(def.id)
+			if art == null or not art.aim_enabled or not def.uses_magazine():
+				continue
+			if art.aim_scoped and scoped == &"":
+				scoped = def.id
+			elif not art.aim_scoped and iron == &"" and ZzWeapons.tier_of(def.id) == &"primary":
+				iron = def.id
+		for id in [iron, scoped]:
+			if id != &"":
+				ids.append(id)
+	else:
+		for id in _weapons:
+			ids.append(StringName(id))
+
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+	# The pointer is never captured under xvfb; the client aims only while it is.
+	_client.set("_captured", true)
+	var hud = _client.get("hud")
+	for id in ids:
+		var def := ZzWeapons.def_of(id)
+		if def == null or not game.arm(local, id):
+			print("skipped %s: not armed" % id)
+			continue
+		_client.set("_slot", def.slot)
+		_client.set("_aiming", false)
+		await _seconds_of(1.2)
+		await _ads_save(dir, id, "hip", hud)
+		_client.set("_aiming", true)
+		await _frames(4)
+		await _ads_save(dir, id, "raising", hud)
+		await _seconds_of(0.8)
+		await _ads_save(dir, id, "aimed", hud)
+		_client.set("_aiming", false)
+
+
+func _ads_save(dir: String, id: StringName, stage: String, hud) -> void:
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var path := dir.path_join("ads_%s_%s.png" % [id, stage])
+	var camera: Camera3D = _client.get("camera")
+	print("%s %s: crosshair %.2f scope %.2f fov %.1f -> %s" % [id, stage,
+		hud._crosshair.modulate.a if hud != null else -1.0, hud.scope.fraction if hud != null else -1.0,
+		camera.fov if camera != null else -1.0, error_string(image.save_png(path))])
 
 
 func _tile(label: Label, id: StringName, what: String) -> Image:

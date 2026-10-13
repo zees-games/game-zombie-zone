@@ -7,9 +7,13 @@ extends RefCounted
 ## the settings document stores one binding per row, the menu's Controls page draws a key per
 ## row, and the help screen lists them with the key each is on now.
 ##
-## [b]The genre's keys.[/b] E does everything with the hands (pick up, open, revive, press), the
-## right mouse button shoves (F as well, for a trackpad), G holds a medkit on yourself or on the
-## friend you are looking at, Q takes pills, and the number keys pick a slot.
+## [b]The genre's keys.[/b] E does everything with the hands (pick up, open, revive, press), F
+## shoves, G holds a medkit on yourself or on the friend you are looking at, Q takes pills, and
+## the number keys pick a slot.
+##
+## [b]The right mouse button aims down the sights[/b] (zee's `ZeeViewModel.aim`, the family's
+## Aim row, as in the arena). It shoved until 2026-10-12, when the family gained aiming; the
+## shove kept F, which it always had.
 ##
 ## [b]H is help, in every game of the family[/b] (dot-menu adds the row). The medkit was on H
 ## until 2026-10-11, the first play test's "[H] medkit"; it is on G, beside the other hand
@@ -26,6 +30,9 @@ const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
 const SHOVE := &"zz_shove"
+## Down the sights while held: the view model comes up and the lens zooms. Presentation only;
+## nothing the server simulates reads it.
+const AIM := &"zz_aim"
 const RELOAD := &"zz_reload"
 const VIEW := &"zz_view"
 const SCOREBOARD := &"zz_scoreboard"
@@ -43,7 +50,8 @@ static func make() -> DotMenuBindings:
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
-	keys.add(SHOVE, &"bind_shove", "Shove (also right mouse)", "F", "Hands")
+	keys.add(SHOVE, &"bind_shove", "Shove", "F", "Hands")
+	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Weapons")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Slot %d: %s" % [i + 1, SLOT_NAMES[i]], str(i + 1), "Weapons")

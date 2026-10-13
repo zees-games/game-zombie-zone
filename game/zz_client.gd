@@ -81,6 +81,12 @@ var _started_msec: int = Time.get_ticks_msec()
 
 var _firing: bool = false
 var _shoving: bool = false
+## The Aim key held (`ZzBindings.AIM`, right mouse): the view model comes up and the lens zooms.
+var _aiming: bool = false
+
+## The lens before an aim zooms it: the menu's field of view lands here, not on the camera, so
+## the zoom always scales the player's own setting and never compounds frame to frame.
+var base_fov: float = 90.0
 var _reloading: bool = false
 var _using: bool = false
 var _healing: bool = false
@@ -341,7 +347,7 @@ func _adopt(candidate: ZzPlayer) -> void:
 		player.command_stamp = _stamp
 
 	if settings != null:
-		settings.bind_camera(camera)
+		settings.bind_camera(self, &"base_fov")
 		if player.sampler != null:
 			settings.bind_look(player.sampler.tunables)
 
@@ -1148,6 +1154,8 @@ func _capture() -> void:
 func _release() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_captured = false
+	# The button's release goes to the menu, so the aim is let go here or it sticks up.
+	_aiming = false
 
 
 ## The hands' bits for this tick, from the held keys.
@@ -1238,6 +1246,7 @@ func _process(delta: float) -> void:
 		world_view.present(delta, camera.global_position)
 
 	_follow_daylight(delta)
+	_present_aim()
 
 	if _drive_spectator_camera():
 		_present_effects(delta)
@@ -1272,6 +1281,20 @@ func _process(delta: float) -> void:
 		hud.set_prompt(_prompt())
 
 	_present_effects(delta)
+
+
+## Down the sights: the hands come up while the Aim key is held, the lens zooms by what the
+## weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the HUD
+## fades its dot and shows a scope. Nobody aims down, held, dead, watching, in third person or
+## with the pointer free. Presentation only, as in the arena: the server's shot ignores it.
+func _present_aim() -> void:
+	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
+	if hands != null:
+		hands.aim(_aiming and _captured and not third_person and not is_spectating()
+			and player.is_alive() and not player.is_down() and not player.is_held())
+	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
+	if hud != null:
+		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 
 
 ## What E would do now, for the HUD: who you would revive, what you would pick up.
@@ -1520,8 +1543,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		if button.button_index == MOUSE_BUTTON_LEFT:
 			_firing = button.pressed
-		elif button.button_index == MOUSE_BUTTON_RIGHT:
-			_shoving = button.pressed
+		elif button.is_action(ZzBindings.AIM):
+			_aiming = button.pressed
 		elif button.pressed and (button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			_cycle_slot(-1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
 
@@ -1553,6 +1576,10 @@ func _key_event(event: InputEvent) -> bool:
 
 	if event.is_action(ZzBindings.RELOAD):
 		_reloading = pressed
+		return true
+
+	if event.is_action(ZzBindings.AIM):
+		_aiming = pressed
 		return true
 
 	if not pressed:

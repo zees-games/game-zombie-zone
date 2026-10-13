@@ -74,9 +74,10 @@ There are ten maps: the **practice street** built into the game, and from [zombi
 | **Space** | Jump |
 | **Ctrl** | Duck |
 | **Mouse 1** / **R** | Fire / reload |
+| **Mouse 2** | Aim down the sights (hold) |
 | **1**-**5** / mouse wheel | Weapons |
 | **E** | Use, pick up, revive a friend (hold) |
-| **F** / **Mouse 2** | Shove |
+| **F** | Shove |
 | **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
 | **Q** | Take pills |
 | **V** | Talk (voice) |

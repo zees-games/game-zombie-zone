@@ -118,6 +118,13 @@ var _use_fill: ColorRect = null
 var _use_label: Label = null
 var _held: Label = null
 var _crosshair: ColorRect = null
+## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
+var scope: ZeeScopeOverlay = null
+## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
+var aim_fraction: float = 0.0
+var _scoped: bool = false
+## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
 var _bile: ColorRect = null
 var _blind: ColorRect = null
 var _fire: ColorRect = null
@@ -150,6 +157,11 @@ func _build() -> void:
 	_fire = _cover("Fire", Color(0.95, 0.4, 0.05))
 	_grey = _cover("LastLife", Color(0.12, 0.12, 0.12))
 	_blind = _cover("Blind", Color(0.97, 0.97, 0.94))
+
+	# Under every HUD piece: the scope is the view, the HUD still reads over it.
+	scope = ZeeScopeOverlay.new()
+	scope.name = "Scope"
+	_root.add_child(scope)
 
 	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
 	# the root, every piece under it inherits them. See [method piece_theme].
@@ -857,6 +869,27 @@ func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 	rect.offset_top = at.y
 	rect.offset_right = at.x + size.x
 	rect.offset_bottom = at.y + size.y
+
+
+## The aim this frame, from the client: the dot fades out as the gun comes up (dot-ui's
+## `DotCrosshair.opacity_for_aim`, the arena's curve) and a scope hides it for its own reticle.
+func set_aim(fraction: float, scoped: bool) -> void:
+	aim_fraction = clampf(fraction, 0.0, 1.0) if is_finite(fraction) else 0.0
+	_scoped = scoped
+	if scope != null:
+		scope.fraction = aim_fraction if scoped else 0.0
+	if _crosshair != null:
+		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
+
+
+## How much of the dot [param fraction] leaves: dot-ui's curve where the host has it, else the
+## dot stays (an older shell had no aim to fade for).
+func crosshair_opacity(fraction: float) -> float:
+	if not _fades:
+		return 1.0
+	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
+	var crosshair: Variant = DotCrosshair
+	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
 
 
 func is_blind() -> bool:
