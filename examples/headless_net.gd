@@ -26,8 +26,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 15
-const CHECKS := 80
+const SECTIONS := 16
+const CHECKS := 83
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -85,6 +85,8 @@ func _run() -> void:
 		await _test_a_gate_reaches_the_client()
 		await _test_the_map_ends()
 		await _test_a_hold_reaches_the_client()
+		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
+		await _test_the_toys_reach_the_client()
 		await _test_leaving()
 
 	print("")
@@ -343,6 +345,30 @@ func _test_the_map_arrives() -> void:
 		"the same document, to the byte", ZzMapDoc.digest(_client_game.map_doc))
 	_check(_client_game.map.gate_is_shut("barrier"), "with its barrier down")
 	_check(_heard.has("map"), "and the client said so")
+	_finished()
+
+
+## The map's toys over the wire: a mirror for each, paired by index from TOYS, frozen and posed
+## from the server's state; a football kicked on the server rolls off on the client.
+func _test_the_toys_reach_the_client() -> void:
+	_section("the map's toys reach the client")
+	await _steps(4)
+	var count := _server_game.map.toys.count()
+	_check(count > 0 and _server_bridge.toy_count() == count and _client_bridge.toy_count() == count,
+		"every toy is an entity on both ends, paired by index", "%d toys, %d and %d" % [count, _server_bridge.toy_count(), _client_bridge.toy_count()])
+	var server_ball := _server_game.map.toys.toy(0)
+	var client_ball := _client_game.map.toys.toy(0)
+	_check(client_ball.body.freeze and not client_ball.authoritative, "the client's are frozen copies")
+	var start := client_ball.body.global_position
+	var _kicked := _server_game.map.toys.hit(server_ball.body, server_ball.body.global_position, Vector3(1, 0.2, 0), 2.0)
+	var furthest := 0.0
+	for _i in range(40):
+		await _step()
+		furthest = maxf(furthest, client_ball.body.global_position.distance_to(start))
+	await _steps(40)
+	var apart := client_ball.body.global_position.distance_to(server_ball.body.global_position)
+	_check(furthest > 1.0 and apart < 0.6, "a football kicked on the server rolls off on the client, and rests where the server's did",
+		"%.2f m out, %.2f m apart" % [furthest, apart])
 	_finished()
 
 

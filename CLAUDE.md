@@ -47,6 +47,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - Everything that changes how a survivor moves is a `ZzController` modifier, never a velocity written on one end.
 - Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits); `headless_net` checks it. [history](docs/history.md)
+- Map toys are loose only (dot-props; walked through, pushed by survivors, shot along the ray without stopping the shot); a client registers every toy mirror on TOYS before its map is built. [design](docs/design.md#toys-loose-ones-only)
 - No `class_name` in `game/` or `npcs/` (a mounted pack cannot register one); brains are named by path.
 
 **The ground and the horde** ([design](docs/design.md#decision-2-the-zombies-ground-is-the-maps-own-floor-plan))

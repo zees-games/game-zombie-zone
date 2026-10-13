@@ -278,6 +278,15 @@ static func practice() -> Dictionary:
 		},
 		"boxes": boxes,
 		"props": props,
+		# dot-props' toys, loose only (see zombie-zone-maps' builder): barrels and a tyre on the
+		# street, a football by the start. The suites lean on these: headless_run walks into the
+		# football, shoots the first barrel and blasts the tyre; headless_net watches a kick.
+		"toys": [
+			{"toy": "football", "at": [2.0, 0.0, -2.0]},
+			{"toy": "barrel", "at": [-4.0, 0.0, 12.0]},
+			{"toy": "barrel", "at": [-4.8, 0.0, 12.6], "yaw": 40.0},
+			{"toy": "tyre", "at": [4.5, 0.0, 33.0], "yaw": 30.0},
+		],
 		"lights": lights,
 		"spawns": {"survivors": [
 			{"at": [-2.0, 0.1, -10.5], "yaw": 180.0}, {"at": [2.0, 0.1, -10.5], "yaw": 180.0},

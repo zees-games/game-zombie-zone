@@ -174,6 +174,10 @@ var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 ## turns ragdolls off means every body. A body lies [constant CORPSE_SECONDS] by default.
 var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 
+## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
+## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
+var toy_rules: DotPropToyRules = DotPropToyRules.new()
+
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
 
@@ -260,6 +264,8 @@ func _ready() -> void:
 		hazards = ZzHazards.new(self)
 		hazards.exploded.connect(func(at: Vector3, radius: float, kind: StringName) -> void:
 			exploded.emit(at, radius, kind))
+		# A pipe bomb, a propane tank, a molotov's burst: the map's toys thrown from it.
+		var _toys := exploded.connect(_on_exploded_near_toys)
 		loot = ZzLoot.new(self)
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
@@ -294,7 +300,7 @@ func _exit_tree() -> void:
 ## Zombies collide with the world and the furniture, and not with each other: a crowd is kept
 ## apart by steering, which is smooth, rather than by bodies, which jam in doorways.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie"])
+	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint"])
 
 	for layer in physics.layers:
 		match layer.id:
@@ -302,6 +308,13 @@ func _build_physics() -> void:
 				layer.collides_with = [&"world", &"prop"]
 			&"zombie":
 				layer.collides_with = [&"world", &"prop"]
+			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never
+			# a survivor or a zombie, who walk through it (a survivor pushes it, `_advance_toys`).
+			&"toy":
+				layer.collides_with = [&"world", &"prop", &"toy"]
+			# A toy's footprint, for a walkable mesh's bake only: nothing collides with it.
+			&"footprint":
+				layer.collides_with = []
 			_:
 				layer.collides_with = [&"player", &"zombie"]
 
@@ -370,6 +383,9 @@ func _build_map() -> void:
 	map.physics = physics
 	map.catalogue = props_catalogue
 	map.draw_world = draw_world
+	map.authoritative = authoritative
+	map.toy_rules = toy_rules
+	map.gravity = config.gravity
 	add_child(map)
 
 
@@ -2319,6 +2335,7 @@ func _advance_weapons() -> void:
 		for shot in outcome.shots:
 			shot.attacker = player.entity_id
 			shot.tick = _tick
+			_shoot_toys(shot)
 			var _resolved := combat.resolve_shot(shot)
 
 			if horde != null:
@@ -2436,6 +2453,7 @@ func _step(delta: float) -> void:
 	_advance_weapons()
 
 	if authoritative:
+		_advance_toys(delta)
 		if horde != null:
 			horde.tick(delta)
 		if pins != null:
@@ -2458,6 +2476,47 @@ func _step(delta: float) -> void:
 		return
 
 	match_node.tick(_tick)
+
+
+# --- Toys ----------------------------------------------------------------------
+
+## A blast's speed at its centre, m/s to a toy (dot-props' `blast`).
+const TOY_BLAST_SPEED := 12.0
+
+
+## Every survivor against the map's toys, after they moved: a walk into a barrel or a ball
+## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
+## Zombies walk through them: a crowd that shoved barrels about would be a crowd steering
+## round its own debris.
+func _advance_toys(delta: float) -> void:
+	if map == null or map.toys == null or map.toys.count() == 0:
+		return
+	for id: StringName in players:
+		var player: ZzPlayer = players[id]
+		if not player.is_alive() or player.watching:
+			continue
+		var state := player.controller.state
+		var tunables := player.controller.tunables
+		var radius := tunables.radius if tunables != null else 0.35
+		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
+		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
+	map.toys.advance(delta)
+
+
+## A survivor's shot against the toys: the first one on its ray, nearer than a wall, is pushed
+## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
+## a barrel is never cover between a survivor and a zombie. Server side.
+func _shoot_toys(shot: DotShot) -> void:
+	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
+		return
+	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
+	for raw: Variant in directions:
+		var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
+
+
+func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
+	if authoritative and map != null and map.toys != null:
+		var _thrown := map.toys.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
 
 
 func delta_for_tick() -> float:

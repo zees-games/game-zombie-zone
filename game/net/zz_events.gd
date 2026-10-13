@@ -94,6 +94,9 @@ enum Kind {
 	SURVIVAL,
 	## A barricade's strength and whether it stands.
 	BARRICADE,
+	## The map's toys: the map's id, then their net ids in toy order (both ends build the toys
+	## in the same order from the map). After MAP, and to a joiner after theirs.
+	TOYS,
 }
 
 enum Ask {
@@ -191,6 +194,26 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 # --- The map -----------------------------------------------------------------
 
 ## The map: [ZzMapDoc.encode]'s bytes, as they are. Opaque here, and checked at the other end.
+static func write_toys(map_id: StringName, net_ids: PackedInt64Array) -> PackedByteArray:
+	var w := _w()
+	w.write_string(String(map_id), ID_BYTES)
+	w.write_varint(net_ids.size())
+	for id in net_ids:
+		w.write_varint(maxi(int(id), 0))
+	return w.to_bytes()
+
+
+static func read_toys(r: DotNetReader) -> Dictionary:
+	var map_id := StringName(r.read_string(ID_BYTES))
+	var count := r.read_varint()
+	var ids := PackedInt64Array()
+	if count < 0 or count > 256:
+		return {"map_id": map_id, "ids": ids, "ok": false}
+	for i in count:
+		ids.append(r.read_varint())
+	return {"map_id": map_id, "ids": ids, "ok": r.ok()}
+
+
 static func write_map(encoded: PackedByteArray) -> PackedByteArray:
 	var w := _w()
 	w.write_bytes(encoded)

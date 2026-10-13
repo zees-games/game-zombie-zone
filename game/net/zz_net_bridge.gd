@@ -6,6 +6,7 @@ const ZzNetCommand := preload("zz_net_command.gd")
 const ZzNetLink := preload("zz_net_link.gd")
 const ZzPlayerNet := preload("zz_player_net.gd")
 const ZzNpcNet := preload("zz_npc_net.gd")
+const ZzToyNet := preload("zz_toy_net.gd")
 const ZzRequest := preload("zz_request.gd")
 
 const ZzGame := preload("../zz_game.gd")
@@ -270,6 +271,15 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 	# simulates what it predicts and leaves the rest to interpolation. A world still running
 	# its own `_physics_process` would move every player twice.
 	game.external_tick = true
+
+	# The map's toys: the server's leave the registry before their nodes go and the new ones are
+	# named after MAP; a client's mirrors stay registered and are handed this end's toys when
+	# its map is built.
+	if net.is_server:
+		game.world_clearing.connect(_release_toys)
+	else:
+		game.world_clearing.connect(_unpair_toys)
+		game.world_rebuilt.connect(_pair_pending_toys)
 
 	if net.is_server:
 		game.player_added.connect(_on_player_added)
@@ -670,6 +680,7 @@ func _on_world_rebuilt() -> void:
 
 	_map_body = ZzEvents.write_map(encoded)
 	_broadcast(ZzEvents.Kind.MAP, _map_body)
+	_register_toys()
 
 
 # --- Server: the round -----------------------------------------------------
@@ -782,6 +793,10 @@ func ensure_game_ticked(tick: int) -> void:
 			behaviour.player.wanted_slot = behaviour.last_slot
 
 	game.tick_once(tick)
+
+	# The toys where the physics left them, before the snapshot.
+	for behaviour: ZzToyNet in _toy_nets:
+		behaviour.pull()
 
 # --- The client tick -------------------------------------------------------
 
@@ -1040,6 +1055,10 @@ func _admit(peer_id: int) -> void:
 	if not _map_body.is_empty():
 		_tell(peer_id, ZzEvents.Kind.MAP, _map_body)
 
+	# The map's toys by net id in toy order, which the joiner's own copies are paired with.
+	if not _toys_body.is_empty():
+		_tell(peer_id, ZzEvents.Kind.TOYS, _toys_body)
+
 	for other in _behaviours.keys():
 		_tell(peer_id, ZzEvents.Kind.JOIN, _join_body(int(other)))
 
@@ -1204,6 +1223,10 @@ func _on_event(message: DotNetMessage) -> void:
 			_apply_hello(reader)
 		ZzEvents.Kind.MAP:
 			_apply_map(reader)
+		ZzEvents.Kind.TOYS:
+			var told := ZzEvents.read_toys(reader)
+			if bool(told["ok"]):
+				_apply_toys(told)
 		ZzEvents.Kind.JOIN:
 			_apply_join(reader)
 		ZzEvents.Kind.LEAVE:
@@ -1620,6 +1643,145 @@ func _adopt_tick_rate(rate: int) -> void:
 ## [b]Refused with a line, never half built.[/b] A client a format behind the server decodes a
 ## document it cannot read; [ZzMapDoc] says so, and the honest answer is no map and a WARN
 ## rather than a map with holes in it.
+# --- Both ends: the map's toys ---------------------------------------------------
+
+## The map's toys on the wire, one behaviour per toy in toy order, and the TOYS event that names
+## their net ids (kept for a joiner).
+var _toy_nets: Array = []
+var _toys_body: PackedByteArray = PackedByteArray()
+
+## Client: which map the last TOYS was for. Its mirrors are registered at once and handed their
+## toys when this end's toys for that map exist ([method _pair_pending_toys]).
+var _toys_map: StringName = &""
+
+## Client: where the mirrors live, which is not under the toys: a client registers them the
+## moment TOYS arrives, before its own map may be built, and keeps them through a map change.
+var _toy_holder: Node3D = null
+
+
+## Server: an entity for each of the map's toys, and TOYS naming them.
+func _register_toys() -> void:
+	if net == null or not net.is_server or game == null:
+		return
+	_release_toys()
+	var ids := PackedInt64Array()
+	if game.map != null and game.map.toys != null:
+		for toy in game.map.toys.toys:
+			var behaviour := _toy_entity(toy, toy, 0)
+			if behaviour == null:
+				break
+			ids.append(behaviour.identity.net_id)
+	_toys_body = ZzEvents.write_toys(game.map.id() if game.map != null else &"", ids)
+	_broadcast(ZzEvents.Kind.TOYS, _toys_body)
+
+
+## A toy's behaviour and identity under [param parent], registered under [param net_id] (0
+## allocates: the server); null when the registry refused it. The behaviour before the
+## identity, which collects behaviours in its `_ready`.
+func _toy_entity(toy: DotPropToy, parent: Node, net_id: int) -> ZzToyNet:
+	var behaviour := ZzToyNet.new()
+	behaviour.name = "Net"
+	behaviour.toy = toy
+	var holder := Node3D.new() if parent != toy else null
+	if holder != null:
+		holder.name = "Toy%d" % _toy_nets.size()
+		parent.add_child(holder)
+	var at: Node = holder if holder != null else toy
+	at.add_child(behaviour)
+	if net.is_server:
+		behaviour.pull()
+	var identity := DotNetIdentity.new()
+	identity.name = "Identity"
+	identity.owner_peer_id = 0
+	identity.authority = DotNetIdentity.Authority.SERVER
+	at.add_child(identity)
+	var registered := net.registry.register(identity, net_id, net.clock.tick, net.config)
+	if not registered.ok:
+		DotLog.warn(CHANNEL, "could not replicate a toy", {"toy": _toy_nets.size(), "error": str(registered.error)})
+		at.remove_child(behaviour)
+		at.remove_child(identity)
+		behaviour.queue_free()
+		identity.queue_free()
+		if holder != null:
+			parent.remove_child(holder)
+			holder.queue_free()
+		return null
+	_toy_nets.append(behaviour)
+	return behaviour
+
+
+## Every toy entity out of the registry and out of the tree at once: a new identity on the same
+## toy collects every behaviour under it in its `_ready`, and a freed one found there broke the
+## next snapshot. The server's, on a map change or a new set.
+func _release_toys() -> void:
+	for behaviour: ZzToyNet in _toy_nets:
+		if not is_instance_valid(behaviour):
+			continue
+		if behaviour.identity != null and net != null and net.registry.has(behaviour.identity.net_id):
+			if net.is_server:
+				_unregister(behaviour.identity.net_id)
+			else:
+				net.registry.unregister(behaviour.identity.net_id)
+		var at := behaviour.get_parent()
+		for node: Node in [behaviour.identity, behaviour]:
+			if node != null and is_instance_valid(node) and node.get_parent() != null:
+				node.get_parent().remove_child(node)
+				node.queue_free()
+		if at != null and at.get_parent() == _toy_holder and _toy_holder != null:
+			_toy_holder.remove_child(at)
+			at.queue_free()
+	_toy_nets.clear()
+
+
+## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys
+## for that map exist yet or not. [b]A client must know every entity a snapshot carries[/b]:
+## dot-net stops reading a snapshot at the first one it does not know (a body cannot be skipped
+## without its declarations), so a toy mirror missing while the client loads the map, or ever,
+## on a client left on another map, was every player after it frozen. Paired with its toy
+## by index as soon as both are here.
+func _apply_toys(told: Dictionary) -> void:
+	if net == null or net.is_server:
+		return
+	_release_toys()
+	if _toy_holder == null:
+		_toy_holder = Node3D.new()
+		_toy_holder.name = "ToyMirrors"
+		add_child(_toy_holder)
+	_toys_map = told["map_id"]
+	for id in (told["ids"] as PackedInt64Array):
+		var _mirror := _toy_entity(null, _toy_holder, int(id))
+	_pair_pending_toys()
+
+
+## Client: each mirror handed this end's toy at its index, once this end's toys are for the map
+## TOYS named; none while they are not (a map change on the way, or another map).
+func _pair_pending_toys() -> void:
+	if net == null or net.is_server or game == null:
+		return
+	var box := game.map.toys if game.map != null and game.map.toys != null and game.map.id() == _toys_map else null
+	if box != null and box.count() != _toy_nets.size():
+		DotLog.warn(CHANNEL, "the server's map has a different number of toys", {"server": _toy_nets.size(), "here": box.count()})
+	for i in range(_toy_nets.size()):
+		var behaviour: ZzToyNet = _toy_nets[i]
+		behaviour.toy = box.toy(i) if box != null else null
+
+
+## Client: the old map's toys are about to go; the mirrors stay registered, without them.
+func _unpair_toys() -> void:
+	for behaviour: ZzToyNet in _toy_nets:
+		if is_instance_valid(behaviour):
+			behaviour.toy = null
+
+
+## How many toys this end replicates (a client: mirrors paired with a toy). For a check.
+func toy_count() -> int:
+	var n := 0
+	for behaviour: ZzToyNet in _toy_nets:
+		if is_instance_valid(behaviour) and (net.is_server or behaviour.toy != null):
+			n += 1
+	return n
+
+
 func _apply_map(reader: DotNetReader) -> void:
 	var told := ZzEvents.read_map(reader)
 

@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 32
+const SECTIONS := 33
 
-const CHECKS := 177
+const CHECKS := 182
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -74,6 +74,7 @@ func _run() -> void:
 	await _test_start_area()
 	await _test_a_common()
 	await _test_shots()
+	await _test_toys()
 	await _test_the_room_wakes()
 	await _test_downs()
 	await _test_borrowed_health()
@@ -311,6 +312,56 @@ func _test_shots() -> void:
 	_check(not npc.is_alive() and head.damages.size() == 1 and head.damages[0].hit_group == DotHitGroup.HEAD,
 		"a headshot finishes it")
 	_check(me.commons_killed == 1 and me.points >= 1, "and it is theirs", "%d kills" % me.commons_killed)
+	_finished()
+
+
+## dot-props' toys on the practice street: a survivor walking into the football sends it on, a
+## shot pushes the barrel it passes and the combat's trace sees straight through it (a toy is
+## no cover), a pipe bomb throws the tyre, and a new map builds them all home again.
+func _test_toys() -> void:
+	_section("the street's toys")
+	var game := await _team(1, _quiet)
+	var box := game.map.toys
+	_check(box != null and box.count() == 4 and box.missing.is_empty(), "the practice street has its four toys", str(box.describe()) if box != null else "none")
+	var me := game.survivors()[0]
+	var ball := box.toy(0)
+	var b0 := ball.body.global_position
+	me.place_at(b0 + Vector3(-0.4, -0.12, 0.0), -90.0)
+	for _i in range(10):
+		me.controller.state.velocity = Vector3(5.0, 0.0, 0.0)
+		game._advance_toys(TICK)
+		await get_tree().physics_frame
+	for _i in range(20):
+		await get_tree().physics_frame
+	_check(ball.body.global_position.x > b0.x + 0.4, "a survivor walking into the football sends it on", "%.2f m" % (ball.body.global_position.x - b0.x))
+
+	var barrel := box.toy(1)
+	var r0 := barrel.body.global_position
+	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	shot.origin = r0 + Vector3(0.0, 0.0, -5.0)
+	shot.direction = Vector3(0.0, 0.0, 1.0)
+	shot.damage = 30.0
+	shot.max_range = 40.0
+	var through := game.combat.trace.line_of_sight(shot.origin, r0 + Vector3(0.0, 0.0, 2.0))
+	game._shoot_toys(shot)
+	for _i in range(20):
+		await get_tree().physics_frame
+	_check(barrel.body.global_position.distance_to(r0) > 0.02 and through,
+		"a shot pushes the barrel it passes, and the combat's trace sees through it: no cover",
+		"%.2f m, clear %s" % [barrel.body.global_position.distance_to(r0), str(through)])
+
+	var tyre := box.toy(3)
+	var t0 := tyre.body.global_position
+	game.exploded.emit(t0 + Vector3(-1.5, 0.0, 0.0), 4.0, &"pipe_bomb")
+	for _i in range(20):
+		await get_tree().physics_frame
+	_check(tyre.body.global_position.distance_to(t0) > 0.3, "a pipe bomb throws the tyre beside it", "%.2f m" % tyre.body.global_position.distance_to(t0))
+
+	var _rebuilt := game.build_map(game.map_doc)
+	await get_tree().physics_frame
+	var fresh := game.map.toys
+	_check(fresh != box and fresh.count() == 4 and fresh.toy(0).body.global_position.distance_to(b0) < 0.05,
+		"a new map builds every toy home again")
 	_finished()
 
 

@@ -229,6 +229,8 @@ func _build_netcode() -> DotResult:
 		var _solid := game.body_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
 		var _dead := game.ragdoll_rules.follow_cvars(link)
+		# And sv_toys*: a client hides the toys a server took away.
+		var _toys := game.toy_rules.follow_cvars(link)
 
 	net = DotNetManager.new()
 	net.name = "Net"
@@ -356,6 +358,11 @@ func _adopt(candidate: ZzPlayer) -> void:
 
 	if hud != null:
 		hud.bind(game, player)
+
+
+func _toy_sound(id: StringName, at: Vector3, strength: float) -> void:
+	if audio != null:
+		var _played := audio.at(id, at, clampf(strength, 0.25, 1.0))
 
 
 # --- What the world, or the server, says --------------------------------------
@@ -501,6 +508,10 @@ func _on_phase(phase: int) -> void:
 func _on_map(map_id: StringName) -> void:
 	if audio != null:
 		audio.on_map_doc(map_id, game.map_doc)
+
+	# The new map's toys are heard: a barrel's knock, a ball's bounce.
+	if game.map != null and game.map.toys != null and not game.map.toys.sound.is_connected(_toy_sound):
+		var _c := game.map.toys.sound.connect(_toy_sound)
 
 	var name_of := str(game.map_doc.get("name", ""))
 	world_view.clear()
