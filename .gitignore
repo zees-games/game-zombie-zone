@@ -49,7 +49,7 @@
 /addons/zed_weapons
 
 # The maps are zombie-zone-maps, a repository and a pack of their own.
-# bootstrap-link: zombie-zone-maps/maps
+# bootstrap-link: zombie-zone-maps/maps ci
 /maps
 
 # Exports
