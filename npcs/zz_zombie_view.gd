@@ -411,7 +411,8 @@ static func _scene(path: String) -> PackedScene:
 		return null
 
 	if not _scenes.has(path):
-		_scenes[path] = load(path) if ResourceLoader.exists(path) else null
+		# Imported or not: a pull that brought new zombies and no editor run left them all capsules.
+		_scenes[path] = DotHumanoidFigure.load_model(path)
 
 	return _scenes[path]
 
@@ -557,7 +558,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 
 	if not _atlases.has(atlas_id):
 		var path: String = ATLASES[atlas_id]
-		_atlases[atlas_id] = load(path) if ResourceLoader.exists(path) else null
+		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
 
 	var material := ShaderMaterial.new()
 	material.shader = _shader
