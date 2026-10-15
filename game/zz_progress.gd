@@ -46,6 +46,11 @@ const BOXES_OPENED := &"zz.boxes_opened"
 const DOWNS := &"zz.downs"
 const DEATHS := &"zz.deaths"
 
+## Seconds a person has been in the game, lifetime. Not a schema stat (nothing shows it): it is
+## kept on the achievements' progress with [method DotAchievementTracker.set_value], which files
+## any id, so team damage can tell a new player from a veteran ([method playtime_of]).
+const SECONDS_PLAYED := &"zz.seconds_played"
+
 signal earned(player_id: StringName, title: String, points: int)
 
 var stats: DotStatsTracker = null
@@ -67,6 +72,8 @@ var durable_key_fn: Callable = Callable()
 
 ## World id -> the key their numbers are filed under, and back. Fixed at [method record]'s
 ## first reading for them.
+const PLAYTIME_FLUSH := 30.0
+var _playtime_pending: Dictionary = {}
 var _keys: Dictionary = {}
 var _ids: Dictionary = {}
 
@@ -248,11 +255,7 @@ func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void
 	if body == null or body.is_bot:
 		return
 
-	var key := _key(player_id)
-
-	if not stats.has_player(key):
-		stats.begin(key, body.display_name)
-		_begin(key)
+	var key := _begin_for(player_id, body)
 
 	var filed := stats.record(key, stat, value)
 
@@ -262,6 +265,51 @@ func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void
 		DotLog.warn(CHANNEL, "a reading was refused", {
 			"player": String(player_id), "stat": String(stat), "why": filed.error.message,
 		})
+
+
+## Starts counting for a person the first time something is filed for them; returns their key.
+func _begin_for(player_id: StringName, body: ZzPlayer) -> StringName:
+	var key := _key(player_id)
+
+	if not stats.has_player(key):
+		stats.begin(key, body.display_name)
+		_begin(key)
+
+	return key
+
+
+## Adds [param seconds] to a person's lifetime playtime. Held in memory and written to the
+## progress every [constant PLAYTIME_FLUSH] s, because the tracker marks a save each time.
+func add_playtime(player_id: StringName, seconds: float) -> void:
+	var body: ZzPlayer = players.get(player_id)
+
+	if stats == null or achievements == null or body == null or body.is_bot:
+		return
+
+	var pending: float = float(_playtime_pending.get(player_id, 0.0)) + seconds
+	_playtime_pending[player_id] = pending
+
+	if pending < PLAYTIME_FLUSH:
+		return
+
+	var key := _begin_for(player_id, body)
+	var held := achievements.progress_of(String(key))
+
+	if held == null:
+		return
+
+	_playtime_pending[player_id] = 0.0
+	var _set := achievements.set_value(String(key), SECONDS_PLAYED, held.value_of(SECONDS_PLAYED) + pending)
+
+
+## Lifetime seconds played, as of the last flush plus what is waiting to be written; 0 for a
+## person not loaded yet (a new player until proven otherwise, which is the safe way round).
+func playtime_of(player_id: StringName) -> float:
+	if achievements == null:
+		return 0.0
+
+	var held := achievements.progress_of(String(_keys.get(player_id, player_id)))
+	return (held.value_of(SECONDS_PLAYED) if held != null else 0.0) + float(_playtime_pending.get(player_id, 0.0))
 
 
 ## The key a player's numbers are filed under. Asked of [member durable_key_fn] once, then
@@ -306,8 +354,22 @@ func _end(player_id: StringName) -> void:
 		})
 
 
+func _flush_playtime(player_id: StringName) -> void:
+	var pending := float(_playtime_pending.get(player_id, 0.0))
+
+	if pending <= 0.0 or achievements == null:
+		return
+
+	var held := achievements.progress_of(String(_keys.get(player_id, player_id)))
+
+	if held != null:
+		var _set := achievements.set_value(String(_keys.get(player_id, player_id)), SECONDS_PLAYED, held.value_of(SECONDS_PLAYED) + pending)
+
+
 ## Stops counting for somebody who left, and saves what they earned.
 func leave(player_id: StringName) -> void:
+	_flush_playtime(player_id)
+	_playtime_pending.erase(player_id)
 	_in_round.erase(player_id)
 	_map_kills.erase(player_id)
 

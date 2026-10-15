@@ -172,6 +172,7 @@ func _test_the_module_loads() -> void:
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
 	config.minimum_players = 3
+	config.exodus_team = 0
 	config.end_hold_seconds = 0.5
 	config.start_grace_seconds = 2.0
 	config.map_ids = PackedStringArray(["zz_practice"])

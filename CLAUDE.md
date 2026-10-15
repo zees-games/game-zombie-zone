@@ -109,6 +109,10 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - The maps pack is named by the server owner, never by `game.yml`; `ZzModule` adds every mount's `maps/` at load and after `zz_reload`.
 - Under MANUAL `ZzVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after the delivered maps; the match answers `round_in_progress_fn` by name.
 
+## Team damage, votebans and barricades
+
+`ZzConfig.friendly_fire_mode` (`zz_friendly_fire_mode`): 0 off, 1 on, 2 (default) a new player's team damage is reflected onto themselves, 3 everybody's. New is lifetime playtime under `zz_rookie_minutes` (achievements progress, session seconds as a floor). `ZzTeamDamage` adds a person's team damage over `zz_team_damage_window` seconds (counted before reflection; stand-ins never counted): `zz_team_damage_vote` starts a voteban through dot-vote's `DotVoteBans.start` (loaded by path, so a host with an older dot-vote runs without), `zz_team_damage_ban` bans for `zz_team_damage_ban_minutes`, staff immune. Reflection redirects `damage.victim` in `ZzGame._adjust_damage`, after the friendly scale. Barricades are their own physics layer so `zz_pass_barricades` (default on, replicated) can drop it from survivors' masks only. Exodus maps seat at least `zz_exodus_team` (8) survivors, stand-ins filling.
+
 ## Validating
 
 ```bash
@@ -137,3 +141,4 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.
+5. **Left alone on purpose**: stand-ins converging on one pinned or downed friend (zz-bots-helpers-1, needs long measurements) and dropping `zz_trace.gd` (waits for dot-combat API level 2 to be tagged).

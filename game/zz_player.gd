@@ -124,6 +124,10 @@ var revives_done: int = 0
 var damage_taken_map: float = 0.0
 var friendly_damage: float = 0.0
 
+## Seconds this player has been in the game this session (server): the floor under their
+## playtime when progress is not kept.
+var session_seconds: float = 0.0
+
 ## Which weapon slot they have asked for, from this game's input message.
 var wanted_slot: int = 0
 

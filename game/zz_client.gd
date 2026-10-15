@@ -227,6 +227,7 @@ func _build_netcode() -> DotResult:
 	if link != null:
 		var _view := game.view_rules.follow_cvars(link)
 		var _solid := game.body_rules.follow_cvars(link)
+		var _passing := game.pass_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
 		var _dead := game.ragdoll_rules.follow_cvars(link)
 		# And sv_toys*: a client hides the toys a server took away.

@@ -17,9 +17,11 @@ const ZzPins := preload("zz_pins.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
+const ZzPassRules := preload("zz_pass_rules.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
+const ZzTeamDamage := preload("zz_team_damage.gd")
 const ZzTrace := preload("zz_trace.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -90,6 +92,7 @@ const BY_FELL := &"fell"
 const BY_HAZARD := &"hazard"
 const BY_BLED := &"bled"
 const BY_BOX := &"box"
+const BY_REFLECT := &"reflected"
 
 signal player_added(player_id: StringName)
 signal player_removed(player_id: StringName)
@@ -172,6 +175,14 @@ var players: Dictionary = {}
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
+## `zz_pass_barricades`: whether survivors walk through barricades. Bound by the module
+## (REPLICATED) and followed by a client, which predicts its own player under it.
+var pass_rules: ZzPassRules = ZzPassRules.new()
+
+## Server: team damage, added up per player over a window ([ZzTeamDamage]); the module wires
+## what a voteban and a ban do.
+var team_damage: ZzTeamDamage = ZzTeamDamage.new()
+
 ## What a dead body does, survivor or zombie, and which death reactions the server allows:
 ## dot-player-char's `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a
 ## client through its link, because the client draws the bodies. One set for both: an owner who
@@ -251,8 +262,13 @@ func _ready() -> void:
 	ZzWeapons.use_packs(config.second_weapon_pack)
 
 	_build_physics()
+	pass_rules.humans_pass = config.humans_pass_barricades
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
 		body_rules.changed.connect(_on_body_rules_changed)
+	if not pass_rules.changed.is_connected(_on_body_rules_changed):
+		pass_rules.changed.connect(_on_body_rules_changed)
+	team_damage.config = config
+	team_damage.playtime_fn = _playtime_of
 	_apply_gravity()
 	_build_random()
 	_build_props()
@@ -321,18 +337,18 @@ func _exit_tree() -> void:
 ## Zombies collide with the world and the furniture, and not with each other: a crowd is kept
 ## apart by steering, which is smooth, rather than by bodies, which jam in doorways.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint"])
+	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade"])
 
 	for layer in physics.layers:
 		match layer.id:
 			&"player":
-				layer.collides_with = [&"world", &"prop"]
+				layer.collides_with = [&"world", &"prop", &"barricade"]
 			&"zombie":
-				layer.collides_with = [&"world", &"prop"]
+				layer.collides_with = [&"world", &"prop", &"barricade"]
 			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never
 			# a survivor or a zombie, who walk through it (a survivor pushes it, `_advance_toys`).
 			&"toy":
-				layer.collides_with = [&"world", &"prop", &"toy"]
+				layer.collides_with = [&"world", &"prop", &"toy", &"barricade"]
 			# A toy's footprint, for a walkable mesh's bake only: nothing collides with it.
 			&"footprint":
 				layer.collides_with = []
@@ -353,7 +369,14 @@ func _build_physics() -> void:
 func _apply_body_mask(player: ZzPlayer) -> void:
 	if physics == null or player == null or player.controller == null:
 		return
-	body_rules.apply_to(player.controller, physics.collision_mask(&"player"), physics.layer_mask(&"player"))
+	# A barricade is on its own layer so a survivor's mask can leave it out: the horde is held by
+	# it and a shot stops on it either way, only the people walk through (`zz_pass_barricades`).
+	var mask := physics.collision_mask(&"player")
+
+	if pass_rules.humans_pass:
+		mask &= ~physics.layer_mask(&"barricade")
+
+	body_rules.apply_to(player.controller, mask, physics.layer_mask(&"player"))
 	var tunables := player.controller.tunables
 	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
 
@@ -367,7 +390,7 @@ func world_mask() -> int:
 	if physics == null:
 		return 1
 
-	return physics.layer_mask(&"world") | physics.layer_mask(&"prop")
+	return physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"barricade")
 
 
 ## The gravity the movement is tuned against, on this world's own physics SPACE: a project
@@ -479,6 +502,11 @@ func _on_hit_landed(damage: DotDamage) -> void:
 
 
 func _adjust_damage(damage: DotDamage) -> void:
+	if authoritative and damage.attacker != damage.victim and damage.attacker != 0 \
+			and DotEntity.is_kind(damage.victim, DotEntity.KIND_PLAYER):
+		_team_damage_hit(damage)
+		return
+
 	if not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
 		return
 
@@ -486,6 +514,33 @@ func _adjust_damage(damage: DotDamage) -> void:
 
 	if attacker != null and boxes != null:
 		damage.amount *= boxes.damage_scale_for(attacker.player_id)
+
+
+## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
+## friendly-fire scale already applied). It is added to the shooter's window first, so a new
+## player being reflected still runs up the total that earns a voteban or a ban, and then, when
+## the shooter's damage is reflected, it lands on the shooter instead: the one who was hit takes
+## nothing. Server only.
+func _team_damage_hit(damage: DotDamage) -> void:
+	var by := player_for_entity(damage.attacker)
+	var victim := player_for_entity(damage.victim)
+
+	if by == null or victim == null or damage.amount <= 0.0:
+		return
+
+	team_damage.record(by, damage.amount, now())
+
+	if team_damage.reflects(by):
+		damage.victim = damage.attacker
+		damage.context["why"] = BY_REFLECT
+		damage.context["reflected_from"] = victim.entity_id
+
+
+## Seconds [param player_id] has played, for deciding who is new: lifetime where progress is
+## kept, otherwise this session's.
+func _playtime_of(player: ZzPlayer) -> float:
+	var held := progress.playtime_of(player.player_id) if progress != null else 0.0
+	return maxf(held, player.session_seconds)
 
 
 func _build_effects() -> void:
@@ -743,6 +798,7 @@ func remove_player(player_id: StringName) -> void:
 	if progress != null:
 		progress.leave(player_id)
 
+	team_damage.forget(player_id)
 	player_removed.emit(player_id)
 
 
@@ -1132,6 +1188,9 @@ func is_survival() -> bool:
 ## The team the map in play is built for, or the configured minimum: what stand-ins fill to.
 func team_size() -> int:
 	var wanted := config.minimum_players
+
+	if config.team_from_map and not map_doc.is_empty() and not is_survival():
+		wanted = maxi(wanted, config.exodus_team)
 
 	if config.team_from_map and not map_doc.is_empty():
 		wanted = maxi(wanted, int(map_doc.get("survivors", 0)))
@@ -2470,6 +2529,12 @@ func _step(delta: float) -> void:
 
 			if authoritative:
 				_advance_hands(player, delta)
+
+		if authoritative and not player.is_bot:
+			player.session_seconds += delta
+
+			if progress != null:
+				progress.add_playtime(id, delta)
 
 	_advance_weapons()
 

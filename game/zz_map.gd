@@ -158,7 +158,7 @@ func _build_toys() -> void:
 		toys.solid_layer = physics.layer_mask(&"prop")
 		toys.solid_mask = physics.collision_mask(&"prop")
 		toys.footprint_layer = physics.layer_mask(&"footprint")
-		toys.aim_mask = physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"toy")
+		toys.aim_mask = physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"toy") | physics.layer_mask(&"barricade")
 	add_child(toys)
 	var built := toys.build(doc.get("toys", []))
 	if not built.ok:
@@ -334,7 +334,9 @@ func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: V
 		var body := StaticBody3D.new()
 		body.name = "Barricade_%s" % id
 		add_child(body)
-		_put_on(body, &"world")
+		# Its own layer: a survivor's mask may leave it out (zz_pass_barricades); the horde's and
+		# every ray's keep it.
+		_put_on(body, &"barricade")
 		_barricades[id] = {"body": body, "shapes": [], "drawn": [], "bounds": bounds, "intact": true, "fraction": 1.0}
 
 	var entry: Dictionary = _barricades[id]

@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 33
+const SECTIONS := 34
 
-const CHECKS := 182
+const CHECKS := 195
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -79,6 +79,7 @@ func _run() -> void:
 	await _test_downs()
 	await _test_borrowed_health()
 	await _test_the_shove()
+	await _test_team_damage()
 	await _test_pins()
 	await _test_every_special()
 	await _test_the_new_specials()
@@ -440,6 +441,67 @@ func _test_borrowed_health() -> void:
 	me.actions = 0
 	_check(me.medkits == 0 and me.real_health() > 85.0 and me.incaps == 0,
 		"a medkit heals most of what is missing and clears the last life", "%.0f" % me.real_health())
+	_finished()
+
+
+func _test_team_damage() -> void:
+	_section("team damage: reflect, voteban, ban, and barricades")
+	var game := await _team(2, _quiet)
+	var a := game.survivors()[0]
+	var b := game.survivors()[1]
+	a.place_at(STREET, 0.0)
+	b.place_at(STREET + Vector3(2.0, 0.0, 0.0), 0.0)
+	game.config.friendly_fire_mode = 2
+	game.config.rookie_minutes = 120.0
+	_check(game.team_damage.is_new(a), "a player with no playtime is new")
+	var a_before := a.health.health
+	var b_before := b.health.health
+	var hit := DotDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
+	hit.tick = game.current_tick()
+	var _applied := game.combat.apply_damage(hit)
+	_check(is_equal_approx(b.health.health, b_before), "a new player's shot at a friend does the friend nothing",
+		"%.1f" % b.health.health)
+	_check(a.health.health < a_before, "it lands on the shooter", "%.1f -> %.1f" % [a_before, a.health.health])
+	a.session_seconds = 200.0 * 60.0
+	_check(not game.team_damage.is_new(a), "a player past rookie_minutes is not new")
+	b_before = b.health.health
+	hit = DotDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
+	hit.tick = game.current_tick()
+	_applied = game.combat.apply_damage(hit)
+	_check(b.health.health < b_before, "and their shot at a friend hurts the friend")
+	game.config.friendly_fire_mode = 3
+	_check(game.team_damage.reflects(a), "mode 3 reflects everybody")
+	game.config.friendly_fire_mode = 0
+	_check(game.config.friendly_fire_scale() == 0.0, "mode 0 is no friendly fire")
+	game.config.friendly_fire_mode = 1
+
+	var asked: Array = []
+	var banned: Array = []
+	game.team_damage.voteban_wanted.connect(func(id: StringName, damage: float) -> void: asked.append([id, damage]))
+	game.team_damage.ban_wanted.connect(func(id: StringName, damage: float, minutes: float) -> void: banned.append([id, damage, minutes]))
+	game.config.team_damage_window = 60.0
+	game.config.team_damage_vote = 100.0
+	game.config.team_damage_ban = 300.0
+	game.config.team_damage_ban_minutes = 45.0
+	var t := game.now()
+	game.team_damage.forget(a.player_id)
+	game.team_damage.record(a, 60.0, t)
+	_check(asked.is_empty() and banned.is_empty(), "under the threshold asks for nothing")
+	game.team_damage.record(a, 60.0, t + 1.0)
+	_check(asked.size() == 1 and asked[0][0] == a.player_id, "over the threshold starts a voteban, once")
+	game.team_damage.record(a, 10.0, t + 2.0)
+	_check(asked.size() == 1, "and not again inside the window")
+	game.team_damage.record(a, 200.0, t + 3.0)
+	_check(banned.size() == 1 and is_equal_approx(float(banned[0][2]), 45.0), "over the ceiling bans for the set time")
+
+	game.pass_rules.humans_pass = true
+	game._apply_body_mask(a)
+	var barricade := game.physics.layer_mask(&"barricade")
+	_check(a.controller.tunables.collision_mask & barricade == 0, "a survivor's mask leaves the barricade out when they pass")
+	game.pass_rules.humans_pass = false
+	game._apply_body_mask(a)
+	_check(a.controller.tunables.collision_mask & barricade != 0, "and keeps it when they do not")
+	game.pass_rules.humans_pass = true
 	_finished()
 
 

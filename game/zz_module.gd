@@ -64,6 +64,10 @@ var _bot_ids: Array[StringName] = []
 ## The players' vote for the next map; null when it could not be built.
 var vote: ZzVote = null
 
+## dot-vote's `DotVoteBans`: players' votes to ban a player, and the one team damage starts.
+## Null on a host whose dot-vote has none (API level under 8), which runs without them.
+var voteban: RefCounted = null
+
 ## The drawn ballot's notice topic. The client shell draws one menu per topic.
 const MAP_BALLOT_TOPIC := &"map_ballot"
 
@@ -198,8 +202,14 @@ func _game_load() -> DotResult:
 	var _toys := world.toy_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
+	# Whether survivors walk through barricades. REPLICATED, because a client predicts its own
+	# player under it (see ZzPassRules).
+	var _passing := world.pass_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
 
 	_build_vote(world)
+	_build_voteban(world)
 
 	_bots = add_cvar(
 		"zz_bots", "1",
@@ -332,6 +342,29 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void:
 			config.friendly_fire = clampf(value, 0.0, 1.0)
 			_apply_friendly_fire(world))
+	_tunable("zz_friendly_fire_mode", float(config.friendly_fire_mode),
+		"What a teammate's bullet does: 0 nothing, 1 hurts, 2 hurts but a new player's is reflected onto them, 3 everybody's is reflected",
+		func(value: float) -> void:
+			config.friendly_fire_mode = clampi(int(value), 0, 3)
+			_apply_friendly_fire(world))
+	_tunable("zz_rookie_minutes", config.rookie_minutes,
+		"Minutes played under which a player is new and (mode 2) has their team damage reflected; 0 nobody is new",
+		func(value: float) -> void: config.rookie_minutes = clampf(value, 0.0, 100000.0))
+	_tunable("zz_team_damage_window", config.team_damage_window,
+		"Seconds team damage is added up over for the voteban and the ban",
+		func(value: float) -> void: config.team_damage_window = clampf(value, 5.0, 3600.0))
+	_tunable("zz_team_damage_vote", config.team_damage_vote,
+		"Team damage inside the window that starts a voteban against the player; 0 never",
+		func(value: float) -> void: config.team_damage_vote = maxf(value, 0.0))
+	_tunable("zz_team_damage_ban", config.team_damage_ban,
+		"Team damage inside the window that bans the player outright; 0 never",
+		func(value: float) -> void: config.team_damage_ban = maxf(value, 0.0))
+	_tunable("zz_team_damage_ban_minutes", config.team_damage_ban_minutes,
+		"Minutes the automatic ban lasts",
+		func(value: float) -> void: config.team_damage_ban_minutes = maxf(value, 1.0))
+	_tunable("zz_exodus_team", float(config.exodus_team),
+		"Survivors (stand-ins fill) on an exodus map at least",
+		func(value: float) -> void: config.exodus_team = clampi(int(value), 0, 24))
 	_tunable("zz_max_incaps", float(config.max_incaps), "Downs before the next one is death",
 		func(value: float) -> void: config.max_incaps = clampi(int(value), 0, 10))
 	_tunable("zz_rescue_seconds", config.rescue_seconds,
@@ -562,6 +595,9 @@ func _game_tick(_tick: int, delta: float) -> void:
 	if vote != null:
 		vote.advance(delta)
 
+	if voteban != null:
+		voteban.advance(delta)
+
 	_since_roster_check += delta
 
 	if _since_roster_check < ROSTER_INTERVAL:
@@ -785,6 +821,130 @@ func _build_vote(world: ZzGame) -> void:
 			if vote != null:
 				vote.forget_voter(StringName(str(session.userid)))
 		)
+
+
+## Votebans, dot-vote's `DotVoteBans`, and the two things team damage asks of them: a vote
+## ([member ZzConfig.team_damage_vote]) and an outright ban ([member ZzConfig.team_damage_ban]).
+## Loaded by path so a host whose dot-vote predates them runs without; a game never names the
+## class. Voter ids are the session's userid, the same as the map vote's.
+func _build_voteban(world: ZzGame) -> void:
+	var path := "res://addons/dot_vote/runtime/dot_vote_bans.gd"
+
+	if not ResourceLoader.exists(path):
+		log_info("this host's dot-vote has no votebans; team damage can still ban")
+		return
+
+	voteban = (load(path) as GDScript).new()
+	voteban.set("voters_fn", func() -> Array:
+		var out: Array = []
+
+		for id: Variant in world.players:
+			if not (world.players[id] as ZzPlayer).is_bot:
+				out.append(StringName(str(ZzNetBridge.session_of(StringName(str(id))))))
+
+		return out)
+	voteban.set("role_fn", func(who: StringName) -> String: return _role_of(String(who).to_int()))
+	voteban.set("name_fn", func(who: StringName) -> String:
+		var session := server.session_by_userid(String(who).to_int()) if server != null else null
+		return session.display_name if session != null else String(who))
+	voteban.set("ban_fn", func(who: StringName, minutes: float, reason: String) -> void:
+		_ban_player(String(who).to_int(), minutes, reason, "voteban"))
+	voteban.set("announce_fn", func(line: String) -> void: _announce(line))
+	voteban.set("voter_fn", func(ctx: Object) -> StringName:
+		var session: Variant = ctx.get("session")
+		var userid: Variant = (session as Object).get("userid") if session is Object else null
+		return StringName(str(userid)) if userid != null else &"console")
+	voteban.set("resolve_fn", func(text: String) -> StringName:
+		var wanted := text.strip_edges().to_lower()
+
+		for id: Variant in world.players:
+			var who: ZzPlayer = world.players[id]
+			var userid := ZzNetBridge.session_of(StringName(str(id)))
+
+			if who.is_bot or userid <= 0:
+				continue
+
+			if wanted == str(userid) or who.display_name.to_lower() == wanted:
+				return StringName(str(userid))
+
+		# A part of a name, only when it names exactly one: a vote against the wrong person
+		# is worse than a refused one.
+		var found: StringName = &""
+		var count := 0
+
+		for id: Variant in world.players:
+			var who: ZzPlayer = world.players[id]
+
+			if not who.is_bot and who.display_name.to_lower().contains(wanted):
+				found = StringName(str(ZzNetBridge.session_of(StringName(str(id)))))
+				count += 1
+
+		return found if count == 1 else &"")
+
+	var bound: DotResult = voteban.call("bind_commands", self)
+	DotLog.result(CHANNEL, "the voteban's commands", bound)
+
+	world.team_damage.voteban_wanted.connect(func(player_id: StringName, damage: float) -> void:
+		var target := StringName(str(ZzNetBridge.session_of(player_id)))
+		var started: DotResult = voteban.call("start", &"", target,
+			"%d team damage in %d seconds" % [int(damage), int(world.config.team_damage_window)])
+		DotLog.result(CHANNEL, "a voteban for team damage", started))
+	world.team_damage.ban_wanted.connect(func(player_id: StringName, damage: float, minutes: float) -> void:
+		var userid := ZzNetBridge.session_of(player_id)
+
+		if bool(voteban.get("rules").call("is_immune", _role_of(userid))):
+			return
+
+		_ban_player(userid, minutes, "%d team damage in %d seconds" % [int(damage), int(world.config.team_damage_window)], "teamdamage"))
+
+	if server != null:
+		server.client_disconnected.connect(func(session: DotClientSession, _reason: String) -> void:
+			if voteban != null:
+				voteban.call("forget_voter", StringName(str(session.userid)))
+		)
+
+
+## "admin", "staff" or "player", for the voteban's start and immunity roles.
+func _role_of(userid: int) -> String:
+	var session := server.session_by_userid(userid) if server != null else null
+
+	if session == null:
+		return "player"
+
+	if session.has_permission(DotAdminFlags.ROOT) or session.has_permission(DotAdminFlags.BAN):
+		return "admin"
+
+	return "staff" if session.has_permission(DotAdminFlags.GENERIC) else "player"
+
+
+func _announce(line: String) -> void:
+	var chat: Object = services.get("chat") if services != null else null
+
+	if chat != null:
+		var _said: Variant = chat.call("announce", line, ZzServices.CH_ALL)
+	elif server != null:
+		server.broadcast_message(line)
+
+
+## Bans a connected person for [param minutes] (0 for ever) and removes them, the way dot-server's
+## own `ban` command does: by account, by address for a guest.
+func _ban_player(userid: int, minutes: float, reason: String, by: String) -> void:
+	var session := server.session_by_userid(userid) if server != null else null
+
+	if session == null or server.bans == null:
+		DotLog.warn(CHANNEL, "a ban could not be carried out", {"userid": userid, "by": by})
+		return
+
+	var name := session.display_name
+	var banned: DotResult = await server.bans.ban_session(session, reason, int(minutes * 60.0), by)
+
+	if not banned.ok:
+		DotLog.result(CHANNEL, "a ban", banned)
+		return
+
+	server.kick(session, "Banned: %s" % reason)
+	var _also := server.enforce_bans("Banned: %s" % reason)
+	_announce("%s was banned: %s" % [name, reason])
 
 
 ## The map is what a server listing prints, reported on every rebuild: the server forgets it

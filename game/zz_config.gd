@@ -124,6 +124,37 @@ extends DotConfig
 ## difficulty. The genre's answer to "spray into the crowd your friend is in".
 @export_range(0.0, 1.0, 0.01) var friendly_fire: float = 0.1
 
+## What a teammate's bullet does to you: 0 nothing, 1 the share above (friendly fire), 2 the
+## same but a NEW player's (under [member rookie_minutes] played) is reflected onto themselves
+## and the teammate they hit takes nothing, 3 everybody's is reflected. 2 by default: the player
+## who does not yet know to stop spraying pays for it, and a veteran's slip still hurts a friend.
+@export_enum("off", "on", "reflect new players", "reflect everybody") var friendly_fire_mode: int = 2
+
+## Playtime under which a player is new, in minutes (lifetime where progress is kept, this
+## session where it is not). 0 makes nobody new.
+@export_range(0.0, 100000.0, 1.0) var rookie_minutes: float = 120.0
+
+## The window, in seconds, that team damage is added up over.
+@export_range(5.0, 3600.0, 1.0) var team_damage_window: float = 60.0
+
+## Team damage dealt within the window that starts a voteban against the player, through
+## dot-vote's API. 0 never. Counted before reflection, so a new player being reflected still
+## runs up their total.
+@export_range(0.0, 100000.0, 5.0) var team_damage_vote: float = 150.0
+
+## Team damage within the window that bans the player outright, for [member team_damage_ban_minutes].
+## 0 never. A hard ceiling: nobody votes on it and staff are not exempt from nothing but staff.
+@export_range(0.0, 100000.0, 5.0) var team_damage_ban: float = 400.0
+@export_range(1.0, 100000.0, 1.0) var team_damage_ban_minutes: float = 30.0
+
+## Whether humans walk through a barricade (and so can go outside) without breaking it: the
+## zombies are still held by it and shots still stop on it. `zz_pass_barricades`.
+@export var humans_pass_barricades: bool = true
+
+## The team an exodus map is filled to with stand-ins, at least (a survival map says its own).
+## An exodus is a long walk and four survivors for the whole of it is a lonely one.
+@export_range(0, 24, 1) var exodus_team: int = 8
+
 # --- The survivors ---------------------------------------------------------
 
 @export_group("The survivors")
@@ -369,6 +400,8 @@ func special_health_scale() -> float:
 
 ## A teammate's bullet, as a multiple of what it would do to a zombie.
 func friendly_fire_scale() -> float:
+	if friendly_fire_mode == 0:
+		return 0.0
 	return friendly_fire * [0.0, 1.0, 3.0, 8.0][clampi(difficulty, 0, 3)]
 
 
