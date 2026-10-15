@@ -468,7 +468,7 @@ func _test_big_map(id: StringName) -> void:
 	for player in game.survivors():
 		if player.is_up():
 			standing += 1
-			var post: Vector3 = game.bots._post_of(player)
+			var post: Vector3 = game.bots._hold_of(player)
 			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather:
 				at_post += 1
 	_check(standing >= int(ceil(team * 0.7)) and at_post >= int(ceil(standing * 0.5)),

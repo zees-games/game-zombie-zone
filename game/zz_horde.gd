@@ -2,6 +2,8 @@ extends Node
 
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzNavGraph := preload("zz_nav_graph.gd")
+const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -79,6 +81,9 @@ var squads: DotNpcAiSquads = DotNpcAiSquads.new()
 var skill: DotNpcAiSkill = DotNpcAiSkill.new()
 var sounds: DotNpcAiSounds = DotNpcAiSounds.new()
 var nav: DotNpcNavData = null
+
+## The map's annotations worked into chokes, drops and holds (`ZzNavNotes`); never null.
+var notes: ZzNavNotes = ZzNavNotes.new()
 var catalogue: DotNpcCatalogue = null
 
 ## Whether the pacing runs: false in a start area, between maps, in warmup.
@@ -277,7 +282,62 @@ func build_for_map(doc: Dictionary) -> DotResult:
 
 	_place_sleepers()
 	_place_wanderers()
+	_begin_notes()
 	return DotResult.success(null)
+
+
+## Starts annotating the map's colliders: bake, annotate, and then [method _plan_notes]. Survival
+## and exodus alike (the zombies' drops and spread are for both); only a survival map's stand-ins
+## hold the chokes.
+func _begin_notes() -> void:
+	notes.clear()
+
+	if game == null or game.map == null or game.physics == null:
+		return
+
+	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), _note_seeds())
+
+
+func _note_seeds() -> PackedVector3Array:
+	var seeds := PackedVector3Array()
+
+	for i in 4:
+		var spot: Array = game.map.spawn("survivors", i)
+		seeds.append(spot[0])
+
+	return seeds
+
+
+## The graph the spawner built is a plain one; the zombies' is `ZzNavGraph`, which also knows the
+## drops. Swapped in after every rebuild, with the links put back.
+func _adopt_links() -> void:
+	var graph := ZzNavGraph.new()
+
+	if not graph.rebuild(nav).ok:
+		return
+
+	spawner.nav = graph
+
+	if notes.is_ready():
+		notes.apply_links(graph)
+
+
+func _plan_notes() -> void:
+	var posts := PackedVector3Array()
+
+	for p: Array in _doc.get("posts", []):
+		posts.append(ZzMapDoc.v3(p))
+
+	notes.plan(spawner.nav, director.spawn_points, posts)
+
+
+## Where a zombie keyed [param key] should walk on its way to [param goal]: through the choke it
+## was given. The goal itself with `zz_zombie_spread` off or no notes.
+func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
+	if not config.zombie_spread:
+		return goal
+
+	return notes.waypoint_for(key, from, goal)
 
 
 func rebuild_navigation() -> DotResult:
@@ -299,6 +359,8 @@ func rebuild_navigation() -> DotResult:
 
 	if not applied.ok:
 		return applied
+
+	_adopt_links()
 
 	var _from_nav := director.set_spawn_points_from_nav(nav, 6.0, DotNpcNavFilter.walking_only())
 	_add_hinted_spawns()
@@ -389,6 +451,8 @@ func open_gate(gate: String) -> void:
 
 
 func clear() -> void:
+	notes.clear()
+
 	if spawner != null:
 		var _cleared := spawner.clear_all(DotNpcSpawner.REASON_CLEANUP)
 
@@ -540,6 +604,11 @@ func tick(delta: float) -> void:
 		return
 
 	_time += delta
+
+	if notes.tick():
+		_plan_notes()
+
+	notes.update(delta, self)
 	_rebuild_candidates()
 	_rebuild_grid()
 	spawner.set_candidates(_candidates)

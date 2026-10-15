@@ -365,6 +365,26 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_exodus_team", float(config.exodus_team),
 		"Survivors (stand-ins fill) on an exodus map at least",
 		func(value: float) -> void: config.exodus_team = clampi(int(value), 0, 24))
+	_tunable("zz_nav_notes", 1.0 if config.nav_notes else 0.0,
+		"Annotate each map (drops, chokepoints, cover) after its bake and let bots and zombies use it; 0 off",
+		func(value: float) -> void: config.nav_notes = value > 0.5)
+	_tunable("zz_nav_drop", config.nav_drop_max, "The longest drop, in metres, a zombie takes off a ledge",
+		func(value: float) -> void: config.nav_drop_max = clampf(value, 1.0, 10.0))
+	_tunable("zz_zombie_drops", 1.0 if config.zombie_drops else 0.0,
+		"Zombies step down ledges the annotations found; 0 off",
+		func(value: float) -> void: config.zombie_drops = value > 0.5)
+	_tunable("zz_zombie_climb", 1.0 if config.zombie_climb else 0.0,
+		"Zombies climb the jump ups as well (a held tower is no longer safe); 0 off",
+		func(value: float) -> void: config.zombie_climb = value > 0.5)
+	_tunable("zz_zombie_spread", 1.0 if config.zombie_spread else 0.0,
+		"Send each zombie through the least used choke on its way, not all down one route; 0 off",
+		func(value: float) -> void: config.zombie_spread = value > 0.5)
+	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
+		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
+		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
+	_tunable("zz_bot_hold_overrun", float(config.bot_hold_overrun),
+		"Zombies within 4.5 m of a choke that make it overrun",
+		func(value: float) -> void: config.bot_hold_overrun = clampi(int(value), 2, 40))
 	_tunable("zz_max_incaps", float(config.max_incaps), "Downs before the next one is death",
 		func(value: float) -> void: config.max_incaps = clampi(int(value), 0, 10))
 	_tunable("zz_rescue_seconds", config.rescue_seconds,

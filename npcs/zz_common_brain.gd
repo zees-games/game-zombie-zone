@@ -250,7 +250,7 @@ func _chase(b: ZzZombieBody) -> bool:
 			if not swinging():
 				var _swung := swing_at(target)
 		elif not swinging():
-			go_to(at, speed)
+			chase_to(at, speed)
 			b.anim = ZzZombieBody.Anim.RUN
 		else:
 			go_to(at, speed * 0.35)

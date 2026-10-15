@@ -1,0 +1,155 @@
+extends DotNpcNavGraph
+
+## The zombies' graph with the one thing the grid cannot say: a way that only goes one way.
+##
+## [b]Why a subclass and not edges in the data.[/b] dot-npc's edge list is undirected by
+## declaration, and a drop is not: a zombie steps off a balcony and cannot step back up it. A
+## graph that let it would route a horde to the foot of a wall and leave it pushing on the
+## brick. So the drops (`ZzNavNotes`, from dot-npc-ai's annotations) live here, beside the
+## adjacency, and are read three ways:
+##
+## [codeblock]
+## a zombie        every drop, downward only (jump ups too, both ways, when `allow_climb`)
+## a stand-in      none: it walks the stairs the map has, and never falls off a balcony
+## [/codeblock]
+##
+## Which of the two is asking is the filter the spawner sets per search (`filter`), never a flag
+## on the graph, for the reason dot-npc gives for filters: one graph serves everybody.
+
+## The filter a stand-in's search sets: no link at all. Its avoid cost is a number nothing else
+## uses, so the native search keeps a graph of its own for it (dot-npc keys them by signature).
+var bot_filter: DotNpcNavFilter = null
+
+## Whether a zombie may climb the jump ups (`zz_zombie_climb`). A body that jumps a metre and a
+## quarter would; the zombies do not, so a tower is defensible.
+var allow_climb: bool = false:
+	set(value):
+		if value != allow_climb:
+			allow_climb = value
+			_native.clear()
+			_patched.clear()
+
+## from index -> PackedInt32Array of the points one drop leads down to.
+var _down: Dictionary = {}
+
+## from index -> the points a jump up leads to (a climb).
+var _up: Dictionary = {}
+
+## Every point either end of a link touches, to ask quickly whether a point has one.
+var _linked: Dictionary = {}
+
+var _patched: Dictionary = {}
+
+## True while the native search's graph is being built: its plain edges are bidirectional, so the
+## one-way links must not be in them (they are connected after, one way).
+var _building: bool = false
+
+## Drops in this graph, for suites and describe.
+var drop_count: int = 0
+var up_count: int = 0
+
+
+func _init(p_data: DotNpcNavData = null) -> void:
+	bot_filter = DotNpcNavFilter.new()
+	bot_filter.avoid_cost = 3.9
+	super(p_data)
+
+
+## A drop from [param high] down to [param low]. Both are graph points. A zombie goes down it;
+## nobody goes back up it.
+func add_drop(high: int, low: int) -> void:
+	_append(_down, high, low)
+	_linked[high] = true
+	_linked[low] = true
+	drop_count += 1
+	_native.clear()
+	_patched.clear()
+
+
+## A jump up from [param low] to [param high], which only a climbing zombie takes.
+func add_climb(low: int, high: int) -> void:
+	_append(_up, low, high)
+	_linked[low] = true
+	_linked[high] = true
+	up_count += 1
+	_native.clear()
+	_patched.clear()
+
+
+func has_links() -> bool:
+	return drop_count > 0 or up_count > 0
+
+
+## Labels the components again once every link is in: a drop can join two pieces of the map.
+func relabel() -> void:
+	_label_components()
+
+
+func _append(into: Dictionary, from: int, to: int) -> void:
+	var list: PackedInt32Array = into.get(from, PackedInt32Array())
+
+	if list.has(to):
+		return
+
+	list.append(to)
+	into[from] = list
+
+
+## Whether [param a] to [param b] is a link edge of any kind, either way round.
+func is_link(a: int, b: int) -> bool:
+	var d: PackedInt32Array = _down.get(a, PackedInt32Array())
+
+	if d.has(b):
+		return true
+
+	d = _down.get(b, PackedInt32Array())
+
+	if d.has(a):
+		return true
+
+	var u: PackedInt32Array = _up.get(a, PackedInt32Array())
+	return u.has(b) or (_up.get(b, PackedInt32Array()) as PackedInt32Array).has(a)
+
+
+func neighbours(index: int) -> PackedInt32Array:
+	var base := super(index)
+
+	if _building or not _linked.has(index) or filter == bot_filter:
+		return base
+
+	var out := base.duplicate()
+
+	for to in _down.get(index, PackedInt32Array()) as PackedInt32Array:
+		if not out.has(to):
+			out.append(to)
+
+	if allow_climb:
+		for to in _up.get(index, PackedInt32Array()) as PackedInt32Array:
+			if not out.has(to):
+				out.append(to)
+
+	return out
+
+
+## The native search's graph: [method super]'s (the plain edges), which has no link in it, plus
+## the links as one-way segments.
+func _native_for(with: DotNpcNavFilter) -> AStar3D:
+	_building = true
+	var astar: AStar3D = super(with)
+	_building = false
+
+	if with == bot_filter or not has_links() or _patched.has(astar.get_instance_id()):
+		return astar
+
+	_patched[astar.get_instance_id()] = true
+
+	for from: int in _down:
+		for to in _down[from] as PackedInt32Array:
+			astar.connect_points(from, to, false)
+
+	if allow_climb:
+		for from: int in _up:
+			for to in _up[from] as PackedInt32Array:
+				astar.connect_points(from, to, false)
+
+	return astar

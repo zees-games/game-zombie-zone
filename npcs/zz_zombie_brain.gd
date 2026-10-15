@@ -148,6 +148,18 @@ func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 	steer_with_spacing(to, speed, context.delta if context != null else 0.016, spacing)
 
 
+## Closes on [param at], by way of the choke the horde gave this zombie when it is a long way off
+## (`ZzHorde.waypoint_for`): so a horde comes by every way in and not down one in a line. Near its
+## quarry, or with no notes, exactly [method go_to].
+func chase_to(at: Vector3, speed: float, spacing: float = 1.1) -> void:
+	var h := horde()
+
+	if h != null and npc != null:
+		at = h.call(&"waypoint_for", npc.instance_id, npc.position(), at)
+
+	go_to(at, speed, spacing)
+
+
 # --- Knowing where survivors are -------------------------------------------------------------
 
 ## The survivor this zombie is after: one it was given, or one it perceived. Empty for none.
@@ -414,7 +426,7 @@ func melee_chase(speed: float) -> bool:
 		if not swinging():
 			var _swung := swing_at(target)
 	elif not swinging():
-		go_to(at, speed)
+		chase_to(at, speed)
 		body().anim = ZzZombieBody.Anim.RUN
 	else:
 		# Mid-swing: keep closing at a walk, so a backing survivor is followed.

@@ -34,8 +34,8 @@ npcs/                the zombie body, its view (the animated models), one brain 
 assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the kit's atlases
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (31 sections), headless_maps, headless_net (15), headless_weapons, dedicated, headless_survival
-tools/               shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
+examples/            headless_run (31 sections), headless_maps, headless_net (15), headless_weapons, dedicated, headless_survival, headless_nav (11 sections, 43 checks)
+tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
 
@@ -82,6 +82,7 @@ tools/               shot.sh (render a view), camera_check.sh, survival_long_run
 - Barricade state goes to clients in sixteenths (BARRICADE) and at every round start; the hold as SURVIVAL every clock and on every stage change; `headless_net` follows both through the bridge.
 - `survivors` in a map raises the stand-ins to that team; unsaid is 0, never 4. Commons alive: 6 per survivor for eight, 2 past them.
 - Tune waves with `tools/survival_long_run.tscn` (whole holds, `--from`, `--profile`); `headless_survival` fails a big map whose wave-1 tick is over 15.6 ms.
+- Bots read the map's nav annotations (`game/zz_nav_notes.gd`, dot-npc-ai's annotator, run after the bake, seeded with the spawns): stand-ins hold a chokepoint or a covered spot behind it (`zz_bot_hold_chokes`) and fall back along the route when `zz_bot_hold_overrun` zombies are on it; zombies spread over the chokes (`zz_zombie_spread`) and take drop links (`zz_zombie_drops`, `ZzNavGraph`), jump-ups only with `zz_zombie_climb`. The finder's defaults found no chokes, so the notes use width 4.5, traffic 0.07, 192 routes. Every shipped map's nav is flat at y=0, so no drop applies yet (mechanism only). `headless_nav` fails the old behaviour (holders near a chokepoint at wave start, approach spread). [survival](docs/survival.md#bots-on-the-navigation-notes)
 - Suites read a map's result from `round_over`: with no intermission the next round has cleared `_decided`. [history](docs/history.md)
 
 **The zombies' look** ([zombies](docs/zombies.md))

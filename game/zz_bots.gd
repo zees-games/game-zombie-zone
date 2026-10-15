@@ -262,6 +262,21 @@ func _post_of(player) -> Vector3:
 	return at
 
 
+## Where this stand-in stands: behind a choke on the horde's route when the map has been
+## annotated (`zz_bot_hold_chokes`), falling back along the route when that choke is overrun,
+## and its post when not. The post still says which barricade it mends.
+func _hold_of(player) -> Vector3:
+	var horde = game.horde
+
+	if horde != null and game.config.bot_hold_chokes and horde.notes.is_ready():
+		var at: Vector3 = horde.notes.hold_for(_seat(player))
+
+		if at != Vector3.INF:
+			return at
+
+	return _post_of(player)
+
+
 func _seat(player) -> int:
 	var memory := _memory(player)
 	var roster: int = game.players.size()
@@ -282,7 +297,7 @@ func _seat(player) -> int:
 
 
 func _hold_post(player, command: DotFpsCommand, memory: Dictionary) -> void:
-	var post := _post_of(player)
+	var post := _hold_of(player)
 
 	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > 2.0:
 		_walk_to(player, command, post, memory)
@@ -713,7 +728,13 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 
 	if nav != null and nav.is_ready() and (game.now() - float(memory["path_at"]) > 1.0 \
 			or (memory["goal"] as Vector3).distance_to(goal) > 2.0 or path.is_empty()):
+		# Its own filter: the graph keeps the last searcher's, and a zombie's would send a
+		# stand-in off a balcony.
+		var kept = nav.filter
+		if nav.has_method(&"relabel"):
+			nav.filter = nav.bot_filter
 		path = nav.find_smooth_path(here, goal, 2.5, true)
+		nav.filter = kept
 		memory["path"] = path
 		memory["path_at"] = game.now()
 		memory["goal"] = goal

@@ -155,6 +155,36 @@ extends DotConfig
 ## An exodus is a long walk and four survivors for the whole of it is a lonely one.
 @export_range(0, 24, 1) var exodus_team: int = 8
 
+# --- Navigation notes ------------------------------------------------------
+
+## Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its
+## bake, and the bots and the horde use what it finds. Off plays as before the annotations.
+## `zz_nav_notes`.
+@export var nav_notes: bool = true
+
+## The longest drop, in metres, a zombie takes off a ledge. `zz_nav_drop`.
+@export_range(1.0, 10.0, 0.5) var nav_drop_max: float = 4.0
+
+## Whether the zombies step down ledges the annotations found (a balcony is a way in, never a way
+## up). `zz_zombie_drops`.
+@export var zombie_drops: bool = true
+
+## Whether a zombie climbs the jump ups too, which lets it up a ledge a survivor holds. Off, so a
+## tower is defensible. `zz_zombie_climb`.
+@export var zombie_climb: bool = false
+
+## Whether each zombie is sent through one of the chokes on the way, the least used, so a horde
+## arrives by every way in and not down one in a line. `zz_zombie_spread`.
+@export var zombie_spread: bool = true
+
+## Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in
+## place of a post at a window. `zz_bot_hold_chokes`.
+@export var bot_hold_chokes: bool = true
+
+## Zombies within four and a half metres of a choke that make it overrun: the stand-ins holding it
+## fall back along the route. `zz_bot_hold_overrun`.
+@export_range(2, 40, 1) var bot_hold_overrun: int = 6
+
 # --- The survivors ---------------------------------------------------------
 
 @export_group("The survivors")
