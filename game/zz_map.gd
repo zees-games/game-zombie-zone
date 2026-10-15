@@ -248,12 +248,15 @@ func _build_boxes() -> void:
 
 		var tint := ZzMapDoc.colour(box.get("tint", [1, 1, 1]))
 		var cell := Vector2i(floori(at.x / CHUNK), floori(at.z / CHUNK))
-		var key := "%s|%s|%d|%d" % [str(box["mat"]), tint.to_html(), cell.x, cell.y]
+		# Seen and not hit (a road marking, a decal, a lamp's bulb, water) is batched apart from
+		# the solid boxes, so the whole chunk can say it is meant to be walked through.
+		var ghost := not bool(box.get("solid", true))
+		var key := "%s|%s|%d|%d|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost]
 
 		if not batches.has(key):
 			var tool := SurfaceTool.new()
 			tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint}
+			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost}
 
 		_add_box((batches[key] as Dictionary)["tool"], frame, size)
 
@@ -262,6 +265,10 @@ func _build_boxes() -> void:
 		var tool: SurfaceTool = batch["tool"]
 		var mesh := MeshInstance3D.new()
 		mesh.name = "Boxes"
+		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# map's own say-so, and a player is meant to walk through it.
+		if bool(batch["ghost"]):
+			mesh.set_meta(&"dot_no_collision", true)
 		mesh.mesh = tool.commit()
 		mesh.material_override = ZzMaterials.material(batch["mat"], batch["tint"])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
@@ -323,6 +330,9 @@ func _build_objective_props() -> void:
 		var drawn := ZzFixtures.objective_prop(o, gate_box if str(o.get("prop", "")) == "padlock" else {})
 		if drawn == null:
 			continue
+		# dot-core's DotCollisionAudit: a padlock hangs on a gate that has its own body, a lever
+		# or a radio is something you reach and use. None of them should stop a survivor.
+		drawn.set_meta(&"dot_no_collision", true)
 		_drawn.add_child(drawn)
 		if str(o.get("prop", "")) == "padlock" and _gates.has(gate_id):
 			((_gates[gate_id] as Dictionary)["drawn"] as Array).append(drawn)

@@ -22,7 +22,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp"]
-const CHECKS_PER_MAP := 14
+const CHECKS_PER_MAP := 15
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -123,6 +123,8 @@ func _test_map(id: StringName) -> void:
 	var missing: PackedStringArray = game.map.get("_missing")
 	_check(missing.is_empty() and game.map.props.size() == (doc["props"] as Array).size(),
 		"every prop in it is one the catalogue has", ", ".join(missing))
+
+	await _report_colliderless(id, doc)
 
 	var seats := ((doc.get("spawns", {}) as Dictionary).get("survivors", []) as Array).size()
 	var bad_spawns: Array = []
@@ -357,7 +359,7 @@ func _rests_on_something(game: ZzGame, frame: Transform3D, size: Vector3) -> boo
 	return false
 
 
-func _world(id: StringName) -> ZzGame:
+func _world(id: StringName, drawn := false) -> ZzGame:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -369,12 +371,41 @@ func _world(id: StringName) -> ZzGame:
 	game.config = config
 	game.tick_rate = 60
 	game.authoritative = true
+	game.draw_world = drawn
 	game.register_service = false
 	add_child(game)
 	game.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	return game
+
+
+## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing
+## in `Drawn` (batched into chunks) and its shapes in `Solid`, so the audit is the lenient one;
+## the exact half is the document: a visible box that is not solid is drawn and walked through.
+func _report_colliderless(id: StringName, doc: Dictionary) -> void:
+	var drawn := await _world(id, true)
+	var res := DotCollisionAudit.audit(drawn.map, true)
+	var ghosts: Array = []
+
+	for box: Dictionary in doc["boxes"]:
+		if bool(box.get("visible", true)) and not bool(box.get("solid", true)):
+			ghosts.append(str(box.get("mat", "")))
+
+	if res.ok:
+		var report: DotCollisionAudit = res.value
+		print("  collision audit: %d meshes with no shape near them of %d, %d visible boxes not solid" % [report.count(), report.examined, ghosts.size()])
+
+		for line in report.describe_lines().slice(1, 8):
+			print("  %s" % line)
+
+	var found: PackedStringArray = (res.value as DotCollisionAudit).paths() if res.ok else PackedStringArray()
+	_check(res.ok and (res.value as DotCollisionAudit).examined > 0 and found.is_empty(),
+		"everything drawn has collision, or says it is decoration (dot_no_collision)", "; ".join(found.slice(0, 6)) if res.ok else res.error.message)
+	await _dispose(drawn)
+	# Both worlds share one physics space: let the server drop the drawn one's bodies before the
+	# checks that follow ask it about the same spot.
+	await get_tree().physics_frame
 
 
 func _dispose(game: ZzGame) -> void:
