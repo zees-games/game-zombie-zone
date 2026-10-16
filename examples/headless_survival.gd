@@ -456,7 +456,9 @@ func _test_big_map(id: StringName) -> void:
 	# release (zz-survival-retune-1) the minute can reach the breather, where `sent` is zero.
 	_check(int(held.get("index", 0)) >= 1 and (game.survival.waves.sent > 0 or game.survival.cleared >= 1),
 		"the hold begins and wave 1 is released", str(held))
-	_check(kills > 5, "the stand-ins kill what comes", "%d kills" % kills)
+	# More than a couple, not more than five: the camp's wave 1 is 10 zombies (wave_scale_by_map 0.85)
+	# and with only two stand-ins answering a downed friend a minute in, five dead is a team holding.
+	_check(kills > 2, "the stand-ins kill what comes", "%d kills" % kills)
 	_check(torn > 0 or kills > 20, "the horde reaches the barricades", "%d barricades hit, %d kills" % [torn, kills])
 
 	var standing := 0

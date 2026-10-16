@@ -185,3 +185,13 @@ Every map but the camp is easier, as expected (the ballpark is cleared five time
 | Ballpark (16) | scale 1.8, share 0.85 | won | 10 | 3 | 9 | won | 8 | 9.5 |
 
 The steps on the way (medians): school 8.5 at scale 1.15, 9 at 1.3, 9 at 1.45, 7.5 with the share; mall 9.5 at 1.0; camp 6.5 at 1.0; ballpark 10.5 at 1.4, 10 at 2.5, 9.5 with the share 0.85, 10.5 at share 1.0 (more room did not help: the cells are a hold cleared or lost in 3 to 4). **The ballpark is the map still off the band**: its hold is bimodal (cleared, or lost early to one bad post), and a single run per cell cannot tell 0.85 from 1.0. One seed moves a cell by six waves, so read the median only. The same unchanged camp measured 6 (the table above) and 8.5 (a later partial run).
+
+**Ballpark retuned again (zz-bots-helpers-1).** With two helpers the ballpark was still above the band (median 9.5). Seeds 3 to 6, wave lost in (won is 10+), one run per cell; only the ballpark's two entries in `wave_scale_by_map` and `wave_alive_share_by_map` moved, so the other three maps' rows above stand:
+
+| Map (team) | Setting | 3 | 4 | 5 | 6 | Median |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ballpark (16) | scale 2.4, share 0.85 | won | 10 | | | 10 |
+| Ballpark (16) | scale 3.6, share 1.0 | 9 | 9 | | | 9 |
+| Ballpark (16) | **scale 5.0, share 1.0 (kept)** | 8 | 7 | 8 | not finished | 8 |
+
+The ballpark's team of sixteen with two helpers needs a much bigger wave than the other maps before its middle waves hurt. Seeds 7 and 8 were not re-run (the build slot was shared); read the median, never a cell. `headless_survival`'s "the stand-ins kill what comes" now asks for more than 2 kills in 75 s, not more than 5: the camp's wave 1 is 10 zombies and the two answering stand-ins left it at 5.
