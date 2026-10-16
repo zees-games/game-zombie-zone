@@ -27,7 +27,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 16
-const CHECKS := 85
+const CHECKS := 86
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -355,6 +355,9 @@ func _test_a_client_joins() -> void:
 
 	_check(_client_bridge.local_player_id == SESSION, "the client is told who it is")
 	_check(_client_game.tick_rate == SERVER_TICK_RATE, "it adopts the server's tick rate", "%d" % _client_game.tick_rate)
+	_check(Engine.max_physics_steps_per_frame >= ceili(0.25 * float(SERVER_TICK_RATE)),
+		"the engine's step cap covers a quarter second at the adopted rate",
+		"%d steps for %d Hz" % [Engine.max_physics_steps_per_frame, SERVER_TICK_RATE])
 	_check(_client_game.players.size() == 2, "it has a body for itself and for the stand-in", "%d" % _client_game.players.size())
 	_check(_client_game.team_of(_me()) == ZzGame.SURVIVORS and _client_game.team_of(_stand_in.player_id) == ZzGame.SURVIVORS,
 		"both are survivors")
