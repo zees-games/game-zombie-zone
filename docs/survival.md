@@ -159,3 +159,18 @@ Stand-ins hold a choke (stand `HOLD_BEHIND` metres behind it, or at cover within
 Zombies pick a choke by traffic share (`zz_zombie_spread`): on the high school they go through 6 chokes, none above 28 percent (off: one line), on the mall through 13, none above 10 percent. `ZzNavGraph` adds one-way drop edges (`zz_nav_drop_max`) and optional climb edges (`zz_zombie_climb`); stand-ins route with `bot_filter` and use neither. **Every shipped map has floors at y=0 only, so drops apply 0 times today**; the mechanism is tested on a synthetic two-floor graph.
 
 `tools/nav_render.tscn` writes the debug top-down and a frame of humans holding a choke to `screenshots/`.
+
+## One friend, two answerers (zz-bots-helpers-1, 2026-10-15)
+
+`ZzBots._pinned_friend` answered a pinned friend from anywhere and `_downed_friend` a downed one within 40 m, so the whole team walked to one friend and went down at one post (a ram at a ballpark dugout downed all sixteen). On a survival map only the `bot_helpers` (`zz_bot_helpers`, 2) nearest standing survivors now answer, and anybody within `bot_helper_radius` (`zz_bot_helper_radius`, 8 m); the rest hold their posts. `bot_helpers 0` is the old behaviour, and exodus maps are unchanged.
+
+Continuous holds, seeds 3 to 8, normal, full team (wave lost in; won is 10+):
+
+| Map (team) | 3 | 4 | 5 | 6 | 7 | 8 | Median | Before |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| School (12) | 10 | 10 | 8 | 9 | 8 | 10 | 9.5 | 7.5 |
+| Mall (14) | 10 | 8 | 10 | 8 | 6 | 7 | 8 | 7 |
+| Ballpark (16) | won | won | won | won | won | 9 | won | 8.5 |
+| Camp (10) | 4 | 10 | 5 | 10 | 4 | 7 | 6 | 8 |
+
+Every map but the camp is easier, as expected (the ballpark is cleared five times in six), and the camp is harder (three of six lost by wave 5, with ten survivors two answerers are a fifth of the team). **The waves are not yet retuned**: the aim of a median at 7 to 8 on every map is open (zz-bots-helpers-1 stays in progress). The next step is to harden the ballpark and school waves (`wave_growth`, `wave_alive_share`) and look at the camp's early losses (`by post`) before touching `bot_helpers` per map.

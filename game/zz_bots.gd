@@ -157,6 +157,9 @@ func _decide(player, command: DotFpsCommand) -> void:
 	# 1. A friend pinned: kill or shove what is on them.
 	var pinned = _pinned_friend(player)
 
+	if pinned != null and not _answers(player, pinned):
+		pinned = null
+
 	if pinned != null:
 		var holder: DotNpcInstance = game.pins.holder_of(pinned.player_id)
 
@@ -175,6 +178,10 @@ func _decide(player, command: DotFpsCommand) -> void:
 
 	# 2. A friend down, and nothing on top of us.
 	var downed = _downed_friend(player)
+
+	if downed != null and not _answers(player, downed):
+		downed = null
+
 	var danger := _threat(player)
 	var close_danger := danger != null and danger.position().distance_to(player.feet()) < 4.0
 
@@ -638,6 +645,31 @@ func _pass_through_level() -> int:
 	if game == null or game.combat == null or game.combat.rules == null:
 		return DotDamageRules.PASS_THROUGH_AT_MUZZLE
 	return game.combat.rules.pass_through_level()
+
+
+## Whether [param player] is one of the stand-ins that go to [param friend], pinned or down. On a
+## survival map only the `bot_helpers` nearest standing survivors do, and anybody within
+## `bot_helper_radius`: everyone walking to one friend left the posts empty and downed the whole
+## team at one door. Elsewhere the team stays together and all answer.
+func _answers(player, friend) -> bool:
+	if not game.is_survival() or game.config.bot_helpers <= 0:
+		return true
+
+	var at: Vector3 = friend.feet()
+	var mine: float = player.feet().distance_to(at)
+
+	if mine <= game.config.bot_helper_radius:
+		return true
+
+	var closer := 0
+
+	for other in game.survivors():
+		if other == friend or other == player or other.is_down() or other.is_pinned() or not other.is_alive():
+			continue
+		if other.feet().distance_to(at) < mine:
+			closer += 1
+
+	return closer < game.config.bot_helpers
 
 
 func _pinned_friend(player):

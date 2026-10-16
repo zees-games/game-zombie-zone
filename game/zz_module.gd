@@ -385,6 +385,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_bot_hold_overrun", float(config.bot_hold_overrun),
 		"Zombies within 4.5 m of a choke that make it overrun",
 		func(value: float) -> void: config.bot_hold_overrun = clampi(int(value), 2, 40))
+	_tunable("zz_bot_helpers", float(config.bot_helpers),
+		"Survival stand-ins that answer a pinned or downed friend (the nearest standing ones); 0 all",
+		func(value: float) -> void: config.bot_helpers = clampi(int(value), 0, 16))
+	_tunable("zz_bot_helper_radius", config.bot_helper_radius,
+		"Metres within which any survival stand-in answers a pinned or downed friend",
+		func(value: float) -> void: config.bot_helper_radius = clampf(value, 0.0, 40.0))
 	_tunable("zz_max_incaps", float(config.max_incaps), "Downs before the next one is death",
 		func(value: float) -> void: config.max_incaps = clampi(int(value), 0, 10))
 	_tunable("zz_rescue_seconds", config.rescue_seconds,

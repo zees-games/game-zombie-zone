@@ -185,6 +185,16 @@ extends DotConfig
 ## fall back along the route. `zz_bot_hold_overrun`.
 @export_range(2, 40, 1) var bot_hold_overrun: int = 6
 
+## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing
+## ones. The rest hold their posts; with every one walking to a single friend a ram at a dugout
+## downed all sixteen of the ballpark's team (docs/survival.md). 0: all of them, as an exodus map
+## does. `zz_bot_helpers`.
+@export_range(0, 16, 1) var bot_helpers: int = 2
+
+## Metres within which any stand-in answers a pinned or downed friend on a survival map, however
+## many already are. `zz_bot_helper_radius`.
+@export_range(0.0, 40.0, 0.5) var bot_helper_radius: float = 8.0
+
 # --- The survivors ---------------------------------------------------------
 
 @export_group("The survivors")
