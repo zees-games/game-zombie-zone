@@ -195,6 +195,17 @@ extends DotConfig
 ## many already are. `zz_bot_helper_radius`.
 @export_range(0.0, 40.0, 0.5) var bot_helper_radius: float = 8.0
 
+## The share of the cap a wave may have up at once, for a map that needs more than `wave_alive_share`
+## (map id to share). The ballpark's cap is so large a team of sixteen cleared every wave a size
+## factor could ask of it; room, not size, is what made its middle waves hard.
+@export var wave_alive_share_by_map: Dictionary = {"zz_stadium": 0.85, "zz_high_school": 0.55}
+
+## A survival map's waves are this many times the size the team asks for (map id to factor; a
+## map not named is 1.0). A bigger team has more guns per zombie than the count per survivor
+## makes up for, and the stand-ins answered the ballpark's every wave until this. `zz_wave_scale_<id>`
+## is not a cvar: it is a measured table (docs/survival.md).
+@export var wave_scale_by_map: Dictionary = {"zz_stadium": 1.8, "zz_high_school": 1.3, "zz_mall": 1.15, "zz_relief_camp": 0.85}
+
 # --- The survivors ---------------------------------------------------------
 
 @export_group("The survivors")

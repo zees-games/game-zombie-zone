@@ -173,4 +173,15 @@ Continuous holds, seeds 3 to 8, normal, full team (wave lost in; won is 10+):
 | Ballpark (16) | won | won | won | won | won | 9 | won | 8.5 |
 | Camp (10) | 4 | 10 | 5 | 10 | 4 | 7 | 6 | 8 |
 
-Every map but the camp is easier, as expected (the ballpark is cleared five times in six), and the camp is harder (three of six lost by wave 5, with ten survivors two answerers are a fifth of the team). **The waves are not yet retuned**: the aim of a median at 7 to 8 on every map is open (zz-bots-helpers-1 stays in progress). The next step is to harden the ballpark and school waves (`wave_growth`, `wave_alive_share`) and look at the camp's early losses (`by post`) before touching `bot_helpers` per map.
+Every map but the camp is easier, as expected (the ballpark is cleared five times in six), and the camp is harder (three of six lost by wave 5, with ten survivors two answerers are a fifth of the team).
+
+**Retuned (same day).** Two per-map tables in `ZzConfig`: `wave_scale_by_map` (a wave's size, school 1.3, mall 1.15, camp 0.85, ballpark 1.8; a map not named is 1.0) and `wave_alive_share_by_map` (the share of the cap up at once, school 0.55, ballpark 0.85; a map not named uses `wave_alive_share`). Size alone did not harden the ballpark: its waves got longer but the room (`wave_alive_share` of a cap of 82) held the peak where it was, and wave 10, where the share reaches 1.0, was the only wave that ever downed the team. Seeds 3 to 8, wave lost in (won is 10+), one run per cell:
+
+| Map (team) | Setting | 3 | 4 | 5 | 6 | 7 | 8 | Median |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| School (12) | scale 1.3, share 0.55 | 4 | 10 | 6 | 9 | 10 | 4 | 7.5 |
+| Mall (14) | scale 1.15 | 8 | 10 | 9 | 8 | 5 | 8 | 8 |
+| Camp (10) | scale 0.85 | 10 | 8 | 7 | 8 | 7 | 9 | 8 |
+| Ballpark (16) | scale 1.8, share 0.85 | won | 10 | 3 | 9 | won | 8 | 9.5 |
+
+The steps on the way (medians): school 8.5 at scale 1.15, 9 at 1.3, 9 at 1.45, 7.5 with the share; mall 9.5 at 1.0; camp 6.5 at 1.0; ballpark 10.5 at 1.4, 10 at 2.5, 9.5 with the share 0.85, 10.5 at share 1.0 (more room did not help: the cells are a hold cleared or lost in 3 to 4). **The ballpark is the map still off the band**: its hold is bimodal (cleared, or lost early to one bad post), and a single run per cell cannot tell 0.85 from 1.0. One seed moves a cell by six waves, so read the median only. The same unchanged camp measured 6 (the table above) and 8.5 (a later partial run).

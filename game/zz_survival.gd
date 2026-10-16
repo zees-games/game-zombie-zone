@@ -85,8 +85,9 @@ func begin() -> DotResult:
 	waves.first_quiet_seconds = c.survival_warmup_seconds if waves.style != DotNpcDirectorWaves.Style.CLOCK else 0.0
 	waves.quiet_seconds = c.breather_seconds if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.day_seconds
 	waves.horde_seconds = c.night_seconds if waves.style == DotNpcDirectorWaves.Style.CYCLE else game.survival_goal
-	waves.wave_base = c.wave_size
-	waves.wave_per_player = c.wave_size_per_survivor
+	var scale: float = float(c.wave_scale_by_map.get(str(game.map_doc.get("id", "")), 1.0))
+	waves.wave_base = int(round(float(c.wave_size) * scale))
+	waves.wave_per_player = int(round(float(c.wave_size_per_survivor) * scale))
 	waves.growth = c.wave_growth
 	waves.growth_accel = c.wave_growth_accel
 	waves.straggler_count = maxi(3, int(round(float(_team()) * c.wave_straggler_share)))
@@ -165,7 +166,7 @@ func _release(horde) -> void:
 	# And a wave may have only part of the cap up at once, growing to all of it by the last, on
 	# a curve: slow through the middle waves (where holds were lost), a wall at the end.
 	var ramp := clampf(float(waves.index - 1) / maxf(float(waves.count - 1), 1.0), 0.0, 1.0)
-	var share := lerpf(clampf(game.config.wave_alive_share, 0.1, 1.0), 1.0, ramp * ramp)
+	var share := lerpf(clampf(float(game.config.wave_alive_share_by_map.get(str(game.map_doc.get("id", "")), game.config.wave_alive_share)), 0.1, 1.0), 1.0, ramp * ramp)
 	horde.wave_room = int(float(game.config.commons_cap(_team())) * share)
 	var room: int = horde.wave_room - horde.commons() - horde.pending_commons()
 	var n := waves.take(room)
