@@ -16,8 +16,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 6
-const CHECKS := 17
+const SECTIONS := 7
+const CHECKS := 19
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -38,6 +38,8 @@ func _ready() -> void:
 func _run() -> void:
 	print("zombiezone weapons, offline, through the client")
 	print("")
+
+	_test_the_weapon_art_is_vendored()
 
 	if await _test_armed():
 		await _test_shots_count()
@@ -68,6 +70,18 @@ func _run() -> void:
 
 
 # --- Sections ----------------------------------------------------------------
+
+## A delivered game has only what is vendored in assets/, so every model the weapon art table
+## names must exist here; an unvendored gun loads as bare arms and nothing else fails. The
+## list and the check are the addon's; `tools/sync-art.sh` in zee-dot-weapons copies what it names.
+func _test_the_weapon_art_is_vendored() -> void:
+	_section("Every model the weapon art table names is vendored in this game")
+	var count := ZeeWeaponArtTable.model_paths().size()
+	_check(count > 20, "the table names models (%d)" % count)
+	var models := ZeeWeaponArtTable.validate_models()
+	_check(models.ok, "no weapon model is missing", "" if models.ok else models.error.message)
+	_finished()
+
 
 func _test_armed() -> bool:
 	_section("the client comes up armed, and the HUD counts the gun in hand")
