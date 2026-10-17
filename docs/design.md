@@ -85,7 +85,7 @@ From the first play test (survivor bots' faces filling the screen): `mp_solidpla
 - **Every `ZzEvents.Kind` must fit `ZzEvent.KIND_BITS`** (6 bits, 64 kinds); at 5, HURT and AMMO went out as HELLO and MAP for a day. `headless_net` checks it ([history](docs/history.md)).
 - **A brain seeds from `npc.seed`, never `npc.instance_id`** (an object id moves with every allocation); `seed_base` is `config.seed_value`. Suites wait for a zombie's state, never time its seeded choice ([history](docs/history.md)).
 - **Your gun is two rigs**: the world's (`ZzPlayer.weapons`, decides) and the client's drawn one (`ZzPlayer.view_rig`, what the HUD counts and the view model plays). Both take `ZzWeapons.command_for` (held hands, an empty magazine reloading itself); offline the buttons go onto the world's sample through `ZzPlayer.command_stamp`, never onto `controller.current_command` (sampled over); the drawn rig is corrected by `correct_view_rig` once quiet. `headless_weapons` presses the client's buttons ([history](docs/history.md)).
-- **A shot starting inside a survivor skips them** (`zz_trace.gd`); stand-ins test a friend's hitboxes, and `headless_run` measures them over the first round, not at 60 s ([history](docs/history.md)).
+- **A shot starting inside a survivor skips them** (dot-combat's `pass_through_sets`); stand-ins test a friend's hitboxes, and `headless_run` measures them over the first round, not at 60 s ([history](docs/history.md)).
 
 ## Look, and project.godot
 

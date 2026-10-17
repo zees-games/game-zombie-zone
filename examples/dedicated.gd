@@ -244,9 +244,8 @@ func _test_the_commands() -> void:
 	_check(game.combat.rules.pass_through_team_mates and game.combat.resolver.rules.pass_through_team_mates,
 		"and 2 reaches the rules the resolver judges with", str(game.combat.rules.describe()))
 	var _never := _run_command("mp_teammate_passthrough 0")
-	_check(not game.combat.rules.pass_through_team_mate_at_muzzle and not game.combat.rules.pass_through_team_mates
-			and game.combat.trace.get(&"rules") == game.combat.rules,
-		"and 0 turns both pass-through rules off, zz_trace's with them", str(game.combat.rules.describe()))
+	_check(not game.combat.rules.pass_through_team_mate_at_muzzle and not game.combat.rules.pass_through_team_mates,
+		"and 0 turns both pass-through rules off", str(game.combat.rules.describe()))
 	var _default := _run_command("mp_teammate_passthrough 1")
 	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
 	# every change, so a client's own combat manager (following its link) predicts tracers

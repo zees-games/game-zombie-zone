@@ -4,7 +4,6 @@ const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzNpcs := preload("zz_npcs.gd")
-const ZzTrace := preload("zz_trace.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 
 ## The stand-in survivors: what a server fills a team with, and what a suite plays with.
@@ -584,7 +583,7 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 ## friend is often right beside the gun, shoulder to shoulder or half inside it. Their middle
 ## is then well off the line while their head and chest are on it: with the middle-only test
 ## four stand-ins dealt each other 200 to 500 points in every minute measured. A friend whose
-## hitbox holds the eye itself is skipped, because the shot passes through them (zz_trace.gd).
+## hitbox holds the eye itself is skipped, because the shot passes through them (`DotCombatManager.pass_through_sets`).
 ##
 ## [b]Under the server's `mp_teammate_passthrough`.[/b] At 2 every shot passes through every
 ## survivor, so nobody is in the way and a stand-in that held fire for a friend in the line
@@ -621,7 +620,7 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		if set_node == null or not is_instance_valid(set_node):
 			continue
 
-		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and ZzTrace.survivor_around(set_node, eye):
+		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and set_node.contains_point(eye):
 			continue
 
 		for box in set_node.hitboxes():

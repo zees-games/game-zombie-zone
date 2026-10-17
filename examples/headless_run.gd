@@ -1145,7 +1145,7 @@ func _test_stand_ins() -> void:
 	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f%s" % [furthest, over])
 	_check(weapons_left < 3, "picking up what was left for them", "%d left" % weapons_left)
 	# Survivors do not collide, so stand-ins stack up shoulder to shoulder or inside each other.
-	# Before zz_trace.gd and the hitbox-based friend check, every shot from inside a friend hit
+	# Before dot-combat's pass-through and the hitbox-based friend check, every shot from inside a friend hit
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
 	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
 	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)

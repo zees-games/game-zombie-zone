@@ -67,7 +67,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 - A box verb unknown to `ZzBoxes` refuses the whole file with a reason; one `_do_<verb>` per verb; lasting effects stack.
 - A second weapon pack is a list (`ZzWeapons.use_packs`); tiers are by tag; everything a weapon throws goes through `ZzGame._throw`.
 - Your gun is two rigs: the world's (`ZzPlayer.weapons`) and the drawn one (`view_rig`, what the HUD counts); offline buttons go through `command_stamp`. [history](docs/history.md)
-- A shot starting inside a survivor skips them (`zz_trace.gd`); stand-ins hold fire for a friend's hitboxes in the line.
+- A shot starting inside a survivor skips them (dot-combat's `pass_through_sets`, API level 2); stand-ins hold fire for a friend's hitboxes in the line.
 - Stand-ins aim and shoot through dot-bot's `DotBotAim`; never set `command.yaw` straight onto a target. They shoot the head when only the head shows over boards.
 - H is help and M is the map list: nothing in `ZzBindings` defaults to either (the medkit is G, the shove F, and an old settings file follows them through `keys.renamed`); `headless_run` and `dedicated` check it.
 - A cvar and a command never share a name (the cvar is `zz_box_drops`, the command `zz_boxes`).
@@ -142,4 +142,4 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 2. **Bile that turns the horde on itself**: a splashed common is drawn (FLAG_BILED) but no brain targets another zombie yet.
 3. **More box outcomes**, written by the owner, toward the hundred.
 4. **Play it with people**, and set normal's numbers from that.
-5. **Left alone on purpose**: stand-ins converging on one pinned or downed friend (zz-bots-helpers-1, needs long measurements) and dropping `zz_trace.gd` (waits for dot-combat API level 2 to be tagged).
+5. **Left alone on purpose**: stand-ins converging on one pinned or downed friend (zz-bots-helpers-1, needs long measurements); `zz_trace.gd` is gone ([history](docs/history.md)).
