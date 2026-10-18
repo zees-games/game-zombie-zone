@@ -44,6 +44,8 @@ func _process(_delta: float) -> bool:
 		return false
 	if not _opened:
 		_settings.menu.open_maps()
+		# The game's own maps come first, so a pack's is on the last page.
+		_settings.menu.picker.turn(99)
 		_opened = true
 	if _wait > 0:
 		_wait -= 1
