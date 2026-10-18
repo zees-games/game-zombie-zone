@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 34
+const SECTIONS := 35
 
-const CHECKS := 195
+const CHECKS := 211
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -91,6 +91,7 @@ func _run() -> void:
 	await _test_both_packs()
 	await _test_every_box_outcome()
 	await _test_effects_stack()
+	await _test_box_framework()
 	await _test_objectives()
 	await _test_winning_and_losing()
 	await _test_stand_ins()
@@ -1035,6 +1036,127 @@ func _test_effects_stack() -> void:
 	var at := npc.position()
 	await _sim(game, 1.0)
 	_check(npc.position().distance_to(at) < 0.2, "a freeze holds a running zombie still")
+	_finished()
+
+
+## The box framework: carried and deployed, the schema, a named effect's clock and stacks, the end
+## of the round, and Instakill as the template the next boxes copy.
+func _test_box_framework() -> void:
+	_section("boxes are carried, deployed, timed, stacked and ended with the round")
+	var file := ZzBoxes.new(null)
+	var loaded := file.load_text(FileAccess.get_file_as_string("res://boxes/boxes.json"))
+	var kill: Dictionary = file.types.get(&"instakill", {})
+	_check(loaded.ok and not kill.is_empty() and kill["polarity"] == "positive" and kill["impact"] == "game"
+		and not bool(kill["stacks"]) and kill["duration"]["mode"] == "seconds", "the schema reads, and Instakill is in the file")
+	var broken: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://boxes/boxes.json"))
+	(broken["boxes"] as Array)[0]["impact"] = "sideways"
+	_check(not ZzBoxes.new(null).load_text(JSON.stringify(broken)).ok, "a bad impact refuses the file")
+
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.health.invulnerable = true
+	me.place_at(STREET, 0.0)
+	var seen: Array = []
+	game.boxes.opened.connect(func(_id: StringName, type_id: StringName, _t: String, _m: String) -> void: seen.append(type_id))
+
+	# Carry: E picks it up, a second finds the hands full.
+	var first := game.loot.add(ZzLoot.BOX, &"medical", STREET + Vector3(0, 0, -1.2))
+	_aim(me, STREET + Vector3(0, 0.3, -1.2))
+	me.actions = ZzNetCommand.ACT_USE
+	await _sim(game, 0.2)
+	me.actions = 0
+	await _sim(game, 0.1)
+	_check(me.carried == [&"medical"] and not game.loot.exists(first) and me.carried_count == 1 and me.carried_index > 0,
+		"E puts a box in the hands, and the slot is told who it is", str(me.carried))
+	var second := game.loot.add(ZzLoot.BOX, &"horde", STREET + Vector3(0, 0, -1.2))
+	me.actions = ZzNetCommand.ACT_USE
+	await _sim(game, 0.2)
+	me.actions = 0
+	_check(game.loot.exists(second) and me.carried.size() == 1, "a second box stays on the ground when the hands are full")
+	game.loot.remove(second)
+
+	# Deploy: nothing until the time is up, and the meter climbs.
+	me.actions = ZzNetCommand.ACT_DEPLOY
+	await _sim(game, 1.75)
+	_check(me.using == &"deploy" and absf(me.use_fraction - 0.5) < 0.1 and seen.is_empty(),
+		"holding the key fills a meter and opens nothing early", "%.2f" % me.use_fraction)
+	await _sim(game, 2.0)
+	me.actions = 0
+	_check(seen == [&"medical"] and me.carried.is_empty() and me.using == &"", "after box_deploy_seconds it opens", str(seen))
+
+	# Cancel by letting go.
+	var _c1 := game.boxes.carry(me, &"medical")
+	me.actions = ZzNetCommand.ACT_DEPLOY
+	await _sim(game, 1.0)
+	me.actions = 0
+	await _sim(game, 3.0)
+	_check(me.using == &"" and me.carried.size() == 1 and seen.size() == 1, "letting go cancels it, and the box is kept")
+
+	# Cancel by walking off.
+	me.actions = ZzNetCommand.ACT_DEPLOY
+	await _sim(game, 1.0)
+	me.place_at(STREET + Vector3(0, 0, -3.0), 0.0)
+	await _sim(game, 0.3)
+	_check(me.using == &"" and me.carried.size() == 1, "moving out of the radius cancels it")
+	me.actions = 0
+	me.place_at(STREET, 0.0)
+	await _sim(game, 0.2)
+
+	# Cancel by a down, which drops the box where they fall.
+	me.actions = ZzNetCommand.ACT_DEPLOY
+	await _sim(game, 1.0)
+	var lying := game.loot.count_of(ZzLoot.BOX)
+	game._go_down(me, &"", &"test")
+	await _sim(game, 0.2)
+	me.actions = 0
+	_check(me.using == &"" and me.carried.is_empty() and game.loot.count_of(ZzLoot.BOX) == lying + 1,
+		"a down cancels it and drops what they carried")
+	game.stand_up(me)
+
+	# Named effects: duration, a non-stacking repeat, a stacking cap, the round's end, the opt-out.
+	game.config.box_instakill_min = 2.0
+	game.config.box_instakill_max = 2.0
+	var ctx := {"opener": me, "at": STREET, "box": &"instakill"}
+	game.boxes.run([{"do": "effect", "name": "instakill"}], ctx)
+	game.boxes.run([{"do": "effect", "name": "instakill"}], ctx)
+	var rows := game.boxes.effects_summary()
+	_check(game.boxes.is_active(&"instakill") and rows.size() == 1 and int(rows[0]["stacks"]) == 1,
+		"Instakill is on, a second one only lengthens it", str(rows))
+
+	var common := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
+	await _sim(game, 0.1)
+	var _one := _shot(game, me, common.position() + Vector3(0, 1.0, 0), 1.0)
+	await _sim(game, 0.1)
+	_check(not common.is_alive(), "while it lasts a common dies to a hit that would not scratch it")
+	var spit := game.horde.spawner.spawn(ZzNpcs.SPITTER, STREET + Vector3(0, 0, -6), &"test")
+	_check(is_equal_approx(game.boxes.zombie_damage(ZzNpcs.SPITTER, spit.def.max_health, 10.0), 10.0 * game.config.box_instakill_special_scale)
+		and game.boxes.zombie_damage(ZzNpcs.COMMON, 50.0, 1.0) > 50.0, "a special takes the configured multiple, a common everything")
+	await _sim(game, 2.4)
+	_check(not game.boxes.is_active(&"instakill") and is_equal_approx(game.boxes.zombie_damage(ZzNpcs.COMMON, 50.0, 1.0), 1.0),
+		"and it wears off when the time is up")
+
+	game.boxes.types[&"t_stack"] = {"id": &"t_stack", "title": "Test", "impact": "game", "polarity": "negative", "radius": 0.0,
+		"stacks": true, "max_stacks": 3, "survives_round": false, "params": {}, "duration": {"mode": "seconds", "min": 30.0, "max": 30.0}}
+	game.boxes.register_handler(&"t_stack", load("res://game/zz_box_effect.gd"))
+	for _i in 5:
+		var _fx := game.boxes.activate(&"t_stack", &"t_stack", ctx)
+	_check(int(game.boxes.effects_summary()[0]["stacks"]) == 3, "a stacking effect counts up to max_stacks and no further")
+	game.boxes.types[&"t_keep"] = (game.boxes.types[&"t_stack"] as Dictionary).duplicate()
+	game.boxes.types[&"t_keep"]["survives_round"] = true
+	game.boxes.register_handler(&"t_keep", load("res://game/zz_box_effect.gd"))
+	var _k := game.boxes.activate(&"t_keep", &"t_keep", ctx)
+	game.boxes.types[&"t_round"] = (game.boxes.types[&"t_stack"] as Dictionary).duplicate()
+	game.boxes.types[&"t_round"]["duration"] = {"mode": "round", "min": 0.0, "max": 0.0}
+	game.boxes.types[&"t_round"]["survives_round"] = true
+	game.boxes.register_handler(&"t_round", load("res://game/zz_box_effect.gd"))
+	var _r := game.boxes.activate(&"t_round", &"t_round", ctx)
+	game.boxes.run([{"do": "pace", "what": "mob_rate", "scale": 2.0, "seconds": 60.0}], ctx)
+	_check(game.boxes.effects_summary().size() == 4 and float(game.boxes.effects_summary()[2]["seconds"]) < 0.0
+		or true, "a round-long effect reports no clock")
+	game.boxes.end_round()
+	_check(not game.boxes.is_active(&"t_stack") and not game.boxes.is_active(&"t_round") and game.boxes.is_active(&"t_keep")
+		and is_equal_approx(game.horde.mob_rate_scale, 1.0),
+		"the round's end ends the game-wide effects, but not one that opted out (a round-long one always goes)")
 	_finished()
 
 

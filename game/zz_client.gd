@@ -91,10 +91,13 @@ var _reloading: bool = false
 var _using: bool = false
 var _healing: bool = false
 var _pills: bool = false
+var _deploying: bool = false
 var _slot: int = 0
 
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
 var _box_colours: Dictionary = {}
+var _box_order: Array[StringName] = []
+var _box_titles: Dictionary = {}
 
 ## A brute is alive: its music plays.
 var _brutes: int = 0
@@ -159,6 +162,11 @@ func _read_box_colours() -> void:
 	if boxes.load_file(game.config.box_file) > 0:
 		for id in boxes.order:
 			_box_colours[id] = boxes.colour_of(id)
+
+		_box_order.assign(boxes.order)
+		_box_titles = {}
+		for id in boxes.order:
+			_box_titles[id] = boxes.title_of(id)
 
 
 # --- Offline ---------------------------------------------------------------
@@ -359,6 +367,9 @@ func _adopt(candidate: ZzPlayer) -> void:
 
 	if hud != null:
 		hud.bind(game, player)
+		hud.box_order = _box_order
+		hud.box_titles = _box_titles
+		hud.box_colours = _box_colours
 
 
 func _toy_sound(id: StringName, at: Vector3, strength: float) -> void:
@@ -438,7 +449,8 @@ func _hear_the_world() -> void:
 
 	if game.loot != null:
 		game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
-			world_view.add_loot(id, kind, item, at, _box_colours.get(item, Color(0.8, 0.6, 0.25))))
+			var seen := game.loot.shown(kind, item)
+			world_view.add_loot(id, kind, seen, at, _box_colours.get(seen, Color(0.8, 0.6, 0.25))))
 		game.loot.removed.connect(func(id: int, _by: StringName) -> void: world_view.remove_loot(id))
 
 	if game.boxes != null:
@@ -1196,6 +1208,8 @@ func _actions() -> int:
 		out |= ZzNetCommand.ACT_HEAL
 	if _pills:
 		out |= ZzNetCommand.ACT_PILLS
+	if _deploying:
+		out |= ZzNetCommand.ACT_DEPLOY
 	return out
 
 
@@ -1601,6 +1615,10 @@ func _key_event(event: InputEvent) -> bool:
 
 	if event.is_action(ZzBindings.PILLS):
 		_pills = pressed
+		return true
+
+	if event.is_action(ZzBindings.DEPLOY):
+		_deploying = pressed
 		return true
 
 	if event.is_action(ZzBindings.RELOAD):

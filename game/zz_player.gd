@@ -84,6 +84,16 @@ var pin_kind: StringName = &""
 var medkits: int = 0
 var pills: int = 0
 
+## The boxes in their hands, by type (server), and what everybody sees of them: how many, and
+## which as an index into the box file's order plus one (0: none, or unknown because
+## `box_labels` is off). See [ZzBoxes].
+var carried: Array[StringName] = []
+var carried_count: int = 0
+var carried_index: int = 0
+
+## Where they stood when they began deploying a box, which they may drift from by only so far.
+var use_origin: Vector3 = Vector3.ZERO
+
 ## Holding E on something: what (`revive`, `heal`, `box`, `objective`, `item`), whom or which,
 ## since when (simulated seconds) and for how long it takes. Server side; the fraction is
 ## replicated to the owner and to whoever is being revived.
@@ -623,6 +633,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 			"aim": deg_to_rad(controller.state.pitch),
 		})
 		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())
+		figure.show_box(carried_count, use_fraction if using == &"deploy" else 0.0)
 
 	return shown
 

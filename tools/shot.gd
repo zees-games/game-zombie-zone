@@ -152,6 +152,13 @@ func _run() -> void:
 			var _applied = game.combat.apply_damage(hit)
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
+		"deploy":
+			# Carrying a box and holding the deploy key partway through a long deploy: the meter,
+			# the carried line and (in third person) the pack and the shrinking ring.
+			game.config.box_deploy_seconds = 10.0
+			var _c := game.boxes.carry(local, &"mystery")
+			_client.set("_deploying", true)
+			await _seconds_of(maxf(_seconds, 4.0))
 		"hit":
 			# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
 			# through dot-combat as a shot would go: the marker and the numbers the client draws

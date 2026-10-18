@@ -26,8 +26,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 16
-const CHECKS := 86
+const SECTIONS := 17
+const CHECKS := 88
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -90,6 +90,7 @@ func _run() -> void:
 		await _test_a_hold_reaches_the_client()
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
 		await _test_the_toys_reach_the_client()
+		await _test_box_labels_off_hide_the_type()
 		await _test_leaving()
 
 	OS.remove_logger(errors)
@@ -308,8 +309,8 @@ func _build() -> bool:
 		_heard["pin"] = [who, npc, kind])
 	_client_bridge.unpin_received.connect(func(who: int, _why: StringName) -> void:
 		_heard["unpin"] = who)
-	_client_bridge.loot_added.connect(func(id: int, kind: StringName, _item: StringName, at: Vector3) -> void:
-		_heard["loot"] = [id, kind, at])
+	_client_bridge.loot_added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
+		_heard["loot"] = [id, kind, at, item])
 	_client_bridge.loot_removed.connect(func(id: int, by: int) -> void:
 		_heard["loot_gone"] = [id, by])
 	_client_bridge.box_received.connect(func(who: int, type_id: StringName, title: String, _message: String) -> void:
@@ -638,6 +639,26 @@ func _test_a_box_reaches_the_client() -> void:
 	await _steps(4)
 	var rows: Array = _heard.get("effects", [])
 	_check(rows.size() >= 1 and str(rows[0]["who"]) == "Ada", "and an effect that lasts is listed, on them by name", str(rows))
+	_finished()
+
+
+func _test_box_labels_off_hide_the_type() -> void:
+	_section("with box_labels off the type never leaves the server")
+	var cfg = _server_game.config
+	cfg.box_labels = false
+	var id := _server_game.loot.add(ZzLoot.BOX, &"horde", STREET + Vector3(2, 0, 0))
+	await _steps(4)
+	_check(_heard.has("loot") and int(_heard["loot"][0]) == id and _heard["loot"][3] == &"unknown",
+		"a box on the ground is announced as unknown", str(_heard.get("loot")))
+	var me = _server_me()
+	var _c = _server_game.boxes.carry(me, &"horde")
+	await _steps(6)
+	var mine = _client_game.player_by_id(_me())
+	if mine != null:
+		_check(mine.carried_count == 1 and mine.carried_index == 0, "and the carried slot has a count but no type", str(mine.carried_index))
+	_server_game.boxes.drop_carried(me)
+	_server_game.loot.remove(id)
+	cfg.box_labels = true
 	_finished()
 
 

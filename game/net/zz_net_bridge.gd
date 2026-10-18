@@ -353,7 +353,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 		if game.loot != null:
 			game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
-				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, item, at)))
+				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at)))
 			game.loot.removed.connect(func(id: int, by: StringName) -> void:
 				_broadcast(ZzEvents.Kind.LOOT_GONE, ZzEvents.write_loot_gone(id, _session_or_zero(by))))
 
@@ -1079,7 +1079,7 @@ func _tell_the_world(peer_id: int) -> void:
 	if game.loot != null:
 		for id: int in game.loot.entries:
 			var e: Dictionary = game.loot.entries[id]
-			_tell(peer_id, ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, e["kind"], e["item"], e["at"]))
+			_tell(peer_id, ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, e["kind"], game.loot.shown(e["kind"], e["item"]), e["at"]))
 
 	if game.hazards != null:
 		for id: int in game.hazards.areas:

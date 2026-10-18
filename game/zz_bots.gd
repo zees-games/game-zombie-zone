@@ -226,6 +226,11 @@ func _decide(player, command: DotFpsCommand) -> void:
 		if slot != null and slot.def.magazine > 0 and slot.magazine < slot.def.magazine * 0.5:
 			command.set_button(ZzNetCommand.BUTTON_RELOAD, true)
 
+	# A box in the hands is opened where it is quiet: standing still for a few seconds is the cost.
+	if not player.carried.is_empty() and _crowd_within(player, 15.0) == 0:
+		player.actions |= ZzNetCommand.ACT_DEPLOY
+		return
+
 	# Something useful lying near.
 	if _pick_up(player, command, memory):
 		return
@@ -922,7 +927,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			ZzLoot.AMMO:
 				wanted = _low_on_ammo(player)
 			ZzLoot.BOX:
-				wanted = true
+				wanted = game.config.box_carry <= 0 or (game.boxes != null and game.boxes.can_carry(player))
 			ZzLoot.WEAPON, ZzLoot.THROWABLE:
 				wanted = _wants_weapon(player, e["item"])
 

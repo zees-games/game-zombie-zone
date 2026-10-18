@@ -214,6 +214,9 @@ func _on_stage(stage: int, index: int) -> void:
 				else:
 					straggled = horde.dawn(30.0)
 				_breather()
+				# A wave held is a round over: what the boxes did to the game ends with it.
+				if game.boxes != null:
+					game.boxes.end_round()
 				game.notice.emit(_cleared_line(index - 1))
 				DotLog.info(CHANNEL, "a breather", {"after": index - 1, "tidied": straggled})
 			else:

@@ -30,6 +30,8 @@ const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
 const SHOVE := &"zz_shove"
+## Hold to open the box in your hands (deploying takes a few seconds, and moving off cancels it).
+const DEPLOY := &"zz_deploy"
 ## Down the sights while held: the view model comes up and the lens zooms. Presentation only;
 ## nothing the server simulates reads it.
 const AIM := &"zz_aim"
@@ -51,6 +53,7 @@ static func make() -> DotMenuBindings:
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "F", "Hands")
+	keys.add(DEPLOY, &"bind_deploy", "Deploy the box you carry (hold)", "B", "Hands")
 	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Weapons")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
 	for i in range(SLOTS.size()):

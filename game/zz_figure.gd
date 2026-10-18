@@ -56,6 +56,10 @@ var team_colour: Color = Color.WHITE
 ## Whether the people's art loaded, or a capsule stands in.
 var from_art: bool = false
 
+var _pack: MeshInstance3D = null
+var _ring: MeshInstance3D = null
+var _pack_material: StandardMaterial3D = null
+
 ## The clip playing, for the suite and for `describe()`.
 var clip: StringName = &""
 
@@ -198,6 +202,46 @@ func fired(times: int, kind: int) -> void:
 	# [b]A swing is the arm, not a kick[/b]: the person's slash, over whatever the legs do.
 	if kind == ZeeWeaponNet.KIND_SWING and person != null:
 		person.swing(DotHumanoidClips.SLASH)
+
+
+## The box on the back while one is carried, and a ring on the ground that fills while the box
+## is being deployed ([param deploying] 0..1). What a team-mate sees of the other half of the
+## box: that somebody is carrying one, and that they are standing still doing something with it.
+func show_box(carrying: int, deploying: float, colour: Color = Color(0.95, 0.7, 0.2)) -> void:
+	if carrying <= 0 and _pack == null:
+		return
+
+	if _pack == null:
+		_pack = MeshInstance3D.new()
+		_pack.name = "BoxPack"
+		var mesh := BoxMesh.new()
+		mesh.size = Vector3(0.38, 0.32, 0.3)
+		_pack.mesh = mesh
+		_pack.position = Vector3(0.0, 1.2, 0.3)
+		_pack_material = StandardMaterial3D.new()
+		_pack_material.emission_enabled = true
+		_pack.material_override = _pack_material
+		add_child(_pack)
+
+		_ring = MeshInstance3D.new()
+		_ring.name = "DeployRing"
+		var torus := TorusMesh.new()
+		torus.inner_radius = 0.9
+		torus.outer_radius = 1.0
+		_ring.mesh = torus
+		_ring.position.y = 0.05
+		var ring_material := StandardMaterial3D.new()
+		ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		ring_material.albedo_color = Color(1.0, 0.85, 0.3)
+		_ring.material_override = ring_material
+		add_child(_ring)
+
+	_pack.visible = carrying > 0
+	_pack_material.albedo_color = colour
+	_pack_material.emission = colour * 0.4
+	_ring.visible = deploying > 0.0
+	# It closes in on the survivor as the box comes open.
+	_ring.scale = Vector3.ONE * lerpf(1.6, 0.5, clampf(deploying, 0.0, 1.0))
 
 
 ## The node a held weapon hangs from, by the name [ZeeWorldModel] asks for: the person's hand.

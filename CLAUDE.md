@@ -22,7 +22,7 @@ game/
   zz_catalogue.gd    every map the server has, and the built-in practice street
   zz_npcs.gd         the zombie catalogue (twelve kinds), and the nav graph a map's document gives
   zz_horde.gd        the horde: spawner, director, senses, squads, sounds; mobs, specials, brutes, sleepers, waves
-  zz_pins.gd zz_hazards.gd zz_loot.gd zz_boxes.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
+  zz_pins.gd zz_hazards.gd zz_loot.gd zz_boxes.gd zz_box_effect.gd zz_box_instakill.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
   zz_survival.gd     a survival map held: dot-npc-ai-director's DotNpcDirectorWaves, the breather, twists, caches
   zz_bots.gd         stand-in survivors (posts, mending and restocking on a survival map)
   zz_controller.gd zz_player.gd   DotFpsController with the game's modifiers; one survivor
@@ -34,7 +34,7 @@ npcs/                the zombie body, its view (the animated models), one brain 
 assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the kit's atlases
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (31 sections), headless_maps, headless_net (15), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks)
+examples/            headless_run (35 sections), headless_maps, headless_net (17), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
@@ -70,6 +70,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 - A shot starting inside a survivor skips them (dot-combat's `pass_through_sets`, API level 2); stand-ins hold fire for a friend's hitboxes in the line.
 - Stand-ins aim and shoot through dot-bot's `DotBotAim`; never set `command.yaw` straight onto a target. They shoot the head when only the head shows over boards.
 - H is help and M is the map list: nothing in `ZzBindings` defaults to either (the medkit is G, the shove F, and an old settings file follows them through `keys.renamed`); `headless_run` and `dedicated` check it.
+- A box with lasting game rules is a `ZzBoxEffect` handler named in `ZzBoxes.HANDLERS` (copy `zz_box_instakill.gd`); its `boxes.json` entry carries polarity, impact, stacks, duration, `survives_round` (keys documented in the file's `comment`). With `box_labels` off the type must never reach `ZzNetBridge`; send `loot.shown(...)`.
 - A cvar and a command never share a name (the cvar is `zz_box_drops`, the command `zz_boxes`).
 
 **Survival** ([survival](docs/survival.md))

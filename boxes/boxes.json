@@ -1,11 +1,21 @@
 {
  "format": 1,
- "comment": "The random boxes. A box type has an id, a title, a colour, how likely each kind of zombie is to drop it ('drop': common, special, brute, and 'map' for one a map leaves lying about), and its outcomes. An outcome has a weight, a title shown to everybody, a message ({name} is whoever opened it), and a list of actions. Every action's 'do' and its parameters are documented in game/zz_boxes.gd (the _do_ methods); an action this game does not know refuses the whole file at load, naming it. 'who' picks whom a survivor action touches: opener (default), team, others, near (radius), random, nearest (count), downed, dead. Effects from 'pace', 'damage_boost' and the like stack: two that each double something make it four times.",
+ "comment": "The random boxes. A box type has an id, a title, a colour, how likely each kind of zombie is to drop it ('drop': common, special, brute, and 'map' for one a map leaves lying about), and its outcomes. An outcome has a weight, a title shown to everybody, a message ({name} is whoever opened it), and a list of actions. Every action's 'do' and its parameters are documented in game/zz_boxes.gd (the _do_ methods); an action this game does not know refuses the whole file at load, naming it. 'who' picks whom a survivor action touches: opener (default), team, others, near (radius), random, nearest (count), downed, dead. Effects from 'pace', 'damage_boost' and the like stack: two that each double something make it four times. SCHEMA (all optional, read by ZzBoxes._read_schema): 'polarity' positive|negative|mixed; 'impact' self|radius|everyone|game (who an 'effect' action lands on); 'radius' metres for impact radius; 'stacks' true|false and 'max_stacks' (a repeat of a non-stacking effect only lengthens it; a stacking one counts up to the cap, then lengthens); 'duration' {mode: instant|seconds|round, min, max} drawn uniformly each time the box is opened (seconds), or until the round ends (round); 'survives_round' true lets a game-impacting effect outlast the round's end; 'params' is the handler's own. A named box is one outcome {\"do\": \"effect\", \"name\": <handler in ZzBoxes.HANDLERS>}. The eight random boxes keep their own per-action 'seconds'; their schema is descriptive.",
  "boxes": [
   {
    "id": "explosive",
    "title": "Explosive Box",
    "colour": "#e2482b",
+   "polarity": "negative",
+   "impact": "radius",
+   "radius": 6.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 4,
     "special": 5,
@@ -186,6 +196,16 @@
    "id": "incendiary",
    "title": "Incendiary Box",
    "colour": "#ff8a1f",
+   "polarity": "negative",
+   "impact": "radius",
+   "radius": 5.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 4,
     "special": 4,
@@ -322,6 +342,16 @@
    "id": "medical",
    "title": "Med Box",
    "colour": "#3fd06a",
+   "polarity": "positive",
+   "impact": "self",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 5,
     "special": 4,
@@ -467,6 +497,16 @@
    "id": "horde",
    "title": "Horde Box",
    "colour": "#9b4fe0",
+   "polarity": "negative",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 3,
     "special": 3,
@@ -611,6 +651,16 @@
    "id": "special",
    "title": "Special Box",
    "colour": "#b0202a",
+   "polarity": "negative",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 2,
     "special": 4,
@@ -739,6 +789,16 @@
    "id": "arsenal",
    "title": "Arsenal Box",
    "colour": "#3b8ff0",
+   "polarity": "positive",
+   "impact": "self",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 5,
     "special": 5,
@@ -875,6 +935,16 @@
    "id": "mystery",
    "title": "Mystery Box",
    "colour": "#f2c94c",
+   "polarity": "mixed",
+   "impact": "self",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 4,
     "special": 4,
@@ -1083,6 +1153,16 @@
    "id": "cursed",
    "title": "Cursed Box",
    "colour": "#2a2a32",
+   "polarity": "negative",
+   "impact": "self",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 99,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
    "drop": {
     "common": 1,
     "special": 2,
@@ -1199,6 +1279,41 @@
        "do": "heal",
        "who": "others",
        "fraction": 1.0
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "instakill",
+   "title": "Instakill Box",
+   "colour": "#f2d21b",
+   "polarity": "positive",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "duration": {
+    "mode": "seconds",
+    "min": 30,
+    "max": 60
+   },
+   "drop": {
+    "common": 1,
+    "special": 3,
+    "brute": 3,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "instakill",
+     "title": "Instakill!",
+     "weight": 1,
+     "message": "{name} opened it: every zombie falls in one hit and the specials take far more.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "instakill"
       }
      ]
     }

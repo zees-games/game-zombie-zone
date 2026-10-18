@@ -366,9 +366,30 @@ extends DotConfig
 @export_range(0.0, 1.0, 0.01) var box_drop_special: float = 0.3
 @export_range(0.0, 1.0, 0.01) var box_drop_brute: float = 1.0
 
-## Seconds of holding E to open a box, and how long an unopened one lies there.
+## Seconds of holding E to open a box lying on the ground when nobody can carry one
+## ([member box_carry] 0), and how long an unopened one lies there.
 @export_range(0.0, 10.0, 0.1) var box_open_seconds: float = 0.8
 @export_range(5.0, 1200.0, 5.0) var box_lifetime: float = 150.0
+
+## How many boxes a survivor carries (E picks one up; the deploy key opens it). 0: no carrying, E
+## opens a box on the ground as it did before boxes could be carried.
+@export_range(0, 6, 1) var box_carry: int = 1
+
+## Seconds the deploy key is held to open a carried box, and the radius (metres) the survivor may
+## drift in meanwhile before it is cancelled.
+@export_range(0.5, 15.0, 0.1) var box_deploy_seconds: float = 3.5
+@export_range(0.2, 6.0, 0.1) var box_deploy_radius: float = 1.2
+
+## Whether a box on the ground and in the slot says what type it is. Off: every box looks the
+## same and the type is unknown until opened (the server does not send it).
+@export var box_labels: bool = true
+
+## Instakill, the first named box: the duration it lasts (seconds, uniform between; a negative
+## minimum or maximum leaves boxes.json's own), and what a special takes per hit as a multiple of
+## its damage (a common simply dies).
+@export var box_instakill_min: float = -1.0
+@export var box_instakill_max: float = -1.0
+@export_range(1.0, 100.0, 0.5) var box_instakill_special_scale: float = 4.0
 
 ## Boxes lying about at once; past it, the oldest goes.
 @export_range(1, 200, 1) var max_boxes: int = 16

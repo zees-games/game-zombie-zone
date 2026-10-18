@@ -113,6 +113,12 @@ var _team: Control = null
 var _team_rows: Array[Dictionary] = []
 var _effects: Label = null
 var _prompt: Label = null
+## The box file's order, titles and colours, set by the client: the carried slot is drawn from
+## `player.carried_index` (an index into it plus one; 0 is unknown, or nothing carried).
+var box_order: Array[StringName] = []
+var box_titles: Dictionary = {}
+var box_colours: Dictionary = {}
+var _carry: Label = null
 var _use_back: ColorRect = null
 var _use_fill: ColorRect = null
 var _use_label: Label = null
@@ -293,6 +299,13 @@ func _build() -> void:
 
 	_use_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_CENTER, -160.0, 74.0, 320.0, 12.0)
 	_use_fill = _rect(Color(0.95, 0.85, 0.35), Control.PRESET_CENTER, -160.0, 74.0, 0.0, 12.0)
+	_carry = _label(16)
+	_carry.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_carry.offset_left = -300.0
+	_carry.offset_right = 300.0
+	_carry.offset_top = -150.0
+	_carry.offset_bottom = -126.0
+	_carry.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_use_label = _label(16)
 	_use_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_use_label.offset_left = -300.0
@@ -462,6 +475,7 @@ func _process(delta: float) -> void:
 	_draw_team()
 	_draw_weapon()
 	_draw_use()
+	_draw_carry()
 	_draw_effects()
 	_draw_overlays(delta)
 	_draw_hurt(delta)
@@ -773,7 +787,7 @@ func _draw_use() -> void:
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…"}.get(player.using, "")
+		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"deploy": "Deploying the box — stay put…"}.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"
@@ -793,6 +807,29 @@ func _draw_use() -> void:
 		_held.visible = false
 
 
+## The box slot: what is in the hands and the key that opens it. Without `box_labels` the type is
+## not known to this end at all (`carried_index` is 0), so this says only "a box".
+func _draw_carry() -> void:
+	if _carry == null:
+		return
+
+	_carry.visible = player.carried_count > 0 and player.is_alive()
+
+	if not _carry.visible:
+		return
+
+	var id: StringName = box_order[player.carried_index - 1] if player.carried_index > 0 and player.carried_index <= box_order.size() else &""
+	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
+	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
+	_carry.text = "%s%s — hold %s to deploy" % [title, more, _key(ZzBindings.DEPLOY)]
+	_carry.add_theme_color_override("font_color", (box_colours.get(id, Color(0.98, 0.84, 0.5)) as Color).lightened(0.2))
+	# The meter pulses while it fills: the first-person cue that something is happening.
+	if player.using == &"deploy":
+		_use_fill.color = Color(0.95, 0.85, 0.35).lerp(Color(1.0, 0.45, 0.2), 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
+	else:
+		_use_fill.color = Color(0.95, 0.85, 0.35)
+
+
 func _draw_effects() -> void:
 	if _effect_rows.is_empty():
 		_effects.text = ""
@@ -802,9 +839,11 @@ func _draw_effects() -> void:
 	var lines := PackedStringArray()
 
 	for row: Dictionary in _effect_rows:
+		var timed := float(row["seconds"]) >= 0.0
 		var left := float(row["seconds"]) - since
 
-		if left <= 0.0:
+		# A negative clock is "until the round ends": it never runs out here.
+		if timed and left <= 0.0:
 			continue
 
 		var who := str(row.get("who", ""))
@@ -818,7 +857,7 @@ func _draw_effects() -> void:
 			tag = " x%s" % (str(snappedf(scale, 0.01)) if scale < 10.0 else str(int(scale)))
 		elif stacks > 1:
 			tag = " x%d" % stacks
-		lines.append("%s%s  %s" % [str(row["title"]), tag, DotScoreStrip.clock_text(left)])
+		lines.append("%s%s  %s" % [str(row["title"]), tag, DotScoreStrip.clock_text(left) if timed else "this round"])
 
 	_effects.text = "\n".join(lines)
 

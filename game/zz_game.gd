@@ -511,6 +511,10 @@ func _adjust_damage(damage: DotDamage) -> void:
 	if attacker != null and boxes != null:
 		damage.amount *= boxes.damage_scale_for(attacker.player_id)
 
+		var npc := horde.npc_for_entity(damage.victim) if horde != null else null
+		if npc != null:
+			damage.amount = boxes.zombie_damage(npc.def.id, npc.def.max_health, damage.amount)
+
 
 ## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
 ## friendly-fire scale already applied). It is added to the shooter's window first, so a new
@@ -987,6 +991,9 @@ func _on_round_started(number: int) -> void:
 
 
 func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
+	if boxes != null:
+		boxes.end_round()
+
 	_set_phase(Phase.IDLE)
 	_stop_survival()
 
@@ -1679,6 +1686,8 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	var shove_pressed := player.shove_held and not player.previous_shove
 	player.previous_shove = player.shove_held
 
+	_sync_carry(player)
+
 	if player.is_down() or not player.is_alive() or player.watching or player.is_pinned():
 		cancel_use(player)
 		return
@@ -1691,7 +1700,12 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 	# Holding: E, or the medkit. Whatever was started keeps going while its key is held.
 	if player.using != &"":
-		var key := ZzNetCommand.ACT_HEAL if player.using == &"heal" else ZzNetCommand.ACT_USE
+		var key := ZzNetCommand.ACT_USE
+
+		if player.using == &"heal":
+			key = ZzNetCommand.ACT_HEAL
+		elif player.using == &"deploy":
+			key = ZzNetCommand.ACT_DEPLOY
 
 		if (held & key) == 0 or not _use_still_valid(player):
 			cancel_use(player)
@@ -1699,7 +1713,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 			_advance_use(player, delta)
 		return
 
-	if (held & ZzNetCommand.ACT_HEAL) != 0 and player.medkits > 0:
+	if (held & ZzNetCommand.ACT_DEPLOY) != 0 and (pressed & ZzNetCommand.ACT_DEPLOY) != 0 and boxes != null:
+		_begin_deploy(player)
+	elif (held & ZzNetCommand.ACT_HEAL) != 0 and player.medkits > 0:
 		_begin_heal(player)
 	elif (held & ZzNetCommand.ACT_USE) != 0 and (pressed & ZzNetCommand.ACT_USE) != 0:
 		_begin_use(player)
@@ -1738,6 +1754,32 @@ func _begin_use(player: ZzPlayer) -> void:
 
 	if mend >= 0:
 		_start(player, &"repair", mend, config.barricade_repair_seconds)
+
+
+## What everybody is told about the boxes in [param player]'s hands: how many, and which (not
+## which when `box_labels` is off: the type does not leave the server).
+func _sync_carry(player: ZzPlayer) -> void:
+	player.carried_count = player.carried.size()
+	player.carried_index = 0
+
+	if not player.carried.is_empty() and boxes != null and config.box_labels:
+		player.carried_index = boxes.order.find(player.carried.back()) + 1
+
+
+## Deploying takes [member ZzConfig.box_deploy_seconds] with the key held, and the survivor may
+## shuffle about only within [member ZzConfig.box_deploy_radius] of where they began. Not BUSY: they
+## may turn and shoot, which is what makes it a risk worth taking.
+func _begin_deploy(player: ZzPlayer) -> void:
+	if player.carried.is_empty():
+		refused.emit(player.player_id, "You are not carrying a box.")
+		return
+
+	player.using = &"deploy"
+	player.use_target = 0
+	player.use_started = now()
+	player.use_needs = maxf(config.box_deploy_seconds, 0.01)
+	player.use_fraction = 0.0
+	player.use_origin = player.feet()
 
 
 func _begin_heal(player: ZzPlayer) -> void:
@@ -1783,6 +1825,9 @@ func _use_still_valid(player: ZzPlayer) -> bool:
 			return current_objective() == player.use_target and objective_states[player.use_target] == &"waiting"
 		&"repair":
 			return barricade_to_mend(player) == player.use_target
+		&"deploy":
+			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
+			return not player.carried.is_empty() and drift.length() <= config.box_deploy_radius
 
 	return false
 
@@ -1813,6 +1858,9 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 			_objective_used(target)
 		&"repair":
 			var _mended := mend_barricade(target, player)
+		&"deploy":
+			if boxes != null:
+				boxes.deploy(player)
 
 
 func cancel_use(player: ZzPlayer) -> void:
@@ -1824,10 +1872,12 @@ func cancel_use(player: ZzPlayer) -> void:
 	if other != null:
 		other.helped_fraction = 0.0
 
+	var what_was := player.using
 	player.using = &""
 	player.use_target = -1
 	player.use_fraction = 0.0
-	var _free := player.controller.remove_modifier(ZzController.BUSY)
+	if what_was != &"deploy":
+		var _free := player.controller.remove_modifier(ZzController.BUSY)
 
 
 ## The survivor [param player] is looking at within [param reach]: one who is down when
@@ -2135,6 +2185,11 @@ func _go_down(player: ZzPlayer, by: StringName, why: StringName) -> void:
 	player.health.max_health = config.downed_health
 	player.health.revive(1.0)
 	cancel_use(player)
+
+	if boxes != null:
+		boxes.drop_carried(player)
+		_sync_carry(player)
+
 	var _down := player.controller.add_modifier(ZzController.DOWN)
 	var _unlimp := player.controller.remove_modifier(ZzController.LIMP)
 	player.fit_hitboxes()
@@ -2190,6 +2245,10 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 	player.died_at = now()
 	player.temp_health = 0.0
 	cancel_use(player)
+
+	if boxes != null:
+		boxes.drop_carried(player)
+		_sync_carry(player)
 
 	if pins != null:
 		pins.release(player.player_id, &"died")

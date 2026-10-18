@@ -74,6 +74,14 @@ func place_from_map(doc: Dictionary) -> void:
 		var _id := add(kind, what, ZzMapDoc.v3(item["at"]))
 
 
+## What a client is told [param item] is: a box's type only when `box_labels` is on.
+func shown(kind: StringName, item: StringName) -> StringName:
+	if kind == BOX and game.boxes != null:
+		return game.boxes.shown_item(item)
+
+	return item
+
+
 func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0) -> int:
 	var id := _next_id
 	_next_id += 1
@@ -149,7 +157,11 @@ func looked_at(eye: Vector3, aim: Vector3, reach: float) -> int:
 
 ## Seconds of holding E a thing takes: a box takes a moment, the rest none.
 func use_seconds(id: int) -> float:
-	return game.config.box_open_seconds if kind_of(id) == BOX else 0.0
+	# Carried, a box is picked up in a moment; it is the deploy that takes the time.
+	if kind_of(id) == BOX and game.config.box_carry <= 0:
+		return game.config.box_open_seconds
+
+	return 0.0
 
 
 ## [param player] uses entry [param id].
@@ -185,6 +197,15 @@ func use(id: int, player) -> void:
 			player.pills = 1
 			remove(id, player.player_id)
 		BOX:
+			if game.config.box_carry > 0:
+				if not game.boxes.can_carry(player):
+					game.refused.emit(player.player_id, "Your hands are full: deploy the box you have first.")
+					return
+
+				remove(id, player.player_id)
+				var _held: bool = game.boxes.carry(player, item)
+				return
+
 			var at: Vector3 = e["at"]
 			remove(id, player.player_id)
 			game.boxes.open(item, player, at)

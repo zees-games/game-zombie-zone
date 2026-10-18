@@ -279,7 +279,7 @@ static func _label(kind: StringName, item: StringName) -> String:
 		&"pills":
 			return "take the pills"
 		&"box":
-			return "open the %s box" % String(item).replace("_", " ")
+			return "take the box" if item == &"unknown" else "take the %s box" % String(item).replace("_", " ")
 	return "pick up"
 
 

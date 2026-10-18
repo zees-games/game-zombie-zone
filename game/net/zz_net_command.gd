@@ -26,12 +26,14 @@ const BUTTON_RELOAD := DotFpsCommand.BUTTON_USER_2
 ## How many bits the slot takes. Eight slots is one more than the pack uses.
 const SLOT_BITS := 3
 
-## What the hands are doing, held: E (revive, open, pick up, press), the medkit, the pills.
+## What the hands are doing, held: E (revive, open, pick up, press), the medkit, the pills, the box.
 ## Bits of [member actions]. Held rather than pressed for the same reason fire is: a revive is
 ## five seconds of holding E, and it stops the tick the key comes up.
 const ACT_USE := 1
 const ACT_HEAL := 2
 const ACT_PILLS := 4
+## Hold to deploy the carried box.
+const ACT_DEPLOY := 8
 const ACT_BITS := 4
 
 var move: DotFpsCommand = DotFpsCommand.new()

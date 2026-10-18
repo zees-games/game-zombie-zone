@@ -1,5 +1,6 @@
 extends RefCounted
 
+const ZzBoxInstakill := preload("zz_box_instakill.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzHazards := preload("zz_hazards.gd")
 const ZzLoot := preload("zz_loot.gd")
@@ -32,8 +33,23 @@ const ZzWeapons := preload("zz_weapons.gd")
 ## the specials taking half again as much — is an EFFECT with a scale and an end, and effects of
 ## the same kind multiply. Open two horde boxes that each double the mob rate and it is four times.
 ## [method effects_summary] is what the HUD shows ("Horde frenzy x4, 1:12").
+##
+## [b]A box is carried, then deployed.[/b] E on a box lying about puts it in the carried slot
+## ([member ZzConfig.box_carry] of them); holding the deploy key for `box_deploy_seconds` opens it.
+## With `box_labels` off the type of a box on the ground and in the slot is not sent
+## ([method shown_item]).
+##
+## [b]A box that lasts is a NAMED effect.[/b] A type carries `polarity`, `impact` (self, radius,
+## everyone, game), `radius`, `stacks`, `max_stacks`, `duration` ({mode: instant|seconds|round,
+## min, max}, drawn uniformly when it is opened) and `survives_round`; an outcome's
+## `{"do": "effect", "name": "instakill"}` starts the handler named in [constant HANDLERS] under
+## that spec. The registry here owns the clock, the stack count and the end of the round
+## ([method end_round]); the handler (see `zz_box_effect.gd`) owns only what the box does.
 
 const CHANNEL := "zz.boxes"
+
+## What every box is called on the wire when `box_labels` is off.
+const UNKNOWN := &"unknown"
 
 const FORMAT := 1
 
@@ -43,8 +59,16 @@ const ACTIONS: Array[String] = [
 	"haste", "low_gravity", "heavy", "invulnerable", "damage_boost", "bile", "burn", "teleport",
 	"knock", "blind", "mob", "special", "brute", "kill_zombies", "freeze_zombies", "ignite_zombies",
 	"lure", "pace", "panic", "explode", "airstrike", "fire", "acid", "heal_zone", "molotov_rain",
-	"drop_boxes", "message", "random", "swap", "shuffle_weapons", "clear_effects",
+	"drop_boxes", "message", "random", "swap", "shuffle_weapons", "clear_effects", "effect",
 ]
+
+## The named boxes' handlers: effect name -> script (see zz_box_effect.gd). A later box is one line
+## here, one small file, and a type in boxes.json.
+const HANDLERS := {"instakill": ZzBoxInstakill}
+
+const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
+const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]
+const MODES: Array[String] = ["instant", "seconds", "round"]
 
 ## What `pace` may change, and its title on the HUD.
 const PACE_TITLES := {
@@ -64,6 +88,11 @@ var order: Array[StringName] = []
 
 ## Active effects: {what, scale, until, title, who}. `who` is empty for the whole game.
 var effects: Array[Dictionary] = []
+
+## Handler instances by effect name, made on first use. A game may add its own with
+## [method register_handler].
+var _handlers: Dictionary = {}
+var _next_effect: int = 1
 
 var _rng := RandomNumberGenerator.new()
 
@@ -140,6 +169,11 @@ func load_text(text: String) -> DotResult:
 		if outcomes.is_empty():
 			return DotResult.fail(DotError.CODE_INVALID, "Box %s has no outcomes." % id)
 
+		var schema := _read_schema(box, id)
+
+		if not schema.ok:
+			return schema
+
 		out[id] = {
 			"id": id,
 			"title": str(box.get("title", String(id).capitalize())),
@@ -147,6 +181,7 @@ func load_text(text: String) -> DotResult:
 			"drop": box.get("drop", {}),
 			"outcomes": outcomes,
 		}
+		out[id].merge(schema.value)
 		ids.append(id)
 
 	if out.is_empty():
@@ -155,6 +190,40 @@ func load_text(text: String) -> DotResult:
 	types = out
 	order = ids
 	return DotResult.success(types.size())
+
+
+## The schema half of a box: polarity, impact, radius, stacks, max_stacks, duration, survives_round
+## and params, defaulted and checked. A bad enum refuses the file, naming the box.
+func _read_schema(box: Dictionary, id: StringName) -> DotResult:
+	var polarity := str(box.get("polarity", "mixed"))
+	var impact := str(box.get("impact", "self"))
+
+	if not POLARITIES.has(polarity):
+		return DotResult.fail(DotError.CODE_INVALID, "Box %s: polarity '%s' is not one of %s." % [id, polarity, ", ".join(POLARITIES)])
+
+	if not IMPACTS.has(impact):
+		return DotResult.fail(DotError.CODE_INVALID, "Box %s: impact '%s' is not one of %s." % [id, impact, ", ".join(IMPACTS)])
+
+	var raw: Variant = box.get("duration", {})
+	var spec: Dictionary = raw if raw is Dictionary else {}
+	var mode := str(spec.get("mode", "instant"))
+
+	if not MODES.has(mode):
+		return DotResult.fail(DotError.CODE_INVALID, "Box %s: duration mode '%s' is not one of %s." % [id, mode, ", ".join(MODES)])
+
+	var low := maxf(float(spec.get("min", 0.0)), 0.0)
+	var high := maxf(float(spec.get("max", low)), low)
+
+	return DotResult.success({
+		"polarity": polarity,
+		"impact": impact,
+		"radius": maxf(float(box.get("radius", 0.0)), 0.0),
+		"stacks": bool(box.get("stacks", true)),
+		"max_stacks": maxi(int(box.get("max_stacks", 99)), 1),
+		"duration": {"mode": mode, "min": low, "max": high},
+		"survives_round": bool(box.get("survives_round", false)),
+		"params": box.get("params", {}),
+	})
 
 
 func _check_actions(actions: Variant, where: String) -> DotResult:
@@ -166,6 +235,11 @@ func _check_actions(actions: Variant, where: String) -> DotResult:
 			return DotResult.fail(DotError.CODE_INVALID,
 				"%s: '%s' is not something a box can do." % [where, str((a as Dictionary).get("do", "?")) if a is Dictionary else str(a)],
 				", ".join(ACTIONS))
+
+		if str((a as Dictionary)["do"]) == "effect" and not HANDLERS.has(str((a as Dictionary).get("name", ""))) \
+				and not _handlers.has(str((a as Dictionary).get("name", ""))):
+			return DotResult.fail(DotError.CODE_INVALID, "%s: no box effect is named '%s'." % [where, str((a as Dictionary).get("name", "?"))],
+				", ".join(HANDLERS.keys()))
 
 		if str((a as Dictionary)["do"]) == "random":
 			for choice: Variant in (a as Dictionary).get("choices", []):
@@ -238,6 +312,49 @@ func random_type(source: StringName, rng: RandomNumberGenerator) -> StringName:
 			return id
 
 	return order[0] if not order.is_empty() else &""
+
+
+# --- Carrying ------------------------------------------------------------------------------
+
+## What a client is told about a box of [param type_id] on the ground or in a slot: the type when
+## `box_labels` is on, else one word for every box, so the type never leaves the server.
+func shown_item(type_id: StringName) -> StringName:
+	return type_id if game.config.box_labels else UNKNOWN
+
+
+## Whether [param player] has a free slot. With `box_carry` 0 nobody carries.
+func can_carry(player) -> bool:
+	return game.config.box_carry > 0 and player.carried.size() < game.config.box_carry
+
+
+## Puts a box of [param type_id] in [param player]'s hands.
+func carry(player, type_id: StringName) -> bool:
+	if not types.has(type_id) or not can_carry(player):
+		return false
+
+	player.carried.append(type_id)
+	return true
+
+
+## [param player] let go of the first box they carry, opened where they stand.
+func deploy(player) -> void:
+	if player.carried.is_empty():
+		return
+
+	var type_id: StringName = player.carried.pop_front()
+	open(type_id, player, player.feet())
+
+
+## Everything [param player] carries falls at their feet (a down, a death).
+func drop_carried(player) -> void:
+	var n := 0
+
+	for type_id in player.carried:
+		var angle := float(n) * 2.4
+		var _id := drop(type_id, player.feet() + Vector3(cos(angle), 0.0, sin(angle)) * 0.7)
+		n += 1
+
+	player.carried.clear()
 
 
 # --- Opening -------------------------------------------------------------------------------
@@ -590,6 +707,12 @@ func _do_panic(a: Dictionary, _ctx: Dictionary) -> void:
 		game.horde.panic(float(a.get("seconds", 30.0)))
 
 
+## A named effect (see zz_box_effect.gd) under the box's own schema: `name` is a key of
+## [constant HANDLERS]. Whom it lands on follows the box's `impact`.
+func _do_effect(a: Dictionary, ctx: Dictionary) -> void:
+	var _fx := activate(StringName(str(a.get("name", ""))), StringName(str(ctx.get("box", ""))), ctx)
+
+
 func _do_clear_effects(_a: Dictionary, _ctx: Dictionary) -> void:
 	effects = effects.filter(func(e: Dictionary) -> bool: return str(e["who"]) != "")
 	effects_changed.emit()
@@ -684,38 +807,191 @@ func _do_random(a: Dictionary, ctx: Dictionary) -> void:
 
 # --- Effects -------------------------------------------------------------------------------
 
+## Adds a handler for [param effect_name] (a script extending zz_box_effect.gd), so a game or a
+## test can have a named box without editing [constant HANDLERS].
+func register_handler(effect_name: StringName, script: Script) -> void:
+	_handlers[String(effect_name)] = script.new()
+
+
+func _handler(effect_name: StringName) -> Object:
+	var key := String(effect_name)
+
+	if not _handlers.has(key) and HANDLERS.has(key):
+		_handlers[key] = (HANDLERS[key] as Script).new()
+
+	return _handlers.get(key)
+
+
+## The seconds a box lasts, drawn uniformly from its range now: 0 for instant, -1 for the round.
+## A handler may adjust the range first (Instakill's cvars).
+func roll_duration(box_id: StringName, effect_name: StringName = &"") -> float:
+	var box: Dictionary = types.get(box_id, {})
+	var spec: Dictionary = box.get("duration", {"mode": "instant", "min": 0.0, "max": 0.0})
+	var handler := _handler(effect_name)
+
+	if handler != null:
+		spec = handler.duration(game.config, spec)
+
+	match str(spec["mode"]):
+		"round":
+			return -1.0
+		"seconds":
+			return _rng.randf_range(float(spec["min"]), maxf(float(spec["max"]), float(spec["min"])))
+
+	return 0.0
+
+
+## Starts the named effect [param effect_name] for the box [param box_id] opened as [param ctx]
+## (`opener`, `at`). Returns the first entry it started or refreshed, or an empty dictionary. Who it
+## lands on is the box's `impact`; a repeat of a non-stacking effect on the same holder only
+## lengthens it, and a stacking one adds a stack up to `max_stacks`, then also only lengthens.
+func activate(effect_name: StringName, box_id: StringName, ctx: Dictionary) -> Dictionary:
+	var handler := _handler(effect_name)
+
+	if handler == null:
+		return {}
+
+	var box: Dictionary = types.get(box_id, {})
+	var seconds := roll_duration(box_id, effect_name)
+	var holders: Array[StringName] = []
+
+	match str(box.get("impact", "game")):
+		"self":
+			if ctx.get("opener") != null:
+				holders.append((ctx["opener"] as Object).get("player_id"))
+		"everyone":
+			for p in _who({"who": "team"}, ctx):
+				holders.append(p.player_id)
+		"radius":
+			for p in _who({"who": "near", "radius": float(box.get("radius", 8.0))}, ctx):
+				holders.append(p.player_id)
+		_:
+			holders.append(&"")
+
+	var first := {}
+
+	for who in holders:
+		var fx := _start_one(handler, effect_name, box, box_id, seconds, who, ctx)
+
+		if first.is_empty():
+			first = fx
+
+	if not holders.is_empty():
+		_apply()
+		effects_changed.emit()
+
+	return first
+
+
+func _start_one(handler: Object, effect_name: StringName, box: Dictionary, box_id: StringName, seconds: float, who: StringName, ctx: Dictionary) -> Dictionary:
+	var now: float = game.now()
+	var until := -1.0 if seconds < 0.0 else now + seconds
+	var found := _find(String(effect_name), who)
+
+	if not found.is_empty():
+		# A longer one replaces the clock; a shorter one never cuts the first short.
+		found["until"] = -1.0 if (until < 0.0 or float(found["until"]) < 0.0) else maxf(float(found["until"]), until)
+
+		if bool(box.get("stacks", false)) and int(found["stacks"]) < int(box.get("max_stacks", 1)):
+			found["stacks"] = int(found["stacks"]) + 1
+			handler.on_stack(self, found)
+
+		return found
+
+	var fx := {
+		"id": _next_effect, "what": String(effect_name), "scale": 1.0, "until": until, "title": str(box.get("title", String(effect_name))),
+		"who": String(who), "box": String(box_id), "stacks": 1, "max_stacks": int(box.get("max_stacks", 1)),
+		"impact": str(box.get("impact", "game")), "polarity": str(box.get("polarity", "mixed")),
+		"radius": float(box.get("radius", 0.0)), "survives_round": bool(box.get("survives_round", false)),
+		"params": box.get("params", {}), "data": {}, "handler": handler, "started": now,
+	}
+	_next_effect += 1
+
+	if seconds == 0.0:
+		handler.on_start(self, fx, ctx)
+		handler.on_end(self, fx)
+		return fx
+
+	effects.append(fx)
+	handler.on_start(self, fx, ctx)
+	return fx
+
+
+func _find(what: String, who: StringName) -> Dictionary:
+	for e in effects:
+		if e["what"] == what and str(e["who"]) == String(who) and e.has("handler"):
+			return e
+
+	return {}
+
+
 func _add_effect(what: String, scale: float, seconds: float, title: String, who: StringName) -> void:
-	effects.append({"what": what, "scale": scale, "until": game.now() + seconds, "title": title, "who": String(who)})
+	effects.append({"what": what, "scale": scale, "until": game.now() + seconds, "title": title, "who": String(who),
+		"impact": "game" if who == &"" else "self", "stacks": 1, "survives_round": false})
 	_apply()
 	effects_changed.emit()
 
 
-## Clears every effect, for a new map.
+## Clears every effect, for a new map; the carried boxes go with it.
 func reset() -> void:
 	for p in game.survivors():
 		if p.health != null:
 			p.health.invulnerable = false
 
-	effects.clear()
+		p.carried.clear()
+
+	_end(effects.duplicate())
+
+
+## The round (a survival wave, or a whole map) is over: every effect that changes the game ends,
+## unless its box says `survives_round`, and so does anything that was to last the round. One
+## that touched only a survivor and had its own clock runs on.
+func end_round() -> void:
+	_end(effects.filter(func(e: Dictionary) -> bool:
+		return float(e["until"]) < 0.0 or (str(e.get("impact", "game")) == "game" and not bool(e.get("survives_round", false)))))
+
+
+func tick(delta: float) -> void:
+	var now: float = game.now()
+	_end(effects.filter(func(e: Dictionary) -> bool: return float(e["until"]) >= 0.0 and float(e["until"]) <= now))
+
+	for e in effects:
+		if e.has("handler"):
+			(e["handler"] as Object).on_tick(self, e, delta)
+
+
+## Takes [param gone] out of the list, tells each one's handler, undoes the old invulnerability.
+func _end(gone: Array) -> void:
+	if gone.is_empty():
+		return
+
+	effects = effects.filter(func(e: Dictionary) -> bool: return not gone.has(e))
+
+	for e in gone:
+		if e.has("handler"):
+			(e["handler"] as Object).on_end(self, e)
+
+		if e["what"] == "invulnerable":
+			var p = game.player_by_id(StringName(str(e["who"])))
+			if p != null and p.health != null and not _has(p.player_id, "invulnerable"):
+				p.health.invulnerable = false
+
 	_apply()
 	effects_changed.emit()
 
 
-func tick(_delta: float) -> void:
-	var now: float = game.now()
-	var before := effects.size()
-	var expired := effects.filter(func(e: Dictionary) -> bool: return float(e["until"]) <= now)
-	effects = effects.filter(func(e: Dictionary) -> bool: return float(e["until"]) > now)
+## What a survivor's shot does to a zombie of [param kind] once the active effects have had their say.
+func zombie_damage(kind: StringName, max_health: float, amount: float) -> float:
+	for e in effects:
+		if e.has("handler"):
+			amount = (e["handler"] as Object).modify_zombie_damage(self, e, kind, max_health, amount)
 
-	for e in expired:
-		if e["what"] == "invulnerable":
-			var p = game.player_by_id(StringName(str(e["who"])))
-			if p != null and not _has(p.player_id, "invulnerable"):
-				p.health.invulnerable = false
+	return amount
 
-	if effects.size() != before:
-		_apply()
-		effects_changed.emit()
+
+## Whether the named effect is on (for [param who], or the whole game by default).
+func is_active(effect_name: StringName, who: StringName = &"") -> bool:
+	return not _find(String(effect_name), who).is_empty()
 
 
 ## Pushes the game-wide effects into the horde.
@@ -778,8 +1054,12 @@ func effects_summary() -> Array:
 			grouped[key] = {"title": e["title"], "stacks": 0, "seconds": 0.0, "who": _who_name(StringName(str(e["who"]))), "scale": 1.0}
 
 		var g: Dictionary = grouped[key]
-		g["stacks"] = int(g["stacks"]) + 1
-		g["seconds"] = maxf(float(g["seconds"]), float(e["until"]) - now)
+		g["stacks"] = int(g["stacks"]) + int(e.get("stacks", 1))
+		# -1: until the round ends. It wins over any clock.
+		if float(e["until"]) < 0.0 or float(g["seconds"]) < 0.0:
+			g["seconds"] = -1.0
+		else:
+			g["seconds"] = maxf(float(g["seconds"]), float(e["until"]) - now)
 		g["scale"] = float(g["scale"]) * float(e["scale"])
 
 	return grouped.values()

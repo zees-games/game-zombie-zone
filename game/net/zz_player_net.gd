@@ -72,11 +72,15 @@ var net_using: int = 0
 ## Medkit in bit 0, pills in bit 1.
 var net_kits: int = 0
 
+## Boxes carried (bits 0-2) and the type of the top one, an index into the box file plus one,
+## 0 for unknown (bits 3-8). The server writes 0 when `box_labels` is off.
+var net_carry: int = 0
+
 ## Bile in bit 0, burning in bit 1, a box's blinding in bit 2.
 var net_status: int = 0
 
 const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride"]
-const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair"]
+const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair", &"deploy"]
 
 ## Points this match and the server's ping for the player, for everybody's Tab board.
 var net_points: int = 0
@@ -160,6 +164,7 @@ func _register_net_vars() -> void:
 	replicate(&"net_using", DotNetVar.Type.UINT).bits(3)
 	replicate(&"net_kits", DotNetVar.Type.UINT).bits(2)
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(3)
+	replicate(&"net_carry", DotNetVar.Type.UINT).bits(9)
 	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
 	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_watching", DotNetVar.Type.BOOL)
@@ -247,6 +252,7 @@ func pull() -> void:
 	net_helped = player.helped_fraction
 	net_using = maxi(USES.find(player.using), 0)
 	net_kits = (1 if player.medkits > 0 else 0) | (2 if player.pills > 0 else 0)
+	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0)
 	net_points = clampi(player.points, 0, 65535)
 	net_ping = clampi(player.ping_ms, 0, 1023)
@@ -343,6 +349,8 @@ func _adopt() -> void:
 	player.using = USES[clampi(net_using, 0, USES.size() - 1)]
 	player.medkits = net_kits & 1
 	player.pills = (net_kits >> 1) & 1
+	player.carried_count = net_carry & 7
+	player.carried_index = (net_carry >> 3) & 63
 	player.biled = (net_status & 1) != 0
 	player.burning = (net_status & 2) != 0
 	player.box_blind = (net_status & 4) != 0
