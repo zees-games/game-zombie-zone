@@ -36,8 +36,6 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const CHANNEL := "zz.client"
 
-const LINK_SERVICE := &"dot_client_link"
-
 const CHASE_BACK := 2.6
 const CHASE_UP := 0.6
 
@@ -51,8 +49,12 @@ var game: ZzGame = null
 var player: ZzPlayer = null
 
 ## Keeps the screen covered, and the local body and the input still, until the map, the
-## player and the camera are all in. See [method _build_gate].
+## player and the camera are all in. The platform's; see [DotGameClient].
 var gate: DotLoadGate = null
+
+## dot-game's client platform: the cover, settings and menu, console, Tab, M, the pointer, the
+## input block and the browser's filesystem flush.
+var platform: DotGameClient = null
 var camera: Camera3D = null
 var hud: ZzHud = null
 var board: DotMenuScoreboard = null
@@ -60,7 +62,7 @@ var chat: DotGameChatClient = null
 var audio: ZzAudio = null
 var settings: ZzSettings = null
 
-## The player's console. See [method DotConsoleKit.build].
+## The player's console (the platform's).
 var console: DotConsoleController = null
 var world_view: ZzWorldView = null
 
@@ -77,7 +79,6 @@ var third_person: bool = false
 var _offline: bool = true
 var _sampler: DotFpsSampler = null
 var _watch_id: int = -1
-var _captured: bool = false
 var _arm: DotCameraBoom = null
 var _fade: DotCameraFade = null
 var _rig_height: float = 0.0
@@ -109,8 +110,17 @@ var _brutes: int = 0
 
 func _ready() -> void:
 	# First, before anything can be drawn: the map, the player and the camera all arrive
-	# after this node is in the tree.
-	_build_gate()
+	# after this node is in the tree. The platform puts the loading cover up, held until the
+	# player exists and the camera is current, and finds the link.
+	platform = DotGameClient.new()
+	platform.name = "Platform"
+	platform.force_offline = force_offline
+	platform.spawned_fn = func() -> bool:
+		return player != null and camera != null and camera.is_inside_tree()
+	platform.scoreboard_action = ZzBindings.SCOREBOARD
+	add_child(platform)
+	gate = platform.gate
+	gate.hold(&"map", "Loading the map")
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
 	var config := ZzConfig.new()
@@ -119,8 +129,8 @@ func _ready() -> void:
 	if not loaded.ok:
 		DotLog.warn(CHANNEL, "falling back to defaults", {"why": loaded.error.message})
 
-	link = DotRegistry.get_node_service(LINK_SERVICE)
-	_offline = force_offline or link == null or OS.get_cmdline_user_args().has("--offline")
+	link = platform.link as Node
+	_offline = platform.offline
 
 	game = ZzGame.new()
 	game.name = "World"
@@ -149,29 +159,12 @@ func _ready() -> void:
 	else:
 		DotLog.result(CHANNEL, "the netcode", _build_netcode())
 
-	if not DotPlatform.is_web():
-		_capture()
 
-
-## The load gate: covered, with the local body and the input still, until the map stands, the
-## local player exists and its camera is current.
-##
-## Covered also means the horde does not act. Offline the world ticks itself, so the director,
-## waves, clocks and damage would all work on the survivor in front of a picture;
-## [member ZzGame.hold_clock] steps only the bodies then, which settle onto the floor under the
-## cover with their input off. Connected, the server owns all of that; what is left to hold is
-## this end's sampling and keys, which wait on [method _covered].
-func _build_gate() -> void:
-	gate = DotLoadGate.new()
-	gate.name = "LoadGate"
-	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
-	# out its timeout, and every suite that drives a client would wait with it.
-	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
-	add_child(gate)
-	gate.hold(&"map", "Loading the map")
-	gate.require(&"spawned", func() -> bool:
-		return player != null and camera != null and camera.is_inside_tree(), "Joining")
-
+# The load gate is the platform's. Covered also means the horde does not act: offline the
+# world ticks itself, so the director, waves, clocks and damage would all work on the survivor
+# in front of a picture; [member ZzGame.hold_clock] steps only the bodies then, which settle
+# onto the floor under the cover with their input off. Connected, the server owns all of that;
+# what is left to hold is this end's sampling and keys, which wait on [method _covered].
 
 ## Covered from the moment a map starts clearing until it is rebuilt, the first build and every
 ## later one (a vote's, the map menu's, a server's next).
@@ -402,6 +395,8 @@ func _adopt(candidate: ZzPlayer) -> void:
 	if gate != null:
 		gate.freeze(player)
 	_build_camera()
+	if platform != null:
+		_suspend_input(platform.is_input_blocked())
 
 	# Offline the world samples this player's movement itself, so the buttons go onto that
 	# sample (see `ZzPlayer.command_stamp`); connected, they go onto the command sent.
@@ -1018,23 +1013,11 @@ func _key(action: StringName) -> String:
 
 # --- The Tab board ---------------------------------------------------------
 
-## M: the map list (dot-menu's map menu). Solo a choice changes the map here at once;
-## connected the server decides, by the owner's `sv_map_menu_flag`, and anybody without it
-## gets a vote instead (dot-vote's map menu, wired in [ZzModule]). By name, so a client shell
-## older than the map menu still runs the game without it.
-func _wire_maps() -> void:
-	if not settings.has_method(&"use_maps"):
-		return
-	var _maps: Variant = settings.call(&"use_maps",
-		func() -> Array: return game.map_rows() if game != null else [],
-		func(id: StringName) -> DotResult: return game.change_map_now(id))
-
-
-func _wire_board() -> void:
-	if settings == null or settings.menu == null:
+## The Tab board: dot-menu's, with this game's columns. The platform feeds it and holds it on Tab.
+func _dress_board() -> void:
+	if board == null:
 		return
 
-	board = settings.menu.scoreboard
 	board.title_text = "Zombie Zone"
 	board.columns = [
 		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
@@ -1047,20 +1030,6 @@ func _wire_board() -> void:
 	board.sort_by = &"points"
 	board.decorate = _decorate_row
 	board.prepare = _prepare_board
-
-	if not _offline and link != null:
-		board.feed_from(link)
-	else:
-		board.source = board_snapshot
-
-
-func _show_board(on: bool) -> void:
-	if board == null:
-		return
-	if on:
-		board.open()
-	else:
-		board.close()
 
 
 func _decorate_row(row: Dictionary) -> void:
@@ -1154,9 +1123,6 @@ func _build_chat() -> void:
 	chat.voice_config = ZzServices.voice_format()
 	add_child(chat)
 
-	chat.typing_changed.connect(func(typing: bool) -> void:
-		_suspend_input(typing or (settings != null and settings.is_open())))
-
 
 func _build_audio() -> void:
 	audio = ZzAudio.new()
@@ -1175,14 +1141,24 @@ func _build_audio() -> void:
 func _build_settings() -> void:
 	settings = ZzSettings.new()
 	add_child(settings)
+	platform.settings = settings
+	# The HUD is a CanvasLayer and the platform's is a Control, so it follows the menu itself.
+	platform.chat = chat
+	platform.board_snapshot_fn = board_snapshot
+	# M: the map list. Solo a choice changes the map here at once; connected the server decides,
+	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (dot-vote's
+	# map menu, wired in [ZzModule]).
+	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
+	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
+	DotLog.result(CHANNEL, "the platform", platform.setup())
+	# Walking is off while the cover is up, a menu is open or a line is typed.
+	platform.input_blocked_changed.connect(_suspend_input)
+	_suspend_input(platform.is_input_blocked())
 
-	var built: DotResult = settings.setup()
+	settings = platform.settings as ZzSettings
+	console = platform.console as DotConsoleController
 
-	if not built.ok:
-		DotLog.warn(CHANNEL, "no settings; everything is at its default", {"why": built.error.message})
-		remove_child(settings)
-		settings.free()
-		settings = null
+	if settings == null:
 		return
 
 	if _sampler != null:
@@ -1192,24 +1168,12 @@ func _build_settings() -> void:
 		settings.bind_audio(audio.manager)
 
 	if settings.menu != null:
-		settings.menu.scoreboard_action = ZzBindings.SCOREBOARD
-		settings.menu_state_changed.connect(func(any_open: bool) -> void:
-			_suspend_input(any_open or (chat != null and chat.is_typing()))
-			if any_open:
-				_release()
-			elif not DotPlatform.is_web():
-				_capture())
-		settings.menu.busy = func() -> bool: return chat != null and chat.is_typing()
-		# The console (the key under Escape): net_stat and every other setting by name, and
-		# the server's console when one runs in this process. One of the menu's overlays, so
-		# opening it stops the player and frees the pointer exactly as the menu does.
-		console = DotConsoleKit.build(self, settings.settings, settings.menu)
 		# The HUD in the menu's theme and at the player's HUD size, live.
 		if hud != null:
 			hud.follow_menu(settings.menu)
 		_bind_bot_console()
-		_wire_board()
-		_wire_maps()
+		board = platform.board as DotMenuScoreboard
+		_dress_board()
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
@@ -1228,6 +1192,10 @@ func _bind_bot_console() -> void:
 
 
 func _suspend_input(suspended: bool) -> void:
+	# The button's release goes to the menu, so the aim is let go here or it sticks up.
+	if suspended:
+		_aiming = false
+
 	if _sampler != null:
 		_sampler.suspended = suspended
 
@@ -1235,16 +1203,9 @@ func _suspend_input(suspended: bool) -> void:
 		player.sampler.suspended = suspended
 
 
-func _capture() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_captured = true
-
-
-func _release() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_captured = false
-	# The button's release goes to the menu, so the aim is let go here or it sticks up.
-	_aiming = false
+## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
+func _pointer_ours() -> bool:
+	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 ## The hands' bits for this tick, from the held keys.
@@ -1386,7 +1347,7 @@ func _process(delta: float) -> void:
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
-		hands.aim(_aiming and _captured and not third_person and not is_spectating()
+		hands.aim(_aiming and _pointer_ours() and not third_person and not is_spectating()
 			and player.is_alive() and not player.is_down() and not player.is_held())
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
@@ -1605,22 +1566,15 @@ static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and not _captured:
-		_capture()
-		return
-
+	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
 	if event.is_action_pressed("ui_cancel"):
-		_release()
+		# Opens the settings when the menu left this Escape alone.
 		if settings != null:
 			settings.open()
 		return
 
 	# Nothing below acts while the cover is up: no shot, jump, look or use.
 	if _covered():
-		return
-
-	if event.is_action(ZzBindings.SCOREBOARD) and not event.is_echo():
-		_show_board(event.is_pressed())
 		return
 
 	if event is InputEventKey and not event.is_echo():
@@ -1645,13 +1599,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			_firing = button.pressed
 		elif button.is_action(ZzBindings.AIM):
 			_aiming = button.pressed
-		elif button.pressed and (button.button_index == MOUSE_BUTTON_WHEEL_UP or button.button_index == MOUSE_BUTTON_WHEEL_DOWN):
-			_cycle_slot(-1 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+		elif button.pressed and _pointer_ours():
+			# The wheel, on dot-menu's previous/next weapon actions (rebindable).
+			if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
+				_cycle_slot(1)
+			elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
+				_cycle_slot(-1)
 
 	if player == null:
 		return
 
-	if event is InputEventMouseMotion and _captured:
+	if event is InputEventMouseMotion and _pointer_ours():
 		if _offline and player.sampler != null:
 			player.sampler.handle_event(event)
 		elif _sampler != null:

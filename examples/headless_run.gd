@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 35
+const SECTIONS := 36
 
-const CHECKS := 211
+const CHECKS := 216
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -100,6 +100,7 @@ func _run() -> void:
 	await _test_the_hud()
 	await _test_help_and_menu()
 	await _test_the_map_menu()
+	await _test_the_client_platform()
 	await _test_the_first_play_test()
 
 	for world in _worlds.duplicate():
@@ -1448,6 +1449,48 @@ func _test_the_map_menu() -> void:
 	_check(wanted != &"" and game.map.id() == wanted, "choosing one changes to it now", "%s, now %s" % [wanted, game.map.id()])
 	_check(not settings.menu.picker.is_open(), "and the picker is closed")
 	settings.queue_free()
+	await get_tree().process_frame
+	_finished()
+
+
+## The client on dot-game's DotGameClient: the loading cover is up at the start and blocks
+## input, lifts once the player is in, and Tab goes through the menu (it holds the board).
+func _test_the_client_platform() -> void:
+	_section("the client: the cover lifts, Tab holds the board through the menu, the wheel is a row")
+	var client := ZzClient.new()
+	client.config_file = "user://cfg/headless-none.json"
+	client.force_offline = true
+	client.offline_bots = 0
+	add_child(client)
+	var platform: DotGameClient = client.platform
+	var covered := platform != null and platform.gate != null and not platform.is_shown() \
+		and platform.is_input_blocked()
+	for _i in 600:
+		await get_tree().physics_frame
+		if platform.is_shown():
+			break
+	for _i in 2:
+		await get_tree().process_frame
+	_check(covered, "the loading cover is up at the start and blocks input")
+	_check(platform.is_shown() and not platform.is_input_blocked() and platform.console != null,
+		"and lifts once the player is in, with the console built", str(platform.describe()))
+	var tab := InputEventKey.new()
+	tab.physical_keycode = KEY_TAB
+	tab.pressed = true
+	var _a: bool = client.settings.menu.handle_event(tab)
+	var board: DotMenuScoreboard = client.board
+	_check(board != null and board.is_open() and board.rows().any(func(r: Dictionary) -> bool: return bool(r.get("you", false))),
+		"Tab holds the scoreboard up, with this player on it", str(board.rows()) if board != null else "no board")
+	tab.pressed = false
+	var _b: bool = client.settings.menu.handle_event(tab)
+	_check(board != null and not board.is_open(), "and letting go puts it away")
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	wheel.pressed = true
+	_check(wheel.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION) and client.settings.bindings.key_for(DotMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
+		"the wheel changes weapon through a rebindable row")
+	remove_child(client)
+	client.free()
 	await get_tree().process_frame
 	_finished()
 

@@ -2,6 +2,7 @@
 # Render the game and look at it. The check no assertion in this repository makes.
 #
 #   tools/shot.sh --view=overview                                  # the map, from above
+#   tools/shot.sh --view=cover                                     # the loading cover, before it lifts
 #   tools/shot.sh --view=room --at=0,1.7,-6 --look=0,1,-14          # a free camera
 #   tools/shot.sh --view=room --alone --zz-map-ids=zz_blackout_1 --at=16.6,1.6,65.4 --look=18,1.1,66   # a close-up, stand-ins left in the start room
 #   tools/shot.sh --view=survivor --spawn=common:12,leaper:1        # your eyes, with a crowd coming
