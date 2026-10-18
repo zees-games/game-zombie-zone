@@ -759,6 +759,9 @@ func _build_vote(world: ZzGame) -> void:
 
 		return out
 	vote.apply_fn = func(id: StringName) -> DotResult:
+		# A Workshop map can be on a solo ballot; it cannot be built (docs/not-yet.md).
+		if not world.catalogue.maps.has(id):
+			return DotResult.fail(DotError.CODE_STATE, "Zombie Zone cannot play Workshop maps yet.")
 		world.next_map_id = id
 		return DotResult.success(id)
 	# Due on the last map of a campaign (one that names no next map) and on a survival map:

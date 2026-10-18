@@ -19,6 +19,8 @@ extends Node
 ## (the client shell's [DotBallotPanel]), and never holds a director: a client that applied a
 ## result would be deciding what it plays.
 
+const ZzWorkshop := preload("zz_workshop.gd")
+
 const CHANNEL := "zombiezone.vote"
 
 ## The key in the running game's descriptor metadata an operator's overrides are read from —
@@ -73,6 +75,10 @@ var people_fn: Callable = Callable()
 ## only for a round in progress. The host's, because only the match knows.
 var round_in_progress_fn: Callable = Callable()
 
+## The content index subscribed maps are read from. Null is dot-core's shared one; a test hands
+## its own so it never touches the process's.
+var content_index: DotContentIndex = null
+
 var director: DotVoteDirector = null
 var source: DotVoteListSource = null
 var commands: DotVoteCommands = null
@@ -92,6 +98,11 @@ func setup() -> DotResult:
 	source.label = "maps"
 	source.apply_fn = func(id: StringName) -> DotResult:
 		return apply_fn.call(id) if apply_fn.is_valid() else DotResult.success(id)
+	# A subscribed pack's maps join the ballot in solo only: the index answers for its own session
+	# and a server's is online, so a ballot there lists none of them. The game's own ids win.
+	source.entries_fn = _own_choices
+	source.follow_content(content_index if content_index != null else DotContentIndex.shared(),
+		ZzWorkshop.accepted_map_kinds())
 	refresh_maps()
 
 	director = DotVoteDirector.new()
@@ -211,14 +222,23 @@ func refresh_maps() -> void:
 	if source == null:
 		return
 
-	source.entries.clear()
+	var _read := source.refresh()
+
+
+## The game's own maps as choices: what [member DotVoteListSource.entries_fn] reads before every
+## ballot, so a map the operator removed leaves it. Subscribed maps are merged on top, never in
+## here.
+func _own_choices() -> Array:
+	var out: Array = []
 
 	if not maps_fn.is_valid():
-		return
+		return out
 
 	for pair: Variant in maps_fn.call():
 		var row: Array = pair
-		var _added := source.add(DotVoteChoice.of(StringName(str(row[0])), str(row[1])))
+		out.append(DotVoteChoice.of(StringName(str(row[0])), str(row[1])))
+
+	return out
 
 
 ## A map was built: the director starts over on it and the ballot timer restarts.
@@ -281,7 +301,7 @@ func advance(delta: float) -> void:
 	_opened_this_map = true
 
 	# Nothing to choose between: one map, or one map and itself.
-	if source.entries.size() < 2:
+	if source.choices().size() < 2:
 		return
 
 	var opened := director.start_vote(DotVoteClock.REASON_MANUAL)

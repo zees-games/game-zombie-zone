@@ -23,6 +23,7 @@ const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
 const ZzTeamDamage := preload("zz_team_damage.gd")
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzWorkshop := preload("zz_workshop.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
@@ -148,6 +149,9 @@ signal survival_changed()
 
 var map: ZzMap = null
 var catalogue: ZzCatalogue = null
+
+## Where subscribed Workshop maps are read from; null is dot-core's shared index. A test gives its own.
+var content_index: DotContentIndex = null
 var props_catalogue: ZzProps = null
 var combat: DotCombatManager = null
 var match_node: DotMatch = null
@@ -1047,6 +1051,9 @@ func map_rows() -> Array:
 		if doc.has("thumbnail"):
 			row["thumbnail"] = str(doc["thumbnail"])
 		out.append(row)
+	# Subscribed maps, after the game's own and only in solo (the index answers for its session).
+	out.append_array(ZzWorkshop.rows(
+		content_index if content_index != null else DotContentIndex.shared(), catalogue.maps.keys()))
 	return out
 
 
@@ -1057,6 +1064,10 @@ func map_rows() -> Array:
 func change_map_now(id: StringName) -> DotResult:
 	if not authoritative:
 		return DotResult.fail(DotError.CODE_STATE, "Only the server changes the map.")
+	if catalogue != null and not catalogue.maps.has(id) \
+			and not ZzWorkshop.rows(content_index if content_index != null else DotContentIndex.shared(),
+				catalogue.maps.keys()).filter(func(r: Dictionary) -> bool: return r["id"] == String(id)).is_empty():
+		return DotResult.fail(DotError.CODE_STATE, ZzWorkshop.NOT_PLAYABLE)
 	if catalogue == null or not catalogue.playable(config.map_ids).has(id):
 		return DotResult.fail(DotError.CODE_INVALID, "There is no map called '%s' here." % id)
 	next_map_id = id
