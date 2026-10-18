@@ -1151,8 +1151,10 @@ func _test_box_framework() -> void:
 	game.boxes.register_handler(&"t_round", load("res://game/zz_box_effect.gd"))
 	var _r := game.boxes.activate(&"t_round", &"t_round", ctx)
 	game.boxes.run([{"do": "pace", "what": "mob_rate", "scale": 2.0, "seconds": 60.0}], ctx)
-	_check(game.boxes.effects_summary().size() == 4 and float(game.boxes.effects_summary()[2]["seconds"]) < 0.0
-		or true, "a round-long effect reports no clock")
+	# Counted, not indexed: effects_summary() comes from a Dictionary's values, whose order is not a promise.
+	var summary := game.boxes.effects_summary()
+	var unclocked := summary.filter(func(g: Dictionary) -> bool: return float(g["seconds"]) < 0.0).size()
+	_check(summary.size() == 4 and unclocked == 1, "a round-long effect reports no clock, and only it")
 	game.boxes.end_round()
 	_check(not game.boxes.is_active(&"t_stack") and not game.boxes.is_active(&"t_round") and game.boxes.is_active(&"t_keep")
 		and is_equal_approx(game.horde.mob_rate_scale, 1.0),
