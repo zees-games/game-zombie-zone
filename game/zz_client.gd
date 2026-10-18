@@ -1664,6 +1664,15 @@ func _key_event(event: InputEvent) -> bool:
 			_slot = i + 1
 			return true
 
+	# Previous and next weapon, on the wheel by default; a row moved onto a key lands here.
+	if _pointer_ours():
+		if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
+			_cycle_slot(1)
+			return true
+		elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
+			_cycle_slot(-1)
+			return true
+
 	return false
 
 

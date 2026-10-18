@@ -36,7 +36,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 36
 
-const CHECKS := 216
+const CHECKS := 219
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1489,6 +1489,25 @@ func _test_the_client_platform() -> void:
 	wheel.pressed = true
 	_check(wheel.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION) and client.settings.bindings.key_for(DotMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
 		"the wheel changes weapon through a rebindable row")
+	var binds: DotMenuBindings = client.settings.bindings
+	_check(binds.key_for(DotMenuBindings.WEAPON_PREVIOUS_ACTION) == "Wheel up" and binds.key_for(DotMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
+		"the wheel rows default to previous (up) and next (down)")
+	var jump_wheel := InputEventMouseButton.new()
+	jump_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	jump_wheel.pressed = true
+	_check(not jump_wheel.is_action_pressed(&"dot_fps_jump") and not wheel.is_action_pressed(&"dot_fps_jump"),
+		"the wheel is not on jump")
+	var slots: Array = client.weapons.arsenal.slots() if client.weapons != null and client.weapons.arsenal != null else []
+	var before: int = client._slot
+	# The press itself is gated on a captured pointer, which a headless run cannot have; the
+	# routing is the action match above, so this drives what the action calls.
+	client._cycle_slot(1)
+	var after: int = client._slot
+	var expected: int = before
+	if slots.size() > 1:
+		expected = slots[posmod((maxi(slots.find(before), 0)) + 1, slots.size())]
+	_check(after == expected and (slots.size() < 2 or after != before),
+		"the next-weapon step moves one slot", "slots %s, %d -> %d" % [str(slots), before, after])
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame
