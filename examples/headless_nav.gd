@@ -13,14 +13,14 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 11
-const CHECKS := 43
+const SECTIONS := 12
+const CHECKS := 47
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 
 ## Maps held by a team, and how far from a choke a stand-in counts as holding it.
-const MAPS := ["zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zz_chapel", "zz_lot"]
+const MAPS := ["zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zz_chapel", "zz_lot", "zs_ravenstreet"]
 const NEAR := 7.0
 
 ## Seconds the stand-ins have to walk to their places before a wave comes.

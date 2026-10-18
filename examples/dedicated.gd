@@ -432,19 +432,26 @@ func _test_the_map_vote() -> void:
 	var opened := director.open_vote(DotVoteClock.REASON_MANUAL)
 	_check(opened.ok and director.is_voting(), "a ballot opens", opened.error.message if not opened.ok else "")
 
-	var cast := director.cast_one(&"7", &"zz_lot")
+	# Any map on the ballot: it holds a few of the catalogue's, chosen by the director, and a
+	# fixed id was on it only while the catalogue was the size it was.
+	var voted: StringName = &""
+	for option_id: StringName in director.ballot.option_ids():
+		if game.catalogue.maps.has(option_id):
+			voted = option_id
+			break
+	var cast := director.cast_one(&"7", voted)
 	# Everybody has voted; the director closes on its next advance, which is the server's tick.
 	director.advance(0.05)
-	_check(cast.ok and director.pending_id() == &"zz_lot", "one vote decides it, waiting for the round's end",
+	_check(cast.ok and director.pending_id() == voted and voted != &"", "one vote decides it, waiting for the round's end",
 		"%s %s" % [cast.ok, director.pending_id()])
 
 	# No frame between these: the stand-ins' rounds are still running, and one that started in
 	# between would lay the voted map itself and leave this check reading the rotation's.
 	vote.call("note_round_end")
-	_check(game.next_map_id == &"zz_lot", "the round's end hands it to the world", str(game.next_map_id))
+	_check(game.next_map_id == voted, "the round's end hands it to the world", str(game.next_map_id))
 
 	game.call("_lay_out_map")
-	_check(str(game.map_doc.get("id", "")) == "zz_lot" and game.next_map_id == &"",
+	_check(StringName(str(game.map_doc.get("id", ""))) == voted and game.next_map_id == &"",
 		"and the next map laid is the one voted for, once", "%s / %s" % [game.map_doc.get("id", ""), game.next_map_id])
 
 	# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL the

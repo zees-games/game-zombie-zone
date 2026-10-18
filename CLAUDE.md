@@ -34,7 +34,7 @@ npcs/                the zombie body, its view (the animated models), one brain 
 assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the kit's atlases
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (31 sections), headless_maps, headless_net (15), headless_weapons, dedicated, headless_survival, headless_nav (11 sections, 43 checks)
+examples/            headless_run (31 sections), headless_maps, headless_net (15), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```

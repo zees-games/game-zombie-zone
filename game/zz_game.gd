@@ -1104,6 +1104,9 @@ func build_map(doc: Dictionary) -> DotResult:
 
 	map_doc = map.doc
 	_reset_barricades()
+	# The states are the map's: a map laid out between rounds (the map menu's change, a vote's)
+	# otherwise keeps the last map's, and a shorter objective list is read past its end.
+	_reset_objectives()
 
 	if spectate != null:
 		spectate.set_overviews(map.overview(), map.overview())

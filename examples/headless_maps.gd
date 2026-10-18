@@ -21,7 +21,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
-const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp"]
+const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet"]
 const CHECKS_PER_MAP := 15
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
