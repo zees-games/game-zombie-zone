@@ -49,6 +49,10 @@ const CHASE_UP := 0.6
 
 var game: ZzGame = null
 var player: ZzPlayer = null
+
+## Keeps the screen covered, and the local body and the input still, until the map, the
+## player and the camera are all in. See [method _build_gate].
+var gate: DotLoadGate = null
 var camera: Camera3D = null
 var hud: ZzHud = null
 var board: DotMenuScoreboard = null
@@ -104,6 +108,9 @@ var _brutes: int = 0
 
 
 func _ready() -> void:
+	# First, before anything can be drawn: the map, the player and the camera all arrive
+	# after this node is in the tree.
+	_build_gate()
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
 	var config := ZzConfig.new()
@@ -122,6 +129,9 @@ func _ready() -> void:
 	game.register_service = _offline
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
 	game.draw_world = true
+	# Before the world is added: a world that ticks itself must not run in front of a picture.
+	game.hold_clock = _covered
+	_hold_for_maps()
 	add_child(game)
 
 	_sampler = DotFpsSampler.new(ZzPlayer.tunables_for(config))
@@ -141,6 +151,42 @@ func _ready() -> void:
 
 	if not DotPlatform.is_web():
 		_capture()
+
+
+## The load gate: covered, with the local body and the input still, until the map stands, the
+## local player exists and its camera is current.
+##
+## Covered also means the horde does not act. Offline the world ticks itself, so the director,
+## waves, clocks and damage would all work on the survivor in front of a picture;
+## [member ZzGame.hold_clock] steps only the bodies then, which settle onto the floor under the
+## cover with their input off. Connected, the server owns all of that; what is left to hold is
+## this end's sampling and keys, which wait on [method _covered].
+func _build_gate() -> void:
+	gate = DotLoadGate.new()
+	gate.name = "LoadGate"
+	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
+	# out its timeout, and every suite that drives a client would wait with it.
+	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
+	add_child(gate)
+	gate.hold(&"map", "Loading the map")
+	gate.require(&"spawned", func() -> bool:
+		return player != null and camera != null and camera.is_inside_tree(), "Joining")
+
+
+## Covered from the moment a map starts clearing until it is rebuilt, the first build and every
+## later one (a vote's, the map menu's, a server's next).
+func _hold_for_maps() -> void:
+	game.world_clearing.connect(func() -> void:
+		if gate != null:
+			gate.hold(&"map", "Loading the map"))
+	game.world_rebuilt.connect(func() -> void:
+		if gate != null:
+			gate.release(&"map"))
+
+
+## True while the load gate covers the screen: no input, no sampling, no horde.
+func _covered() -> bool:
+	return gate != null and not gate.is_open()
 
 
 func _exit_tree() -> void:
@@ -353,6 +399,8 @@ func _adopt(candidate: ZzPlayer) -> void:
 		return
 
 	player = candidate
+	if gate != null:
+		gate.freeze(player)
 	_build_camera()
 
 	# Offline the world samples this player's movement itself, so the buttons go onto that
@@ -1223,10 +1271,15 @@ func _physics_process(delta: float) -> void:
 	if net == null or not net.is_running() or bridge == null:
 		return
 
+	# The clock advances; only the sampling waits, so the mouse does not pile up a turn behind
+	# the cover and the server sees an idle body until it lifts.
+	var ticks := net.clock.advance(delta)
+
+	if _covered():
+		return
+
 	var move := _sampler.sample(delta) if _sampler != null else DotFpsCommand.new()
 	_stamp(move)
-
-	var ticks := net.clock.advance(delta)
 
 	for i in range(ticks):
 		if not net.clock.is_synced():
@@ -1238,7 +1291,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _drive_offline() -> void:
-	if player == null or player.sampler == null:
+	if player == null or player.sampler == null or _covered():
 		return
 
 	var pending := player.controller.current_command
@@ -1560,6 +1613,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release()
 		if settings != null:
 			settings.open()
+		return
+
+	# Nothing below acts while the cover is up: no shot, jump, look or use.
+	if _covered():
 		return
 
 	if event.is_action(ZzBindings.SCOREBOARD) and not event.is_echo():
