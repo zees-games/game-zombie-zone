@@ -295,6 +295,9 @@ func _ready() -> void:
 		bots = ZzBots.new(self)
 		_build_horde()
 		catalogue = ZzCatalogue.new()
+		# Subscribed (solo) pack maps are map documents and join the catalogue; online none.
+		catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
+			ZzWorkshop.accepted_map_kinds())
 		var _loaded := catalogue.load_from(config.map_directory)
 		# Solo in the client shell: the map packs it mounted for this game, which a server
 		# would have named. See [method solo_map_dirs].
@@ -1044,16 +1047,13 @@ func map_rows() -> Array:
 	var now := map.id() if map != null else &""
 	for id in catalogue.playable(config.map_ids):
 		var doc: Dictionary = catalogue.maps.get(id, {})
-		var row := {"id": String(id), "name": str(doc.get("name", id)), "current": id == now,
+		var row := {"id": String(id), "name": catalogue.display_name(id), "current": id == now,
 			"mode": str(doc.get("mode", "")).capitalize(),
 			"detail": str(doc.get("blurb", "")) if int(doc.get("survivors", 0)) <= 0 \
 				else "%s (%d survivors)" % [str(doc.get("blurb", "")), int(doc["survivors"])]}
 		if doc.has("thumbnail"):
 			row["thumbnail"] = str(doc["thumbnail"])
 		out.append(row)
-	# Subscribed maps, after the game's own and only in solo (the index answers for its session).
-	out.append_array(ZzWorkshop.rows(
-		content_index if content_index != null else DotContentIndex.shared(), catalogue.maps.keys()))
 	return out
 
 
@@ -1064,10 +1064,6 @@ func map_rows() -> Array:
 func change_map_now(id: StringName) -> DotResult:
 	if not authoritative:
 		return DotResult.fail(DotError.CODE_STATE, "Only the server changes the map.")
-	if catalogue != null and not catalogue.maps.has(id) \
-			and not ZzWorkshop.rows(content_index if content_index != null else DotContentIndex.shared(),
-				catalogue.maps.keys()).filter(func(r: Dictionary) -> bool: return r["id"] == String(id)).is_empty():
-		return DotResult.fail(DotError.CODE_STATE, ZzWorkshop.NOT_PLAYABLE)
 	if catalogue == null or not catalogue.playable(config.map_ids).has(id):
 		return DotResult.fail(DotError.CODE_INVALID, "There is no map called '%s' here." % id)
 	next_map_id = id

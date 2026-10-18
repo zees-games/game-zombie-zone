@@ -755,13 +755,16 @@ func _build_vote(world: ZzGame) -> void:
 		var out: Array = []
 
 		for id in world.catalogue.playable(world.config.map_ids):
-			out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
+			# Pack maps join the ballot through dot-vote's follow_content, with their pack's name.
+			if not world.catalogue.is_content(id):
+				out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
 
 		return out
 	vote.apply_fn = func(id: StringName) -> DotResult:
-		# A Workshop map can be on a solo ballot; it cannot be built (docs/not-yet.md).
+		# A Workshop map on a solo ballot is a catalogue map once the catalogue has read the index.
+		world.catalogue.sync_content()
 		if not world.catalogue.maps.has(id):
-			return DotResult.fail(DotError.CODE_STATE, "Zombie Zone cannot play Workshop maps yet.")
+			return DotResult.fail(DotError.CODE_STATE, "There is no map called '%s' here." % id)
 		world.next_map_id = id
 		return DotResult.success(id)
 	# Due on the last map of a campaign (one that names no next map) and on a survival map:

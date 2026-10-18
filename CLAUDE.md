@@ -34,7 +34,7 @@ npcs/                the zombie body, its view (the animated models), one brain 
 assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the kit's atlases
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (35 sections), headless_maps, headless_net (17), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (what subscribed map packs add to the lists; listed, not playable: [not-yet](docs/not-yet.md))
+examples/            headless_run (35 sections), headless_maps, headless_net (17), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
@@ -109,6 +109,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 **Delivery** ([design](docs/design.md#delivery-and-the-map-vote))
 - `project.godot` carries no comments (the editor drops them); gravity is `ZzConfig.gravity` on the world's own space; the renderer is `gl_compatibility`; texture imports keep `detect_3d/compress_to=0`.
 - The maps pack is named by the server owner, never by `game.yml`; `ZzModule` adds every mount's `maps/` at load and after `zz_reload`.
+- **Workshop maps** (`provides.json`: `accepts.map_kinds` `survival` and `exodus`): a pack's `map` entry's `scene` is a ZZ map DOCUMENT (JSON, same as `maps/`) whose `id` equals the entry's. `ZzCatalogue.follow_content` reads `DotContentIndex.shared()` on every `playable()`, so a subscribed map (solo) is validated, nav-graphed and played like the game's own, shown "Name [Pack]"; the game's own ids win, a bad document lands in `catalogue.refused` and is not listed, and online lists none. The ballot lists them through dot-vote's `follow_content`, so `maps_fn` leaves them out. `headless_workshop` holds it.
 - Under MANUAL `ZzVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after the delivered maps; the match answers `round_in_progress_fn` by name.
 
 ## Team damage, votebans and barricades

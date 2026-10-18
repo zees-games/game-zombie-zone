@@ -26,18 +26,31 @@ var refused: Dictionary = {}
 var _order: Array[StringName] = []
 var _next: int = 0
 
+# --- Workshop maps ----------------------------------------------------------
+# A pack's `map` entry names a ZzMapDoc DOCUMENT in `scene` (the same JSON as maps/), so a
+# subscribed map goes through exactly the validation, nav graph, safe rooms and waves of the
+# game's own. Online the index answers for its session and lists none.
+var _index: DotContentIndex = null
+var _kinds: PackedStringArray = PackedStringArray()
+var _content_ids: Dictionary = {}    # id -> the document this follower added
+var _content_titles: Dictionary = {} # id -> pack title
+var _content_docs: Dictionary = {}   # entry key -> document ({} when refused), read once
+
 
 ## Reads every document under [param directory] (relative to this game's root), and adds the
 ## one built in. Forgets anything read before.
 func load_from(directory: String) -> int:
 	maps.clear()
 	refused.clear()
+	_content_ids.clear()
+	_content_docs.clear()
 
 	_add(practice(), "built-in")
 
 	var root := ZzPaths.rebase("res://" + directory.trim_prefix("res://").trim_prefix("/"))
 	var loaded := _read_directory(root)
 	_rebuild_order()
+	sync_content()
 
 	DotLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
 	return loaded
@@ -90,6 +103,106 @@ func _read_directory(root: String) -> int:
 	return loaded
 
 
+## Follows [param index]: subscribed (solo) map entries of an accepted kind become maps here, for
+## the index's CURRENT session only. The game's own ids always win.
+func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray) -> void:
+	_index = index
+	_kinds = accepted_kinds
+	sync_content()
+
+
+## Re-reads the index into [member maps]. Called from [method playable] rather than on a signal,
+## because a session change announces nothing and a stale list is worse than a loop over a
+## handful of entries.
+func sync_content() -> void:
+	var wanted: Dictionary = {}
+
+	if _index != null:
+		for entry in _index.entries(&"map"):
+			var kind := str(entry.raw.get("map_kind", ""))
+
+			if entry.id == "" or kind == "" or not (_kinds.has("*") or _kinds.has(kind)):
+				continue
+
+			var doc := _content_doc(entry)
+
+			if doc.is_empty():
+				continue
+
+			var id := StringName(str(doc["id"]))
+
+			if not wanted.has(id):
+				wanted[id] = doc
+				_content_titles[id] = entry.pack_title
+
+	var changed := false
+
+	# Only a map this follower added is taken out: load_from may since have put the game's own
+	# under the id.
+	for id: StringName in _content_ids:
+		if maps.has(id) and is_same(maps[id], _content_ids[id]) \
+				and not (wanted.has(id) and is_same(wanted[id], _content_ids[id])):
+			var _gone := maps.erase(id)
+			changed = true
+
+	_content_ids.clear()
+
+	for id: StringName in wanted:
+		if maps.has(id):
+			if is_same(maps[id], wanted[id]):
+				_content_ids[id] = wanted[id]
+			continue
+
+		maps[id] = wanted[id]
+		_content_ids[id] = wanted[id]
+		changed = true
+
+	if changed:
+		_rebuild_order()
+
+
+## Whether [param id] is a subscribed pack map rather than one of the game's own.
+func is_content(id: StringName) -> bool:
+	return _content_ids.has(id)
+
+
+## The name a menu shows: "Name [Pack]" for a pack's map, the document's name otherwise.
+func display_name(id: StringName) -> String:
+	var doc: Dictionary = maps.get(id, {})
+	var shown := str(doc.get("name", id))
+	var title := str(_content_titles.get(id, "")) if _content_ids.has(id) else ""
+	return "%s [%s]" % [shown, title] if title != "" else shown
+
+
+func _content_doc(entry: DotContentEntry) -> Dictionary:
+	if _content_docs.has(entry.key):
+		return _content_docs[entry.key]
+
+	var file := entry.path("scene")
+	var text := FileAccess.get_file_as_string(file) if file != "" else ""
+	var doc: Dictionary = {}
+
+	if text.is_empty():
+		refused[entry.key] = "The pack's map document is empty or unreadable: %s" % file
+	else:
+		var parsed := ZzMapDoc.parse_json(text, file)
+
+		if parsed.ok and str(parsed.value["id"]) != entry.id:
+			# The ballot names the entry's id and the map menu the document's: two names for one
+			# map would offer a choice the catalogue cannot find.
+			refused[entry.key] = "The pack's entry id is %s but its document's id is %s." % [entry.id, parsed.value["id"]]
+		elif parsed.ok:
+			doc = parsed.value
+		else:
+			refused[entry.key] = parsed.error.message
+			DotLog.warn(CHANNEL, "a subscribed map was refused", {
+				"key": entry.key, "why": parsed.error.message, "detail": parsed.error.detail,
+			})
+
+	_content_docs[entry.key] = doc
+	return doc
+
+
 func _add(doc: Dictionary, origin: String) -> bool:
 	var id := StringName(str(doc["id"]))
 
@@ -114,6 +227,7 @@ func _rebuild_order() -> void:
 ## The ids a server may draw from, after [param allowed] (empty is all). The built-in practice
 ## map drops out once there is anything else.
 func playable(allowed: PackedStringArray) -> Array[StringName]:
+	sync_content()
 	var out: Array[StringName] = []
 
 	for id in _order:

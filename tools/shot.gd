@@ -3,6 +3,7 @@ extends Node
 ## Renders the game and saves a frame. The check no assertion in this repository makes.
 ## See `tools/shot.sh` for the views. Any `--zz-*` is the game's own configuration.
 
+const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
@@ -63,6 +64,8 @@ func _ready() -> void:
 			_aim = arg.trim_prefix("--aim=").to_float()
 		elif arg.begins_with("--box="):
 			_box = StringName(arg.trim_prefix("--box="))
+		elif arg == "--workshop":
+			_subscribe_fixture()
 
 	_client = ZzClient.new()
 	_client.name = "Client"
@@ -70,6 +73,27 @@ func _ready() -> void:
 	_client.set("offline_bots", 3)
 	add_child(_client)
 	_run.call_deferred()
+
+
+## --workshop: a subscribed pack whose one map is a document (the practice street under another
+## id) in the process's shared index, solo. Pair with --zz-map-ids=fixture_ruin to play only it.
+static func _subscribe_fixture() -> void:
+	var dir := "user://ws_fixture_shot/"
+	var _made := DirAccess.make_dir_recursive_absolute(dir)
+	var doc := ZzCatalogue.practice().duplicate(true)
+	doc["id"] = "fixture_ruin"
+	doc["name"] = "Fixture Ruin"
+	var f := FileAccess.open(dir + "ruin.json", FileAccess.WRITE)
+	f.store_string(JSON.stringify(doc))
+	f.close()
+	var added := DotContentIndex.shared().add_pack({
+		"content_id": "fixture/ruins", "version": "1.0.0", "prefix": dir,
+		"session": DotContentIndex.SESSION_SOLO, "source": &"subscription",
+		"provides": {"schema": 1, "title": "Ruins Pack", "kinds": ["map"], "entries": [
+			{"kind": "map", "id": "fixture_ruin", "name": "Fixture Ruin", "scene": "ruin.json", "map_kind": "exodus"},
+		]},
+	})
+	print("workshop fixture: ", added.ok)
 
 
 static func _v3(text: String) -> Vector3:
