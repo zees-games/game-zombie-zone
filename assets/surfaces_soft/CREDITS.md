@@ -1,0 +1,1 @@
+tile_checker.jpg is ../surfaces/tile_checker/albedo.jpg (ambientCG Tiles074, CC0) with every pixel pulled 45% toward a light stone grey, so the school's dark squares read dark grey rather than black (ZzMaterials.SOFT_ALBEDO). Kept outside assets/surfaces because dot-map's sync owns that folder.

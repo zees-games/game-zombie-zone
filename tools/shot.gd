@@ -529,8 +529,22 @@ func _frames(count: int) -> void:
 
 func _seconds_of(seconds: float) -> void:
 	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
+	var gaps := PackedFloat64Array()
+	var last := Time.get_ticks_usec()
 	while Time.get_ticks_msec() < until:
 		await get_tree().process_frame
+		var now := Time.get_ticks_usec()
+		gaps.append(float(now - last) / 1000.0)
+		last = now
+	# A frame time a run can be compared by (ms, first fifth dropped as warm-up): the number a
+	# texture or light change is judged on, on the GPU box through ../gpu.sh.
+	if seconds >= 3.0 and gaps.size() > 10:
+		var kept := gaps.slice(gaps.size() / 5)
+		kept.sort()
+		var sum := 0.0
+		for g in kept:
+			sum += g
+		print("FRAME_MS mean=%.2f p95=%.2f n=%d" % [sum / kept.size(), kept[int(kept.size() * 0.95)], kept.size()])
 
 
 ## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.

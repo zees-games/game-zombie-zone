@@ -140,17 +140,28 @@ const KIND_OF := {
 	"metal": ["metal", "metal"], "grass": ["grass", "grass"], "dirt": ["ground", "ground"],
 }
 
+## A map's own reading of a mat: map id -> mat -> the kind that draws it there. The mall shares
+## "tile_check" with the school, but the black-and-cream marble checker is harsh in a shopping
+## mall; it takes the light tile (a map's own "surface" word still wins).
+const SURFACE_BY_MAP := {"zz_mall": {"tile_check": "tile_white"}}
+
+## Kinds whose photograph is drawn with a softer copy (assets/surfaces_soft/<kind>.jpg, made from
+## the vendored albedo by pulling it halfway toward its light squares): the school keeps a
+## checker, with dark squares that are dark grey rather than black. Kept outside assets/surfaces
+## because dot-map's sync owns that folder.
+const SOFT_ALBEDO := {"tile_checker": "res://assets/surfaces_soft/tile_checker.jpg"}
+
 ## A kind's own tint, multiplied under the map's. The photographs are mid-tone to bright
 ## (white tile is 0.97 on average, plaster 0.75): scaled so a map reads at the brightness the
 ## pale prototype grid had, which the zombies are read against, and so tile, grass, ground and
 ## planks are not neon under a night's light.
 const KIND_TINT := {
-	"concrete": Color(0.95, 0.95, 0.95), "concrete_clean": Color(0.85, 0.85, 0.85),
-	"plaster": Color(0.9, 0.9, 0.9), "brick": Color(1.15, 1.1, 1.1),
+	"concrete": Color(1.45, 1.45, 1.45), "concrete_clean": Color(1.0, 1.0, 1.0),
+	"plaster": Color(1.1, 1.1, 1.1), "brick": Color(1.35, 1.3, 1.3),
 	"tile_white": Color(0.8, 0.8, 0.82), "tile_checker": Color(1.3, 1.3, 1.3),
 	"wood_floor": Color(1.35, 1.3, 1.3), "wood_planks": Color(0.8, 0.78, 0.75),
-	"asphalt": Color(1.2, 1.2, 1.2), "metal": Color(1.2, 1.2, 1.2),
-	"corrugated": Color(0.9, 0.9, 0.9), "grass": Color(0.6, 0.64, 0.5),
+	"asphalt": Color(1.5, 1.5, 1.5), "metal": Color(1.5, 1.5, 1.5),
+	"corrugated": Color(1.15, 1.15, 1.15), "grass": Color(1.15, 1.2, 0.95),
 	"ground": Color(0.8, 0.75, 0.65),
 }
 
@@ -190,6 +201,14 @@ static func is_shiny(id: String, role: String = "", surface: String = "") -> boo
 ## "floor" for a slab lying down (0.6 m or thinner, wider than 1.5 m), "wall" for the rest.
 static func role_of(size: Vector3) -> String:
 	return "floor" if size.y <= 0.6 and maxf(size.x, size.z) >= 1.5 else "wall"
+
+
+## The "surface" word for a box of [param mat] in map [param map_id]: the box's own, else the
+## map's reading of the mat (SURFACE_BY_MAP), else none.
+static func surface_for(map_id: String, mat: String, surface: String) -> String:
+	if surface != "":
+		return surface
+	return String((SURFACE_BY_MAP.get(map_id, {}) as Dictionary).get(mat, ""))
 
 
 ## The photographic kind that draws [param id] for a box of [param role], or empty when it keeps
@@ -296,7 +315,17 @@ static func _photo(kind: String, tint: Color) -> StandardMaterial3D:
 	var pale := Color(minf(tint.r, 1.1), minf(tint.g, 1.1), minf(tint.b, 1.1)).lerp(Color.WHITE, 0.5)
 	var base: Color = KIND_TINT.get(kind, Color.WHITE)
 	var res: DotResult = surfaces.try_material(StringName(kind), Color(base.r * pale.r, base.g * pale.g, base.b * pale.b))
-	return res.value if res.ok else null
+	if not res.ok:
+		return null
+	var m: StandardMaterial3D = res.value
+	if SOFT_ALBEDO.has(kind):
+		var soft := ZzPaths.rebase(SOFT_ALBEDO[kind])
+		if ResourceLoader.exists(soft, "Texture2D"):
+			# A copy: the library caches the material it made, and other users of the kind
+			# (none now) must keep the photograph.
+			m = m.duplicate() as StandardMaterial3D
+			m.albedo_texture = ResourceLoader.load(soft, "Texture2D") as Texture2D
+	return m
 
 
 ## A building surface on Kenney's grid (or tiles), or null when the textures are not there.

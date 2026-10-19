@@ -296,8 +296,8 @@ func _build_boxes() -> void:
 		# the solid boxes, so the whole chunk can say it is meant to be walked through.
 		var ghost := not bool(box.get("solid", true))
 		var role := ZzMaterials.role_of(size)
-		var surface := str(box.get("surface", ""))
-		var key := "%s|%s|%d|%d|%s|%s|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost, role, surface]
+		var surface := ZzMaterials.surface_for(str(id()), str(box["mat"]), str(box.get("surface", "")))
+		var key :="%s|%s|%d|%d|%s|%s|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost, role, surface]
 
 		if not batches.has(key):
 			var tool := SurfaceTool.new()
