@@ -20,6 +20,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorldView := preload("zz_world_view.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
 ## offline, or against a server.
@@ -193,6 +194,27 @@ func _build_world_view() -> void:
 	world_view.ragdoll_mask = game.world_mask()
 	world_view.ragdoll_rules = game.ragdoll_rules
 	game.add_child(world_view)
+	_warm_zombies()
+
+
+## Draws every zombie look once under the cover, so the first one of a kind to walk into view
+## does not compile its shader mid-play: nothing of them is in the tree until the server spawns
+## one, and the gate only warms what it can find.
+func _warm_zombies() -> void:
+	if gate == null:
+		return
+
+	var materials: Array = []
+
+	for kind: StringName in [ZzNpcs.COMMON, ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM,
+			ZzNpcs.SPITTER, ZzNpcs.RIDER, ZzNpcs.BRUTE, ZzNpcs.SLEEPER, ZzNpcs.SCREAMER, ZzNpcs.CRAWLER,
+			ZzNpcs.RIOT]:
+		var variants := ZzZombieView.common_variety() if kind == ZzNpcs.COMMON else 1
+
+		for variant in variants:
+			materials.append(ZzZombieView._material_for(ZzZombieView.look_for(kind, variant)))
+
+	gate.warm_up(materials)
 
 
 func _read_box_colours() -> void:

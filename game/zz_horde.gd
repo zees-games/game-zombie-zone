@@ -658,7 +658,9 @@ func _rebuild_candidates() -> void:
 	for player in game.survivors():
 		var id: StringName = player.player_id
 		var state: DotFpsState = player.controller.state
-		var alive: bool = player.is_alive() and not player.watching
+		# A seat behind its loading cover is not a target: not chased, not spawned at, not counted
+		# in the crowd's size (dot-game's "still loading"); it is still alive for the round.
+		var alive: bool = player.is_alive() and not player.watching and game.can_be_harmed(id)
 
 		_survivors[id] = {
 			"position": state.position,

@@ -154,6 +154,10 @@ var catalogue: ZzCatalogue = null
 var content_index: DotContentIndex = null
 var props_catalogue: ZzProps = null
 var combat: DotCombatManager = null
+
+## `func(player_id: StringName) -> bool`: whether a survivor may be hurt now, assigned by the
+## module from dot-game's `can_peer_be_harmed`. Unset offline, and a stand-in is never loading.
+var harm_gate: Callable = Callable()
 var match_node: DotMatch = null
 var random: DotRandomManager = null
 var physics: DotPhysicsLayout = null
@@ -505,6 +509,16 @@ func _on_hit_landed(damage: DotDamage) -> void:
 
 
 func _adjust_damage(damage: DotDamage) -> void:
+	# dot-game's "still loading": the one place every hurt on a survivor passes (a bite, a pin's
+	# damage, acid, fire, a blast, a friend's bullet), so a seat behind its client's cover is
+	# neither hurt, downed nor killed. An admin's slay or slap is the operator's word and passes.
+	if DotEntity.is_kind(damage.victim, DotEntity.KIND_PLAYER) and not damage.context.get("admin", false):
+		var covered := player_for_entity(damage.victim)
+
+		if covered != null and not can_be_harmed(covered.player_id):
+			damage.refuse("still loading")
+			return
+
 	if authoritative and damage.attacker != damage.victim and damage.attacker != 0 \
 			and DotEntity.is_kind(damage.victim, DotEntity.KIND_PLAYER):
 		_team_damage_hit(damage)
@@ -521,6 +535,13 @@ func _adjust_damage(damage: DotDamage) -> void:
 		var npc := horde.npc_for_entity(damage.victim) if horde != null else null
 		if npc != null:
 			damage.amount = boxes.zombie_damage(npc.def.id, npc.def.max_health, damage.amount)
+
+
+## Whether [param player_id] may be hurt, downed, pinned or hunted now: false while their client
+## is behind its loading cover. True for anybody the gate does not know (a stand-in is never
+## loading; offline there is no gate).
+func can_be_harmed(player_id: StringName) -> bool:
+	return not harm_gate.is_valid() or bool(harm_gate.call(player_id))
 
 
 ## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
@@ -2377,7 +2398,12 @@ func _advance_bodies(delta: float) -> void:
 
 		# Below the map is death, not a down.
 		if player.is_alive() and player.feet().y < map.kill_height():
-			_die(player, &"", BY_FELL)
+			if can_be_harmed(player.player_id):
+				_die(player, &"", BY_FELL)
+			else:
+				# Under the cover nothing may kill it, but it cannot be left falling either.
+				var spot := map.spawn("survivors", 0)
+				player.place_at(spot[0], spot[1])
 
 
 # --- Zombies dying ------------------------------------------------------------------------------

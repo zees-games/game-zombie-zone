@@ -71,6 +71,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 - Stand-ins aim and shoot through dot-bot's `DotBotAim`; never set `command.yaw` straight onto a target. They shoot the head when only the head shows over boards.
 - H is help and M is the map list: nothing in `ZzBindings` defaults to either (the medkit is G, the shove F, and an old settings file follows them through `keys.renamed`); `headless_run` and `dedicated` check it.
 - A box with lasting game rules is a `ZzBoxEffect` handler named in `ZzBoxes.HANDLERS` (copy `zz_box_instakill.gd`); its `boxes.json` entry carries polarity, impact, stacks, duration, `survives_round` (keys documented in the file's `comment`). With `box_labels` off the type must never reach `ZzNetBridge`; send `loot.shown(...)`.
+- **Still loading** (dot-game): `ZzGame.harm_gate`, set by the module from `can_peer_be_harmed`, is asked by `_adjust_damage` (every bite, pin, hazard, blast and bullet on a survivor; admin slay/slap carry `context.admin`), by `ZzPins.pin`, and by `ZzHorde._rebuild_candidates`, which leaves a covered seat out of the targets, so nobody is chased or spawned at it. A covered seat below the map is put back, not killed. `dedicated` checks it over a real socket; `tools/render_cover.sh` renders the cover and the frame after it lifts. The client warms every zombie look under the cover (`ZzClient._warm_zombies`).
 - A cvar and a command never share a name (the cvar is `zz_box_drops`, the command `zz_boxes`).
 
 **Survival** ([survival](docs/survival.md))

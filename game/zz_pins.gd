@@ -66,6 +66,10 @@ func pin(entity: int, npc: DotNpcInstance, victim: StringName, kind: StringName)
 	if player == null or not player.is_alive() or player.is_pinned() or player.watching:
 		return false
 
+	# Still behind its loading cover: it cannot see or move, and a hold would damage it.
+	if not game.can_be_harmed(victim):
+		return false
+
 	if victim_of(entity) != &"":
 		return false
 

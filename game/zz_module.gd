@@ -236,6 +236,15 @@ func _game_load() -> DotResult:
 	if vote != null:
 		vote.refresh_maps()
 
+	# dot-game's "still loading": a seat behind its client's cover is neither hurt, pinned nor
+	# hunted (see ZzGame.harm_gate). Asked by player id, resolved to a peer through the bridge.
+	world.harm_gate = func(player_id: StringName) -> bool:
+		if bridge == null:
+			return true
+
+		var peer := int((bridge as ZzNetBridge).peer_for_player(ZzNetBridge.session_of(player_id)))
+		return peer <= 0 or can_peer_be_harmed(peer)
+
 	world.start()
 
 	log_info("the map is up", world.describe())

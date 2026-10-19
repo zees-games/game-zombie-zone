@@ -363,7 +363,7 @@ func _team() -> int:
 	var n := 0
 
 	for player in game.survivors():
-		if player.is_alive() and not player.watching:
+		if player.is_alive() and not player.watching and game.can_be_harmed(player.player_id):
 			n += 1
 
 	return maxi(n, 1)
