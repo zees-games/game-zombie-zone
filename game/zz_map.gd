@@ -36,20 +36,22 @@ const ZzPaths := preload("zz_paths.gd")
 ##
 ## [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by
 ## `tools/bake_lightmaps.sh`; dot-lighting's [DotLightBake]). Every opaque box batch carries a
-## second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`),
+## second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only),
 ## because the bake names its meshes by path and was made from this same code. A bake whose
 ## fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
 ## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked,
 ## the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their
 ## shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays
 ## live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters
-## only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes).
-## Everything that moves (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by
-## the LightmapGI probes plus the live lamps. Lightmapped surfaces ignore the Environment's
-## ambient, which is what a day raises, so a baked map carries the day with a live shadowless
-## fill (`BAKED_FILL`, per map in `BAKED_FILL_BY_MAP`) and a tonemap exposure rise
-## (`BAKED_DAY_EXPOSURE`). Glass and water are not in the bake. A server never loads one
-## ([member draw_world] is false).
+## only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes), and
+## so are brushed-metal batches (`Shiny_<n>`): a lamp's highlight is what makes metal look like
+## metal and a lightmap holds diffuse light only, so metal stays live-lit. Everything that moves
+## (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by the LightmapGI probes
+## plus the live lamps. A lightmap ignores the Environment's ambient, and a closed room has no sky
+## for the bake's own sky term to show, so the bake makes every surface emit the ambient colour
+## (tools/lightmap_scenes.gd, `EMIT_BY_MAP`): the flat fill the live map has, with occlusion.
+## What a day raises is carried by `BAKED_DAY_EXPOSURE`. Glass and water are not in the bake. A
+## server never loads one ([member draw_world] is false).
 
 const CHANNEL := "zz.map"
 
@@ -65,20 +67,13 @@ const GROUND_DEPTH := 1.8
 
 ## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
 ## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
-const BAKE_VERSION := 2
-
-## How much stronger the live fill is under a bake. Tuned from frames: baked and live read as
-## the same brightness, by night and by day.
-const BAKED_FILL := 4.0
-
-## Maps whose frames wanted another strength (an open car park is mostly sky, a corridor map
-## nearly none), found by rendering each baked against live and matching the mean brightness.
-const BAKED_FILL_BY_MAP := {"zz_lot": 1.2, "zz_high_school": 5.5, "ze_nuke_beta": 6.5, "ze_runforyourlife_1_v4": 2.5}
+const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
+const SHEET_SCRIPT := "res://addons/dot_lighting/bake/dot_lightmap_sheet.gd"
+const BAKE_VERSION := 3
 
 ## What a day adds to a lightmapped surface: nothing from the ambient, so the exposure rises with
 ## the day by this factor instead (frames: a baked school by day read a third darker than live).
-const BAKED_FILL_COOL := Color(0.85, 1.0, 1.2)
-const BAKED_DAY_EXPOSURE := 1.7
+const BAKED_DAY_EXPOSURE := 1.5
 
 ## Where a map's bake is, by id; rebased, so a delivered pack finds its own.
 const BAKE_PATH := "res://lightmaps/%s.res"
@@ -308,8 +303,8 @@ func _build_boxes() -> void:
 			# Baked light falls on what is solid and opaque; a decal, a bulb, water and glass
 			# are drawn live (and the bake sees through them).
 			var bakeable := not ghost and not ZzMaterials.is_transparent(str(box["mat"]))
-			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost,
-				"sheet": DotLightmapSheet.new() if bakeable else null}
+			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost, "shiny": bakeable and ZzMaterials.is_shiny(str(box["mat"])),
+				"sheet": (load(SHEET_SCRIPT) as GDScript).new() if bakeable and can_bake() else null}
 
 		var batch_of: Dictionary = batches[key]
 		if batch_of["sheet"] != null:
@@ -322,12 +317,15 @@ func _build_boxes() -> void:
 	for key: String in batches:
 		var batch: Dictionary = batches[key]
 		var tool: SurfaceTool = batch["tool"]
-		var sheet: DotLightmapSheet = batch["sheet"]
+		var sheet: RefCounted = batch["sheet"]
 		if sheet != null:
 			sheet.commit(tool)
 		var mesh := MeshInstance3D.new()
 		# The same name on every build of this document: a bake finds its meshes by path.
-		mesh.name = "Boxes_%d" % index
+		# A shiny batch (brushed metal) is in the bake as a caster only and trimmed from the stored
+		# file (tools/lightmap_trim.gd): what makes it look like metal is a lamp's highlight, which a
+		# lightmap cannot hold, so it stays unlit by the lightmap and the lamps light it live.
+		mesh.name = "%s_%d" % ["Shiny" if batch["shiny"] else "Boxes", index]
 		index += 1
 		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so, and a player is meant to walk through it.
@@ -535,7 +533,7 @@ static func _add_box(tool: SurfaceTool, frame: Transform3D, size: Vector3) -> vo
 
 
 ## The same six faces into a lightmap sheet, which writes them with the same winding plus UV2.
-static func _add_box_faces(sheet: DotLightmapSheet, frame: Transform3D, size: Vector3) -> void:
+static func _add_box_faces(sheet: RefCounted, frame: Transform3D, size: Vector3) -> void:
 	for face: Array in _box_faces(frame, size):
 		sheet.face(face[1], face[2], face[3], face[4], face[0])
 
@@ -639,11 +637,23 @@ func _build_lights() -> void:
 		_lamps.append(omni)
 
 
+## Whether the host's dot-lighting can lay a bake (API level 5: DotLightBake, DotLightmapSheet). Those
+## classes are reached by path, never by name: a host shell with an older dot-lighting would fail to
+## parse this whole script on the name, and the map would not load. Without them the map is drawn
+## with its live lamps.
+static func can_bake() -> bool:
+	return DotAddonApi.build_level("dot_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
+			and ResourceLoader.exists(SHEET_SCRIPT)
+
+
 ## What this map's bake must have been made from: the boxes, the lamps and the sky, and the
 ## versions of everything that lays them out. The same on the machine that baked and on every
 ## client, from the document alone.
 func light_fingerprint() -> String:
-	return DotLightBake.fingerprint({
+	if not can_bake():
+		return ""
+
+	return (load(BAKE_SCRIPT) as GDScript).call(&"fingerprint", {
 		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "props": doc.get("props", []), "lights": doc.get("lights", []),
 		"environment": doc.get("environment", {}),
 	})
@@ -652,7 +662,10 @@ func light_fingerprint() -> String:
 ## The map's bake laid over it, if the game ships one made from this document.
 func _attach_bake() -> void:
 	var path := ZzPaths.rebase(BAKE_PATH % String(id()))
-	var res := DotLightBake.attach(self, path, light_fingerprint())
+	if not can_bake():
+		return
+
+	var res: DotResult = (load(BAKE_SCRIPT) as GDScript).call(&"attach", self, path, light_fingerprint())
 
 	if not res.ok:
 		return
@@ -661,31 +674,13 @@ func _attach_bake() -> void:
 	for lamp in _lamps:
 		lamp.light_bake_mode = Light3D.BAKE_STATIC
 
-	# A lightmapped surface takes its sky light from the bake, not from the environment's
-	# ambient, so the ambient a day raises reaches only what is not lightmapped. The fill (a live
-	# light, shadowless, blended with the day like the ambient) carries it instead, stronger by
-	# BAKED_FILL, which the bake's own ambient gain is tuned against (tools/lightmap_scenes.gd).
+	# A lightmapped surface takes its ambient from the bake, not from the environment, so the
+	# ambient a day raises reaches only what is not lightmapped: the exposure rises with the day
+	# instead (BAKED_DAY_EXPOSURE). The night's ambient is in the bake (tools/lightmap_scenes.gd).
 	if _environment != null:
 		_baked_exposure = _environment.environment.tonemap_exposure
 
-	if _fill != null:
-		var gain: float = BAKED_FILL_BY_MAP.get(String(id()), BAKED_FILL)
-		_fill.light_energy *= gain
-		# The baked lamps are warm and the bake's sky is flat, so what the fill does not reach reads
-		# yellow beside the live frame, whose ambient is cool: the fill is cooled to cancel it.
-		_fill.light_color = _cooled(_fill.light_color)
-		for key: String in ["fill:light_energy"]:
-			for values: Dictionary in [_night_light, _day_light]:
-				if values.has(key):
-					values[key] = float(values[key]) * gain
-			for values: Dictionary in [_night_light, _day_light]:
-				if values.has("fill:light_color"):
-					values["fill:light_color"] = _cooled(values["fill:light_color"])
 	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
-
-
-static func _cooled(c: Color) -> Color:
-	return Color(c.r * BAKED_FILL_COOL.r, c.g * BAKED_FILL_COOL.g, c.b * BAKED_FILL_COOL.b)
 
 
 ## The lamps, for the bake scene and the suites.

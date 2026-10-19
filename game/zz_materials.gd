@@ -133,6 +133,13 @@ static func is_transparent(id: String) -> bool:
 	return float((SURFACES.get(id, {}) as Dictionary).get("alpha", 1.0)) < 1.0
 
 
+## A surface whose look is a highlight a lamp throws on it (brushed metal): a lightmap holds
+## diffuse light only, so baked, a lamp's bright pool on a metal wall is gone. Such a surface is
+## left out of the bake and lit live by the lamps, which still light what has no lightmap.
+static func is_shiny(id: String) -> bool:
+	return float((SURFACES.get(id, {}) as Dictionary).get("metallic", 0.0)) >= 0.5
+
+
 ## The material for [param id], tinted. Cached per (surface, tint).
 static func material(id: String, tint: Color = Color.WHITE) -> StandardMaterial3D:
 	if not SURFACES.has(id):

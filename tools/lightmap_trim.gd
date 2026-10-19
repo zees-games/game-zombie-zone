@@ -10,7 +10,8 @@ extends SceneTree
 
 
 ## Same as tools/lightmap_scenes.gd (not preloaded: that script pulls in the whole game).
-const CASTER_PREFIX := "Prop_"
+## Bake-time casters: the props, and the shiny batches (see ZzMap._build_boxes).
+const CASTER_PREFIXES := ["Prop_", "Shiny_"]
 
 
 func _init() -> void:
@@ -34,7 +35,7 @@ func _init() -> void:
 
 		# Flat, four values a user: its path, UV scale, slice and sub-instance.
 		for i in range(0, uses.size(), 4):
-			if not str((uses[i] as NodePath).get_name(uses[i].get_name_count() - 1)).begins_with(CASTER_PREFIX):
+			if not _is_caster(str((uses[i] as NodePath).get_name(uses[i].get_name_count() - 1))):
 				kept.append_array(uses.slice(i, i + 4))
 
 		if kept.size() == uses.size():
@@ -48,3 +49,10 @@ func _init() -> void:
 		failed += 0 if saved == OK else 1
 
 	quit(1 if failed > 0 else 0)
+
+
+static func _is_caster(node_name: String) -> bool:
+	for prefix: String in CASTER_PREFIXES:
+		if node_name.begins_with(prefix):
+			return true
+	return false

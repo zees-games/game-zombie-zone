@@ -27,8 +27,17 @@ const CASTER_TEXEL := 4.0
 
 ## Per map: LightmapGI settings for DotLightBake.prepare. The defaults suit a street; the big
 ## holds take a coarser texel so the file stays a browser download.
+## How much of the live ambient each surface emits into the bake (see _with_emission): an open
+## street already has its sky, a closed hold has none, so the holds take more. Tuned per map
+## against a live frame (tools/shot.sh --no-bake), not derived.
+const EMIT_BY_MAP := {"zz_lot": 0.15, "zz_practice": 0.15, "zz_blackout_2": 0.15, "zz_blackout_3": 0.2, "zz_chapel": 0.2, "zz_stadium": 0.2, "zz_relief_camp": 0.2, "zs_ravenstreet": 0.15, "ze_runforyourlife_1_v4": 0.3, "zz_mall": 0.5, "zz_high_school": 0.5, "ze_nuke_beta": 0.55}
+
+## The bake's sky term, as a multiple of the live ambient: an open map sees its sky from every
+## surface, so it takes less than a closed hold (which sees none of it). Tuned like EMIT_BY_MAP.
+const AMBIENT_GAIN_BY_MAP := {"zz_lot": 1.65, "zz_practice": 1.4, "zz_blackout_2": 1.35, "zz_blackout_3": 2.0, "zz_chapel": 1.8, "zz_stadium": 1.6, "zz_relief_camp": 1.4, "zs_ravenstreet": 1.8, "ze_runforyourlife_1_v4": 2.7}
+
 const SETTINGS := {
-	"default": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0, "ambient_gain": 6.0, "bounce_energy": 0.7},
+	"default": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0, "ambient_gain": 6.0, "bounce_energy": 0.7, "emit": 0.4},
 	# Half the texels each way (a texel per 0.5 m): at full density the stadium was 12 MB and the
 	# mall 6 MB, more than the rest of the game's download.
 	"zz_stadium": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
@@ -106,24 +115,36 @@ func _bake_scene(map: ZzMap) -> Node3D:
 	var drawn := Node3D.new()
 	drawn.name = "Drawn"
 	root.add_child(drawn)
-	var settings: Dictionary = SETTINGS.get(String(map.id()), SETTINGS["default"])
+	var settings: Dictionary = (SETTINGS["default"] as Dictionary).duplicate()
+	settings.merge(SETTINGS.get(String(map.id()), {}), true)
+	if FileAccess.file_exists("res://tools/lb_override.json"):
+		settings.merge(JSON.parse_string(FileAccess.get_file_as_string("res://tools/lb_override.json")), true)
+
+	var ambient := Color.WHITE
+	var ambient_energy := 1.0
+	var env_node := map.get_node_or_null("Lighting/Lighting") as WorldEnvironment
+	if env_node != null:
+		ambient = env_node.environment.ambient_light_color
+		ambient_energy = env_node.environment.ambient_light_energy
+	var emit_gain: float = float(EMIT_BY_MAP.get(String(map.id()), settings.get("emit", 0.4))) * ambient_energy
 
 	for child in map.get_node("Drawn").get_children():
 		if child is MeshInstance3D and child.has_meta(&"zz_bakeable"):
 			var mesh := MeshInstance3D.new()
 			mesh.name = child.name
 			mesh.mesh = (child as MeshInstance3D).mesh
-			mesh.material_override = (child as MeshInstance3D).material_override
+			mesh.material_override = _with_emission((child as MeshInstance3D).material_override, ambient, emit_gain)
 			mesh.gi_mode = GeometryInstance3D.GI_MODE_STATIC
 			drawn.add_child(mesh)
 		elif child is OmniLight3D:
 			var lamp := (child as OmniLight3D).duplicate() as OmniLight3D
 			lamp.light_bake_mode = Light3D.BAKE_STATIC
-			lamp.shadow_enabled = true
+			lamp.shadow_enabled = bool(settings.get("lamp_shadow", true))
 			lamp.light_size = 0.15
 			drawn.add_child(lamp)
 
-	_add_prop_casters(map, drawn)
+	if settings.get("casters", true):
+		_add_prop_casters(map, drawn)
 
 	var lighting := map.get_node("Lighting").duplicate() as Node3D
 	root.add_child(lighting)
@@ -143,10 +164,25 @@ func _bake_scene(map: ZzMap) -> Node3D:
 	if world != null:
 		gi.environment_mode = LightmapGI.ENVIRONMENT_MODE_CUSTOM_COLOR
 		gi.environment_custom_color = world.environment.ambient_light_color
-		gi.environment_custom_energy = world.environment.ambient_light_energy * float(settings.get("ambient_gain", 6.0))
+		gi.environment_custom_energy = world.environment.ambient_light_energy * float(AMBIENT_GAIN_BY_MAP.get(String(map.id()), settings.get("ambient_gain", 6.0)))
 	gi.bounce_indirect_energy = float(settings.get("bounce_energy", 0.7))
 	_own(root, root)
 	return root
+
+
+## A closed room has no sky to see, so a lightmap's sky term never reaches its walls, yet the live
+## map is lit there by a flat ambient. Every surface emits the ambient colour in the bake (a
+## copy of its material; the lightmap holds only what the surface receives), so light bounces
+## off the others and the room is filled the way the ambient fills it, shadowed by its corners.
+func _with_emission(source: Material, colour: Color, energy: float) -> Material:
+	if energy <= 0.0 or not (source is StandardMaterial3D):
+		return source
+	var copy := (source as StandardMaterial3D).duplicate() as StandardMaterial3D
+	copy.emission_enabled = true
+	copy.emission = colour
+	copy.emission_energy_multiplier = energy
+	copy.emission_texture = null
+	return copy
 
 
 ## Props never move once a map is built, so they belong in the bake: they shade the floor and the

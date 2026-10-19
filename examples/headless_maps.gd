@@ -24,7 +24,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet"]
 const CHECKS_PER_MAP := 16
-const BAKE_CHECKS := 6
+const BAKE_CHECKS := 7
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -138,7 +138,7 @@ func _test_baked_light() -> void:
 		# The bake step trims the prop casters (tools/lightmap_trim.gd): a client builds no such node.
 		var users: Array = data.get("user_data") if data != null else []
 		for i in range(0, users.size(), 4):
-			if str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Prop_"):
+			if str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Prop_") or str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Shiny_"):
 				casters.append(id)
 				break
 		if data == null or str(data.get_meta(DotLightBake.META_FINGERPRINT, "")) != map.light_fingerprint():
@@ -148,7 +148,7 @@ func _test_baked_light() -> void:
 	_check(stale.is_empty(), "every committed bake was made from its map as it is now",
 		"baked %s, stale %s" % [baked, stale])
 	_check(unbaked.is_empty(), "every map the game ships has a bake", "no bake: %s" % [unbaked])
-	_check(casters.is_empty(), "no bake names a prop caster (the trim ran)", "%s" % [casters])
+	_check(casters.is_empty(), "no bake names a prop or shiny caster (the trim ran)", "%s" % [casters])
 	_check(baked.has("zz_practice"), "the practice street, the one map every build has, ships a bake")
 
 	var moved := ZzMap.new()
@@ -169,6 +169,17 @@ func _test_baked_light() -> void:
 	_check(not res.ok and res.error.code == DotError.CODE_UNSUPPORTED and host.get_child_count() == 0,
 		"a headless process (a server) never lays a bake over its world", "%s" % [res.error.message if not res.ok else "attached"])
 	host.free()
+
+	# A host with dot-lighting older than API level 5 must still parse the game: nothing under game/
+	# may name a level-5 class, only reach it by path behind ZzMap.can_bake().
+	var named := PackedStringArray()
+	for f in Array(DirAccess.get_files_at("res://game")) + Array(DirAccess.get_files_at("res://game/net")).map(func(n): return "net/" + n):
+		if not f.ends_with(".gd"):
+			continue
+		for line in FileAccess.get_file_as_string("res://game/" + f).split("\n"):
+			if not line.strip_edges().begins_with("#") and (line.contains("DotLightBake") or line.contains("DotLightmapSheet")):
+				named.append("%s: %s" % [f, line.strip_edges()])
+	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 dot-lighting class", "%s" % [named])
 	await _dispose(game)
 	_finished()
 
