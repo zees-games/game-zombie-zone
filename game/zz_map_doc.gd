@@ -432,6 +432,12 @@ static func _box(raw: Variant) -> Dictionary:
 	if b.has("tint"):
 		out["tint"] = _floats(_colour_list(b["tint"]), 3)
 
+	# A map's own word for what this box is made of ("brick", "asphalt"; dot-map's surface kinds
+	# and aliases), over the kind its `mat` would pick. Left alone here: an unknown word draws the
+	# mat's usual look, so the document is never refused for a texture name.
+	if b.has("surface") and str(b["surface"]) != "":
+		out["surface"] = str(b["surface"])
+
 	# Solid unless the map says not: water, a light's glow, a line painted on a floor.
 	if b.has("solid") and not bool(b["solid"]):
 		out["solid"] = false

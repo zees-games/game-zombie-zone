@@ -11,6 +11,7 @@
 # dependency is the repository that has to ignore its link.
 /addons/dot_core
 /addons/dot_lighting
+/addons/dot_map
 /addons/dot_entity
 /addons/dot_physics
 /addons/dot_player

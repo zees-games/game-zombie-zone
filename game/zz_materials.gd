@@ -115,8 +115,52 @@ const SURFACES := {
 	"flat": {"pattern": "flat", "a": Color(0.8, 0.8, 0.8), "b": Color(0.8, 0.8, 0.8), "metres": 2.0, "rough": 0.8},
 }
 
+## Where the photographic kinds are (dot-map's DotMapSurfaces), in this game's own tree: the
+## client shell bundles dot-map without its textures, so the ones used ship in this pack
+## (assets/surfaces, [code]tools/sync-surfaces.sh[/code] in dot-map writes it). Rebased, for a
+## delivered pack.
+const SURFACES_ROOT := "res://assets/surfaces"
+const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
+
+## Which surface kind draws a map surface, by what the box is: a [b]wall[/b] (anything
+## upright or small) or a [b]floor[/b] (a slab lying down, 0.6 m or thinner and wider than
+## 1.5 m: floors, ceilings, roofs, roads). Most surfaces are one kind either way; a painted
+## surface is plaster on a wall and bare clean concrete underfoot. A surface not here (lockers,
+## carpet, glass, water, lines, fabric, hedges) keeps its generated look.
+const KIND_OF := {
+	"concrete": ["concrete", "concrete"], "stone": ["concrete", "concrete"],
+	"sidewalk": ["concrete_clean", "concrete_clean"], "ceiling": ["concrete_clean", "concrete_clean"],
+	"asphalt": ["asphalt", "asphalt"],
+	"tile": ["tile_white", "tile_white"], "tile_small": ["tile_white", "tile_white"],
+	"tile_check": ["tile_checker", "tile_checker"],
+	"paint": ["plaster", "concrete_clean"], "plaster": ["plaster", "concrete_clean"],
+	"brick": ["brick", "brick"], "roof": ["corrugated", "corrugated"],
+	"wood_floor": ["wood_floor", "wood_floor"], "parquet": ["wood_floor", "wood_floor"],
+	"gym": ["wood_floor", "wood_floor"], "wood": ["wood_planks", "wood_planks"],
+	"metal": ["metal", "metal"], "grass": ["grass", "grass"], "dirt": ["ground", "ground"],
+}
+
+## A kind's own tint, multiplied under the map's. The photographs are mid-tone to bright
+## (white tile is 0.97 on average, plaster 0.75): scaled so a map reads at the brightness the
+## pale prototype grid had, which the zombies are read against, and so tile, grass, ground and
+## planks are not neon under a night's light.
+const KIND_TINT := {
+	"concrete": Color(0.95, 0.95, 0.95), "concrete_clean": Color(0.85, 0.85, 0.85),
+	"plaster": Color(0.9, 0.9, 0.9), "brick": Color(1.15, 1.1, 1.1),
+	"tile_white": Color(0.8, 0.8, 0.82), "tile_checker": Color(1.3, 1.3, 1.3),
+	"wood_floor": Color(1.35, 1.3, 1.3), "wood_planks": Color(0.8, 0.78, 0.75),
+	"asphalt": Color(1.2, 1.2, 1.2), "metal": Color(1.2, 1.2, 1.2),
+	"corrugated": Color(0.9, 0.9, 0.9), "grass": Color(0.6, 0.64, 0.5),
+	"ground": Color(0.8, 0.75, 0.65),
+}
+
 static var _textures: Dictionary = {}
 static var _materials: Dictionary = {}
+## DotMapSurfaces for baked surfaces (no metallic: a lightmap holds diffuse light only) and for
+## the one live-lit metal; null until asked, and false when the addon or the textures are not
+## in this build (then every surface keeps its generated look).
+static var _baked_surfaces: Variant = null
+static var _live_surfaces: Variant = null
 
 
 static func ids() -> Array:
@@ -136,19 +180,79 @@ static func is_transparent(id: String) -> bool:
 ## A surface whose look is a highlight a lamp throws on it (brushed metal): a lightmap holds
 ## diffuse light only, so baked, a lamp's bright pool on a metal wall is gone. Such a surface is
 ## left out of the bake and lit live by the lamps, which still light what has no lightmap.
-static func is_shiny(id: String) -> bool:
+static func is_shiny(id: String, role: String = "", surface: String = "") -> bool:
+	var kind := kind_for(id, role, surface)
+	if kind != "":
+		return kind == "metal"
 	return float((SURFACES.get(id, {}) as Dictionary).get("metallic", 0.0)) >= 0.5
 
 
+## "floor" for a slab lying down (0.6 m or thinner, wider than 1.5 m), "wall" for the rest.
+static func role_of(size: Vector3) -> String:
+	return "floor" if size.y <= 0.6 and maxf(size.x, size.z) >= 1.5 else "wall"
+
+
+## The photographic kind that draws [param id] for a box of [param role], or empty when it keeps
+## its generated look (or this build has no textures). [param surface] is a map's own word for
+## the box ("surface": "brick") and wins; it may be a kind or one of DotMapSurfaces' aliases.
+static func kind_for(id: String, role: String = "wall", surface: String = "") -> String:
+	# A barricade's damage is its tint stepping down (zz_map.set_barricade); a photograph under
+	# the paled tint would barely show it, so the boards keep their generated look.
+	if role == "barricade":
+		return ""
+	var surfaces: Variant = _surfaces(false)
+	if surfaces == null:
+		return ""
+	var kind := ""
+	if surface != "":
+		kind = String(surfaces.resolve(StringName(surface)))
+	if kind == "" and KIND_OF.has(id):
+		kind = (KIND_OF[id] as Array)[1 if role == "floor" else 0]
+	return kind if kind != "" and _kind_present(surfaces, kind) else ""
+
+
+## Whether a kind's textures are in this build's tree (the vendored copy is the one a pack ships).
+static func _kind_present(surfaces: Object, kind: String) -> bool:
+	return ResourceLoader.exists("%s/%s/albedo.jpg" % [surfaces.root, kind])
+
+
+## The surfaces library, or null. [param live] is the one with its metallic values; the other has
+## them off, for surfaces a lightmap covers.
+static func _surfaces(live: bool) -> Variant:
+	var held: Variant = _live_surfaces if live else _baked_surfaces
+	if held != null:
+		return held if held is Object else null
+	if not ResourceLoader.exists(SURFACES_SCRIPT):
+		_live_surfaces = false
+		_baked_surfaces = false
+		return null
+	var script := load(SURFACES_SCRIPT) as GDScript
+	var made: Object = script.new(ZzPaths.rebase(SURFACES_ROOT))
+	if not live:
+		made.set("metallic_scale", 0.0)
+	if live:
+		_live_surfaces = made
+	else:
+		_baked_surfaces = made
+	return made
+
+
 ## The material for [param id], tinted. Cached per (surface, tint).
-static func material(id: String, tint: Color = Color.WHITE) -> StandardMaterial3D:
+static func material(id: String, tint: Color = Color.WHITE, role: String = "wall", surface: String = "") -> StandardMaterial3D:
 	if not SURFACES.has(id):
 		id = "flat"
 
-	var key := "%s|%s" % [id, tint.to_html()]
+	var key := "%s|%s|%s|%s" % [id, tint.to_html(), role, surface]
 
 	if _materials.has(key):
 		return _materials[key]
+
+	var kind := kind_for(id, role, surface)
+	if kind != "":
+		var photo := _photo(kind, tint)
+		if photo != null:
+			_materials[key] = photo
+			return photo
 
 	if PASTELS.has(id):
 		var grid := _pastel(id, tint)
@@ -180,6 +284,19 @@ static func material(id: String, tint: Color = Color.WHITE) -> StandardMaterial3
 
 	_materials[key] = m
 	return m
+
+
+## A photographic kind under the map's tint, or null when it did not load. The map's tint was
+## chosen against the old darker base colours, so it is paled halfway to white before it
+## multiplies (as for the grid below); the kind's own tint scales the photograph's brightness.
+static func _photo(kind: String, tint: Color) -> StandardMaterial3D:
+	var surfaces: Variant = _surfaces(kind == "metal")
+	if surfaces == null:
+		return null
+	var pale := Color(minf(tint.r, 1.1), minf(tint.g, 1.1), minf(tint.b, 1.1)).lerp(Color.WHITE, 0.5)
+	var base: Color = KIND_TINT.get(kind, Color.WHITE)
+	var res: DotResult = surfaces.try_material(StringName(kind), Color(base.r * pale.r, base.g * pale.g, base.b * pale.b))
+	return res.value if res.ok else null
 
 
 ## A building surface on Kenney's grid (or tiles), or null when the textures are not there.

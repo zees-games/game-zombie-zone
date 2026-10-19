@@ -1,0 +1,14 @@
+# Surface kinds this game vendors (dot-map tools/sync-surfaces.sh); one per line.
+asphalt
+brick
+concrete
+concrete_clean
+corrugated
+grass
+ground
+metal
+plaster
+tile_checker
+tile_white
+wood_floor
+wood_planks

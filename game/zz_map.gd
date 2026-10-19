@@ -295,7 +295,9 @@ func _build_boxes() -> void:
 		# Seen and not hit (a road marking, a decal, a lamp's bulb, water) is batched apart from
 		# the solid boxes, so the whole chunk can say it is meant to be walked through.
 		var ghost := not bool(box.get("solid", true))
-		var key := "%s|%s|%d|%d|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost]
+		var role := ZzMaterials.role_of(size)
+		var surface := str(box.get("surface", ""))
+		var key := "%s|%s|%d|%d|%s|%s|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost, role, surface]
 
 		if not batches.has(key):
 			var tool := SurfaceTool.new()
@@ -303,7 +305,8 @@ func _build_boxes() -> void:
 			# Baked light falls on what is solid and opaque; a decal, a bulb, water and glass
 			# are drawn live (and the bake sees through them).
 			var bakeable := not ghost and not ZzMaterials.is_transparent(str(box["mat"]))
-			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost, "shiny": bakeable and ZzMaterials.is_shiny(str(box["mat"])),
+			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost, "role": role, "surface": surface,
+				"shiny": bakeable and ZzMaterials.is_shiny(str(box["mat"]), role, surface),
 				"sheet": (load(SHEET_SCRIPT) as GDScript).new() if bakeable and can_bake() else null}
 
 		var batch_of: Dictionary = batches[key]
@@ -336,7 +339,7 @@ func _build_boxes() -> void:
 			arrays.lightmap_size_hint = sheet.size
 			mesh.set_meta(&"zz_bakeable", true)
 		mesh.mesh = arrays
-		mesh.material_override = ZzMaterials.material(batch["mat"], batch["tint"])
+		mesh.material_override = ZzMaterials.material(batch["mat"], batch["tint"], batch["role"], batch["surface"])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
 			if ZzMaterials.is_transparent(batch["mat"]) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_drawn.add_child(mesh)
@@ -371,7 +374,8 @@ func _add_gate_box(gate: String, box: Dictionary, frame: Transform3D, size: Vect
 			_add_box(tool, frame, size)
 			var mesh := MeshInstance3D.new()
 			mesh.mesh = tool.commit()
-			mesh.material_override = ZzMaterials.material(str(box["mat"]), ZzMapDoc.colour(box.get("tint", [1, 1, 1])))
+			mesh.material_override = ZzMaterials.material(str(box["mat"]), ZzMapDoc.colour(box.get("tint", [1, 1, 1])),
+				ZzMaterials.role_of(size), str(box.get("surface", "")))
 			drawn = mesh
 		drawn.name = "Gate_%s" % gate
 		_drawn.add_child(drawn)
@@ -433,7 +437,7 @@ func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: V
 		mesh.name = "Barricade_%s" % id
 		mesh.mesh = tool.commit()
 		var tint := ZzMapDoc.colour(box.get("tint", [1, 1, 1]))
-		mesh.material_override = ZzMaterials.material(str(box["mat"]), tint)
+		mesh.material_override = ZzMaterials.material(str(box["mat"]), tint, "barricade")
 		mesh.set_meta(&"zz_mat", str(box["mat"]))
 		mesh.set_meta(&"zz_tint", tint)
 		_drawn.add_child(mesh)
@@ -485,7 +489,7 @@ func set_barricade(id: String, intact: bool, fraction: float) -> void:
 		# Three steps, not a material per percent: a few shared materials, never one per hit.
 		var step := snappedf(shade, 0.233)
 		mesh.material_override = ZzMaterials.material(str(mesh.get_meta(&"zz_mat", "wood")),
-			Color(tint.r * step, tint.g * step, tint.b * step))
+			Color(tint.r * step, tint.g * step, tint.b * step), "barricade")
 
 
 ## Takes a gate's boxes away: collision and picture.
