@@ -419,6 +419,12 @@ func _restock(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			or game.survival.waves.stage != DotNpcDirectorWaves.Stage.QUIET:
 		return false
 
+	# The opening quiet is for taking the chokes: the caches are stocked then too (the player
+	# has something to find), but a stand-in without a primary walking off to them left the
+	# chokes empty when wave 1 came (headless_nav). They restock from the first breather on.
+	if game.survival.waves.index <= 1:
+		return false
+
 	var wants: bool = _low_on_ammo(player) or player.medkits == 0 \
 		or (player.weapons != null and player.weapons.arsenal != null and not _has_primary(player))
 
