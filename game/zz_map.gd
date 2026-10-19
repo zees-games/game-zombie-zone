@@ -4,6 +4,7 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzFixtures := preload("zz_fixtures.gd")
+const ZzPaths := preload("zz_paths.gd")
 
 ## A map document, built: the building, the furniture, the lights and the sky.
 ##
@@ -32,6 +33,17 @@ const ZzFixtures := preload("zz_fixtures.gd")
 ## objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`),
 ## which come and go: broken by the horde, mended by the survivors ([method set_barricade]),
 ## and drawn darker as they weaken so a defender sees which window is about to go.
+##
+## [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by
+## `tools/bake_lightmaps.sh`; dot-lighting's [DotLightBake]). Every opaque box batch carries a
+## second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`),
+## because the bake names its meshes by path and was made from this same code. A bake whose
+## fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
+## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked,
+## the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their
+## shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays
+## live (a hold's day turns it) and only its bounce is baked. Gates, barricades, glass, water and
+## the props are not in the bake. A server never loads one ([member draw_world] is false).
 
 const CHANNEL := "zz.map"
 
@@ -44,6 +56,16 @@ const HIT_MARGIN := 0.06
 
 ## How much deeper than drawn a ground slab collides (see `_build_boxes`).
 const GROUND_DEPTH := 1.8
+
+## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
+## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
+const BAKE_VERSION := 1
+
+## Where a map's bake is, by id; rebased, so a delivered pack finds its own.
+const BAKE_PATH := "res://lightmaps/%s.res"
+
+## Whether a client looks for a map's bake at all. Off draws every map with live lamps.
+static var use_bakes: bool = true
 
 signal built()
 
@@ -93,6 +115,9 @@ var _day_light: Dictionary = {}
 var _daylight: float = 0.0
 var _bounds: AABB = AABB()
 var _missing: PackedStringArray = PackedStringArray()
+var _lamps: Array[OmniLight3D] = []
+## The LightmapGI laid over this map, or null: drawn with live lamps.
+var baked: LightmapGI = null
 
 
 func id() -> StringName:
@@ -127,6 +152,8 @@ func build(p_doc: Dictionary) -> DotResult:
 		_build_objective_props()
 		_build_lights()
 		_build_environment()
+		if use_bakes:
+			_attach_bake()
 
 	if not _missing.is_empty():
 		DotLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
@@ -175,6 +202,8 @@ func clear() -> void:
 	_barricades.clear()
 	_missing.clear()
 	_bounds = AABB()
+	_lamps.clear()
+	baked = null
 	toys = null
 	_solid = null
 	_furniture = null
@@ -256,20 +285,39 @@ func _build_boxes() -> void:
 		if not batches.has(key):
 			var tool := SurfaceTool.new()
 			tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost}
+			# Baked light falls on what is solid and opaque; a decal, a bulb, water and glass
+			# are drawn live (and the bake sees through them).
+			var bakeable := not ghost and not ZzMaterials.is_transparent(str(box["mat"]))
+			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost,
+				"sheet": DotLightmapSheet.new() if bakeable else null}
 
-		_add_box((batches[key] as Dictionary)["tool"], frame, size)
+		var batch_of: Dictionary = batches[key]
+		if batch_of["sheet"] != null:
+			_add_box_faces(batch_of["sheet"], frame, size)
+		else:
+			_add_box(batch_of["tool"], frame, size)
+
+	var index := 0
 
 	for key: String in batches:
 		var batch: Dictionary = batches[key]
 		var tool: SurfaceTool = batch["tool"]
+		var sheet: DotLightmapSheet = batch["sheet"]
+		if sheet != null:
+			sheet.commit(tool)
 		var mesh := MeshInstance3D.new()
-		mesh.name = "Boxes"
+		# The same name on every build of this document: a bake finds its meshes by path.
+		mesh.name = "Boxes_%d" % index
+		index += 1
 		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so, and a player is meant to walk through it.
 		if bool(batch["ghost"]):
 			mesh.set_meta(&"dot_no_collision", true)
-		mesh.mesh = tool.commit()
+		var arrays := tool.commit()
+		if sheet != null:
+			arrays.lightmap_size_hint = sheet.size
+			mesh.set_meta(&"zz_bakeable", true)
+		mesh.mesh = arrays
 		mesh.material_override = ZzMaterials.material(batch["mat"], batch["tint"])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
 			if ZzMaterials.is_transparent(batch["mat"]) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
@@ -456,6 +504,25 @@ func in_area(side: String, point: Vector3) -> bool:
 ## Six faces of a box, outward normals, into [param tool]. No UVs: every surface material is
 ## mapped in world space.
 static func _add_box(tool: SurfaceTool, frame: Transform3D, size: Vector3) -> void:
+	for face: Array in _box_faces(frame, size):
+		# Godot's front face winds so that (b - a) x (c - a) points AGAINST the normal (measured
+		# against BoxMesh's own arrays). The corners above go round the other way, so each
+		# triangle is emitted reversed; the other order is a map drawn inside out, every wall
+		# invisible from the room it bounds.
+		for v: Vector3 in [face[1], face[3], face[2], face[1], face[4], face[3]]:
+			tool.set_normal(face[0])
+			tool.add_vertex(v)
+
+
+## The same six faces into a lightmap sheet, which writes them with the same winding plus UV2.
+static func _add_box_faces(sheet: DotLightmapSheet, frame: Transform3D, size: Vector3) -> void:
+	for face: Array in _box_faces(frame, size):
+		sheet.face(face[1], face[2], face[3], face[4], face[0])
+
+
+## `[normal, a, b, c, d]` per face, in world space: a to b up the face, a to d across it.
+static func _box_faces(frame: Transform3D, size: Vector3) -> Array:
+	var out := []
 	var h := size * 0.5
 	var faces := [
 		[Vector3.RIGHT, Vector3(h.x, -h.y, -h.z), Vector3(h.x, h.y, -h.z), Vector3(h.x, h.y, h.z), Vector3(h.x, -h.y, h.z)],
@@ -467,19 +534,10 @@ static func _add_box(tool: SurfaceTool, frame: Transform3D, size: Vector3) -> vo
 	]
 
 	for face: Array in faces:
-		var normal: Vector3 = frame.basis * (face[0] as Vector3)
-		var a: Vector3 = frame * (face[1] as Vector3)
-		var b: Vector3 = frame * (face[2] as Vector3)
-		var c: Vector3 = frame * (face[3] as Vector3)
-		var d: Vector3 = frame * (face[4] as Vector3)
+		out.append([frame.basis * (face[0] as Vector3), frame * (face[1] as Vector3),
+			frame * (face[2] as Vector3), frame * (face[3] as Vector3), frame * (face[4] as Vector3)])
 
-		# Godot's front face winds so that (b - a) x (c - a) points AGAINST the normal (measured
-		# against BoxMesh's own arrays). The corners above go round the other way, so each
-		# triangle is emitted reversed; the other order is a map drawn inside out, every wall
-		# invisible from the room it bounds.
-		for v: Vector3 in [a, c, b, a, d, c]:
-			tool.set_normal(normal)
-			tool.add_vertex(v)
+	return out
 
 
 func _build_props() -> void:
@@ -558,6 +616,36 @@ func _build_lights() -> void:
 		omni.omni_attenuation = 1.2
 		omni.shadow_enabled = false
 		_drawn.add_child(omni)
+		_lamps.append(omni)
+
+
+## What this map's bake must have been made from: the boxes, the lamps and the sky, and the
+## versions of everything that lays them out. The same on the machine that baked and on every
+## client, from the document alone.
+func light_fingerprint() -> String:
+	return DotLightBake.fingerprint({
+		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "lights": doc.get("lights", []),
+		"environment": doc.get("environment", {}),
+	})
+
+
+## The map's bake laid over it, if the game ships one made from this document.
+func _attach_bake() -> void:
+	var path := ZzPaths.rebase(BAKE_PATH % String(id()))
+	var res := DotLightBake.attach(self, path, light_fingerprint())
+
+	if not res.ok:
+		return
+
+	baked = res.value
+	for lamp in _lamps:
+		lamp.light_bake_mode = Light3D.BAKE_STATIC
+	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
+
+
+## The lamps, for the bake scene and the suites.
+func lamps() -> Array[OmniLight3D]:
+	return _lamps
 
 
 ## The sky, the moon or the low sun, and the fill: a dot-lighting document made from the map's
@@ -980,4 +1068,5 @@ func describe_lines() -> PackedStringArray:
 		"boxes      %d" % (doc.get("boxes", []) as Array).size(),
 		"props      %d" % props.size(),
 		"lights     %d" % (doc.get("lights", []) as Array).size(),
+		"light      %s" % ("baked" if baked != null else "live lamps"),
 	])

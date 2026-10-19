@@ -109,6 +109,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 
 **Delivery** ([design](docs/design.md#delivery-and-the-map-vote))
 - `project.godot` carries no comments (the editor drops them); gravity is `ZzConfig.gravity` on the world's own space; the renderer is `gl_compatibility`; texture imports keep `detect_3d/compress_to=0`.
+- **Baked light** (dot-lighting's `DotLightBake`): `lightmaps/<id>.res`, one per map, is tracked and ships in THIS pack (the maps pack is server-only, `maps_delivery: server`), found through `ZzPaths.rebase`. Every opaque box batch has UV2 from `DotLightmapSheet` and is named `Boxes_<n>`; a bake whose fingerprint (`ZzMap.light_fingerprint`: boxes, lights, environment, `BAKE_VERSION`) is not the document's is refused with a WARN and the map is drawn with live lamps, as is a map with none (workshop maps). Baked, the lamps turn `BAKE_STATIC` and still light zombies and props; the moon or sun stays live. **Edit a map's boxes or lights, then rebake**: `tools/bake_lightmaps.sh [ids]` (on the GPU box through `../gpu.sh`; seconds per map) and commit `lightmaps/`; `headless_maps`' "baked light" section fails on a stale bake. The dot-lighting editor plugin is enabled in `project.godot` for this and does nothing without its flag. Big maps bake at `texel_scale` 0.5 (`tools/lightmap_scenes.gd` SETTINGS) to keep the download near 12 MB for all eleven.
 - The maps pack is named by the server owner, never by `game.yml`; `ZzModule` adds every mount's `maps/` at load and after `zz_reload`.
 - **Workshop maps** (`provides.json`: `accepts.map_kinds` `survival` and `exodus`): a pack's `map` entry's `scene` is a ZZ map DOCUMENT (JSON, same as `maps/`) whose `id` equals the entry's. `ZzCatalogue.follow_content` reads `DotContentIndex.shared()` on every `playable()`, so a subscribed map (solo) is validated, nav-graphed and played like the game's own, shown "Name [Pack]"; the game's own ids win, a bad document lands in `catalogue.refused` and is not listed, and online lists none. The ballot lists them through dot-vote's `follow_content`, so `maps_fn` leaves them out. `headless_workshop` holds it.
 - Under MANUAL `ZzVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after the delivered maps; the match answers `round_in_progress_fn` by name.
@@ -122,6 +123,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 ```bash
 ./game.sh test                                          # parse, then every suite
 python3 ../zombie-zone-maps/tools/build_maps.py --check
+tools/bake_lightmaps.sh zz_lot                           # rebake one map's light (the GPU box); BAKE_LOCAL=1 for here
 godot --headless --path . res://tools/survival_long_run.tscn -- --map=zz_high_school [--from=7] [--profile] [--watch=30 --detail]
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1

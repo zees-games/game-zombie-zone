@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzMap := preload("../game/zz_map.gd")
 
 ## Every map the game can be sent, built the way a server builds it and looked over for the
 ## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
@@ -23,6 +24,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet"]
 const CHECKS_PER_MAP := 15
+const BAKE_CHECKS := 4
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -57,6 +59,7 @@ func _run() -> void:
 	print("")
 
 	await _test_the_catalogue()
+	await _test_baked_light()
 
 	for id: String in _maps:
 		await _test_map(StringName(id))
@@ -70,8 +73,8 @@ func _run() -> void:
 
 	var code := 1 if _failed > 0 else 0
 
-	var sections := 1 + _maps.size()
-	var checks := 1 + CHECKS_PER_MAP * _maps.size()
+	var sections := 2 + _maps.size()
+	var checks := 1 + BAKE_CHECKS + CHECKS_PER_MAP * _maps.size()
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -107,6 +110,54 @@ func _test_the_catalogue() -> void:
 
 	_check(missing.is_empty() and game.catalogue.refused.is_empty(),
 		"every map is in it, and no file was refused", "have %s, missing %s, refused %s" % [ids, missing, game.catalogue.refused])
+	await _dispose(game)
+	_finished()
+
+
+## The committed bakes against the maps as they are now. A map edited without a rebake still
+## plays (live lamps and a WARN on every client), so nothing else would notice: this does.
+## Rebake with tools/bake_lightmaps.sh. Headless, a bake's pixels are not loaded, but its
+## fingerprint is, and attaching is refused without touching the map.
+func _test_baked_light() -> void:
+	_section("baked light")
+	var game := await _world(&"")
+	var stale: Array = []
+	var baked: Array = []
+
+	for id: String in _maps:
+		var path := ZzMap.BAKE_PATH % id
+		if not ResourceLoader.exists(path):
+			continue
+		var map := ZzMap.new()
+		map.doc = game.catalogue.maps.get(StringName(id), {})
+		var data := load(path) as LightmapGIData
+		baked.append(id)
+		if data == null or str(data.get_meta(DotLightBake.META_FINGERPRINT, "")) != map.light_fingerprint():
+			stale.append(id)
+		map.free()
+
+	_check(stale.is_empty(), "every committed bake was made from its map as it is now",
+		"baked %s, stale %s" % [baked, stale])
+	_check(baked.has("zz_practice"), "the practice street, the one map every build has, ships a bake")
+
+	var moved := ZzMap.new()
+	moved.doc = (game.catalogue.maps.get(&"zz_practice", {}) as Dictionary).duplicate(true)
+	var before := moved.light_fingerprint()
+	var boxes: Array = moved.doc.get("boxes", [])
+	if not boxes.is_empty():
+		var first: Dictionary = boxes[0]
+		var at := ZzMapDoc.v3(first["at"]) + Vector3(0.25, 0.0, 0.0)
+		first["at"] = [at.x, at.y, at.z]
+	_check(not boxes.is_empty() and moved.light_fingerprint() != before,
+		"moving one box makes the bake stale (the fingerprint changes)")
+	moved.free()
+
+	var host := Node3D.new()
+	add_child(host)
+	var res := DotLightBake.attach(host, ZzMap.BAKE_PATH % "zz_practice", before)
+	_check(not res.ok and res.error.code == DotError.CODE_UNSUPPORTED and host.get_child_count() == 0,
+		"a headless process (a server) never lays a bake over its world", "%s" % [res.error.message if not res.ok else "attached"])
+	host.free()
 	await _dispose(game)
 	_finished()
 
