@@ -7,6 +7,7 @@ const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
+const ZzMap := preload("../game/zz_map.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -30,6 +31,10 @@ var _alone := false
 var _reaction := &""
 var _client: Node = null
 var _weapons: PackedStringArray = PackedStringArray()
+## --no-bake draws the map with live lamps (the look before bakes); --day=0..1 holds the map's
+## light at that daylight, to compare a night and a day frame on any map that has a day.
+var _day := -1.0
+var _amb := -1.0
 
 
 func _ready() -> void:
@@ -66,6 +71,12 @@ func _ready() -> void:
 			_box = StringName(arg.trim_prefix("--box="))
 		elif arg == "--workshop":
 			_subscribe_fixture()
+		elif arg == "--no-bake":
+			ZzMap.use_bakes = false
+		elif arg.begins_with("--amb="):
+			_amb = arg.trim_prefix("--amb=").to_float()
+		elif arg.begins_with("--day="):
+			_day = arg.trim_prefix("--day=").to_float()
 
 	_client = ZzClient.new()
 	_client.name = "Client"
@@ -88,6 +99,16 @@ func _ready() -> void:
 
 ## --workshop: a subscribed pack whose one map is a document (the practice street under another
 ## id) in the process's shared index, solo. Pair with --zz-map-ids=fixture_ruin to play only it.
+func _process(_delta: float) -> void:
+	if _amb >= 0.0 and _client != null and _client.get("game") != null and _client.get("game").map != null:
+		_client.get("game").map._environment.environment.ambient_light_energy = _amb
+	if _day < 0.0 or _client == null:
+		return
+	var game: Variant = _client.get("game")
+	if game != null and game.map != null:
+		game.map.set_daylight(_day)
+
+
 static func _subscribe_fixture() -> void:
 	var dir := "user://ws_fixture_shot/"
 	var _made := DirAccess.make_dir_recursive_absolute(dir)
@@ -112,6 +133,23 @@ static func _v3(text: String) -> Vector3:
 	return Vector3(parts[0].to_float(), parts[1].to_float(), parts[2].to_float()) if parts.size() == 3 else Vector3.INF
 
 
+## Where everybody is put when --at is not given: the practice street's open ground at z 12, or
+## the first survivor seat on a map with nothing under that point. A converted street has a
+## void there, and a frame taken from it showed the whole team falling, which read as a broken
+## map when it was only this tool standing them in the air (zz-ravenstreet-1).
+func _default_stand(game: ZzGame) -> Vector3:
+	var usual := Vector3(0.0, 0.05, 12.0)
+	var space := game.get_world_3d().direct_space_state
+	var mask := game.physics.layer_mask(&"world")
+	var down := PhysicsRayQueryParameters3D.create(usual + Vector3(0.0, 1.0, 0.0), usual + Vector3(0.0, -0.6, 0.0), mask)
+
+	if not space.intersect_ray(down).is_empty():
+		return usual
+
+	var seat: Vector3 = game.map.spawn("survivors", 0)[0]
+	return seat + Vector3(0.0, 0.05, 0.0)
+
+
 func _run() -> void:
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
@@ -129,7 +167,7 @@ func _run() -> void:
 		player.is_bot = false
 		player.health.invulnerable = true
 
-	var stand := _at if _at != Vector3.INF else Vector3(0.0, 0.05, 12.0)
+	var stand := _at if _at != Vector3.INF else _default_stand(game)
 	local.place_at(stand, 0.0)
 
 	var i := 0

@@ -189,6 +189,18 @@ func _test_map(id: StringName) -> void:
 	_check(seats >= MIN_SPAWNS and bad_spawns.is_empty(), "%d spawns, each on a floor with room for a person" % seats,
 		"; ".join(bad_spawns))
 
+	# Spawns are not the only places a body is put: a post (a stand-in walks to it), a cache and
+	# a horde spawn at ground level over a hole in a converted map is a body that falls at once.
+	var airborne: Array = []
+
+	for key in ["posts", "caches", "zombie_spawns"]:
+		for point in (doc.get(key, []) as Array):
+			var at: Vector3 = ZzMapDoc.v3(point)
+			if at.y < 0.3 and not _over_something(game, at):
+				airborne.append("%s %s" % [key, at])
+
+	_check(airborne.is_empty(), "every ground-level post, cache and horde spawn has floor under it", "; ".join(airborne.slice(0, 6)))
+
 	var buried: Array = []
 	var floating: Array = []
 
