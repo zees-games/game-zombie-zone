@@ -15,8 +15,8 @@ const ZzNetLink := preload("../game/net/zz_net_link.gd")
 ## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
 ## nothing but the stand-ins the module seats itself.
 
-const SECTIONS := 11
-const CHECKS := 78
+const SECTIONS := 12
+const CHECKS := 84
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -62,6 +62,7 @@ func _run() -> void:
 		# the live one is then named @Node@n, which no client path reaches.
 		await _test_a_covered_seat_is_not_harmed()
 		await _test_a_reload_keeps_delivered_maps()
+		await _test_a_module_reload()
 		await _test_the_map_vote()
 		_test_finish_round_waits_for_a_live_round()
 		await _test_it_unloads_cleanly()
@@ -674,7 +675,8 @@ func _test_a_covered_seat_is_not_harmed() -> void:
 	# server's snapshots is put back at each phase change (a real game scene does this itself).
 	var attach := func(_a: Variant = null, _b: Variant = null) -> void:
 		if link.get_node_or_null(NodePath(ZzNetLink.NODE_NAME)) == null:
-			var _sink := ZzNetLink.attached_to(link, null, false)
+			var sink := ZzNetLink.attached_to(link, null, false)
+			link.add_child(sink)
 	attach.call()
 	link.phase_changed.connect(attach)
 	var spawned := [false]
@@ -763,6 +765,58 @@ func _until(condition: Callable, seconds: float) -> bool:
 			return true
 		await get_tree().physics_frame
 	return bool(condition.call())
+
+
+## A module reload must leave ONE link under the server, still named for the client's route.
+## Two used to be left, the live one renamed `@Node@n`, and every RPC to a real client was lost
+## without an error. The proof is a real client over the socket: signing on is server events.
+func _test_a_module_reload() -> void:
+	_section("a module reload leaves one live link")
+
+	for _i in range(2):
+		_check(server.modules.unload_module("zombiezone").ok, "the module unloads")
+		var back: DotResult = await server.modules.load_module("res://game/zz_module.gd")
+		_check(back.ok, "and loads again", back.error.message if not back.ok else "")
+	for _i in range(5):
+		await get_tree().process_frame
+
+	var links := 0
+	for child in server.get_children():
+		if child.get_script() == ZzNetLink:
+			links += 1
+	_check(links == 1 and server.has_node(NodePath(String(ZzNetLink.NODE_NAME))),
+		"exactly one link, under the name the client routes to", "%d" % links)
+
+	var side := Node.new()
+	side.name = "ReloadClient"
+	add_child(side)
+	get_tree().set_multiplayer(MultiplayerAPI.create_default_interface(), side.get_path())
+	var link := DotClientLink.new()
+	link.name = "Server"
+	link.player_name = "Reloaded"
+	link.transport_preference = "udp"
+	link.udp_address = "127.0.0.1:%d" % PORT
+	var mirror := Node.new()
+	mirror.name = "Dedicated"
+	side.add_child(mirror)
+	mirror.add_child(link)
+	var attach := func(_a: Variant = null, _b: Variant = null) -> void:
+		if link.get_node_or_null(NodePath(ZzNetLink.NODE_NAME)) == null:
+			var sink := ZzNetLink.attached_to(link, null, false)
+			link.add_child(sink)
+	attach.call()
+	link.phase_changed.connect(attach)
+	var spawned := [false]
+	link.spawned.connect(func() -> void: spawned[0] = true)
+	link.connect_to_server("127.0.0.1:%d" % PORT)
+	var joined := await _until(func() -> bool:
+		return spawned[0] or link.phase == DotClientLink.Phase.FAILED, 30.0)
+	_check(joined and spawned[0], "a real client still hears the server's events after two reloads")
+	link.disconnect_from_server("done")
+	for _i in range(10):
+		await get_tree().process_frame
+	side.queue_free()
+	_finished()
 
 
 func _test_it_unloads_cleanly() -> void:
