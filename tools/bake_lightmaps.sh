@@ -5,6 +5,7 @@
 #   tools/bake_lightmaps.sh                    # every map (the practice street and maps/)
 #   tools/bake_lightmaps.sh zz_lot zz_chapel   # these
 #   BAKE_LOCAL=1 tools/bake_lightmaps.sh       # on this machine, not the GPU box
+#   GPU_BOX=staging02 tools/bake_lightmaps.sh  # on the desktop's RTX 2070 (default: the laptop)
 #
 # Two steps: tools/lightmap_scenes.tscn writes a bake scene per map into lightbake_work/
 # (gitignored), then the editor bakes them (dot-lighting's editor plugin, enabled in
@@ -31,6 +32,11 @@ if [[ -z "${BAKE_LOCAL:-}" && -x ../gpu.sh ]]; then
     ../gpu.sh exec timeout "${GPU_TIMEOUT:-1800}" xvfb-run -a -s "-screen 0 1280x720x24" \
         gpu/bin/godot --path "gpu/godot/$project" --rendering-driver vulkan --gpu-index "${GPU_INDEX:-0}" \
         "${bake[@]}" > "$log" 2>&1 || true
+    # Then the trim (tools/lightmap_trim.gd): the props are in the bake as casters only. The timeout
+    # is inside xvfb-run so a script error (which leaves Godot waiting) cannot strand the display.
+    ../gpu.sh exec xvfb-run -a -s "-screen 0 1280x720x24" timeout 300 \
+        gpu/bin/godot --path "gpu/godot/$project" --rendering-driver vulkan --gpu-index "${GPU_INDEX:-0}" \
+        --script res://tools/lightmap_trim.gd -- $* 2>&1 | grep -E '^LIGHTMAP_TRIM|SCRIPT ERROR' || true
     ../gpu.sh pull "$project" lightmaps
 else
     GODOT="${GODOT:-godot}"
@@ -40,6 +46,8 @@ else
     ls lightbake_work/*.tscn >/dev/null 2>&1 || { echo "no bake scenes were written" >&2; exit 1; }
     xvfb-run -a -s "-screen 0 1280x720x24" "$GODOT" --path . --rendering-driver vulkan "${bake[@]}" \
         > "$log" 2>&1 || true
+    xvfb-run -a -s "-screen 0 1280x720x24" timeout 300 "$GODOT" --path . --rendering-driver vulkan \
+        --script res://tools/lightmap_trim.gd -- "$@" 2>&1 | grep -E '^LIGHTMAP_TRIM|SCRIPT ERROR' || true
 fi
 
 grep -E '^DOT_BAKE' "$log" || true

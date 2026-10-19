@@ -19,17 +19,31 @@ const ZzMap := preload("../game/zz_map.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzProps := preload("../game/zz_props.gd")
 
+## Node names of a map's prop casters in the bake (the trim and the suites find them by it), the
+## smallest prop that casts one, and the metres per texel their UV2 is _unwrapped at.
+const CASTER_PREFIX := "Prop_"
+const CASTER_MIN_SIZE := 0.6
+const CASTER_TEXEL := 4.0
+
 ## Per map: LightmapGI settings for DotLightBake.prepare. The defaults suit a street; the big
 ## holds take a coarser texel so the file stays a browser download.
 const SETTINGS := {
-	"default": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0},
+	"default": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0, "ambient_gain": 6.0, "bounce_energy": 0.7},
 	# Half the texels each way (a texel per 0.5 m): at full density the stadium was 12 MB and the
 	# mall 6 MB, more than the rest of the game's download.
 	"zz_stadium": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 	"zz_mall": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 	"zz_high_school": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 	"zz_relief_camp": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
+	# Converted maps: hundreds of boxes, long corridors.
+	"ze_nuke_beta": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
+	"ze_runforyourlife_1_v4": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 }
+
+
+var _props: ZzProps = null
+## Prop part -> its UV2-unwrapped mesh (or null), shared by every map: unwrapping is the slow part.
+var _unwrapped := {}
 
 
 func _ready() -> void:
@@ -51,6 +65,7 @@ func _run() -> void:
 	catalogue.load_from("maps")
 	var props := ZzProps.new()
 	props.load_file()
+	_props = props
 	var wanted := _arg("maps", "")
 	var ids: Array = catalogue.maps.keys()
 	ids.sort()
@@ -108,6 +123,8 @@ func _bake_scene(map: ZzMap) -> Node3D:
 			lamp.light_size = 0.15
 			drawn.add_child(lamp)
 
+	_add_prop_casters(map, drawn)
+
 	var lighting := map.get_node("Lighting").duplicate() as Node3D
 	root.add_child(lighting)
 
@@ -117,9 +134,67 @@ func _bake_scene(map: ZzMap) -> Node3D:
 			var light := node as DirectionalLight3D
 			light.light_bake_mode = Light3D.BAKE_DYNAMIC if node == lighting.get_child(0) else Light3D.BAKE_DISABLED
 
-	DotLightBake.prepare(root, map.light_fingerprint(), ZzMap.BAKE_PATH % String(map.id()), settings)
+	var gi := DotLightBake.prepare(root, map.light_fingerprint(), ZzMap.BAKE_PATH % String(map.id()), settings)
+	# The sky term is the map's own AMBIENT, not the bake scene's sky: the sky is a deep blue at
+	# night and a lightmap lit by it came out bluer and darker than the live ambient (a flat
+	# colour at the live energy) that every map is tuned under. The bake keeps what a flat
+	# ambient cannot do, which is its occlusion: corners and under-shelf darkening.
+	var world := lighting.get_node_or_null("Lighting") as WorldEnvironment
+	if world != null:
+		gi.environment_mode = LightmapGI.ENVIRONMENT_MODE_CUSTOM_COLOR
+		gi.environment_custom_color = world.environment.ambient_light_color
+		gi.environment_custom_energy = world.environment.ambient_light_energy * float(settings.get("ambient_gain", 6.0))
+	gi.bounce_indirect_energy = float(settings.get("bounce_energy", 0.7))
 	_own(root, root)
 	return root
+
+
+## Props never move once a map is built, so they belong in the bake: they shade the floor and the
+## walls from the lamps, and lamplight bounces off them. They are drawn as MultiMeshes (a
+## lightmap cannot name an instance of one, and a node per prop is hundreds of draw calls), so
+## here they are casters only: each part gets a coarse UV2 so the baker takes it in, and the
+## bake step's trim (tools/lightmap_trim.gd) drops their texels from the stored file. What is lit
+## on a prop at runtime is the bake's light probes, which see the same shadows.
+func _add_prop_casters(map: ZzMap, drawn: Node3D) -> void:
+	var made := 0
+
+	for index in map.props.size():
+		var prop: Dictionary = map.props[index]
+		var size: Vector3 = prop["size"]
+
+		if maxf(size.x, maxf(size.y, size.z)) < CASTER_MIN_SIZE:
+			continue
+
+		var parts := _props.parts(prop["id"])
+
+		for part_index in parts.size():
+			var part: Array = parts[part_index]
+			var key := "%s/%d" % [prop["id"], part_index]
+
+			if not _unwrapped.has(key):
+				var started := Time.get_ticks_msec()
+				var source := part[0] as Mesh
+				var mesh := ArrayMesh.new()
+				if source is ArrayMesh:
+					for surface in source.get_surface_count():
+						mesh.add_surface_from_arrays(source.surface_get_primitive_type(surface), source.surface_get_arrays(surface))
+				_unwrapped[key] = mesh if mesh.get_surface_count() > 0 and mesh.lightmap_unwrap(part[1] as Transform3D, CASTER_TEXEL) == OK else null
+
+				print("LIGHTMAP_SCENE unwrap %s %d ms" % [key, Time.get_ticks_msec() - started])
+
+			if _unwrapped[key] == null:
+				continue
+
+			var node := MeshInstance3D.new()
+			node.name = "%s%d_%d" % [CASTER_PREFIX, index, part_index]
+			node.mesh = _unwrapped[key]
+			node.transform = (prop["transform"] as Transform3D) * (part[1] as Transform3D)
+			node.gi_mode = GeometryInstance3D.GI_MODE_STATIC
+			node.set_meta(&"zz_caster", true)
+			drawn.add_child(node)
+			made += 1
+
+	print("LIGHTMAP_SCENE casters %s %d" % [map.id(), made])
 
 
 func _own(node: Node, owner_node: Node) -> void:

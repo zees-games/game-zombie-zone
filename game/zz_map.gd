@@ -42,8 +42,14 @@ const ZzPaths := preload("zz_paths.gd")
 ## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked,
 ## the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their
 ## shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays
-## live (a hold's day turns it) and only its bounce is baked. Gates, barricades, glass, water and
-## the props are not in the bake. A server never loads one ([member draw_world] is false).
+## live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters
+## only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes).
+## Everything that moves (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by
+## the LightmapGI probes plus the live lamps. Lightmapped surfaces ignore the Environment's
+## ambient, which is what a day raises, so a baked map carries the day with a live shadowless
+## fill (`BAKED_FILL`, per map in `BAKED_FILL_BY_MAP`) and a tonemap exposure rise
+## (`BAKED_DAY_EXPOSURE`). Glass and water are not in the bake. A server never loads one
+## ([member draw_world] is false).
 
 const CHANNEL := "zz.map"
 
@@ -59,7 +65,20 @@ const GROUND_DEPTH := 1.8
 
 ## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
 ## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
-const BAKE_VERSION := 1
+const BAKE_VERSION := 2
+
+## How much stronger the live fill is under a bake. Tuned from frames: baked and live read as
+## the same brightness, by night and by day.
+const BAKED_FILL := 4.0
+
+## Maps whose frames wanted another strength (an open car park is mostly sky, a corridor map
+## nearly none), found by rendering each baked against live and matching the mean brightness.
+const BAKED_FILL_BY_MAP := {"zz_lot": 1.2, "zz_high_school": 5.5, "ze_nuke_beta": 6.5, "ze_runforyourlife_1_v4": 2.5}
+
+## What a day adds to a lightmapped surface: nothing from the ambient, so the exposure rises with
+## the day by this factor instead (frames: a baked school by day read a third darker than live).
+const BAKED_FILL_COOL := Color(0.85, 1.0, 1.2)
+const BAKED_DAY_EXPOSURE := 1.7
 
 ## Where a map's bake is, by id; rebased, so a delivered pack finds its own.
 const BAKE_PATH := "res://lightmaps/%s.res"
@@ -118,6 +137,7 @@ var _missing: PackedStringArray = PackedStringArray()
 var _lamps: Array[OmniLight3D] = []
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
+var _baked_exposure: float = 1.0
 
 
 func id() -> StringName:
@@ -624,7 +644,7 @@ func _build_lights() -> void:
 ## client, from the document alone.
 func light_fingerprint() -> String:
 	return DotLightBake.fingerprint({
-		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "lights": doc.get("lights", []),
+		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "props": doc.get("props", []), "lights": doc.get("lights", []),
 		"environment": doc.get("environment", {}),
 	})
 
@@ -640,7 +660,32 @@ func _attach_bake() -> void:
 	baked = res.value
 	for lamp in _lamps:
 		lamp.light_bake_mode = Light3D.BAKE_STATIC
+
+	# A lightmapped surface takes its sky light from the bake, not from the environment's
+	# ambient, so the ambient a day raises reaches only what is not lightmapped. The fill (a live
+	# light, shadowless, blended with the day like the ambient) carries it instead, stronger by
+	# BAKED_FILL, which the bake's own ambient gain is tuned against (tools/lightmap_scenes.gd).
+	if _environment != null:
+		_baked_exposure = _environment.environment.tonemap_exposure
+
+	if _fill != null:
+		var gain: float = BAKED_FILL_BY_MAP.get(String(id()), BAKED_FILL)
+		_fill.light_energy *= gain
+		# The baked lamps are warm and the bake's sky is flat, so what the fill does not reach reads
+		# yellow beside the live frame, whose ambient is cool: the fill is cooled to cancel it.
+		_fill.light_color = _cooled(_fill.light_color)
+		for key: String in ["fill:light_energy"]:
+			for values: Dictionary in [_night_light, _day_light]:
+				if values.has(key):
+					values[key] = float(values[key]) * gain
+			for values: Dictionary in [_night_light, _day_light]:
+				if values.has("fill:light_color"):
+					values["fill:light_color"] = _cooled(values["fill:light_color"])
 	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
+
+
+static func _cooled(c: Color) -> Color:
+	return Color(c.r * BAKED_FILL_COOL.r, c.g * BAKED_FILL_COOL.g, c.b * BAKED_FILL_COOL.b)
 
 
 ## The lamps, for the bake scene and the suites.
@@ -906,6 +951,9 @@ func set_daylight(amount: float) -> void:
 			holder.set(parts[1], (a as Vector3).lerp(b as Vector3, amount))
 		else:
 			holder.set(parts[1], lerpf(float(a), float(b), amount))
+
+	if baked != null:
+		env.tonemap_exposure = _baked_exposure * lerpf(1.0, BAKED_DAY_EXPOSURE, amount)
 
 
 func daylight() -> float:

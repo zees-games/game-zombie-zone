@@ -37,7 +37,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--reaction=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--reaction=*|--no-bake|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

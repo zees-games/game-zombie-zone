@@ -34,7 +34,6 @@ var _weapons: PackedStringArray = PackedStringArray()
 ## --no-bake draws the map with live lamps (the look before bakes); --day=0..1 holds the map's
 ## light at that daylight, to compare a night and a day frame on any map that has a day.
 var _day := -1.0
-var _amb := -1.0
 
 
 func _ready() -> void:
@@ -73,8 +72,6 @@ func _ready() -> void:
 			_subscribe_fixture()
 		elif arg == "--no-bake":
 			ZzMap.use_bakes = false
-		elif arg.begins_with("--amb="):
-			_amb = arg.trim_prefix("--amb=").to_float()
 		elif arg.begins_with("--day="):
 			_day = arg.trim_prefix("--day=").to_float()
 
@@ -100,8 +97,6 @@ func _ready() -> void:
 ## --workshop: a subscribed pack whose one map is a document (the practice street under another
 ## id) in the process's shared index, solo. Pair with --zz-map-ids=fixture_ruin to play only it.
 func _process(_delta: float) -> void:
-	if _amb >= 0.0 and _client != null and _client.get("game") != null and _client.get("game").map != null:
-		_client.get("game").map._environment.environment.ambient_light_energy = _amb
 	if _day < 0.0 or _client == null:
 		return
 	var game: Variant = _client.get("game")

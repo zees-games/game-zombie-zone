@@ -23,8 +23,8 @@ const ZzMap := preload("../game/zz_map.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet"]
-const CHECKS_PER_MAP := 15
-const BAKE_CHECKS := 4
+const CHECKS_PER_MAP := 16
+const BAKE_CHECKS := 6
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -123,21 +123,32 @@ func _test_baked_light() -> void:
 	var game := await _world(&"")
 	var stale: Array = []
 	var baked: Array = []
+	var unbaked: Array = []
+	var casters: Array = []
 
 	for id: String in _maps:
 		var path := ZzMap.BAKE_PATH % id
 		if not ResourceLoader.exists(path):
+			unbaked.append(id)
 			continue
 		var map := ZzMap.new()
 		map.doc = game.catalogue.maps.get(StringName(id), {})
 		var data := load(path) as LightmapGIData
 		baked.append(id)
+		# The bake step trims the prop casters (tools/lightmap_trim.gd): a client builds no such node.
+		var users: Array = data.get("user_data") if data != null else []
+		for i in range(0, users.size(), 4):
+			if str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Prop_"):
+				casters.append(id)
+				break
 		if data == null or str(data.get_meta(DotLightBake.META_FINGERPRINT, "")) != map.light_fingerprint():
 			stale.append(id)
 		map.free()
 
 	_check(stale.is_empty(), "every committed bake was made from its map as it is now",
 		"baked %s, stale %s" % [baked, stale])
+	_check(unbaked.is_empty(), "every map the game ships has a bake", "no bake: %s" % [unbaked])
+	_check(casters.is_empty(), "no bake names a prop caster (the trim ran)", "%s" % [casters])
 	_check(baked.has("zz_practice"), "the practice street, the one map every build has, ships a bake")
 
 	var moved := ZzMap.new()
