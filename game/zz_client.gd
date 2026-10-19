@@ -247,10 +247,19 @@ func _start_offline() -> void:
 	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
 
+## The most stand-ins a solo game seats where [method DotPlatform.has_threads] is false or the
+## machine has four cores or fewer.
+const WEAK_HARDWARE_BOTS := 7
+
+
 ## Solo stand-ins: [member offline_bots], or the team the map is built for less you, whichever
 ## is more ([method ZzGame.team_size]); the last ones in leave first on a smaller map.
 func _fill_offline_team() -> void:
 	var wanted := maxi(offline_bots, game.team_size() - 1) if offline_bots > 0 else 0
+	# A browser without threads, or a machine with few cores, cannot run fifteen stand-ins and the
+	# horde in the time a frame has: half a team still holds the map. A capability, never the OS name.
+	if wanted > WEAK_HARDWARE_BOTS and (not DotPlatform.has_threads() or OS.get_processor_count() <= 4):
+		wanted = WEAK_HARDWARE_BOTS
 	var have: Array[StringName] = []
 
 	for id: StringName in game.players:

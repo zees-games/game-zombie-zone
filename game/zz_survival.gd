@@ -220,6 +220,9 @@ func _on_stage(stage: int, index: int) -> void:
 				game.notice.emit(_cleared_line(index - 1))
 				DotLog.info(CHANNEL, "a breather", {"after": index - 1, "tidied": straggled})
 			else:
+				# Four of the big maps have no loose items, only caches, and a cache was filled
+				# only by the first breather: wave 1 began with nothing to pick up.
+				var _placed := restock()
 				game.notice.emit(_opening_line())
 
 		DotNpcDirectorWaves.Stage.HORDE:

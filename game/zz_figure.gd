@@ -180,14 +180,27 @@ func _set_hold_kind() -> void:
 	if holding == &"" or held == null or not held.visible:
 		person.set_hold(DotHumanoidFigure.Hold.NONE)
 		return
-	var art: Variant = ZeeWeaponArtTable.table().get(holding)
-	var pose: StringName = (art as ZeeWeaponArt).pose if art is ZeeWeaponArt else ZeeWeaponArtTable.POSE_RIFLE
+	var pose := _pose_of(holding)
 	if pose == ZeeWeaponArtTable.POSE_MELEE:
 		person.set_hold(DotHumanoidFigure.Hold.MELEE)
 	elif pose == ZeeWeaponArtTable.POSE_THROWN:
 		person.set_hold(DotHumanoidFigure.Hold.NONE)
 	else:
 		person.set_hold(DotHumanoidFigure.Hold.GUN)
+
+
+## Weapon id -> pose, looked up once. This runs per figure per frame, and the table behind it
+## is a dictionary of art; asking it each time was 8 of 10.5 ms of script a frame with sixteen
+## bodies (zz-solo-loot-lag-1).
+static var _poses: Dictionary = {}
+
+
+static func _pose_of(id: StringName) -> StringName:
+	if not _poses.has(id):
+		var art: Variant = ZeeWeaponArtTable.table().get(id)
+		_poses[id] = (art as ZeeWeaponArt).pose if art is ZeeWeaponArt else ZeeWeaponArtTable.POSE_RIFLE
+
+	return _poses[id]
 
 
 ## The weapon in this figure's hand was used [param times] times, as a [ZeeWeaponNet] kind.

@@ -24,7 +24,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
 const SECTIONS := 13
-const CHECKS := 67
+const CHECKS := 71
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -405,7 +405,7 @@ func _test_map_rows() -> void:
 func _test_big_map(id: StringName) -> void:
 	_section("%s: a wave, played" % id)
 	if not _linked:
-		for i in 6:
+		for i in 7:
 			_check(true, "skipped without maps/")
 		_finished()
 		return
@@ -426,6 +426,14 @@ func _test_big_map(id: StringName) -> void:
 	_check(game.map.id() == id and game.horde.nav != null and game.horde.nav.point_count() > 2000,
 		"it builds for %d, with its ground" % team, "%d nav points, %d ms to build and seat" % [
 			game.horde.nav.point_count() if game.horde.nav != null else 0, built_ms])
+
+	# The hold begins when the ready phase ends; its opening quiet is where the caches are filled.
+	var waited := 0
+	while game.survival == null and waited < 20:
+		await _sim(game, 0.5)
+		waited += 1
+	_check(game.loot != null and game.loot.entries.size() > 0 and not game.map_doc.get("caches", []).is_empty(),
+		"wave 1 opens with loot on the floor", "%d pieces" % (game.loot.entries.size() if game.loot != null else -1))
 
 	var ticks := 0
 	var spent := 0

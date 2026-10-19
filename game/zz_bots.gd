@@ -109,6 +109,16 @@ func drive(_delta: float) -> void:
 		if not player.is_bot or not player.is_alive() or player.watching:
 			continue
 
+		# [b]Standing posts decide every second tick[/b], like a far zombie's brain: the command
+		# of the tick before is applied again (a view, a walk and a held trigger are states, not
+		# events), seats alternating so half the team thinks on each tick. Anyone down, pinned,
+		# shoving or mid-mend decides every tick, as does the first tick.
+		var kept: Variant = _state.get(player.player_id, {}).get("last_command")
+		if kept is DotFpsCommand and player.is_up() and not player.is_pinned() and player.using == &"" \
+				and (game.current_tick() + _seat(player)) % 2 == 1 and game.phase != game.Phase.IDLE:
+			player.controller.apply_command(kept as DotFpsCommand)
+			continue
+
 		var command := DotFpsCommand.new()
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
@@ -127,6 +137,7 @@ func drive(_delta: float) -> void:
 			_decide(player, command)
 			_pulse_trigger(player, command)
 
+		memory["last_command"] = command
 		player.controller.apply_command(command)
 
 
