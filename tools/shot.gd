@@ -138,7 +138,15 @@ func _default_stand(game: ZzGame) -> Vector3:
 	var mask := game.physics.layer_mask(&"world")
 	var down := PhysicsRayQueryParameters3D.create(usual + Vector3(0.0, 1.0, 0.0), usual + Vector3(0.0, -0.6, 0.0), mask)
 
-	if not space.intersect_ray(down).is_empty():
+	# Ground under it is not enough: a converted yard's slab runs past its own fence, and the
+	# point can be on the slab's rim, outside every floor the map has (a frame of the whole team
+	# falling, again). It must also be in a floor of the map's own navigation.
+	var inside := false
+	for f in ((game.map.doc.get("nav", {}) as Dictionary).get("floors", []) as Array):
+		if usual.x >= float(f[0]) and usual.x <= float(f[2]) and usual.z >= float(f[1]) and usual.z <= float(f[3]):
+			inside = true
+
+	if inside and not space.intersect_ray(down).is_empty():
 		return usual
 
 	var seat: Vector3 = game.map.spawn("survivors", 0)[0]
@@ -163,13 +171,19 @@ func _run() -> void:
 		player.health.invulnerable = true
 
 	var stand := _at if _at != Vector3.INF else _default_stand(game)
-	local.place_at(stand, 0.0)
+	# Facing the way the map's first seat faces (a frame that ignores it stares at whatever is
+	# behind that seat's back, which once read as a map that starts you against a wall).
+	local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
 
 	var i := 0
 	for player in game.survivors():
 		if player != local:
 			i += 1
-			player.place_at(game.map.spawn("survivors", i)[0] if _alone else stand + Vector3(-1.6 + float(i) * 1.1, 0.0, 1.8), 0.0)
+			# Off the practice street's open ground the offset spot is as likely a void as not (the seat
+			# fallback above), so each stand-in takes its own seat.
+			var on_seat := _alone or (_at == Vector3.INF and stand != Vector3(0.0, 0.05, 12.0))
+			var seat: Array = game.map.spawn("survivors", i)
+			player.place_at(seat[0] if on_seat else stand + Vector3(-1.6 + float(i) * 1.1, 0.0, 1.8), float(seat[1]) if on_seat else 0.0)
 
 	if _look != Vector3.INF:
 		_face(local, _look)
