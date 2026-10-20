@@ -48,6 +48,7 @@ const SETTINGS := {
 	"ze_nuke_beta": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 	"ze_runforyourlife_1_v4": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 0.5},
 	"ze_jurassicpark": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 2, "texel_scale": 0.2},
+	"ze_blackmesa_escape": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 2, "texel_scale": 0.2},
 }
 
 
