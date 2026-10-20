@@ -408,6 +408,13 @@ extends DotConfig
 ## map's `next` always wins over both.
 @export var shuffle_maps: bool = false
 
+## The file that says which maps this server ROTATES: `cfg/maps.yml` (dot-map's
+## `DotMapRotationFile`: named rotations, `random` or `cycle`, wildcards, command names), looked
+## for in the `--config` directory. Empty, or no such file, rotates every map. A map it leaves out
+## stays installed (`zz_map <id>` and the map menu load it); it is only never drawn, balloted or
+## nominated. A rotation in the file replaces [member shuffle_maps]. `sv_map_rotation_file`.
+@export var map_rotation_file: String = "cfg/maps.yml"
+
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 

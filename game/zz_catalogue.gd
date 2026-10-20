@@ -24,6 +24,13 @@ var maps: Dictionary = {}
 var refused: Dictionary = {}
 
 var _order: Array[StringName] = []
+
+## The server's maps.yml, or null when there is none (every map rotates, as it always did).
+## dot-map's rotation file speaks DotMapDef; this catalogue holds map documents, so [member _defs]
+## mirrors the ids and the file marks `in_rotation` on the mirror. See [method rotating].
+var rotation_file: DotMapRotationFile = null
+var _defs: DotMapCatalogue = DotMapCatalogue.new()
+var _rotation: DotMapRotation = DotMapRotation.of(_defs)
 var _next: int = 0
 
 # --- Workshop maps ----------------------------------------------------------
@@ -240,11 +247,113 @@ func playable(allowed: PackedStringArray) -> Array[StringName]:
 	return out
 
 
+## Whether maps.yml names rotations, so that it (not [code]zz_shuffle[/code]) orders the maps.
+func has_rotation_file() -> bool:
+	return rotation_file != null and rotation_file.has_rotations()
+
+
+## Brings the mirror up to date with [member maps] and lets the file mark who rotates.
+## Without a file every map is in (the practice street only when it is all there is), which is
+## what [method playable] always did.
+func apply_rotation(allowed: PackedStringArray = PackedStringArray()) -> void:
+	sync_content()
+	var seen := {}
+
+	for id: StringName in _order:
+		seen[id] = true
+		var def := _defs.get_map(id)
+
+		if def == null:
+			def = DotMapDef.new()
+			def.id = id
+			def.scene_path = "zz:%s" % id
+			def.display_name = display_name(id)
+			var _added := _defs.add(def)
+
+		def.enabled = allowed.is_empty() or allowed.has(String(id))
+
+	for def: DotMapDef in _defs.maps.duplicate():
+		if not seen.has(def.id):
+			var _gone := _defs.remove(def.id)
+
+	if has_rotation_file():
+		rotation_file.fallback_in = func(def: DotMapDef) -> bool:
+			return def.id != PRACTICE or _defs.size() == 1
+		var _applied := rotation_file.apply(_rotation)
+		return
+
+	_rotation.order = []
+
+	for def: DotMapDef in _defs.maps:
+		def.in_rotation = true
+
+
+## `zz_rotation <name>`: the live switch to another named rotation in the file.
+func switch_rotation(rotation_name: String) -> DotResult:
+	if not has_rotation_file():
+		return DotResult.fail(DotError.CODE_STATE, "There is no maps.yml to switch rotations in.")
+
+	apply_rotation()
+	return rotation_file.switch(_rotation, rotation_name)
+
+
+## Whether [param id] is in the active rotation. A map the catalogue does not hold is not.
+func in_rotation(id: StringName) -> bool:
+	if not maps.has(id):
+		return false
+
+	if not has_rotation_file():
+		return true
+
+	apply_rotation()
+	var def := _defs.get_map(id)
+	return def != null and def.in_rotation
+
+
+## What the ballot, a nomination and the next-map draw may offer: [method playable] less the
+## maps maps.yml leaves out. A map left out stays [i]playable[/i] (an admin's `zz_map` and the
+## map menu load it). With no file, or a file that leaves nothing, it is [method playable].
+func rotating(allowed: PackedStringArray) -> Array[StringName]:
+	var every := playable(allowed)
+
+	if not has_rotation_file():
+		return every
+
+	apply_rotation(allowed)
+	var out: Array[StringName] = []
+
+	for id in every:
+		var def := _defs.get_map(id)
+
+		if def != null and def.in_rotation:
+			out.append(id)
+
+	return out if not out.is_empty() else every
+
+
+## Records that [param id] was built, for the file's cooldown and cycle. Nothing without a file.
+func note_played(id: StringName) -> void:
+	if has_rotation_file() and maps.has(id):
+		_rotation.note_played(id)
+
+
 ## The next map: drawn from [param stream] when shuffling, in order otherwise, and never the
-## same one twice running when there is a choice.
+## same one twice running when there is a choice. A maps.yml with rotations replaces both: its
+## rotation's mode (`random` with a cooldown, or `cycle`) and written order decide.
 func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream,
 		previous: StringName) -> Dictionary:
-	var ids := playable(allowed)
+	if has_rotation_file():
+		apply_rotation(allowed)
+
+		if _rotation.seed_value == 0 and stream != null:
+			_rotation.seed_value = stream.next_range_i(1, 0x3fffffff)
+
+		var chosen := _rotation.choose(0)
+
+		if chosen != null and maps.has(chosen.id):
+			return maps[chosen.id]
+
+	var ids := rotating(allowed)
 
 	if ids.is_empty():
 		DotLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
@@ -271,8 +380,9 @@ func describe_lines() -> PackedStringArray:
 
 	for id in _order:
 		var doc: Dictionary = maps[id]
-		lines.append("  %-22s %-28s %-8s %4d props  %s" % [
+		lines.append("  %-22s %-28s %-8s %4d props  %s%s" % [
 			id, str(doc["name"]), str(doc["mode"]), (doc["props"] as Array).size(), str(doc["author"]),
+			"" if in_rotation(id) else "  (not in rotation)",
 		])
 
 	if not refused.is_empty():

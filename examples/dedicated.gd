@@ -15,8 +15,8 @@ const ZzNetLink := preload("../game/net/zz_net_link.gd")
 ## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
 ## nothing but the stand-ins the module seats itself.
 
-const SECTIONS := 12
-const CHECKS := 84
+const SECTIONS := 13
+const CHECKS := 97
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -64,6 +64,7 @@ func _run() -> void:
 		await _test_a_reload_keeps_delivered_maps()
 		await _test_a_module_reload()
 		await _test_the_map_vote()
+		_test_rotation_file()
 		_test_finish_round_waits_for_a_live_round()
 		await _test_it_unloads_cleanly()
 
@@ -486,6 +487,120 @@ func _test_the_map_vote() -> void:
 ## in warmup held the change for `finish_round_max_sec` over a round that had not started.
 ## Run on a director of its own carrying the game's own hook, so the real vote's clock is
 ## untouched; the match's state is set by hand and put back.
+## Stands in for the module a vote's commands are registered on, recording the names.
+class CommandHost extends Node:
+	var added: Dictionary = {}
+
+	func add_command(full: String, fn: Callable, _help: String, _permission: String) -> Object:
+		added[full] = fn
+		return null
+
+
+## `cfg/maps.yml`: which maps rotate. The format is dot-map's selftest's; this is what the GAME
+## does with it: a map left out is installed and loadable and is never drawn, never on a ballot,
+## marked in the map list; a switch of rotation takes effect; a renamed command is registered.
+func _test_rotation_file() -> void:
+	_section("rotation file")
+	var module := _module()
+	var vote: Node = module.get("vote") if module != null else null
+	var catalogue = game.catalogue
+	var made: Array[StringName] = []
+
+	for n in 4:
+		var doc: Dictionary = catalogue.practice().duplicate(true)
+		doc["id"] = "rot_%d" % n
+		doc["name"] = "Rotation %d" % n
+		var _added: bool = catalogue._add(doc, "rotation test")
+		made.append(StringName("rot_%d" % n))
+
+	catalogue._rebuild_order()
+	var keep_a: Array = ["rot_0", "rot_1"]
+	var keep_b: Array = ["rot_2", "rot_3"]
+
+	var parsed := DotMapRotationFile.from_trees([{"defaults": {
+		"rotation": "a",
+		"rotations": {"a": {"maps": keep_a, "mode": "random"}, "b": {"maps": keep_b, "mode": "cycle"}},
+		"commands": {"names": {"rtv": "rockit", "zz_map": "nextmap"}},
+	}}], "game-zombie-zone")
+	_check(parsed.ok, "a rotation file parses", str(parsed.error))
+	var kept = catalogue.rotation_file
+	catalogue.rotation_file = parsed.value
+	catalogue.apply_rotation(game.config.map_ids)
+
+	var drawn := {}
+	for _i in 30:
+		var doc: Dictionary = catalogue.next_map(game.config.map_ids, false, game.random.stream(&"map"), &"")
+		drawn[String(doc["id"])] = true
+		catalogue.note_played(StringName(str(doc["id"])))
+	var strays := drawn.keys().filter(func(id: String) -> bool: return not keep_a.has(id))
+	_check(not drawn.is_empty() and strays.is_empty(), "a map outside the rotation is never drawn", str(strays))
+	_check(catalogue.maps.has(&"rot_2") and catalogue.playable(game.config.map_ids).has(&"rot_2"),
+		"and stays installed and loadable")
+	_check(not catalogue.rotating(game.config.map_ids).has(&"rot_2"), "but is not what the rotation offers")
+
+	if vote != null:
+		vote.call("refresh_maps")
+		var ballot: Array = []
+		for choice in (vote.get("source") as DotVoteListSource).choices():
+			ballot.append(String(choice.id))
+		_check(ballot.has("rot_0") and not ballot.has("rot_2"), "never on a ballot", str(ballot))
+	else:
+		_check(false, "never on a ballot", "no vote")
+
+	var rows: Array = game.map_rows()
+	var out_row: Dictionary = {}
+	var in_row: Dictionary = {}
+	for row: Dictionary in rows:
+		if row["id"] == "rot_2":
+			out_row = row
+		elif row["id"] == "rot_0":
+			in_row = row
+	_check(not out_row.is_empty() and not bool(out_row["in_rotation"])
+			and str(out_row["name"]).contains("not in rotation"), "the map list marks it")
+	_check(not in_row.is_empty() and bool(in_row["in_rotation"])
+			and not str(in_row["name"]).contains("not in rotation"), "and leaves the rotating ones alone")
+
+	_check(catalogue.switch_rotation("b").ok
+			and catalogue.rotating(game.config.map_ids) == ([&"rot_2", &"rot_3"] as Array[StringName]),
+		"a rotation switch takes effect")
+	_check(not catalogue.switch_rotation("nowhere").ok, "and an unknown rotation changes nothing")
+
+	# A cycle plays the written order and wraps.
+	var seen: Array = []
+	for _i in 4:
+		var doc: Dictionary = catalogue.next_map(game.config.map_ids, false, null, &"")
+		seen.append(String(doc["id"]))
+		catalogue.note_played(StringName(str(doc["id"])))
+	_check(seen[0] != seen[1] and seen[0] == seen[2] and seen[1] == seen[3]
+			and keep_b.has(seen[0]) and keep_b.has(seen[1]), "a cycle walks the rotation in turn", str(seen))
+
+	_check(game.command_names("zz_map") == PackedStringArray(["nextmap"])
+			and game.command_names("zz_maps") == PackedStringArray(["zz_maps"]),
+		"the game's own map command is renameable from the file")
+
+	var host := CommandHost.new()
+	var bound: DotResult = vote.call("install_commands", host) if vote != null else null
+	_check(bound != null and bound.ok and host.added.has("rockit") and not host.added.has("rtv"),
+		"and a renamed rtv is registered under its new name", ", ".join(host.added.keys().slice(0, 6)))
+	host.free()
+
+	# No file: nothing changes -- every map rotates, as it always did.
+	catalogue.rotation_file = null
+	catalogue.apply_rotation(game.config.map_ids)
+	_check(catalogue.rotating(game.config.map_ids) == catalogue.playable(game.config.map_ids)
+			and catalogue.in_rotation(&"rot_2"), "with no file every map is back in the rotation")
+
+	# Put the world back: the other suites share this catalogue.
+	for id in made:
+		var _gone: bool = catalogue.maps.erase(id)
+	catalogue._rebuild_order()
+	catalogue.rotation_file = kept
+	catalogue.apply_rotation(game.config.map_ids)
+	if vote != null:
+		vote.call("refresh_maps")
+	_finished()
+
+
 func _test_finish_round_waits_for_a_live_round() -> void:
 	_section("finish_round waits for a live round, not warmup")
 	var module := _module()

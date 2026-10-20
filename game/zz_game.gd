@@ -311,6 +311,7 @@ func _ready() -> void:
 		# would have named. See [method solo_map_dirs].
 		for root in solo_map_dirs("maps"):
 			var _added := catalogue.add_directory(root)
+		var _rotation := load_rotation()
 		# Laid out now, not on the first round: a warmup on an empty world is indistinguishable
 		# from a map that failed to load.
 		_lay_out_map()
@@ -1074,7 +1075,10 @@ func map_rows() -> Array:
 	var now := map.id() if map != null else &""
 	for id in catalogue.playable(config.map_ids):
 		var doc: Dictionary = catalogue.maps.get(id, {})
-		var row := {"id": String(id), "name": catalogue.display_name(id), "current": id == now,
+		var rotates := catalogue.in_rotation(id)
+		var row := {"id": String(id),
+			"name": catalogue.display_name(id) + ("" if rotates else " (not in rotation)"),
+			"in_rotation": rotates, "current": id == now,
 			"mode": str(doc.get("mode", "")).capitalize(),
 			"detail": str(doc.get("blurb", "")) if int(doc.get("survivors", 0)) <= 0 \
 				else "%s (%d survivors)" % [str(doc.get("blurb", "")), int(doc["survivors"])]}
@@ -1101,6 +1105,72 @@ func change_map_now(id: StringName) -> DotResult:
 	return DotResult.success(id)
 
 
+## Reads maps.yml (the `--config` directory first) and applies it. Called at boot and by
+## `sv_map_rotation_file`. A file that is present and unreadable is an ERROR and changes nothing:
+## rotating every map is a better failure than rotating none.
+func load_rotation() -> DotResult:
+	if catalogue == null:
+		return DotResult.fail(DotError.CODE_STATE, "There is no catalogue to rotate.")
+
+	var stem := config.map_rotation_file
+	var dir := DotMapRotationFile.config_dir_arg()
+	var found := DotMapRotationFile.find(stem, dir)
+
+	if found == "" and stem != "" and (dir != "" or stem != ZzConfig.new().map_rotation_file):
+		# The default name being absent is an install with no maps.yml; a name or a directory
+		# somebody chose that finds nothing is a typo they would otherwise never hear about.
+		DotLog.warn(CHANNEL, "the map rotation file was not found; every map rotates", {
+			"file": stem, "config_dir": dir,
+		})
+
+	var paths := PackedStringArray()
+
+	if found != "":
+		paths.append(found)
+
+	var read := DotMapRotationFile.load_files(paths, "game-zombie-zone")
+
+	if not read.ok:
+		DotLog.error(CHANNEL, "the map rotation file could not be read; every map rotates", {
+			"why": read.error.message,
+		})
+		catalogue.rotation_file = null
+		catalogue.apply_rotation(config.map_ids)
+		return read
+
+	catalogue.rotation_file = read.value
+	catalogue.apply_rotation(config.map_ids)
+
+	if catalogue.has_rotation_file():
+		DotLog.info(CHANNEL, "the map rotation file", {
+			"paths": ", ".join(catalogue.rotation_file.sources),
+			"active": catalogue.rotation_file.active_name(),
+		})
+
+	return read
+
+
+## maps.yml's `commands:` block (prefix and names), or empty with no file.
+func rotation_commands() -> Dictionary:
+	if catalogue == null or catalogue.rotation_file == null:
+		return {}
+
+	return catalogue.rotation_file.commands()
+
+
+## Every name a role of this game's own answers to (the first is the one help shows), from
+## maps.yml's `commands:` block; the role's own name with no file. Lets `zz_map` and its siblings
+## be renamed the way dot-vote's roles are.
+func command_names(role: String) -> PackedStringArray:
+	var spec := rotation_commands()
+	var names: Dictionary = spec.get("names", {})
+
+	if not names.has(role):
+		return PackedStringArray([role])
+
+	return DotCommandNames.all_of("", names, {}, role)
+
+
 func _rotation_next() -> StringName:
 	if catalogue == null:
 		return map.id()
@@ -1125,6 +1195,7 @@ func _lay_out_map() -> void:
 		doc = catalogue.next_map(config.map_ids, config.shuffle_maps, random.stream(&"map"),
 			StringName(str(map_doc.get("id", ""))))
 
+	catalogue.note_played(StringName(str(doc.get("id", ""))))
 	var _built := build_map(doc)
 	_place_everybody()
 
