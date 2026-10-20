@@ -30,11 +30,11 @@ const CASTER_TEXEL := 4.0
 ## How much of the live ambient each surface emits into the bake (see _with_emission): an open
 ## street already has its sky, a closed hold has none, so the holds take more. Tuned per map
 ## against a live frame (tools/shot.sh --no-bake), not derived.
-const EMIT_BY_MAP := {"zz_lot": 0.3, "zz_practice": 0.15, "zz_blackout_2": 0.15, "zz_blackout_3": 0.2, "zz_chapel": 0.2, "zz_stadium": 0.4, "zz_relief_camp": 0.2, "zs_ravenstreet": 0.25, "ze_runforyourlife_1_v4": 0.3, "zz_mall": 0.5, "zz_high_school": 0.75, "ze_nuke_beta": 0.95}
+const EMIT_BY_MAP := {"zz_lot": 0.3, "zz_practice": 0.15, "zz_blackout_2": 0.15, "zz_blackout_3": 0.2, "zz_chapel": 0.2, "zz_stadium": 0.4, "zz_relief_camp": 0.2, "zs_ravenstreet": 0.25, "ze_runforyourlife_1_v4": 0.3, "ze_boat_escape": 0.0, "zz_mall": 0.5, "zz_high_school": 0.75, "ze_nuke_beta": 0.95}
 
 ## The bake's sky term, as a multiple of the live ambient: an open map sees its sky from every
 ## surface, so it takes less than a closed hold (which sees none of it). Tuned like EMIT_BY_MAP.
-const AMBIENT_GAIN_BY_MAP := {"zz_lot": 2.5, "zz_practice": 1.4, "zz_blackout_2": 1.35, "zz_blackout_3": 2.0, "zz_chapel": 1.8, "zz_stadium": 2.6, "zz_relief_camp": 1.4, "zs_ravenstreet": 2.4, "ze_runforyourlife_1_v4": 2.7}
+const AMBIENT_GAIN_BY_MAP := {"zz_lot": 2.5, "zz_practice": 1.4, "zz_blackout_2": 1.35, "zz_blackout_3": 2.0, "zz_chapel": 1.8, "zz_stadium": 2.6, "zz_relief_camp": 1.4, "zs_ravenstreet": 2.4, "ze_runforyourlife_1_v4": 2.7, "ze_boat_escape": 0.0}
 
 const SETTINGS := {
 	"default": {"quality": LightmapGI.BAKE_QUALITY_MEDIUM, "bounces": 3, "texel_scale": 1.0, "ambient_gain": 6.0, "bounce_energy": 0.7, "emit": 0.4},

@@ -75,6 +75,11 @@ func _run() -> void:
 		if arg.begins_with("--only="):
 			only = arg.substr(7)
 
+	if only.begins_with("hold:"):
+		await _test_holding(StringName(only.substr(5)))
+		get_tree().quit(0)
+		return
+
 	if only != "":
 		await _test_spread(&"zz_high_school")
 		await _test_spread(&"zz_mall")
@@ -218,8 +223,8 @@ func _test_holding(id: StringName) -> void:
 	_check(on["share"] >= 0.75, "most stand-ins stand at a choke before the wave", "%.2f within %.0f m" % [on["share"], NEAR])
 	_check(on["share"] >= off["share"] + 0.25 or (off["share"] >= 0.9 and on["share"] >= off["share"]), "which the posts alone did not do (a post already at a choke is allowed to stay)",
 		"%.2f against %.2f at their posts" % [on["share"], off["share"]])
-	_check(on["distinct"] >= mini(2, on["chokes"]), "and they are spread over the chokes, not at one",
-		"%d chokes held of %d" % [on["distinct"], on["chokes"]])
+	_check(on["distinct"] >= mini(2, on["places"]), "and they are spread over the chokes, not at one",
+		"%d chokes held of %d (%d places to stand)" % [on["distinct"], on["chokes"], on["places"]])
 	_finished()
 
 
@@ -259,22 +264,47 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 
 		total += 1
 		var best := INF
-		var which := -1
 
 		for i in notes.chokes.size():
 			var at: Vector3 = notes.chokes[i]["at"]
-			var d := Vector2(at.x - p.feet().x, at.z - p.feet().z).length()
+			best = minf(best, Vector2(at.x - p.feet().x, at.z - p.feet().z).length())
 
-			if d < best:
-				best = d
-				which = i
+		if best > NEAR:
+			continue
 
-		if best <= NEAR:
-			near += 1
-			held[which] = true
+		near += 1
+
+		# Which choke it holds is the one whose place to stand (`hold`, a few metres behind the
+		# choke) is nearest it, not the one whose choke is: on a street where two chokes are a few
+		# metres apart a bot standing behind one is nearer the other's choke, and the count then
+		# flipped between runs on where each stand-in had got to.
+		var mine := -1
+		var mine_d := INF
+
+		for i in notes.chokes.size():
+			var spot: Vector3 = notes.chokes[i]["hold"]
+
+			if spot == Vector3.INF:
+				spot = notes.chokes[i]["at"]
+
+			var d := Vector2(spot.x - p.feet().x, spot.z - p.feet().z).length()
+
+			if d < mine_d:
+				mine_d = d
+				mine = i
+
+		held[mine] = true
+
+	# Chokes whose places to stand coincide (two on one route can share the one behind them) are one
+	# place to hold, and a spread cannot be asked of fewer places than there are.
+	var places := {}
+
+	for c in notes.chokes:
+		var spot: Vector3 = c["hold"] if c["hold"] != Vector3.INF else c["at"]
+		places[Vector2i(roundi(spot.x / 2.0), roundi(spot.z / 2.0))] = true
 
 	var out := {
-		"ready": notes.is_ready(), "chokes": notes.chokes.size(), "found": notes.all_chokes.size(),
+		"places": places.size(), "ready": notes.is_ready(), "chokes": notes.chokes.size(), "found": notes.all_chokes.size(),
 		"share": float(near) / float(maxi(total, 1)), "distinct": held.size(),
 		"bake": notes.bake_ms, "annotate": notes.annotate_ms,
 	}

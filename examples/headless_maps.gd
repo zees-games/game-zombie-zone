@@ -22,7 +22,7 @@ const ZzMap := preload("../game/zz_map.gd")
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
-const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall"]
+const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape"]
 const CHECKS_PER_MAP := 16
 const BAKE_CHECKS := 7
 
