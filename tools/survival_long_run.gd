@@ -186,6 +186,11 @@ func _run() -> void:
 		t += 32.0 * TICK
 		await get_tree().physics_frame
 
+		if _game.survival == null and _watch > 0.0 and t >= _next_watch:
+			# An exodus map has no waves: where the team is, how many are up, how many zombies are about.
+			_next_watch = t + _watch
+			_print_exodus_watch(t)
+
 		if _game.survival == null or _game.survival.waves == null:
 			continue
 
@@ -379,6 +384,33 @@ func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
 	if not _refusals.is_empty():
 		print("      refused %s" % _refusals)
 		_refusals.clear()
+
+
+func _print_exodus_watch(t: float) -> void:
+	var up := 0
+	var down := 0
+	var dead := 0
+	var sum := Vector3.ZERO
+	var near := 0
+	var npcs: Array = _game.horde.spawner.all_npcs() if _game.horde != null else []
+	for player in _game.survivors():
+		if player.is_up():
+			up += 1
+		elif player.is_down():
+			down += 1
+		elif not player.is_alive():
+			dead += 1
+		sum += player.feet()
+	var count := maxi(_game.survivors().size(), 1)
+	var centre := sum / float(count)
+	var alive_npcs := 0
+	for npc: DotNpcInstance in npcs:
+		if not npc.is_alive():
+			continue
+		alive_npcs += 1
+		if npc.position().distance_to(centre) < 25.0:
+			near += 1
+	print("  %5.0f s  team at %s | up %d down %d dead %d | zombies %d, within 25 m of the team %d" % [t, centre.snappedf(0.1), up, down, dead, alive_npcs, near])
 
 
 ## ZzHorde.tick, part by part (the same order).

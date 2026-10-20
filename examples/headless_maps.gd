@@ -303,7 +303,7 @@ func _test_map(id: StringName) -> void:
 			unreached.append("%s at %s" % [place[0], to])
 
 	_check(unreached.is_empty() and open.data.points.size() > 50, "the zombies' ground joins everything to the start",
-		"%d points; %s" % [open.data.points.size(), "; ".join(unreached.slice(0, 6))])
+		"%d points; %s" % [open.data.points.size(), "; ".join(unreached.slice(0, 40))])
 
 	# With the gates shut, what lies past them is cut off: a gate the horde walks through is
 	# not one. A map without gates says so.
