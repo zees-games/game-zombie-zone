@@ -277,8 +277,11 @@ func apply_rotation(allowed: PackedStringArray = PackedStringArray()) -> void:
 			var _gone := _defs.remove(def.id)
 
 	if has_rotation_file():
+		# Captures the mirror, never self: a lambda on self held by a member is a reference cycle,
+		# and a RefCounted cycle leaks.
+		var mirror := _defs
 		rotation_file.fallback_in = func(def: DotMapDef) -> bool:
-			return def.id != PRACTICE or _defs.size() == 1
+			return def.id != PRACTICE or mirror.size() == 1
 		var _applied := rotation_file.apply(_rotation)
 		return
 
