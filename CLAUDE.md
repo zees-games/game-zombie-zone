@@ -35,7 +35,7 @@ assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the 
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
 examples/            headless_run (36 sections), headless_maps, headless_net (17), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
-tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured),
+tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured), server_probe.sh (the server tick by phase at 16 to 128 survivors),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
 
@@ -125,6 +125,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 tools/bake_lightmaps.sh zz_lot                           # rebake one map's light (the GPU box); BAKE_LOCAL=1 for here
 godot --headless --path . res://tools/survival_long_run.tscn -- --map=zz_high_school [--from=7] [--profile] [--watch=30 --detail]
+tools/server_probe.sh [16 32 64 100 128]   # server tick by phase, N peers plus the horde, 64 and 33 Hz ([survival](docs/survival.md#the-server-tick-at-16-to-128-survivors-zz-scale-probe-1-2026-10-19))
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1
 tools/shot.sh --view=room --alone --zz-map-ids=zz_blackout_1 --at=16.6,1.6,65.4 --look=18,1.1,66   # the fence and its padlock

@@ -195,3 +195,31 @@ The steps on the way (medians): school 8.5 at scale 1.15, 9 at 1.3, 9 at 1.45, 7
 | Ballpark (16) | **scale 5.0, share 1.0 (kept)** | 8 | 7 | 8 | not finished | 8 |
 
 The ballpark's team of sixteen with two helpers needs a much bigger wave than the other maps before its middle waves hurt. Seeds 7 and 8 were not re-run (the build slot was shared); read the median, never a cell. `headless_survival`'s "the stand-ins kill what comes" now asks for more than 2 kills in 75 s, not more than 5: the camp's wave 1 is 10 zombies and the two answering stand-ins left it at 5.
+
+## The server tick at 16 to 128 survivors (zz-scale-probe-1, 2026-10-19)
+
+`tools/server_probe.sh` (one process per row, through `heavy`; `tools/server_probe.tscn` for one row; `tools/server_probe_table.py` makes the tables) runs the real server half on `zz_stadium` (the biggest survival map): `ZzGame`, a `DotNetManager` and `ZzNetBridge` with the socket replaced by a counter, N survivors each seated as a peer (own entity, own snapshot) and driven by the stand-in brain, the hold put at wave 10, and the commons topped up to `commons_cap(N)` (or a fixed `--commons`) until the window opens; the window is 12 s of play. Phases are laps around `ZzGame._step`'s own calls (kept in step with it, as `survival_long_run --profile` is) and around the manager's half of the tick; times are ms per tick, means over all ticks of the window, so `net snapshot` is the mean of ticks that send and ticks that do not (30 snapshots/s: every second tick at 64 Hz, every tick at 33 Hz).
+
+**Read these as relative costs, not absolute.** The VM was shared (load 2 to 4), peers do not acknowledge snapshots (the no-ack host; a real client acks, which game-g2gfast's load probe found changes a snapshot's cost), and the engine step is the time spent awaiting one physics frame once every 16 ticks, which includes whatever else the machine was doing. dot-npc has no timer inside a path search, so pathing is derived: searches per tick (`DotNpcNavGraph.searches`) times the cost of one search measured on the same graph afterwards; it is part of `brains`, not additional.
+
+| survivors | Hz | commons (cap) | budget | total mean | p50 | p95 | max | game logic | senses | brains | bodies | horde other | net pull | **net snapshot** | engine step | pathing (derived) | B/s per peer | peak MB |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 16 | 64 | 80 (82) | 15.6 | 19.8 | 23.5 | 33.0 | 41.5 | 3.3 | 1.1 | 2.4 | 0.7 | 0.5 | 0.5 | **11.4** | 0.6 | 0.2 | 36778 | 275 |
+| 32 | 64 | 114 (114) | 15.6 | 44.7 | 68.3 | 77.7 | 86.3 | 7.5 | 1.2 | 2.5 | 0.9 | 1.0 | 0.8 | **30.9** | 0.7 | 0.6 | 52903 | 357 |
+| 64 | 64 | 170 (178) | 15.6 | 146.6 | 199.6 | 297.8 | 414.4 | 15.6 | 4.6 | 8.3 | 1.9 | 2.1 | 1.7 | **112.5** | 4.0 | 0.7 | 84944 | 671 |
+| 100 | 64 | 215 (250) | 15.6 | 243.2 | 372.9 | 490.7 | 629.4 | 24.9 | 4.1 | 10.1 | 2.5 | 3.6 | 2.4 | **195.7** | 17.2 | 1.6 | 84634 | 1118 |
+| 128 | 64 | 274 (306) | 15.6 | 369.7 | 497.8 | 765.6 | 969.0 | 35.2 | 5.7 | 15.1 | 3.2 | 5.2 | 3.2 | **302.1** | 25.6 | 1.5 | 79807 | 1636 |
+| 16 | 33 | 79 (82) | 30.3 | 33.2 | 33.2 | 37.2 | 55.2 | 3.8 | 1.1 | 3.0 | 0.9 | 0.6 | 0.6 | **23.3** | 0.8 | 0.3 | 33990 | 269 |
+| 32 | 33 | 113 (114) | 30.3 | 97.9 | 88.1 | 170.8 | 310.7 | 8.6 | 1.4 | 3.4 | 1.3 | 1.4 | 1.2 | **80.7** | 1.0 | 1.2 | 49039 | 343 |
+| 64 | 33 | 157 (178) | 30.3 | 265.8 | 249.3 | 379.0 | 516.9 | 17.7 | 4.5 | 9.6 | 2.1 | 2.4 | 1.8 | **227.7** | 8.7 | 1.5 | 81265 | 663 |
+| 100 | 33 | 238 (250) | 30.3 | 474.4 | 435.5 | 699.5 | 881.0 | 28.5 | 4.7 | 14.9 | 2.9 | 4.2 | 2.6 | **416.6** | 26.5 | 1.7 | 74339 | 1069 |
+| 128 | 33 | 253 (306) | 30.3 | 592.1 | 591.3 | 667.6 | 716.0 | 35.9 | 5.3 | 18.6 | 3.5 | 5.0 | 3.0 | **520.8** | 43.7 | 2.3 | 75863 | 1610 |
+| 64 | 64 | 236 (fixed 250) | 15.6 | 151.4 | 221.4 | 282.9 | 320.5 | 15.9 | 5.2 | 12.1 | 2.6 | 2.4 | 1.9 | **111.4** | 6.7 | 0.9 | 80382 | 770 |
+| 64 | 64 | 148 (fixed 150) | 15.6 | 125.6 | 191.2 | 238.8 | 256.4 | 14.2 | 3.0 | 6.4 | 1.6 | 1.8 | 1.4 | **97.2** | 3.9 | 0.6 | 86143 | 652 |
+| 128 | 64 | 232 (fixed 250) | 15.6 | 313.4 | 458.2 | 679.7 | 880.0 | 34.1 | 5.5 | 11.7 | 2.6 | 4.2 | 2.8 | **252.4** | 16.2 | 1.6 | 77271 | 1538 |
+| 128 | 64 | 147 (fixed 150) | 15.6 | 258.0 | 400.8 | 497.3 | 527.4 | 31.8 | 3.8 | 5.6 | 1.5 | 3.1 | 2.1 | **210.0** | 4.4 | 0.9 | 79690 | 1272 |
+
+Every row is over its budget, the 16-survivor row too (19.8 ms against 15.6; the 10 to 11 ms measured above was `headless_survival` without the net half, where the snapshot is 11 of these 20). Memory fits: 1.6 GB at 128 survivors, so nothing had to be stopped for it; the cost is time (a 128 row takes about 15 minutes of wall clock for 12 s of play).
+
+**The three costs at 128 survivors and 64 Hz** (of 370 ms a tick): (1) **snapshot build and send, 302 ms (82 %)**, growing with the square of the team (11, 31, 112, 196, 302 ms at 16, 32, 64, 100, 128): every peer is sent every relevant entity, and the horde's 274 zombies are always relevant (`zz_npc_net`); `net_history` is nothing (0.01), `net_pull` 3 ms. (2) **Game logic, 35 ms**: the stand-ins' decisions (`bots.drive`), 128 survivors' controllers and hands, weapons, combat, the world; linear in the team. (3) **Zombie brains, 15 ms** (senses another 6, bodies' `move_and_slide` 3): linear in the horde; path searches are only 1.5 ms of it (9 a tick at 160 us), so the pathing is not what costs. The engine's physics step comes fourth (26 ms, noisy). The fixed-crowd rows say the same from the other side: at 128 survivors going from 150 to 250 commons adds 6 ms of brains and 42 ms of snapshot; the team, not the horde, sets the tick. The first lever for a bigger team is therefore the snapshot (interest filtering for the zombies, a lower snapshot rate, a measured acking host), the second the stand-ins' logic.
+
