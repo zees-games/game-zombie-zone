@@ -111,6 +111,9 @@ signal loot_added(id: int, kind: StringName, item: StringName, at: Vector3)
 signal loot_removed(id: int, by: int)
 signal hazard_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float)
 signal hazard_removed(id: int)
+signal turret_added(id: int, at: Vector3, yaw: float, seconds: float)
+signal turret_fired(id: int, target: Vector3)
+signal turret_removed(id: int)
 signal thrown(id: int, kind: StringName, from: Vector3, velocity: Vector3)
 signal landed(id: int, kind: StringName, at: Vector3)
 signal blast_received(at: Vector3, radius: float, kind: StringName)
@@ -355,6 +358,14 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 				_broadcast(ZzEvents.Kind.THROW, ZzEvents.write_throw(id, kind, from, velocity)))
 			game.hazards.landed.connect(func(id: int, kind: StringName, at: Vector3) -> void:
 				_broadcast(ZzEvents.Kind.LANDED, ZzEvents.write_landed(id, kind, at)))
+
+		if game.turrets != null:
+			game.turrets.placed.connect(func(id: int, at: Vector3, yaw: float, seconds: float) -> void:
+				_broadcast(ZzEvents.Kind.TURRET, ZzEvents.write_turret(id, at, yaw, seconds)))
+			game.turrets.fired.connect(func(id: int, target: Vector3) -> void:
+				_broadcast(ZzEvents.Kind.TURRET_FIRE, ZzEvents.write_turret_fire(id, target)))
+			game.turrets.ended.connect(func(id: int) -> void:
+				_broadcast(ZzEvents.Kind.TURRET_GONE, ZzEvents.write_id(id)))
 
 		if game.loot != null:
 			game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
@@ -1096,6 +1107,12 @@ func _tell_the_world(peer_id: int) -> void:
 			_tell(peer_id, ZzEvents.Kind.HAZARD, ZzEvents.write_hazard(id, a["kind"], a["at"], float(a["radius"]),
 				maxf(float(a["until"]) - game.now(), 0.0)))
 
+	if game.turrets != null:
+		for id: int in game.turrets.turrets:
+			var sentry: DotSentry = game.turrets.turrets[id]["sentry"]
+			_tell(peer_id, ZzEvents.Kind.TURRET, ZzEvents.write_turret(id, sentry.position, sentry.yaw,
+				maxf(sentry.seconds_left(game.now()), 0.0)))
+
 	if game.pins != null:
 		for victim: StringName in game.pins.pins:
 			var held: Dictionary = game.pins.pins[victim]
@@ -1388,6 +1405,18 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var ended := ZzEvents.read_id(reader)
 			if bool(ended["ok"]):
 				hazard_removed.emit(int(ended["id"]))
+		ZzEvents.Kind.TURRET:
+			var tu := ZzEvents.read_turret(reader)
+			if bool(tu["ok"]):
+				turret_added.emit(int(tu["id"]), tu["at"], float(tu["yaw"]), float(tu["seconds"]))
+		ZzEvents.Kind.TURRET_FIRE:
+			var tf := ZzEvents.read_turret_fire(reader)
+			if bool(tf["ok"]):
+				turret_fired.emit(int(tf["id"]), tf["target"])
+		ZzEvents.Kind.TURRET_GONE:
+			var tg := ZzEvents.read_id(reader)
+			if bool(tg["ok"]):
+				turret_removed.emit(int(tg["id"]))
 		ZzEvents.Kind.THROW:
 			var t := ZzEvents.read_throw(reader)
 			if bool(t["ok"]):

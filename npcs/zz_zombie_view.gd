@@ -49,6 +49,7 @@ static var BODIES := {
 	&"lis": ZzPaths.rebase("res://assets/zombies/zombie_lis.glb"),
 	&"sam": ZzPaths.rebase("res://assets/zombies/zombie_sam.glb"),
 	&"shaun": ZzPaths.rebase("res://assets/zombies/zombie_shaun.glb"),
+	&"worker": ZzPaths.rebase("res://assets/zombies/zombie_worker.glb"),
 }
 
 ## The kit's atlas, in the three versions its bodies were painted against: they differ in a few
@@ -57,10 +58,12 @@ static var ATLASES := {
 	&"basic": ZzPaths.rebase("res://assets/zombies/atlas_basic.png"),
 	&"heavy": ZzPaths.rebase("res://assets/zombies/atlas_heavy.png"),
 	&"people": ZzPaths.rebase("res://assets/zombies/atlas_people.png"),
+	## Ours, not the kit's: the worker's gear and dirt are baked in (`art-src/zombie_worker.py`).
+	&"worker": ZzPaths.rebase("res://assets/zombies/atlas_worker.png"),
 }
 
 const ATLAS_OF := {&"basic": &"basic", &"chubby": &"heavy", &"arm": &"heavy", &"matt": &"people",
-	&"lis": &"people", &"sam": &"people", &"shaun": &"people"}
+	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker"}
 
 ## Bodies that carry no clips of their own and are driven by another's (same rig, same bone names).
 const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic"}
@@ -76,10 +79,11 @@ const WEARS := {
 	&"lis": {"skin": ["c09264"], "top": ["bd8e30"], "bottom": ["466469"], "hair": ["225385"]},
 	&"sam": {"skin": ["7c4e26"], "top": ["504c43"], "bottom": ["2a2927"], "hat": ["ac741d"]},
 	&"shaun": {"skin": ["c09264"], "top": ["5f4009"], "bottom": ["466469"]},
+	&"worker": {},  # painted in the atlas: nothing to swap
 }
 
 ## The commons' bodies, in variant order.
-const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun"]
+const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker"]
 
 ## Dead skin: grey-greens, ash, a bruised blue, jaundice, rot.
 const SKINS: Array[String] = ["7d8f6a", "8f9a84", "8c98a0", "a39f6c", "66734f", "8a7a86", "9aa58a", "75806e"]

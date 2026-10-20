@@ -1318,6 +1318,45 @@
      ]
     }
    ]
+  },
+  {
+   "id": "turret",
+   "title": "Turret Box",
+   "colour": "#3fb6d9",
+   "polarity": "positive",
+   "impact": "self",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 2,
+   "duration": {
+    "mode": "instant",
+    "min": 0,
+    "max": 0
+   },
+   "drop": {
+    "common": 1,
+    "special": 4,
+    "brute": 4,
+    "map": 2
+   },
+   "outcomes": [
+    {
+     "id": "sentry",
+     "title": "Sentry turret",
+     "weight": 1,
+     "message": "{name} set up a sentry turret.",
+     "actions": [
+      {
+       "do": "turret",
+       "seconds": 45,
+       "ammo": 240,
+       "damage": 14,
+       "reach": 20,
+       "interval": 0.14
+      }
+     ]
+    }
+   ]
   }
  ]
 }

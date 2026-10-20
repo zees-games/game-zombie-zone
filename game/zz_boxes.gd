@@ -59,7 +59,7 @@ const ACTIONS: Array[String] = [
 	"haste", "low_gravity", "heavy", "invulnerable", "damage_boost", "bile", "burn", "teleport",
 	"knock", "blind", "mob", "special", "brute", "kill_zombies", "freeze_zombies", "ignite_zombies",
 	"lure", "pace", "panic", "explode", "airstrike", "fire", "acid", "heal_zone", "molotov_rain",
-	"drop_boxes", "message", "random", "swap", "shuffle_weapons", "clear_effects", "effect",
+	"drop_boxes", "message", "random", "swap", "shuffle_weapons", "clear_effects", "effect", "turret",
 ]
 
 ## The named boxes' handlers: effect name -> script (see zz_box_effect.gd). A later box is one line
@@ -370,6 +370,9 @@ func open(type_id: StringName, player, at: Vector3) -> void:
 	var ctx := {"opener": player, "at": at, "box": type_id}
 	run(outcome["actions"], ctx)
 
+	if ctx.get("refused", false):
+		return
+
 	var message := str(outcome["message"]).replace("{name}", player.display_name)
 	opened.emit(player.player_id, type_id, str(outcome["title"]), message)
 
@@ -644,6 +647,25 @@ func _do_special(a: Dictionary, _ctx: Dictionary) -> void:
 		if kind == &"any" or not ZzNpcs.SPECIALS.has(kind):
 			kind = ZzNpcs.SPECIALS[_rng.randi_range(0, ZzNpcs.SPECIALS.size() - 1)]
 		var _s = game.horde.spawn_special(kind)
+
+
+## Stands a sentry turret where the opener is looking (dot-combat's DotSentry; the rules are
+## `zz_turrets.gd`). `seconds`, `ammo`, `damage`, `reach` and `interval` come from the outcome. When
+## there is nowhere to stand it, the opener is told and the box goes back in their hands.
+func _do_turret(a: Dictionary, ctx: Dictionary) -> void:
+	var opener = ctx["opener"]
+
+	if game.turrets == null or opener == null:
+		return
+
+	var res: DotResult = game.turrets.deploy(opener, a)
+
+	if not res.ok:
+		# Not spent: the box goes back in the hands it came from, and the player is told why.
+		opener.carried.push_front(ctx["box"])
+		ctx["refused"] = true
+		game.refused.emit(opener.player_id, str(res.error.message))
+		DotLog.debug(CHANNEL, "a turret was refused", {"why": res.error.detail})
 
 
 func _do_brute(_a: Dictionary, _ctx: Dictionary) -> void:

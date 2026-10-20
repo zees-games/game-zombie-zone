@@ -379,6 +379,9 @@ func _build_netcode() -> DotResult:
 	bridge.loot_removed.connect(func(id: int, _by: int) -> void: world_view.remove_loot(id))
 	bridge.hazard_added.connect(world_view.add_hazard)
 	bridge.hazard_removed.connect(world_view.remove_hazard)
+	bridge.turret_added.connect(world_view.add_turret)
+	bridge.turret_fired.connect(world_view.fire_turret)
+	bridge.turret_removed.connect(world_view.remove_turret)
 	bridge.thrown.connect(world_view.throw)
 	bridge.landed.connect(world_view.land)
 	bridge.blast_received.connect(world_view.blast)
@@ -520,6 +523,11 @@ func _hear_the_world() -> void:
 		game.hazards.area_ended.connect(world_view.remove_hazard)
 		game.hazards.launched.connect(world_view.throw)
 		game.hazards.landed.connect(world_view.land)
+
+	if game.turrets != null:
+		game.turrets.placed.connect(world_view.add_turret)
+		game.turrets.fired.connect(world_view.fire_turret)
+		game.turrets.ended.connect(world_view.remove_turret)
 
 	if game.loot != null:
 		game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:

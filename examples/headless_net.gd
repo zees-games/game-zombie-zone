@@ -28,7 +28,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 18
-const CHECKS := 94
+const CHECKS := 96
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -217,6 +217,13 @@ func _test_the_codec() -> void:
 	var hazard := ZzEvents.read_hazard(_r(ZzEvents.write_hazard(9, &"acid", Vector3(2.0, 0.0, 3.0), 3.5, 7.0)))
 	_check(bool(hazard["ok"]) and hazard["kind"] == &"acid" and absf(float(hazard["radius"]) - 3.5) < 0.05
 		and absf(float(hazard["seconds"]) - 7.0) < 0.1, "HAZARD", str(hazard))
+
+	var turret := ZzEvents.read_turret(_r(ZzEvents.write_turret(4, Vector3(1.0, 0.0, -2.0), 1.5, 45.0)))
+	_check(bool(turret["ok"]) and int(turret["id"]) == 4 and absf(float(turret["yaw"]) - 1.5) < 0.02
+		and absf(float(turret["seconds"]) - 45.0) < 0.1, "TURRET", str(turret))
+	var turret_fire := ZzEvents.read_turret_fire(_r(ZzEvents.write_turret_fire(4, Vector3(3.0, 1.0, -9.0))))
+	_check(bool(turret_fire["ok"]) and int(turret_fire["id"]) == 4
+		and (turret_fire["target"] as Vector3).distance_to(Vector3(3.0, 1.0, -9.0)) < 0.1, "TURRET_FIRE", str(turret_fire))
 
 	var blast := ZzEvents.read_blast(_r(ZzEvents.write_blast(Vector3(0.0, 1.0, 5.0), 6.0, &"pipe")))
 	_check(bool(blast["ok"]) and blast["kind"] == &"pipe" and absf(float(blast["radius"]) - 6.0) < 0.05, "BLAST")

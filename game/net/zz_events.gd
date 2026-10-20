@@ -97,6 +97,12 @@ enum Kind {
 	## The map's toys: the map's id, then their net ids in toy order (both ends build the toys
 	## in the same order from the map). After MAP, and to a joiner after theirs.
 	TOYS,
+	## A sentry turret was set up: id, place, which way it faces, seconds it lasts.
+	TURRET,
+	## It fired at this point.
+	TURRET_FIRE,
+	## It ran out, or was taken down.
+	TURRET_GONE,
 }
 
 enum Ask {
@@ -613,6 +619,36 @@ static func read_hazard(r: DotNetReader) -> Dictionary:
 	var radius := r.read_float_range(0.0, 64.0, 12)
 	var seconds := r.read_float_range(0.0, 600.0, 14)
 	return {"id": id, "kind": StringName(kind), "at": at, "radius": radius, "seconds": seconds, "ok": r.ok()}
+
+
+static func write_turret(id: int, at: Vector3, yaw: float, seconds: float) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	_pos(w, at)
+	w.write_float_range(wrapf(yaw, -PI, PI), -PI, PI, 10)
+	w.write_float_range(clampf(seconds, 0.0, 600.0), 0.0, 600.0, 14)
+	return w.to_bytes()
+
+
+static func read_turret(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var at := _read_pos(r)
+	var yaw := r.read_float_range(-PI, PI, 10)
+	var seconds := r.read_float_range(0.0, 600.0, 14)
+	return {"id": id, "at": at, "yaw": yaw, "seconds": seconds, "ok": r.ok()}
+
+
+static func write_turret_fire(id: int, target: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	_pos(w, target)
+	return w.to_bytes()
+
+
+static func read_turret_fire(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var target := _read_pos(r)
+	return {"id": id, "target": target, "ok": r.ok()}
 
 
 static func write_id(id: int) -> PackedByteArray:

@@ -6,6 +6,7 @@ const ZzCatalogue := preload("zz_catalogue.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzHazards := preload("zz_hazards.gd")
+const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMap := preload("zz_map.gd")
@@ -169,6 +170,8 @@ var progress: ZzProgress = null
 var horde: ZzHorde = null
 var pins: ZzPins = null
 var hazards: ZzHazards = null
+## Server only. The sentry turrets a box deployed.
+var turrets: ZzTurrets = null
 var loot: ZzLoot = null
 var boxes: ZzBoxes = null
 var bots: ZzBots = null
@@ -289,6 +292,7 @@ func _ready() -> void:
 	if authoritative:
 		pins = ZzPins.new(self)
 		hazards = ZzHazards.new(self)
+		turrets = ZzTurrets.new(self)
 		hazards.exploded.connect(func(at: Vector3, radius: float, kind: StringName) -> void:
 			exploded.emit(at, radius, kind))
 		# A pipe bomb, a propane tank, a molotov's burst: the map's toys thrown from it.
@@ -991,6 +995,8 @@ func _on_round_started(number: int) -> void:
 		pins.clear()
 	if hazards != null:
 		hazards.clear()
+	if turrets != null:
+		turrets.clear()
 	if loot != null:
 		loot.clear()
 		loot.place_from_map(map_doc)
@@ -2658,6 +2664,8 @@ func _step(delta: float) -> void:
 			pins.advance(delta)
 		if hazards != null:
 			hazards.tick(delta)
+		if turrets != null:
+			turrets.tick(delta)
 		if boxes != null:
 			boxes.tick(delta)
 		if loot != null:

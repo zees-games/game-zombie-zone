@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 36
+const SECTIONS := 37
 
-const CHECKS := 219
+const CHECKS := 227
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -91,6 +91,7 @@ func _run() -> void:
 	await _test_both_packs()
 	await _test_every_box_outcome()
 	await _test_effects_stack()
+	await _test_turret_box()
 	await _test_box_framework()
 	await _test_objectives()
 	await _test_winning_and_losing()
@@ -1013,6 +1014,60 @@ func _test_every_box_outcome() -> void:
 	await _sim(game, 3.0)
 	_check(ran >= 70 and _failed == before_errors, "every outcome of every box ran", "%d" % ran)
 	_check(game.horde.count() > 0, "and the horde they summoned is out there", "%d zombies" % game.horde.count())
+	_finished()
+
+
+## The Turret Box: opened where a survivor looks, a sentry stands on the floor and shoots the horde on
+## its own (the server's decision, dot-combat's DotSentry), wears out, is limited per survivor, and a
+## spot with no floor gives the box back.
+func _test_turret_box() -> void:
+	_section("the turret box: deployed, shoots zombies, wears out, limited, refused with no floor")
+	var file := ZzBoxes.new(null)
+	var loaded := file.load_text(FileAccess.get_file_as_string("res://boxes/boxes.json"))
+	_check(loaded.ok and file.types.has(&"turret") and str(file.types[&"turret"]["outcomes"][0]["actions"][0]["do"]) == "turret",
+		"the box is in the file and its one outcome deploys a turret")
+
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.health.invulnerable = true
+	me.place_at(STREET, 0.0)
+	await _sim(game, 0.3)
+	var seen: Array = []
+	game.turrets.placed.connect(func(id: int, _at: Vector3, _yaw: float, _s: float) -> void: seen.append(id))
+
+	var _carried := game.boxes.carry(me, &"turret")
+	game.boxes.deploy(me)
+	_check(game.turrets.turrets.size() == 1 and seen.size() == 1, "opening the box stands one turret up", str(game.turrets.turrets.size()))
+	var sentry: DotSentry = (game.turrets.turrets.values()[0] as Dictionary)["sentry"]
+	_check(absf(sentry.position.y) < 0.3 and sentry.position.distance_to(me.feet()) < 3.0 and sentry.position.z < me.feet().z,
+		"on the floor, in front of the survivor", str(sentry.position))
+
+	# It shoots on its own: a common walks into its reach and falls without anybody firing.
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, sentry.position + Vector3(0.0, 0.0, -9.0), &"test")
+	await _sim(game, 3.0)
+	_check(not npc.is_alive() or npc.health < npc.def.max_health, "it hurts a zombie in its reach by itself",
+		"%d shots" % sentry.shots)
+	_check(sentry.shots > 0 and sentry.ammo < 240, "and it spends ammunition doing it", str(sentry.ammo))
+
+	# At most two per survivor: a third takes the oldest down.
+	var first_id: int = game.turrets.turrets.keys()[0]
+	game.boxes.run([{"do": "turret"}], {"opener": me, "at": me.feet(), "box": &"turret"})
+	game.boxes.run([{"do": "turret"}], {"opener": me, "at": me.feet(), "box": &"turret"})
+	_check(game.turrets.count_for(me.entity_id) == 2 and not game.turrets.turrets.has(first_id),
+		"a survivor has at most two, the oldest goes", str(game.turrets.turrets.keys()))
+
+	# It wears out.
+	for id: int in game.turrets.turrets:
+		((game.turrets.turrets[id] as Dictionary)["sentry"] as DotSentry).lifetime = 0.5
+	await _sim(game, 1.2)
+	_check(game.turrets.turrets.is_empty(), "when its time is up it is taken down")
+
+	# No floor: refused, and the box is not spent.
+	me.carried.clear()
+	me.place_at(STREET + Vector3(0.0, 40.0, 0.0), 0.0)
+	game.boxes.open(&"turret", me, me.feet())
+	_check(game.turrets.turrets.is_empty() and me.carried == [&"turret"], "with no floor there is no turret, and the box comes back",
+		str(me.carried))
 	_finished()
 
 

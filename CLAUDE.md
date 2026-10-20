@@ -22,7 +22,7 @@ game/
   zz_catalogue.gd    every map the server has, and the built-in practice street
   zz_npcs.gd         the zombie catalogue (twelve kinds), and the nav graph a map's document gives
   zz_horde.gd        the horde: spawner, director, senses, squads, sounds; mobs, specials, brutes, sleepers, waves
-  zz_pins.gd zz_hazards.gd zz_loot.gd zz_boxes.gd zz_box_effect.gd zz_box_instakill.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
+  zz_turrets.gd (the Turret Box's sentries: placement, targeting and ammo are dot-combat's `DotSentry`, the box rule and tuning are here) zz_pins.gd zz_hazards.gd zz_loot.gd zz_boxes.gd zz_box_effect.gd zz_box_instakill.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
   zz_survival.gd     a survival map held: dot-npc-ai-director's DotNpcDirectorWaves, the breather, twists, caches
   zz_bots.gd         stand-in survivors (posts, mending and restocking on a survival map)
   zz_controller.gd zz_player.gd   DotFpsController with the game's modifiers; one survivor
@@ -31,10 +31,11 @@ game/
   zz_module.gd       the DotGameModule: cvars, console and admin commands, stand-ins
   net/               the codec (NPC, PIN, LOOT, BOX, HAZARD, BLAST, ROUND...), behaviours, the bridge
 npcs/                the zombie body, its view (the animated models), one brain script per kind (by path)
-assets/zombies/      the animated bodies (tools/build_zombie_models.py) and the kit's atlases
+assets/zombies/      the animated bodies (tools/build_zombie_models.py; the worker is art-src/zombie_worker.py) and the atlases
+assets/turret/       the sentry (art-src/turret.py, Blender on the GPU box via ../gpu.sh)
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (36 sections), headless_maps, headless_net (17), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
+examples/            headless_run (37 sections), headless_maps, headless_net (18), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured), server_probe.sh (the server tick by phase at 16 to 128 survivors),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```

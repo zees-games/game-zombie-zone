@@ -68,3 +68,7 @@ Measured with `tools/zombie_rack.gd --set=horde --at=5` (sixty commons walking a
 - bodies decimated to 35% at build.
 
 Not measured: a real browser on a real GPU, where the numbers that matter are different. That is in the nightly queue.
+
+## The worker (2026-10-20)
+
+The first body that is ours rather than the kit's: `art-src/zombie_worker.py` takes `zombie_basic.glb`, models a hard hat, hi-vis vest with reflective bands, backpack, tool belt and knee pads, weights each piece whole to one bone, bakes the kit's colours, the gear's paint, dirt and ambient occlusion into one atlas (`atlas_worker.png`) on a fresh UV layout and exports one mesh with the kit's clips. About 9.4k triangles. It is a sixth common variant (`COMMON_BODIES`); `WEARS` is empty because the colours are baked, so the per-zombie skin and clothes swaps do not touch it. The kit body is low-poly with rings of vertices about 0.15 apart at the waist, so the generator fits gear to the skin by `band_fit` over a wide window rather than by exact rings. Render sheets: `reports/models/2026-10-20/`.
