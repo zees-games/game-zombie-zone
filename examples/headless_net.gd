@@ -10,6 +10,7 @@ const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
+const ZzNpcNet := preload("../game/net/zz_npc_net.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzRequest := preload("../game/net/zz_request.gd")
@@ -26,8 +27,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 17
-const CHECKS := 88
+const SECTIONS := 18
+const CHECKS := 94
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -91,6 +92,9 @@ func _run() -> void:
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
 		await _test_the_toys_reach_the_client()
 		await _test_box_labels_off_hide_the_type()
+		# After the hold: its section reads a time of day, and this one's hundred ticks moved the
+		# clock it was sampled on (daylight 0.53 against 0.76 when it ran earlier).
+		await _test_only_what_is_near_is_sent()
 		await _test_leaving()
 
 	OS.remove_logger(errors)
@@ -573,6 +577,70 @@ func _test_zombies_replicate() -> void:
 		"killed, and the client is told it died rather than went away")
 	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
 		"and how it fell, for its body to fall that way")
+	_finished()
+
+
+func _test_only_what_is_near_is_sent() -> void:
+	_section("a zombie out of range is not sent, and the boss and the team still are")
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
+	await _steps(4)
+
+	# The street is shorter than any real radius, so the radii are cut to two metres for this
+	# section: the same rule, with everything on the street far away. Without that this would
+	# prove nothing about distance, and the boss check below would pass whether or not the
+	# boss were exempt.
+	var rule := _server_net.interest as DotNetInterestDistance
+	_check(rule != null and rule.radius_by_tag.has(ZzNetBridge.TAG_COMMON) and rule.radius_by_tag.has(ZzNetBridge.TAG_SPECIAL)
+		and ZzNetBridge.zombie_radius(ZzNpcs.COMMON) < ZzNetBridge.zombie_radius(ZzNpcs.STRANGLER),
+		"the server tells commons by distance, and specials from further out")
+	var radii: Dictionary = rule.radius_by_tag.duplicate()
+	var interval := rule.evaluation_interval_sec
+	rule.radius_by_tag = {ZzNetBridge.TAG_COMMON: 2.0, ZzNetBridge.TAG_SPECIAL: 2.0}
+	rule.radius = 2.0
+	rule.evaluation_interval_sec = 0.0
+
+	var common := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test")
+	var boss := _server_game.horde.spawner.spawn(ZzNpcs.BRUTE, STREET + Vector3(4.0, 0.0, -10.0), &"test")
+	await _steps(6)
+	# Its linger is the time half of hysteresis and runs on the wall clock, which a headless
+	# run does not keep to; a zero here is what lets the distance show.
+	var common_net: ZzNpcNet = _server_bridge._zombie_nets[common.instance_id]
+	common_net.identity.interest_linger_sec = 0.0
+	var common_id: int = common_net.identity.net_id
+	var boss_id: int = (_server_bridge._zombie_nets[boss.instance_id] as ZzNpcNet).identity.net_id
+	_check(common_net.identity.interest_tags.has(ZzNetBridge.TAG_COMMON) and not common_net.identity.always_relevant,
+		"a common is tagged and not always relevant")
+	_check((_server_bridge._zombie_nets[boss.instance_id] as ZzNpcNet).identity.always_relevant,
+		"the boss is always relevant")
+
+	# Both walk twenty metres on the server, well outside two metres of everyone.
+	common.node.global_position += Vector3(20.0, 0.0, 0.0)
+	boss.node.global_position += Vector3(20.0, 0.0, 0.0)
+	await _steps(40)
+	var boss_mirror := _client_bridge.zombie_mirror(boss_id)
+	var common_mirror := _client_bridge.zombie_mirror(common_id)
+	var boss_apart := boss_mirror.global_position.distance_to(boss.position()) if boss_mirror != null else INF
+	var common_apart := common_mirror.global_position.distance_to(common.position()) if common_mirror != null else INF
+	_check(boss_mirror != null and boss_apart < 1.0, "a boss far from every survivor is still where the server has it",
+		"%.1f m apart" % boss_apart)
+	_check(common_mirror != null and common_apart > 10.0, "a common out of range is not sent, so its copy stays where it was told last",
+		"%.1f m apart" % common_apart)
+
+	# A teammate far away is still a teammate: the player entities are always relevant.
+	var teammate := _client_game.players.get(_stand_in.player_id) as ZzPlayer
+	_stand_in.place_at(STREET + Vector3(-3.0, 0.0, 6.0), 0.0)
+	await _steps(30)
+	var team_apart := teammate.global_position.distance_to(_stand_in.global_position) if teammate != null else INF
+	_check(teammate != null and team_apart < 1.0, "a teammate is tracked whatever the radius", "%.1f m apart" % team_apart)
+
+	_hurt_npc(common, 100000.0)
+	_hurt_npc(boss, 100000.0)
+	rule.radius_by_tag = radii
+	rule.radius = ZzNetBridge.DEFAULT_RADIUS
+	rule.evaluation_interval_sec = interval
+	await _steps(8)
 	_finished()
 
 

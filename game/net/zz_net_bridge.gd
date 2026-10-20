@@ -14,6 +14,7 @@ const ZzMapDoc := preload("../zz_map_doc.gd")
 const ZzPlayer := preload("../zz_player.gd")
 const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
 const ZzPaths := preload("../zz_paths.gd")
+const ZzNpcs := preload("../zz_npcs.gd")
 
 ## Joins an [ZzGame] to a [DotNetManager]. The netcode seam, and the only file in this
 ## project that names both.
@@ -215,6 +216,7 @@ var _map_body: PackedByteArray = PackedByteArray()
 ## (net id -> [ZzNpcNet]).
 var _zombie_nets: Dictionary = {}
 var _zombie_mirrors: Dictionary = {}
+var _stale_clock := 0.0
 var _zombie_world: Node3D = null
 
 ## Whether the last thing that removed a zombie was its death, so NPC_GONE can say so.
@@ -247,6 +249,9 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 	add_child(_entities)
 
 	net.send_fn = _send
+
+	if net.is_server:
+		net.interest = make_interest()
 
 	var event := net.messages.register(
 		ZzEvent.NAME, ZzEvent,
@@ -1438,6 +1443,77 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 
 # --- Zombies -----------------------------------------------------------------
 
+## Interest tags a zombie entity carries, and the radii (metres) [method make_interest] gives them.
+const TAG_COMMON := "common"
+const TAG_SPECIAL := "special"
+## A common is a body in a crowd: the fog (0.008 on the biggest map) has taken half of it by 80 m,
+## and a horde spawns within 60 m of a survivor (`spawn_max_distance`), so the ones past this are
+## ones nobody is fighting. A designer's number: the cost of too small is a zombie that appears
+## at the edge of the dark, of too large is the snapshot (docs/survival.md).
+const COMMON_RADIUS := 80.0
+## A special is a threat the team plans around (a rider heard before it is seen, a sleeper), so it
+## is told from further out. There are a handful, not hundreds, so the width costs little.
+const SPECIAL_RADIUS := 260.0
+## Players, toys and anything else with no tag.
+const DEFAULT_RADIUS := 200.0
+## Seconds a zombie keeps being sent after it leaves a peer's radius: the time half of hysteresis
+## (dot-net's strategies have one radius), so a zombie pacing along the edge is not a spawn and a
+## despawn several times a second. Eight metres of walking at a common's pace.
+const ZOMBIE_LINGER_SEC := 3.0
+## A client hides a mirror this far past its kind's radius: the server stopped sending it, so the
+## body would stand frozen where it was last told to be.
+const STALE_MARGIN := 12.0
+
+## The server's interest rule. [b]What is always relevant, and why.[/b] Players (four to a few
+## dozen; a teammate's outline, health and position are the HUD), the boss (one entity), and
+## everything the world announces by event rather than by snapshot. Zombies are by distance,
+## because they were 274 of the 302 ms a tick at 128 survivors (docs/survival.md): each peer was
+## sent every one of them. Not [DotNetInterestGrid]: it has one radius for everything, and a
+## special needs a wider one than a common; [DotNetInterestDistance] has one per tag, and its
+## query over a few hundred entities is cached for a quarter of a second per peer.
+static func make_interest() -> DotNetInterest:
+	var interest := DotNetInterestDistance.new()
+	interest.radius = DEFAULT_RADIUS
+	interest.radius_by_tag = {TAG_COMMON: COMMON_RADIUS, TAG_SPECIAL: SPECIAL_RADIUS}
+	return interest
+
+
+static func zombie_radius(kind: StringName) -> float:
+	return SPECIAL_RADIUS if ZzNpcs.is_special(kind) else COMMON_RADIUS
+
+
+## Client: hides a zombie the server has stopped telling about. A mirror is made by an event sent
+## to everybody, but its position comes in snapshots, and one past its radius gets none.
+func _hide_unsent_zombies() -> void:
+	var mine: ZzPlayerNet = _behaviours.get(local_player_id)
+
+	if mine == null or mine.player == null or not is_instance_valid(mine.player):
+		return
+
+	var eye := mine.player.global_position
+
+	for net_id in _zombie_mirrors:
+		var behaviour: ZzNpcNet = _zombie_mirrors[net_id]
+		var body := behaviour.body
+
+		if body == null or not is_instance_valid(body) or body.kind == ZzNpcs.BRUTE:
+			continue
+
+		var far := body.global_position.distance_to(eye) > zombie_radius(body.kind) + STALE_MARGIN
+		body.visible = not far
+
+
+func _process(delta: float) -> void:
+	if net == null or net.is_server:
+		return
+
+	_stale_clock += delta
+
+	if _stale_clock >= 0.25:
+		_stale_clock = 0.0
+		_hide_unsent_zombies()
+
+
 ## The entity id a zombie's net id is known by, for a PIN. 0 when it is not replicated.
 func _npc_net_id(entity: int) -> int:
 	if game == null or game.horde == null:
@@ -1452,9 +1528,9 @@ func _npc_net_id(entity: int) -> int:
 	return behaviour.identity.net_id if behaviour != null and behaviour.identity != null else 0
 
 
-## A zombie appeared on the server: an entity for it, and the announcement. Always relevant:
-## a crowd half sent is a crowd with holes in it, and the arena's first version, culled by
-## distance, announced monsters and then never sent them a snapshot.
+## A zombie appeared on the server: an entity for it, and the announcement. Relevant by distance
+## and kind, the boss always: see [method make_interest] for why a client is not sent a horde it
+## cannot see, and for what is kept whole so that nothing a client needs goes missing.
 func _on_zombie_spawned(npc: DotNpcInstance) -> void:
 	var body := npc.node as ZzZombieBody
 
@@ -1471,7 +1547,11 @@ func _on_zombie_spawned(npc: DotNpcInstance) -> void:
 	identity.name = "Identity"
 	identity.owner_peer_id = 0
 	identity.authority = DotNetIdentity.Authority.SERVER
-	identity.always_relevant = true
+	# By kind, not all of them (see [method make_interest]): the boss is one entity and the
+	# team must see where it is from across the map; every other kind is told by distance.
+	identity.always_relevant = npc.def.id == ZzNpcs.BRUTE
+	identity.interest_tags = PackedStringArray([TAG_SPECIAL if ZzNpcs.is_special(npc.def.id) else TAG_COMMON])
+	identity.interest_linger_sec = ZOMBIE_LINGER_SEC
 	body.add_child(identity)
 
 	var registered := net.registry.register(identity, 0, net.clock.tick, net.config)

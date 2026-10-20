@@ -43,7 +43,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 
 **The split and the wire** ([design](docs/design.md#decision-1-the-zombies-are-the-servers-and-a-client-draws-them))
 - **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `ZzAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [design](docs/design.md#sound)
-- Zombies are the server's, never predicted, always relevant; a client interpolates them and is told a death (NPC_GONE) so a body falls.
+- Zombies are the server's, never predicted, relevant by distance and kind (the brute always; `ZzNetBridge.make_interest`); a client interpolates them and is told a death (NPC_GONE) so a body falls.
 - **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - Everything that changes how a survivor moves is a `ZzController` modifier, never a velocity written on one end.
 - Every `ZzEvents.Kind` fits `ZzEvent.KIND_BITS` (6 bits), and `ZzEvent.MAX_BODY` holds the largest MAP (`ZzEvents.MAP_BYTES`): a longer body reads as empty, silently; `headless_net` checks both.

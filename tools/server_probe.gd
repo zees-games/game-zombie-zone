@@ -198,7 +198,18 @@ func _run() -> void:
 	var commons := _game.horde.commons()
 	var npcs := _game.horde.spawner.all_npcs().size()
 	var secs := float(measured) / float(_rate)
-	var row := {"n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	# What interest leaves each peer, averaged over the peers: the number a snapshot's cost follows.
+	var all_identities := _net.registry.all()
+	var told := 0
+	var asked := 0
+	for p in _game.survivors():
+		var peer := _bridge.peer_for_player(_bridge.session_of(p.player_id))
+		if peer <= 0:
+			continue
+		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
+		told += seen.size()
+		asked += 1
+	var row := {"relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
