@@ -775,6 +775,7 @@ func _build_vote(world: ZzGame) -> void:
 	vote = ZzVote.new()
 	vote.name = "MapVote"
 	vote.commands_spec_fn = world.rotation_commands
+	vote.in_rotation_fn = func(id: StringName) -> bool: return world.catalogue.in_rotation(id)
 	vote.maps_fn = func() -> Array:
 		var out: Array = []
 
