@@ -240,6 +240,13 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# Water: how survivors wade, swim and drown, and how the horde wades (see ZzWaterRules). The
+	# movement ones are REPLICATED, because a client predicts its own swim.
+	var _water := world.water_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
+
 	_build_vote(world)
 	_build_voteban(world)
 

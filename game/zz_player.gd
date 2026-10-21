@@ -3,6 +3,7 @@ extends CharacterBody3D
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
+const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzAvatars := preload("zz_avatars.gd")
 
@@ -195,6 +196,30 @@ const VIEW_RIG_SETTLE_SEC := 0.6
 ## reached the world's rig, so offline the HUD's 15 / 60 never moved and nothing you shot was hit.
 var command_stamp: Callable = Callable()
 
+# --- Water --------------------------------------------------------------------
+
+## How deep in water: none, the feet (below the waist: wading), the waist (swimming) or the eyes
+## (under: the breath runs out). Source's four levels, and the same names here.
+enum WaterLevel { NONE, FEET, WAIST, EYES }
+
+## The map's water volumes this player moves through, world space (see [method set_water]).
+var water: Array[AABB] = []
+
+## This player's swimming mode (dot-player-controller's DotFpsSwimMode), one per player in
+## `controller.extra_modes` so a style's rebuilt motor keeps it under the same id on every machine.
+var swim: DotFpsSwimMode = DotFpsSwimMode.new()
+
+## Breath left, in seconds under water; refilled with the head out. Each end counts its own
+## from its own copy of the water: the server's decides the damage, the client's is the HUD's
+## bar, and neither is on the wire.
+var air: float = 12.0
+
+## Whether the eyes are under water now, as of the last tick.
+var submerged: bool = false
+
+## The level as of the last simulated tick.
+var water_level: int = WaterLevel.NONE
+
 var tick_rate: int = 64:
 	set(value):
 		tick_rate = value
@@ -216,11 +241,83 @@ func _ready() -> void:
 	controller.drive = DotFpsController.Drive.EXTERNAL
 	controller.tunables = tunables_for(config)
 	controller.admin_abilities = true
+	controller.extra_modes = [swim]
 	add_child(controller)
+	controller.simulated.connect(_on_simulated)
 
 	if samples_input:
 		sampler = DotFpsSampler.new(controller.tunables)
 		register_actions(sampler)
+
+
+## Hands over the map's water, [param boxes] (empty: none), and the rules that tune it.
+func set_water(boxes: Array[AABB], rules: ZzWaterRules) -> void:
+	water = boxes
+	swim.volumes = boxes
+	swim.swim_speed = rules.swim_speed if rules != null else 4.4
+
+	if controller != null:
+		controller.set_wade_scale(rules.wade_scale if rules != null else 0.8)
+
+		if boxes.is_empty() and controller.motor != null and controller.state != null \
+				and controller.state.mode == swim.mode_id:
+			controller.motor.set_mode(controller.state, DotFpsState.Mode.AIR)
+
+	air = rules.drown_seconds if rules != null else 12.0
+
+
+## The level of [param feet] in this player's water: the feet a hand's breadth up, the waist where
+## the swim mode puts it, the eyes where [param eye] is. A question of the box list alone, so a
+## replayed tick and a server tick give one answer.
+func level_at(feet: Vector3, eye: Vector3) -> int:
+	var boxes := water
+
+	if boxes.is_empty():
+		return WaterLevel.NONE
+
+	var out := WaterLevel.NONE
+
+	for box in boxes:
+		if box.has_point(eye):
+			return WaterLevel.EYES
+
+		if box.has_point(feet + Vector3.UP * swim.waist):
+			out = maxi(out, WaterLevel.WAIST)
+		elif box.has_point(feet + Vector3.UP * 0.1):
+			out = maxi(out, WaterLevel.FEET)
+
+	return out
+
+
+## Once per simulated tick, after the move, a replay's included: into the water at the waist,
+## and the wading slowdown while the feet are wet and the waist is not.
+func _on_simulated(_tick: int, state: DotFpsState) -> void:
+	if controller.motor == null:
+		return
+
+	swim.update(controller.motor, state)
+	water_level = level_at(state.position, eye_position())
+	submerged = water_level == WaterLevel.EYES
+	var wading := water_level == WaterLevel.FEET and state.mode != swim.mode_id
+	var has := controller.motor.has_modifier(state, ZzController.WADING)
+
+	if wading and not has:
+		var _on := controller.motor.add_modifier(state, ZzController.WADING)
+	elif not wading and has:
+		var _off := controller.motor.remove_modifier(state, ZzController.WADING)
+
+
+## One tick of breath, from the level the last tick ended at. Returns the damage owed, in health
+## per second times [param delta]: 0 while there is air. [param rules] says how long a breath is.
+func breathe(delta: float, rules: ZzWaterRules) -> float:
+	var full := maxf(rules.drown_seconds, 0.001)
+
+	if not submerged or rules.drown_seconds <= 0.0:
+		air = minf(full, air + delta * rules.air_refill)
+		return 0.0
+
+	air = maxf(air - delta, 0.0)
+	return rules.drown_damage * delta if air <= 0.0 else 0.0
 
 
 ## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
@@ -563,11 +660,14 @@ func reset_map() -> void:
 	revives_done = 0
 	damage_taken_map = 0.0
 	friendly_damage = 0.0
+	air = 12.0
+	submerged = false
+	water_level = WaterLevel.NONE
 
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
 				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY,
-				ZzController.MOVE_BOOST, ZzController.CRAWL_BOOST]:
+				ZzController.MOVE_BOOST, ZzController.CRAWL_BOOST, ZzController.WADING]:
 			var _off := controller.remove_modifier(id)
 
 	fit_hitboxes()

@@ -5,6 +5,7 @@ const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzFixtures := preload("zz_fixtures.gd")
 const ZzPaths := preload("zz_paths.gd")
+const WATER_SHADER := preload("zz_water.gdshader")
 
 ## A map document, built: the building, the furniture, the lights and the sky.
 ##
@@ -132,6 +133,15 @@ var _missing: PackedStringArray = PackedStringArray()
 var _lamps: Array[OmniLight3D] = []
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
+
+## The map's water volumes, world space: what a survivor's swim mode and the horde's wading ask,
+## built from the document on every end (a box list answers the same on both, which an Area3D
+## cannot for a client replaying ticks). Empty for a map without water.
+var water_boxes: Array[AABB] = []
+
+var _water_nodes: Array[MeshInstance3D] = []
+var _dry_fog: Dictionary = {}
+var _wet: bool = false
 var _baked_exposure: float = 1.0
 
 
@@ -160,10 +170,12 @@ func build(p_doc: Dictionary) -> DotResult:
 		add_child(_drawn)
 
 	_build_boxes()
+	_build_water_volumes()
 	_build_props()
 	_build_toys()
 
 	if draw_world:
+		_build_water_surfaces()
 		_build_objective_props()
 		_build_lights()
 		_build_environment()
@@ -213,6 +225,10 @@ func clear() -> void:
 		child.queue_free()
 
 	props.clear()
+	water_boxes.clear()
+	_water_nodes.clear()
+	_dry_fog = {}
+	_wet = false
 	_gates.clear()
 	_barricades.clear()
 	_missing.clear()
@@ -229,6 +245,74 @@ func clear() -> void:
 	_night_light = {}
 	_day_light = {}
 	_daylight = 0.0
+
+
+## The document's water as boxes (`at` is the centre, the top face is the surface).
+func _build_water_volumes() -> void:
+	water_boxes.clear()
+
+	for pool: Dictionary in doc.get("water", []):
+		var size := ZzMapDoc.v3(pool["size"])
+		water_boxes.append(AABB(ZzMapDoc.v3(pool["at"]) - size * 0.5, size))
+
+
+## Each volume's surface: one sheet at the top face, with the water shader (see zz_water.gdshader),
+## which draws the ripples, the sheen and the lip. The volume has no walls: Source's water is a
+## surface too, and a swimmer sees the pool's own sides through it.
+func _build_water_surfaces() -> void:
+	var waters: Array = doc.get("water", [])
+
+	for i in water_boxes.size():
+		var box := water_boxes[i]
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(box.size.x, box.size.z)
+		var material := ShaderMaterial.new()
+		material.shader = WATER_SHADER
+		var entry: Dictionary = waters[i]
+
+		if entry.has("tint"):
+			var tint := ZzMapDoc.colour(entry["tint"])
+			material.set_shader_parameter("tint", tint)
+			material.set_shader_parameter("deep_tint", tint.darkened(0.65))
+
+		material.set_shader_parameter("extent", Vector4(box.position.x, box.position.z, box.end.x, box.end.z))
+		var sheet := MeshInstance3D.new()
+		sheet.name = "Water%d" % i
+		sheet.mesh = plane
+		sheet.material_override = material
+		sheet.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# A hair under the top face, so a wall at the pool's edge does not fight the sheet.
+		sheet.position = Vector3(box.get_center().x, box.end.y - 0.02, box.get_center().z)
+		_drawn.add_child(sheet)
+		_water_nodes.append(sheet)
+
+
+## Under the surface: the world's fog turns to the water's colour and closes in, so the pool's
+## far side is a murk and not a clear room. [param tint] is the water's colour; false puts the
+## map's own fog back. Presentation only, on the end whose camera it is.
+func set_underwater(under: bool, tint: Color = Color(0.05, 0.28, 0.36)) -> void:
+	if _environment == null or _environment.environment == null or under == _wet:
+		return
+
+	var env := _environment.environment
+	_wet = under
+
+	if under:
+		_dry_fog = {
+			"fog_enabled": env.fog_enabled, "fog_mode": env.fog_mode, "fog_density": env.fog_density,
+			"fog_light_color": env.fog_light_color, "fog_sky_affect": env.fog_sky_affect,
+			"fog_light_energy": env.fog_light_energy,
+		}
+		env.fog_enabled = true
+		env.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+		env.fog_density = 0.09
+		env.fog_light_color = tint
+		env.fog_sky_affect = 1.0
+		env.fog_light_energy = 1.0
+	else:
+		for key: String in _dry_fog:
+			env.set(key, _dry_fog[key])
+		_dry_fog = {}
 
 
 func _put_on(body: CollisionObject3D, layer: StringName) -> void:

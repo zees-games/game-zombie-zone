@@ -622,7 +622,7 @@ func tick(delta: float) -> void:
 	for npc in spawner.all_npcs():
 		if npc.is_alive() and npc.node is ZzZombieBody:
 			var b := npc.node as ZzZombieBody
-			b.speed_scale = speed
+			b.speed_scale = speed * (game.water_pace_at(b.global_position) if game != null else 1.0)
 			b.tick(delta)
 
 	squads.prune()

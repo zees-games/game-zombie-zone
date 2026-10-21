@@ -46,6 +46,10 @@ const CRAWL_BOOST := &"zz_crawl_boost"
 const MOVE_BOOST_SCALE := 1.3
 const CRAWL_BOOST_SCALE := 1.8
 
+## Feet in water below the waist: slower. The scale is `zz_water_wade_scale`, so it is registered
+## again whenever that changes ([method set_wade_scale]), on every end, or a replay reads the old.
+const WADING := &"zz_wading"
+
 ## Knocked flying, toward one of eight compass points (index 0 is -Z, then clockwise).
 const KNOCK_PREFIX := "zz_knock_"
 const KNOCK_DIRECTIONS := 8
@@ -64,6 +68,7 @@ func _register_extensions() -> void:
 	var _p := motor.register_modifier(pinned)
 
 	set_crawl_speed(0.0)
+	set_wade_scale(0.8)
 
 	var limp := DotFpsModifier.make(LIMP)
 	limp.max_speed_scale = 0.78
@@ -138,6 +143,15 @@ func set_crawl_speed(metres_per_second: float) -> void:
 		down.max_speed_scale = 0.0
 
 	var _d := motor.register_modifier(down)
+
+
+## Registers the WADING modifier at [param scale] of a run again, which replaces its definition
+## and keeps its place in the order (the id is what travels, so the order must not move).
+func set_wade_scale(scale: float) -> void:
+	var wading := DotFpsModifier.make(WADING)
+	wading.max_speed_scale = clampf(scale, 0.05, 1.0)
+	wading.jump_scale = 0.9
+	var _w := motor.register_modifier(wading)
 
 
 ## The knock modifier that throws somebody along [param direction] (horizontal).

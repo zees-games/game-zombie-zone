@@ -3,6 +3,7 @@ extends Node
 const ZzBindings := preload("../game/zz_bindings.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
+const ZzWaterRules := preload("../game/zz_water_rules.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
@@ -35,9 +36,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 39
+const SECTIONS := 40
 
-const CHECKS := 257
+const CHECKS := 273
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -106,6 +107,7 @@ func _run() -> void:
 	await _test_the_client_platform()
 	await _test_the_first_play_test()
 	await _test_crawling_and_speed_boxes()
+	await _test_water()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1375,6 +1377,82 @@ func _test_crawling_and_speed_boxes() -> void:
 
 	_check(not dud and seen_swift, "with crawling off a crawl box is never dropped, and the others still are")
 	game.crawl_rules.set_cvar("1.4")
+	_finished()
+
+
+func _test_water() -> void:
+	_section("water: wading, swimming, drowning, the zombies' pace, the cvars")
+	var doc := ZzCatalogue.practice()
+	doc["water"] = [{"at": [0, 0, 14], "size": [8, 1, 8]}]
+	var parsed := ZzMapDoc.validate(doc)
+	_check(parsed.ok and (parsed.value["water"] as Array).size() == 1, "a map document carries water volumes")
+	doc["water"] = [{"at": [0, 0, 14], "size": [8, 0, 8]}]
+	_check(not ZzMapDoc.validate(doc).ok, "and a volume with no depth is refused")
+
+	var game := await _team(2, _quiet)
+	var me := game.survivors()[0]
+	game.survivors()[1].health.invulnerable = true
+	var start := STREET + Vector3(0, 0, 2.0)
+	var none: Array[AABB] = []
+	var dry: float = await _walk(game, me, start, 1.0)
+
+	# Knee deep: the feet wet, the waist not. Source-like, a wade is slower than a walk.
+	var shallow: Array[AABB] = [AABB(Vector3(-6, -1, 8), Vector3(12, 1.4, 20))]
+	game.map.water_boxes = shallow
+	game._push_water()
+	var wet: float = await _walk(game, me, start, 1.0)
+	_check(me.water_level == ZzPlayer.WaterLevel.FEET and wet < dry * 0.95 and wet > dry * 0.5,
+		"wading slows a survivor", "%.2f m against %.2f dry" % [wet, dry])
+	_check(me.controller.has_modifier(ZzController.WADING), "as a modifier, so a client predicts it")
+	_check(game.water_pace_at(start) == game.water_rules.zombie_wade, "and slows a zombie in it", "%.2f" % game.water_pace_at(start))
+
+	# Deep: the waist in, then the eyes. Swimming is the mode.
+	var deep: Array[AABB] = [AABB(Vector3(-6, -3, 8), Vector3(12, 5.5, 20))]
+	game.map.water_boxes = deep
+	game._push_water()
+	me.place_at(start, 0.0)
+	await _sim(game, 0.5)
+	_check(me.controller.state.mode == me.swim.mode_id and me.water_level >= ZzPlayer.WaterLevel.WAIST,
+		"deep water is swum in, the waist under", str(me.water_level))
+	await _sim(game, 1.5)
+	_check(not me.submerged and is_equal_approx(me.air, game.water_rules.drown_seconds), "a swimmer floats with the head out, and breathes")
+	var dive := DotFpsCommand.new()
+	dive.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	me.controller.apply_command(dive)
+	await _sim(game, 1.5)
+	_check(me.submerged, "and a diver's eyes go under")
+	_check(game.water_pace_at(start) == game.water_rules.zombie_deep, "and a zombie is slowest there")
+	var life := me.health.health
+	var air_before := me.air
+	await _sim(game, 3.0)
+	_check(me.air < air_before - 2.5 and is_equal_approx(me.health.health, life), "the breath runs out before the health does", "%.1f s of air" % me.air)
+	await _sim(game, 10.0)
+	_check(me.air <= 0.0 and me.health.health < life, "and then the water drowns", "%.0f of %.0f" % [me.health.health, life])
+
+	game.map.water_boxes = none
+	game._push_water()
+	me.health.health = game.config.max_health
+	await _sim(game, 5.0)
+	_check(me.air >= game.water_rules.drown_seconds - 0.01 and not me.submerged and game.water_pace_at(start) == 1.0,
+		"out of the water the air refills and the pace returns", "%.1f s" % me.air)
+
+	var _off := game.water_rules.set_cvar("zz_water", "0")
+	game.map.water_boxes = deep
+	game._push_water()
+	_check(game._water_boxes().is_empty(), "zz_water 0 turns it all off")
+	var _on := game.water_rules.set_cvar("zz_water", "1")
+
+	var added := {}
+	var recorder := func(n: String, _v: String, _h: String, f: int) -> Object:
+		added[n] = f
+		return null
+	var made := game.water_rules.bind_cvars(recorder, 4, 1)
+	_check(made.is_empty() and added.size() == ZzWaterRules.VARS.size() and added["zz_water"] == 4 and added["zz_water_drown_seconds"] == 1,
+		"every setting is a cvar, the ones a client predicts replicated", str(added.size()))
+	_check(not game.water_rules.set_cvar("zz_water_swim_speed", "fast") and game.water_rules.set_cvar("zz_water_swim_speed", "99")
+		and game.water_rules.swim_speed <= 12.0, "junk is refused and a huge speed clamped")
+	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= 32,
+		"the wading modifier fits the motor's 32", str(me.controller.motor.modifier_defs.size()))
 	_finished()
 
 

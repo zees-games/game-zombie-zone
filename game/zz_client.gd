@@ -103,6 +103,10 @@ var _slot: int = 0
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
 var _box_colours: Dictionary = {}
 var _box_order: Array[StringName] = []
+## The water the local survivor was in last frame (a ZzPlayer.WaterLevel), for the splash; the
+## low-pass the SFX bus wears under water, and the slot it took (-1 when not worn).
+var _last_water_level: int = 0
+var _muffler_slot: int = -1
 var _box_titles: Dictionary = {}
 
 ## A brute is alive: its music plays.
@@ -307,6 +311,7 @@ func _build_netcode() -> DotResult:
 		var _solid := game.body_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
+		var _wading := game.water_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
 		var _dead := game.ragdoll_rules.follow_cvars(link)
 		# And sv_toys*: a client hides the toys a server took away.
@@ -1383,6 +1388,7 @@ func _process(delta: float) -> void:
 		world_view.present(delta, camera.global_position)
 
 	_follow_daylight(delta)
+	_present_water()
 	_present_aim()
 
 	if _drive_spectator_camera():
@@ -1437,6 +1443,50 @@ func _present_aim() -> void:
 ## What E would do now, for the HUD: who you would revive, what you would pick up.
 ## The light of a map held by nights, eased toward what the hold says (it ramps through dawn
 ## and dusk itself; this only smooths the half-second steps a client is told it in).
+## What water does to the screen and the ears, presentation only: the map's murk when the CAMERA
+## (a third-person or spectator one included) is inside a volume, a splash as the local survivor
+## goes in or climbs out past the waist, and the effects muffled under the surface.
+func _present_water() -> void:
+	if game == null or game.map == null:
+		return
+
+	var under := false
+
+	if game.water_rules.is_on():
+		for box in game.map.water_boxes:
+			if box.has_point(camera.global_position):
+				under = true
+				break
+
+	game.map.set_underwater(under)
+	_muffle(under)
+	var level: int = player.water_level if player != null else 0
+	var swimming := level >= ZzPlayer.WaterLevel.WAIST
+	var was := _last_water_level >= ZzPlayer.WaterLevel.WAIST
+
+	if swimming != was and audio != null:
+		var _splash := audio.at(ZzAudio.SPLAT, player.global_position, 0.7)
+
+	_last_water_level = level
+
+
+## A low-pass on the SFX bus while the camera is under water; added once, taken off on the way out.
+func _muffle(under: bool) -> void:
+	var bus := AudioServer.get_bus_index(&"SFX")
+
+	if bus < 0:
+		return
+
+	if under and _muffler_slot < 0:
+		var filter := AudioEffectLowPassFilter.new()
+		filter.cutoff_hz = 900.0
+		AudioServer.add_bus_effect(bus, filter)
+		_muffler_slot = AudioServer.get_bus_effect_count(bus) - 1
+	elif not under and _muffler_slot >= 0:
+		AudioServer.remove_bus_effect(bus, _muffler_slot)
+		_muffler_slot = -1
+
+
 func _follow_daylight(delta: float) -> void:
 	if game == null or game.map == null:
 		return

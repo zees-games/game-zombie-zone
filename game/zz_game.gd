@@ -19,6 +19,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzCrawlRules := preload("zz_crawl_rules.gd")
+const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzPassRules := preload("zz_pass_rules.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
@@ -92,6 +93,9 @@ const BY_SPECIAL := &"special"
 const BY_FRIEND := &"friend"
 const BY_FELL := &"fell"
 const BY_HAZARD := &"hazard"
+
+## Damage type and weapon id of a survivor out of breath under water.
+const DROWN := &"drown"
 const BY_BLED := &"bled"
 const BY_BOX := &"box"
 const BY_REFLECT := &"reflected"
@@ -194,6 +198,10 @@ var pass_rules: ZzPassRules = ZzPassRules.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
+## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
+## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
+var water_rules: ZzWaterRules = ZzWaterRules.new()
+
 ## Server: team damage, added up per player over a window ([ZzTeamDamage]); the module wires
 ## what a voteban and a ban do.
 var team_damage: ZzTeamDamage = ZzTeamDamage.new()
@@ -281,6 +289,8 @@ func _ready() -> void:
 	crawl_rules.speed = config.downed_crawl_speed
 	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
 		crawl_rules.changed.connect(_on_crawl_rules_changed)
+	if not water_rules.changed.is_connected(_push_water):
+		water_rules.changed.connect(_push_water)
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
 		body_rules.changed.connect(_on_body_rules_changed)
 	if not pass_rules.changed.is_connected(_on_body_rules_changed):
@@ -410,6 +420,48 @@ func _on_crawl_rules_changed() -> void:
 		(players[id] as ZzPlayer).controller.set_crawl_speed(crawl_rules.speed)
 
 
+## The water survivors move through: the map's volumes, or none when `zz_water` is off.
+func _water_boxes() -> Array[AABB]:
+	var none: Array[AABB] = []
+	return map.water_boxes if map != null and water_rules.is_on() else none
+
+
+## Hands every survivor the map's water and the rules, on this end: a map just built, a setting
+## changed, a player just added. The server and each client run the same.
+func _push_water() -> void:
+	var boxes := _water_boxes()
+
+	for id in players:
+		(players[id] as ZzPlayer).set_water(boxes, water_rules)
+
+
+## How deep a zombie standing at [param feet] is in water, as the factor on its pace: 1 dry,
+## `zz_water_zombie_scale` with the feet wet, `zz_water_zombie_deep_scale` with the waist. The
+## ground they walk is the bed (the nav is the map's floor plan), so wading is all they do.
+func water_pace_at(feet: Vector3) -> float:
+	if map == null or map.water_boxes.is_empty() or not water_rules.is_on():
+		return 1.0
+
+	var pace := 1.0
+
+	for box in map.water_boxes:
+		if box.has_point(feet + Vector3.UP * 1.0):
+			return water_rules.zombie_deep
+		if box.has_point(feet + Vector3.UP * 0.1):
+			pace = water_rules.zombie_wade
+
+	return pace
+
+
+## A survivor's breath for one tick; on the server, drowning too. Every end counts its own air
+## from its own copy of the water (the client's is the HUD's bar), only the server hurts.
+func _advance_water(player: ZzPlayer, delta: float) -> void:
+	var owed := player.breathe(delta, water_rules)
+
+	if owed > 0.0 and authoritative and player.is_up():
+		hazard_damage(player, owed, 0, DROWN)
+
+
 func _on_body_rules_changed() -> void:
 	for id in players:
 		_apply_body_mask(players[id] as ZzPlayer)
@@ -493,7 +545,7 @@ func _build_combat() -> void:
 	combat.resolver.adjust = _adjust_damage
 
 	for type in [_type(&"bite", 0.0), _type(&"fire", 0.0), _type(&"acid", 0.0), _type(&"blast", 0.0),
-			_type(&"strike", 0.0), _type(&"fall", 0.0)]:
+			_type(&"strike", 0.0), _type(&"fall", 0.0), _type(&"drown", 0.0)]:
 		combat.register_damage_type(type)
 
 	add_child(combat)
@@ -759,6 +811,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		_apply_body_mask(player)
 
 	player.controller.set_crawl_speed(crawl_rules.speed)
+	player.set_water(_water_boxes(), water_rules)
 
 	var opened := entities.open(DotEntity.KIND_PLAYER, player, &"", player_id, now())
 	player.entity_id = (opened.value as DotEntityHandle).id if opened.ok else 0
@@ -1231,6 +1284,7 @@ func build_map(doc: Dictionary) -> DotResult:
 		return built
 
 	map_doc = map.doc
+	_push_water()
 	_reset_barricades()
 	# The states are the map's: a map laid out between rounds (the map menu's change, a vote's)
 	# otherwise keeps the last map's, and a shorter objective list is read past its end.
@@ -2731,6 +2785,7 @@ func _step(delta: float) -> void:
 
 		if player.is_alive() and not player.watching:
 			player.simulate(_tick, delta)
+			_advance_water(player, delta)
 
 			if authoritative:
 				_advance_hands(player, delta)

@@ -61,6 +61,7 @@ const MAX_BOXES := 6000
 const MAX_PROPS := 2000
 const MAX_TOYS := 96
 const MAX_LIGHTS := 128
+const MAX_WATER := 24
 const MAX_SPAWNS := 64
 const MAX_ITEMS := 400
 const MAX_OBJECTIVES := 16
@@ -234,6 +235,27 @@ static func validate(source: Dictionary) -> DotResult:
 		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
 
 	doc["lights"] = lights
+
+	# Water: axis-aligned volumes, `{at, size, tint?}` like a box (its top is the surface). Left
+	# out of a map that has none, so a map without water keeps the document it always had.
+	var water: Array = []
+	for raw: Variant in source.get("water", []):
+		if not (raw is Dictionary) or not (raw as Dictionary).has("at") or not (raw as Dictionary).has("size"):
+			return _refuse("water %d is not {at, size}" % water.size(), source)
+		var pool := raw as Dictionary
+		var pool_size := _floats(pool["size"], 3)
+		if pool_size[0] <= 0.0 or pool_size[1] <= 0.0 or pool_size[2] <= 0.0:
+			return _refuse("water %d has no volume" % water.size(), source)
+		var entry := {"at": _floats(pool["at"], 3), "size": pool_size}
+		if pool.has("tint"):
+			entry["tint"] = _floats(_colour_list(pool["tint"]), 3)
+		water.append(entry)
+
+	if water.size() > MAX_WATER:
+		return _refuse("%d water volumes; the most is %d" % [water.size(), MAX_WATER], source)
+
+	if not water.is_empty():
+		doc["water"] = water
 
 	var spawns: Variant = source.get("spawns", {})
 	if not (spawns is Dictionary):

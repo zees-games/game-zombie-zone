@@ -136,6 +136,9 @@ var _blind: ColorRect = null
 var _fire: ColorRect = null
 var _grey: ColorRect = null
 var _low: ColorRect = null
+var _wet: ColorRect = null
+var _air_back: ColorRect = null
+var _air_fill: ColorRect = null
 var _hurt_marks: Array = []
 var _effect_rows: Array = []
 var _effects_at: float = 0.0
@@ -159,6 +162,8 @@ func _build() -> void:
 	add_child(_root)
 
 	_low = _cover("Low", Color(0.55, 0.0, 0.0, 0.0))
+	# Eyes under water: a cold green-blue over everything, under the HUD (the fog does the depth).
+	_wet = _cover("Wet", Color(0.04, 0.30, 0.40))
 	_bile = _cover("Bile", Color(0.38, 0.52, 0.08))
 	_fire = _cover("Fire", Color(0.95, 0.4, 0.05))
 	_grey = _cover("LastLife", Color(0.12, 0.12, 0.12))
@@ -299,6 +304,11 @@ func _build() -> void:
 
 	_use_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_CENTER, -160.0, 74.0, 320.0, 12.0)
 	_use_fill = _rect(Color(0.95, 0.85, 0.35), Control.PRESET_CENTER, -160.0, 74.0, 0.0, 12.0)
+	# The breath, above the use bar's place; shown only while it is not full.
+	_air_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_CENTER, -100.0, 96.0, 200.0, 8.0)
+	_air_fill = _rect(Color(0.55, 0.85, 1.0), Control.PRESET_CENTER, -100.0, 96.0, 200.0, 8.0)
+	_air_back.visible = false
+	_air_fill.visible = false
 	_carry = _label(16)
 	_carry.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_carry.offset_left = -300.0
@@ -878,6 +888,8 @@ func _draw_effects() -> void:
 func _draw_overlays(delta: float) -> void:
 	var step := maxf(delta, 0.0) / BLIND_FADE_SEC
 	_fade(_bile, 0.42 if player.biled else 0.0, step)
+	_fade(_wet, 0.38 if player.submerged else 0.0, step * 2.0)
+	_draw_air()
 	_fade(_blind, 1.0 if (player.blinded or player.box_blind) else 0.0, step * 0.5)
 	_fade(_fire, 0.18 if player.burning else 0.0, step)
 	_fade(_grey, 0.35 if player.is_alive() and player.incaps >= game.config.max_incaps and not player.is_down() else 0.0, step * 0.3)
@@ -886,6 +898,20 @@ func _draw_overlays(delta: float) -> void:
 		and player.health.health < game.config.limp_health
 	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.006)
 	_fade(_low, pulse if low or player.is_down() else 0.0, step)
+
+
+## The breath bar: there while the eyes are under or the lungs not yet full, red when it is out.
+func _draw_air() -> void:
+	var full := maxf(game.water_rules.drown_seconds, 0.001)
+	var fraction := clampf(player.air / full, 0.0, 1.0)
+	var show := game.water_rules.drown_seconds > 0.0 and (player.submerged or fraction < 0.999)
+	_air_back.visible = show
+	_air_fill.visible = show
+
+	if show:
+		_air_fill.offset_right = _air_fill.offset_left + 200.0 * fraction
+		_air_fill.color = Color(0.55, 0.85, 1.0) if fraction > 0.0 else Color(0.95, 0.2, 0.15)
+		_air_fill.visible = fraction > 0.0
 
 
 func _fade(rect: ColorRect, target: float, step: float) -> void:
