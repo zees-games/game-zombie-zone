@@ -324,6 +324,12 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 
 # --- Navigation ------------------------------------------------------------------------------
 
+## A prop at least this tall is cut out of the graph. It was half a metre, and a pallet 0.41 m high
+## (2.7 m square, chamfered) sat across a loading bay on zz_blackout_2: every zombie that met its
+## corner stood there for a hundred seconds, sliding on six contacts, because the graph said the
+## way was clear and the body could not step it.
+const PROP_CUT_HEIGHT := 0.3
+
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
 ## them as an obstacle, and its links between storeys.
 ##
@@ -370,7 +376,7 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 		for prop: Dictionary in doc.get("props", []):
 			var size: Vector3 = props_size.call(StringName(str(prop["id"])))
 
-			if size.y < 0.5:
+			if size.y < PROP_CUT_HEIGHT:
 				continue
 
 			var at := ZzMapDoc.v3(prop["at"])
@@ -381,11 +387,47 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 				absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
 			builder.add_obstacle(AABB(at + Vector3(-extent.x, 0.0, -extent.z), Vector3(extent.x * 2.0, size.y, extent.z * 2.0)))
 
+	var walls: Array[AABB] = []
+
+	for box: Dictionary in doc.get("boxes", []):
+		# What a body cannot pass whatever the graph says: solid, not a gate (a gate has its own rule),
+		# not a floor and not told to stay out of the navigation.
+		if not bool(box.get("solid", true)) or box.has("gate") or (box.has("nav") and not bool(box["nav"])):
+			continue
+
+		var bounds := _box_bounds(box)
+
+		if not box.has("nav") and _is_floor(bounds, floors):
+			continue
+
+		walls.append(bounds)
+
 	for link: Array in nav_doc.get("links", []):
-		builder.add_link(Vector3(float(link[0]), float(link[1]), float(link[2])),
-			Vector3(float(link[3]), float(link[4]), float(link[5])))
+		var from := Vector3(float(link[0]), float(link[1]), float(link[2]))
+		var to := Vector3(float(link[3]), float(link[4]), float(link[5]))
+
+		# A link the importer drew across a wall (a window sill, a rail) is a path nobody can walk:
+		# the horde queued at it for the length of a wave (the stuck meter in `headless_nav`).
+		if link_crosses_solid(from, to, walls):
+			continue
+
+		builder.add_link(from, to)
 
 	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates))
+
+
+## Whether the straight way from [param from] to [param to] runs into one of [param walls] at knee
+## or chest height (half a metre and 1.2 m up, the two heights a body is wide enough to hit).
+static func link_crosses_solid(from: Vector3, to: Vector3, walls: Array[AABB]) -> bool:
+	for rise: float in [0.5, 1.2]:
+		var a := from + Vector3(0.0, rise, 0.0)
+		var b := to + Vector3(0.0, rise, 0.0)
+
+		for wall in walls:
+			if wall.intersects_segment(a, b):
+				return true
+
+	return false
 
 
 ## The axis-aligned bounds of a (possibly turned) box.
