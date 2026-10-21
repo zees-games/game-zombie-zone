@@ -1,5 +1,7 @@
 extends "zz_zombie_brain.gd"
 
+const ZzUnstick := preload("../game/zz_unstick.gd")
+
 ## The common infected: the crowd.
 ##
 ## [codeblock]
@@ -42,6 +44,9 @@ const RING_MAX := 3.4
 ## Seconds a stuck common waits before it tries to climb over what is stopping it.
 const STUCK_SECONDS := 1.2
 
+## Hops that have not freed it before it is stepped along instead.
+const HOPS_BEFORE_NUDGE := 2
+
 var idle_kind: int = Idle.STAND
 var home: Vector3 = Vector3.ZERO
 
@@ -56,6 +61,9 @@ var _mill_goal: Vector3 = Vector3.INF
 var _mill_wait_until: float = 0.0
 var _stuck_at: Vector3 = Vector3.INF
 var _stuck_since: float = 0.0
+## Hops at one place that did not free it, and where the last was.
+var _hops: int = 0
+var _last_hop_at: Vector3 = Vector3.INF
 var _woken_at: float = INF
 
 
@@ -275,6 +283,9 @@ func _unstick(b: ZzZombieBody, toward: Vector3) -> void:
 	var here := npc.position()
 
 	if _stuck_at == Vector3.INF or here.distance_to(_stuck_at) > 0.6:
+		if _stuck_at == Vector3.INF and here.distance_to(_last_hop_at) > 1.5:
+			_hops = 0
+
 		_stuck_at = here
 		_stuck_since = now()
 		return
@@ -284,6 +295,15 @@ func _unstick(b: ZzZombieBody, toward: Vector3) -> void:
 		# target, which from a doorway is often into the wall beside it.
 		var forward := b.wish if b.wish.length() > 0.1 else (toward - here)
 		forward.y = 0.0
+		_hops += 1
+		_last_hop_at = here
+
+		# Two hops that did not free it: a step along where it was going, if it fits (`ZzUnstick`).
+		if _hops > HOPS_BEFORE_NUDGE and ZzUnstick.nudge(b, forward):
+			_hops = 0
+			_stuck_at = Vector3.INF
+			return
+
 		b.leap(forward.normalized() * 3.0 + Vector3(0.0, 7.0, 0.0))
 		b.anim = ZzZombieBody.Anim.LEAP
 		_stuck_at = Vector3.INF

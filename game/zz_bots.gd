@@ -4,6 +4,7 @@ const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzUnstick := preload("zz_unstick.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 
 ## The stand-in survivors: what a server fills a team with, and what a suite plays with.
@@ -1015,6 +1016,10 @@ func _get_out_of_hazards(player, command: DotFpsCommand) -> void:
 			return
 
 
+## Hops that have not freed a stand-in before the game steps it along (`ZzUnstick`).
+const HOPS_BEFORE_NUDGE := 2
+
+
 func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var mark: Vector3 = memory["stuck_at"]
@@ -1022,9 +1027,19 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 	if mark == Vector3.INF or here.distance_to(mark) > 0.5:
 		memory["stuck_at"] = here
 		memory["stuck_time"] = game.now()
+		memory["hops"] = 0
 		return
 
 	if command.move.length() > 0.5 and game.now() - float(memory["stuck_time"]) > 1.0:
 		command.set_button(DotFpsCommand.BUTTON_JUMP, true)
 		memory["path"] = PackedVector3Array()
 		memory["stuck_time"] = game.now()
+		memory["hops"] = int(memory.get("hops", 0)) + 1
+
+		# A hop that has not freed it twice will not: a step along where it was going, if it fits.
+		if int(memory["hops"]) > HOPS_BEFORE_NUDGE:
+			var yaw := deg_to_rad(command.yaw)
+			var heading := Vector3(cos(yaw), 0.0, -sin(yaw)) * command.move.x + Vector3(-sin(yaw), 0.0, -cos(yaw)) * command.move.y
+			var moved := ZzUnstick.nudge(player, heading)
+			memory["hops"] = 0
+			memory["nudges"] = int(memory.get("nudges", 0)) + (1 if moved else 0)
