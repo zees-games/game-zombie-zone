@@ -146,7 +146,7 @@ zz_brute_max 480               // seconds between brutes, to
 zz_director 1                  // whether the build-up, peak and relax pacing runs
 zz_sleepers 1                  // whether the maps' sleepers are there
 zz_box_drops 1                 // whether zombies drop boxes
-zz_box_common 0.012            // chance a common drops a box
+zz_box_common 0.04             // chance a common drops a box
 zz_box_special 0.3             // chance a special drops a box
 zz_gravity 20                  // metres per second squared, for everything
 mp_teammate_passthrough 1      // shots and team-mates: 0 a team-mate is hit and blocks, 1 through one at the muzzle, 2 through every team-mate

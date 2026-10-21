@@ -361,8 +361,8 @@ extends DotConfig
 ## Where the boxes and what they do are read from, relative to this game's root.
 @export var box_file: String = "boxes/boxes.json"
 
-## Chance a common drops a box when it dies, and a special, and a brute.
-@export_range(0.0, 1.0, 0.001) var box_drop_common: float = 0.012
+## Chance a common drops a box when it dies, and a special, and a brute. A common was 1.2% (one in eighty), so a solo run of a few dozen kills saw no loot at all; 4% is about one a minute at a hold's pace.
+@export_range(0.0, 1.0, 0.001) var box_drop_common: float = 0.04
 @export_range(0.0, 1.0, 0.01) var box_drop_special: float = 0.3
 @export_range(0.0, 1.0, 0.01) var box_drop_brute: float = 1.0
 

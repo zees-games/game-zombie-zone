@@ -34,9 +34,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 37
+const SECTIONS := 38
 
-const CHECKS := 227
+const CHECKS := 230
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -74,6 +74,7 @@ func _run() -> void:
 	await _test_start_area()
 	await _test_a_common()
 	await _test_shots()
+	await _test_zombie_loot()
 	await _test_toys()
 	await _test_the_room_wakes()
 	await _test_downs()
@@ -298,6 +299,38 @@ func _test_a_common() -> void:
 	await _sim(game, 3.0)
 	_check(me.health.health < before, "it closes and hits", "%.0f -> %.0f" % [before, me.health.health])
 	_check(before - me.health.health < 30.0, "a common's hits are small on normal", "%.0f" % (before - me.health.health))
+	_finished()
+
+
+## Why zombies seemed to drop nothing: the path works (a kill at certain odds lays a box and says
+## so), and at the shipped odds a common is a one in eighty-odd drop, so a solo run that kills a
+## few dozen mostly sees none.
+func _test_zombie_loot() -> void:
+	_section("a killed zombie drops a box at the configured odds")
+	var game := await _team(1, func(c: ZzConfig) -> void:
+		_quiet.call(c)
+		c.box_drop_common = 1.0)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var told: Array = []
+	game.loot.added.connect(func(_id: int, kind: StringName, _item: StringName, _at: Vector3) -> void:
+		told.append(kind))
+	var lying := game.loot.count_of(ZzLoot.BOX)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
+	await _sim(game, 0.1)
+	_hurt_npc(game, npc, 10000.0)
+	await _sim(game, 0.1)
+	_check(not npc.is_alive() and game.loot.count_of(ZzLoot.BOX) == lying + 1 and told.has(ZzLoot.BOX),
+		"at certain odds a dead common lays a box and the LOOT event goes out", "%d boxes over %d" % [game.loot.count_of(ZzLoot.BOX), lying])
+	game.config.boxes_enabled = false
+	var off := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
+	await _sim(game, 0.1)
+	_hurt_npc(game, off, 10000.0)
+	await _sim(game, 0.1)
+	_check(game.loot.count_of(ZzLoot.BOX) == lying + 1, "zz_box_drops 0 drops none")
+	var shipped := ZzConfig.new()
+	_check(shipped.boxes_enabled and shipped.box_drop_common > 0.0, "the shipped config has drops on",
+		"%.1f%% common" % (shipped.box_drop_common * 100.0))
 	_finished()
 
 
