@@ -311,6 +311,7 @@ func _build_netcode() -> DotResult:
 		var _dead := game.ragdoll_rules.follow_cvars(link)
 		# And sv_toys*: a client hides the toys a server took away.
 		var _toys := game.toy_rules.follow_cvars(link)
+		var _roster := follow_roster(link, game.config)
 
 	net = DotNetManager.new()
 	net.name = "Net"
@@ -1040,6 +1041,20 @@ func _build_hud() -> void:
 	add_child(hud)
 
 
+## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
+## every change. An older shell's link cannot say, and the config's default (off) stands.
+static func follow_roster(source: Object, config: ZzConfig) -> bool:
+	if source == null or not source.has_method(&"replicated_cvar") or not source.has_signal(&"replicated_cvar_changed"):
+		return false
+	var held := String(source.call(&"replicated_cvar", "zz_team_roster", ""))
+	if held != "":
+		config.team_roster = held.strip_edges() == "1"
+	source.connect(&"replicated_cvar_changed", func(cvar_name: String, value: String) -> void:
+		if cvar_name == "zz_team_roster":
+			config.team_roster = value.strip_edges() == "1")
+	return true
+
+
 ## The key an action is on, as the player has it bound.
 func _key(action: StringName) -> String:
 	if settings != null and settings.bindings != null:
@@ -1062,6 +1077,8 @@ func _dress_board() -> void:
 	board.columns = [
 		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
 		{"key": &"name", "title": "Survivor", "width": 3.0},
+		{"key": &"health", "title": "Health", "kind": DotMenuScoreboard.KIND_TEXT},
+		{"key": &"downs", "title": "Downs left", "kind": DotMenuScoreboard.KIND_TEXT},
 		{"key": &"kills", "title": "Kills", "kind": DotMenuScoreboard.KIND_NUMBER},
 		{"key": &"specials", "title": "Specials", "kind": DotMenuScoreboard.KIND_NUMBER},
 		{"key": &"points", "title": "Points", "kind": DotMenuScoreboard.KIND_NUMBER},
@@ -1086,10 +1103,33 @@ func _decorate_row(row: Dictionary) -> void:
 	row["kills"] = who.commons_killed
 	row["specials"] = who.specials_killed
 	row["team"] = ZzGame.SURVIVORS
+	row["health"] = health_text(who)
+	row["downs"] = downs_text(who, game.config.max_incaps)
 	if int(row.get("ping", -1)) < 0 and who.ping_ms >= 0:
 		row["ping"] = who.ping_ms
 	if who == player:
 		row["you"] = true
+
+
+## A survivor's state for the Tab board, so the team's health is there with the HUD list off.
+static func health_text(who: ZzPlayer) -> String:
+	if who.watching or not who.is_alive():
+		return "dead"
+	if who.is_pinned():
+		return "HELD (%s)" % String(who.pin_kind)
+	if who.is_down():
+		return "DOWN"
+	if who.health != null:
+		return "%d" % int(ceilf(who.health.health))
+	return "-"
+
+
+## Downs left before the next one is death.
+static func downs_text(who: ZzPlayer, max_incaps: int) -> String:
+	if who.watching or not who.is_alive():
+		return "-"
+	var left := max_incaps - who.incaps
+	return "last life" if left <= 0 else str(left)
 
 
 func _prepare_board(snap: Dictionary) -> void:

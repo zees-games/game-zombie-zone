@@ -187,6 +187,17 @@ func _game_load() -> DotResult:
 	_wire_progress(world)
 	_add_tunables(world)
 
+	# The top-left team-mate list: `zz_team_roster` 0 (the default) or 1. REPLICATED, because
+	# the HUD is drawn by each client; the config file / argv set it through ZzConfig, and a
+	# value set first is what the cvar starts as.
+	var roster := add_cvar("zz_team_roster", "1" if world.config.team_roster else "0",
+		"Show the team-mate health list at the top left of the HUD (0 or 1)",
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	if roster != null:
+		world.config.team_roster = roster.get_string().strip_edges() == "1"
+		roster.changed.connect(func(_old: String, new_value: String) -> void:
+			world.config.team_roster = new_value.strip_edges() == "1")
+
 	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a team-mate
 	# holding the muzzle (the default), 2 every team-mate in the line. dot-combat's cvar,
 	# defined there once for every game; live from the next shot, and a value the operator set

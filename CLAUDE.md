@@ -100,6 +100,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 - Glance pieces are dot-ui's (vitals, ammo, strip, key hints, hit marker, damage numbers); naming them needs a shell with dot-ui API level 4, which `headless_run` checks.
 - The HUD follows the menu's theme (`ZzHud.follow_menu`, dot-menu's `follow_hud` by name); `piece_theme()` is accent only (amber, health green); Labels set no colour of their own except accent lines.
 - Every character the game writes is in the HUD's font (`headless_run` scans `game/` and `npcs/`); bars are drawn, never block characters. [design](docs/design.md#what-the-first-play-test-changed-2026-10-11)
+- The top-left team-mate list is a server setting, `zz_team_roster` (`ZzConfig.team_roster`, OFF by default, REPLICATED, followed by `ZzClient.follow_roster`); the Tab board carries each survivor's Health and Downs left (`ZzClient.health_text`/`downs_text`) so nothing is lost with it off.
 - Feed lines go through `ZzClient.feed_line`: "You are down", never "You is down".
 - A hit is drawn only from the server's confirmation (`ZzGame.hit_landed`): marker, number, zee's red burst (`ZzClient._draw_body_hit`); the number is real health, borrowed is the white length. [design](docs/design.md#the-hud-dot-uis-glance-pieces)
 - Right mouse aims down the sights (`ZzBindings.AIM`), presentation only; the lens zooms from `ZzClient.base_fov` (where the menu's field of view binds, never the camera); the shove is F alone. `tools/shot.sh --view=ads`. [design](docs/design.md#down-the-sights)

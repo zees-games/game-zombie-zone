@@ -13,6 +13,14 @@ extends DotConfig
 ## a horde that comes in waves, specials that punish whoever strays, and a down rather than a
 ## death for the first two mistakes.
 
+# --- The HUD ----------------------------------------------------------------
+
+@export_group("The HUD")
+## The top-left list of team-mates with their health bars. Off by default: the Tab board
+## carries each survivor's health and downs left, and a long list of bars is noise on a big
+## team. A server setting (`zz_team_roster`, replicated), so every client follows it.
+@export var team_roster: bool = false
+
 # --- The round -------------------------------------------------------------
 
 @export_group("The round")

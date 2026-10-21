@@ -37,7 +37,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 39
 
-const CHECKS := 252
+const CHECKS := 257
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1774,9 +1774,22 @@ func _test_the_hud() -> void:
 	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit" and str(hud.kits.rows[0][1]) != "",
 		"the medkit is a DotKeyHints row with its key", str(hud.kits.rows))
 
+	# The team-mate list is a server setting, off by default; the board carries the same facts.
+	_check(not game.config.team_roster and not hud._team.visible, "the team list is off by default and hidden")
+	game.config.team_roster = true
+	hud._process(0.0)
+	_check(hud._team.visible, "zz_team_roster 1 shows the team list")
+	game.config.team_roster = false
+	hud._process(0.0)
+	_check(not hud._team.visible, "and 0 hides it again")
+	_check(ZzClient.health_text(me) == "55" and ZzClient.downs_text(me, game.config.max_incaps) == str(game.config.max_incaps),
+		"the board's health and downs left for a survivor", ZzClient.health_text(me))
+
 	_hurt(game, me, 500.0)
 	await _sim(game, 0.1)
 	hud._process(0.0)
+	_check(ZzClient.health_text(me) == "DOWN" and ZzClient.downs_text(me, game.config.max_incaps) == str(game.config.max_incaps - 1),
+		"down shows DOWN and one down fewer on the board")
 	_check(me.is_down() and hud.vitals.status == "DOWN" and hud.vitals.is_low(),
 		"down, DOWN replaces the number and it is all in the low colour", str(hud.vitals.describe()))
 
@@ -1862,7 +1875,8 @@ func _test_the_first_play_test() -> void:
 
 	var game := await _team(3, func(c: ZzConfig) -> void:
 		_quiet(c)
-		c.intermission_seconds = 3.0)
+		c.intermission_seconds = 3.0
+		c.team_roster = true)
 	var me: ZzPlayer = game.survivors()[0]
 	var hud := ZzHud.new()
 	add_child(hud)

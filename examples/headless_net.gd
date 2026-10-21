@@ -6,6 +6,7 @@ const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzClient := preload("../game/zz_client.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
@@ -28,8 +29,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 19
-const CHECKS := 102
+const SECTIONS := 20
+const CHECKS := 107
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -797,6 +798,20 @@ func _test_a_downed_crawl_is_predicted() -> void:
 	_client_game.crawl_rules.speed = 1.4
 	_server_game.stand_up(server_me)
 	await _steps(8)
+	_finished()
+
+	_section("the team list is the server's setting (zz_team_roster), followed by a client")
+	var roster_link := FakeLink.new()
+	var roster_cfg := ZzConfig.new()
+	_check(not roster_cfg.team_roster, "off by default")
+	roster_link.held["zz_team_roster"] = "1"
+	_check(ZzClient.follow_roster(roster_link, roster_cfg) and roster_cfg.team_roster, "a client reads the server's value through its link")
+	roster_link.replicated_cvar_changed.emit("zz_team_roster", "0")
+	_check(not roster_cfg.team_roster, "and follows every change")
+	roster_link.replicated_cvar_changed.emit("zz_team_roster", "1")
+	_check(roster_cfg.team_roster, "on again")
+	_check(ZzClient.health_text(_mine()) != "" and ZzClient.downs_text(_mine(), 3) != "", "the board has a health and a downs text for a replicated survivor",
+		"%s / %s" % [ZzClient.health_text(_mine()), ZzClient.downs_text(_mine(), 3)])
 	_finished()
 
 

@@ -665,6 +665,13 @@ const TEAM_BAR_HEIGHT := 8.0
 
 
 func _draw_team() -> void:
+	# Off by default (`zz_team_roster`): hidden, so nothing is drawn and the corner is empty;
+	# every other HUD piece is anchored on its own, so there is no gap to close.
+	var wanted := game.config != null and game.config.team_roster
+	_team.visible = wanted
+	if not wanted:
+		return
+
 	var shown := 0
 
 	for other in game.survivors():
