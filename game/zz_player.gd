@@ -566,7 +566,8 @@ func reset_map() -> void:
 
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
-				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY]:
+				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY,
+				ZzController.MOVE_BOOST, ZzController.CRAWL_BOOST]:
 			var _off := controller.remove_modifier(id)
 
 	fit_hitboxes()

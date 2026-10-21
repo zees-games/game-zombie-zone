@@ -1,6 +1,7 @@
 extends RefCounted
 
 const ZzBoxInstakill := preload("zz_box_instakill.gd")
+const ZzBoxSpeed := preload("zz_box_speed.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzHazards := preload("zz_hazards.gd")
 const ZzLoot := preload("zz_loot.gd")
@@ -64,7 +65,7 @@ const ACTIONS: Array[String] = [
 
 ## The named boxes' handlers: effect name -> script (see zz_box_effect.gd). A later box is one line
 ## here, one small file, and a type in boxes.json.
-const HANDLERS := {"instakill": ZzBoxInstakill}
+const HANDLERS := {"instakill": ZzBoxInstakill, "move_speed": ZzBoxSpeed, "crawl_speed": ZzBoxSpeed}
 
 const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
 const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]
@@ -301,17 +302,47 @@ func random_type(source: StringName, rng: RandomNumberGenerator) -> StringName:
 	var total := 0.0
 
 	for id in order:
-		total += float(((types[id] as Dictionary)["drop"] as Dictionary).get(String(source), 1.0))
+		total += _drop_weight(id, source)
 
 	var roll := rng.randf() * total
 
 	for id in order:
-		roll -= float(((types[id] as Dictionary)["drop"] as Dictionary).get(String(source), 1.0))
+		roll -= _drop_weight(id, source)
 
 		if roll <= 0.0:
 			return id
 
 	return order[0] if not order.is_empty() else &""
+
+
+## How likely [param id] is to drop from [param source]: 0 when every outcome it has is a named
+## effect that says it would do nothing here (a crawl box where nobody can crawl).
+func _drop_weight(id: StringName, source: StringName) -> float:
+	var box: Dictionary = types[id]
+
+	if not _has_use(box):
+		return 0.0
+
+	return float((box["drop"] as Dictionary).get(String(source), 1.0))
+
+
+func _has_use(box: Dictionary) -> bool:
+	for outcome: Dictionary in box["outcomes"]:
+		var useful := true
+
+		for a: Dictionary in outcome["actions"]:
+			if str(a.get("do", "")) != "effect":
+				continue
+
+			var handler := _handler(StringName(str(a.get("name", ""))))
+
+			if handler != null and not handler.available(self, box.get("params", {})):
+				useful = false
+
+		if useful:
+			return true
+
+	return false
 
 
 # --- Carrying ------------------------------------------------------------------------------

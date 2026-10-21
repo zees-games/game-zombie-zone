@@ -375,7 +375,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 		if game.boxes != null:
 			game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
-				_broadcast(ZzEvents.Kind.BOX, ZzEvents.write_box(session_of(id), type_id, title, message)))
+				# The outcome's title and message are the reveal; the TYPE is not, with box_labels off.
+				_broadcast(ZzEvents.Kind.BOX, ZzEvents.write_box(session_of(id), game.boxes.shown_item(type_id), title, message)))
 			game.boxes.effects_changed.connect(func() -> void:
 				_broadcast(ZzEvents.Kind.EFFECTS, ZzEvents.write_effects(game.boxes.effects_summary())))
 

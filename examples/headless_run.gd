@@ -6,6 +6,7 @@ const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
+const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzHazards := preload("../game/zz_hazards.gd")
 const ZzFixtures := preload("../game/zz_fixtures.gd")
@@ -34,9 +35,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 38
+const SECTIONS := 39
 
-const CHECKS := 230
+const CHECKS := 252
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -104,6 +105,7 @@ func _run() -> void:
 	await _test_the_map_menu()
 	await _test_the_client_platform()
 	await _test_the_first_play_test()
+	await _test_crawling_and_speed_boxes()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -148,6 +150,19 @@ func _test_config() -> void:
 	config.difficulty = 1
 	_check(config.commons_cap(4) == config.commons_base + 3 * config.commons_per_survivor and config.commons_cap(1) == config.commons_base,
 		"the crowd grows with the team")
+	var settings := ZzConfig.new()
+	_check(is_equal_approx(settings.box_deploy_seconds, 1.0), "a box deploys in a second by default (was 3.5)", str(settings.box_deploy_seconds))
+	_check(not settings.box_labels, "boxes do not say what they are by default: the contents are a surprise")
+	_check(settings.downed_crawl_speed > 0.0 and settings.downed_crawl_speed < settings.run_speed * 0.5,
+		"a downed survivor crawls by default, at a pace well under a run", str(settings.downed_crawl_speed))
+	var from_file := settings.apply_dictionary({"box_deploy_seconds": 2.5, "downed_crawl_speed": 0.8, "box_labels": true}, "file")
+	_check(from_file.size() == 3 and is_equal_approx(settings.box_deploy_seconds, 2.5) and is_equal_approx(settings.downed_crawl_speed, 0.8)
+		and settings.box_labels and settings.validate().ok, "all three are keys of the server's config file", str(from_file))
+	settings.box_deploy_seconds = 0.1
+	_check(not settings.validate().ok, "a deploy time under half a second is refused with a reason")
+	settings.box_deploy_seconds = 1.0
+	settings.downed_crawl_speed = 9.0
+	_check(not settings.validate().ok, "so is a crawl faster than a walk")
 	config.mob_interval_min = 500.0
 	_check(not config.validate().ok, "a mob interval that runs backwards is refused")
 	config.mob_interval_min = 90.0
@@ -1155,8 +1170,8 @@ func _test_box_framework() -> void:
 	await _sim(game, 0.2)
 	me.actions = 0
 	await _sim(game, 0.1)
-	_check(me.carried == [&"medical"] and not game.loot.exists(first) and me.carried_count == 1 and me.carried_index > 0,
-		"E puts a box in the hands, and the slot is told who it is", str(me.carried))
+	_check(me.carried == [&"medical"] and not game.loot.exists(first) and me.carried_count == 1 and me.carried_index == 0,
+		"E puts a box in the hands, and the slot is told only that it is one (box_labels is off)", str(me.carried))
 	var second := game.loot.add(ZzLoot.BOX, &"horde", STREET + Vector3(0, 0, -1.2))
 	me.actions = ZzNetCommand.ACT_USE
 	await _sim(game, 0.2)
@@ -1165,25 +1180,26 @@ func _test_box_framework() -> void:
 	game.loot.remove(second)
 
 	# Deploy: nothing until the time is up, and the meter climbs.
+	var deploy := game.config.box_deploy_seconds
 	me.actions = ZzNetCommand.ACT_DEPLOY
-	await _sim(game, 1.75)
+	await _sim(game, deploy * 0.5)
 	_check(me.using == &"deploy" and absf(me.use_fraction - 0.5) < 0.1 and seen.is_empty(),
 		"holding the key fills a meter and opens nothing early", "%.2f" % me.use_fraction)
-	await _sim(game, 2.0)
+	await _sim(game, deploy * 0.6)
 	me.actions = 0
 	_check(seen == [&"medical"] and me.carried.is_empty() and me.using == &"", "after box_deploy_seconds it opens", str(seen))
 
 	# Cancel by letting go.
 	var _c1 := game.boxes.carry(me, &"medical")
 	me.actions = ZzNetCommand.ACT_DEPLOY
-	await _sim(game, 1.0)
+	await _sim(game, deploy * 0.4)
 	me.actions = 0
-	await _sim(game, 3.0)
+	await _sim(game, deploy * 2.0)
 	_check(me.using == &"" and me.carried.size() == 1 and seen.size() == 1, "letting go cancels it, and the box is kept")
 
 	# Cancel by walking off.
 	me.actions = ZzNetCommand.ACT_DEPLOY
-	await _sim(game, 1.0)
+	await _sim(game, deploy * 0.4)
 	me.place_at(STREET + Vector3(0, 0, -3.0), 0.0)
 	await _sim(game, 0.3)
 	_check(me.using == &"" and me.carried.size() == 1, "moving out of the radius cancels it")
@@ -1193,7 +1209,7 @@ func _test_box_framework() -> void:
 
 	# Cancel by a down, which drops the box where they fall.
 	me.actions = ZzNetCommand.ACT_DEPLOY
-	await _sim(game, 1.0)
+	await _sim(game, deploy * 0.4)
 	var lying := game.loot.count_of(ZzLoot.BOX)
 	game._go_down(me, &"", &"test")
 	await _sim(game, 0.2)
@@ -1248,6 +1264,117 @@ func _test_box_framework() -> void:
 	_check(not game.boxes.is_active(&"t_stack") and not game.boxes.is_active(&"t_round") and game.boxes.is_active(&"t_keep")
 		and is_equal_approx(game.horde.mob_rate_scale, 1.0),
 		"the round's end ends the game-wide effects, but not one that opted out (a round-long one always goes)")
+	_finished()
+
+
+## Metres a survivor goes in [param seconds] pressing forward (yaw 0, so toward -Z) from [param from].
+func _walk(game: ZzGame, player: ZzPlayer, from: Vector3, seconds: float) -> float:
+	player.place_at(from, 0.0)
+	player.controller.state.velocity = Vector3.ZERO
+	var forward := DotFpsCommand.new()
+	forward.move = Vector2(0.0, 1.0)
+	player.controller.apply_command(forward)
+	await _sim(game, seconds)
+	var gone := player.feet().distance_to(from)
+	var stop := DotFpsCommand.new()
+	player.controller.apply_command(stop)
+	await _sim(game, 0.3)
+	return gone
+
+
+func _test_crawling_and_speed_boxes() -> void:
+	_section("a downed survivor crawls at the server's pace, and the speed boxes")
+	var game := await _team(2, _quiet)
+	var me := game.survivors()[0]
+	game.survivors()[1].health.invulnerable = true
+	me.place_at(STREET, 0.0)
+	var start := STREET + Vector3(0, 0, 4.0)
+	var run_gone: float = await _walk(game, me, start, 1.0)
+
+	_hurt(game, me, 500.0)
+	_check(me.is_down(), "down")
+	var crawled: float = await _walk(game, me, start, 1.5)
+	var pace := game.crawl_rules.speed
+	_check(crawled > pace * 0.8 and crawled < pace * 1.5 + 0.3, "a downed survivor crawls at zz_down_crawl_speed",
+		"%.2f m in 1.5 s at %.1f m/s" % [crawled, pace])
+	_check(me.controller.has_modifier(ZzController.DOWN) and not me.controller.motor.modifier_defs[ZzController.DOWN].deny_move,
+		"as the DOWN modifier's speed scale, so a client predicts it")
+
+	game.crawl_rules.set_cvar("0")
+	var still: float = await _walk(game, me, start, 1.5)
+	_check(still < 0.15 and me.controller.motor.modifier_defs[ZzController.DOWN].deny_move, "at 0 they stay where they fell", "%.2f m" % still)
+	game.crawl_rules.set_cvar("3.0")
+	var fast: float = await _walk(game, me, start, 1.5)
+	_check(fast > crawled * 1.6, "and the cvar changes the live pace", "%.2f m against %.2f" % [fast, crawled])
+	_check(not game.crawl_rules.set_cvar("fast") and not game.crawl_rules.set_cvar("") and is_equal_approx(game.crawl_rules.speed, 3.0)
+		and game.crawl_rules.set_cvar("99") and is_equal_approx(game.crawl_rules.speed, ZzCrawlRules.MAX_SPEED),
+		"junk is refused and a huge value is clamped")
+	game.crawl_rules.set_cvar("1.4")
+
+	# The boxes: in the file, four ways of being faster.
+	var file := ZzBoxes.new(null)
+	var loaded := file.load_text(FileAccess.get_file_as_string("res://boxes/boxes.json"))
+	var wanted := {&"swift": ["seconds", true], &"marathon": ["round", false], &"lifeline": ["seconds", true], &"long_crawl": ["round", false]}
+	var in_file := loaded.ok
+
+	for id: StringName in wanted:
+		var box: Dictionary = file.types.get(id, {})
+		in_file = in_file and not box.is_empty() and box["duration"]["mode"] == wanted[id][0] \
+			and bool(box["survives_round"]) == wanted[id][1] and box["polarity"] == "positive" and not bool(box["stacks"])
+
+	_check(in_file, "swift, marathon, lifeline and long crawl are in boxes.json: seconds or the round, survives_round as documented")
+
+	game.stand_up(me)
+	# Revived limping is a slower walk of its own; this measures the box against a healthy run.
+	me.health.health = game.config.max_health
+	me.temp_health = 0.0
+	await _sim(game, 0.2)
+	var ctx := {"opener": me, "at": STREET, "box": &"swift"}
+	game.boxes.types[&"swift"]["duration"] = {"mode": "seconds", "min": 2.0, "max": 2.0}
+	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
+	_check(me.controller.has_modifier(ZzController.MOVE_BOOST) and game.boxes.is_active(&"move_speed"), "Swift gives every survivor the move modifier")
+	var quick: float = await _walk(game, me, start, 1.0)
+	_check(quick > run_gone * 1.15, "and they cover more ground", "%.2f m against %.2f" % [quick, run_gone])
+	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
+	var rows := game.boxes.effects_summary().filter(func(g: Dictionary) -> bool: return g["title"] == "Swift Box")
+	_check(rows.size() == 1 and int(rows[0]["stacks"]) == 1, "a second one only lengthens it, as the file says")
+	await _sim(game, 2.6)
+	_check(not me.controller.has_modifier(ZzController.MOVE_BOOST) and not game.boxes.is_active(&"move_speed"), "and it wears off when its seconds are up")
+
+	# The whole round: gone at the round's end whatever survives_round says; seconds survive it.
+	game.boxes.types[&"marathon"]["duration"] = {"mode": "round", "min": 0.0, "max": 0.0}
+	game.boxes.run([{"do": "effect", "name": "move_speed"}], {"opener": me, "at": STREET, "box": &"marathon"})
+	game.boxes.end_round()
+	_check(not me.controller.has_modifier(ZzController.MOVE_BOOST), "Marathon lasts the round and not past it")
+	game.boxes.types[&"swift"]["duration"] = {"mode": "seconds", "min": 30.0, "max": 30.0}
+	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
+	game.boxes.end_round()
+	_check(me.controller.has_modifier(ZzController.MOVE_BOOST), "a Swift (survives_round) outlasts a wave", "")
+	game.boxes.reset()
+	_check(not me.controller.has_modifier(ZzController.MOVE_BOOST), "and a new map clears it")
+
+	# Crawl speed: felt only while down, and no box is dropped where nobody can crawl.
+	var crawl_ctx := {"opener": me, "at": STREET, "box": &"lifeline"}
+	game.boxes.types[&"lifeline"]["duration"] = {"mode": "seconds", "min": 30.0, "max": 30.0}
+	game.boxes.run([{"do": "effect", "name": "crawl_speed"}], crawl_ctx)
+	_hurt(game, me, 500.0)
+	var boosted: float = await _walk(game, me, start, 1.5)
+	_check(me.is_down() and me.controller.has_modifier(ZzController.CRAWL_BOOST) and boosted > crawled * 1.4,
+		"Lifeline: a survivor who goes down after it was opened crawls faster", "%.2f m against %.2f" % [boosted, crawled])
+	game.boxes.reset()
+	game.crawl_rules.set_cvar("0")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var dud := false
+	var seen_swift := false
+
+	for _i in 400:
+		var drawn := game.boxes.random_type(&"brute", rng)
+		dud = dud or drawn == &"lifeline" or drawn == &"long_crawl"
+		seen_swift = seen_swift or drawn == &"swift"
+
+	_check(not dud and seen_swift, "with crawling off a crawl box is never dropped, and the others still are")
+	game.crawl_rules.set_cvar("1.4")
 	_finished()
 
 

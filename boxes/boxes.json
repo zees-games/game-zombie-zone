@@ -1,6 +1,6 @@
 {
  "format": 1,
- "comment": "The random boxes. A box type has an id, a title, a colour, how likely each kind of zombie is to drop it ('drop': common, special, brute, and 'map' for one a map leaves lying about), and its outcomes. An outcome has a weight, a title shown to everybody, a message ({name} is whoever opened it), and a list of actions. Every action's 'do' and its parameters are documented in game/zz_boxes.gd (the _do_ methods); an action this game does not know refuses the whole file at load, naming it. 'who' picks whom a survivor action touches: opener (default), team, others, near (radius), random, nearest (count), downed, dead. Effects from 'pace', 'damage_boost' and the like stack: two that each double something make it four times. SCHEMA (all optional, read by ZzBoxes._read_schema): 'polarity' positive|negative|mixed; 'impact' self|radius|everyone|game (who an 'effect' action lands on); 'radius' metres for impact radius; 'stacks' true|false and 'max_stacks' (a repeat of a non-stacking effect only lengthens it; a stacking one counts up to the cap, then lengthens); 'duration' {mode: instant|seconds|round, min, max} drawn uniformly each time the box is opened (seconds), or until the round ends (round); 'survives_round' true lets a game-impacting effect outlast the round's end; 'params' is the handler's own. A named box is one outcome {\"do\": \"effect\", \"name\": <handler in ZzBoxes.HANDLERS>}. The eight random boxes keep their own per-action 'seconds'; their schema is descriptive.",
+ "comment": "The random boxes. A box type has an id, a title, a colour, how likely each kind of zombie is to drop it ('drop': common, special, brute, and 'map' for one a map leaves lying about), and its outcomes. An outcome has a weight, a title shown to everybody, a message ({name} is whoever opened it), and a list of actions. Every action's 'do' and its parameters are documented in game/zz_boxes.gd (the _do_ methods); an action this game does not know refuses the whole file at load, naming it. 'who' picks whom a survivor action touches: opener (default), team, others, near (radius), random, nearest (count), downed, dead. Effects from 'pace', 'damage_boost' and the like stack: two that each double something make it four times. SCHEMA (all optional, read by ZzBoxes._read_schema): 'polarity' positive|negative|mixed; 'impact' self|radius|everyone|game (who an 'effect' action lands on); 'radius' metres for impact radius; 'stacks' true|false and 'max_stacks' (a repeat of a non-stacking effect only lengthens it; a stacking one counts up to the cap, then lengthens); 'duration' {mode: instant|seconds|round, min, max} drawn uniformly each time the box is opened (seconds), or until the round ends (round); 'survives_round' true lets a game-impacting effect outlast the round's end; 'params' is the handler's own. A named box is one outcome {\"do\": \"effect\", \"name\": <handler in ZzBoxes.HANDLERS>}. The eight random boxes keep their own per-action 'seconds'; their schema is descriptive. SPEED BOXES (move_speed, crawl_speed; handler game/zz_box_speed.gd): impact 'game' puts a controller modifier on every living survivor for the box's duration, 'seconds' (survives_round true: it outlasts a survival wave) or 'round' (ends with the round whatever survives_round says). A modifier is held once, so they do not stack (stacks false): a second box only lengthens the first. Move speed multiplies the run by 1.3 and crawl speed the crawl by 1.8 (constants in zz_controller.gd, because a definition is registered on every end); both multiply with Adrenaline's haste. A crawl box is never dropped while zz_down_crawl_speed is 0. params.modifier picks move or crawl.",
  "boxes": [
   {
    "id": "explosive",
@@ -1353,6 +1353,162 @@
        "damage": 14,
        "reach": 20,
        "interval": 0.14
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "swift",
+   "title": "Swift Box",
+   "colour": "#3fd0e0",
+   "polarity": "positive",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "survives_round": true,
+   "params": {
+    "modifier": "move"
+   },
+   "duration": {
+    "mode": "seconds",
+    "min": 30,
+    "max": 60
+   },
+   "drop": {
+    "common": 2,
+    "special": 3,
+    "brute": 2,
+    "map": 2
+   },
+   "outcomes": [
+    {
+     "id": "swift",
+     "title": "Swift!",
+     "weight": 1,
+     "message": "{name} opened it: everybody runs faster for a while.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "move_speed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "marathon",
+   "title": "Marathon Box",
+   "colour": "#2aa6b8",
+   "polarity": "positive",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "survives_round": false,
+   "params": {
+    "modifier": "move"
+   },
+   "duration": {
+    "mode": "round",
+    "min": 0,
+    "max": 0
+   },
+   "drop": {
+    "common": 1,
+    "special": 2,
+    "brute": 3,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "marathon",
+     "title": "Marathon!",
+     "weight": 1,
+     "message": "{name} opened it: everybody runs faster until the round is over.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "move_speed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lifeline",
+   "title": "Lifeline Box",
+   "colour": "#e07fd0",
+   "polarity": "positive",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "survives_round": true,
+   "params": {
+    "modifier": "crawl"
+   },
+   "duration": {
+    "mode": "seconds",
+    "min": 30,
+    "max": 60
+   },
+   "drop": {
+    "common": 2,
+    "special": 3,
+    "brute": 2,
+    "map": 2
+   },
+   "outcomes": [
+    {
+     "id": "lifeline",
+     "title": "Lifeline!",
+     "weight": 1,
+     "message": "{name} opened it: anybody who goes down crawls much faster for a while.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "crawl_speed"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "long_crawl",
+   "title": "Long Crawl Box",
+   "colour": "#b85aa8",
+   "polarity": "positive",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "survives_round": false,
+   "params": {
+    "modifier": "crawl"
+   },
+   "duration": {
+    "mode": "round",
+    "min": 0,
+    "max": 0
+   },
+   "drop": {
+    "common": 1,
+    "special": 2,
+    "brute": 3,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "long_crawl",
+     "title": "Long crawl!",
+     "weight": 1,
+     "message": "{name} opened it: the downed crawl much faster until the round is over.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "crawl_speed"
       }
      ]
     }

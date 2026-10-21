@@ -612,7 +612,12 @@ func _draw_health() -> void:
 		vitals.low_fraction = 1.0
 		vitals.show_vitals(health.health, max_health)
 		vitals.show_status("DOWN")
-		_status.text = "Down — hold on for help" if player.helped_fraction <= 0.0 else "Getting up…"
+		if player.helped_fraction > 0.0:
+			_status.text = "Getting up…"
+		elif game.crawl_rules.speed > 0.0:
+			_status.text = "Down — crawl to a friend, or hold on for help"
+		else:
+			_status.text = "Down — hold on for help"
 	elif not player.is_alive():
 		vitals.low_fraction = 1.0
 		vitals.show_vitals(0.0, max_health)

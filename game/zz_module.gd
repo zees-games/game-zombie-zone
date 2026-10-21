@@ -222,6 +222,13 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# How fast a downed survivor crawls. REPLICATED: the DOWN modifier's speed is part of the
+	# prediction (see ZzCrawlRules).
+	world.crawl_rules.speed = world.config.downed_crawl_speed
+	var _crawl := world.crawl_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	_build_vote(world)
 	_build_voteban(world)
 
@@ -492,9 +499,9 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.box_drop_special = clampf(value, 0.0, 1.0))
 	_tunable("zz_box_carry", float(config.box_carry), "How many boxes a survivor carries (0: E opens them on the ground)",
 		func(value: float) -> void: config.box_carry = clampi(int(value), 0, 6))
-	_tunable("zz_box_deploy_seconds", config.box_deploy_seconds, "Seconds the deploy key is held to open a carried box",
+	_tunable("zz_box_deploy_seconds", config.box_deploy_seconds, "Seconds the deploy key is held to open a carried box (0.5 to 15, default 1; the config file key is box_deploy_seconds)",
 		func(value: float) -> void: config.box_deploy_seconds = clampf(value, 0.5, 15.0))
-	_tunable("zz_box_labels", 1.0 if config.box_labels else 0.0, "Whether a box says its type before it is opened",
+	_tunable("zz_box_labels", 1.0 if config.box_labels else 0.0, "Whether a box says its type before it is opened (default 0: the contents are a surprise, and the type is never sent)",
 		func(value: float) -> void: config.box_labels = value > 0.5)
 	_tunable("zz_box_instakill_min", config.box_instakill_min, "Instakill lasts at least this many seconds (negative: the box file's)",
 		func(value: float) -> void: config.box_instakill_min = value)

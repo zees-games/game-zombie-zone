@@ -224,6 +224,11 @@ extends DotConfig
 
 ## A downed survivor's pool, and how fast it bleeds away a second.
 @export_range(10.0, 2000.0, 10.0) var downed_health: float = 300.0
+
+## Metres per second a downed survivor crawls at (`zz_down_crawl_speed`, also the file key
+## `downed_crawl_speed`). 0 keeps them where they fell, as downs were before crawling. A run is
+## 6.2, so the default is a fifth of it: enough to reach a friend, never to escape the horde.
+@export_range(0.0, 6.0, 0.1) var downed_crawl_speed: float = 1.4
 @export_range(0.0, 100.0, 0.1) var downed_bleed_per_second: float = 3.0
 
 ## Seconds of holding E to pick somebody up, and the temporary health they get up with.
@@ -375,14 +380,17 @@ extends DotConfig
 ## opens a box on the ground as it did before boxes could be carried.
 @export_range(0, 6, 1) var box_carry: int = 1
 
-## Seconds the deploy key is held to open a carried box, and the radius (metres) the survivor may
-## drift in meanwhile before it is cancelled.
-@export_range(0.5, 15.0, 0.1) var box_deploy_seconds: float = 3.5
+## Seconds the deploy key is held to open a carried box (server file key `box_deploy_seconds`,
+## cvar `zz_box_deploy_seconds`, 0.5 to 15), and the radius (metres) the survivor may drift in
+## meanwhile before it is cancelled. 1 s is quick enough to open one mid-fight; it was 3.5, which
+## nobody did with a horde about, so boxes were only ever opened in the safe room.
+@export_range(0.5, 15.0, 0.1) var box_deploy_seconds: float = 1.0
 @export_range(0.2, 6.0, 0.1) var box_deploy_radius: float = 1.2
 
-## Whether a box on the ground and in the slot says what type it is. Off: every box looks the
-## same and the type is unknown until opened (the server does not send it).
-@export var box_labels: bool = true
+## Whether a box on the ground and in the slot says what type it is. Off (the default): every
+## box looks the same and what is in it is a surprise until it is opened; the server never sends
+## the type, only the outcome once it is opened. On: the type is shown on the ground and in the hands.
+@export var box_labels: bool = false
 
 ## Instakill, the first named box: the duration it lasts (seconds, uniform between; a negative
 ## minimum or maximum leaves boxes.json's own), and what a special takes per hit as a multiple of
@@ -521,6 +529,14 @@ func validate() -> DotResult:
 	if start_weapons.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "Survivors have to start holding something.")
 
+	if box_deploy_seconds < 0.5 or box_deploy_seconds > 15.0:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"box_deploy_seconds is %.2f; it is 0.5 to 15 (the cvar zz_box_deploy_seconds clamps the same)." % box_deploy_seconds)
+
+	if downed_crawl_speed < 0.0 or downed_crawl_speed > 6.0:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"downed_crawl_speed is %.2f; it is 0 (stay put) to 6 metres per second." % downed_crawl_speed)
+
 	return DotResult.success(null)
 
 
@@ -549,7 +565,8 @@ func describe() -> Dictionary:
 			mob_interval_min, mob_interval_max],
 		"specials": "%d + 1 per %.1f survivors, every %.0f..%.0f s" % [specials_base, survivors_per_special,
 			special_interval_min, special_interval_max],
-		"downs": "%d, then death; rescue %s" % [max_incaps, "off" if rescue_seconds <= 0.0 else "%.0f s" % rescue_seconds],
+		"downs": "%d, then death; rescue %s; crawl %s" % [max_incaps, "off" if rescue_seconds <= 0.0 else "%.0f s" % rescue_seconds,
+			"off" if downed_crawl_speed <= 0.0 else "%.1f m/s" % downed_crawl_speed],
 		"boxes": "off" if not boxes_enabled else "%.1f%% common, %.0f%% special" % [box_drop_common * 100.0, box_drop_special * 100.0],
 		"maps": "all" if map_ids.is_empty() else ",".join(map_ids),
 		"bots": "%d%s" % [minimum_players, ", or the map's team" if team_from_map else ""],

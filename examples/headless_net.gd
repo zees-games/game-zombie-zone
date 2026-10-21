@@ -2,6 +2,7 @@ extends Node
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
+const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -27,8 +28,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 18
-const CHECKS := 96
+const SECTIONS := 19
+const CHECKS := 102
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -83,6 +84,7 @@ func _run() -> void:
 		await _test_shots_count_online()
 		await _test_zombies_replicate()
 		await _test_a_down_reaches_the_client()
+		await _test_a_downed_crawl_is_predicted()
 		await _test_a_pin_reaches_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
@@ -324,8 +326,8 @@ func _build() -> bool:
 		_heard["loot"] = [id, kind, at, item])
 	_client_bridge.loot_removed.connect(func(id: int, by: int) -> void:
 		_heard["loot_gone"] = [id, by])
-	_client_bridge.box_received.connect(func(who: int, type_id: StringName, title: String, _message: String) -> void:
-		_heard["box"] = [who, type_id, title])
+	_client_bridge.box_received.connect(func(who: int, type_id: StringName, title: String, message: String) -> void:
+		_heard["box"] = [who, type_id, title, message])
 	_client_bridge.effects_received.connect(func(rows: Array) -> void:
 		_heard["effects"] = rows)
 	_client_bridge.gate_received.connect(func(gate: String) -> void:
@@ -704,6 +706,7 @@ func _test_loot_reaches_the_client() -> void:
 
 func _test_a_box_reaches_the_client() -> void:
 	_section("a box opened is told to everybody, with what it did")
+	_server_game.config.box_labels = true
 	_server_game.boxes.open(&"medical", _server_me(), STREET)
 	await _steps(4)
 	_check(_heard.has("box") and int(_heard["box"][0]) == SESSION and _heard["box"][1] == &"medical"
@@ -733,7 +736,67 @@ func _test_box_labels_off_hide_the_type() -> void:
 		_check(mine.carried_count == 1 and mine.carried_index == 0, "and the carried slot has a count but no type", str(mine.carried_index))
 	_server_game.boxes.drop_carried(me)
 	_server_game.loot.remove(id)
-	cfg.box_labels = true
+	# Opened with labels off: the outcome is the reveal (title and message reach everybody), the
+	# type is not. Armed by the section above, where the same open names its type.
+	_heard.erase("box")
+	_server_game.boxes.open(&"medical", me, STREET)
+	await _steps(4)
+	_check(_heard.has("box") and _heard["box"][1] == &"unknown" and str(_heard["box"][2]) != "" and str(_heard["box"][3]) != "",
+		"an opened box reveals the outcome but sends its type as unknown", str(_heard.get("box", [])))
+	cfg.box_labels = false
+	_finished()
+
+
+class FakeLink extends RefCounted:
+	signal replicated_cvar_changed(cvar_name: String, value: String)
+	var held := {}
+
+	func replicated_cvar(cvar_name: String, fallback: String) -> String:
+		return String(held.get(cvar_name, fallback))
+
+
+func _test_a_downed_crawl_is_predicted() -> void:
+	_section("a downed survivor's crawl is predicted, and follows the server's setting")
+	var server_me := _server_me()
+	var mine := _mine()
+	server_me.health.invulnerable = false
+	_server_game.crawl_rules.speed = 1.4
+	_client_game.crawl_rules.speed = 1.4
+	server_me.place_at(STREET, 0.0)
+	await _steps(10)
+	_hurt(server_me, 500.0)
+	server_me.health.invulnerable = true
+	await _steps(8)
+	var forward := DotFpsCommand.new()
+	forward.move = Vector2(0.0, 1.0)
+	var before := mine.controller.state.position
+	await _steps(48, forward)
+	await _steps(24)
+	var gone := mine.controller.state.position.distance_to(before)
+	var apart := mine.controller.state.position.distance_to(server_me.controller.state.position)
+	_check(mine.is_down() and gone > 0.5 and gone < 3.0, "the client's own downed survivor crawls on the keys", "%.2f m" % gone)
+	_check(apart < 0.25, "and the two ends agree where they got to", "%.3f m" % apart)
+
+	_server_game.crawl_rules.speed = 0.0
+	_client_game.crawl_rules.speed = 0.0
+	await _steps(4)
+	before = mine.controller.state.position
+	await _steps(40, forward)
+	await _steps(16)
+	_check(mine.controller.state.position.distance_to(before) < 0.15 and server_me.controller.state.position.distance_to(before) < 0.3,
+		"at 0 neither end moves them")
+
+	var link := FakeLink.new()
+	link.held[ZzCrawlRules.CVAR] = "2.5"
+	var follower := ZzCrawlRules.new()
+	_check(follower.follow_cvars(link) and is_equal_approx(follower.speed, 2.5), "a client reads the server's value through its link")
+	link.replicated_cvar_changed.emit(ZzCrawlRules.CVAR, "0.5")
+	_check(is_equal_approx(follower.speed, 0.5), "and follows every change")
+
+	_server_game.crawl_rules.speed = 1.4
+	_client_game.crawl_rules.speed = 1.4
+	_server_game.stand_up(server_me)
+	await _steps(8)
 	_finished()
 
 

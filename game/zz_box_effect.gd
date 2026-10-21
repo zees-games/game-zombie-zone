@@ -18,6 +18,12 @@ func duration(_config, spec: Dictionary) -> Dictionary:
 	return spec
 
 
+## Whether this effect is worth dropping with these [param params] (the box's own): false keeps
+## its box out of the drops, so nobody opens a box that would do nothing here. The base says yes.
+func available(_boxes, _params: Dictionary) -> bool:
+	return true
+
+
 ## The effect began (once per holder: a game-wide effect once, a radius one per survivor in it).
 func on_start(_boxes, _fx: Dictionary, _ctx: Dictionary) -> void:
 	pass

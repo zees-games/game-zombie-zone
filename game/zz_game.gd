@@ -18,6 +18,7 @@ const ZzPins := preload("zz_pins.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
+const ZzCrawlRules := preload("zz_crawl_rules.gd")
 const ZzPassRules := preload("zz_pass_rules.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
@@ -189,6 +190,10 @@ var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var pass_rules: ZzPassRules = ZzPassRules.new()
 
+## `zz_down_crawl_speed`: how fast a downed survivor crawls (0: not at all). Bound by the module
+## (REPLICATED) and followed by a client, which predicts its own player under it.
+var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
+
 ## Server: team damage, added up per player over a window ([ZzTeamDamage]); the module wires
 ## what a voteban and a ban do.
 var team_damage: ZzTeamDamage = ZzTeamDamage.new()
@@ -273,6 +278,9 @@ func _ready() -> void:
 
 	_build_physics()
 	pass_rules.humans_pass = config.humans_pass_barricades
+	crawl_rules.speed = config.downed_crawl_speed
+	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
+		crawl_rules.changed.connect(_on_crawl_rules_changed)
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
 		body_rules.changed.connect(_on_body_rules_changed)
 	if not pass_rules.changed.is_connected(_on_body_rules_changed):
@@ -394,6 +402,12 @@ func _apply_body_mask(player: ZzPlayer) -> void:
 	body_rules.apply_to(player.controller, mask, physics.layer_mask(&"player"))
 	var tunables := player.controller.tunables
 	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
+
+
+## The DOWN modifier's pace on every survivor, on this end; the server and each client run the same.
+func _on_crawl_rules_changed() -> void:
+	for id in players:
+		(players[id] as ZzPlayer).controller.set_crawl_speed(crawl_rules.speed)
 
 
 func _on_body_rules_changed() -> void:
@@ -743,6 +757,8 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 			DotLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
 
 		_apply_body_mask(player)
+
+	player.controller.set_crawl_speed(crawl_rules.speed)
 
 	var opened := entities.open(DotEntity.KIND_PLAYER, player, &"", player_id, now())
 	player.entity_id = (opened.value as DotEntityHandle).id if opened.ok else 0
