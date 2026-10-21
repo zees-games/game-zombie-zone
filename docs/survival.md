@@ -236,3 +236,27 @@ Zombies are no longer all `always_relevant`. `ZzNetBridge.make_interest` is a `D
 
 **Read this as: the lever does almost nothing on this map, and the times above are not comparable to the old ones.** The "after" rows ran with the VM at load 8 (the old ones at 2 to 4): the whole tick, game logic included, is 1.5 to 2 times slower, so milliseconds say nothing; bytes per peer do not depend on load. The reason is geometry: `zz_stadium` is 170 by 175 m, and the survivors are spread over all of it with the horde on them, so an 80 m radius leaves a peer most of the horde. Counted at the end of the 64 row (`relevant_per_peer` in the RESULT line): 239 entities in the world, **191 sent to each peer**, of which 64 are the survivors themselves (always relevant, a third of what a peer is sent) and 127 of 175 zombies. Relevance pays on a map larger than its radius with the team spread out, which no map here is yet; at 100 survivors on this one it does not shrink the snapshot enough to matter. What would: the per-entity cost of a snapshot (the same 191 entities cost 190 ms across 64 peers, 1 ms each), which is dot-net's threading (net-snapshot-threads-1) and the snapshot rate; and, for the 64 survivors in every peer's set, a cheaper description of a faraway teammate than a full entity (a low-rate roster channel, then players could be tagged by distance too). Not done: spectators see a teammate's surroundings only if they are near their own body, so a downed survivor watching a friend across a large map would see no zombies there.
 
+
+## Stuck movers by map
+
+`headless_nav --only=stuck` plays each shipped map for 150 simulated seconds with a team of stand-ins against its horde, and `tools/stuck_meter.gd` counts the seconds a mover with a goal stayed within 0.75 m for 4 s (a zombie fighting, bashing or with no path does not count). Percent of the seconds a mover of that kind had a goal; one run per map each side, and a kind with a few dozen goal seconds swings by tens of points between two runs of the same code (a single wedged stand-in), so read the commons columns and the large moves. Specials have no goal time in 150 s and are unmeasured.
+
+Three changes: props from 0.3 m are cut from the graph (was 0.5: a 0.41 m pallet wedged every zombie that met its corner), a mover that hops twice without freeing itself is nudged sideways (`game/zz_unstick.gd`), and the loot rate. A fourth, dropping importer links that cross a wall, was tried and removed: it fixed atix and broke ground connectivity on four maps (`headless_maps`), because those links are the only connection the document has.
+
+| map | stand-in before | after | common before | after | worst stretch before (s) | after |
+| --- | --- | --- | --- | --- | --- | --- |
+| zz_blackout_2 | 0.0% | 0.0% | 3.0% | 6.8% | 18 | 8 |
+| zz_blackout_3 | 0.0% | 15.6% | 2.8% | 3.7% | 4 | 8 |
+| zz_high_school | 22.9% | 9.6% | 3.5% | 3.2% | 19 | 10 |
+| zz_lot | 40.5% | 2.7% | 0.0% | 0.0% | 23 | 4 |
+| zz_mall | 17.5% | 49.0% | 1.8% | 0.0% | 10 | 28 |
+| zz_stadium | 14.7% | 0.0% | 9.9% | 0.3% | 60 | 4 |
+| zs_ravenstreet | 6.5% | 25.1% | 0.0% | 0.0% | 7 | 25 |
+| zm_atix_helicopter | 56.5% | 58.5% | 4.4% | 15.2% | 26 | 27 |
+| zm_house_outbreak | 0.0% | 0.0% | 43.4% | 1.5% | 68 | 8 |
+| zm_officeattack | 0.0% | 0.0% | 11.6% | 7.6% | 14 | 9 |
+| ze_blackmesa_escape | 10.8% | 10.8% | 29.6% | 0.0% | 38 | 4 |
+| ze_death_star_escape | 0.0% | 0.0% | 17.9% | 0.5% | 42 | 4 |
+| ze_nuke_beta | 50.1% | 50.0% | 4.7% | 10.6% | 20 | 42 |
+
+The other ten maps are at or under 13% for both kinds before and after. Open: the atix stand-ins walk into a window sill the importer linked across (zombie-zone-maps `import_bsp.py`, `nav_emulate`), the nuke stand-in on a sill doorway, and zm_antarctic_hospital (unshipped, imported to a scratch directory only) stands commons at 27% against a window counter with a pillar over it.
