@@ -66,6 +66,14 @@ const HIT_MARGIN := 0.06
 ## How much deeper than drawn a ground slab collides (see `_build_boxes`).
 const GROUND_DEPTH := 1.8
 
+## How far past the playable ground (the nav floors, spawns and route) the invisible boundary
+## stands, its thickness, and how far above the highest floor it reaches. A converted map's
+## boxes run far past what is walked on (ze_jurassicpark: 500 m of terrain round a 240 m play
+## area), and nothing stopped a survivor going out to the edge of the world.
+const BOUNDARY_MARGIN := 8.0
+const BOUNDARY_THICKNESS := 4.0
+const BOUNDARY_HEIGHT := 60.0
+
 ## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
 ## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
 const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
@@ -170,6 +178,7 @@ func build(p_doc: Dictionary) -> DotResult:
 		add_child(_drawn)
 
 	_build_boxes()
+	_build_boundary()
 	_build_water_volumes()
 	_build_props()
 	_build_toys()
@@ -326,6 +335,82 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 
 
 # --- Building --------------------------------------------------------------
+
+## The ground a map is played on, from its document: the nav floors, spawns, route and areas
+## (x and z, with y the highest floor). Empty when the document names no ground.
+func playable_region() -> AABB:
+	var lo := Vector3(INF, INF, INF)
+	var hi := Vector3(-INF, -INF, -INF)
+
+	var floors: Array = (doc.get("nav", {}) as Dictionary).get("floors", [])
+	for f: Array in floors:
+		lo = Vector3(minf(lo.x, float(f[0])), minf(lo.y, float(f[4])), minf(lo.z, float(f[1])))
+		hi = Vector3(maxf(hi.x, float(f[2])), maxf(hi.y, float(f[4])), maxf(hi.z, float(f[3])))
+
+	if floors.is_empty():
+		return AABB()
+
+	var points: Array = []
+	for side: String in (doc.get("spawns", {}) as Dictionary):
+		for entry: Dictionary in doc["spawns"][side]:
+			points.append(entry["at"])
+	points.append_array(doc.get("route", []))
+	points.append_array(doc.get("zombie_spawns", []))
+	for side: String in (doc.get("areas", {}) as Dictionary):
+		for area: Dictionary in doc["areas"][side]:
+			points.append(area["min"])
+			points.append(area["max"])
+	for obj: Dictionary in doc.get("objectives", []):
+		if obj.has("at"):
+			points.append(obj["at"])
+
+	for pt: Array in points:
+		var v := ZzMapDoc.v3(pt)
+		lo = Vector3(minf(lo.x, v.x), minf(lo.y, v.y), minf(lo.z, v.z))
+		hi = Vector3(maxf(hi.x, v.x), maxf(hi.y, v.y), maxf(hi.z, v.z))
+
+	return AABB(lo, hi - lo)
+
+
+## Four invisible walls round [method playable_region], from the kill height up, on the world
+## layer: nobody walks, falls off a ledge or is thrown out of the map's ground, on any map.
+## Under the world's own boxes, so a map that already closes itself in loses nothing.
+func _build_boundary() -> void:
+	var region := playable_region()
+	if region.size == Vector3.ZERO:
+		return
+
+	var lo := region.position - Vector3(BOUNDARY_MARGIN, 0.0, BOUNDARY_MARGIN)
+	var hi := region.end + Vector3(BOUNDARY_MARGIN, 0.0, BOUNDARY_MARGIN)
+	var floor_y := minf(kill_height(), region.position.y) - 5.0
+	var height := region.end.y + BOUNDARY_HEIGHT - floor_y
+	var mid_y := floor_y + height * 0.5
+	var t := BOUNDARY_THICKNESS
+	var span := hi - lo
+	# Its own body on its own layer, which survivors and zombies stop at and the navigation bake
+	# and the notes' probes (the world and the furniture) never see: as world boxes the walls
+	# stretched the bake over the whole void and the annotator found no chokes.
+	var body := StaticBody3D.new()
+	body.name = "Boundary"
+	add_child(body)
+	_put_on(body, &"boundary")
+
+	var walls := [
+		[Vector3(lo.x - t * 0.5, mid_y, (lo.z + hi.z) * 0.5), Vector3(t, height, span.z + t * 2.0)],
+		[Vector3(hi.x + t * 0.5, mid_y, (lo.z + hi.z) * 0.5), Vector3(t, height, span.z + t * 2.0)],
+		[Vector3((lo.x + hi.x) * 0.5, mid_y, lo.z - t * 0.5), Vector3(span.x + t * 2.0, height, t)],
+		[Vector3((lo.x + hi.x) * 0.5, mid_y, hi.z + t * 0.5), Vector3(span.x + t * 2.0, height, t)],
+	]
+
+	for i in walls.size():
+		var shape := CollisionShape3D.new()
+		shape.name = "Boundary_%d" % i
+		var cube := BoxShape3D.new()
+		cube.size = walls[i][1]
+		shape.shape = cube
+		shape.position = walls[i][0]
+		body.add_child(shape)
+
 
 func _build_boxes() -> void:
 	var batches := {}

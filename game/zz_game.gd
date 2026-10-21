@@ -370,14 +370,14 @@ func _exit_tree() -> void:
 ## Zombies collide with the world and the furniture, and not with each other: a crowd is kept
 ## apart by steering, which is smooth, rather than by bodies, which jam in doorways.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade"])
+	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary"])
 
 	for layer in physics.layers:
 		match layer.id:
 			&"player":
-				layer.collides_with = [&"world", &"prop", &"barricade"]
+				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary"]
 			&"zombie":
-				layer.collides_with = [&"world", &"prop", &"barricade"]
+				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary"]
 			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never
 			# a survivor or a zombie, who walk through it (a survivor pushes it, `_advance_toys`).
 			&"toy":

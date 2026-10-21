@@ -43,6 +43,10 @@ for arg in "$@"; do
     esac
 done
 
+# A contact sheet is of the gun in hand: the stand-ins an exodus map seats beside the camera put
+# their own rifles in the corner of every hip frame (the yellow and blue shape bottom-left).
+[ "$view" = "weapons" ] && config+=("--zz-exodus-team=1")
+
 name="$view"
 for e in "${extra[@]}"; do
     case "$e" in --name=*) name="${e#*=}" ;; esac
