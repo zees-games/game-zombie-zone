@@ -330,14 +330,6 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
 
-## Metres at each end of a link left out of the wall test.
-const LINK_ENDS := 0.5
-
-## A solid whose top is higher than this above a link's feet is a wall to it. The importer draws links
-## over low things on purpose (a kerb, a car bonnet, a fence at 0.57 m, which a jump clears), and a
-## window sill at 0.8 to 0.9 m is not one: the stand-ins queued at it.
-const LINK_WALL := 0.7
-
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
 ## them as an obstacle, and its links between storeys.
 ##
@@ -395,54 +387,11 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 				absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
 			builder.add_obstacle(AABB(at + Vector3(-extent.x, 0.0, -extent.z), Vector3(extent.x * 2.0, size.y, extent.z * 2.0)))
 
-	var walls: Array[AABB] = []
-
-	for box: Dictionary in doc.get("boxes", []):
-		# What a body cannot pass whatever the graph says: solid, not a gate (a gate has its own rule),
-		# not a floor and not told to stay out of the navigation.
-		if not bool(box.get("solid", true)) or box.has("gate") or (box.has("nav") and not bool(box["nav"])):
-			continue
-
-		var bounds := _box_bounds(box)
-
-		if not box.has("nav") and _is_floor(bounds, floors):
-			continue
-
-		walls.append(bounds)
-
 	for link: Array in nav_doc.get("links", []):
-		var from := Vector3(float(link[0]), float(link[1]), float(link[2]))
-		var to := Vector3(float(link[3]), float(link[4]), float(link[5]))
-
-		# A link the importer drew across a wall (a window sill, a rail) is a path nobody can walk:
-		# the horde queued at it for the length of a wave (the stuck meter in `headless_nav`).
-		if link_crosses_solid(from, to, walls):
-			continue
-
-		builder.add_link(from, to)
+		builder.add_link(Vector3(float(link[0]), float(link[1]), float(link[2])),
+			Vector3(float(link[3]), float(link[4]), float(link[5])))
 
 	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates))
-
-
-## Whether the straight way from [param from] to [param to] runs into one of [param walls] at
-## half a metre above the feet and taller than [constant LINK_WALL], [constant LINK_ENDS] at each end left out.
-static func link_crosses_solid(from: Vector3, to: Vector3, walls: Array[AABB]) -> bool:
-	var span := to - from
-
-	if span.length() < 2.0 * LINK_ENDS:
-		return false
-
-	# The ends are left out: a link starts and ends on the sill or step it climbs, which is a box.
-	var ends := span.normalized() * LINK_ENDS
-	var a := from + ends + Vector3(0.0, 0.5, 0.0)
-	var b := to - ends + Vector3(0.0, 0.5, 0.0)
-	var feet := minf(from.y, to.y)
-
-	for wall in walls:
-		if wall.end.y - feet > LINK_WALL and wall.intersects_segment(a, b):
-			return true
-
-	return false
 
 
 ## The axis-aligned bounds of a (possibly turned) box.
