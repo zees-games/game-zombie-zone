@@ -330,6 +330,14 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
 
+## Metres at each end of a link left out of the wall test.
+const LINK_ENDS := 0.5
+
+## A solid whose top is higher than this above a link's feet is a wall to it. The importer draws links
+## over low things on purpose (a kerb, a car bonnet, a fence at 0.57 m, which a jump clears), and a
+## window sill at 0.8 to 0.9 m is not one: the stand-ins queued at it.
+const LINK_WALL := 0.7
+
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
 ## them as an obstacle, and its links between storeys.
 ##
@@ -416,16 +424,23 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates))
 
 
-## Whether the straight way from [param from] to [param to] runs into one of [param walls] at knee
-## or chest height (half a metre and 1.2 m up, the two heights a body is wide enough to hit).
+## Whether the straight way from [param from] to [param to] runs into one of [param walls] at
+## half a metre above the feet and taller than [constant LINK_WALL], [constant LINK_ENDS] at each end left out.
 static func link_crosses_solid(from: Vector3, to: Vector3, walls: Array[AABB]) -> bool:
-	for rise: float in [0.5, 1.2]:
-		var a := from + Vector3(0.0, rise, 0.0)
-		var b := to + Vector3(0.0, rise, 0.0)
+	var span := to - from
 
-		for wall in walls:
-			if wall.intersects_segment(a, b):
-				return true
+	if span.length() < 2.0 * LINK_ENDS:
+		return false
+
+	# The ends are left out: a link starts and ends on the sill or step it climbs, which is a box.
+	var ends := span.normalized() * LINK_ENDS
+	var a := from + ends + Vector3(0.0, 0.5, 0.0)
+	var b := to - ends + Vector3(0.0, 0.5, 0.0)
+	var feet := minf(from.y, to.y)
+
+	for wall in walls:
+		if wall.end.y - feet > LINK_WALL and wall.intersects_segment(a, b):
+			return true
 
 	return false
 
