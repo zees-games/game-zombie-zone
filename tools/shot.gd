@@ -234,6 +234,23 @@ func _run() -> void:
 			var _applied = game.combat.apply_damage(hit)
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
+		"crawl", "crawl_third":
+			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
+			# effects strip is in the frame, and the status line saying you may crawl. The third
+			# person one is the figure's crawl clip, at the server's crawl pace.
+			var ctx := {"opener": local, "at": stand, "box": &"swift"}
+			game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
+			game.boxes.run([{"do": "effect", "name": "crawl_speed"}], {"opener": local, "at": stand, "box": &"lifeline"})
+			local.health.invulnerable = false
+			var wound := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+			var _hurt = game.combat.apply_damage(wound)
+			local.health.invulnerable = true
+			if _view == "crawl_third":
+				_client.call("toggle_view")
+			Input.action_press(&"dot_fps_forward")
+			await _seconds_of(_seconds)
+			print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
+			Input.action_release(&"dot_fps_forward")
 		"deploy":
 			# Carrying a box and holding the deploy key partway through a long deploy: the meter,
 			# the carried line and (in third person) the pack and the shrinking ring.

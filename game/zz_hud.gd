@@ -852,7 +852,8 @@ func _draw_effects() -> void:
 			continue
 
 		var who := str(row.get("who", ""))
-		if who != "" and player != null and who != String(player.player_id):
+		# The rows carry a name ("everybody" or a person), never a player key, so compare by name.
+		if who != "" and who != "everybody" and player != null and who != player.display_name:
 			continue
 
 		var stacks := int(row["stacks"])

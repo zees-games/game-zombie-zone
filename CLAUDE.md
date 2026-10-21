@@ -65,6 +65,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 
 **Survivors, downs, boxes, weapons** ([design](docs/design.md#decision-4-down-is-not-dead-and-borrowed-health-is-inside-the-health))
 - Borrowed health lives inside `DotHealth.health` with `temp_health` saying how much; a hit takes it first.
+- A downed survivor crawls at `zz_down_crawl_speed` (REPLICATED, `ZzCrawlRules`, 0 stays put) through `ZzController.set_crawl_speed`, never a velocity. Boxes default to a 1.0 s deploy (`box_deploy_seconds`, 0.5 to 15) and `box_labels` off: the opening is the surprise. Speed boxes are `ZzBoxSpeed` (`move_speed`, `crawl_speed`); `tools/shot.sh --view=crawl` / `crawl_third` render a downed crawl.
 - A box verb unknown to `ZzBoxes` refuses the whole file with a reason; one `_do_<verb>` per verb; lasting effects stack.
 - A second weapon pack is a list (`ZzWeapons.use_packs`); tiers are by tag; everything a weapon throws goes through `ZzGame._throw`.
 - Your gun is two rigs: the world's (`ZzPlayer.weapons`) and the drawn one (`view_rig`, what the HUD counts); offline buttons go through `command_stamp`. [history](docs/history.md)
