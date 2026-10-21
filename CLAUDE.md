@@ -35,7 +35,7 @@ assets/zombies/      the animated bodies (tools/build_zombie_models.py; the work
 assets/turret/       the sentry (art-src/turret.py, Blender on the GPU box via ../gpu.sh)
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (37 sections), headless_maps, headless_net (18), headless_weapons, dedicated, headless_survival, headless_nav (15 sections, 56 checks; the last three hold a map to a stuck-time band), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
+examples/            headless_run (37 sections), headless_maps, headless_net (18), headless_weapons, dedicated, headless_survival, headless_nav (15 sections, 56 checks; the last three hold blackout_2, lot and high_school to a stuck-time band), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured), server_probe.sh (the server tick by phase at 16 to 128 survivors),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
