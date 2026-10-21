@@ -5,6 +5,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzNavGraph := preload("../game/zz_nav_graph.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
+const StuckMeter := preload("../tools/stuck_meter.gd")
 
 ## The annotations in use: where the stand-ins stand before a wave, where the horde goes, and the
 ## graph's one-way drops. Every check that compares a behaviour with the old one runs both (the
@@ -13,8 +14,8 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 12
-const CHECKS := 47
+const SECTIONS := 15
+const CHECKS := 56
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -26,6 +27,23 @@ const NEAR := 7.0
 ## Seconds the stand-ins have to walk to their places before a wave comes.
 const SETTLE := 45.0
 const HORDE_SECONDS := 120.0
+
+## Every shipped map, for the stuck measurement.
+const ALL_MAPS := ["zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_chapel", "zz_high_school", "zz_lot", "zz_mall", "zz_relief_camp",
+	"zz_stadium", "zs_ravenstreet", "zm_4way_tunnel", "zm_abandoned_mall", "zm_atix_helicopter", "zm_chaos_city", "zm_house_outbreak",
+	"zm_officeattack", "zm_pathogen", "ze_blackmesa_escape", "ze_boat_escape", "ze_death_star_escape", "ze_jurassicpark", "ze_nuke_beta",
+	"ze_runforyourlife_1_v4"]
+
+## Maps held to a stuck band, each once a worst case: blackout_2 had a 108 s wedge on a pallet, atix walked
+## its stand-ins into a wall through an importer link, high_school wedged on a low prop. The bands are wide
+## because two runs of one map differ; they catch a return to those numbers, not a 1% drift.
+const STUCK_BANDS := ["zz_blackout_2", "zm_atix_helicopter", "zz_high_school"]
+const STANDIN_BAND := 0.15
+const COMMON_BAND := 0.10
+const LONGEST_BAND := 30.0
+
+## Simulated seconds a map is played for the stuck measurement, after the first ten.
+const STUCK_SECONDS := 150.0
 
 ## What a stand-in map's team is raised to: the maps that say none are still held by a few.
 const TEAM := 8
@@ -75,6 +93,21 @@ func _run() -> void:
 		if arg.begins_with("--only="):
 			only = arg.substr(7)
 
+	if only.begins_with("stuck"):
+		# Development: `--only=stuck` every map, `--only=stuck:zz_mall` one; prints the table.
+		var ids: Array = ALL_MAPS if only == "stuck" else [only.substr(6)]
+
+		for id: String in ids:
+			var meter: StuckMeter = await _stuck(StringName(id))
+			print("STUCK %-24s %s" % [id, meter.line()])
+			for kind: StringName in StuckMeter.KINDS:
+				print("      %s worst cells %s" % [kind, meter.worst_cells(kind)])
+			for line in meter.cases.slice(0, 8):
+				print("      case %s" % line)
+
+		get_tree().quit(0)
+		return
+
 	if only.begins_with("hold:"):
 		await _test_holding(StringName(only.substr(5)))
 		get_tree().quit(0)
@@ -98,6 +131,9 @@ func _run() -> void:
 	await _test_fallback()
 	await _test_spread(&"zz_high_school")
 	await _test_spread(&"zz_mall")
+
+	for id: String in STUCK_BANDS:
+		await _test_stuck(StringName(id))
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -310,6 +346,46 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	}
 	await _dispose(game)
 	return out
+
+
+# --- Stuck -------------------------------------------------------------------------------------
+
+## A team of stand-ins plays [param id] against its horde for [constant STUCK_SECONDS], and a
+## [StuckMeter] says how long movers with a goal stood still.
+func _stuck(id: StringName) -> StuckMeter:
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray([String(id)])
+		c.survival_warmup_seconds = 10.0
+		c.wanderer_density = 0.0)
+
+	for i in maxi(game.team_size(), TEAM):
+		var p := game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
+		p.is_bot = true
+		p.health.invulnerable = true
+
+	game.start()
+	var meter := StuckMeter.new(game)
+	var ticks := int(STUCK_SECONDS * float(TICK_RATE))
+
+	for i in ticks:
+		game.simulate(TICK)
+		meter.sample()
+
+		if i % 8 == 7:
+			await get_tree().physics_frame
+
+	await _dispose(game)
+	return meter
+
+
+func _test_stuck(id: StringName) -> void:
+	_section("%s: movers with a goal do not stand still" % id)
+	var meter: StuckMeter = await _stuck(id)
+	var detail := meter.line()
+	_check(meter.ratio(&"standin") <= STANDIN_BAND, "stand-ins are stuck under %d%% of their goal time" % int(STANDIN_BAND * 100.0), detail)
+	_check(meter.ratio(&"common") <= COMMON_BAND, "commons are stuck under %d%% of their goal time" % int(COMMON_BAND * 100.0), detail)
+	_check(maxf(meter.longest[&"standin"], meter.longest[&"common"]) <= LONGEST_BAND, "no mover is stuck longer than %.0f s" % LONGEST_BAND, detail)
+	_finished()
 
 
 # --- Falling back -------------------------------------------------------------------------------

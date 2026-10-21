@@ -35,7 +35,7 @@ assets/zombies/      the animated bodies (tools/build_zombie_models.py; the work
 assets/turret/       the sentry (art-src/turret.py, Blender on the GPU box via ../gpu.sh)
 boxes/boxes.json     the box types and every outcome; an owner edits it
 props/               kits.json, catalogue.json, pieces.json (tools/measure_props.gd writes the last two)
-examples/            headless_run (37 sections), headless_maps, headless_net (18), headless_weapons, dedicated, headless_survival, headless_nav (12 sections, 47 checks), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
+examples/            headless_run (37 sections), headless_maps, headless_net (18), headless_weapons, dedicated, headless_survival, headless_nav (15 sections, 56 checks; the last three hold a map to a stuck-time band), headless_workshop (subscribed map packs: listed, chosen in solo, built from their document; online none)
 tools/               nav_probe, nav_render (debug top-down plus a frame of holders), shot.sh (render a view), camera_check.sh, survival_long_run.tscn (a whole hold, measured), server_probe.sh (the server tick by phase at 16 to 128 survivors),
                      zombie_rack.gd, zombie_palette.gd, build_zombie_models.py, audio_probe
 ```
@@ -52,7 +52,7 @@ tools/               nav_probe, nav_render (debug top-down plus a frame of holde
 - No `class_name` in `game/` or `npcs/` (a mounted pack cannot register one); brains are named by path.
 
 **The ground and the horde** ([design](docs/design.md#decision-2-the-zombies-ground-is-the-maps-own-floor-plan))
-- `nav.floors` comes from the map; every solid box, prop over half a metre and shut gate is cut out; opening a gate rebuilds the graph.
+- `nav.floors` comes from the map; every solid box, prop over 0.3 m (a pallet wedges a mover well below half a metre) and shut gate is cut out, and a link whose straight line crosses a solid taller than 0.7 m above its feet is dropped (the importer emits some through window sills and walls, and a mover follows one into the wall; links over a kerb or a car are meant to cross a solid and stay); opening a gate rebuilds the graph. A mover that hops twice without freeing itself is nudged sideways (`game/zz_unstick.gd`). `tools/stuck_meter.gd` counts seconds a mover with a goal stays within 0.75 m for 4 s, by kind (stand-in, common, special): `headless_nav --only=stuck[:map]` prints it per map, `survival_long_run --watch` ends with it.
 - A mob spawns only where it can reach somebody, and never in a safe room.
 - Only `attackers_per_survivor` take an attack slot; the rest ring. Specials wait for a moment (`ready_to_strike`).
 - A brain seeds from `npc.seed`, never `npc.instance_id`; suites wait for a zombie's state, never time its seeded choice. [history](docs/history.md)

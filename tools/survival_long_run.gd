@@ -21,6 +21,7 @@ extends Node
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const StuckMeter := preload("stuck_meter.gd")
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -47,6 +48,8 @@ var _spikes: Array = []
 const SPIKES_KEPT := 6
 
 var _game: ZzGame = null
+## With `--watch`: how long movers with a goal stood still (tools/stuck_meter.gd), said at the end.
+var _stuck: StuckMeter = null
 var _waves: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _result: Array = []
@@ -151,6 +154,7 @@ func _run() -> void:
 		var player := _game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
 		player.is_bot = true
 	_game.start()
+	_stuck = StuckMeter.new(_game)
 
 	print("%s: %d stand-ins, difficulty %s, seed %d, %s" % [_map, team, config.difficulty_name(), _seed, _sets])
 	print("wave  twist      secs   sent  peak  downs deaths broken  up    tick ms mean/worst   wall s   end")
@@ -168,6 +172,8 @@ func _run() -> void:
 
 	while t < _cap and _result.is_empty():
 		for i in 32:
+			if _watch > 0.0:
+				_stuck.sample()
 			var before := Time.get_ticks_usec()
 			if _profile:
 				_profiled_step()
@@ -250,6 +256,10 @@ func _run() -> void:
 				if int(spike[2][part]) >= 1000:
 					line += " %s %.0f" % [part, float(spike[2][part]) / 1000.0]
 			print("  spike %.1f ms at %.0f s:%s" % [float(spike[0]) / 1000.0, spike[1], line])
+	if _watch > 0.0 and _stuck != null:
+		print("stuck: %s" % _stuck.line())
+		for kind: StringName in StuckMeter.KINDS:
+			print("  %s worst cells %s" % [kind, _stuck.worst_cells(kind)])
 	print("RESULT %s" % JSON.stringify({"map": String(_map), "team": team, "seed": _seed, "difficulty": _difficulty,
 		"sets": _sets, "won": won, "why": _result[1] if not _result.is_empty() else "", "cleared": cleared,
 		"held": snappedf(t, 0.1), "waves": _waves}))
