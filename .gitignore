@@ -48,6 +48,7 @@
 /addons/dot_props
 /addons/zee_weapons
 /addons/zed_weapons
+/addons/dot_spawn
 
 # The maps are zombie-zone-maps, a repository and a pack of their own.
 # bootstrap-link: zombie-zone-maps/maps ci
