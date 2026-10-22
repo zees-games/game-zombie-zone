@@ -30,6 +30,22 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	if body.test_move(lifted, Vector3.ZERO):
 		return false
 
+	# And nothing solid between here and there. `test_move` at the destination only asks whether
+	# the body fits THERE, so a wedged zombie tearing at a 0.14 m barricade (stuck for a second by
+	# design) was nudged clean through the boards, standing intact: the destination was free,
+	# the wall in between was never looked at. Rays at knee and chest height catch a thin wall
+	# that a swept shape would also catch, without refusing the sill or chamfer the sweep clips.
+	var space := body.get_world_3d().direct_space_state
+	var from := body.global_transform.origin
+
+	for height: float in [0.4, 1.2]:
+		var query := PhysicsRayQueryParameters3D.create(
+			from + Vector3(0.0, height, 0.0), lifted.origin + Vector3(0.0, height - 0.08, 0.0),
+			body.collision_mask, [body.get_rid()])
+
+		if not space.intersect_ray(query).is_empty():
+			return false
+
 	# And ground within a step below, so a nudge is never off a ledge.
 	if not body.test_move(lifted, Vector3(0.0, -0.6, 0.0)):
 		return false
