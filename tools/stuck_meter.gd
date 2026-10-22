@@ -154,6 +154,31 @@ func _blocker(body: CharacterBody3D, to: Vector3) -> String:
 	return "%s at %s normal %s" % [c.name if c is Node else "?", hit.get_position().snappedf(0.1), hit.get_normal().snappedf(0.1)]
 
 
+## Everything a body's capsule overlaps where it stands (names and places): a mover wedged in a prop.
+func _touching(body: CharacterBody3D, state: Object) -> String:
+	if body == null:
+		return ""
+
+	var shape := CapsuleShape3D.new()
+	shape.radius = 0.4
+	shape.height = 1.7
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.transform = Transform3D(Basis(), body.global_position + Vector3(0.0, 0.9, 0.0))
+	query.collision_mask = body.collision_mask
+	query.exclude = [body.get_rid()]
+	var names := PackedStringArray()
+
+	for hit: Dictionary in body.get_world_3d().direct_space_state.intersect_shape(query, 6):
+		var c: Object = hit["collider"]
+		names.append("%s@%s" % [c.name if c is Node else "?", (c as Node3D).global_position.snappedf(0.1) if c is Node3D else "-"])
+
+	var mode := "-"
+	if state != null:
+		mode = "mode %s pos %s vel %s" % [state.mode, state.position.snappedf(0.1), state.velocity.snappedf(0.1)]
+	return ", %s overlaps [%s]" % [mode, ", ".join(names)]
+
+
 ## What its last move slid along (names), and its velocity: a body that wishes and does not move.
 func _sliding(body: CharacterBody3D) -> String:
 	if body == null:
@@ -187,9 +212,11 @@ func _why(who: Variant) -> String:
 	for other in game.survivors():
 		if other != who and other.feet().distance_to(who.feet()) < 1.5:
 			mates.append("%s %.1f m" % [other.player_id, other.feet().distance_to(who.feet())])
-	return "goal %s path %d points, next %s, blocked by %s, velocity %s floor %s hops %s mates [%s]" % [(memory["goal"] as Vector3).snappedf(0.1), path.size(),
+	var kept: Variant = memory.get("last_command")
+	var move: Variant = (kept as DotFpsCommand).move.snappedf(0.1) if kept is DotFpsCommand else "-"
+	return "t %.1f phase %s move %s using '%s' goal %s path %d points, next %s, blocked by %s, velocity %s floor %s hops %s mates [%s]" % [game.now(), game.phase, move, who.using, (memory["goal"] as Vector3).snappedf(0.1), path.size(),
 		path[0].snappedf(0.1) if not path.is_empty() else "-", _blocker(who, path[0] if not path.is_empty() else Vector3.INF),
-		who.velocity.snappedf(0.1), who.is_on_floor(), memory.get("hops", 0), ", ".join(mates)] + _sliding(who)
+		who.velocity.snappedf(0.1), who.is_on_floor(), memory.get("hops", 0), ", ".join(mates)] + _sliding(who) + _touching(who, who.controller.state)
 
 
 func _standin_walks(player) -> bool:

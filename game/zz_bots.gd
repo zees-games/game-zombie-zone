@@ -940,6 +940,11 @@ func _objective(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 
+## How far off an item is taken on, and how long a stand-in tries for one before leaving it be.
+const PICK_UP_REACH := 7.0
+const PICK_UP_GIVE_UP := 15.0
+
+
 ## Picks up what it needs within a few metres: a medkit without one, pills, ammo when low, a box.
 func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	var loot = game.loot
@@ -948,13 +953,26 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		return false
 
 	var best := -1
-	var best_gap := 7.0
+	var best_gap := PICK_UP_REACH
+	var kept := int(memory.get("pick", -1))
+
+	# An item taken on is kept until it is had, gone or PICK_UP_GIVE_UP seconds old: the path to
+	# one 7 m away can lead off the other way, and re-judging by straight distance each tick
+	# made the stand-in alternate between it and its post, standing still.
+	if kept >= 0 and (not loot.entries.has(kept) or game.now() > float(memory.get("pick_until", 0.0))):
+		memory["pick"] = -1
+		memory["pick_ignore"] = kept if loot.entries.has(kept) else -1
+		memory["pick_ignore_until"] = game.now() + 30.0
+		kept = -1
 
 	for id: int in loot.entries:
 		var e: Dictionary = loot.entries[id]
 		var gap: float = (e["at"] as Vector3).distance_to(player.feet())
 
-		if gap > best_gap:
+		if id == int(memory.get("pick_ignore", -1)) and game.now() < float(memory.get("pick_ignore_until", 0.0)):
+			continue
+
+		if gap > best_gap and id != kept:
 			continue
 
 		var wanted := false
@@ -971,12 +989,21 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			ZzLoot.WEAPON, ZzLoot.THROWABLE:
 				wanted = _wants_weapon(player, e["item"])
 
+		if wanted and id == kept:
+			best = id
+			break
+
 		if wanted:
 			best = id
 			best_gap = gap
 
 	if best < 0:
+		memory["pick"] = -1
 		return false
+
+	if best != kept:
+		memory["pick"] = best
+		memory["pick_until"] = game.now() + PICK_UP_GIVE_UP
 
 	var at: Vector3 = loot.position_of(best)
 
