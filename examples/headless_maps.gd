@@ -27,7 +27,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
 const CHECKS_PER_MAP := 17
 const BAKE_CHECKS := 7
-const WORLD_CHECKS := 3
+const WORLD_CHECKS := 4
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -236,6 +236,7 @@ func _test_worlds() -> void:
 		if not read.ok:
 			_check(false, "%s: its movers have geometry" % id)
 			_check(false, "%s: a mechanics builds from it" % id)
+			_check(false, "%s: its sounds and props attach" % id)
 			continue
 
 		var world: RefCounted = read.value
@@ -256,6 +257,25 @@ func _test_worlds() -> void:
 		mech.build(world, Callable())
 		_check(mech.mover_count() == movers, "%s: a mechanics builds from it" % id, "%d of %d" % [mech.mover_count(), movers])
 		mech.queue_free()
+
+		# Sounds and props: as many nodes as the manifest has stand-ins that exist, none for a
+		# world without them, and no collision on any.
+		var extras := ZzMap.new()
+		extras.doc = (ZzMapDoc.parse_json(FileAccess.get_file_as_string(ZzPaths.rebase("res://maps/" + file))).value as Dictionary)
+		var host := Node3D.new()
+		extras.call(&"_attach_world_extras", world, host)
+		var wanted_props := 0
+		for rec: Dictionary in manifest.get("props", []):
+			if (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"find_resource", str(rec.get("stand_in", "")),
+					PackedStringArray(["res://addons/dot_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
+				wanted_props += 1
+		var props_node := host.get_node_or_null("Props")
+		var drawn_props := props_node.get_child_count() if props_node != null else 0
+		var bodies := host.find_children("*", "CollisionObject3D", true, false).size()
+		_check(drawn_props == wanted_props and bodies == 0, "%s: its sounds and props attach" % id,
+			"%d props drawn of %d, %d bodies" % [drawn_props, wanted_props, bodies])
+		host.free()
+		extras.free()
 
 	_finished()
 

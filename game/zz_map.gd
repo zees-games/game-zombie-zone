@@ -980,8 +980,41 @@ func attach_world(world: RefCounted) -> void:
 			ZzMaterials.surface_for(map_id, mat, ""))
 		_drawn.add_child(kept)
 
+	_attach_world_extras(world, node)
 	world_drawn = true
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## What the drawn world carries beyond its meshes: reflection probes, fog when the map document
+## sets none (the document's own sun and sky stay: a second sun lit everything twice), ambient
+## sounds and prop stand-ins, drawn only. Each is nothing for a world without it.
+func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
+	var env_node: Node3D = world.call(&"build_environment", 8, false)
+	if env_node != null:
+		var probes := env_node.get_node_or_null("Probes")
+		if probes != null:
+			env_node.remove_child(probes)
+			node.add_child(probes)
+		var we := env_node.get_node_or_null("Environment") as WorldEnvironment
+		if we != null and we.environment.fog_enabled and _environment != null \
+				and float((doc["environment"] as Dictionary).get("fog", 0.0)) <= 0.0:
+			var target := _environment.environment
+			target.fog_enabled = true
+			target.fog_light_color = we.environment.fog_light_color
+			target.fog_density = we.environment.fog_density
+		env_node.free()
+
+	var sounds: Node3D = world.call(&"build_sounds")
+	if sounds.get_child_count() > 0:
+		node.add_child(sounds)
+	else:
+		sounds.free()
+
+	var drawn_props: Node3D = world.call(&"build_props")
+	if drawn_props.get_child_count() > 0:
+		node.add_child(drawn_props)
+	else:
+		drawn_props.free()
 
 
 ## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
