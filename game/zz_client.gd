@@ -128,6 +128,8 @@ func _ready() -> void:
 	gate.hold(&"map", "Loading the map")
 	# Connected, the cover waits for the server's word on what this survivor holds, so the view model is
 	# drawn (and its materials warmed) before the player is shown; the gate's timeout is the backstop.
+	# The survivor is on the map (its first server position applied), not at a mirror's default in the void.
+	gate.require(&"placed", _is_placed, "Placing you")
 	gate.require(&"weapon", func() -> bool: return _offline or _armed_told, "Arming")
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
@@ -181,9 +183,9 @@ func _hold_for_maps() -> void:
 		if gate != null:
 			gate.hold(&"map", "Loading the map"))
 	game.world_rebuilt.connect(func() -> void:
+		_draw_world()
 		if gate != null:
-			gate.release(&"map")
-		_draw_world())
+			gate.release(&"map"))
 
 
 ## The map's own geometry, fetched when it is delivered, under the cover ([method ZzMap.load_world]).
@@ -204,6 +206,19 @@ func _draw_world() -> void:
 var _world_ticket: int = 0
 ## The server has said what this survivor holds (a weapon or nothing); the load gate's `weapon` requirement.
 var _armed_told: bool = false
+
+
+## The local survivor stands inside the built map's bounds and above its kill height.
+func _is_placed() -> bool:
+	if _offline:
+		return true
+
+	if player == null or game == null or game.map == null:
+		return false
+
+	var at := player.global_position
+	var bounds := game.map.bounds()
+	return at.y > game.map.kill_height() and (bounds.size == Vector3.ZERO or bounds.grow(8.0).has_point(at))
 
 
 ## True while the load gate covers the screen: no input, no sampling, no horde.
