@@ -30,6 +30,8 @@ const CHANNEL := "zz.packs"
 const PROVIDER_FILE := "spawn_provider.gd"
 const ADDON := "zombie_zone"
 const SOURCE_PREFIX := "zzpack:"
+## The id a pack's `cfg/game/<game>/weapon` tier is read under.
+const GAME_ID := "game-zombie-zone"
 const MAX_ENTRIES_PER_PROVIDER := 256
 
 ## The game's own kinds: a pack monster of the same name would shadow one, so it is refused.
@@ -101,6 +103,7 @@ static func scan(from: String = "") -> int:
 			DotLog.warn(CHANNEL, "a pack's provider does not load", {"pack": dir_name, "path": path})
 			continue
 
+		_set_pack_game("%s/%s/" % [base, dir_name])
 		var provider: Object = script.new()
 		providers[dir_name] = provider
 		found += 1
@@ -133,6 +136,19 @@ static func _load_config() -> void:
 		return
 
 	config = res.value
+
+
+## Gives every config class of a pack (a global `*Config` class under [param dir] with a static `game`) this game's id.
+## Reached by path because a pack's class cannot be named here; it must run before weapon_defs().
+static func _set_pack_game(dir: String) -> void:
+	for entry: Dictionary in ProjectSettings.get_global_class_list():
+		if not str(entry.get("path", "")).begins_with(dir) or not str(entry.get("class", "")).ends_with("Config"):
+			continue
+
+		var script := load(str(entry["path"])) as GDScript
+
+		if script != null and script.get(&"game") is String:
+			script.set(&"game", GAME_ID)
 
 
 static func cfg(path: String, fallback: Variant) -> Variant:

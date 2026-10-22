@@ -22,9 +22,9 @@ const CHECKS := 29
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 23
-const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag"]
-const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "mace", "spear", "crossbow", "dagger"]
+const REAL_CHECKS := 26
+const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss"]
+const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
 var _passed := 0
 var _failed := 0
@@ -206,6 +206,19 @@ func _write_real(pack: String, name: String, body: String) -> void:
 	f.close()
 
 
+## The pack's game tier (`cfg/game/<game>/weapon`) is read under this game's id, so a profile override reaches it.
+func _check_game_tier() -> void:
+	var dir := "user://cfg/game/%s/weapon" % ZzPacks.GAME_ID
+	DirAccess.make_dir_recursive_absolute(dir)
+	var f := FileAccess.open("%s/vss.yml" % dir, FileAccess.WRITE)
+	f.store_string("extra:\n  damage: 61.0\n")
+	f.close()
+	ZzPacks.scan()
+	ZzWeapons.use_packs(true)
+	_check(is_equal_approx(_damage_of(&"zz_vss"), 61.0), "a game-tier profile overrides a pack weapon", "%.1f" % _damage_of(&"zz_vss"))
+	DirAccess.remove_absolute("%s/vss.yml" % dir)
+
+
 func _real_packs() -> void:
 	_entered += 1
 	print("\nthe real packs, linked in addons/")
@@ -215,16 +228,18 @@ func _real_packs() -> void:
 	var found := ZzPacks.scan()
 	ZzWeapons.use_packs(true)
 	_check(found == 3, "three providers are loaded from addons/", "%d" % found)
-	_check(ZzPacks.weapon_rows.size() == 15, "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
+	_check(ZzPacks.weapon_rows.size() == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
 
 	for id: String in MODERN_IDS + MEDIEVAL_IDS:
 		if not ZzWeapons.exists(StringName(id)):
 			_check(false, "weapon %s is in the pool" % id)
 
-	_check(MODERN_IDS.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id))), "all seven modern weapons are in the pool")
-	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id))), "all eight medieval weapons are in the pool")
+	_check(MODERN_IDS.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id))), "every modern weapons are in the pool")
+	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id))), "every medieval weapons are in the pool")
 	_check(MODERN_IDS.all(func(id: String) -> bool: return ZzWeapons.tier_of(StringName(id)) != &""), "each modern weapon has a tier")
 	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return ZzWeapons.tier_of(StringName(id)) != &""), "each medieval weapon has a tier")
+	_check(ZzWeapons.tier_of(&"zz_vss") == &"primary", "the Vintorez is a primary", str(ZzWeapons.tier_of(&"zz_vss")))
+	_check(ZzWeapons.tier_of(&"war_axe") == &"melee" and ZzWeapons.tier_of(&"double_axe") == &"melee", "both new axes are melee")
 	_check(ZzWeapons.exists(&"pistol"), "the built-in weapons are still there")
 	_check(ZzPacks.monsters.size() == 3 and ZzPacks.specials().size() == 2 and ZzPacks.bosses().size() == 1,
 		"three monsters: two specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
@@ -253,6 +268,7 @@ func _real_packs() -> void:
 		print("  KNOWN GAP  medieval weapon_defs ignores cfg/addons/zz_medieval_weapons/*.yml (dagger %.1f, wanted 41)" % _damage_of(&"dagger"))
 	else:
 		print("  note  medieval cfg yml now applies: make this a check")
+	_check_game_tier()
 	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
 	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
 	_check(tiger != null and is_equal_approx(float(tiger.meta.get("damage", 0)), 33.0), "a monster's damage follows its cfg yml")
