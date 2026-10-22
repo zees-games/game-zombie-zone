@@ -16,6 +16,10 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 ## `unreachable`, not a snag. Counting a holder at its post would
 ## make every map look the same.
 ##
+## A queued stand-in (see [constant QUEUE]) is counted apart from the ratio but still in `longest`, so a
+## jam that never clears fails the longest-stretch band; who goes through a 2 m door first is not a snag
+## and changes from run to run.
+##
 ## Kinds: `standin`, `common`, `special`.
 
 const KINDS := [&"standin", &"common", &"special"]
@@ -24,6 +28,8 @@ const AFTER := 4.0
 const RADIUS := 0.75
 const FIGHT := 3.0
 const ARRIVED := 2.5
+## A stand-in this close to another survivor while still is queueing (a doorway taken in turns), not snagged.
+const QUEUE := 1.0
 
 var game = null
 
@@ -48,7 +54,7 @@ func _init(p_game: Object) -> void:
 	game = p_game
 
 	for kind: StringName in KINDS:
-		totals[kind] = {"goal": 0.0, "stuck": 0.0}
+		totals[kind] = {"goal": 0.0, "stuck": 0.0, "queued": 0.0}
 		ever[kind] = {}
 		longest[kind] = 0.0
 
@@ -102,6 +108,11 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 	if still < AFTER:
 		return
 
+	if kind == &"standin" and _queued(at, who):
+		(totals[kind] as Dictionary)["queued"] += EVERY
+		longest[kind] = maxf(float(longest[kind]), still)
+		return
+
 	(totals[kind] as Dictionary)["stuck"] += EVERY
 
 	if still < AFTER + EVERY and cases.size() < 40 and who != null:
@@ -113,6 +124,14 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 	var tally: Dictionary = spots.get(kind, {})
 	tally[cell] = float(tally.get(cell, 0.0)) + EVERY
 	spots[kind] = tally
+
+
+func _queued(at: Vector3, who: Variant) -> bool:
+	for other in game.survivors():
+		if other != who and other.is_alive() and other.feet().distance_to(at) < QUEUE:
+			return true
+
+	return false
 
 
 ## What a body would hit going 0.4 m toward [param to]: the collider and its place, or "free".
@@ -164,8 +183,13 @@ func _why(who: Variant) -> String:
 
 	var memory: Dictionary = game.bots._state[who.player_id]
 	var path: PackedVector3Array = memory["path"]
-	return "goal %s path %d points, next %s, blocked by %s" % [(memory["goal"] as Vector3).snappedf(0.1), path.size(),
-		path[0].snappedf(0.1) if not path.is_empty() else "-", _blocker(who, path[0] if not path.is_empty() else Vector3.INF)]
+	var mates := PackedStringArray()
+	for other in game.survivors():
+		if other != who and other.feet().distance_to(who.feet()) < 1.5:
+			mates.append("%s %.1f m" % [other.player_id, other.feet().distance_to(who.feet())])
+	return "goal %s path %d points, next %s, blocked by %s, velocity %s floor %s hops %s mates [%s]" % [(memory["goal"] as Vector3).snappedf(0.1), path.size(),
+		path[0].snappedf(0.1) if not path.is_empty() else "-", _blocker(who, path[0] if not path.is_empty() else Vector3.INF),
+		who.velocity.snappedf(0.1), who.is_on_floor(), memory.get("hops", 0), ", ".join(mates)] + _sliding(who)
 
 
 func _standin_walks(player) -> bool:
@@ -235,7 +259,7 @@ func line() -> String:
 		parts.append("%s %.1f%% of %.0f s goal (%d stuck, worst %.0f s)" % [
 			kind, 100.0 * ratio(kind), float(t["goal"]), (ever[kind] as Dictionary).size(), float(longest[kind])])
 
-	parts.append("no path to goal %.0f s" % unreachable)
+	parts.append("queued %.0f s, no path to goal %.0f s" % [float((totals[&"standin"] as Dictionary)["queued"]), unreachable])
 	return " | ".join(parts)
 
 
