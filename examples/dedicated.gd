@@ -436,6 +436,10 @@ func _test_the_map_vote() -> void:
 
 	vote.set("voters_fn", func() -> Array: return [&"7"])
 	var director: DotVoteDirector = vote.get("director")
+	# The game wants two humans for a ballot (ZzVote._rules; headless_workshop checks that); this
+	# walks the ballot's and rtv's paths with the one voter the fixture has.
+	director.rules.min_players_to_vote = 1
+	director.rules.rtv_min_players = 1
 	var opened := director.open_vote(DotVoteClock.REASON_MANUAL)
 	_check(opened.ok and director.is_voting(), "a ballot opens", opened.error.message if not opened.ok else "")
 

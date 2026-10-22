@@ -214,6 +214,10 @@ func _rules() -> DotVoteRules:
 	# the round's end anyway (rtv_apply), and the delay made `!rtv` a command that never worked
 	# in the round people wanted to leave.
 	rules.rtv_delay_sec = 0.0
+	# One player is not a vote: alone they change the map from the menu (which does so
+	# directly) and an automatic ballot would only crown their own pick.
+	rules.min_players_to_vote = 2
+	rules.rtv_min_players = 2
 	rules.include_current = true
 	# Plays, not minutes: two maps with a cooldown of five would offer nothing at all.
 	rules.cooldown = 0
@@ -300,12 +304,21 @@ func advance(delta: float) -> void:
 	if director.hibernating:
 		return
 
+	# Warmup's "get ready" countdown is not time on the map: the ballot opened mid-countdown.
+	if round_in_progress_fn.is_valid() and not bool(round_in_progress_fn.call()):
+		return
+
 	_on_map_sec += delta
 
 	if _opened_this_map or _on_map_sec < open_after_sec:
 		return
 
 	if due_fn.is_valid() and not bool(due_fn.call()):
+		return
+
+	# Not marked opened: a second human joining later is owed the ballot, and this costs nothing
+	# per tick (no refusal is logged).
+	if _voters().size() < 2:
 		return
 
 	_opened_this_map = true

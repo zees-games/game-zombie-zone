@@ -17,7 +17,7 @@ const ZzWorkshop := preload("../game/zz_workshop.gd")
 ## godot --headless --path . res://examples/headless_workshop.tscn
 ## [/codeblock]
 
-const SECTIONS := 6
+const SECTIONS := 7
 const MAP := "fixture_ruin"
 const OTHER_KIND := "fixture_run"
 const BAD := "fixture_bad"
@@ -40,6 +40,7 @@ func _run() -> void:
 	_test_accepts()
 	_test_solo()
 	_test_online()
+	_test_ballot_needs_two()
 	_test_ids()
 	_test_refused()
 	await _test_play()
@@ -148,6 +149,41 @@ func _test_solo() -> void:
 	_check(labels.has("Fixture Ruin [Ruins Pack]"), "solo: the ballot lists the pack's map (%s)" % ",".join(labels))
 	_check(not labels.has("Fixture Run [Ruins Pack]"), "solo: the ballot leaves the unaccepted kind out")
 	vote.free()
+	_completed += 1
+
+
+func _test_ballot_needs_two() -> void:
+	_entered += 1
+	var vote := ZzVote.new()
+	vote.config_path = ""
+	vote.maps_fn = func() -> Array: return [[&"a", "A"], [&"b", "B"]]
+	add_child(vote)
+	var humans: Array = [&"u1"]
+	vote.voters_fn = func() -> Array: return humans
+	_check(vote.setup().ok, "ballot: the vote builds")
+	vote.note_map(&"a")
+	vote.open_after_sec = 1.0
+	vote.advance(2.0)
+	_check(not vote.is_voting(), "ballot: one human is never given an automatic ballot")
+	humans.append(&"u2")
+	vote.advance(0.1)
+	_check(vote.is_voting(), "ballot: a second human brings it")
+	vote.free()
+
+	var gated := ZzVote.new()
+	gated.config_path = ""
+	gated.maps_fn = func() -> Array: return [[&"a", "A"], [&"b", "B"]]
+	add_child(gated)
+	gated.voters_fn = func() -> Array: return [&"u1", &"u2"]
+	gated.round_in_progress_fn = func() -> bool: return false
+	_check(gated.setup().ok, "ballot: the second vote builds")
+	gated.note_map(&"a")
+	gated.open_after_sec = 1.0
+	gated.advance(5.0)
+	_check(not gated.is_voting(), "ballot: warmup seconds are not counted toward it")
+	_check(gated.configured_rules().min_players_to_vote == 2 and gated.configured_rules().rtv_min_players == 2,
+		"ballot: and rtv wants two humans as well")
+	gated.free()
 	_completed += 1
 
 
