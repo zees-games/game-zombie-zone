@@ -1,0 +1,26 @@
+name: Spitter
+category: zombie
+faction: infected
+weight: light
+cost: 3
+health: 100.0
+speed: 5.2
+sight: 50.0
+sight_angle: 90.0
+hearing: 16.0
+los: true
+eye: 1.71
+extra:
+  damage: 4.0
+  reach: 1.6
+  attack_interval: 1.0
+  spit_range: 28.0
+  spit_min: 6.0
+  spit_cooldown: 18.0
+  spit_speed: 15.0
+  acid_radius: 3.2
+  acid_seconds: 7.0
+  acid_damage: 6.0
+  body: spitter
+  radius: 0.3
+  height: 1.9

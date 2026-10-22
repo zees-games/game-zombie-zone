@@ -1592,7 +1592,7 @@ func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> Dot
 	if npc == null:
 		return null
 
-	var health := ZzNpcs.brute_health(config, _survivor_count()) * special_health_scale
+	var health := ZzNpcs.brute_health(config, _survivor_count(), catalogue.get_npc(ZzNpcs.BRUTE)) * special_health_scale
 	_set_health(npc, health)
 	brute_spawned.emit(npc)
 	DotLog.info(CHANNEL, "a brute", {"health": health, "at": str(where)})

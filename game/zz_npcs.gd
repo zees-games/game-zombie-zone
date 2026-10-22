@@ -3,6 +3,7 @@ extends RefCounted
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzPackList := preload("zz_packs.gd")
+const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 const ZzPaths := preload("zz_paths.gd")
 
 ## What can come at you, and the ground it walks on.
@@ -77,20 +78,42 @@ static func is_special(kind: StringName) -> bool:
 	return kind != COMMON and kind != &""
 
 
-static func catalogue(config: ZzConfig = null) -> DotNpcCatalogue:
+## The built-in kinds (twelve) with their `npc` profiles laid over them; [param roots] replaces the config roots (tests).
+static func catalogue(config: ZzConfig = null, roots: PackedStringArray = PackedStringArray()) -> DotNpcCatalogue:
 	var c := config if config != null else ZzConfig.new()
 	var out := DotNpcCatalogue.new()
 	out.meta = {"game": "zombiezone"}
+	var set := ZzNpcProfiles.make_set(roots)
+	var base_config := ZzConfig.new()
+	var base := {}
+	for d in builtin(base_config):
+		base[d.id] = d
 
-	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)] + _pack_defs(c):
-		var added := out.add(_eyes(def))
+	var defs := builtin(c)
+	for def in defs:
+		ZzNpcProfiles.overlay(def, base[def.id], c, base_config, set)
+	set.clear_cache()
+
+	for pack_def in _pack_defs(c):
+		defs.append(_eyes(pack_def))
+
+	for def in defs:
+		var added := out.add(def)
 
 		if not added.ok:
 			DotLog.warn(CHANNEL, "a zombie could not be catalogued", {
 				"npc": String(def.id), "why": added.error.message
 			})
 
+	return out
+
+
+## The twelve kinds from code and [param c] alone, no profile; the floor the shipped ymls are written from.
+static func builtin(c: ZzConfig) -> Array:
+	var out: Array = []
+	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
+			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)]:
+		out.append(_eyes(def))
 	return out
 
 
@@ -285,8 +308,9 @@ static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
 	return def
 
 
-static func brute_health(c: ZzConfig, survivors: int) -> float:
-	return (c.brute_health + c.brute_health_per_survivor * float(maxi(survivors - 1, 0))) * c.special_health_scale()
+static func brute_health(c: ZzConfig, survivors: int, def: DotNpcDef = null) -> float:
+	var base: float = float(def.meta.get("brute_health", c.brute_health)) if def != null else c.brute_health
+	return (base + c.brute_health_per_survivor * float(maxi(survivors - 1, 0))) * c.special_health_scale()
 
 
 static func _sleeper(c: ZzConfig) -> DotNpcDef:

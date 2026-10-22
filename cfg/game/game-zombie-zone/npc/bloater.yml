@@ -1,0 +1,24 @@
+name: Bloater
+category: zombie
+faction: infected
+weight: heavy
+cost: 3
+health: 50.0
+speed: 4.0
+sight: 40.0
+sight_angle: 90.0
+hearing: 16.0
+los: true
+eye: 1.665
+extra:
+  damage: 4.0
+  reach: 1.6
+  attack_interval: 1.2
+  vomit_range: 5.0
+  vomit_half_angle: 28.0
+  vomit_cooldown: 20.0
+  bile_seconds: 15.0
+  burst_radius: 3.6
+  body: bloater
+  radius: 0.5
+  height: 1.85

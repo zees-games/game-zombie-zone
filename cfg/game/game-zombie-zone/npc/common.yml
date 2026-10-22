@@ -1,0 +1,22 @@
+name: Infected
+category: zombie
+faction: infected
+weight: normal
+cost: 1
+health: 50.0
+speed: 6.3
+sight: 30.0
+sight_angle: 75.0
+hearing: 10.0
+los: true
+eye: 1.575
+extra:
+  damage: 2.0
+  reach: 1.55
+  attack_interval: 0.9
+  walk_speed: 1.1
+  squad: horde
+  attackers: 6
+  body: common
+  radius: 0.32
+  height: 1.75

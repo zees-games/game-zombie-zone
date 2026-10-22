@@ -1,0 +1,26 @@
+name: Brute
+category: zombie
+faction: infected
+weight: heavy
+cost: 12
+health: 3000.0
+speed: 6.1
+sight: 80.0
+sight_angle: 120.0
+hearing: 40.0
+los: false
+eye: 2.61
+extra:
+  damage: 24.0
+  reach: 2.4
+  attack_interval: 1.45
+  knock: 1.0
+  rock_range: 40.0
+  rock_min: 9.0
+  rock_cooldown: 9.0
+  rock_damage: 24.0
+  rock_speed: 24.0
+  frustration_seconds: 25.0
+  body: brute
+  radius: 0.7
+  height: 2.9

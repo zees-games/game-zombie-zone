@@ -1,0 +1,25 @@
+name: Rider
+category: zombie
+faction: infected
+weight: light
+cost: 4
+health: 325.0
+speed: 7.0
+sight: 45.0
+sight_angle: 100.0
+hearing: 18.0
+los: true
+eye: 1.08
+extra:
+  damage: 4.0
+  reach: 1.4
+  attack_interval: 0.8
+  leap_range: 6.0
+  leap_speed: 11.0
+  ride_damage: 4.0
+  ride_interval: 1.0
+  ride_speed: 3.4
+  leap_cooldown: 6.0
+  body: rider
+  radius: 0.28
+  height: 1.2

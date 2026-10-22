@@ -1,0 +1,24 @@
+name: Screamer
+category: zombie
+faction: infected
+weight: light
+cost: 3
+health: 90.0
+speed: 5.4
+sight: 55.0
+sight_angle: 100.0
+hearing: 20.0
+los: true
+eye: 1.8
+extra:
+  damage: 3.0
+  reach: 1.5
+  attack_interval: 1.0
+  scream_range: 35.0
+  scream_min: 9.0
+  scream_seconds: 1.6
+  scream_cooldown: 20.0
+  scream_mob: 10
+  body: screamer
+  radius: 0.28
+  height: 2.0

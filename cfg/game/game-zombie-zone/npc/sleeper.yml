@@ -1,0 +1,22 @@
+name: Sleeper
+category: zombie
+faction: infected
+weight: normal
+cost: 1
+health: 1000.0
+speed: 7.8
+sight: 14.0
+sight_angle: 180.0
+hearing: 10.0
+los: false
+eye: 1.44
+extra:
+  damage: 100.0
+  reach: 1.7
+  attack_interval: 1.0
+  startle_near: 7.0
+  startle_seconds: 3.0
+  flee_seconds: 10.0
+  body: sleeper
+  radius: 0.3
+  height: 1.6

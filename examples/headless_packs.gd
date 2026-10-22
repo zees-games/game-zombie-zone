@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzNpcProfiles := preload("../game/zz_npc_profiles.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
@@ -16,8 +17,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addons/zombie_zone"
-const SECTIONS := 4
-const CHECKS := 29
+const SECTIONS := 5
+const CHECKS := 37
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -44,6 +45,7 @@ func _run() -> void:
 	_installed()
 	_tuned()
 	await _in_a_game()
+	_npc_profiles()
 
 	if _real_packs_linked():
 		_sections += 1
@@ -88,6 +90,58 @@ func _none_installed() -> void:
 	_check(cat.size() == 12, "the catalogue is the twelve built-in kinds", "%d" % cat.size())
 	_check(ZzPacks.specials().is_empty() and ZzPacks.bosses().is_empty(), "no pack specials or bosses")
 	_finished += 1
+
+
+func _npc_profiles() -> void:
+	_entered += 1
+	print("npc profiles (cfg/game/game-zombie-zone/npc)")
+	var c := ZzConfig.new()
+	var built := ZzNpcs.builtin(c)
+	var cat := ZzNpcs.catalogue(c)
+	var same := 0
+	var stale := 0
+	for def: DotNpcDef in built:
+		var got: DotNpcDef = cat.get_npc(def.id)
+		if got != null and got.max_health == def.max_health and got.move_speed == def.move_speed \
+				and got.sight_range == def.sight_range and got.sight_half_angle_deg == def.sight_half_angle_deg \
+				and got.hearing_range == def.hearing_range and got.eye_height == def.eye_height \
+				and got.cost == def.cost and got.weight == def.weight and got.display_name == def.display_name \
+				and got.require_line_of_sight == def.require_line_of_sight and got.meta == def.meta:
+			same += 1
+		if FileAccess.get_file_as_string("%s/%s.yml" % [ZzNpcProfiles.DIR, String(def.id)]) != ZzNpcProfiles.yaml_of(def, c):
+			stale += 1
+	_check(DirAccess.get_files_at(ZzNpcProfiles.DIR).size() == built.size(), "a profile file for each of the twelve kinds", "%d" % DirAccess.get_files_at(ZzNpcProfiles.DIR).size())
+	_check(same == built.size(), "with the shipped files, every kind resolves to its code numbers", "%d of %d" % [same, built.size()])
+	_check(stale == 0, "the shipped files are what tools/export_npc_profiles.gd writes", "%d stale" % stale)
+
+	var hard := ZzConfig.new()
+	hard.common_health = 80.0
+	hard.difficulty = 3
+	var tuned := ZzNpcs.catalogue(hard)
+	_check(tuned.get_npc(&"common").max_health == 80.0, "a cvar still reaches a kind whose file was not edited")
+	_check(is_equal_approx(tuned.get_npc(&"leaper").max_health, 250.0 * hard.special_health_scale()), "difficulty scales the profile's health")
+
+	var tier := "user://zz_npc_profile_test"
+	var dir := "%s/cfg/game/%s/npc" % [tier, ZzNpcProfiles.GAME]
+	DirAccess.make_dir_recursive_absolute(dir)
+	var f := FileAccess.open(dir + "/leaper.yml", FileAccess.WRITE)
+	f.store_string("speed: 9.5\nextra:\n  pounce_max: 30.0\n")
+	f.close()
+	f = FileAccess.open(dir + "/brute.yml", FileAccess.WRITE)
+	f.store_string("health: 5000.0\n")
+	f.close()
+	var over := ZzNpcs.catalogue(c, PackedStringArray(["res://cfg", tier + "/cfg"]))
+	var leaper: DotNpcDef = over.get_npc(&"leaper")
+	_check(leaper.move_speed == 9.5 and float(leaper.meta["pounce_max"]) == 30.0, "a later tier overrides the keys it names")
+	_check(leaper.max_health == 250.0 and float(leaper.meta["pounce_min"]) == 4.0 and leaper.sight_range == 60.0, "and leaves the rest as shipped")
+	_check(is_equal_approx(ZzNpcs.brute_health(c, 1, over.get_npc(&"brute")), 5000.0), "a brute's profile health is its base")
+	_clean_tier(dir)
+	_finished += 1
+
+
+func _clean_tier(dir: String) -> void:
+	for name in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir + "/" + name)
 
 
 func _installed() -> void:

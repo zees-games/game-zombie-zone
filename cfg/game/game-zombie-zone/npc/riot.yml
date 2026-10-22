@@ -1,0 +1,20 @@
+name: Riot
+category: zombie
+faction: infected
+weight: heavy
+cost: 3
+health: 260.0
+speed: 4.4
+sight: 40.0
+sight_angle: 90.0
+hearing: 18.0
+los: true
+eye: 1.665
+extra:
+  damage: 9.0
+  reach: 1.6
+  attack_interval: 1.1
+  shield: 0.1
+  body: riot
+  radius: 0.36
+  height: 1.85

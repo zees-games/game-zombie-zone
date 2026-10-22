@@ -1,0 +1,26 @@
+name: Leaper
+category: zombie
+faction: infected
+weight: light
+cost: 4
+health: 250.0
+speed: 7.4
+sight: 60.0
+sight_angle: 100.0
+hearing: 20.0
+los: false
+eye: 1.44
+extra:
+  damage: 5.0
+  reach: 1.6
+  attack_interval: 0.5
+  pounce_min: 4.0
+  pounce_max: 22.0
+  pounce_speed: 16.0
+  pounce_damage: 5.0
+  pin_damage: 5.0
+  pin_interval: 0.5
+  stalk_speed: 3.2
+  body: leaper
+  radius: 0.3
+  height: 1.6

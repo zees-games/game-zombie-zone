@@ -1,0 +1,23 @@
+name: Crawler
+category: zombie
+faction: infected
+weight: light
+cost: 3
+health: 150.0
+speed: 2.6
+sight: 25.0
+sight_angle: 120.0
+hearing: 14.0
+los: true
+eye: 0.675
+extra:
+  damage: 4.0
+  reach: 1.3
+  attack_interval: 1.0
+  grab_reach: 1.5
+  pin_dps: 6.0
+  grab_cooldown: 6.0
+  lunge_speed: 4.5
+  body: crawler
+  radius: 0.34
+  height: 0.75
