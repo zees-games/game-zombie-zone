@@ -32,6 +32,9 @@ const FLAG_BILED := 16
 
 const CHANNEL := "zz.zombie"
 
+## A limb came off (the server's shot, or a mirror told by [member limb_mask]).
+signal limb_severed(limb: StringName, info: Dictionary)
+
 ## Which kind, from the catalogue. Set by the horde as it spawns, and on a client from the
 ## announcement.
 var kind: StringName = &"common"
@@ -49,6 +52,16 @@ var health: float = -1.0
 ## How it fell, once it is dead: decided by the server (`ZzHorde.decide_death`), sent with
 ## NPC_GONE, and read by the view. Null until then, and on a client that was not told.
 var death: DotPlayerDeath = null
+
+## Its shootable limbs (`ZzZombieLimbs.attach` makes them); null for a kind without any.
+var limbs: DotNpcLimbs = null
+
+## Replicated: bit `i` is set when the `i`th limb in config order is gone. Setting it severs the missing ones.
+var limb_mask: int = 0:
+	set(value):
+		limb_mask = value
+		if limbs != null and value != limbs.mask():
+			limbs.apply_mask(value)
 
 ## The horizontal velocity the brain wants this tick.
 var wish: Vector3 = Vector3.ZERO
@@ -236,6 +249,19 @@ func shove(impulse: Vector3) -> void:
 
 	if impulse.y > 0.0 and is_on_floor():
 		velocity.y = impulse.y
+
+
+func limb_speed_scale() -> float:
+	return limbs.speed_scale() if limbs != null else 1.0
+
+
+func limb_attack_scale() -> float:
+	return limbs.attack_scale() if limbs != null else 1.0
+
+
+func on_limbs_severed(limb: StringName, info: Dictionary) -> void:
+	limb_mask = limbs.mask()
+	limb_severed.emit(limb, info)
 
 
 func set_flag(bit: int, on: bool) -> void:

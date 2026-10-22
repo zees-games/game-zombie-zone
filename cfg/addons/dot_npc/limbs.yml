@@ -1,0 +1,43 @@
+# Shootable limbs (dot-npc's DotNpcLimbs). `zombie` is every kind's body; a kind named under it
+# changes only the keys it lists. Bones are the skinned zombie skeleton's (all bodies share them),
+# the first comes off with everything below it; radius and tip are metres of the drawn body.
+# `share` is the limb's health as a fraction of the kind's health (`health` is a flat number).
+limbs:
+  zombie:
+    head:
+      bones: [Head]
+      radius: 0.2
+      tip: 0.12
+      share: 0.35
+      kills: true
+    armL:
+      bones: [UpperArm.L, LowerArm.L]
+      radius: 0.11
+      tip: 0.3
+      share: 0.6
+      attack: 0.6
+    armR:
+      bones: [UpperArm.R, LowerArm.R]
+      radius: 0.11
+      tip: 0.3
+      share: 0.6
+      attack: 0.6
+    legL:
+      bones: [UpperLeg.L, LowerLeg.L]
+      radius: 0.13
+      tip: 0.35
+      share: 0.7
+      slow: 0.5
+    legR:
+      bones: [UpperLeg.R, LowerLeg.R]
+      radius: 0.13
+      tip: 0.35
+      share: 0.7
+      slow: 0.5
+  # A boss does not die of a lost head; it takes the limb and carries on.
+  brute:
+    head:
+      kills: false
+  zhm_trex:
+    head:
+      kills: false

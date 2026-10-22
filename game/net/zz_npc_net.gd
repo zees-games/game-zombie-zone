@@ -27,6 +27,7 @@ var net_health: int = 0
 var net_state: int = 0
 var net_anim: int = 0
 var net_flags: int = 0
+var net_limbs: int = 0
 
 
 func _register_net_vars() -> void:
@@ -39,6 +40,9 @@ func _register_net_vars() -> void:
 		if bool(spec["interpolated"]):
 			field.interpolated()
 
+	for spec in DotNpcNetSync.limb_specs():
+		replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"]))
+
 	replicate(&"net_anim", DotNetVar.Type.UINT).bits(5)
 	replicate(&"net_flags", DotNetVar.Type.UINT).bits(5)
 
@@ -50,6 +54,7 @@ func pull() -> void:
 	DotNpcNetSync.pull(npc, self, DotNpcNetSync.State.ATTACKING if npc.has_target() else DotNpcNetSync.State.IDLE)
 	net_anim = clampi(body.anim, 0, 31)
 	net_flags = body.flags & 31
+	net_limbs = body.limb_mask & ((1 << DotNpcNetSync.LIMB_BITS) - 1)
 
 
 func _net_simulate(_tick: int, _delta: float) -> void:
@@ -63,6 +68,7 @@ func _net_state_applied(_tick: int) -> void:
 	if body != null and identity != null and not identity.is_authoritative:
 		body.anim = net_anim
 		body.flags = net_flags
+		body.limb_mask = net_limbs
 		body.health = float(net_health)
 
 

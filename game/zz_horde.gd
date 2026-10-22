@@ -8,6 +8,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 
 ## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the
 ## five clocks the genre runs on top of a director.
@@ -628,7 +629,7 @@ func tick(delta: float) -> void:
 	for npc in spawner.all_npcs():
 		if npc.is_alive() and npc.node is ZzZombieBody:
 			var b := npc.node as ZzZombieBody
-			b.speed_scale = speed * (game.water_pace_at(b.global_position) if game != null else 1.0)
+			b.speed_scale = speed * b.limb_speed_scale() * (game.water_pace_at(b.global_position) if game != null else 1.0)
 			b.tick(delta)
 
 	squads.prune()
@@ -895,7 +896,8 @@ func melee(npc: DotNpcInstance, victim: StringName, amount: float) -> void:
 	if npc == null or not npc.is_alive():
 		return
 
-	game.zombie_hit(npc, entity_id_for(npc), victim, amount)
+	var body := npc.node as ZzZombieBody
+	game.zombie_hit(npc, entity_id_for(npc), victim, amount * (body.limb_attack_scale() if body != null else 1.0))
 
 
 ## Everything a special does that touches a survivor goes through the game, which owns pins
@@ -1801,6 +1803,50 @@ func _register_combat(npc: DotNpcInstance) -> void:
 	_by_entity[entity] = npc
 
 
+var _in_limb_hit := false
+
+
+## A shot that hurt a zombie reaches its limbs, beside the damage it already did: a head shot
+## takes the head, any other the limb under the point (the head is never taken by a body shot
+## near the neck). A head off kills it, through the same damage path a bullet uses, credited to
+## the shooter and counted as a headshot.
+func limb_hit(damage: DotDamage) -> void:
+	if _in_limb_hit or damage.refused or damage.amount <= 0.0 or not is_npc_entity(damage.victim):
+		return
+
+	var npc := npc_for_entity(damage.victim)
+	var body := npc.node as ZzZombieBody if npc != null else null
+
+	if body == null or body.limbs == null or not npc.is_alive():
+		return
+
+	var limbs := body.limbs
+	var head := damage.hit_group == DotHitGroup.HEAD
+	var limb: StringName = &"head" if head else limbs.limb_at(damage.point)
+
+	if limb == &"" or (limb == &"head" and not head):
+		return
+
+	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
+	var _took := limbs.hit_limb(limb, damage.point, damage.amount, impulse)
+
+	if not limbs.is_lethal():
+		return
+
+	var health := npc.node.get_node_or_null(^"Health") as DotHealth
+
+	if health == null or not health.alive:
+		return
+
+	var kill := DotDamage.make(damage.attacker, damage.victim, health.health + health.armour + 1.0, damage.type)
+	kill.hit_group = DotHitGroup.HEAD
+	kill.point = damage.point
+	kill.direction = damage.direction
+	_in_limb_hit = true
+	var _applied = game.combat.apply_damage(kill)
+	_in_limb_hit = false
+
+
 func _forget_combat(npc: DotNpcInstance) -> void:
 	var entity := entity_id_for(npc)
 
@@ -1826,6 +1872,10 @@ func _on_spawned(npc: DotNpcInstance) -> void:
 			b.collision_mask = game.physics.collision_mask(&"zombie")
 
 	_register_combat(npc)
+
+	if b != null:
+		var _limbs := ZzZombieLimbs.attach(b, npc.def.id, b.variant, npc.def.max_health)
+
 	zombie_spawned.emit(npc)
 
 

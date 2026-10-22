@@ -593,6 +593,7 @@ func _build_combat() -> void:
 
 	add_child(combat)
 	combat.damage_applied.connect(_on_hit_landed)
+	combat.damage_applied.connect(_on_limb_damage)
 
 
 static func _type(id: StringName, armour_share: float) -> DotDamageType:
@@ -620,6 +621,12 @@ func _on_hit_landed(damage: DotDamage) -> void:
 
 	hit_landed.emit(by, damage.victim, damage.health_lost, damage.point, damage.lethal,
 		damage.hit_group == DotHitGroup.HEAD)
+
+
+## Every applied hit on a zombie also goes to its limbs (the server only: a client's are told).
+func _on_limb_damage(damage: DotDamage) -> void:
+	if authoritative and horde != null:
+		horde.limb_hit(damage)
 
 
 func _adjust_damage(damage: DotDamage) -> void:

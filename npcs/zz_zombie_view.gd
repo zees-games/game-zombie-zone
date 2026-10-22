@@ -630,6 +630,71 @@ static func _measure(skeleton: Skeleton3D, model: Node3D) -> float:
 	return maxf(top, high) - minf(low, 0.0)
 
 
+## The bone origins of [param p_kind]'s body in the body's own space as drawn (turned, scaled to
+## its height and girth), filed under the returned key in [method DotNpcLimbs.rest_points]: the
+## server draws nothing, and its limb regions must still sit where a client sees the limbs.
+static func limb_rest(p_kind: StringName, p_variant: int) -> String:
+	var look := look_for(p_kind, p_variant)
+	var scene := _scene(BODIES.get(look["body"], ""))
+
+	if scene == null:
+		return ""
+
+	var key := "zz-rest:%s:%.3f:%.3f" % [look["body"], float(look["height"]), float(look["girth"])]
+	var filed := DotNpcLimbs.rest_points(key)
+
+	if not filed.is_empty():
+		return key
+
+	var root := scene.instantiate() as Node3D
+	var found := root.find_children("*", "Skeleton3D", true, false)
+
+	if not found.is_empty():
+		var skeleton := found[0] as Skeleton3D
+		var chain := Transform3D.IDENTITY
+		var node: Node = skeleton
+
+		while node != null and node != root:
+			if node is Node3D:
+				chain = (node as Node3D).transform * chain
+			node = node.get_parent()
+
+		var fit := float(look["height"]) / maxf(_measure(skeleton, root), 0.01)
+		var girth := float(look["girth"])
+		var drawn := Basis(Vector3.UP, PI).scaled(Vector3(fit * girth, fit, fit * girth))
+
+		for i in skeleton.get_bone_count():
+			var bone := skeleton.get_bone_name(i)
+			filed[StringName(bone)] = drawn * (chain * skeleton.get_bone_global_rest(i)).origin
+
+			if skeleton.get_bone_parent(i) >= 0:
+				filed["@" + bone] = StringName(skeleton.get_bone_name(skeleton.get_bone_parent(i)))
+
+	root.free()
+	return key
+
+
+## [DotNpcLimbs]' view seam: takes a limb off the drawn body, and returns where it was cut.
+func sever_limb(limb: StringName, d: Dictionary, impulse: Vector3) -> Vector3:
+	if _skeleton == null or _model == null:
+		return Vector3.INF
+
+	return DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, impulse)
+
+
+## A limb that was gone before this machine saw the zombie: the stump alone.
+func stump_limb(limb: StringName, d: Dictionary) -> Vector3:
+	if _skeleton == null or _model == null:
+		return Vector3.INF
+
+	return DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, Vector3.ZERO, true)
+
+
+func restore_limbs() -> void:
+	if _skeleton != null:
+		DotNpcGibs.restore(_skeleton, _model)
+
+
 func _capsule() -> Node3D:
 	var mesh := MeshInstance3D.new()
 	var capsule := CapsuleMesh.new()
@@ -907,6 +972,10 @@ func _pose(anim: int) -> void:
 
 	if anim == ZzZombieBody.Anim.DEAD:
 		hunch = 0.0
+
+	# A severed limb's collapsed bone: the clip wrote its scale back this frame.
+	for gone: int in _skeleton.get_meta(DotNpcGibs.COLLAPSED, []):
+		_skeleton.set_bone_pose_scale(gone, Vector3.ONE * 0.001)
 
 	var spine: int = _bones.get(&"Torso", -1)
 

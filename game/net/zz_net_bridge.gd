@@ -13,6 +13,7 @@ const ZzGame := preload("../zz_game.gd")
 const ZzMapDoc := preload("../zz_map_doc.gd")
 const ZzPlayer := preload("../zz_player.gd")
 const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
+const ZzZombieLimbs := preload("../../npcs/zz_zombie_limbs.gd")
 const ZzPaths := preload("../zz_paths.gd")
 const ZzNpcs := preload("../zz_npcs.gd")
 
@@ -1667,6 +1668,8 @@ func _mirror_zombie(info: Dictionary) -> void:
 		return
 
 	_zombie_mirrors[net_id] = behaviour
+	# The mask the server sends needs limbs to land on, drawn or not.
+	var _limbs := ZzZombieLimbs.attach(body, body.kind, body.variant)
 	npc_added.emit(net_id, body.kind, body.variant, body)
 
 

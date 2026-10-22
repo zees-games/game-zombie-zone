@@ -6,6 +6,7 @@ const ZzPaths := preload("zz_paths.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 
 ## Everything a client draws in the world that is not a survivor or a wall: the zombies and their
 ## bodies, what lies on the ground, pools of acid and fire, things thrown, explosions, and a
@@ -118,6 +119,9 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	view.name = "View"
 	body.add_child(view)
 	view.build(kind, variant)
+	# A mirror has no limbs yet (the server's body has them from its spawn); the view cuts them.
+	var _limbs := ZzZombieLimbs.attach(body, kind, variant)
+	ZzZombieLimbs.bind_view(body, view)
 
 	var entry := {"body": body, "view": view, "kind": kind, "last_anim": -1,
 		"next_moan": _rng.randf_range(1.0, 9.0), "voice": 0}

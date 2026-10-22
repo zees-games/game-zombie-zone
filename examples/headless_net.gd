@@ -3,6 +3,7 @@ extends Node
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -29,8 +30,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 20
-const CHECKS := 107
+const SECTIONS := 21
+const CHECKS := 114
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -84,6 +85,7 @@ func _run() -> void:
 		await _test_the_local_player_is_predicted()
 		await _test_shots_count_online()
 		await _test_zombies_replicate()
+		await _test_a_head_shot_off_reaches_the_client()
 		await _test_a_down_reaches_the_client()
 		await _test_a_downed_crawl_is_predicted()
 		await _test_a_pin_reaches_the_client()
@@ -891,7 +893,9 @@ func _test_a_hold_reaches_the_client() -> void:
 		and int(told.get("stage", -1)) == int(served["stage"]) and int(told.get("index", -1)) == int(served["index"])
 		and absf(float(told.get("left", -9.0)) - float(served["left"])) < 0.75,
 		"the client is told the style, the stage, the night and the clock", "%s / %s" % [told, served])
-	_check(float(told.get("daylight", -1.0)) > 0.3 and absf(float(told["daylight"]) - float(served["daylight"])) < 0.1,
+	# The state is broadcast every CLOCK_EVERY ticks, so what is told lags by up to that, and
+	# the warm-up dusk moves fast: the tolerance is that lag, not an exact match.
+	_check(float(told.get("daylight", -1.0)) > 0.3 and absf(float(told["daylight"]) - float(served["daylight"])) < 0.25,
 		"and the daylight of the warm-up's day", "%.2f / %.2f" % [float(told.get("daylight", -1.0)), float(served["daylight"])])
 
 	for _i in range(SERVER_TICK_RATE * 4):
@@ -966,6 +970,49 @@ func _hurt(player: ZzPlayer, amount: float) -> void:
 	var hit := DotDamage.make(0, player.entity_id, amount, _server_game.combat.damage_type(&"strike"))
 	hit.tick = _server_game.current_tick()
 	var _applied := _server_game.combat.apply_damage(hit)
+
+
+func _test_a_head_shot_off_reaches_the_client() -> void:
+	_section("a shot that takes a limb off is seen by the client, and a head off kills")
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	await _steps(4)
+	_heard.erase("npc")
+	var npc := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test", Basis(Vector3.UP, PI))
+	await _steps(6)
+	var net_id: int = _heard["npc"][0] if _heard.has("npc") else 0
+	var body := npc.node as ZzZombieBody
+	_check(body != null and body.limbs != null and body.limbs.limb_names().has(&"armL"), "a common has its limbs on the server")
+	var mirror := _client_bridge.zombie_mirror(net_id)
+	_check(mirror != null and mirror.limbs != null and mirror.limb_mask == 0, "and on the client, all attached")
+
+	# A body shot at the left arm: gone, and the zombie lives, slower to hurt.
+	var arm := body.limbs.points_of(body.limbs.defs[&"armL"])
+	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
+	shot.point = arm[arm.size() - 1]
+	shot.direction = Vector3.FORWARD
+	shot.tick = _server_game.current_tick()
+	var _landed := _server_game.combat.apply_damage(shot)
+	_check(body.limbs.is_severed(&"armL") and npc.is_alive(), "a shot at an arm severs it, and the zombie lives")
+	_check(body.limbs.attack_scale() < 1.0, "with a weaker swing", str(body.limbs.attack_scale()))
+	var waited := 0
+	while mirror != null and mirror.limb_mask == 0 and waited < 30:
+		await _step()
+		waited += 1
+	_check(mirror != null and mirror.limbs != null and mirror.limbs.is_severed(&"armL"),
+		"and the client's copy has the arm severed", str(mirror.limb_mask) if mirror != null else "gone")
+
+	# A head shot: the head, then the life.
+	var head := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 20.0, null)
+	head.hit_group = DotHitGroup.HEAD
+	head.point = body.global_position + Vector3(0.0, 1.6, 0.0)
+	head.direction = Vector3.FORWARD
+	head.tick = _server_game.current_tick()
+	var _headed := _server_game.combat.apply_damage(head)
+	_check(body.limbs.is_severed(&"head"), "a head shot severs the head")
+	_check(not npc.is_alive(), "and a lost head kills it")
+	await _steps(SERVER_TICK_RATE * 2)
+	_finished()
 
 
 func _hurt_npc(npc: DotNpcInstance, amount: float) -> void:

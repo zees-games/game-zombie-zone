@@ -20,6 +20,8 @@ var _at := Vector3.INF
 var _look := Vector3.INF
 var _spawn: Array = []
 var _pin := &""
+## --sever=head,armL: the spawned zombies lose those limbs, so a frame shows the stumps.
+var _sever: PackedStringArray = PackedStringArray()
 var _pin_me := false
 var _box := &""
 ## --aim=DEG: every stand-in but you holds this view pitch (up positive), so a frame from the
@@ -55,6 +57,8 @@ func _ready() -> void:
 			for part in arg.trim_prefix("--spawn=").split(","):
 				var bits := part.split(":")
 				_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
+		elif arg.begins_with("--sever="):
+			_sever = arg.trim_prefix("--sever=").split(",", false)
 		elif arg.begins_with("--pin="):
 			_pin = StringName(arg.trim_prefix("--pin="))
 		elif arg == "--pin-me":
@@ -210,6 +214,10 @@ func _run() -> void:
 				else game.horde.spawner.spawn(entry[0], game.horde.snap_to_nav(at), &"shot", Basis(Vector3.UP, PI))
 			if npc != null and npc.brain != null and entry[0] == ZzNpcs.COMMON:
 				npc.brain.call(&"force_target", local.player_id)
+			var body: Node3D = npc.node if npc != null else null
+			if body != null and body.get(&"limbs") != null:
+				for limb in _sever:
+					body.limbs.sever(StringName(limb), body.global_position + Vector3(0.0, 1.2, 0.0), Vector3(0.0, 2.0, 1.0))
 
 	if _box != &"" and game.boxes != null:
 		var _dropped := game.boxes.drop(_box, stand + Vector3(0.0, 0.0, -2.2))
