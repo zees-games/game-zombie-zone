@@ -118,6 +118,8 @@ signal player_hurt(player_id: StringName, amount: float, from: Vector3)
 signal zombie_killed(npc_kind: StringName, by: StringName, headshot: bool)
 signal objective_changed(index: int, state: StringName)
 signal gate_opened(gate: String)
+## A moving part of the map changed state ([method ZzMechanics.snapshot] has it).
+signal mover_changed(index: int)
 signal notice(text: String)
 signal refused(player_id: StringName, why: String)
 signal achievement_earned(player_id: StringName, title: String, points: int)
@@ -518,7 +520,41 @@ func _build_map() -> void:
 	map.authoritative = authoritative
 	map.toy_rules = toy_rules
 	map.gravity = config.gravity
+	map.occupants_fn = _mechanics_occupied
+	map.points_fn = _mechanics_points
+	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	add_child(map)
+
+
+func _mechanics_of_map() -> Variant:
+	return map.mechanics if map != null else null
+
+
+## Living survivors' body points, for the map's triggers.
+func _mechanics_points() -> PackedVector3Array:
+	var out := PackedVector3Array()
+
+	for id: StringName in players:
+		var p: ZzPlayer = players[id]
+
+		if p.is_alive() and not p.watching:
+			out.append(p.feet() + Vector3.UP * 0.9)
+
+	return out
+
+
+## Whether a survivor or a zombie is inside [param zone]; doors wait for nobody in their way.
+func _mechanics_occupied(zone: AABB) -> bool:
+	for point in _mechanics_points():
+		if zone.has_point(point):
+			return true
+
+	if horde != null:
+		for npc in horde.zombies_near(zone.get_center(), zone.size.length() * 0.5):
+			if zone.has_point(npc.position()):
+				return true
+
+	return false
 
 
 func _build_combat() -> void:
@@ -806,6 +842,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 	player.samples_input = samples_input
 	player.tick_rate = tick_rate
 	player.config = config
+	player.mechanics_fn = _mechanics_of_map
 	player.team = SURVIVORS
 	add_child(player)
 
@@ -1068,6 +1105,9 @@ func _on_round_started(number: int) -> void:
 	_stop_survival()
 	_reset_barricades()
 
+	if map != null and map.mechanics != null and authoritative:
+		map.mechanics.reset(_tick)
+
 	if pins != null:
 		pins.clear()
 	if hazards != null:
@@ -1299,6 +1339,8 @@ func build_map(doc: Dictionary) -> DotResult:
 		return built
 
 	map_doc = map.doc
+	if authoritative:
+		var _moving := map.build_mechanics_local()
 	_push_water()
 	_reset_barricades()
 	# The states are the map's: a map laid out between rounds (the map menu's change, a vote's)
@@ -1940,6 +1982,10 @@ func _begin_use(player: ZzPlayer) -> void:
 			_start(player, &"objective", index, float(o["seconds"]))
 			return
 
+	if map != null and map.mechanics != null \
+			and map.mechanics.try_press(player.eye_position(), player.aim_direction(), config.use_reach, _tick):
+		return
+
 	var mend := barricade_to_mend(player)
 
 	if mend >= 0:
@@ -2554,7 +2600,7 @@ func _advance_bodies(delta: float) -> void:
 		player.burning = player.burning_until > now_s
 		player.box_blind = boxes != null and boxes.is_blind(player.player_id)
 
-		if player.life == ZzPlayer.Life.DEAD and config.rescue_seconds > 0.0 and phase == Phase.PLAY \
+		if player.life == ZzPlayer.Life.DEAD and config.rescue_seconds > 0.0 \
 				and player.died_at >= 0.0 and now_s - player.died_at >= config.rescue_seconds:
 			var _back := rescue(player)
 
@@ -2812,6 +2858,9 @@ func _step(delta: float) -> void:
 				progress.add_playtime(id, delta)
 
 	_advance_weapons()
+
+	if map != null and map.mechanics != null:
+		map.mechanics.step(_tick)
 
 	if authoritative:
 		_advance_toys(delta)

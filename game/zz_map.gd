@@ -5,6 +5,7 @@ const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzFixtures := preload("zz_fixtures.gd")
 const ZzPaths := preload("zz_paths.gd")
+const ZzMechanics := preload("zz_mechanics.gd")
 const WATER_SHADER := preload("zz_water.gdshader")
 
 ## A map document, built: the building, the furniture, the lights and the sky.
@@ -103,7 +104,18 @@ const LOCAL_WORLD := "res://world/%s/%s"
 ## True once [method attach_world] has drawn this map's own geometry.
 var world_drawn: bool = false
 
+## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
+var mechanics: ZzMechanics = null
+## Whether a world's movers are built (off in suites that want the boxes alone).
+var use_mechanics: bool = true
+## Handed to the mechanics: a box has somebody in it, and the living survivors' points.
+var occupants_fn: Callable = Callable()
+var points_fn: Callable = Callable()
+var _pending_movers: Dictionary = {}
+
 signal built()
+## A moving part changed state on the server (see [method ZzMechanics.snapshot]).
+signal mover_changed(index: int)
 
 var physics: DotPhysicsLayout = null
 
@@ -253,6 +265,8 @@ func clear() -> void:
 	_wet = false
 	_gates.clear()
 	_barricades.clear()
+	mechanics = null
+	_pending_movers.clear()
 	_missing.clear()
 	_bounds = AABB()
 	_lamps.clear()
@@ -949,6 +963,9 @@ func attach_world(world: RefCounted) -> void:
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
+	attach_mechanics(world)
+	if mechanics != null:
+		mechanics.bind_drawn(node)
 
 	for box: Dictionary in zz.get("keep_boxes", []):
 		var tool := SurfaceTool.new()
@@ -965,6 +982,54 @@ func attach_world(world: RefCounted) -> void:
 
 	world_drawn = true
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
+## for the solid ones, the outputs that drive them. A second call keeps the first.
+func attach_mechanics(world: RefCounted) -> void:
+	if mechanics != null or not use_mechanics:
+		return
+	var made := ZzMechanics.new()
+	made.name = "Mechanics"
+	made.authoritative = authoritative
+	made.occupants_fn = occupants_fn
+	made.points_fn = points_fn
+	made.build(world, func(body: StaticBody3D) -> void: _put_on(body, &"world"))
+	if made.mover_count() == 0 and not made.has_logic():
+		made.free()
+		return
+	made.state_changed.connect(func(index: int) -> void: mover_changed.emit(index))
+	add_child(made)
+	mechanics = made
+	for index: int in _pending_movers:
+		var s: Array = _pending_movers[index]
+		made.apply_state(index, int(s[0]), int(s[1]), int(s[2]), int(s[3]) != 0)
+	_pending_movers.clear()
+
+
+## Reads the map's world from the checkout's `world/` (no drawing, no fetch) and builds its
+## mechanics: what a server, which draws nothing, runs. True when there were any.
+func build_mechanics_local() -> bool:
+	var pack := str(doc.get("world", ""))
+	if mechanics != null or not use_mechanics or pack == "" or not can_draw_world():
+		return false
+	var prefix := local_world_prefix()
+	if not FileAccess.file_exists(prefix + ".json"):
+		return false
+	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	if not read.ok:
+		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
+		return false
+	attach_mechanics(read.value)
+	return mechanics != null
+
+
+## A mover's state as the server sent it; kept until the mechanics exist.
+func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool) -> void:
+	if mechanics != null:
+		mechanics.apply_state(index, start, from_thousandths, dir, locked)
+	else:
+		_pending_movers[index] = [start, from_thousandths, dir, 1 if locked else 0]
 
 
 ## Takes a bake off: what was baked was the boxes.

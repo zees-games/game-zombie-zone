@@ -244,6 +244,7 @@ func _ready() -> void:
 	controller.extra_modes = [swim]
 	add_child(controller)
 	controller.simulated.connect(_on_simulated)
+	controller.before_fn = _before_tick
 
 	if samples_input:
 		sampler = DotFpsSampler.new(controller.tunables)
@@ -289,11 +290,42 @@ func level_at(feet: Vector3, eye: Vector3) -> int:
 	return out
 
 
+## Returns the map's mechanics (lifts, doors), or null. Set by the game.
+var mechanics_fn: Callable = Callable()
+
+
+func _before_tick(tick: int) -> void:
+	var mech: Variant = mechanics_fn.call() if mechanics_fn.is_valid() else null
+
+	if mech != null:
+		mech.pose_at(tick)
+
+
+## What the ground does to somebody standing on it: a lift or a swinging door carries them, in
+## the state, because the next tick starts from `state.position`.
+func _ride(tick: int, state: DotFpsState) -> void:
+	if state.mode != DotFpsState.Mode.GROUND or state.ground_id == 0 or not mechanics_fn.is_valid():
+		return
+
+	var mech: Variant = mechanics_fn.call()
+
+	if mech == null:
+		return
+
+	var moved: Vector3 = mech.carry(state.ground_id, state.position, tick)
+
+	if moved != Vector3.ZERO:
+		state.position += moved
+		global_position = state.position
+
+
 ## Once per simulated tick, after the move, a replay's included: into the water at the waist,
 ## and the wading slowdown while the feet are wet and the waist is not.
-func _on_simulated(_tick: int, state: DotFpsState) -> void:
+func _on_simulated(tick: int, state: DotFpsState) -> void:
 	if controller.motor == null:
 		return
+
+	_ride(tick, state)
 
 	swim.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())

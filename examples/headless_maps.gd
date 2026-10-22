@@ -4,6 +4,8 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzMap := preload("../game/zz_map.gd")
+const ZzMechanics := preload("../game/zz_mechanics.gd")
+const ZzPaths := preload("../game/zz_paths.gd")
 
 ## Every map the game can be sent, built the way a server builds it and looked over for the
 ## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
@@ -25,12 +27,14 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
 const CHECKS_PER_MAP := 17
 const BAKE_CHECKS := 7
+const WORLD_CHECKS := 3
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
 ## does: the delivered maps are checked wherever they are present, which is every machine
 ## that has run dot-bootstrap. Sections and checks are counted against this list.
 var _maps: Array = []
+var _worlds_read := 0
 
 ## A person's capsule, for "is this spawn clear".
 const RADIUS := 0.4
@@ -60,6 +64,7 @@ func _run() -> void:
 
 	await _test_the_catalogue()
 	await _test_baked_light()
+	await _test_worlds()
 
 	for id: String in _maps:
 		await _test_map(StringName(id))
@@ -73,8 +78,8 @@ func _run() -> void:
 
 	var code := 1 if _failed > 0 else 0
 
-	var sections := 2 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + CHECKS_PER_MAP * _maps.size()
+	var sections := 3 + _maps.size()
+	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size()
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -198,6 +203,60 @@ func _test_baked_light() -> void:
 				named.append("%s: %s" % [f, line.strip_edges()])
 	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 dot-lighting class", "%s" % [named])
 	await _dispose(game)
+	_finished()
+
+
+## Every converted map's drawn world reads, its movers all have geometry, and a mechanics builds
+## from them (zombie-zone-maps' tools/check_worlds.py holds the manifest half). Every document
+## in `maps/` that names a world, whether or not the section below plays it.
+func _test_worlds() -> void:
+	_section("worlds")
+	_worlds_read = 0
+
+	if not ZzMap.can_draw_world() or not DirAccess.dir_exists_absolute(ZzPaths.rebase("res://maps")):
+		_finished()
+		return
+
+	for file in DirAccess.get_files_at(ZzPaths.rebase("res://maps")):
+		if not file.ends_with(".json"):
+			continue
+
+		var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZzPaths.rebase("res://maps/" + file)))
+		var pack: String = str((doc as Dictionary).get("world", "")) if doc is Dictionary else ""
+		var id := file.get_basename()
+		var prefix := ZzPaths.rebase(ZzMap.LOCAL_WORLD % [pack, id])
+
+		if pack == "" or not FileAccess.file_exists(prefix + ".json"):
+			continue
+
+		_worlds_read += 1
+		var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+		_check(read.ok, "%s: its world reads" % id, "" if read.ok else read.error.message)
+
+		if not read.ok:
+			_check(false, "%s: its movers have geometry" % id)
+			_check(false, "%s: a mechanics builds from it" % id)
+			continue
+
+		var world: RefCounted = read.value
+		var manifest: Dictionary = world.get("manifest")
+		var models := {}
+		for model: int in world.call(&"models"):
+			models[model] = true
+
+		var orphans := 0
+		for rec: Dictionary in manifest.get("movers", []):
+			if rec.get("model") == null or not models.has(int(rec["model"])):
+				orphans += 1
+
+		var movers := (manifest["movers"] as Array).size()
+		_check(movers > 0 and orphans == 0, "%s: its movers have geometry" % id, "%d movers, %d without" % [movers, orphans])
+		var mech := ZzMechanics.new()
+		add_child(mech)
+		mech.build(world, Callable())
+		_check(mech.mover_count() == movers, "%s: a mechanics builds from it" % id, "%d of %d" % [mech.mover_count(), movers])
+		mech.queue_free()
+
 	_finished()
 
 

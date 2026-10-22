@@ -59,6 +59,15 @@ const KNOCK_SPEED := 9.0
 const KNOCK_LIFT := 5.0
 
 
+## Called with the tick before the motor sweeps (a replay's included): the map poses its movers.
+var before_fn: Callable = Callable()
+
+
+func _on_pre_simulate(tick: int, _delta: float) -> void:
+	if before_fn.is_valid():
+		before_fn.call(tick)
+
+
 func _register_extensions() -> void:
 	var pinned := DotFpsModifier.make(PINNED)
 	pinned.deny_move = true

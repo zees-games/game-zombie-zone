@@ -103,6 +103,9 @@ enum Kind {
 	TURRET_FIRE,
 	## It ran out, or was taken down.
 	TURRET_GONE,
+	## A lift, door or other moving part of a converted map changed state: index, start tick,
+	## fraction then, direction, locked.
+	MOVER,
 }
 
 enum Ask {
@@ -736,6 +739,25 @@ static func read_objective(r: DotNetReader) -> Dictionary:
 	var index := r.read_uint(5)
 	var state := r.read_uint(2)
 	return {"index": index, "state": state, "ok": r.ok()}
+
+
+static func write_mover(state: Array, index: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(index)
+	w.write_varint(int(state[0]))
+	w.write_uint(clampi(int(state[1]), 0, 1000), 10)
+	w.write_uint(clampi(int(state[2]) + 1, 0, 2), 2)
+	w.write_uint(int(state[3]), 1)
+	return w.to_bytes()
+
+
+static func read_mover(r: DotNetReader) -> Dictionary:
+	var index := r.read_varint()
+	var start := r.read_varint()
+	var from := r.read_uint(10)
+	var dir := r.read_uint(2) - 1
+	var locked := r.read_uint(1)
+	return {"index": index, "start": start, "from": from, "dir": dir, "locked": locked != 0, "ok": r.ok()}
 
 
 static func write_gate(gate: String) -> PackedByteArray:

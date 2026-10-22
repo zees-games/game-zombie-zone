@@ -325,6 +325,9 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_broadcast(ZzEvents.Kind.OBJECTIVE, ZzEvents.write_objective(index, _objective_code(state))))
 		game.gate_opened.connect(func(gate: String) -> void:
 			_broadcast(ZzEvents.Kind.GATE, ZzEvents.write_gate(gate)))
+		game.mover_changed.connect(func(index: int) -> void:
+			if game.map != null and game.map.mechanics != null:
+				_broadcast(ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index)))
 		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
 			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
 		game.survival_changed.connect(func() -> void:
@@ -1127,6 +1130,10 @@ func _tell_the_world(peer_id: int) -> void:
 		for gate in game.horde.open_gates:
 			_tell(peer_id, ZzEvents.Kind.GATE, ZzEvents.write_gate(gate))
 
+	if game.map != null and game.map.mechanics != null:
+		for index in game.map.mechanics.told_indices():
+			_tell(peer_id, ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index))
+
 	for id: String in game.barricades:
 		var b: Dictionary = game.barricades[id]
 		if float(b["health"]) < float(b["max"]) or not bool(b["intact"]):
@@ -1445,6 +1452,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			if bool(g["ok"]):
 				game.map.open_gate(str(g["gate"]))
 				gate_received.emit(str(g["gate"]))
+		ZzEvents.Kind.MOVER:
+			var mv := ZzEvents.read_mover(reader)
+			if bool(mv["ok"]) and game.map != null:
+				game.map.apply_mover_state(int(mv["index"]), int(mv["start"]), int(mv["from"]), int(mv["dir"]), bool(mv["locked"]))
 		ZzEvents.Kind.BARRICADE:
 			var bar := ZzEvents.read_barricade(reader)
 			if bool(bar["ok"]):
