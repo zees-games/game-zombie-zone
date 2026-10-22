@@ -73,3 +73,7 @@ With the last floor recorded (`fallen_from`, `fallen_how`), about a hundred long
 ## zz_trace.gd removed (2026-10-16)
 
 dot-combat 3977e7a (tag v0.1.6, API level 2) moved the stacked-team-mate rule into `DotCombatManager.pass_through_sets`, so `zz_trace.gd` is gone and `ZzGame` uses the stock `DotTracePhysics`; the stand-ins' friend check asks `DotHitboxSet.contains_point`. **Do not tag or push this commit until the client shell carrying dot-combat 3977e7a is live**: a delivered pack runs against the host's dot-combat, and on an older host nothing would skip a stacked friend.
+
+## An investigating common sat 24 s on a floor seam (2026-10-22)
+
+`headless_nav --only=stuck:ze_death_star_escape` put 12% of the commons' goal time in the cell (40,-200). The body stood at (39.92, 0.32, -201.37) with `wish` set, six identical up-normal contacts on one shape (depth 0.001) per `move_and_slide`, and a free `test_move`: a seam between overlapping coplanar floor slabs, which a capsule probe of radius 0.30 crossed freely (the body is 0.32). Only the chase branch called `_unstick`; the investigate and lure branches never hopped or nudged. They do now: that cell 12.2% to 1.8%, worst stretch 24 s to 5 s. The remaining (36,-268) is a 0.15 m lip across a stair foot (slabs topping 0.457 on a 0.305 floor): a capsule is stopped dead by it (measured), the nav does not know a lip that low, and the hop clears it in about 3 s.

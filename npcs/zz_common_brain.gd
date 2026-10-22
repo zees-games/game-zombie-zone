@@ -183,6 +183,8 @@ func _decide(_delta: float) -> void:
 				idle_kind = Idle.MILL
 			else:
 				b.anim = ZzZombieBody.Anim.RUN if b.wish.length() > 2.0 else ZzZombieBody.Anim.IDLE
+				# Chase hopped a wedged body free; investigating one sat 24 s on a floor seam (ze_death_star_escape).
+				_unstick(b, npc.position())
 
 		&"chase":
 			_set_sight(ALERT_SIGHT)
@@ -208,6 +210,7 @@ func _decide(_delta: float) -> void:
 				if gap > 1.8:
 					go_to(lure, npc.def.move_speed * pace, 1.0)
 					b.anim = ZzZombieBody.Anim.RUN
+					_unstick(b, lure)
 				else:
 					halt()
 					face(lure - npc.position())
