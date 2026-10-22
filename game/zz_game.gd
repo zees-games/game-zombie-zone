@@ -154,6 +154,10 @@ signal survival_changed()
 ## Whether this machine draws the world: a client does, a server does not.
 @export var draw_world: bool = false
 
+## doc -> `<owner>/<world>@<version>`, or "": where a map's drawn world is published. Set by the
+## module on a server; unset, a client finds a world only in its own checkout.
+var world_key_fn: Callable = Callable()
+
 var map: ZzMap = null
 var catalogue: ZzCatalogue = null
 
@@ -1279,6 +1283,14 @@ func build_map(doc: Dictionary) -> DotResult:
 
 	for id: StringName in players:
 		(players[id] as ZzPlayer).reset_map()
+
+	# The pack a client fetches this map's drawn world from ([method ZzMap.load_world]), named by
+	# the server, which knows which maps pack the document came from.
+	if world_key_fn.is_valid() and str(doc.get("world", "")) != "" and not doc.has("world_key"):
+		var key := str(world_key_fn.call(doc))
+		if key != "":
+			doc = doc.duplicate()
+			doc["world_key"] = key
 
 	var built := map.build(doc)
 

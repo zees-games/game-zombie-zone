@@ -154,6 +154,7 @@ func _game_load() -> DotResult:
 	if world == null:
 		return DotResult.fail(DotError.CODE_STATE, "The registered game is not an ZzGame.")
 
+	world.world_key_fn = _world_key
 	add_command("zz_status", _cmd_status, "Show the map, the survivors and the horde")
 	add_command("zz_net", _cmd_net, "Show what the netcode is doing")
 	# The map commands are renameable from maps.yml's `commands:` block, like dot-vote's roles.
@@ -318,6 +319,26 @@ func _add_delivered_maps(world: ZzGame) -> int:
 		read += world.catalogue.add_directory(root)
 
 	return read
+
+
+## Where a map's drawn world is published: its document's `world` pack, at the owner and version
+## of the maps pack the document came from (zombie-zone-maps' release publishes both from one tag,
+## dot-ci's release-maps). Empty for a map from no pack: a client then draws its boxes, unless
+## its own checkout has the world.
+func _world_key(doc: Dictionary) -> String:
+	var pack := str(doc.get("world", ""))
+	if server == null or pack == "":
+		return ""
+
+	for key in DotGameContent.map_keys(server):
+		if not FileAccess.file_exists("%s/maps/%s.json" % [DotGameContent.mount_of(key), str(doc.get("id", ""))]):
+			continue
+		var slash := key.find("/")
+		var at := key.rfind("@")
+		if slash > 0 and at > slash:
+			return "%s/%s@%s" % [key.substr(0, slash), pack, key.substr(at + 1)]
+
+	return ""
 
 
 ## Who somebody is reaches the world: a face as they are seated, and the real name and face

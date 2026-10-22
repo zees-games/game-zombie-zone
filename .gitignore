@@ -53,6 +53,11 @@
 # bootstrap-link: zombie-zone-maps/maps ci
 /maps
 
+# The converted maps' drawn worlds, for a checkout (game/zz_map.gd load_world). Never in CI or in
+# this game's pack: delivered, each world is a pack of its own that a client fetches for its map.
+# bootstrap-link: zombie-zone-maps/world
+/world
+
 # Exports
 build/
 export_presets.cfg

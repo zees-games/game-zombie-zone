@@ -179,7 +179,26 @@ func _hold_for_maps() -> void:
 			gate.hold(&"map", "Loading the map"))
 	game.world_rebuilt.connect(func() -> void:
 		if gate != null:
-			gate.release(&"map"))
+			gate.release(&"map")
+		_draw_world())
+
+
+## The map's own geometry, fetched when it is delivered, under the cover ([method ZzMap.load_world]).
+## Whatever happens the cover lifts: without its world a map is drawn with its boxes.
+func _draw_world() -> void:
+	if game == null or game.map == null or str(game.map.doc.get("world", "")) == "":
+		return
+	# A later map's load owns the hold once it starts: an earlier one returning must not lift it.
+	_world_ticket += 1
+	var ticket := _world_ticket
+	if gate != null:
+		gate.hold(&"world", "Loading the world")
+	var _drawn: DotResult = await game.map.load_world()
+	if gate != null and ticket == _world_ticket:
+		gate.release(&"world")
+
+
+var _world_ticket: int = 0
 
 
 ## True while the load gate covers the screen: no input, no sampling, no horde.

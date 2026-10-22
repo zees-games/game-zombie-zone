@@ -31,7 +31,8 @@ var _alone := false
 var _reaction := &""
 var _client: Node = null
 var _weapons: PackedStringArray = PackedStringArray()
-## --no-bake draws the map with live lamps (the look before bakes); --day=0..1 holds the map's
+## --no-bake draws the map with live lamps (the look before bakes); --no-world draws a converted
+## map's boxes instead of its own geometry (ZzMap.load_world); --day=0..1 holds the map's
 ## light at that daylight, to compare a night and a day frame on any map that has a day.
 var _day := -1.0
 
@@ -72,6 +73,8 @@ func _ready() -> void:
 			_subscribe_fixture()
 		elif arg == "--no-bake":
 			ZzMap.use_bakes = false
+		elif arg == "--no-world":
+			ZzMap.use_worlds = false
 		elif arg.begins_with("--day="):
 			_day = arg.trim_prefix("--day=").to_float()
 

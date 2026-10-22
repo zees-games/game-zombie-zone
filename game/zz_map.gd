@@ -90,6 +90,19 @@ const BAKE_PATH := "res://lightmaps/%s.res"
 ## Whether a client looks for a map's bake at all. Off draws every map with live lamps.
 static var use_bakes: bool = true
 
+## Whether a client draws a converted map with its own geometry ([method load_world]). Off
+## draws the boxes, as before the worlds existed.
+static var use_worlds: bool = true
+
+## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
+const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
+
+## Where a checkout keeps a map's world: `world/<pack>/<id>`.
+const LOCAL_WORLD := "res://world/%s/%s"
+
+## True once [method attach_world] has drawn this map's own geometry.
+var world_drawn: bool = false
+
 signal built()
 
 var physics: DotPhysicsLayout = null
@@ -244,6 +257,7 @@ func clear() -> void:
 	_bounds = AABB()
 	_lamps.clear()
 	baked = null
+	world_drawn = false
 	toys = null
 	_solid = null
 	_furniture = null
@@ -854,6 +868,116 @@ func _attach_bake() -> void:
 		_baked_exposure = _environment.environment.tonemap_exposure
 
 	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
+
+
+## Whether this host can read a map's drawn world: dot-map's [code]DotMapBspMesh[/code], reached by
+## path for the reason [method can_bake] gives (a shell with an older dot-map would fail to parse
+## this script on the name).
+static func can_draw_world() -> bool:
+	return ResourceLoader.exists(MESH_SCRIPT)
+
+
+## Where a world sits beside the game in a checkout (`world/` is zombie-zone-maps' `world/`,
+## linked by dot-bootstrap and never shipped in the game's pack).
+func local_world_prefix() -> String:
+	return ZzPaths.rebase(LOCAL_WORLD % [str(doc.get("world", "")), String(id())])
+
+
+## Draws the map with its own geometry ([member doc]'s `world`, zombie-zone-maps'
+## tools/build_worlds.py) in place of its boxes, which still collide and still are the horde's
+## ground: the mesh is what a survivor sees, never what anything stands on. From the checkout's
+## `world/` when it is there, else fetched through dot-cloud by the `world_key` the server sent.
+## A world that cannot be had leaves the boxes drawn: the map plays the same either way.
+##
+## Succeeds with true when the world is drawn, false when there is none to draw.
+func load_world() -> DotResult:
+	var pack := str(doc.get("world", ""))
+	if not draw_world or not use_worlds or pack == "" or not can_draw_world() or _drawn == null:
+		return DotResult.success(false)
+
+	var wanted := id()
+	var prefix := local_world_prefix()
+
+	if not FileAccess.file_exists(prefix + ".json"):
+		var key := str(doc.get("world_key", ""))
+		if key == "":
+			return DotResult.success(false)
+		var got: DotResult = await DotGameContent.ensure_one(key)
+		if id() != wanted or _drawn == null:
+			return DotResult.success(false)
+		if not got.ok:
+			DotLog.warn(CHANNEL, "a map's world could not be fetched; its boxes are drawn", {
+				"map": String(wanted), "pack": key, "why": got.error.message,
+			})
+			return got
+		prefix = DotGameContent.mount_of(key) + "/" + String(wanted)
+
+	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+
+	if not read.ok:
+		DotLog.warn(CHANNEL, "a map's world would not read; its boxes are drawn", {
+			"map": String(wanted), "at": prefix, "why": read.error.message,
+		})
+		return read
+
+	attach_world(read.value)
+	return DotResult.success(true)
+
+
+## Lays [param world] (a [code]DotMapBspMesh[/code]) over the map: its meshes in, the box batches
+## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
+## drawn as boxes; they are not in the original's faces. A bake is made from the boxes, so it is
+## taken off and the lamps light the world live.
+func attach_world(world: RefCounted) -> void:
+	if _drawn == null:
+		return
+
+	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
+	var mats: Dictionary = zz.get("materials", {})
+	var map_id := String(id())
+	var material_for := func(rec: Dictionary) -> Material:
+		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
+		return ZzMaterials.material(mat, Color.WHITE, "wall", ZzMaterials.surface_for(map_id, mat, ""))
+
+	_unbake()
+
+	for child in _drawn.get_children():
+		if child is MeshInstance3D and (String(child.name).begins_with("Boxes_") or String(child.name).begins_with("Shiny_")):
+			_drawn.remove_child(child)
+			child.queue_free()
+
+	var node: Node3D = world.call(&"build_node", material_for)
+	node.name = "World"
+	_drawn.add_child(node)
+
+	for box: Dictionary in zz.get("keep_boxes", []):
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var size := ZzMapDoc.v3(box["size"])
+		_add_box(tool, Transform3D(Basis(Vector3.UP, deg_to_rad(float(box.get("yaw", 0.0)))), ZzMapDoc.v3(box["at"])), size)
+		var kept := MeshInstance3D.new()
+		kept.name = "Kept"
+		kept.mesh = tool.commit()
+		var mat := str(box.get("mat", "concrete"))
+		kept.material_override = ZzMaterials.material(mat, ZzMapDoc.colour(box.get("tint", [1, 1, 1])), ZzMaterials.role_of(size),
+			ZzMaterials.surface_for(map_id, mat, ""))
+		_drawn.add_child(kept)
+
+	world_drawn = true
+	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## Takes a bake off: what was baked was the boxes.
+func _unbake() -> void:
+	if baked == null:
+		return
+	baked.get_parent().remove_child(baked)
+	baked.queue_free()
+	baked = null
+	for lamp in _lamps:
+		lamp.light_bake_mode = Light3D.BAKE_DYNAMIC
+	if _environment != null:
+		_environment.environment.tonemap_exposure = _baked_exposure
 
 
 ## The lamps, for the bake scene and the suites.

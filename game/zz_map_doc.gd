@@ -57,6 +57,9 @@ const KIND := "zombiezone_map"
 ## must fit with room for the header.
 const WIRE_LIMIT := 60000
 
+## A map's drawn world is the pack `zz_world_<id>` (zombie-zone-maps' tools/build_worlds.py).
+const WORLD_PREFIX := "zz_world_"
+
 const MAX_BOXES := 6000
 const MAX_PROPS := 2000
 const MAX_TOYS := 96
@@ -145,6 +148,19 @@ static func validate(source: Dictionary) -> DotResult:
 		"next": str(source.get("next", "")),
 		"survive_seconds": maxf(float(source.get("survive_seconds", 0.0)), 0.0),
 	}
+
+	# The map's own drawn geometry, a pack of its own (ZzMap.load_world); without it the boxes are
+	# drawn. Only a name the converter makes, so a document cannot point a client at any pack.
+	var world := str(source.get("world", ""))
+	if world != "":
+		if not world.begins_with(WORLD_PREFIX) or not _is_id(world):
+			return _refuse("world '%s' is not %s<id>" % [world, WORLD_PREFIX], source)
+		doc["world"] = world
+		# What the server resolved it to (`<owner>/<pack>@<version>`), sent in MAP: the same pack
+		# name, so a key from the wire can only name this map's world.
+		var key := str(source.get("world_key", ""))
+		if key != "" and _world_key_ok(key, world):
+			doc["world_key"] = key
 
 	var mode := str(source.get("mode", EXODUS))
 
@@ -615,6 +631,23 @@ static func _colour_list(value: Variant) -> Array:
 ## Millimetres, as a double JSON prints short.
 static func _r(value: float) -> float:
 	return snappedf(value, 0.001)
+
+
+## Whether [param key] is `<owner>/<world>@<version>` for exactly [param world].
+static func _world_key_ok(key: String, world: String) -> bool:
+	var slash := key.find("/")
+	var at := key.rfind("@")
+	if slash <= 0 or at <= slash or key.length() > 160:
+		return false
+	var owner := key.substr(0, slash)
+	var version := key.substr(at + 1)
+	if key.substr(slash + 1, at - slash - 1) != world or version.is_empty():
+		return false
+	for part: String in [owner, version]:
+		for character in part:
+			if not (character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.+"):
+				return false
+	return not owner.contains("..") and not version.contains("..")
 
 
 static func _is_id(id: String) -> bool:
