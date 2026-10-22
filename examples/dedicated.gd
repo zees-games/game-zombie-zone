@@ -473,15 +473,21 @@ func _test_the_map_vote() -> void:
 	_check(director.current_id() == laid and not director.is_voting(),
 		"the new map starts the vote over", "%s / %s" % [director.current_id(), laid])
 	vote.set("voters_fn", func() -> Array: return [&"console"])
+	director.rules.rtv_delay_sec = 0.0
 	director.advance(director.rules.vote_cooldown_sec + 0.1)
 	var opened_count := [0]
 	var counter := func(_options: Array, _seconds: float) -> void: opened_count[0] += 1
 	director.vote_opened.connect(counter)
+	# The map's own rules came back with it (two humans); this fixture has one.
+	director.rules.min_players_to_vote = 1
+	director.rules.rtv_min_players = 1
+	director.rules.allow_single_voter_auto = true
+	var before := director.is_voting()
 	var rocked := _run_command("rtv")
 	vote.call("advance", 0.05)
 	_check(director.is_voting(), "and a passing rock-the-vote opens a ballot", str(rocked))
 	# The director opens it under MANUAL; this game used to open it from clock.expired too.
-	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", str(opened_count[0]))
+	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", "%s (voting before rtv: %s)" % [opened_count[0], before])
 	director.vote_opened.disconnect(counter)
 	_finished()
 
