@@ -35,8 +35,7 @@ const ALL_MAPS := ["zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_chapel
 	"ze_runforyourlife_1_v4"]
 
 ## Maps held to a stuck band, each once a worst case: blackout_2 had a 108 s wedge on a pallet, lot and
-## high_school wedged stand-ins on a low prop (zm_atix_helicopter is not held: its importer links run through
-## a window sill and it stays at about 50% until the importer is fixed). The bands are wide
+## high_school wedged stand-ins on a low prop. The bands
 ## because two runs of one map differ; they catch a return to those numbers, not a 1% drift.
 const STUCK_BANDS := ["zz_blackout_2", "zz_lot", "zz_high_school"]
 const STANDIN_BAND := 0.15

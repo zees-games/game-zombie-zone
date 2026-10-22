@@ -378,6 +378,9 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## corner stood there for a hundred seconds, sliding on six contacts, because the graph said the
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
+## Metres above the higher end a link is tested for a wall at (a counter top and a chest), and trimmed off each end of it.
+const LINK_TEST_HEIGHTS := [0.4, 0.9]
+const LINK_TEST_TRIM := 0.15
 
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
 ## them as an obstacle, and its links between storeys.
@@ -388,7 +391,60 @@ const PROP_CUT_HEIGHT := 0.3
 ## than a step. A gate is in the way while it is shut: the graph is built again when one opens
 ## ([param open_gates]), because a horde that pathed through a shut door would pile up against
 ## it, and one that never learned it had opened would never come through.
-static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray()) -> DotNpcNavData:
+static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> DotNpcNavData:
+	var info := {}
+	var strict := _nav_with(doc, props_size, open_gates, extra_solids, LINK_TEST_HEIGHTS, info)
+
+	if int(info["rejected"]) == 0:
+		return strict
+
+	# A link over a counter or through a wall is a hop nobody can make; but some maps have no other
+	# way between their rooms, and cutting those strands the posts. Keep the links that hold a map
+	# together: the strictest test that loses no post and under 1% of the ground.
+	var kept := _nav_with(doc, props_size, open_gates, extra_solids, [], info)
+	var floor_reach := _reach(kept, doc)
+
+	for heights: Array in [LINK_TEST_HEIGHTS, [LINK_TEST_HEIGHTS[-1]]]:
+		var tried := strict if heights == LINK_TEST_HEIGHTS else _nav_with(doc, props_size, open_gates, extra_solids, heights, info)
+		var reach := _reach(tried, doc)
+
+		if reach.x >= floor_reach.x and reach.y * 100 >= floor_reach.y * 99:
+			return tried
+
+	return kept
+
+
+## The posts and the points of the ground joined to the first survivor spawn on [param nav].
+static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
+	var graph := DotNpcNavGraph.new(nav)
+	var spawns: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
+
+	if spawns.is_empty():
+		return Vector2i.ZERO
+
+	var home := nav.nearest_point(ZzMapDoc.v3(spawns[0]["at"]), 2.0)
+
+	if home < 0:
+		return Vector2i.ZERO
+
+	var posts := 0
+
+	for p: Variant in doc.get("posts", []):
+		var point := nav.nearest_point(ZzMapDoc.v3(p), 2.0)
+
+		if point >= 0 and graph.connected(home, point):
+			posts += 1
+
+	var points := 0
+
+	for i in nav.points.size():
+		if graph.connected(home, i):
+			points += 1
+
+	return Vector2i(posts, points)
+
+
+static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> DotNpcNavData:
 	var nav_doc: Dictionary = doc.get("nav", {})
 	var builder := DotNpcNavBuilder.new()
 	builder.spacing = float(nav_doc.get("spacing", 1.0))
@@ -403,6 +459,8 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 		var area := AABB(Vector3(float(f[0]), float(f[4]), float(f[1])),
 			Vector3(float(f[2]) - float(f[0]), 0.0, float(f[3]) - float(f[1])))
 		builder.add_floor(area, float(f[4]))
+
+	var solids: Array[AABB] = []
 
 	for box: Dictionary in doc.get("boxes", []):
 		if not bool(box.get("solid", true)):
@@ -420,6 +478,7 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 			continue
 
 		builder.add_obstacle(bounds)
+		solids.append(bounds)
 
 	if props_size.is_valid():
 		for prop: Dictionary in doc.get("props", []):
@@ -436,11 +495,57 @@ static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 				absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
 			builder.add_obstacle(AABB(at + Vector3(-extent.x, 0.0, -extent.z), Vector3(extent.x * 2.0, size.y, extent.z * 2.0)))
 
-	for link: Array in nav_doc.get("links", []):
-		builder.add_link(Vector3(float(link[0]), float(link[1]), float(link[2])),
-			Vector3(float(link[3]), float(link[4]), float(link[5])))
+	for bounds in extra_solids:
+		builder.add_obstacle(bounds)
+		solids.append(bounds)
 
-	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates))
+	var rejected := 0
+
+	for link: Array in nav_doc.get("links", []):
+		var from := Vector3(float(link[0]), float(link[1]), float(link[2]))
+		var to := Vector3(float(link[3]), float(link[4]), float(link[5]))
+
+		if _link_blocked(from, to, solids, heights):
+			rejected += 1
+			continue
+
+		builder.add_link(from, to)
+
+	info["rejected"] = rejected
+
+	if rejected > 0:
+		DotLog.debug(CHANNEL, "nav links through solid geometry dropped", {"map": doc.get("id", ""), "dropped": rejected})
+
+	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates, extra_solids))
+
+
+## Whether the straight run from [param from] to [param to] goes through a wall: the importer
+## emits links without looking, and one through a wall joins two rooms that have no door. Tested
+## at knee and chest height over the higher end, shrunk at both ends so a link that starts at a wall's face
+## is not judged by it. Gates count only while shut (they are in [param solids] only then).
+static func _link_blocked(from: Vector3, to: Vector3, solids: Array[AABB], heights: Array) -> bool:
+	var top := maxf(from.y, to.y)
+
+	for rise: float in heights:
+		var y := top + rise
+		var a := Vector3(from.x, y, from.z)
+		var b := Vector3(to.x, y, to.z)
+
+		if a.distance_to(b) < 0.5:
+			return false
+
+		var dir := (b - a).normalized()
+		a += dir * LINK_TEST_TRIM
+		b -= dir * LINK_TEST_TRIM
+
+		for bounds in solids:
+			if bounds.end.y < y or bounds.position.y > y:
+				continue
+
+			if bounds.intersects_segment(a, b):
+				return true
+
+	return false
 
 
 ## The axis-aligned bounds of a (possibly turned) box.
@@ -476,9 +581,9 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 
 
 ## A fingerprint of everything the graph was built from.
-static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray()) -> String:
+static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> String:
 	return DotNpcNavData.digest_of([
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
-		",".join(open_gates),
+		",".join(open_gates), str(extra_solids),
 	])

@@ -113,6 +113,29 @@ func mover_count() -> int:
 	return _movers.size()
 
 
+## Where the pieces of the moving hulls (boats, trains) lie at rest, for the zombies' graph: walkers climbed
+## onto one and stood wedged on it. Doors and lifts are left out, they open or are gated.
+func rest_blockers() -> Array[AABB]:
+	var found: Array[AABB] = []
+
+	for m in _movers:
+		var body: Variant = m.get("body")
+
+		if str(m["kind"]) != "path" or body == null:
+			continue
+
+		for c in (body as Node3D).get_children():
+			if c is CollisionShape3D and (c as CollisionShape3D).shape != null:
+				var box: AABB = (c as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+				box.position += (c as Node3D).global_position
+				# Down to the ground: a hull that hangs a hand above it is an overhead to the graph, yet a walker wedges under it.
+				box.size.y += maxf(box.position.y, 0.0)
+				box.position.y = minf(box.position.y, 0.0)
+				found.append(box)
+
+	return found
+
+
 ## The mover at [param index] as plain data (for checks and the debug overlay).
 func mover(index: int) -> Dictionary:
 	return _movers[index]

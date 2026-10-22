@@ -349,7 +349,12 @@ func rebuild_navigation() -> DotResult:
 			return game.props_catalogue.size_of(id) if game.props_catalogue.has(id) else Vector3.ZERO
 
 	var started := Time.get_ticks_msec()
-	nav = ZzNpcs.nav_for(_doc, props_size, open_gates)
+	var blockers: Array[AABB] = []
+
+	if game.map != null and game.map.mechanics != null:
+		blockers = game.map.mechanics.rest_blockers()
+
+	nav = ZzNpcs.nav_for(_doc, props_size, open_gates, blockers)
 
 	var valid := nav.validate()
 
