@@ -57,6 +57,10 @@ const FRIEND_CLEARANCE := 0.7
 ## The cone a stand-in's shot may land in around its aim: its own aim wobble plus a moving
 ## shotgun's spread. A friend's hitbox inside it is a friend in the line.
 const FRIEND_CONE_DEGREES := 14.0
+
+## How far inside a friend's hitbox the eye must be (metres, each way) for the shot to count as
+## passing through them; see [method _holds_muzzle]. A stand-in moves about 4 cm per tick.
+const MUZZLE_MARGIN := 0.08
 const SHOVE_RANGE := 1.7
 
 ## How far a bot lets its leader get before it walks after them.
@@ -643,7 +647,7 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		if set_node == null or not is_instance_valid(set_node):
 			continue
 
-		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and set_node.contains_point(eye):
+		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and _holds_muzzle(set_node, eye):
 			continue
 
 		for box in set_node.hitboxes():
@@ -660,6 +664,24 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 				return true
 
 	return false
+
+
+## Whether a friend's hitboxes hold the eye with room to spare, not by a hair. The decision to
+## fire is made a tick before the shot, and both stand-ins keep walking in between: an eye
+## 2 cm inside a friend's capsule when it decided was 2 cm outside when the pellets left, so the
+## pass-through no longer applied and a shotgun volley hit that friend at 7 mm (86 damage in one
+## shot, the "102 friendly damage" that failed headless_run whenever the loot pool let a stand-in
+## pick the shotgun up). An eye near the edge counts as not held, so the line test below runs.
+func _holds_muzzle(set_node: DotHitboxSet, eye: Vector3) -> bool:
+	if not set_node.contains_point(eye):
+		return false
+
+	for offset in [Vector3(MUZZLE_MARGIN, 0.0, 0.0), Vector3(-MUZZLE_MARGIN, 0.0, 0.0),
+			Vector3(0.0, 0.0, MUZZLE_MARGIN), Vector3(0.0, 0.0, -MUZZLE_MARGIN)]:
+		if not set_node.contains_point(eye + offset):
+			return false
+
+	return true
 
 
 ## The level the server's combat manager judges shots under (its `mp_teammate_passthrough`).
