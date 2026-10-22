@@ -150,6 +150,22 @@ static func _set_pack_game(dir: String) -> void:
 		if script != null and script.get(&"game") is String:
 			script.set(&"game", GAME_ID)
 
+		if script != null and script.get(&"pack_cfg_root") is String:
+			script.set(&"pack_cfg_root", _mounted_cfg_root(dir))
+
+
+## A pack delivered by dot-cloud sits under `<mount prefix>/addons/<pack>/`, and its profiles under `<prefix>/cfg`
+## (`DotCloudMounter.cfg_root_of`); a pack linked into `res://addons` has no root of its own, so this is empty.
+static func _mounted_cfg_root(dir: String) -> String:
+	var at := dir.find("/addons/")
+	var prefix := dir.substr(0, at) if at >= 0 else ""
+
+	if prefix in ["", "res:/", "res:", "res://"]:
+		return ""
+
+	var root := prefix.path_join("cfg")
+	return root if DirAccess.dir_exists_absolute(root) else ""
+
 
 static func cfg(path: String, fallback: Variant) -> Variant:
 	return DotAddonConfig.get_value(config, path, fallback)

@@ -18,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addons/zombie_zone"
 const SECTIONS := 5
-const CHECKS := 37
+const CHECKS := 38
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -85,6 +85,10 @@ func _none_installed() -> void:
 	var found := ZzPacks.scan("res://examples/fixtures/none")
 	ZzWeapons.use_packs(true)
 	_check(found == 0 and ZzPacks.monsters.is_empty() and ZzPacks.weapon_rows.is_empty(), "an empty scan finds nothing")
+	var cfg_dir := ProjectSettings.globalize_path("user://zz_mounted_pack")
+	DirAccess.make_dir_recursive_absolute(cfg_dir.path_join("cfg"))
+	_check(ZzPacks._mounted_cfg_root("res://addons/pack/") == "" and ZzPacks._mounted_cfg_root(cfg_dir + "/addons/pack/") == cfg_dir + "/cfg",
+		"a mounted pack's cfg root is found, a linked pack has none")
 	_check(not ZzWeapons.exists(&"fx_rifle"), "no pack weapon in the pool")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
 	_check(cat.size() == 12, "the catalogue is the twelve built-in kinds", "%d" % cat.size())
