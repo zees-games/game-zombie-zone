@@ -126,6 +126,9 @@ func _ready() -> void:
 	add_child(platform)
 	gate = platform.gate
 	gate.hold(&"map", "Loading the map")
+	# Connected, the cover waits for the server's word on what this survivor holds, so the view model is
+	# drawn (and its materials warmed) before the player is shown; the gate's timeout is the backstop.
+	gate.require(&"weapon", func() -> bool: return _offline or _armed_told, "Arming")
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
 	var config := ZzConfig.new()
@@ -199,6 +202,8 @@ func _draw_world() -> void:
 
 
 var _world_ticket: int = 0
+## The server has said what this survivor holds (a weapon or nothing); the load gate's `weapon` requirement.
+var _armed_told: bool = false
 
 
 ## True while the load gate covers the screen: no input, no sampling, no horde.
@@ -228,6 +233,7 @@ func _warm_zombies() -> void:
 		return
 
 	var materials: Array = []
+	var bodies := {}
 
 	for kind: StringName in [ZzNpcs.COMMON, ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM,
 			ZzNpcs.SPITTER, ZzNpcs.RIDER, ZzNpcs.BRUTE, ZzNpcs.SLEEPER, ZzNpcs.SCREAMER, ZzNpcs.CRAWLER,
@@ -235,7 +241,17 @@ func _warm_zombies() -> void:
 		var variants := ZzZombieView.common_variety() if kind == ZzNpcs.COMMON else 1
 
 		for variant in variants:
-			materials.append(ZzZombieView._material_for(ZzZombieView.look_for(kind, variant)))
+			var look := ZzZombieView.look_for(kind, variant)
+			materials.append(ZzZombieView._material_for(look))
+
+			# Each distinct body once: its model, clips and retarget are cached statics, which the first
+			# zombie of a wave would otherwise build mid-play.
+			if not bodies.has(look["body"]):
+				bodies[look["body"]] = true
+				var view := ZzZombieView.new()
+				world_view.add_child(view)
+				view.build(kind, variant)
+				view.queue_free()
 
 	gate.warm_up(materials)
 
@@ -862,6 +878,8 @@ func _on_zombie(kind: StringName, appeared: bool) -> void:
 func _on_armed(session_id: int, weapon_id: StringName) -> void:
 	if session_id != _watch_id:
 		return
+
+	_armed_told = true
 
 	if weapon_id == &"":
 		_strip_locally()
