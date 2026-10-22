@@ -61,6 +61,9 @@ var _worlds: Array[ZzGame] = []
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
+	# Optional packs linked into addons/ add weapons to the loot pool, which shifts what the
+	# stand-ins pick up: this suite's thresholds are for the built-in game (headless_packs covers packs).
+	load("res://game/zz_packs.gd").root = "res://examples/fixtures/none"
 	_run.call_deferred()
 
 

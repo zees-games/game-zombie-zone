@@ -149,7 +149,7 @@ static func _take(pack: String, provider: Object) -> void:
 	var defs: Array = []
 
 	if provider.has_method(&"weapon_defs") and bool(cfg("weapons.enabled", true)):
-		defs = provider.call(&"weapon_defs")
+		defs = provider.call(&"weapon_defs", ZeeWeaponDamage.table())
 
 	var excluded: Array = cfg("weapons.exclude", [])
 	var source := StringName(SOURCE_PREFIX + pack)
@@ -161,7 +161,9 @@ static func _take(pack: String, provider: Object) -> void:
 			weapon_ids.append(String(def.id))
 
 	if not kept.is_empty():
-		ZeeWeaponPack.add_source(source, Callable(provider.get_script(), &"weapon_defs"))
+		# Through _tiered, never the provider's own: zee calls the source on every rig it builds and
+		# a pack's definitions come back fresh each time, so the tier has to be given each time.
+		ZeeWeaponPack.add_source(source, Callable(load("res://game/zz_packs.gd"), &"_tiered").bind(provider.get_script()))
 		_sources.append(source)
 
 		if provider.has_method(&"weapon_art"):
@@ -197,6 +199,26 @@ static func _take(pack: String, provider: Object) -> void:
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row)
+
+
+## A pack weapon's definitions with a tier. The game draws boxes, loot and stand-in kits by tier
+## (ZzWeapons.TIERS) and a weapon with none is in the pool and never handed out: the medieval
+## pack's bow and crossbow are tagged `ranged`, not `primary`, so they were silently unreachable.
+## A ranged weapon with no tier joins `primary`, a melee one `melee`. Static and public to the
+## engine only because a source Callable must be a static method, never a lambda.
+static func _tiered(types: Dictionary, provider_script: Script) -> Array[DotWeaponDef]:
+	var defs: Array[DotWeaponDef] = provider_script.call(&"weapon_defs", types)
+
+	for def in defs:
+		var has_tier := false
+
+		for tier: StringName in [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]:
+			has_tier = has_tier or def.tags.has(tier)
+
+		if not has_tier:
+			def.tags.append(&"melee" if def.tags.has(&"melee") else &"primary")
+
+	return defs
 
 
 static func _add_monster(pack: String, row: Dictionary) -> void:
