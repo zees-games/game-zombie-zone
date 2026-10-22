@@ -10,6 +10,7 @@ const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMap := preload("zz_map.gd")
+const ZzPacks := preload("zz_packs.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzNpcs := preload("zz_npcs.gd")
@@ -282,6 +283,8 @@ func _ready() -> void:
 		return
 
 	_round_seed = config.seed_value
+	# Optional packs first: a rig reads its catalogue once, and zee's sources are what it reads.
+	var _packs := ZzPacks.scan()
 	ZzWeapons.use_packs(config.second_weapon_pack)
 
 	_build_physics()

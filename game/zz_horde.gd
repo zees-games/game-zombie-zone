@@ -5,6 +5,7 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzPackList := preload("zz_packs.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
@@ -1447,6 +1448,9 @@ func specials_alive() -> int:
 	for kind in ZzNpcs.SPECIALS:
 		n += spawner.count_of(kind)
 
+	for m in ZzPackList.monsters:
+		n += spawner.count_of(m.id) if not m.boss else 0
+
 	return n
 
 
@@ -1465,8 +1469,9 @@ func _advance_specials() -> void:
 		return
 
 	var kinds := _allowed_specials()
+	var packed := ZzPackList.specials()
 
-	if kinds.is_empty():
+	if kinds.is_empty() and packed.is_empty():
 		return
 
 	# Prefer a kind that is not already out: two leapers at once is less frightening than a
@@ -1477,6 +1482,21 @@ func _advance_specials() -> void:
 			fresh.append(kind)
 
 	var pool := fresh if not fresh.is_empty() else kinds
+
+	# Each built-in kind weighs 1.0 and an installed monster its configured weight, so a pack
+	# that is not installed (or weighted 0) changes nothing, including the rolls drawn.
+	if not packed.is_empty():
+		var extra := ZzPackList.total_weight(packed)
+		var roll := _rng.randf() * (float(pool.size()) + extra)
+
+		if roll >= float(pool.size()):
+			var chosen := ZzPackList.pick(packed, roll - float(pool.size()))
+			var _pk := spawn_special(chosen.id)
+			return
+
+	if pool.is_empty():
+		return
+
 	var _made := spawn_special(pool[_rng.randi_range(0, pool.size() - 1)])
 
 
@@ -1517,8 +1537,45 @@ func _advance_brute() -> void:
 
 	_next_brute = _time + maxf(gap, 30.0)
 
-	if spawner.count_of(ZzNpcs.BRUTE) == 0:
+	var bosses := ZzPackList.bosses()
+
+	# An installed boss takes some of the brute's turns (it never adds to them), and only one
+	# boss of any kind is out at a time.
+	if not bosses.is_empty() and _boss_alive() == 0 \
+			and _rng.randf() < float(ZzPackList.cfg("monsters.boss_chance", 0.4)):
+		var chosen := ZzPackList.pick(bosses, _rng.randf() * ZzPackList.total_weight(bosses))
+		var _pb := spawn_pack_boss(chosen.id)
+		return
+
+	if _boss_alive() == 0:
 		var _b := spawn_brute()
+
+
+func _boss_alive() -> int:
+	var n := spawner.count_of(ZzNpcs.BRUTE)
+
+	for m in ZzPackList.bosses():
+		n += spawner.count_of(m.id)
+
+	return n
+
+
+## An installed pack's boss, sized like a brute for the team. Returns it, or null.
+func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
+	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
+
+	if where == Vector3.INF:
+		return null
+
+	var npc := spawner.spawn(kind, where, owner)
+
+	if npc == null:
+		return null
+
+	_set_health(npc, npc.def.max_health * special_health_scale * wave_health_scale)
+	brute_spawned.emit(npc)
+	DotLog.info(CHANNEL, "a pack boss", {"kind": String(kind), "at": str(where)})
+	return npc
 
 
 func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:

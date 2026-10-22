@@ -1,0 +1,13 @@
+# Optional content packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters, or any
+# addon with a spawn_provider.gd). ALL .yml files in this directory are read, in name order, a
+# later file winning; keep a server's changes in its own file (e.g. 90-server.yml).
+weapons:
+  enabled: true      # installed weapons join boxes, loot, the buy pool and the stand-ins' kits
+  exclude: []        # weapon ids to keep out of the pool
+monsters:
+  enabled: true
+  weight: 1.0        # an installed monster's weight as a special; each built-in kind weighs 1.0
+  # weights:          # id: weight under here (indented), over the default above; 0 drops that monster
+  #   some_monster: 0
+  boss: []           # ids sent in place of the brute instead of as specials
+  boss_chance: 0.4   # chance a brute's turn goes to an installed boss, when there is one

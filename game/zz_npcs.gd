@@ -2,6 +2,7 @@ extends RefCounted
 
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzPackList := preload("zz_packs.gd")
 const ZzPaths := preload("zz_paths.gd")
 
 ## What can come at you, and the ground it walks on.
@@ -82,13 +83,37 @@ static func catalogue(config: ZzConfig = null) -> DotNpcCatalogue:
 	out.meta = {"game": "zombiezone"}
 
 	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)]:
+			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)] + _pack_defs(c):
 		var added := out.add(_eyes(def))
 
 		if not added.ok:
 			DotLog.warn(CHANNEL, "a zombie could not be catalogued", {
 				"npc": String(def.id), "why": added.error.message
 			})
+
+	return out
+
+
+## An installed pack's monsters (see zz_packs.gd), each the common's numbers with the pack's
+## `spawn` on top. A special's health scale applies, as it does to every special.
+static func _pack_defs(c: ZzConfig) -> Array:
+	var out: Array = []
+
+	for m in ZzPackList.monsters:
+		var s: Dictionary = m.spawn
+		var health := float(s.get("health", 200.0)) * (c.special_health_scale() if not m.boss else 1.0)
+		var brain := str(s.get("brain", "")) if s.has("brain") else COMMON_BRAIN
+		var def := _def(m.id, m.title, brain, health, float(s.get("speed", 4.4)), 3 if not m.boss else 8,
+			DotNpcDef.Weight.NORMAL if not m.boss else DotNpcDef.Weight.HEAVY)
+		def.sight_range = 40.0
+		def.sight_half_angle_deg = 90.0
+		def.hearing_range = 18.0
+		def.meta = {
+			"damage": float(s.get("damage", 8.0)), "reach": float(s.get("reach", 1.6)),
+			"attack_interval": float(s.get("attack_interval", 1.0)), "attackers": c.attackers_per_survivor,
+			"body": str(s.get("body", "common")), "radius": 0.34, "height": 1.8, "pack": m.pack,
+		}
+		out.append(def)
 
 	return out
 
