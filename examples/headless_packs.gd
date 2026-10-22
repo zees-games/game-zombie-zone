@@ -295,10 +295,10 @@ func _real_packs() -> void:
 	_check(ZzWeapons.tier_of(&"zz_vss") == &"primary", "the Vintorez is a primary", str(ZzWeapons.tier_of(&"zz_vss")))
 	_check(ZzWeapons.tier_of(&"war_axe") == &"melee" and ZzWeapons.tier_of(&"double_axe") == &"melee", "both new axes are melee")
 	_check(ZzWeapons.exists(&"pistol"), "the built-in weapons are still there")
-	_check(ZzPacks.monsters.size() == 3 and ZzPacks.specials().size() == 2 and ZzPacks.bosses().size() == 1,
-		"three monsters: two specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
+	_check(ZzPacks.monsters.size() == 6 and ZzPacks.specials().size() == 5 and ZzPacks.bosses().size() == 1,
+		"six monsters: five specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
-	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 15, "the catalogue is the twelve built-in kinds and the three monsters")
+	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 18, "the catalogue is the twelve built-in kinds and the six monsters")
 
 	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
 	_check(is_equal_approx(_damage_of(&"zz_m4"), 29.0), "a modern weapon carries the pack's damage", "%.1f" % _damage_of(&"zz_m4"))
@@ -326,7 +326,7 @@ func _real_packs() -> void:
 	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
 	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
 	_check(tiger != null and is_equal_approx(float(tiger.meta.get("damage", 0)), 33.0), "a monster's damage follows its cfg yml")
-	_check(ZzPacks.monsters.size() == 2 and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
+	_check(ZzPacks.monsters.size() == 5 and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
 	_clean_real()
 	_clean()
 	found = ZzPacks.scan()
