@@ -32,7 +32,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 22
-const CHECKS := 126
+const CHECKS := 130
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -874,13 +874,22 @@ func _test_a_gate_reaches_the_client() -> void:
 class DoorWorld extends RefCounted:
 	var ents: Variant = DotMapEntities.from_manifest({"movers": [{"entity": 900, "model": null, "kind": "rotate", "classname": "prop_door_rotating",
 		"targetname": "", "origin": [60.0, 0.0, 60.0], "axis": [0.0, 1.0, 0.0], "degrees": 90.0, "speed": 100.0, "travel_time": 0.9, "wait": 4.0,
-		"open_dir": 0, "yaw": 0.0, "use": true, "touch": false, "solid": true, "locked": false, "start_open": false, "outputs": [], "opened_by": []}]})
+		"open_dir": 0, "yaw": 0.0, "use": true, "touch": false, "solid": true, "locked": false, "start_open": false, "outputs": [], "opened_by": []},
+		{"classname": "func_door", "direction": [0.0, 1.0, 0.0], "distance": 3.0, "entity": 901, "kind": "slide", "lip": 0.0, "locked": false,
+		"maxs": [90.5, 3.0, 70.5], "mins": [89.5, 0.0, 69.5], "model": 7, "opened_by": [], "origin": [90.0, 1.5, 70.0], "outputs": [],
+		"solid": true, "spawnflags": 256, "speed": 3.0, "start_open": false, "targetname": "", "toggle": false, "touch": false,
+		"travel_time": 1.0, "use": true, "wait": 4.0}]})
 
 	func entities() -> Variant:
 		return ents
 
 	func models() -> PackedInt32Array:
-		return PackedInt32Array()
+		return PackedInt32Array([7])
+
+	func hull_shapes(_model: int, _kinds: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:
+		var box := BoxShape3D.new()
+		box.size = Vector3(1.0, 3.0, 1.0)
+		return [{"shape": box, "kind": "solid", "brush": 0}]
 
 
 func _test_a_door_reaches_the_client() -> void:
@@ -889,7 +898,7 @@ func _test_a_door_reaches_the_client() -> void:
 		game.map.attach_mechanics(DoorWorld.new(), true)
 	var server_door: ZzMechanics = _server_game.map.mechanics
 	var client_door: ZzMechanics = _client_game.map.mechanics
-	_check(server_door != null and client_door != null and client_door.mover_count() == 1, "both ends stand the door up")
+	_check(server_door != null and client_door != null and client_door.mover_count() == 2, "both ends stand the doors up: a prop door and a brush door")
 
 	if server_door == null or client_door == null:
 		_finished()
@@ -905,6 +914,16 @@ func _test_a_door_reaches_the_client() -> void:
 	_check(float(server_door.mover(0)["side"]) == -1.0 and float(client_door.mover(0)["side"]) == -1.0, "away from somebody on the far side, the same on both ends (armed: the default is +1)", "server %s, client %s" % [str(server_door.mover(0)["side"]), str(client_door.mover(0)["side"])])
 	var shown := (client_door.mover(0)["node"] as Node3D).transform.basis
 	_check(not shown.is_equal_approx((client_door.mover(0)["base"] as Transform3D).basis), "and its drawn panel has turned off its closed pose")
+	# The brush door (index 1): shut on the client until somebody walks up, then told, and its body is posed off the doorway.
+	_check(float(client_door.mover(1)["from"]) == 0.0 and int(client_door.mover(1)["dir"]) == 0 and client_door.mover(1)["body"] != null,
+		"armed: the brush door has a body and stays shut on the client while nobody is near")
+	_stand_in.place_at(Vector3(90.0, 0.0, 71.0), 0.0)
+	await _steps(90)
+	_check(int(server_door.mover(1)["dir"]) > 0 or float(server_door.mover(1)["from"]) > 0.0, "the server opens the brush door to a survivor at it")
+	_check(int(client_door.mover(1)["dir"]) > 0 or float(client_door.mover(1)["from"]) > 0.0, "and the client was told: its brush door slides open too")
+	var body := client_door.mover(1)["body"] as CollisionObject3D
+	var posed := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
+	_check(posed.origin.y > 1.5 + 0.1, "and the client's collision body rose with it", str(posed.origin))
 	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
 	_finished()
 

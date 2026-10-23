@@ -19,7 +19,7 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 6
-const CHECKS := 43
+const CHECKS := 48
 
 var _passed := 0
 var _failed := 0
@@ -305,24 +305,27 @@ func _test_prop_doors() -> void:
 	var mech: ZzMechanics = game.map.mechanics
 	var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", game.map.local_world_prefix())
 	var doors := 0
-	var brush_movers := 0
+	var brush_doors := 0
 
 	if read.ok:
 		for rec: Dictionary in (read.value.get("manifest") as Dictionary)["movers"]:
 			if rec.get("classname") == "prop_door_rotating":
 				doors += 1
-			else:
-				brush_movers += 1
+			elif rec.get("classname") == "func_door" and rec.get("model") != null and not read.value.call(&"hull_shapes", int(rec["model"])).is_empty():
+				brush_doors += 1
 
-	_check(mech != null and doors > 0 and mech.mover_count() == doors, "the map's prop doors are built, and only they (its brush movers are in the boxes)",
-		"%d built of %d doors, %d brush movers left out" % [mech.mover_count() if mech != null else 0, doors, brush_movers])
+	_check(mech != null and doors > 0 and mech.mover_count() == doors + brush_doors, "the map's prop doors and its brush doors with hulls are built, and nothing else",
+		"%d built of %d prop doors and %d brush doors" % [mech.mover_count() if mech != null else 0, doors, brush_doors])
 
 	if mech == null or doors == 0:
 		game.queue_free()
 		_finished += 1
 		return
 
-	var m: Dictionary = mech.mover(0)
+	var d := 0
+	while d < mech.mover_count() and not mech.mover(d).has("door"):
+		d += 1
+	var m: Dictionary = mech.mover(d)
 	var node := m["node"] as Node3D
 	var body := node.get_node("col_solid") as CollisionObject3D
 	var rest: Transform3D = m["base"]
@@ -345,33 +348,33 @@ func _test_prop_doors() -> void:
 		who[0] = middle + normal * sign_of * 1.0
 		var spent := 0
 
-		while mech.fraction_at(0, tick) < 1.0 and spent < 4000:
+		while mech.fraction_at(d, tick) < 1.0 and spent < 4000:
 			tick += 1
 			spent += 1
 			mech.step(tick)
 
 		for _f in 3:
 			await get_tree().physics_frame
-		var open_middle: Vector3 = mech.transform_at(0, tick) * (rest.affine_inverse() * middle)
+		var open_middle: Vector3 = mech.transform_at(d, tick) * (rest.affine_inverse() * middle)
 		var side_of_opener := signf(normal.dot(who[0] - hinge))
 		var side_of_panel := signf(normal.dot(open_middle - hinge))
 		swung.append(float(m["side"]))
-		_check(mech.fraction_at(0, tick) >= 1.0 and not _ray_hits(game, body, middle - normal, middle + normal),
+		_check(mech.fraction_at(d, tick) >= 1.0 and not _ray_hits(game, body, middle - normal, middle + normal),
 			"opened for somebody on side %+d, the ray passes where the panel was" % int(sign_of),
-			"fraction %.2f ray %s" % [mech.fraction_at(0, tick), game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(middle - normal, middle + normal))])
+			"fraction %.2f ray %s" % [mech.fraction_at(d, tick), game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(middle - normal, middle + normal))])
 		_check(side_of_panel == -side_of_opener, "and it swung away from them", "opener %+d, panel %+d" % [int(side_of_opener), int(side_of_panel)])
 
 		who[0] = Vector3.INF
 		spent = 0
 
-		while mech.fraction_at(0, tick) > 0.0 and spent < 12000:
+		while mech.fraction_at(d, tick) > 0.0 and spent < 12000:
 			tick += 1
 			spent += 1
 			mech.step(tick)
 
 		for _f in 3:
 			await get_tree().physics_frame
-		_check(mech.fraction_at(0, tick) <= 0.0, "left alone, it closes", "fraction %.2f after %d ticks" % [mech.fraction_at(0, tick), spent])
+		_check(mech.fraction_at(d, tick) <= 0.0, "left alone, it closes", "fraction %.2f after %d ticks" % [mech.fraction_at(d, tick), spent])
 		_check(_ray_hits(game, body, middle - normal, middle + normal), "and blocks again", "server body %s, ray %s" % [str(PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM)), str(game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(middle - normal, middle + normal)))])
 
 	_check(swung[0] != swung[1], "the two openers made it swing opposite ways (armed: a fixed side fails this)", str(swung))
@@ -387,15 +390,72 @@ func _test_prop_doors() -> void:
 
 	# The wire: the side is in the snapshot and survives it.
 	m["side"] = -1.0
-	var snap: Array = mech.snapshot(0)
-	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, 0)))
+	var snap: Array = mech.snapshot(d)
+	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, d)))
 	_check(bool(wire["ok"]) and float(wire["side"]) == -1.0, "the side survives the wire", str(wire))
 	m["side"] = 1.0
-	snap = mech.snapshot(0)
-	wire = ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, 0)))
+	snap = mech.snapshot(d)
+	wire = ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, d)))
 	_check(float(wire["side"]) == 1.0, "and so does the other")
+	await _test_brush_door(game, mech)
 	game.queue_free()
 	_finished += 1
+
+
+## A brush door of a global pack: its hull is a body on the world layer that is posed away when somebody walks up, and
+## back when they leave; the collision follows the pose (a ray through the doorway meets it shut and passes open).
+func _test_brush_door(game: ZzGame, mech: ZzMechanics) -> void:
+	var index := -1
+	for i in mech.mover_count():
+		var mm: Dictionary = mech.mover(i)
+		if not mm.has("door") and mm["body"] != null and str(mm["kind"]) == "slide":
+			index = i
+			break
+	_check(index >= 0, "a brush door has a body on the map")
+	if index < 0:
+		return
+	var m: Dictionary = mech.mover(index)
+	var body := m["body"] as CollisionObject3D
+	_check(body.collision_layer != 0 and bool(m["auto"]) and not bool(m["locked"]), "it is on a layer and opens to anyone near")
+	var shape_box: AABB = (body.get_child(0) as CollisionShape3D).shape.get_debug_mesh().get_aabb()
+	var centre: Vector3 = body.global_transform * shape_box.get_center()
+	var shut_at: Vector3 = centre
+	var shut_xf := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
+	var who := [Vector3.INF]
+	mech.occupants_fn = func(box: AABB) -> bool: return who[0] != Vector3.INF and box.grow(1.0).has_point(who[0])
+	mech.opener_fn = func(_box: AABB) -> Variant: return null if who[0] == Vector3.INF else who[0]
+	await get_tree().physics_frame
+	_check(_body_covers(game, body, shut_at), "shut, its body is at the doorway", str(shut_at))
+	who[0] = centre + Vector3(0.0, 0.0, 0.5)
+	var tick := 6000
+	var spent := 0
+	while mech.fraction_at(index, tick) < 1.0 and spent < 4000:
+		tick += 1
+		spent += 1
+		mech.step(tick)
+	for _f in 3:
+		await get_tree().physics_frame
+	var open_xf := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
+	_check(mech.fraction_at(index, tick) >= 1.0 and not open_xf.is_equal_approx(shut_xf), "opened for somebody near, the physics body has moved off its shut pose",
+		"fraction %.2f, %s to %s" % [mech.fraction_at(index, tick), str(shut_xf.origin), str(open_xf.origin)])
+	who[0] = Vector3.INF
+	spent = 0
+	while mech.fraction_at(index, tick) > 0.0 and spent < 12000:
+		tick += 1
+		spent += 1
+		mech.step(tick)
+	for _f in 3:
+		await get_tree().physics_frame
+	var closed_xf := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
+	_check(closed_xf.is_equal_approx(shut_xf) and _body_covers(game, body, shut_at), "left alone, it closes onto the doorway again")
+
+
+## Whether a ray down through [param point] meets [param body].
+func _body_covers(game: ZzGame, body: CollisionObject3D, point: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(point + Vector3(0.0, 3.0, 0.0), point - Vector3(0.0, 3.0, 0.0))
+	query.collision_mask = 0xFFFFFFFF
+	var hit := game.get_world_3d().direct_space_state.intersect_ray(query)
+	return not hit.is_empty() and hit["collider"] == body
 
 
 ## Whether the first thing a ray from [param from] to [param to] meets is [param body].

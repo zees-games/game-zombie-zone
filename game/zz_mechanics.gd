@@ -13,6 +13,8 @@ const CHANNEL := "zz.mechanics"
 ## Kinds that move and collide (the others are read for their outputs only).
 const SOLID_KINDS := ["slide", "rotate", "plat", "path"]
 const BUTTON_KINDS := ["button", "rotate_button"]
+## A brush door's classes: what a global pack's mover list holds that opens to whoever walks up, with no switch run.
+const DOOR_CLASSES := ["func_door", "func_door_rotating", "func_movelinear"]
 const MIN_TRAVEL := 0.05
 const DEFAULT_PATH_SPEED := 2.0
 ## How long a door that stays open waits for nobody to be near before it closes.
@@ -54,8 +56,9 @@ var _activator: Variant = null
 
 ## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
 ## it the world's physics layer.
-## [param doors_only] builds just the hinged prop doors (a world from the global converter draws its own brush
-## doors, so the rest would collide twice); with no switch or key run there, such a door opens to anyone near it.
+## [param doors_only] builds just the doors (a world from the global converter has no switches run): the hinged
+## prop doors and the brush doors whose hulls the pack carries (a boxed gate has none, so nothing collides twice).
+## Each opens to anyone near it.
 func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> void:
 	_ents = world.call(&"entities")
 	var models := {}
@@ -66,15 +69,21 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 		if mv.model < 0 and str(mv.classname).to_lower() == "prop_door_rotating":
 			_build_door(mv, put_on, doors_only)
 			continue
-		if doors_only or mv.model < 0 or not models.has(mv.model):
+		if mv.model < 0 or not models.has(mv.model):
+			continue
+		var shapes: Array = world.call(&"hull_shapes", mv.model)
+		if doors_only and (shapes.is_empty() or not _is_brush_door(mv)):
 			continue
 		var m := _make_mover(mv, world)
+		if doors_only:
+			m["locked"] = false
+			m["initial_locked"] = false
+			m["auto"] = true
 		m["idx"] = _movers.size()
 		_movers.append(m)
 		_by_entity[mv.entity] = {"type": &"mover", "i": m["idx"]}
 
 		if SOLID_KINDS.has(mv.kind):
-			var shapes: Array = world.call(&"hull_shapes", mv.model)
 			if not shapes.is_empty():
 				var body := StaticBody3D.new()
 				body.name = "Mover%d" % m["idx"]
@@ -103,6 +112,10 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 	for g: Dictionary in _ents.generic:
 		_by_entity[int(g["entity"])] = {"type": &"generic", "i": int(g["entity"])}
 		_generic[int(g["entity"])] = {"rec": g, "enabled": true}
+
+
+static func _is_brush_door(mv: Variant) -> bool:
+	return DOOR_CLASSES.has(str(mv.classname).to_lower()) and (mv.kind == "slide" or mv.kind == "rotate")
 
 
 ## A prop door has no brush: dot-map's DotMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
