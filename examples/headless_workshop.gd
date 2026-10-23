@@ -141,7 +141,9 @@ func _test_accepts() -> void:
 func _test_solo() -> void:
 	_entered += 1
 	var index := _index(DotContentIndex.SESSION_SOLO)
-	var names := _names(_game(index).map_rows())
+	var listed := _game(index)
+	var names := _names(listed.map_rows())
+	listed.free()
 	_check(names.has("Fixture Ruin [Ruins Pack]"), "solo: the map menu lists the pack's map with its pack (%s)" % ",".join(names))
 	_check(not names.has("Fixture Run [Ruins Pack]"), "solo: a kind the game does not accept is left out")
 	var vote := _vote(index)
@@ -192,7 +194,9 @@ func _test_online() -> void:
 	# A subscribed pack is tagged solo; the session then goes online, as it does on joining a server.
 	var index := _index(DotContentIndex.SESSION_SOLO)
 	index.set_session(DotContentIndex.SESSION_ONLINE)
-	var names := _names(_game(index).map_rows())
+	var listed := _game(index)
+	var names := _names(listed.map_rows())
+	listed.free()
 	_check(not names.has("Fixture Ruin [Ruins Pack]") and names.size() == 1,
 		"online: the map menu lists only the game's own (%s)" % ",".join(names))
 	var vote := _vote(index)
@@ -255,7 +259,7 @@ func _test_play() -> void:
 	var rows := solo.map_rows()
 	var mine := rows.filter(func(r: Dictionary) -> bool: return r["id"] == MAP)
 	_check(mine.size() == 1 and mine[0]["name"] == "Fixture Ruin [Ruins Pack]", "solo: listed once, with its pack")
-	solo.queue_free()
+	solo.free()
 
 	# Online the same pack is not even a catalogue entry.
 	var index := _index(DotContentIndex.SESSION_SOLO)

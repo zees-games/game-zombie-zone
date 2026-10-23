@@ -748,6 +748,7 @@ func _test_the_new_specials() -> void:
 	me = game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	var riot := game.horde.spawner.spawn(ZzNpcs.RIOT, STREET + Vector3(0, 0, -6), &"test")
+	(riot.brain as DotNpcBrain).unbind()
 	riot.brain = null
 	var body := riot.node as Node3D
 	body.look_at(Vector3(STREET.x, body.global_position.y, STREET.z), Vector3.UP)
