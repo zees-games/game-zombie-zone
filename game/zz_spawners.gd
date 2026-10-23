@@ -23,6 +23,10 @@ var _inst_of: Dictionary = {}
 var _price_of: Dictionary = {}
 ## Loot id -> {site, slot} for a trader's shelf; restocks wait in _restock as {at, site, slot}.
 var _shelf: Dictionary = {}
+var _empty_tries: Dictionary = {}
+
+## The most one entry may cost; a price outside 0..this (or not a number) is unaffordable, never free.
+const MAX_PRICE := 1000000.0
 var _restock: Array = []
 var _traders: Dictionary = {}
 ## Trader id -> how many shelf rolls it has had, so each restock is a new draw.
@@ -54,6 +58,7 @@ func start_round(doc: Dictionary) -> void:
 	_price_of.clear()
 	_shelf.clear()
 	_restock.clear()
+	_empty_tries.clear()
 	_traders.clear()
 	_generation.clear()
 	spawner.load_map(str(doc.get("id", "")), [])
@@ -125,7 +130,12 @@ func _stock(id: StringName, slot: int) -> void:
 	var rolled := spawner.roll(id, int(_generation[id]))
 	_generation[id] = int(_generation[id]) + 1
 	if rolled.is_empty():
+		var wait: float = maxf(float(t.get("restock", 0.0)), 10.0)
+		if int(_empty_tries.get(id, 0)) < 5:
+			_empty_tries[id] = int(_empty_tries.get(id, 0)) + 1
+			_restock.append({"at": game.now() + wait, "site": id, "slot": slot})
 		return
+	_empty_tries.erase(id)
 	var side := Vector3(cos(t["yaw"]), 0.0, -sin(t["yaw"]))
 	var at: Vector3 = t["at"] + side * (float(slot) - float(int(t["slots"]) - 1) * 0.5) * float(t["spacing"])
 	var data: Dictionary = rolled.get("data", {})
@@ -166,11 +176,25 @@ func price_of(loot_id: int) -> int:
 
 func _price_for(item: StringName, data: Dictionary) -> int:
 	if data.has("price"):
-		return maxi(int(data["price"]), 0)
+		return _clean_price(data["price"])
 	if data.get("tier_price", false):
 		var prices: Variant = (spawner.game_block().get("shop", {}) as Dictionary).get("prices", {})
-		return maxi(int((prices as Dictionary).get(String(ZzWeapons.tier_of(item)), 0)), 0) if prices is Dictionary else 0
+		return _clean_price((prices as Dictionary).get(String(ZzWeapons.tier_of(item)), 0)) if prices is Dictionary else 0
 	return 0
+
+
+static func _clean_price(v: Variant) -> int:
+	if not (v is int or v is float or v is String):
+		return 0
+	var f := float(v)
+	if is_nan(f) or is_inf(f) or f > MAX_PRICE:
+		return int(MAX_PRICE)
+	return int(maxf(f, 0.0))
+
+
+## True when loot entry [param loot_id] was laid by a spawner site (not a trader shelf).
+func lays(loot_id: int) -> bool:
+	return _inst_of.has(loot_id)
 
 
 ## False, with the reason sent to [param player], when they cannot pay for [param loot_id]. The charge is taken when the entry is used up.
@@ -186,7 +210,7 @@ func may_use(loot_id: int, player) -> bool:
 func on_loot_removed(loot_id: int, by: StringName) -> void:
 	var price: int = int(_price_of.get(loot_id, 0))
 	if price > 0 and game.players.has(by):
-		game.players[by].points -= price
+		game.players[by].points = maxi(int(game.players[by].points) - price, 0)
 	_price_of.erase(loot_id)
 
 	if _shelf.has(loot_id):

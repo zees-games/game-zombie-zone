@@ -186,9 +186,13 @@ func use(id: int, player) -> void:
 					game._draw(player, item)
 				remove(id, player.player_id)
 		AMMO:
-			# A pile is never used up: the genre leaves it there for the next person.
-			var _filled := give_ammo(player)
+			# A map's own pile stays for the next person; one a spawner laid or a shop prices is used up,
+			# so it is charged and its site respawns it.
+			var spent: bool = price_of(id) > 0 or (game.spawners != null and game.spawners.lays(id))
+			var filled := give_ammo(player)
 			game.ammo_given.emit(player.player_id)
+			if spent and filled > 0:
+				remove(id, player.player_id)
 		MEDKIT:
 			if player.medkits >= 1:
 				game.refused.emit(player.player_id, "You already have a medkit.")

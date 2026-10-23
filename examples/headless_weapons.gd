@@ -18,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 8
-const CHECKS := 31
+const CHECKS := 36
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -283,6 +283,28 @@ func _test_spawner() -> void:
 		if game.loot.price_of(id) > 0:
 			again += 1
 	_check(again == 3 or game.now() < 30.0, "the slot restocks after its wait", str(again))
+	# A priced ammo pile is used up: charged once, and its site lays the next.
+	game.spawners.start_round({"id": "spawner_probe3", "spawners": [{"id": "am", "at": [0, 0, 0], "kind": "ammo", "item": "ammo", "respawn": 5, "data": {"price": 50}}],
+		"traders": [{"id": "empty_shop", "at": [0, 0, 20], "slots": 2, "pool": "no_such_pool", "restock": 5.0}]})
+	game.spawners.tick()
+	var amid: int = -1
+	for id: int in game.spawners.loot_ids():
+		if game.loot.kind_of(id) == ZzLoot.AMMO:
+			amid = id
+	var arsenal: DotWeaponArsenal = me.weapons.arsenal
+	for pool in arsenal.ammo().pools():
+		arsenal.ammo().set_count(pool, 0)
+	me.points = 200
+	game.loot.use(amid, me)
+	_check(amid >= 0 and not game.loot.exists(amid) and me.points == 150, "a priced ammo pile is used up and charged", str(me.points))
+	_check(game.spawners.spawner.alive() == 0 and game.spawners.spawner.seconds_until(&"am") > 0.0, "and its site respawns it")
+	_check(game.spawners._restock.size() >= 2, "an empty roll reschedules the trader's slot", str(game.spawners._restock.size()))
+	_check(game.spawners._clean_price(NAN) > 100000 and game.spawners._clean_price(INF) > 100000 and game.spawners._clean_price(1e30) > 100000 and game.spawners._clean_price(-5) == 0 and game.spawners._clean_price(75) == 75, "a nan, infinite or huge price is unaffordable, never free")
+	var cheap: int = game.loot.add(ZzLoot.WEAPON, &"shotgun", Vector3.ZERO, -1.0, 300)
+	game.spawners._price_of[cheap] = 300
+	me.points = 10
+	game.loot.remove(cheap, me.player_id)
+	_check(me.points == 0, "a charge never takes the points below zero", str(me.points))
 	var wire := ZzEvents.read_loot(DotNetReader.new(ZzEvents.write_loot(7, &"weapon", &"shotgun", Vector3.ZERO, 250)))
 	_check(int(wire["price"]) == 250 and bool(wire["ok"]), "the loot event carries the price to the client")
 	_finished()
