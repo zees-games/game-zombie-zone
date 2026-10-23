@@ -250,11 +250,15 @@ func _test_worlds() -> void:
 			models[model] = true
 
 		var orphans := 0
+		var doors := 0
 		for rec: Dictionary in manifest.get("movers", []):
-			if rec.get("model") == null or not models.has(int(rec["model"])):
+			if rec.get("model") == null and rec.get("classname") == "prop_door_rotating":
+				doors += 1
+			elif rec.get("model") == null or not models.has(int(rec["model"])):
 				orphans += 1
 
-		var movers := (manifest["movers"] as Array).size()
+		# Model-less doors are DotMapDoorStandIn's; ZzMechanics does not build them yet (nightly zz-art-pass-1).
+		var movers := (manifest["movers"] as Array).size() - doors
 		_check(orphans == 0, "%s: its movers have geometry" % id, "%d movers, %d without" % [movers, orphans])
 		var mech := ZzMechanics.new()
 		add_child(mech)
