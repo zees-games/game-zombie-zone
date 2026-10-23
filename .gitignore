@@ -59,6 +59,15 @@
 # bootstrap-link: zombie-zone-maps/world
 /world
 
+# Optional weapon and monster packs, content repositories of their own (docs/design.md): dot-bootstrap
+# links them by default and skips them under --min; the game parses and passes its suites without.
+# bootstrap-optional
+/addons/zz_modern_weapons
+# bootstrap-optional
+/addons/zz_medieval_weapons
+# bootstrap-optional
+/addons/zz_historical_monsters
+
 # Exports
 build/
 export_presets.cfg
