@@ -20,6 +20,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzProps := preload("../game/zz_props.gd")
 const ZzSettings := preload("../game/zz_settings.gd")
+const ZzBlood := preload("../game/zz_blood.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
@@ -38,7 +39,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 40
 
-const CHECKS := 278
+const CHECKS := 284
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1739,6 +1740,38 @@ func _test_the_map_menu() -> void:
 	var gore_row: DotMenuRow = image.find_row(&"gore") if image != null else null
 	_check(gore_row != null and gore_row.row_id() == &"gore" and settings.schema.has(&"gore"),
 		"the Video page's Image section has a Blood splatters row on the gore setting")
+	# Gore persists: toggled off, flushed to a real file store in a scratch user:// directory, read back by a fresh instance.
+	var scratch := "user://headless_gore_persist"
+	var first := ZzSettings.new()
+	first.directory = scratch
+	add_child(first)
+	var _b1 := first.setup(DotSettingsStoreFile.new(scratch), false)
+	var _g2 := first.settings.set_value(&"gore", false)
+	var flushed := first.settings.flush()
+	_check(flushed.ok and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(scratch)) and not DirAccess.get_files_at(scratch).is_empty(),
+		"turning Blood splatters off and saving writes the settings file", str(flushed.error.message if not flushed.ok else ""))
+	var second := ZzSettings.new()
+	second.directory = scratch
+	add_child(second)
+	var _b2 := second.setup(DotSettingsStoreFile.new(scratch), false)
+	_check(second.settings.get_bool(&"gore", true) == false,
+		"a fresh settings manager loading that file reads gore as off")
+	var blood := ZzBlood.new()
+	add_child(blood)
+	blood.apply_settings(second.settings)
+	_check(not blood.decals.config.gore, "and the blood decals' config sees gore off")
+	_check(blood.decals.splatter(Vector3.ZERO, Vector3.UP) == null, "so a hit draws no splatter")
+	var _g3 := second.settings.set_value(&"gore", true)
+	blood.apply_settings(second.settings)
+	_check(blood.decals.config.gore, "turning it back on reaches the decals again")
+	blood.queue_free()
+	first.queue_free()
+	second.queue_free()
+	var real := ProjectSettings.globalize_path(scratch)
+	for f in DirAccess.get_files_at(real):
+		var _rm := DirAccess.remove_absolute(real.path_join(f))
+	var _rd := DirAccess.remove_absolute(real)
+	_check(not DirAccess.dir_exists_absolute(real), "the scratch settings directory is removed afterwards")
 	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table defaults to M",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
