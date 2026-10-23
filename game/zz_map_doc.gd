@@ -113,6 +113,70 @@ const DEFAULT_ENV := {
 }
 
 
+## What the converter writes when the source map says nothing of its light.
+const IMPORTER_ENV := {
+	"sky_top": [0.02, 0.03, 0.07], "sky_horizon": [0.08, 0.1, 0.15], "ground": [0.03, 0.03, 0.04],
+	"sun_pitch": -45.0, "sun_yaw": 12.0, "sun_energy": 0.22, "sun_colour": [0.45, 0.65, 0.95],
+	"ambient": [0.36, 0.4, 0.52], "ambient_energy": 0.3, "fog": 0.02,
+}
+
+## Sky names that are dark by name (dot-map's build_environment reads the same words).
+const NIGHT_SKY_WORDS := ["night", "dark", "black", "space", "star"]
+
+
+## True when [param env] is the converter's placeholder, so the drawn world's own entities decide.
+static func is_importer_env(env: Dictionary) -> bool:
+	for key: String in IMPORTER_ENV:
+		if not env.has(key) or str(env[key]) != str(_floats(IMPORTER_ENV[key], 3) if IMPORTER_ENV[key] is Array else float(IMPORTER_ENV[key])):
+			return false
+	return true
+
+
+## An `environment` block from a drawn world's own light_environment, env_fog_controller and sky
+## name (dot-map's `environment_data()`); {} when it has no sun or sky to read.
+static func environment_from_world(data: Dictionary) -> Dictionary:
+	var sun: Dictionary = data.get("sun", {})
+	if sun.is_empty() and not data.has("sky"):
+		return {}
+	var sky_name := str((data.get("sky", {}) as Dictionary).get("name", "")).to_lower()
+	var night := false
+	for word: String in NIGHT_SKY_WORDS:
+		night = night or sky_name.contains(word)
+
+	var env := (IMPORTER_ENV if night else DEFAULT_ENV).duplicate(true)
+	var amb: Variant = sun.get("ambient")
+	var col: Variant = sun.get("colour")
+	var lum := 1.0
+	if col is Array and (col as Array).size() >= 4:
+		var peak := maxf(maxf(float(col[0]), float(col[1])), maxf(float(col[2]), 0.01))
+		env["sun_colour"] = [float(col[0]) / peak, float(col[1]) / peak, float(col[2]) / peak]
+		# Source's brightness 200 is a plain sun; the colour carries how much of it is light.
+		lum = peak * float(col[3]) / 200.0
+	if not sun.is_empty():
+		env["sun_pitch"] = clampf(float(sun.get("pitch", -45.0)), -85.0, -5.0)
+		env["sun_yaw"] = float(sun.get("yaw", 0.0)) - 90.0
+	if night:
+		env["sun_energy"] = clampf(sqrt(lum) * 0.35, 0.1, 0.3)
+	else:
+		env["sun_energy"] = clampf(sqrt(lum) * 0.9, 0.4, 1.1)
+	if amb is Array and (amb as Array).size() >= 4:
+		env["ambient"] = [float(amb[0]), float(amb[1]), float(amb[2])]
+		if not night:
+			env["ambient_energy"] = clampf(0.35 * sqrt(float(amb[3]) / 100.0), 0.22, 0.45)
+
+	var fogged := false
+	for f: Dictionary in data.get("fog", []):
+		if f.get("enabled", false):
+			var fc: Array = f.get("colour", [0.5, 0.5, 0.5])
+			env["sky_horizon"] = [float(fc[0]), float(fc[1]), float(fc[2])]
+			env["fog"] = clampf(2.0 / maxf(float(f.get("end", 60.0)) - 14.0, 6.0), 0.01, 0.12)
+			fogged = true
+			break
+	if not fogged:
+		env["fog"] = 0.012
+	return env
+
+
 ## Reads a document from JSON text, and checks it.
 static func parse_json(text: String, origin: String = "") -> DotResult:
 	var json := JSON.new()

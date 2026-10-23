@@ -974,6 +974,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
+	_light_from_world(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.
 	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
@@ -997,6 +998,25 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	_attach_world_extras(world, node)
 	world_drawn = true
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## A converted map whose document kept the converter's placeholder light takes the sky, sun,
+## ambient and fog its own entities name, and the lighting is built again from them.
+func _light_from_world(world: RefCounted) -> void:
+	if not ZzMapDoc.is_importer_env(doc["environment"]):
+		return
+	var derived := ZzMapDoc.environment_from_world(world.call(&"environment_data"))
+	if derived.is_empty():
+		return
+	doc["environment"] = derived
+	var old := get_node_or_null("Lighting")
+	if old != null:
+		remove_child(old)
+		old.free()
+	_sun = null
+	_fill = null
+	_environment = null
+	_build_environment()
 
 
 ## What the drawn world carries beyond its meshes: reflection probes, fog when the map document
