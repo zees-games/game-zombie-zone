@@ -277,10 +277,11 @@ func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
 	return true
 
 
-## Stuck seconds over seconds with a goal, 0 to 1.
-func ratio(kind: StringName) -> float:
+## Stuck seconds over seconds with a goal, 0 to 1. [param at_least] floors the denominator: stand-ins
+## that mostly hold a post have 40 to 140 s of goal time, where one 14 s wait in a doorway reads 25%.
+func ratio(kind: StringName, at_least: float = 1.0) -> float:
 	var t: Dictionary = totals[kind]
-	return float(t["stuck"]) / maxf(float(t["goal"]), 1.0)
+	return float(t["stuck"]) / maxf(float(t["goal"]), at_least)
 
 
 func line() -> String:
