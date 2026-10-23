@@ -97,6 +97,7 @@ static var use_worlds: bool = true
 
 ## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
+const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
 
 ## Where a checkout keeps a map's world: `world/<pack>/<id>`.
 const LOCAL_WORLD := "res://world/%s/%s"
@@ -935,7 +936,7 @@ func load_world() -> DotResult:
 		})
 		return read
 
-	attach_world(read.value)
+	attach_world(read.value, prefix.get_base_dir())
 	return DotResult.success(true)
 
 
@@ -943,7 +944,7 @@ func load_world() -> DotResult:
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
 ## drawn as boxes; they are not in the original's faces. A bake is made from the boxes, so it is
 ## taken off and the lamps light the world live.
-func attach_world(world: RefCounted) -> void:
+func attach_world(world: RefCounted, dir: String = "") -> void:
 	if _drawn == null:
 		return
 
@@ -953,6 +954,11 @@ func attach_world(world: RefCounted) -> void:
 	var material_for := func(rec: Dictionary) -> Material:
 		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
 		return ZzMaterials.material(mat, Color.WHITE, "wall", ZzMaterials.surface_for(map_id, mat, ""))
+	# A pack from dot-map's global converter has no `zz` block: it draws itself with free textures and glass.
+	var global_pack := not (world.get("manifest") as Dictionary).has("zz")
+	if global_pack:
+		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new()
+		material_for = surfaces.call(&"world_material_for", world, dir)
 
 	_unbake()
 
@@ -964,7 +970,10 @@ func attach_world(world: RefCounted) -> void:
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
-	attach_mechanics(world)
+	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
+	# doors would collide a second time, so only a pack made for this game brings mechanics.
+	if not global_pack:
+		attach_mechanics(world)
 	if mechanics != null:
 		mechanics.bind_drawn(node)
 
@@ -1054,7 +1063,8 @@ func build_mechanics_local() -> bool:
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
 		return false
-	attach_mechanics(read.value)
+	if (read.value.get("manifest") as Dictionary).has("zz"):
+		attach_mechanics(read.value)
 	return mechanics != null
 
 
