@@ -9,6 +9,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
+const ZzSpawners := preload("zz_spawners.gd")
 const ZzMap := preload("zz_map.gd")
 const ZzPacks := preload("zz_packs.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
@@ -185,6 +186,8 @@ var hazards: ZzHazards = null
 ## Server only. The sentry turrets a box deployed.
 var turrets: ZzTurrets = null
 var loot: ZzLoot = null
+## The map's weapon and supply spawners (zz_spawners.gd), server only.
+var spawners: ZzSpawners = null
 var boxes: ZzBoxes = null
 var bots: ZzBots = null
 
@@ -325,6 +328,9 @@ func _ready() -> void:
 		# A pipe bomb, a propane tank, a molotov's burst: the map's toys thrown from it.
 		var _toys := exploded.connect(_on_exploded_near_toys)
 		loot = ZzLoot.new(self)
+		spawners = ZzSpawners.new(self)
+		spawners.load_config()
+		loot.removed.connect(spawners.on_loot_removed)
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
 		bots = ZzBots.new(self)
@@ -1133,6 +1139,8 @@ func _on_round_started(number: int) -> void:
 	if loot != null:
 		loot.clear()
 		loot.place_from_map(map_doc)
+	if spawners != null:
+		spawners.start_round(map_doc)
 	if boxes != null:
 		boxes.reset()
 
@@ -1982,6 +1990,9 @@ func _begin_use(player: ZzPlayer) -> void:
 	if thing >= 0:
 		var needs := loot.use_seconds(thing)
 
+		if spawners != null and not spawners.may_use(thing, player):
+			return
+
 		if needs <= 0.0:
 			loot.use(thing, player)
 		else:
@@ -2105,7 +2116,8 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 		&"heal":
 			_heal_with_kit(player_for_entity(target), player)
 		&"loot":
-			loot.use(target, player)
+			if spawners == null or spawners.may_use(target, player):
+				loot.use(target, player)
 		&"objective":
 			_objective_used(target)
 		&"repair":
@@ -2892,6 +2904,8 @@ func _step(delta: float) -> void:
 			boxes.tick(delta)
 		if loot != null:
 			loot.tick(delta)
+		if spawners != null:
+			spawners.tick()
 		_advance_bodies(delta)
 
 	if combat != null:

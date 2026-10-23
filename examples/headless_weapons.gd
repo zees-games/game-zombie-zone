@@ -16,8 +16,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 7
-const CHECKS := 19
+const SECTIONS := 8
+const CHECKS := 26
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -47,6 +47,7 @@ func _run() -> void:
 		await _test_empty_reloads()
 		await _test_ammo_pile()
 		await _test_rearmed()
+		_test_spawner()
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -223,6 +224,34 @@ func _test_rearmed() -> void:
 		"stripped and handed the same gun, the drawn reserve is the gun's own",
 		"%d, the gun gives %d" % [_reserve(me.view_rig), def.reserve])
 	_check(me.view_rig.arsenal.current().magazine == def.magazine, "with a full magazine")
+	_finished()
+
+
+func _test_spawner() -> void:
+	_section("a map spawner lays a gun as loot; using it starts the timer, the timer lays the next")
+	var game = _client.game
+	var me := _client.player
+	var doc := {"id": "spawner_probe", "spawners": [{"id": "wall", "at": [0, 0, 0], "pool": "wall_guns", "filter": {"ids": ["shotgun"]}, "respawn": 20, "max": 1}]}
+	game.spawners.start_round(doc)
+	game.spawners.tick()
+	var lid: int = game.spawners.loot_ids()[0] if not game.spawners.loot_ids().is_empty() else -1
+	_check(game.spawners.spawner.alive() == 1 and lid >= 0, "the spawner's item is a loot entry")
+	var item: StringName = game.loot.entries[lid]["item"]
+	_check(ZzWeapons.exists(item), "drawn from the weapon catalogue", String(item))
+	game.loot.use(lid, me)
+	_check(game.spawners.spawner.alive() == 0 and not game.loot.exists(lid), "using it frees the slot and the entry")
+	_check(game.spawners.spawner.seconds_until(&"wall") > 10.0, "the respawn timer runs", str(game.spawners.spawner.seconds_until(&"wall")))
+	game.spawners.spawner.tick(game.now() + 25.0)
+	_check(game.spawners.spawner.alive() == 1 and game.loot.count_of(ZzLoot.WEAPON) >= 1, "after the timer the next one lies there")
+	var shop := {"id": "spawner_probe", "spawners": [{"id": "buy", "at": [0, 0, 0], "item": "shotgun", "respawn": 0, "data": {"price": 300}}]}
+	game.spawners.start_round(shop)
+	game.spawners.tick()
+	var buy: int = game.spawners.loot_ids()[0] if not game.spawners.loot_ids().is_empty() else -1
+	me.points = 100
+	_check(game.spawners.price_of(buy) == 300 and not game.spawners.may_use(buy, me), "a priced spawner refuses a survivor who cannot pay")
+	me.points = 400
+	game.loot.use(buy, me)
+	_check(me.points == 100, "and takes the price when the item is used", str(me.points))
 	_finished()
 
 

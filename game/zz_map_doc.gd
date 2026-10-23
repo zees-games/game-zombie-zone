@@ -25,6 +25,7 @@ const ZzFixtures := preload("zz_fixtures.gd")
 ## route         the critical path the director spawns AHEAD along, start to end
 ## nav           {spacing, floors: [[x0, z0, x1, z1, y]], links: [[from xyz, to xyz]]}
 ## items         weapons, ammo, medkits, pills and boxes lying where a mapper left them
+## spawners      weapon and supply spawners (dot-weapon docs/spawners.md): {at, pool?, tags_any?, respawn?, max?...}
 ## objectives    things to do on the way: press a button, hold out while the horde comes
 ## gates         a box with a "gate" id is a door an objective opens
 ## sleepers      where the crying one sits, waiting for somebody to come too close
@@ -365,6 +366,17 @@ static func validate(source: Dictionary) -> DotResult:
 		return _refuse("%d items; the most is %d" % [items.size(), MAX_ITEMS], source)
 	doc["items"] = items
 
+	var spawners: Array = []
+	for raw: Variant in source.get("spawners", []):
+		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
+			return _refuse("spawner %d has no 'at'" % spawners.size(), source)
+		var sp: Dictionary = _as_floats((raw as Dictionary).duplicate(true))
+		sp["at"] = _floats(sp["at"], 3)
+		spawners.append(sp)
+	if spawners.size() > MAX_ITEMS:
+		return _refuse("%d spawners; the most is %d" % [spawners.size(), MAX_ITEMS], source)
+	doc["spawners"] = spawners
+
 	# --- Objectives ------------------------------------------------------------
 	var objectives: Array = []
 	for raw: Variant in source.get("objectives", []):
@@ -599,6 +611,23 @@ static func digest(doc: Dictionary) -> String:
 
 
 # --- Small readers ----------------------------------------------------------
+
+## Every number in [param value] as a float, as JSON reads it back, so the document's digest survives the wire.
+static func _as_floats(value: Variant) -> Variant:
+	if value is int:
+		return float(value)
+	if value is Dictionary:
+		var out := {}
+		for k: Variant in value:
+			out[k] = _as_floats(value[k])
+		return out
+	if value is Array:
+		var list := []
+		for v: Variant in value:
+			list.append(_as_floats(v))
+		return list
+	return value
+
 
 static func v3(value: Variant) -> Vector3:
 	if value is Vector3:

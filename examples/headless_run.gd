@@ -285,7 +285,10 @@ func _test_world_builds() -> void:
 	_check(all_in_start, "everybody starts in the start room")
 	_check(armed, "holding the sidearm")
 	_check(game.survivors()[0].medkits == 1 and game.survivors()[0].health.health == 100.0, "with a medkit and full health")
-	_check(game.loot.count_of(ZzLoot.WEAPON) == 3 and game.loot.count_of(ZzLoot.BOX) == 1, "the map's weapons and its box are lying where it put them")
+	var laid := 0
+	for lid: int in game.spawners.loot_ids():
+		laid += 1 if game.loot.entries[lid]["kind"] == ZzLoot.WEAPON else 0
+	_check(game.loot.count_of(ZzLoot.WEAPON) - laid == 3 and game.loot.count_of(ZzLoot.BOX) == 1, "the map's weapons and its box are lying where it put them")
 	_check(game.horde.spawner.count_of(ZzNpcs.SLEEPER) == 1, "and the sleeper is sitting where it put her")
 	_finished()
 

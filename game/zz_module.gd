@@ -75,7 +75,24 @@ const MAP_BALLOT_TOPIC := &"map_ballot"
 
 ## The cvars a map's `dot_map/map/<name>.yml` may set (zz_map_config.gd).
 func _map_config_keys() -> Dictionary:
-	return ZzMapConfig.KEYS
+	var keys: Dictionary = ZzMapConfig.KEYS.duplicate()
+	keys.merge(DotWeaponSpawnerConfig.MAP_KEYS)
+	return keys
+
+
+## The spawner's settings live on the spawner, not in a cvar.
+func _map_config_get(key: String) -> Variant:
+	if DotWeaponSpawnerConfig.MAP_KEYS.has(key):
+		var spawners: Variant = (game as ZzGame).spawners
+		return spawners.spawner.config.get_setting(key) if spawners != null else null
+	return super._map_config_get(key)
+
+
+func _map_config_set(key: String, value: Variant) -> bool:
+	if DotWeaponSpawnerConfig.MAP_KEYS.has(key):
+		var spawners: Variant = (game as ZzGame).spawners
+		return spawners != null and spawners.spawner.config.set_setting(key, value)
+	return super._map_config_set(key, value)
 
 
 func _map_config_game() -> String:

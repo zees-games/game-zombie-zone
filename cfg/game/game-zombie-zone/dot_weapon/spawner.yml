@@ -1,0 +1,58 @@
+# Weapon and supply spawners (dot-weapon docs/spawners.md). A map document lists the places in
+# `spawners:`; this file says what they give. The operator overrides in cfg/server/game/game-zombie-zone/dot_weapon/.
+default_pool: wall_guns
+
+pools:
+  wall_guns:
+    kind: weapon
+    catalogue:
+      tags_any: [sidearm, primary]
+      tags_none: [heavy, melee, thrown]
+      weight: 1
+  heavy_guns:
+    kind: weapon
+    catalogue:
+      tags_any: [heavy]
+      weight: 1
+  throwables:
+    kind: throwable
+    catalogue:
+      tags_any: [thrown]
+      weight: 1
+  supplies:
+    kind: medkit
+    entries:
+      - id: medkit
+        kind: medkit
+        weight: 3
+      - id: pills
+        kind: pills
+        weight: 4
+
+# Defaults by spawner id, over what the map says.
+sites:
+  heavy:
+    pool: heavy_guns
+    respawn: 180
+    max: 1
+  supplies:
+    pool: supplies
+    respawn: 90
+    max: 1
+  throwables:
+    pool: throwables
+    respawn: 60
+    max: 1
+
+# The shop. A spawner whose `data` has `price: N` sells its item for N points (the wall-buy: a site
+# with a fixed `item` and `respawn: 0`); `tier_price: true` takes the weapon's tier price below.
+# A map says so in its `spawners:`: {id: wall1, at: [...], item: shotgun, respawn: 0, data: {price: 300}}
+# or {id: crate, at: [...], pool: wall_guns, respawn: 0, data: {tier_price: true}}.
+# Per map, add `maps:` with a block per map id or glob, e.g. zm_lot: then game: shop: prices: ...
+game:
+  shop:
+    prices:
+      sidearm: 50
+      primary: 250
+      heavy: 600
+      thrown: 75
