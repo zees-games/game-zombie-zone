@@ -95,6 +95,10 @@ const FALL_FASTEST := 25.0
 ## steering) for 1804 ticks, then fell out of the map.
 const LEAP_LONGEST := 64 * 3
 
+## The highest lip a grounded mover is lifted over, and how far past it the lift goes.
+const STEP_UP := 0.25
+const STEP_REACH := 0.2
+
 var _shape: CollisionShape3D = null
 
 
@@ -217,12 +221,40 @@ func advance(delta: float, ticks: int = 1) -> void:
 	else:
 		velocity.y = maxf(velocity.y - GRAVITY * delta, -FALL_FASTEST)
 
+	var before := global_position
 	var _moved := _sweep(ticks)
+
+	if is_on_floor() and horizontal.length_squared() > 0.04:
+		var flat := global_position - before
+		flat.y = 0.0
+
+		if flat.length() < horizontal.length() * delta * 0.3:
+			_step_up(horizontal.normalized())
 
 	if is_on_floor():
 		last_floor_at = global_position
 
 	push = push.move_toward(Vector3.ZERO, PUSH_DECAY * delta * maxf(push.length(), 1.0))
+
+
+## Lifts a body stopped by a low lip (a stair foot's 0.15 m) over it. A capsule's round bottom does
+## not climb one by itself, and the nav does not know a lip that low; taller than STEP_UP is a wall.
+func _step_up(direction: Vector3) -> void:
+	# A barricade is meant to stop it, however low its boards.
+	for i in get_slide_collision_count():
+		var hit := get_slide_collision(i).get_collider() as Object
+
+		if hit != null and hit.has_meta(&"barricade"):
+			return
+
+	var lifted := global_transform
+	lifted.origin.y += STEP_UP
+
+	if test_move(global_transform, Vector3(0.0, STEP_UP, 0.0)) or test_move(lifted, direction * STEP_REACH):
+		return
+
+	lifted.origin += direction * STEP_REACH
+	global_transform = lifted
 
 
 ## Starts a leap with [param launch] as its velocity.

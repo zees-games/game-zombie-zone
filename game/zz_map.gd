@@ -614,6 +614,7 @@ func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: V
 		# Its own layer: a survivor's mask may leave it out (zz_pass_barricades); the horde's and
 		# every ray's keep it.
 		_put_on(body, &"barricade")
+		body.set_meta(&"barricade", true)
 		_barricades[id] = {"body": body, "shapes": [], "drawn": [], "bounds": bounds, "intact": true, "fraction": 1.0}
 
 	var entry: Dictionary = _barricades[id]
