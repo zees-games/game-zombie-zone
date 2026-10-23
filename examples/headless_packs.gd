@@ -18,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addons/zombie_zone"
 const SECTIONS := 5
-const CHECKS := 38
+const CHECKS := 42
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -194,6 +194,34 @@ func _tuned() -> void:
 	_f = ZzPacks.scan(FIXTURE)
 	ZzWeapons.use_packs(true)
 	_check(ZzPacks.monsters.is_empty() and not ZzWeapons.exists(&"fx_rifle"), "both switches off leave the game as it was")
+	_clean()
+
+	_write("10-base.yml", "weapons:\n  tiers:\n    fx_rifle: heavy\n  not_in:\n    box: [fx_rifle]\nmonsters:\n  min_wave:\n    fx_ghoul: 4\n")
+	_f = ZzPacks.scan(FIXTURE)
+	ZzWeapons.use_packs(true)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	_check(ZzWeapons.tier_of(&"fx_rifle") == &"heavy", "weapons.tiers moves a pack weapon to another tier", String(ZzWeapons.tier_of(&"fx_rifle")))
+	var drawn_box := 0
+	var drawn_loot := 0
+
+	for _i in 200:
+		drawn_box += 1 if ZzWeapons.random_of(&"heavy", rng, &"box") == &"fx_rifle" else 0
+		drawn_loot += 1 if ZzWeapons.random_of(&"heavy", rng, &"loot") == &"fx_rifle" else 0
+
+	_check(drawn_box == 0 and drawn_loot > 0, "weapons.not_in keeps it out of boxes only", "%d box, %d loot" % [drawn_box, drawn_loot])
+	_check(ZzPacks.specials(3).is_empty() and ZzPacks.specials(4).size() == 1 and ZzPacks.specials().size() == 1,
+		"monsters.min_wave holds a monster back until its wave")
+	_clean()
+	_write("10-base.yml", "weapons:\n  weights:\n    fx_rifle: 0\n")
+	_f = ZzPacks.scan(FIXTURE)
+	ZzWeapons.use_packs(true)
+	var got := 0
+
+	for _i in 200:
+		got += 1 if ZzWeapons.random_of(&"any", rng) == &"fx_rifle" else 0
+
+	_check(got == 0 and ZzWeapons.exists(&"fx_rifle"), "weapons.weights 0 is never drawn but still exists")
 	_clean()
 	_finished += 1
 

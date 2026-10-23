@@ -111,6 +111,9 @@ var wave_room: int = -1
 var wave_speed_scale: float = 1.0
 var wave_health_scale: float = 1.0
 
+## The survival wave in play (1-based; 0 outside a survival hold), for a pack monster's `min_wave`.
+var wave_index: int = 0
+
 ## Barricades this map has: id -> {bounds: AABB, centre: Vector3}. Filled by the game.
 var barricades: Dictionary = {}
 
@@ -1476,7 +1479,7 @@ func _advance_specials() -> void:
 		return
 
 	var kinds := _allowed_specials()
-	var packed := ZzPackList.specials()
+	var packed := ZzPackList.specials(wave_index)
 
 	if kinds.is_empty() and packed.is_empty():
 		return
@@ -1544,7 +1547,7 @@ func _advance_brute() -> void:
 
 	_next_brute = _time + maxf(gap, 30.0)
 
-	var bosses := ZzPackList.bosses()
+	var bosses := ZzPackList.bosses(wave_index)
 
 	# An installed boss takes some of the brute's turns (it never adds to them), and only one
 	# boss of any kind is out at a time.

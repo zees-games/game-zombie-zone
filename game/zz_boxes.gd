@@ -526,7 +526,7 @@ func _do_give_weapon(a: Dictionary, ctx: Dictionary) -> void:
 	for p in _who(a, ctx):
 		var id := StringName(str(a.get("id", "")))
 		if id == &"" or not ZzWeapons.exists(id):
-			id = ZzWeapons.random_of(StringName(str(a.get("tier", "primary"))), _rng)
+			id = ZzWeapons.random_of(StringName(str(a.get("tier", "primary"))), _rng, &"box")
 		if game.arm(p, id):
 			game._draw(p, id)
 
@@ -645,7 +645,7 @@ func _do_shuffle_weapons(a: Dictionary, ctx: Dictionary) -> void:
 
 	for p in _who(who, ctx):
 		for tier in [&"sidearm", &"primary"]:
-			var id := ZzWeapons.random_of(tier, _rng)
+			var id := ZzWeapons.random_of(tier, _rng, &"box")
 			var _armed: bool = game.arm(p, id)
 
 

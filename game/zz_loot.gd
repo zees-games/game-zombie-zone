@@ -63,10 +63,10 @@ func place_from_map(doc: Dictionary) -> void:
 		match kind:
 			WEAPON:
 				if what == &"" or not ZzWeapons.exists(what):
-					what = ZzWeapons.random_of(&"primary", _rng)
+					what = ZzWeapons.random_of(&"primary", _rng, &"loot")
 			THROWABLE:
 				if what == &"" or not ZzWeapons.exists(what):
-					what = ZzWeapons.random_of(&"thrown", _rng)
+					what = ZzWeapons.random_of(&"thrown", _rng, &"loot")
 			BOX:
 				if what == &"" and game.boxes != null:
 					what = game.boxes.random_type(&"map", _rng)

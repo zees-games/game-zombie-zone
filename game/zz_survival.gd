@@ -3,6 +3,7 @@ extends RefCounted
 const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzPackList := preload("zz_packs.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 
@@ -165,6 +166,7 @@ func _release(horde) -> void:
 	# back by what it owed again (thirty-six on the ballpark).
 	# And a wave may have only part of the cap up at once, growing to all of it by the last, on
 	# a curve: slow through the middle waves (where holds were lost), a wall at the end.
+	horde.wave_index = waves.index
 	var ramp := clampf(float(waves.index - 1) / maxf(float(waves.count - 1), 1.0), 0.0, 1.0)
 	var share := lerpf(clampf(float(game.config.wave_alive_share_by_map.get(str(game.map_doc.get("id", "")), game.config.wave_alive_share)), 0.1, 1.0), 1.0, ramp * ramp)
 	horde.wave_room = int(float(game.config.commons_cap(_team())) * share)
@@ -180,7 +182,18 @@ func _release(horde) -> void:
 
 	if _specials_owed > 0 and _time >= _next_special:
 		var kinds: Array[StringName] = horde._allowed_specials()
-		if not kinds.is_empty():
+		var packed := ZzPackList.specials(waves.index)
+		var pick: ZzPackList.Monster = null
+
+		# No roll without an installed monster, so a game without packs draws what it always did.
+		if not packed.is_empty():
+			var roll := _rng.randf() * (float(kinds.size()) + ZzPackList.total_weight(packed))
+			pick = ZzPackList.pick(packed, roll - float(kinds.size())) if roll >= float(kinds.size()) else null
+
+		if pick != null:
+			if horde.spawn_special(pick.id, Vector3.INF, horde.WAVE) != null:
+				_specials_owed -= 1
+		elif not kinds.is_empty():
 			var made = horde.spawn_special(kinds[_rng.randi_range(0, kinds.size() - 1)], Vector3.INF, horde.WAVE)
 			if made != null:
 				_specials_owed -= 1
@@ -336,7 +349,7 @@ func restock() -> int:
 			if (loot.position_of(id) as Vector3).distance_to(at) < 1.6:
 				loot.remove(id)
 
-		var gun: StringName = ZzWeapons.random_of(tier, _rng)
+		var gun: StringName = ZzWeapons.random_of(tier, _rng, &"cache")
 		var things := [
 			[ZzLoot.AMMO, &"", Vector3(-0.45, 0.0, 0.0)],
 			[ZzLoot.MEDKIT if _rng.randf() < 0.5 else ZzLoot.PILLS, &"", Vector3(0.0, 0.0, 0.0)],
@@ -344,7 +357,7 @@ func restock() -> int:
 		]
 
 		if waves != null and waves.index >= 3:
-			things.append([ZzLoot.THROWABLE, ZzWeapons.random_of(&"thrown", _rng), Vector3(0.0, 0.0, 0.4)])
+			things.append([ZzLoot.THROWABLE, ZzWeapons.random_of(&"thrown", _rng, &"cache"), Vector3(0.0, 0.0, 0.4)])
 
 		for thing: Array in things:
 			var _id: int = loot.add(thing[0], thing[1], at + (thing[2] as Vector3))

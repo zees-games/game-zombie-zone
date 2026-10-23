@@ -10,6 +10,8 @@ extends RefCounted
 
 const TIERS: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]
 
+const ZzPackList := preload("zz_packs.gd")
+
 static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
 
@@ -70,13 +72,35 @@ static func ids_of(tier: StringName) -> Array[StringName]:
 	return out
 
 
-static func random_of(tier: StringName, rng: RandomNumberGenerator) -> StringName:
+## A weighted pick among the weapons of [param tier] (or any), drawn for [param channel] (`box`, `loot`,
+## `cache`, or "" for none): `weapons.not_in.<channel>` keeps ids out of one channel, `weapons.weights`
+## weighs each draw (default 1, 0 never), both from `cfg/addons/zombie_zone/packs.yml`.
+static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: StringName = &"") -> StringName:
 	var ids := ids_of(tier) if tier != &"any" else _any()
+	var barred: Array = ZzPackList.cfg("weapons.not_in.%s" % channel, []) if channel != &"" else []
+	var weights: Dictionary = ZzPackList.cfg("weapons.weights", {})
+	var pool: Array[StringName] = []
+	var total := 0.0
 
-	if ids.is_empty():
+	for id in ids:
+		if barred.has(String(id)) or float(weights.get(String(id), 1.0)) <= 0.0:
+			continue
+
+		pool.append(id)
+		total += float(weights.get(String(id), 1.0))
+
+	if pool.is_empty():
 		return &"pistol"
 
-	return ids[rng.randi_range(0, ids.size() - 1)]
+	var at := rng.randf() * total
+
+	for id in pool:
+		at -= float(weights.get(String(id), 1.0))
+
+		if at < 0.0:
+			return id
+
+	return pool[pool.size() - 1]
 
 
 static func _any() -> Array[StringName]:

@@ -38,12 +38,20 @@ const MAX_ENTRIES_PER_PROVIDER := 256
 const RESERVED: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloater", &"ram", &"spitter",
 	&"rider", &"brute", &"sleeper", &"screamer", &"crawler", &"riot"]
 
+const TIERS_ALL: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]
+
 const DEFAULTS := {
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
 		# Weapon ids kept out of the pool.
 		"exclude": [],
+		# id -> draw weight in boxes, loot and caches (default 1, 0 never drawn; still given by name).
+		"weights": {},
+		# id -> tier (sidearm, primary, heavy, melee, thrown), over what the pack tags.
+		"tiers": {},
+		# channel (box, loot, cache) -> ids kept out of that channel only.
+		"not_in": {},
 	},
 	"monsters": {
 		"enabled": true,
@@ -54,6 +62,8 @@ const DEFAULTS := {
 		"weights": {},
 		# Ids that are bosses (sent in place of the brute) rather than specials.
 		"boss": [],
+		# id -> first survival wave that may send it (default 1).
+		"min_wave": {},
 		# Chance that a brute's turn goes to an installed boss, when there is one.
 		"boss_chance": 0.4,
 	},
@@ -240,9 +250,16 @@ static func _take(pack: String, provider: Object) -> void:
 ## engine only because a source Callable must be a static method, never a lambda.
 static func _tiered(types: Dictionary, provider_script: Script) -> Array[DotWeaponDef]:
 	var defs: Array[DotWeaponDef] = provider_script.call(&"weapon_defs", types)
+	var tiers: Dictionary = cfg("weapons.tiers", {})
 
 	for def in defs:
 		var has_tier := false
+
+		if tiers.has(String(def.id)) and TIERS_ALL.has(StringName(str(tiers[String(def.id)]))):
+			for tier: StringName in TIERS_ALL:
+				def.tags.erase(tier)
+
+			def.tags.append(StringName(str(tiers[String(def.id)])))
 
 		for tier: StringName in [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]:
 			has_tier = has_tier or def.tags.has(tier)
@@ -275,24 +292,29 @@ static func _add_monster(pack: String, row: Dictionary) -> void:
 	monsters.append(m)
 
 
-static func specials() -> Array[Monster]:
+## The monsters sent as specials in [param wave] (0 = any); `monsters.min_wave` holds each back.
+static func specials(wave: int = 0) -> Array[Monster]:
 	var out: Array[Monster] = []
 
 	for m in monsters:
-		if not m.boss:
+		if not m.boss and _from_wave(m, wave):
 			out.append(m)
 
 	return out
 
 
-static func bosses() -> Array[Monster]:
+static func bosses(wave: int = 0) -> Array[Monster]:
 	var out: Array[Monster] = []
 
 	for m in monsters:
-		if m.boss:
+		if m.boss and _from_wave(m, wave):
 			out.append(m)
 
 	return out
+
+
+static func _from_wave(m: Monster, wave: int) -> bool:
+	return wave <= 0 or wave >= int((cfg("monsters.min_wave", {}) as Dictionary).get(String(m.id), 0))
 
 
 static func is_pack_kind(kind: StringName) -> bool:

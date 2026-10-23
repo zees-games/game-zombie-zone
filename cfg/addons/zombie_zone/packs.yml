@@ -4,10 +4,18 @@
 weapons:
   enabled: true      # installed weapons join boxes, loot, the buy pool and the stand-ins' kits
   exclude: []        # weapon ids to keep out of the pool
+  # weights:         # id: draw weight in boxes, loot and caches (default 1; 0 is never drawn there, still given by name)
+  #   zz_sniper: 0.3
+  # tiers:           # id: sidearm | primary | heavy | melee | thrown, over what the pack tags
+  #   zz_vss: heavy
+  # not_in:          # channel (box, loot, cache) -> ids kept out of that channel only
+  #   box: [zz_knife]
 monsters:
   enabled: true
   weight: 1.0        # an installed monster's weight as a special; each built-in kind weighs 1.0
   # weights:          # id: weight under here (indented), over the default above; 0 drops that monster
   #   some_monster: 0
+  # min_wave:        # id: first survival wave that may send it (default 1)
+  #   zhm_trex: 6
   boss: []           # ids sent in place of the brute instead of as specials
   boss_chance: 0.4   # chance a brute's turn goes to an installed boss, when there is one
