@@ -32,6 +32,8 @@ var authoritative: bool = true
 var occupants_fn: Callable = Callable()
 ## The living survivors' body points.
 var points_fn: Callable = Callable()
+## Where whoever is in a box (survivor or zombie) stands, nearest its centre, or null: which way a door swings away from.
+var opener_fn: Callable = Callable()
 
 var _ents: Variant = null
 var _movers: Array[Dictionary] = []
@@ -46,18 +48,25 @@ var _told: Dictionary = {}
 var _started: bool = false
 var _posed_tick: int = -2147483648
 var _unsupported_seen: Dictionary = {}
+## Who pressed the input being run (a survivor's eye), for a door's side.
+var _activator: Variant = null
 
 
 ## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
 ## it the world's physics layer.
-func build(world: RefCounted, put_on: Callable) -> void:
+## [param doors_only] builds just the hinged prop doors (a world from the global converter draws its own brush
+## doors, so the rest would collide twice); with no switch or key run there, such a door opens to anyone near it.
+func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> void:
 	_ents = world.call(&"entities")
 	var models := {}
 	for model: int in world.call(&"models"):
 		models[model] = true
 
 	for mv: Variant in _ents.movers:
-		if mv.model < 0 or not models.has(mv.model):
+		if mv.model < 0 and str(mv.classname).to_lower() == "prop_door_rotating":
+			_build_door(mv, put_on, doors_only)
+			continue
+		if doors_only or mv.model < 0 or not models.has(mv.model):
 			continue
 		var m := _make_mover(mv, world)
 		m["idx"] = _movers.size()
@@ -80,6 +89,9 @@ func build(world: RefCounted, put_on: Callable) -> void:
 				_by_body[body.get_instance_id()] = m["idx"]
 				_place(body, _transform_of(m, float(m["from"])))
 
+	if doors_only:
+		return
+
 	for vol: Variant in _ents.volumes:
 		var v := {"vol": vol, "entity": vol.entity, "inside": false, "ready": 0, "enabled": not vol.disabled}
 		if vol.kind == "multiple" or vol.kind == "once":
@@ -91,6 +103,44 @@ func build(world: RefCounted, put_on: Callable) -> void:
 	for g: Dictionary in _ents.generic:
 		_by_entity[int(g["entity"])] = {"type": &"generic", "i": int(g["entity"])}
 		_generic[int(g["entity"])] = {"rec": g, "enabled": true}
+
+
+## A prop door has no brush: dot-map's DotMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
+func _build_door(mv: Variant, put_on: Callable, free_for_all: bool) -> void:
+	var yaw: float = mv.panel_yaw if not is_nan(mv.panel_yaw) else mv.yaw
+	var node: Node3D = DotMapDoorStandIn.build(mv, yaw, DotMapDoorStandIn.SIZE, 1)
+	add_child(node)
+	var body := node.get_node_or_null("col_solid") as CollisionObject3D
+	if body != null and put_on.is_valid():
+		put_on.call(body)
+	var m := _make_mover(mv, null)
+	m["idx"] = _movers.size()
+	m["node"] = node
+	m["door"] = true
+	m["base"] = node.transform
+	m["side"] = _rest_side(mv)
+	m["zone"] = _door_zone(mv, node)
+	if free_for_all:
+		m["locked"] = false
+		m["initial_locked"] = false
+		m["auto"] = true
+	_movers.append(m)
+	_by_entity[mv.entity] = {"type": &"mover", "i": m["idx"]}
+
+
+## The side a door that starts open stands on, else 1.
+static func _rest_side(mv: Variant) -> float:
+	if mv.spawn_side != 0.0 and mv.degrees != 0.0:
+		return mv.spawn_side * signf(mv.degrees)
+	return 1.0
+
+
+## The door's reach: its swing about the hinge, from a metre under it (a hinge is often set above the floor) to the panel's top.
+static func _door_zone(mv: Variant, node: Node3D) -> AABB:
+	var width := DotMapDoorStandIn.SIZE.x
+	if not is_nan(mv.panel_yaw) and mv.panel_width > 0.1:
+		width = mv.panel_width
+	return AABB(node.position + Vector3(-width, -1.0, -width), Vector3(width * 2.0, DotMapDoorStandIn.SIZE.y + 1.0, width * 2.0))
 
 
 ## Hands the drawn nodes over (from build_node): each mover's node takes its pose.
@@ -257,6 +307,10 @@ func _transform_of(m: Dictionary, fraction: float) -> Transform3D:
 		return Transform3D(Basis.IDENTITY, at + here - pts[0])
 	if kind == "spin":
 		return Transform3D(Basis.IDENTITY, at)
+	if m.has("door"):
+		var rest: Transform3D = m["base"]
+		var turn: Transform3D = (m["mv"] as Variant).transform_at(fraction, float(m["side"]))
+		return Transform3D(turn.basis * rest.basis, rest.origin)
 	var rel: Transform3D = (m["mv"] as Variant).transform_at(fraction)
 	return Transform3D(rel.basis, at + rel.origin)
 
@@ -285,6 +339,12 @@ func _pose_mover(m: Dictionary, tick: int) -> void:
 	var node2: Variant = m["node"]
 	if node2 != null and is_instance_valid(node2):
 		(node2 as Node3D).transform = xf
+
+		if m.has("door"):
+			var solid := (node2 as Node3D).get_node_or_null("col_solid") as CollisionObject3D
+
+			if solid != null and solid.is_inside_tree():
+				PhysicsServer3D.body_set_state(solid.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, solid.global_transform)
 
 
 ## Poses every body at [param tick], before a motor sweeps against them.
@@ -315,7 +375,8 @@ func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
 ## The state of mover [param index] as `[start tick, fraction in thousandths, direction, locked]`.
 func snapshot(index: int) -> Array:
 	var m: Dictionary = _movers[index]
-	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0]
+	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0,
+			1 if float(m.get("side", 1.0)) > 0.0 else 0]
 
 
 ## Mover indices that have left their rest state, for somebody who joins late.
@@ -328,7 +389,7 @@ func told_indices() -> PackedInt32Array:
 
 
 ## Takes a state the server sent.
-func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool) -> void:
+func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
 	if index < 0 or index >= _movers.size():
 		return
 	var m: Dictionary = _movers[index]
@@ -336,6 +397,8 @@ func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked
 	m["from"] = float(from_thousandths) / 1000.0
 	m["dir"] = clampi(dir, -1, 1)
 	m["locked"] = locked
+	if m.has("door"):
+		m["side"] = side
 	m["posed"] = -1.0
 	_posed_tick = -2147483648
 	_told[index] = true
@@ -351,6 +414,8 @@ func reset(tick: int) -> void:
 	_told.clear()
 	for m in _movers:
 		m["from"] = (m["mv"] as Variant).rest_fraction() if str(m["kind"]) != "path" else 0.0
+		if m.has("door"):
+			m["side"] = _rest_side(m["mv"])
 		m["dir"] = 0
 		m["start"] = tick
 		m["locked"] = m["initial_locked"]
@@ -495,7 +560,9 @@ func try_press(eye: Vector3, look: Vector3, reach: float, tick: int) -> bool:
 				best = int(m["idx"])
 	if best < 0:
 		return false
+	_activator = eye
 	_apply_input(_movers[best]["entity"], "Press", "", tick)
+	_activator = null
 	return true
 
 
@@ -653,6 +720,8 @@ func _toggle(m: Dictionary, tick: int) -> void:
 func _set_dir(m: Dictionary, d: int, tick: int) -> void:
 	var f := _fraction(m, tick)
 	var before := int(m["dir"])
+	if d > 0 and m.has("door") and f <= 0.0 and int(m["mv"].open_dir) == 0:
+		_swing_away(m)
 	m["from"] = f
 	m["start"] = tick
 	m["dir"] = d
@@ -662,6 +731,14 @@ func _set_dir(m: Dictionary, d: int, tick: int) -> void:
 		_fire(int(m["entity"]), "OnOpen", tick)
 	elif d < 0 and before >= 0:
 		_fire(int(m["entity"]), "OnClose", tick)
+
+
+## Which way a door about to open turns: away from whoever opens it, as dot-map's mover node chooses.
+func _swing_away(m: Dictionary) -> void:
+	var at: Variant = _activator
+	if at == null and opener_fn.is_valid():
+		at = opener_fn.call((m["zone"] as AABB).grow(DOOR_PAD))
+	m["side"] = (m["mv"] as Variant).side_away_from(at)
 
 
 func _note_unsupported(what: String) -> void:

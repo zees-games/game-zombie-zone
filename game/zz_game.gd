@@ -528,6 +528,7 @@ func _build_map() -> void:
 	map.gravity = config.gravity
 	map.occupants_fn = _mechanics_occupied
 	map.points_fn = _mechanics_points
+	map.opener_fn = _mechanics_opener
 	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	add_child(map)
 
@@ -561,6 +562,27 @@ func _mechanics_occupied(zone: AABB) -> bool:
 				return true
 
 	return false
+
+
+## Where whoever stands in [param zone] is, the one nearest its centre (a survivor or a zombie), or null.
+func _mechanics_opener(zone: AABB) -> Variant:
+	var best: Variant = null
+	var best_d := INF
+	var centre := zone.get_center()
+
+	for point in _mechanics_points():
+		if zone.has_point(point) and point.distance_to(centre) < best_d:
+			best_d = point.distance_to(centre)
+			best = point
+
+	if horde != null:
+		for npc in horde.zombies_near(centre, zone.size.length() * 0.5):
+			var at: Vector3 = npc.position()
+			if zone.has_point(at) and at.distance_to(centre) < best_d:
+				best_d = at.distance_to(centre)
+				best = at
+
+	return best
 
 
 func _build_combat() -> void:

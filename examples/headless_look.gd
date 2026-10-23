@@ -10,7 +10,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 ## godot --headless --path . res://examples/headless_look.tscn
 ## [/codeblock]
 
-const CHECKS := 12
+const CHECKS := 15
 
 var _passed := 0
 var _failed := 0
@@ -66,6 +66,20 @@ func _blood() -> void:
 	_check(blood.decals.blood_count() <= cap, "the cap holds (%d of %d)" % [blood.decals.blood_count(), cap])
 	blood.clear()
 	_check(blood.decals.blood_count() == 0, "a map change clears the blood")
+
+	var surf := Vector3(0, 1.5, -3.7)
+	_check(blood.on_splat(surf, Vector3.BACK) == null, "a server splat with no camera is dropped, not drawn without the distance gate")
+	var cam := Camera3D.new()
+	add_child(cam)
+	cam.current = true
+	cam.global_position = Vector3(0, 1.7, 8)
+	var drawn := 0
+	for i in 40:
+		if blood.on_splat(surf + Vector3(i * 0.01, 0, 0), Vector3.BACK) != null:
+			drawn += 1
+	_check(drawn == ZzBlood.SPLATS_PER_SECOND, "server splats are capped per second (%d drawn of 40, cap %d)" % [drawn, ZzBlood.SPLATS_PER_SECOND])
+	_check(blood.on_splat(Vector3(0, 1.5, -300), Vector3.BACK) == null, "a splat beyond 60 m of the camera is dropped")
+	blood.clear()
 
 	var off := DotFxDecalConfig.new()
 	off.gore = false

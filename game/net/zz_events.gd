@@ -753,6 +753,7 @@ static func write_mover(state: Array, index: int) -> PackedByteArray:
 	w.write_uint(clampi(int(state[1]), 0, 1000), 10)
 	w.write_uint(clampi(int(state[2]) + 1, 0, 2), 2)
 	w.write_uint(int(state[3]), 1)
+	w.write_uint(int(state[4]), 1)
 	return w.to_bytes()
 
 
@@ -762,7 +763,8 @@ static func read_mover(r: DotNetReader) -> Dictionary:
 	var from := r.read_uint(10)
 	var dir := r.read_uint(2) - 1
 	var locked := r.read_uint(1)
-	return {"index": index, "start": start, "from": from, "dir": dir, "locked": locked != 0, "ok": r.ok()}
+	var side := r.read_uint(1)
+	return {"index": index, "start": start, "from": from, "dir": dir, "locked": locked != 0, "side": 1.0 if side != 0 else -1.0, "ok": r.ok()}
 
 
 static func write_gate(gate: String) -> PackedByteArray:
@@ -860,10 +862,10 @@ static func read_hit(r: DotNetReader) -> Dictionary:
 		"headshot": flags & 2 != 0, "ok": r.ok()}
 
 
-# --- Chat ------------------------------------------------------------------
-
 ## The octahedral normal's bits per axis: 6 gives about 2 degrees, plenty for a blood decal.
+## 63 levels (not 64), so 0 sits on a level and an axis normal round-trips exactly.
 const NORMAL_BITS := 6
+const NORMAL_TOP := (1 << NORMAL_BITS) - 2
 
 
 static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
@@ -873,9 +875,8 @@ static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
 	var o := Vector2(n.x, n.z) / (absf(n.x) + absf(n.y) + absf(n.z))
 	if n.y < 0.0:
 		o = Vector2((1.0 - absf(o.y)) * _sign(o.x), (1.0 - absf(o.x)) * _sign(o.y))
-	var top := (1 << NORMAL_BITS) - 1
-	w.write_uint(clampi(roundi((o.x * 0.5 + 0.5) * top), 0, top), NORMAL_BITS)
-	w.write_uint(clampi(roundi((o.y * 0.5 + 0.5) * top), 0, top), NORMAL_BITS)
+	w.write_uint(clampi(roundi((o.x * 0.5 + 0.5) * NORMAL_TOP), 0, NORMAL_TOP), NORMAL_BITS)
+	w.write_uint(clampi(roundi((o.y * 0.5 + 0.5) * NORMAL_TOP), 0, NORMAL_TOP), NORMAL_BITS)
 	return w.to_bytes()
 
 
@@ -885,9 +886,8 @@ static func _sign(v: float) -> float:
 
 static func read_splat(r: DotNetReader) -> Dictionary:
 	var point := _read_pos(r)
-	var top := float((1 << NORMAL_BITS) - 1)
-	var x := float(r.read_uint(NORMAL_BITS)) / top * 2.0 - 1.0
-	var z := float(r.read_uint(NORMAL_BITS)) / top * 2.0 - 1.0
+	var x := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
+	var z := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
 	var y := 1.0 - absf(x) - absf(z)
 	if y < 0.0:
 		var ox := x
@@ -896,6 +896,8 @@ static func read_splat(r: DotNetReader) -> Dictionary:
 	var n := Vector3(x, y, z)
 	return {"point": point, "normal": n.normalized() if n.length_squared() > 0.0001 else Vector3.UP, "ok": r.ok()}
 
+
+# --- Chat ------------------------------------------------------------------
 
 ## A chat line's own field widths. Wider than the rules allow, so a rule can be raised
 ## without the wire silently truncating what it lets through.

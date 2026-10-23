@@ -7,6 +7,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
@@ -30,8 +31,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 21
-const CHECKS := 119
+const SECTIONS := 22
+const CHECKS := 126
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -92,6 +93,7 @@ func _run() -> void:
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
 		await _test_a_gate_reaches_the_client()
+		await _test_a_door_reaches_the_client()
 		await _test_the_map_ends()
 		await _test_a_hold_reaches_the_client()
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
@@ -212,8 +214,6 @@ func _test_the_codec() -> void:
 		and bool(hit["killed"]) and bool(hit["headshot"]) and (hit["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
 		"HIT (the victim's entity serial, so a whole entity id never overflows the field)", str(hit))
 
-	var effects := ZzEvents.read_effects(_r(ZzEvents.write_effects([
-		{"title": "Glass cannon", "stacks": 2, "seconds": 14.25, "who": "everybody", "scale": 1.5},
 	var splat_bytes := ZzEvents.write_splat(Vector3(1.0, 1.4, -6.0), Vector3(0.6, -0.64, -0.48).normalized())
 	var splat := ZzEvents.read_splat(_r(splat_bytes))
 	_check(bool(splat["ok"]) and (splat["normal"] as Vector3).dot(Vector3(0.6, -0.64, -0.48).normalized()) > 0.98
@@ -221,6 +221,13 @@ func _test_the_codec() -> void:
 		"SPLAT (a point and a 12-bit octahedral normal, both hemispheres)", "%d bytes, %s" % [splat_bytes.size(), str(splat)])
 	var up_splat := ZzEvents.read_splat(_r(ZzEvents.write_splat(Vector3.ZERO, Vector3.UP)))
 	_check((up_splat["normal"] as Vector3).dot(Vector3.UP) > 0.99, "SPLAT keeps a floor facing up")
+	var exact := true
+	for axis in [Vector3.RIGHT, Vector3.LEFT, Vector3.UP, Vector3.DOWN, Vector3.BACK, Vector3.FORWARD]:
+		var back: Vector3 = ZzEvents.read_splat(_r(ZzEvents.write_splat(Vector3.ZERO, axis)))["normal"]
+		exact = exact and back.is_equal_approx(axis)
+	_check(exact, "SPLAT round-trips an axis normal exactly (0 is a quantisation level)")
+	var effects := ZzEvents.read_effects(_r(ZzEvents.write_effects([
+		{"title": "Glass cannon", "stacks": 2, "seconds": 14.25, "who": "everybody", "scale": 1.5},
 	])))
 	var rows: Array = effects["effects"]
 	_check(bool(effects["ok"]) and rows.size() == 1 and int(rows[0]["stacks"]) == 2 and str(rows[0]["title"]) == "Glass cannon",
@@ -322,10 +329,10 @@ func _build() -> bool:
 		_heard["npc"] = [net_id, kind, body])
 	_client_bridge.hit_received.connect(func(victim: int, amount: float, _point: Vector3, killed: bool, _head: bool) -> void:
 		(_heard.get_or_add("hits", []) as Array).append([victim, amount, killed]))
-	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
-		_heard["npc_gone"] = [net_id, killed, body.get(&"death") if body != null else null])
 	_client_bridge.splat_received.connect(func(point: Vector3, normal: Vector3) -> void:
 		(_heard.get_or_add("splats", []) as Array).append([point, normal]))
+	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
+		_heard["npc_gone"] = [net_id, killed, body.get(&"death") if body != null else null])
 	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
 		_heard["down"] = who)
 	_client_bridge.revived_received.connect(func(who: int, _by: int) -> void:
@@ -590,8 +597,6 @@ func _test_zombies_replicate() -> void:
 	_check(hits.size() == 1 and absf(float(hits[0][1]) - 5.0) < 0.1 and not bool(hits[0][2]),
 		"a survivor's hit on it is confirmed to that survivor's client", str(hits))
 
-	_hurt_npc(npc, 100000.0)
-	await _steps(6)
 	_check((_heard.get("splats", []) as Array).is_empty(),
 		"the shooter is not sent a SPLAT for their own hit (they splatter from the HIT)", str(_heard.get("splats", [])))
 
@@ -620,6 +625,8 @@ func _test_zombies_replicate() -> void:
 	_check(budget_sent <= int(ZzNetBridge.SPLAT_PER_SECOND), "SPLATs are rate limited", "%d of 100 in one burst" % budget_sent)
 	floor_shape.queue_free()
 
+	_hurt_npc(npc, 100000.0)
+	await _steps(6)
 	_check((_heard.get("hits", []) as Array).size() == 1,
 		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
 	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
@@ -860,6 +867,45 @@ func _test_a_gate_reaches_the_client() -> void:
 	await _steps(4)
 	_check(str(_heard.get("gate", "")) == "barrier", "the client is told")
 	_check(not _client_game.map.gate_is_shut("barrier"), "and its barrier is up: nobody walks into a wall that is not there")
+	_finished()
+
+
+## A world of one hinged prop door, as dot-map's manifest writes it.
+class DoorWorld extends RefCounted:
+	var ents: Variant = DotMapEntities.from_manifest({"movers": [{"entity": 900, "model": null, "kind": "rotate", "classname": "prop_door_rotating",
+		"targetname": "", "origin": [60.0, 0.0, 60.0], "axis": [0.0, 1.0, 0.0], "degrees": 90.0, "speed": 100.0, "travel_time": 0.9, "wait": 4.0,
+		"open_dir": 0, "yaw": 0.0, "use": true, "touch": false, "solid": true, "locked": false, "start_open": false, "outputs": [], "opened_by": []}]})
+
+	func entities() -> Variant:
+		return ents
+
+	func models() -> PackedInt32Array:
+		return PackedInt32Array()
+
+
+func _test_a_door_reaches_the_client() -> void:
+	_section("a door a survivor opens on the server swings open on the client, away from them")
+	for game: ZzGame in [_server_game, _client_game]:
+		game.map.attach_mechanics(DoorWorld.new(), true)
+	var server_door: ZzMechanics = _server_game.map.mechanics
+	var client_door: ZzMechanics = _client_game.map.mechanics
+	_check(server_door != null and client_door != null and client_door.mover_count() == 1, "both ends stand the door up")
+
+	if server_door == null or client_door == null:
+		_finished()
+		return
+
+	var hinge := Vector3(60.0, 0.0, 60.0)
+	await _steps(6)
+	_check(float(client_door.mover(0)["from"]) == 0.0 and int(client_door.mover(0)["dir"]) == 0, "armed: with nobody near, the door stays shut on the client")
+	_stand_in.place_at(hinge + Vector3(-1.0, 0.0, -0.5), 0.0)
+	await _steps(90)
+	_check(int(server_door.mover(0)["dir"]) != 0 or float(server_door.mover(0)["from"]) > 0.0, "the server opens it to a survivor at the door")
+	_check(int(client_door.mover(0)["dir"]) > 0 or float(client_door.mover(0)["from"]) > 0.0, "and the client was told: it swings too")
+	_check(float(server_door.mover(0)["side"]) == -1.0 and float(client_door.mover(0)["side"]) == -1.0, "away from somebody on the far side, the same on both ends (armed: the default is +1)", "server %s, client %s" % [str(server_door.mover(0)["side"]), str(client_door.mover(0)["side"])])
+	var shown := (client_door.mover(0)["node"] as Node3D).transform.basis
+	_check(not shown.is_equal_approx((client_door.mover(0)["base"] as Transform3D).basis), "and its drawn panel has turned off its closed pose")
+	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
 	_finished()
 
 

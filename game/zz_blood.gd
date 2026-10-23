@@ -5,6 +5,11 @@ extends Node
 var decals := DotFxDecals.new()
 ## Layers the splatter may land on; the game's world, props and barricades.
 var mask := 0xFFFFFFFF
+## Server splats drawn per second at most.
+const SPLATS_PER_SECOND := 20
+
+var _window_start := 0
+var _window_count := 0
 
 
 func _init() -> void:
@@ -50,11 +55,19 @@ func on_body_hit(victim: int, point: Vector3, from: Vector3, reach: float = 4.0)
 	return decals.splatter(hit["position"], hit["normal"])
 
 
-## The server's word that blood landed at [param point] on a surface facing [param normal]; only near the camera.
+## The server's word that blood landed at [param point] on a surface facing [param normal]; only near the
+## camera (no camera, no decal) and at most [constant SPLATS_PER_SECOND] a second, so a flood of events cannot flood the decals.
 func on_splat(point: Vector3, normal: Vector3, within: float = 60.0) -> Node3D:
 	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
-	if camera != null and camera.global_position.distance_to(point) > within:
+	if camera == null or camera.global_position.distance_to(point) > within:
 		return null
+	var now := Time.get_ticks_msec()
+	if now - _window_start >= 1000:
+		_window_start = now
+		_window_count = 0
+	if _window_count >= SPLATS_PER_SECOND:
+		return null
+	_window_count += 1
 	return decals.splatter(point, normal)
 
 

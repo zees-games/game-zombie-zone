@@ -8,6 +8,7 @@ const ZzClient := preload("../game/zz_client.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMap := preload("../game/zz_map.gd")
+const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -29,6 +30,8 @@ var _box := &""
 var _aim := INF
 ## --alone: the stand-ins stay in the start room, out of a close-up.
 var _alone := false
+## --door=INDEX:open|closed[:SIDE]: that door frozen in that state (side 1 or -1 is the way it swings), for a frame of it.
+var _doors: Array[String] = []
 ## `--reaction=<id>`: the ragdoll view forces that death reaction (sv_ragdoll_reactions).
 var _reaction := &""
 var _client: Node = null
@@ -67,6 +70,8 @@ func _ready() -> void:
 			_reaction = StringName(arg.trim_prefix("--reaction="))
 		elif arg == "--alone":
 			_alone = true
+		elif arg.begins_with("--door="):
+			_doors.append(arg.trim_prefix("--door="))
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--aim="):
@@ -194,6 +199,14 @@ func _run() -> void:
 
 	if _look != Vector3.INF:
 		_face(local, _look)
+
+	if not _doors.is_empty() and game.map.mechanics != null:
+		var mech: ZzMechanics = game.map.mechanics
+		mech.authoritative = false
+		for spec in _doors:
+			var bits := spec.split(":")
+			var opened := bits.size() > 1 and bits[1] == "open"
+			mech.apply_state(bits[0].to_int(), 0, 1000 if opened else 0, 0, false, bits[2].to_float() if bits.size() > 2 else 1.0)
 
 	if _aim != INF:
 		# Written before anything else runs each frame: the stand-ins' empty commands would

@@ -1503,7 +1503,7 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 		ZzEvents.Kind.MOVER:
 			var mv := ZzEvents.read_mover(reader)
 			if bool(mv["ok"]) and game.map != null:
-				game.map.apply_mover_state(int(mv["index"]), int(mv["start"]), int(mv["from"]), int(mv["dir"]), bool(mv["locked"]))
+				game.map.apply_mover_state(int(mv["index"]), int(mv["start"]), int(mv["from"]), int(mv["dir"]), bool(mv["locked"]), float(mv["side"]))
 		ZzEvents.Kind.BARRICADE:
 			var bar := ZzEvents.read_barricade(reader)
 			if bool(bar["ok"]):

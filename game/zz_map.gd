@@ -115,6 +115,7 @@ static var bring_global_mechanics: bool = false
 ## Handed to the mechanics: a box has somebody in it, and the living survivors' points.
 var occupants_fn: Callable = Callable()
 var points_fn: Callable = Callable()
+var opener_fn: Callable = Callable()
 var _pending_movers: Dictionary = {}
 
 signal built()
@@ -979,6 +980,8 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	# doors would collide a second time, so only a pack made for this game brings mechanics.
 	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
 		attach_mechanics(world)
+	else:
+		attach_mechanics(world, true)
 	if mechanics != null:
 		mechanics.bind_drawn(node)
 
@@ -1053,7 +1056,8 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 
 ## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
 ## for the solid ones, the outputs that drive them. A second call keeps the first.
-func attach_mechanics(world: RefCounted) -> void:
+## [param doors_only]: a global pack's hinged prop doors alone (its brush doors are already in the boxes).
+func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 	if mechanics != null or not use_mechanics:
 		return
 	var made := ZzMechanics.new()
@@ -1061,7 +1065,8 @@ func attach_mechanics(world: RefCounted) -> void:
 	made.authoritative = authoritative
 	made.occupants_fn = occupants_fn
 	made.points_fn = points_fn
-	made.build(world, func(body: StaticBody3D) -> void: _put_on(body, &"world"))
+	made.opener_fn = opener_fn
+	made.build(world, func(body: CollisionObject3D) -> void: _put_on(body, &"world"), doors_only)
 	if made.mover_count() == 0 and not made.has_logic():
 		made.free()
 		return
@@ -1070,7 +1075,7 @@ func attach_mechanics(world: RefCounted) -> void:
 	mechanics = made
 	for index: int in _pending_movers:
 		var s: Array = _pending_movers[index]
-		made.apply_state(index, int(s[0]), int(s[1]), int(s[2]), int(s[3]) != 0)
+		made.apply_state(index, int(s[0]), int(s[1]), int(s[2]), int(s[3]) != 0, float(s[4]))
 	_pending_movers.clear()
 
 
@@ -1087,17 +1092,17 @@ func build_mechanics_local() -> bool:
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
 		return false
-	if (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics:
-		attach_mechanics(read.value)
+	var own := (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics
+	attach_mechanics(read.value, not own)
 	return mechanics != null
 
 
 ## A mover's state as the server sent it; kept until the mechanics exist.
-func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool) -> void:
+func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
 	if mechanics != null:
-		mechanics.apply_state(index, start, from_thousandths, dir, locked)
+		mechanics.apply_state(index, start, from_thousandths, dir, locked, side)
 	else:
-		_pending_movers[index] = [start, from_thousandths, dir, 1 if locked else 0]
+		_pending_movers[index] = [start, from_thousandths, dir, 1 if locked else 0, side]
 
 
 ## Takes a bake off: what was baked was the boxes.

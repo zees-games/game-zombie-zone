@@ -5,6 +5,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
+const ZzNpcs := preload("../game/zz_npcs.gd")
 
 ## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
 ## survivor up, a door blocks and opens, a button's outputs run after their delays, and a map
@@ -17,8 +18,8 @@ const ZzEvents := preload("../game/net/zz_events.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 5
-const CHECKS := 27
+const SECTIONS := 6
+const CHECKS := 43
 
 var _passed := 0
 var _failed := 0
@@ -64,6 +65,7 @@ func _run() -> void:
 	print("zombiezone mechanics")
 	await _test_lift()
 	await _test_real_door()
+	await _test_prop_doors()
 	await _test_button_and_delay()
 	await _test_volume_and_unsupported()
 	await _test_no_world()
@@ -287,6 +289,121 @@ func _built() -> ZzMechanics:
 	add_child(mech)
 	mech.build(FakeWorld.new(_fixture()), Callable())
 	return mech
+
+
+## A shipped map's hinged prop doors: built on a global pack, solid, swung away from whoever opens
+## them, opened by a zombie as by a survivor, and the side crosses the wire.
+func _test_prop_doors() -> void:
+	_entered += 1
+	const DOOR_MAP := &"zm_abandoned_mall"
+	print("%s: its hinged doors swing" % DOOR_MAP)
+	ZzMap.bring_global_mechanics = false
+	var game := await _game(DOOR_MAP)
+	game.next_map_id = DOOR_MAP
+	game.start()
+	await _sim(game, 8)
+	var mech: ZzMechanics = game.map.mechanics
+	var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", game.map.local_world_prefix())
+	var doors := 0
+	var brush_movers := 0
+
+	if read.ok:
+		for rec: Dictionary in (read.value.get("manifest") as Dictionary)["movers"]:
+			if rec.get("classname") == "prop_door_rotating":
+				doors += 1
+			else:
+				brush_movers += 1
+
+	_check(mech != null and doors > 0 and mech.mover_count() == doors, "the map's prop doors are built, and only they (its brush movers are in the boxes)",
+		"%d built of %d doors, %d brush movers left out" % [mech.mover_count() if mech != null else 0, doors, brush_movers])
+
+	if mech == null or doors == 0:
+		game.queue_free()
+		_finished += 1
+		return
+
+	var m: Dictionary = mech.mover(0)
+	var node := m["node"] as Node3D
+	var body := node.get_node("col_solid") as CollisionObject3D
+	var rest: Transform3D = m["base"]
+	var normal := rest.basis * Vector3.RIGHT
+	var hinge := rest.origin
+	var middle := hinge + rest.basis * Vector3(0.0, 1.0, -DotMapDoorStandIn.SIZE.x * 0.5)
+	_check(body != null and body.collision_layer != 0 and bool(m["auto"]) and not bool(m["locked"]),
+		"the door has a body on a layer, and opens to anyone near", "layer %d" % (body.collision_layer if body != null else -1))
+
+	var who := [Vector3.INF]
+	mech.occupants_fn = func(box: AABB) -> bool: return who[0] != Vector3.INF and box.grow(1.0).has_point(who[0])
+	mech.opener_fn = func(_box: AABB) -> Variant: return null if who[0] == Vector3.INF else who[0]
+	await get_tree().physics_frame
+	_check(_ray_hits(game, body, middle - normal, middle + normal), "closed, it stops a ray through its panel")
+
+	var tick := 2000
+	var swung := []
+
+	for sign_of in [1.0, -1.0]:
+		who[0] = middle + normal * sign_of * 1.0
+		var spent := 0
+
+		while mech.fraction_at(0, tick) < 1.0 and spent < 4000:
+			tick += 1
+			spent += 1
+			mech.step(tick)
+
+		for _f in 3:
+			await get_tree().physics_frame
+		var open_middle: Vector3 = mech.transform_at(0, tick) * (rest.affine_inverse() * middle)
+		var side_of_opener := signf(normal.dot(who[0] - hinge))
+		var side_of_panel := signf(normal.dot(open_middle - hinge))
+		swung.append(float(m["side"]))
+		_check(mech.fraction_at(0, tick) >= 1.0 and not _ray_hits(game, body, middle - normal, middle + normal),
+			"opened for somebody on side %+d, the ray passes where the panel was" % int(sign_of),
+			"fraction %.2f ray %s" % [mech.fraction_at(0, tick), game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(middle - normal, middle + normal))])
+		_check(side_of_panel == -side_of_opener, "and it swung away from them", "opener %+d, panel %+d" % [int(side_of_opener), int(side_of_panel)])
+
+		who[0] = Vector3.INF
+		spent = 0
+
+		while mech.fraction_at(0, tick) > 0.0 and spent < 12000:
+			tick += 1
+			spent += 1
+			mech.step(tick)
+
+		for _f in 3:
+			await get_tree().physics_frame
+		_check(mech.fraction_at(0, tick) <= 0.0, "left alone, it closes", "fraction %.2f after %d ticks" % [mech.fraction_at(0, tick), spent])
+		_check(_ray_hits(game, body, middle - normal, middle + normal), "and blocks again", "server body %s, ray %s" % [str(PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM)), str(game.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(middle - normal, middle + normal)))])
+
+	_check(swung[0] != swung[1], "the two openers made it swing opposite ways (armed: a fixed side fails this)", str(swung))
+
+	# A zombie stands where a survivor would: the game's own callables see it, so a closed door never holds a horde.
+	var zone: AABB = m["zone"]
+	var occupied: Callable = game.map.occupants_fn
+	_check(not occupied.call(zone), "nobody near: the game reports the door's box empty")
+	var zombie := game.horde.spawner.spawn(ZzNpcs.COMMON, hinge + normal * 1.0 + Vector3(0.0, 0.1, 0.0), &"test")
+	await _sim(game, 4)
+	_check(zombie != null and occupied.call(zone) and game.map.opener_fn.call(zone) is Vector3, "a zombie in its box is an opener",
+		"zombie %s at %s, zone %s" % [str(zombie), str(zombie.position()) if zombie != null else "", str(zone)])
+
+	# The wire: the side is in the snapshot and survives it.
+	m["side"] = -1.0
+	var snap: Array = mech.snapshot(0)
+	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, 0)))
+	_check(bool(wire["ok"]) and float(wire["side"]) == -1.0, "the side survives the wire", str(wire))
+	m["side"] = 1.0
+	snap = mech.snapshot(0)
+	wire = ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, 0)))
+	_check(float(wire["side"]) == 1.0, "and so does the other")
+	game.queue_free()
+	_finished += 1
+
+
+## Whether the first thing a ray from [param from] to [param to] meets is [param body].
+func _ray_hits(game: ZzGame, body: CollisionObject3D, from: Vector3, to: Vector3) -> bool:
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collision_mask = 0xFFFFFFFF
+	var hit := game.get_world_3d().direct_space_state.intersect_ray(query)
+	return not hit.is_empty() and hit["collider"] == body
 
 
 func _test_button_and_delay() -> void:
