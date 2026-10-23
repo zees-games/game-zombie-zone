@@ -39,7 +39,7 @@ const DEFAULT_FOV := 92
 ## Stock keys nothing here applies: every sound is on the SFX bus, the client binds no
 ## effects, and the chat box has no switch.
 const NOT_APPLIED: Array[StringName] = [
-	&"ui_volume", &"shake_scale", &"allow_flashes", &"fx_quality", &"chat_window",
+	&"ui_volume", &"shake_scale", &"allow_flashes", &"chat_window",
 ]
 
 
@@ -67,12 +67,18 @@ static func schema_for() -> DotSettingsSchema:
 	))
 	s.add(DotSettingsDef.boolean(&"reduce_motion", false, &"accessibility").with_scope(DotSettingsDef.Scope.ACCOUNT)
 		.with_description("The end-of-map announcement appears at once, with nothing sliding, rising or bursting."))
+	s.add(DotSettingsDef.boolean(&"gore", true, &"video").with_description(
+		"Blood splatters on the surface behind a zombie or survivor you hit."))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
 
 
 func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
 	var made := super.setup(store, with_menu)
 	if menu != null:
+		var video := menu.page(&"video")
+		if video != null:
+			video.section("Image").add(DotMenuRow.toggle(&"gore", "Blood splatters",
+				"Blood on the walls and floor behind a body you hit. Off draws none."))
 		var general := menu.page(&"general")
 		if general != null:
 			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",

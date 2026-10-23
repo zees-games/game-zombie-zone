@@ -1008,7 +1008,7 @@ func _light_from_world(world: RefCounted) -> void:
 	var derived := ZzMapDoc.environment_from_world(world.call(&"environment_data"))
 	if derived.is_empty():
 		return
-	doc["environment"] = derived
+	ZzMapDoc.take_derived_light(doc, derived)
 	var old := get_node_or_null("Lighting")
 	if old != null:
 		remove_child(old)

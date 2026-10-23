@@ -6,6 +6,7 @@ const ZzBots := preload("zz_bots.gd")
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzSettings := preload("zz_settings.gd")
+const ZzBlood := preload("zz_blood.gd")
 const ZzServices := preload("zz_services.gd")
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
@@ -67,6 +68,8 @@ var settings: ZzSettings = null
 ## The player's console (the platform's).
 var console: DotConsoleController = null
 var world_view: ZzWorldView = null
+## Blood behind a body the local shooter hit (see zz_blood.gd).
+var blood: ZzBlood = null
 
 ## Your own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
@@ -249,6 +252,10 @@ func _build_world_view() -> void:
 	world_view.ragdoll_mask = game.world_mask()
 	world_view.ragdoll_rules = game.ragdoll_rules
 	game.add_child(world_view)
+	blood = ZzBlood.new()
+	blood.mask = game.world_mask()
+	game.add_child(blood)
+	blood.apply_settings(null)
 	_warm_zombies()
 
 
@@ -685,6 +692,8 @@ func _on_map(map_id: StringName) -> void:
 
 	var name_of := str(game.map_doc.get("name", ""))
 	world_view.clear()
+	if blood != null:
+		blood.clear()
 
 	if hud != null:
 		hud.shout(name_of, 3.0)
@@ -887,6 +896,9 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 	if hud != null:
 		hud.confirm_hit(victim, amount, point, killed, headshot)
 	_draw_body_hit(weapons, point)
+	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+	if blood != null and camera != null:
+		var _splat := blood.on_body_hit(victim, point, camera.global_position)
 
 
 ## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
@@ -1454,6 +1466,9 @@ func _build_settings() -> void:
 	if settings == null:
 		return
 
+	if blood != null:
+		blood.follow(settings.settings)
+
 	if _sampler != null:
 		settings.bind_look(_sampler.tunables)
 
@@ -1774,6 +1789,9 @@ func _present_effects(delta: float) -> void:
 	if game.effects != null:
 		game.effects.viewer_position = camera.global_position
 		game.effects.advance(delta)
+
+	if blood != null:
+		blood.advance(delta)
 
 
 # --- Watching, once out -----------------------------------------------------

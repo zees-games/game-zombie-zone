@@ -177,6 +177,17 @@ static func environment_from_world(data: Dictionary) -> Dictionary:
 	return env
 
 
+## Puts [param derived] (from [method environment_from_world]) into [param doc]. A hold fades between
+## the placeholder night and a day, so a derived day becomes its `day_environment` and the night stays;
+## a derived night, or any other mode, replaces the `environment`.
+static func take_derived_light(doc: Dictionary, derived: Dictionary) -> void:
+	var dark := float(derived["sun_energy"]) < 0.4  # the night branch clamps to 0.1..0.3, the day to 0.4..1.1
+	if str(doc.get("mode", "")) == SURVIVAL and not doc.has("day_environment") and not dark:
+		doc["day_environment"] = derived
+	else:
+		doc["environment"] = derived
+
+
 ## Reads a document from JSON text, and checks it.
 static func parse_json(text: String, origin: String = "") -> DotResult:
 	var json := JSON.new()

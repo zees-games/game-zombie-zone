@@ -112,9 +112,17 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 **The map vote** (`game/zz_vote.gd`, MANUAL, applied at a round's end): under MANUAL `ZzVote` opens a passed rock-the-vote itself (dot-vote does not; `rtv_delay_sec` 0), and `_game_load` refreshes the map list after `_add_delivered_maps`. Without either, `!rtv` answers "Rocked. 1 of 1." and nothing opens, or a delivered server's ballot holds only the practice map and never opens. `examples/dedicated` arms both. The match answers dot-vote's `round_in_progress_fn` (`world.match_node.is_live()`, set by name because an older shell's dot-vote lacks it), so a `time_up: finish_round` limit that runs out in warmup or between rounds changes at once instead of holding for `finish_round_max_sec`; `dedicated` checks both halves.
 
+## Blood
+
+`ZzClient.blood` (`game/zz_blood.gd`, a node holding dot-fx's `DotFxDecals`, no autoload) splatters the first world, prop or barricade surface behind a zombie or survivor the local shooter hit: `_on_hit` casts from the hit point away from the camera. The `gore` setting (Video, Image; default on) and `fx_quality` feed `DotFxDecalConfig`; a map change clears it. Only the shooter sees it: the HIT event carries a point and no normal, and other clients are not told (a wire change, not made). `headless_look` holds it.
+
 ## Sound
 
 Sound follows the map document: each box's `mat` is its collision shape's `surface` meta, so survivors' footsteps go by surface (dot-audio's `DotAudioFootsteps`); every `ceiling` or `roof` box is an indoor ambience zone; the outdoor bed and ground come from `ZzAudio.MAP_SOUND` or the document's `ambience` and `surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` and held in the family's −17 LUFS band by `loudness_trim_db`. A dead body's landing is dot-player-char's stock death sounds, in `ZzAudio`'s catalogue and played from the world view's ragdoll yard.
+
+## A hold's day
+
+A survival map fades between its night (the converter's placeholder) and a day. A day the map's own entities derive (`ZzMapDoc.environment_from_world`, `take_derived_light`) is that day, not the default overcast one; a derived night sky replaces the night as before.
 
 ## Putting it live
 
