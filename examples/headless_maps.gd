@@ -274,7 +274,9 @@ func _test_worlds() -> void:
 		extras.call(&"_attach_world_extras", world, host)
 		var wanted_props := 0
 		for rec: Dictionary in manifest.get("props", []):
-			if (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"find_resource", str(rec.get("stand_in", "")),
+			if rec.has("box"):
+				wanted_props += 1
+			elif (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"find_resource", str(rec.get("stand_in", "")),
 					PackedStringArray(["res://addons/dot_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
 				wanted_props += 1
 		var props_node := host.get_node_or_null("Props")
