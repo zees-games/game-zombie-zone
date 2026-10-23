@@ -38,7 +38,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 40
 
-const CHECKS := 275
+const CHECKS := 277
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -351,6 +351,20 @@ func _test_zombie_loot() -> void:
 	_hurt_npc(game, off, 10000.0)
 	await _sim(game, 0.1)
 	_check(game.loot.count_of(ZzLoot.BOX) == lying + 1, "zz_box_drops 0 drops none")
+	# Measured rate: N kills at the shipped odds, counted through the LOOT event.
+	game.config.boxes_enabled = true
+	game.config.box_drop_common = ZzConfig.new().box_drop_common
+	game.config.box_drop_special = ZzConfig.new().box_drop_special
+	game.config.max_boxes = 100000
+	var kills := 4000
+	for kind: Array in [[ZzNpcs.COMMON, game.config.box_drop_common], [ZzNpcs.BRUTE, 1.0]]:
+		var before := told.size()
+		var n: int = kills if kind[0] == ZzNpcs.COMMON else 50
+		for i in n:
+			game.boxes.maybe_drop(kind[0], STREET)
+		var got := told.size() - before
+		var want: float = float(kind[1]) * n
+		_check(absf(got - want) <= maxf(4.0, 5.0 * sqrt(want)), "%d %s kills drop about %.0f boxes" % [n, kind[0], want], "%d dropped" % got)
 	var shipped := ZzConfig.new()
 	_check(shipped.boxes_enabled and shipped.box_drop_common > 0.0, "the shipped config has drops on",
 		"%.1f%% common" % (shipped.box_drop_common * 100.0))
