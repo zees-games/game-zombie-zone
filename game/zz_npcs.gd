@@ -463,7 +463,7 @@ static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedS
 	var solids: Array[AABB] = []
 
 	for box: Dictionary in doc.get("boxes", []):
-		if not bool(box.get("solid", true)):
+		if not bool(box.get("solid", true)) or ZzMapDoc.is_trim(box):
 			continue
 
 		if box.has("gate") and open_gates.has(str(box["gate"])):

@@ -461,7 +461,7 @@ func _build_boxes() -> void:
 			_add_barricade_box(str(box["barricade"]), box, frame, size, corner)
 			continue
 
-		if bool(box.get("solid", true)):
+		if bool(box.get("solid", true)) and not ZzMapDoc.is_trim(box):
 			var shape := CollisionShape3D.new()
 			var cube := BoxShape3D.new()
 			cube.size = size

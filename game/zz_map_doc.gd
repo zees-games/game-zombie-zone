@@ -50,6 +50,9 @@ const ZzFixtures := preload("zz_fixtures.gd")
 ## half-built.
 const FORMAT := 1
 
+## The largest side of a box that counts as trim (see [method is_trim]).
+const TRIM_SIZE := 0.3
+
 const KIND := "zombiezone_map"
 
 ## The largest a document may be on the wire, compressed. A WebSocket's outbound buffer is
@@ -504,6 +507,16 @@ static func _box(raw: Variant) -> Dictionary:
 		out["nav"] = bool(b["nav"])
 
 	return out
+
+
+## Door hardware and such: a box no side of which is over 0.3 m. Neither body nor nav sees it, since a
+## 0.1 m latch on a jamb wedged zombies in a doorway for minutes (ze_nuke_beta) and a mover cannot use it.
+static func is_trim(box: Dictionary) -> bool:
+	if box.has("gate") or box.has("barricade") or not box.has("size"):
+		return false
+
+	var size := v3(box["size"])
+	return maxf(size.x, maxf(size.y, size.z)) <= TRIM_SIZE
 
 
 ## An axis-aligned area, `{min, max}`, normalised so min is the lesser corner.
