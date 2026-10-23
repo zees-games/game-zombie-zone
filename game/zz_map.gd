@@ -960,7 +960,8 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	# A pack from dot-map's global converter has no `zz` block: it draws itself with free textures and glass.
 	var global_pack := not (world.get("manifest") as Dictionary).has("zz")
 	if global_pack:
-		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new()
+		# The vendored kinds, rebased onto the mount: the addon's own folder never ships to a client.
+		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
 	_unbake()

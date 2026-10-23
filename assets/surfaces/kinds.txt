@@ -1,6 +1,11 @@
 # Surface kinds this game vendors (dot-map tools/sync-surfaces.sh); one per line.
 asphalt
 brick
+carpet_blue
+carpet_grey
+carpet_pattern
+carpet_red
+ceiling_tile
 concrete
 concrete_clean
 corrugated
@@ -8,7 +13,15 @@ grass
 ground
 metal
 plaster
+plaster_worn
+rock
+roof_clay
+rust
+sand
+snow
+stone_block
 tile_checker
+tile_dark
 tile_white
 wood_floor
 wood_planks
