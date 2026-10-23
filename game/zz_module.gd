@@ -208,6 +208,15 @@ func _game_load() -> DotResult:
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
+	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
+	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
+		"Seconds the killcam of a map's last moment plays, added to the intermission (0 for none)",
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	if killcam != null:
+		killcam.changed.connect(func(_old: String, new_value: String) -> void:
+			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
+			world.apply_intermission())
+
 	# dot-player-controller's mp_forceview (first or third person: the player's choice, or one
 	# held) and mp_solidplayers (survivors and stand-ins block each other, 1 by default).
 	# REPLICATED: the client places its own camera under the first and predicts its own

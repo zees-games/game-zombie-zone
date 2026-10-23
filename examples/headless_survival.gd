@@ -211,7 +211,7 @@ func _test_wipe() -> void:
 	var game := await _hold(func(c: ZzConfig) -> void:
 		c.survival_style = 0
 		c.survival_warmup_seconds = 1.0
-		c.intermission_seconds = 1.0, 2)
+		c.intermission_seconds = 1.0; c.killcam_seconds = 0.0, 2)
 	await _sim(game, 2.0)
 	var number := game.round_number
 	for player in game.survivors():

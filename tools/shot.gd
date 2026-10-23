@@ -245,6 +245,16 @@ func _run() -> void:
 			var _applied = game.combat.apply_damage(hit)
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
+		"killcam", "reveal":
+			# The last survivor falls and the map is lost; --seconds is how long after, so ~3 is the
+			# replay and ~9 the podium.
+			await _seconds_of(4.0)
+			for who in game.survivors():
+				who.health.invulnerable = false
+				var blow := DotDamage.make(0, who.entity_id, 9999.0, game.combat.damage_type(&"strike"))
+				var _felled = game.combat.apply_damage(blow)
+			game._decide(false, "the horde took the last survivor")
+			await _seconds_of(_seconds)
 		"crawl", "crawl_third":
 			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
 			# effects strip is in the frame, and the status line saying you may crawl. The third

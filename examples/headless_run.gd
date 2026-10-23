@@ -38,7 +38,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 40
 
-const CHECKS := 273
+const CHECKS := 275
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1484,14 +1484,15 @@ func _test_winning_and_losing() -> void:
 	_section("how a map is won and lost")
 	var game := await _team(2, func(c: ZzConfig) -> void:
 		c.end_hold_seconds = 0.5
-		c.intermission_seconds = 0.5)
+		c.intermission_seconds = 0.5
+		c.killcam_seconds = 0.0)
 	for player in game.survivors():
 		player.health.invulnerable = true
 		player.place_at(END_ROOM, 0.0)
 	await _sim(game, 1.0)
 	_check(game._decided and game._won, "everybody standing in the end room wins it")
 
-	game = await _team(2, func(c: ZzConfig) -> void: c.intermission_seconds = 0.5)
+	game = await _team(2, func(c: ZzConfig) -> void: c.intermission_seconds = 0.5; c.killcam_seconds = 0.0)
 	for player in game.survivors():
 		player.place_at(STREET, 0.0)
 	await _sim(game, 0.5)
@@ -1926,6 +1927,7 @@ func _test_the_hud() -> void:
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
 	hud.set_aim(0.0, false)
 	_check_requires()
+	await _check_killcam_time()
 
 	hud.queue_free()
 	_finished()
@@ -1957,6 +1959,7 @@ func _test_the_first_play_test() -> void:
 	var game := await _team(3, func(c: ZzConfig) -> void:
 		_quiet(c)
 		c.intermission_seconds = 3.0
+		c.killcam_seconds = 0.0
 		c.team_roster = true)
 	var me: ZzPlayer = game.survivors()[0]
 	var hud := ZzHud.new()
@@ -2047,6 +2050,18 @@ func _check_requires() -> void:
 		"the pack asks a shell for dot-ui level 4, the glance pieces",
 		str(asks.get("dot_ui"))
 	)
+
+
+## The killcam is added to an intermission, never to an intermission of 0 (the suites run on 0).
+func _check_killcam_time() -> void:
+	var world := await _world()
+	world.config.killcam_seconds = 7.0
+	world.apply_intermission()
+	_check(is_zero_approx(world.match_node.rules.intermission_sec), "the killcam adds nothing to an intermission of 0")
+	world.config.intermission_seconds = 8.0
+	world.apply_intermission()
+	_check(is_equal_approx(world.match_node.rules.intermission_sec, 15.0), "and is added to the pause otherwise",
+		str(world.match_node.rules.intermission_sec))
 
 
 func _world(configure: Callable = Callable()) -> ZzGame:

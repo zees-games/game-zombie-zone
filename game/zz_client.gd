@@ -12,6 +12,7 @@ const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzGame := preload("zz_game.gd")
 const ZzHud := preload("zz_hud.gd")
+const ZzKillcam := preload("zz_killcam.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNpcs := preload("zz_npcs.gd")
@@ -74,10 +75,20 @@ var view_model: ZeeViewModel = null
 var net: DotNetManager = null
 var bridge: ZzNetBridge = null
 var link: Node = null
+## Records every frame and replays the map's last moment ([ZzKillcam]); then the reveal.
+var killcam: ZzKillcam = null
+var winner_reveal: DotWinnerReveal = null
 
 var third_person: bool = false
 
 var _offline: bool = true
+## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
+var _killcam_sec: float = -1.0
+var _map_ending: bool = false
+var _map_won: bool = false
+var _map_why: String = ""
+var _board_opened: bool = false
+var _covered_by_reveal: Dictionary = {}
 var _sampler: DotFpsSampler = null
 var _watch_id: int = -1
 var _arm: DotCameraBoom = null
@@ -161,6 +172,7 @@ func _ready() -> void:
 	_build_chat()
 	_build_audio()
 	_build_settings()
+	_build_killcam()
 	_build_world_view()
 	_read_box_colours()
 
@@ -358,6 +370,10 @@ func _build_netcode() -> DotResult:
 	# predicts its own player.
 	if link != null:
 		var _view := game.view_rules.follow_cvars(link)
+		if link.has_method(&"replicated_cvar"):
+			_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
+			if link.has_signal(&"replicated_cvar_changed"):
+				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
@@ -684,6 +700,7 @@ func _on_map(map_id: StringName) -> void:
 func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 	if began:
 		_brutes = 0
+		_end_map_presentation()
 		if audio != null:
 			audio.music(&"")
 		if hud != null:
@@ -697,6 +714,8 @@ func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 	if hud != null:
 		hud.shout(("YOU MADE IT — %s" if won else "YOU DIED — %s") % why, 5.0)
 
+	_begin_map_end(won, why)
+
 	if chat != null and why != "":
 		chat.say_locally(why, Color(0.98, 0.86, 0.40))
 
@@ -704,6 +723,9 @@ func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName) -> void:
 	var who := _player_of(session_id)
 	var mine := session_id == _watch_id
+
+	if killcam != null and who != null:
+		killcam.note_moment(who.player_id, "fell to %s" % ("a " + String(by_kind) if by_kind != &"" else "the horde"), "THE LAST STAND")
 
 	if audio != null and mine:
 		var _heard := audio.play(ZzAudio.YOU_ARE_DEAD)
@@ -732,6 +754,10 @@ func _fall(who: ZzPlayer) -> void:
 func _on_down(session_id: int, by: int, why: StringName, by_kind: StringName) -> void:
 	var who := _player_of(session_id)
 	var mine := session_id == _watch_id
+
+	# The hold is lost when nobody is up, so the last down is as decisive as the last death.
+	if killcam != null and who != null:
+		killcam.note_moment(who.player_id, "went down to %s" % ("a " + String(by_kind) if by_kind != &"" else "the horde"), "THE LAST STAND")
 
 	if audio != null:
 		if mine:
@@ -1246,6 +1272,133 @@ func _portrait(atlas: String) -> Texture2D:
 	return texture
 
 
+# --- The end of a map: killcam, winner reveal, board ---------------------------
+
+func _build_killcam() -> void:
+	killcam = ZzKillcam.new()
+	killcam.name = "MapKillcam"
+	killcam.players_fn = func() -> Array: return game.players.values() if game != null else []
+	killcam.player_for_fn = func(key: StringName) -> Variant: return game.players.get(key) if game != null else null
+	killcam.feet_fn = func(p: ZzPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
+	killcam.colour_fn = func(_p: ZzPlayer) -> Color: return game.side_colour(ZzGame.SURVIVORS)
+	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
+	killcam.over.connect(func(_skipped: bool) -> void: _reveal_map())
+	add_child(killcam)
+	winner_reveal = DotWinnerReveal.new()
+	winner_reveal.name = "WinnerReveal"
+	winner_reveal.skip_actions = ZzKillcam.SKIP_ACTIONS
+	winner_reveal.hold_seconds = 4.0
+	winner_reveal.finished.connect(_on_reveal_finished)
+	add_child(winner_reveal)
+
+
+## `mp_killcam_time`, from the server's replicated cvar.
+func _on_killcam_cvar(cvar_name: String, value: String) -> void:
+	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
+		_killcam_sec = clampf(value.to_float(), 0.0, 30.0)
+
+
+## The HUD and the chat window: hidden while the replay or the reveal owns the screen.
+func _screen_furniture() -> Array:
+	return [hud, chat.window if chat != null else null]
+
+
+func _begin_map_end(won: bool, why: String) -> void:
+	_map_won = won
+	_map_why = why
+	_map_ending = true
+
+	if killcam == null:
+		return
+
+	# A won map ends on the last survivor standing in the hold, seen through their own eyes.
+	if won:
+		var holder: ZzPlayer = player if player != null and player.is_alive() else null
+
+		if holder == null:
+			for key: StringName in game.players:
+				if game.players[key].is_alive():
+					holder = game.players[key]
+					break
+
+		if holder != null:
+			killcam.note_moment(holder.player_id, "held on" if game.is_survival() else "made it to the shelter",
+				"THE LAST WAVE" if game.is_survival() else "THE SHELTER")
+
+	killcam.hide_while_playing = _screen_furniture()
+
+	if not killcam.map_ended():
+		return
+
+	DotLog.debug(CHANNEL, "the reveal waits for the killcam")
+
+
+## The survivors by points on a podium, after the killcam and before the board.
+func _reveal_map() -> void:
+	if not _map_ending:
+		return
+
+	var rows: Array = game.players.values()
+	rows.sort_custom(func(a: ZzPlayer, b: ZzPlayer) -> bool: return a.points > b.points)
+	var entries: Array = []
+
+	for who: ZzPlayer in rows.slice(0, 3):
+		entries.append({"name": who.display_name, "score": "%d %s" % [who.points, "point" if who.points == 1 else "points"],
+			"colour": game.side_colour(ZzGame.SURVIVORS)})
+
+	winner_reveal.reduced_motion = settings != null and settings.settings != null and settings.settings.get_bool(&"reduce_motion", false)
+	var shown := winner_reveal.present(entries, {"title": "SURVIVORS" if _map_won else "OVERRUN",
+		"subtitle": _map_why.substr(0, 1).to_upper() + _map_why.substr(1) if _map_why != "" else "Map over", "hint": "Jump to skip"})
+
+	if not shown.ok:
+		_open_map_board()
+		return
+
+	for n: Variant in _screen_furniture():
+		if n is Object and is_instance_valid(n) and (n as Object).get(&"visible") != null:
+			_covered_by_reveal[n] = bool((n as Object).get(&"visible"))
+			(n as Object).set(&"visible", false)
+
+
+func _restore_furniture() -> void:
+	for n: Variant in _covered_by_reveal:
+		if is_instance_valid(n):
+			(n as Object).set(&"visible", _covered_by_reveal[n])
+	_covered_by_reveal.clear()
+
+
+func _on_reveal_finished(_skipped: bool) -> void:
+	_restore_furniture()
+
+	if _map_ending:
+		_open_map_board()
+
+
+func _open_map_board() -> void:
+	if board != null and not board.is_open():
+		board.open()
+		_board_opened = true
+
+
+## A new map: whatever is still up goes, so it never covers the start, and the old frames go.
+func _end_map_presentation() -> void:
+	_map_ending = false
+
+	if killcam != null:
+		killcam.skip()
+		killcam.reset()
+
+	if winner_reveal != null:
+		winner_reveal.skip()
+
+	_restore_furniture()
+
+	if _board_opened and board != null:
+		board.close()
+
+	_board_opened = false
+
+
 # --- Chat, sound, settings ---------------------------------------------------
 
 func _build_chat() -> void:
@@ -1433,6 +1586,9 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 
 func _process(delta: float) -> void:
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
+
+	if killcam != null and game != null:
+		killcam.frame()
 
 	if camera == null or player == null:
 		return
