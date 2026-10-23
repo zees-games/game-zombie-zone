@@ -8,8 +8,10 @@ weapons:
   #   zz_sniper: 0.3
   # tiers:           # id: sidearm | primary | heavy | melee | thrown, over what the pack tags
   #   zz_vss: heavy
-  # not_in:          # channel (box, loot, cache) -> ids kept out of that channel only
+  # not_in:          # channel -> ids kept out of that channel only. Channels: box, loot, cache (the drops),
+  #                  # spawner (weapons the map lays), wall (wall-buys), crate (map crates), trader (the shelf)
   #   box: [zz_knife]
+  #   trader: [zz_sniper]
 monsters:
   enabled: true
   weight: 1.0        # an installed monster's weight as a special; each built-in kind weighs 1.0

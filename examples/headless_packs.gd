@@ -18,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addons/zombie_zone"
 const SECTIONS := 5
-const CHECKS := 42
+const CHECKS := 43
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -210,6 +210,8 @@ func _tuned() -> void:
 		drawn_loot += 1 if ZzWeapons.random_of(&"heavy", rng, &"loot") == &"fx_rifle" else 0
 
 	_check(drawn_box == 0 and drawn_loot > 0, "weapons.not_in keeps it out of boxes only", "%d box, %d loot" % [drawn_box, drawn_loot])
+	_check(ZzWeapons.channel_weight(&"trader", &"fx_rifle", 1.0) == 1.0 and ZzWeapons.channel_weight(&"box", &"fx_rifle", 1.0) == 0.0
+		and ZzWeapons.channel_weight(&"trader", &"medkit", 2.0) == 2.0, "the spawner pools' weigher reads the same not_in per channel")
 	_check(ZzPacks.specials(3).is_empty() and ZzPacks.specials(4).size() == 1 and ZzPacks.specials().size() == 1,
 		"monsters.min_wave holds a monster back until its wave")
 	_clean()
@@ -236,6 +238,7 @@ func _in_a_game() -> void:
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
 	config.keep_progress = false
+	config.map_ids = PackedStringArray(["zz_practice"])
 	var game := ZzGame.new()
 	game.config = config
 	game.tick_rate = 64
@@ -369,6 +372,7 @@ func _real_packs() -> void:
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
 	config.keep_progress = false
+	config.map_ids = PackedStringArray(["zz_practice"])
 	var game := ZzGame.new()
 	game.config = config
 	game.tick_rate = 64

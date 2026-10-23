@@ -975,6 +975,10 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		if gap > best_gap and id != kept:
 			continue
 
+		# Shelf goods cost points: a stand-in that cannot pay would stand pressing use on it.
+		if int(e.get("price", 0)) > player.points:
+			continue
+
 		var wanted := false
 
 		match e["kind"]:

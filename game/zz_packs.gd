@@ -50,7 +50,7 @@ const DEFAULTS := {
 		"weights": {},
 		# id -> tier (sidearm, primary, heavy, melee, thrown), over what the pack tags.
 		"tiers": {},
-		# channel (box, loot, cache) -> ids kept out of that channel only.
+		# channel (box, loot, cache, spawner, wall, crate, trader) -> ids kept out of that channel only.
 		"not_in": {},
 	},
 	"monsters": {

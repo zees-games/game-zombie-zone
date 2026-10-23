@@ -73,7 +73,7 @@ static func ids_of(tier: StringName) -> Array[StringName]:
 
 
 ## A weighted pick among the weapons of [param tier] (or any), drawn for [param channel] (`box`, `loot`,
-## `cache`, or "" for none): `weapons.not_in.<channel>` keeps ids out of one channel, `weapons.weights`
+## `cache`, or "" for none; the spawner pools use `spawner`, `wall`, `crate`, `trader` through channel_weight): `weapons.not_in.<channel>` keeps ids out of one channel, `weapons.weights`
 ## weighs each draw (default 1, 0 never), both from `cfg/addons/zombie_zone/packs.yml`.
 static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: StringName = &"") -> StringName:
 	var ids := ids_of(tier) if tier != &"any" else _any()
@@ -101,6 +101,21 @@ static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: Str
 			return id
 
 	return pool[pool.size() - 1]
+
+
+## A spawner pool's weight for weapon [param id] on [param channel] (`spawner`, `wall`, `crate`, `trader`, plus the
+## box, loot and cache ones): 0 when `weapons.not_in.<channel>` bars it, else [param weight] times `weapons.weights`.
+## Handed to dot-weapon's `DotWeaponSpawnerConfig.weigher`; ids that are no weapon (a medkit) pass through.
+static func channel_weight(channel: StringName, id: StringName, weight: float) -> float:
+	if not exists(id):
+		return weight
+
+	var barred: Array = ZzPackList.cfg("weapons.not_in.%s" % channel, []) if channel != &"" else []
+	if barred.has(String(id)):
+		return 0.0
+
+	var weights: Dictionary = ZzPackList.cfg("weapons.weights", {})
+	return weight * float(weights.get(String(id), 1.0))
 
 
 static func _any() -> Array[StringName]:

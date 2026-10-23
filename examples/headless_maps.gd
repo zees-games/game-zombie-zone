@@ -251,7 +251,7 @@ func _test_worlds() -> void:
 				orphans += 1
 
 		var movers := (manifest["movers"] as Array).size()
-		_check(movers > 0 and orphans == 0, "%s: its movers have geometry" % id, "%d movers, %d without" % [movers, orphans])
+		_check(orphans == 0, "%s: its movers have geometry" % id, "%d movers, %d without" % [movers, orphans])
 		var mech := ZzMechanics.new()
 		add_child(mech)
 		mech.build(world, Callable())

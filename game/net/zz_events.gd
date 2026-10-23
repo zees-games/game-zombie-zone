@@ -534,12 +534,13 @@ static func read_pin(r: DotNetReader) -> Dictionary:
 
 # --- Things on the ground ------------------------------------------------------
 
-static func write_loot(id: int, kind: StringName, item: StringName, at: Vector3) -> PackedByteArray:
+static func write_loot(id: int, kind: StringName, item: StringName, at: Vector3, price: int = 0) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(id)
 	w.write_string(String(kind), ID_BYTES)
 	w.write_string(String(item), ID_BYTES)
 	_pos(w, at)
+	w.write_varint(maxi(price, 0))
 	return w.to_bytes()
 
 
@@ -548,7 +549,8 @@ static func read_loot(r: DotNetReader) -> Dictionary:
 	var kind := r.read_string(ID_BYTES)
 	var item := r.read_string(ID_BYTES)
 	var at := _read_pos(r)
-	return {"id": id, "kind": StringName(kind), "item": StringName(item), "at": at, "ok": r.ok()}
+	var price := r.read_varint()
+	return {"id": id, "kind": StringName(kind), "item": StringName(item), "at": at, "price": price, "ok": r.ok()}
 
 
 static func write_loot_gone(id: int, by: int) -> PackedByteArray:

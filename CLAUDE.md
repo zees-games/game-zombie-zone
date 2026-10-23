@@ -8,6 +8,7 @@ Read the family [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's `CL
 | --- | --- |
 | [docs/design.md](docs/design.md) | Changing the netcode split, the zombies' ground, the director, downs, boxes, weapon packs, stand-ins, the HUD, cameras, the look, delivery or the vote |
 | [docs/survival.md](docs/survival.md) | Touching a survival map, a wave, a barricade, the team size, the crowd's cost, or the numbers (the long-run measurements are there) |
+| [docs/operators.md](docs/operators.md) | Telling a server operator how to add packs, set weapon availability, spawners and the shop |
 | [docs/zombies.md](docs/zombies.md) | The zombie models, their animation, what a special wears, a death |
 | [docs/history.md](docs/history.md) | Believing a suite: the bugs found by running |
 

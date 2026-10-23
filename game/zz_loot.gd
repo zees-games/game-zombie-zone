@@ -82,10 +82,10 @@ func shown(kind: StringName, item: StringName) -> StringName:
 	return item
 
 
-func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0) -> int:
+func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0, price: int = 0) -> int:
 	var id := _next_id
 	_next_id += 1
-	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0}
+	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0, "price": price}
 	added.emit(id, kind, item, at)
 	return id
 
@@ -93,6 +93,11 @@ func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0
 func remove(id: int, by: StringName = &"") -> void:
 	if entries.erase(id):
 		removed.emit(id, by)
+
+
+## What using entry [param id] costs in points (the shop's price; 0 is free).
+func price_of(id: int) -> int:
+	return int((entries[id] as Dictionary).get("price", 0)) if entries.has(id) else 0
 
 
 func exists(id: int) -> bool:

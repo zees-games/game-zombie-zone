@@ -449,6 +449,7 @@ func _build_netcode() -> DotResult:
 		world_view.remove_zombie(net_id, killed, body))
 	bridge.loot_added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
 		world_view.add_loot(id, kind, item, at, _box_colours.get(item, Color(0.8, 0.6, 0.25))))
+	bridge.loot_priced.connect(world_view.set_loot_price)
 	bridge.loot_removed.connect(func(id: int, _by: int) -> void: world_view.remove_loot(id))
 	bridge.hazard_added.connect(world_view.add_hazard)
 	bridge.hazard_removed.connect(world_view.remove_hazard)
@@ -605,7 +606,8 @@ func _hear_the_world() -> void:
 	if game.loot != null:
 		game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
 			var seen := game.loot.shown(kind, item)
-			world_view.add_loot(id, kind, seen, at, _box_colours.get(seen, Color(0.8, 0.6, 0.25))))
+			world_view.add_loot(id, kind, seen, at, _box_colours.get(seen, Color(0.8, 0.6, 0.25)))
+			world_view.set_loot_price(id, game.loot.price_of(id)))
 		game.loot.removed.connect(func(id: int, _by: StringName) -> void: world_view.remove_loot(id))
 
 	if game.boxes != null:
@@ -1736,7 +1738,9 @@ func _prompt() -> String:
 
 		if off < best_off:
 			best_off = off
-			best = "%s — %s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up"))]
+			var cost := int(node.get_meta(&"price", 0))
+			best = "%s — %s%s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up")),
+				" (%d points)" % cost if cost > 0 else ""]
 
 	if best != "":
 		return best

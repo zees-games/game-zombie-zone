@@ -2,24 +2,44 @@
 # `spawners:`; this file says what they give. The operator overrides in cfg/server/game/game-zombie-zone/dot_weapon/.
 default_pool: wall_guns
 
+# Every pool has a `channel` (where it is offered); the weapons.not_in / weapons.weights keys of
+# cfg/addons/zombie_zone/packs.yml are applied per channel: spawner, wall, crate, trader.
 pools:
   wall_guns:
+    channel: wall
+    kind: weapon
+    catalogue:
+      tags_any: [sidearm, primary]
+      tags_none: [heavy, melee, thrown]
+      weight: 1
+  field_guns:
+    channel: spawner
     kind: weapon
     catalogue:
       tags_any: [sidearm, primary]
       tags_none: [heavy, melee, thrown]
       weight: 1
   heavy_guns:
+    channel: spawner
     kind: weapon
     catalogue:
       tags_any: [heavy]
       weight: 1
   throwables:
+    channel: spawner
     kind: throwable
     catalogue:
       tags_any: [thrown]
       weight: 1
+  crate:
+    channel: crate
+    kind: weapon
+    catalogue:
+      tags_any: [sidearm, primary, heavy]
+      tags_none: [melee, thrown]
+      weight: 1
   supplies:
+    channel: spawner
     kind: medkit
     entries:
       - id: medkit
@@ -28,6 +48,66 @@ pools:
       - id: pills
         kind: pills
         weight: 4
+  ammo:
+    channel: spawner
+    kind: ammo
+    entries:
+      - id: ammo
+        kind: ammo
+        weight: 1
+  trader_stock:
+    channel: trader
+    kind: weapon
+    catalogue:
+      tags_any: [sidearm, primary, heavy, thrown]
+      tags_none: [melee]
+      weight: 1
+      weights:
+        pistol: 0.5
+    entries:
+      - id: medkit
+        kind: medkit
+        weight: 1.5
+        data:
+          price: 150
+      - id: pills
+        kind: pills
+        weight: 1.5
+        data:
+          price: 75
+      - id: ammo
+        kind: ammo
+        weight: 1
+        data:
+          price: 100
+
+# What the converter's weapon_*, item_* and ammo_* entities become (first match wins; a map's own
+# pickups come from its world manifest). Everything here is free to take, and comes back after `respawn`.
+classes:
+  "weapon_*grenade*":
+    pool: throwables
+    respawn: 120
+    group: throwables
+  "weapon_*":
+    pool: field_guns
+    respawn: 90
+    group: field_guns
+  "item_health*":
+    pool: supplies
+    respawn: 120
+  "item_*ammo*":
+    pool: ammo
+    respawn: 60
+  "ammo_*":
+    pool: ammo
+    respawn: 60
+  "item_*":
+    pool: supplies
+    respawn: 120
+
+groups:
+  field_guns: 8
+  throwables: 4
 
 # Defaults by spawner id, over what the map says.
 sites:
@@ -56,3 +136,27 @@ game:
       primary: 250
       heavy: 600
       thrown: 75
+  # Traders: a shelf of priced stock rolled from a pool. Defaults here; a map lists its own in its
+  # document's `traders:` or per map below. A bought slot comes back after `restock` seconds (0 never).
+  trader:
+    pool: trader_stock
+    slots: 4
+    spacing: 0.9
+    restock: 0
+
+# Per-map additions, by map id or glob. Example: a trader and a crate on a map.
+# maps:
+#   zm_abandoned_mall:
+#     game:
+#       traders:
+#         - id: trader_a
+#           at: [0, 0, 0]
+#           yaw: 0
+#           restock: 120
+#       spawners:
+#         - id: crate_a
+#           at: [4, 0, 0]
+#           pool: crate
+#           respawn: 0
+#           data:
+#             tier_price: true

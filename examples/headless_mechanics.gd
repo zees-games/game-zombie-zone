@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
+const ZzMap := preload("../game/zz_map.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
 ## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
@@ -114,6 +115,7 @@ func _sim(game: ZzGame, ticks: int) -> void:
 func _test_lift() -> void:
 	_entered += 1
 	print("%s: a lift carries a survivor" % LIFT_MAP)
+	ZzMap.bring_global_mechanics = true
 	var game := await _game(LIFT_MAP)
 	var rider := game.add_player(&"u1", "Rider")
 	rider.health.invulnerable = true

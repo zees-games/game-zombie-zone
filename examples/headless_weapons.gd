@@ -3,6 +3,7 @@ extends Node
 const ZzClient := preload("../game/zz_client.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## The gun you hold, offline, through the real client: the buttons, the world's rig that decides,
@@ -17,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 8
-const CHECKS := 26
+const CHECKS := 31
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -252,6 +253,38 @@ func _test_spawner() -> void:
 	me.points = 400
 	game.loot.use(buy, me)
 	_check(me.points == 100, "and takes the price when the item is used", str(me.points))
+
+	# A converter's weapon_* and item_* entities lay what the config's classes say; a trader shelves priced stock.
+	var world := {"id": "spawner_probe2", "entities": [
+		{"classname": "weapon_m3", "origin": [4, 0, 0], "angle": 0},
+		{"classname": "item_healthkit", "origin": [5, 0, 0], "angle": 0},
+		{"classname": "item_ammo_pistol", "origin": [6, 0, 0], "angle": 0}],
+		"traders": [{"id": "shop", "at": [0, 0, 8], "slots": 3, "restock": 30.0}]}
+	game.spawners.start_round(world)
+	game.spawners.tick()
+	var kinds := {}
+	for id: int in game.spawners.loot_ids():
+		kinds[game.loot.kind_of(id)] = true
+	_check(kinds.has(ZzLoot.WEAPON) and (kinds.has(ZzLoot.MEDKIT) or kinds.has(ZzLoot.PILLS)) and kinds.has(ZzLoot.AMMO), "converter entities lay a gun, a medkit and ammo through the classes mapping", str(kinds.keys()))
+	var shelf: Array = []
+	for id: int in game.loot.entries:
+		if game.loot.price_of(id) > 0:
+			shelf.append(id)
+	_check(shelf.size() == 3, "a trader shelves three priced entries", str(shelf.size()))
+	var bought: int = shelf[0]
+	var price: int = game.loot.price_of(bought)
+	me.points = 1000
+	game.loot.remove(bought, me.player_id)
+	_check(me.points == 1000 - price, "buying from the shelf charges the entry's price", "%d for %d" % [price, 1000 - me.points])
+	game.spawners.spawner.tick(game.now() + 40.0)
+	game.spawners.tick()
+	var again := 0
+	for id: int in game.loot.entries:
+		if game.loot.price_of(id) > 0:
+			again += 1
+	_check(again == 3 or game.now() < 30.0, "the slot restocks after its wait", str(again))
+	var wire := ZzEvents.read_loot(DotNetReader.new(ZzEvents.write_loot(7, &"weapon", &"shotgun", Vector3.ZERO, 250)))
+	_check(int(wire["price"]) == 250 and bool(wire["ok"]), "the loot event carries the price to the client")
 	_finished()
 
 

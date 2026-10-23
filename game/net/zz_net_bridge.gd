@@ -109,6 +109,8 @@ signal pin_received(player_id: int, npc_net_id: int, kind: StringName)
 signal unpin_received(player_id: int, why: StringName)
 signal box_received(player_id: int, type_id: StringName, title: String, message: String)
 signal loot_added(id: int, kind: StringName, item: StringName, at: Vector3)
+## After loot_added, for an entry the shop sells.
+signal loot_priced(id: int, price: int)
 signal loot_removed(id: int, by: int)
 signal hazard_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float)
 signal hazard_removed(id: int)
@@ -373,7 +375,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 		if game.loot != null:
 			game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
-				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at)))
+				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at, game.loot.price_of(id))))
 			game.loot.removed.connect(func(id: int, by: StringName) -> void:
 				_broadcast(ZzEvents.Kind.LOOT_GONE, ZzEvents.write_loot_gone(id, _session_or_zero(by))))
 
@@ -1104,7 +1106,7 @@ func _tell_the_world(peer_id: int) -> void:
 	if game.loot != null:
 		for id: int in game.loot.entries:
 			var e: Dictionary = game.loot.entries[id]
-			_tell(peer_id, ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, e["kind"], game.loot.shown(e["kind"], e["item"]), e["at"]))
+			_tell(peer_id, ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, e["kind"], game.loot.shown(e["kind"], e["item"]), e["at"], int(e.get("price", 0))))
 
 	if game.hazards != null:
 		for id: int in game.hazards.areas:
@@ -1398,6 +1400,8 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var loot := ZzEvents.read_loot(reader)
 			if bool(loot["ok"]):
 				loot_added.emit(int(loot["id"]), loot["kind"], loot["item"], loot["at"])
+				if int(loot["price"]) > 0:
+					loot_priced.emit(int(loot["id"]), int(loot["price"]))
 		ZzEvents.Kind.LOOT_GONE:
 			var taken := ZzEvents.read_loot_gone(reader)
 			if bool(taken["ok"]):

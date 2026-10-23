@@ -109,6 +109,9 @@ var world_drawn: bool = false
 var mechanics: ZzMechanics = null
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
+## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
+## already stand where its doors are); a map document says `"mechanics": true` when its boxes leave the movers out. Suites set this.
+static var bring_global_mechanics: bool = false
 ## Handed to the mechanics: a box has somebody in it, and the living survivors' points.
 var occupants_fn: Callable = Callable()
 var points_fn: Callable = Callable()
@@ -972,7 +975,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	_drawn.add_child(node)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.
-	if not global_pack:
+	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
 		attach_mechanics(world)
 	if mechanics != null:
 		mechanics.bind_drawn(node)
@@ -1063,7 +1066,7 @@ func build_mechanics_local() -> bool:
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
 		return false
-	if (read.value.get("manifest") as Dictionary).has("zz"):
+	if (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics:
 		attach_mechanics(read.value)
 	return mechanics != null
 

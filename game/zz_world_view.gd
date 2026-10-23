@@ -290,6 +290,25 @@ static func _label(kind: StringName, item: StringName) -> String:
 	return "pick up"
 
 
+## Marks loot [param id] as sold for [param price] points; the prompt says so.
+func set_loot_price(id: int, price: int) -> void:
+	var node: Node3D = _loot.get(id)
+
+	if node != null and price > 0:
+		node.set_meta(&"price", price)
+		var tag := Label3D.new()
+		tag.text = "%d" % price
+		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		tag.no_depth_test = true
+		tag.fixed_size = true
+		tag.pixel_size = 0.0007
+		tag.font_size = 40
+		tag.outline_size = 12
+		tag.modulate = Color(1.0, 0.85, 0.3)
+		tag.position = Vector3(0.0, 0.7, 0.0)
+		node.add_child(tag)
+
+
 func remove_loot(id: int) -> void:
 	var node: Node3D = _loot.get(id)
 	_loot.erase(id)

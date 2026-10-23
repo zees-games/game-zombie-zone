@@ -1578,6 +1578,8 @@ func _test_stand_ins() -> void:
 			furthest = maxf(furthest, player.feet().z)
 			friendly += player.friendly_damage
 		weapons_left = game.loot.count_of(ZzLoot.WEAPON)
+		for lid: int in game.loot.entries:
+			weapons_left -= 1 if game.loot.kind_of(lid) == ZzLoot.WEAPON and game.loot.price_of(lid) > 0 else 0
 
 	var over := "" if played >= 60.0 else ", round over by %.0f s" % played
 	_check(kills > 0, "they shoot what comes at them", "%d kills%s" % [kills, over])

@@ -25,6 +25,8 @@ const ZzFixtures := preload("zz_fixtures.gd")
 ## route         the critical path the director spawns AHEAD along, start to end
 ## nav           {spacing, floors: [[x0, z0, x1, z1, y]], links: [[from xyz, to xyz]]}
 ## items         weapons, ammo, medkits, pills and boxes lying where a mapper left them
+## mechanics     true when the document's boxes leave out the world's movers, so a global pack's lifts and doors run
+## traders       shelves of priced stock: {at, yaw?, pool?, slots?, spacing?, restock?}, the stock from the spawner config's pool
 ## spawners      weapon and supply spawners (dot-weapon docs/spawners.md): {at, pool?, tags_any?, respawn?, max?...}
 ## objectives    things to do on the way: press a button, hold out while the horde comes
 ## gates         a box with a "gate" id is a door an objective opens
@@ -376,6 +378,18 @@ static func validate(source: Dictionary) -> DotResult:
 	if spawners.size() > MAX_ITEMS:
 		return _refuse("%d spawners; the most is %d" % [spawners.size(), MAX_ITEMS], source)
 	doc["spawners"] = spawners
+
+	var traders: Array = []
+	for raw: Variant in source.get("traders", []):
+		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
+			return _refuse("trader %d has no 'at'" % traders.size(), source)
+		var tr: Dictionary = _as_floats((raw as Dictionary).duplicate(true))
+		tr["at"] = _floats(tr["at"], 3)
+		traders.append(tr)
+	if traders.size() > MAX_ITEMS:
+		return _refuse("%d traders; the most is %d" % [traders.size(), MAX_ITEMS], source)
+	doc["traders"] = traders
+	doc["mechanics"] = bool(source.get("mechanics", false))
 
 	# --- Objectives ------------------------------------------------------------
 	var objectives: Array = []
