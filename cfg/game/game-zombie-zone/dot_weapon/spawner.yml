@@ -144,19 +144,623 @@ game:
     spacing: 0.9
     restock: 0
 
-# Per-map additions, by map id or glob. Example: a trader and a crate on a map.
-# maps:
-#   zm_abandoned_mall:
-#     game:
-#       traders:
-#         - id: trader_a
-#           at: [0, 0, 0]
-#           yaw: 0
-#           restock: 120
-#       spawners:
-#         - id: crate_a
-#           at: [4, 0, 0]
-#           pool: crate
-#           respawn: 0
-#           data:
-#             tier_price: true
+# Per-map blocks, by map id or glob (the more literal characters win, a map's own block last).
+# Themes: "ze_*" escapes, "zm_*" and "zs_*" survival; horror maps (dark, short on supplies) and city
+# maps (open, plenty of guns) carry their class overrides in their own block, since a glob has no
+# alternatives. Then one block per shipped world map: a field gun, and on a survival map a trader and
+# a crate, placed at that map's own survivor spawns so no map file is touched. A map with no block
+# plays the defaults above.
+maps:
+  "ze_*":
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 180
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 240
+        group: field_guns
+    game:
+      shop:
+        prices:
+          primary: 200
+          heavy: 500
+  "zm_*":
+    game:
+      trader:
+        slots: 5
+        restock: 150
+  "zs_*":
+    game:
+      trader:
+        slots: 4
+        restock: 180
+  ze_biohazard_manor:
+    game:
+      spawners:
+        - id: field_a
+          at: [169.2, -1.0, 112.3]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  ze_blackmesa_escape:
+    game:
+      spawners:
+        - id: field_a
+          at: [-33.0, 1.3, 254.3]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  ze_boat_escape:
+    game:
+      spawners:
+        - id: field_a
+          at: [-140.6, 9.8, 262.1]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  ze_death_star_escape:
+    game:
+      spawners:
+        - id: field_a
+          at: [38.0, 0.5, -249.2]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  ze_jurassicpark:
+    game:
+      spawners:
+        - id: field_a
+          at: [85.6, -15.1, -100.0]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  ze_potc:
+    game:
+      spawners:
+        - id: field_a
+          at: [-133.1, 27.5, 129.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+  zm_16chambres:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [-4.9, 0.1, -16.5]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [3.7, 0.1, -28.7]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-8.5, 0.1, -23.8]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_4way_tunnel:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [-86.7, 0.1, 30.4]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-73.4, 0.1, 32.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-79.6, 0.1, 30.4]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_abandoned_mall:
+    game:
+      traders:
+        - id: trader_a
+          at: [18.6, 0.4, -76.5]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-6.1, 0.4, -76.2]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-10.4, 0.4, -86.9]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_antarctic_hospital:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [1.0, 0.7, -4.2]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [3.6, 0.7, -0.2]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [5.3, 0.7, -3.9]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_atix_helicopter:
+    game:
+      traders:
+        - id: trader_a
+          at: [9.0, 0.1, 36.8]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [10.6, 0.3, 30.1]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [10.0, 0.1, 39.6]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_blockfort:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [41.3, 5.0, 45.3]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [33.0, 5.0, 32.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [41.6, 5.0, 29.4]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_chaos_city:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [-8.0, 0.2, -23.0]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-5.2, 0.2, -21.6]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-3.8, 0.2, -20.2]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_day_lego:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [5.0, 1.3, -3.2]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [16.9, 1.3, -8.6]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-17.3, 1.3, -2.3]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_hellarch:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [-49.0, 1.3, -18.9]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-41.0, 1.3, -17.7]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-49.1, 1.3, -17.7]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_house_outbreak:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [-12.5, -0.4, 5.3]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-15.4, -0.7, 0.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-13.7, -0.4, 15.9]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_krusty_krab:
+    game:
+      traders:
+        - id: trader_a
+          at: [6.1, -4.8, 21.9]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-0.9, -4.8, -18.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [6.7, -9.3, -0.6]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_lila_panic:
+    game:
+      traders:
+        - id: trader_a
+          at: [19.5, 0.1, 7.3]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [18.3, 0.1, 8.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [18.3, 0.1, 11.0]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_mansion_css:
+    game:
+      traders:
+        - id: trader_a
+          at: [36.3, -4.8, -4.2]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [35.6, -4.8, 14.7]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [38.0, -4.8, 16.3]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_officeattack:
+    game:
+      traders:
+        - id: trader_a
+          at: [18.4, 0.3, 35.6]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [3.5, 0.3, 37.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [16.1, 0.3, 29.4]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_pathogen:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [8.0, 5.5, -16.0]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [8.0, 5.5, -13.2]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [9.4, 5.5, -11.8]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_roy_highway:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [-73.7, -20.6, -108.9]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-23.7, -20.6, -195.3]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [73.9, -12.1, -112.8]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zm_roy_the_ship:
+    game:
+      traders:
+        - id: trader_a
+          at: [-48.2, 13.5, -48.2]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-47.8, 13.5, -38.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-48.0, 13.5, -49.6]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_erosion:
+    classes:
+      "weapon_*grenade*":
+        pool: throwables
+        respawn: 60
+        group: throwables
+      "weapon_*":
+        pool: field_guns
+        respawn: 60
+        group: field_guns
+    groups:
+      field_guns: 14
+    game:
+      traders:
+        - id: trader_a
+          at: [-56.1, 0.1, -3.7]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-55.0, 0.1, -5.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-56.0, 0.1, -0.9]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_goth_house:
+    classes:
+      "item_health*":
+        pool: supplies
+        respawn: 240
+      "item_*ammo*":
+        pool: ammo
+        respawn: 120
+      "ammo_*":
+        pool: ammo
+        respawn: 120
+    game:
+      traders:
+        - id: trader_a
+          at: [3.4, -2.6, -0.3]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [2.7, 2.8, -0.3]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [0.1, 0.1, 0.6]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_krusty_krab_large:
+    game:
+      traders:
+        - id: trader_a
+          at: [6.7, -9.3, 0.6]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [3.4, -4.8, 4.6]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [0.2, -1.4, -2.2]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_lens:
+    game:
+      traders:
+        - id: trader_a
+          at: [-1.9, 0.1, -0.5]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-1.4, 0.1, 2.5]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [0.6, 0.1, 0.6]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_slugde:
+    game:
+      traders:
+        - id: trader_a
+          at: [3.4, 6.2, -9.4]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [3.4, 6.2, -8.2]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [1.5, 6.2, -8.8]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
+  zs_verystill:
+    game:
+      traders:
+        - id: trader_a
+          at: [-103.0, 39.3, 63.7]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-103.0, 39.3, 66.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-103.0, 39.4, 60.5]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true

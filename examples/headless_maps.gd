@@ -53,6 +53,10 @@ var _sections_finished := 0
 var _failures := PackedStringArray()
 
 
+## Shipped world maps whose spawner config was checked (three checks each).
+var _spawner_worlds := 0
+
+
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
@@ -79,7 +83,7 @@ func _run() -> void:
 	var code := 1 if _failed > 0 else 0
 
 	var sections := 3 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size()
+	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -364,6 +368,30 @@ func _test_map(id: StringName) -> void:
 
 	_check(lost.is_empty(), "every item lies where it can be picked up", "; ".join(lost.slice(0, 6)))
 
+	# A shipped world map resolves a spawner config and lays at least one weapon site, each over a floor.
+	if str(doc.get("world", "")) != "" and game.spawners != null:
+		_spawner_worlds += 1
+		game.spawners.start_round(doc)
+		var ours := {}
+		for key: String in ["spawners", "traders"]:
+			for raw: Variant in lay_block(game, doc).get(key, []):
+				ours[StringName(str((raw as Dictionary).get("id", "")))] = true
+		var lay := game.spawners.spawner
+		var weapon_sites := 0
+		var site_floating: Array = []
+		for sid: StringName in lay.site_ids():
+			var laid := lay.site(sid)
+			if laid == null:
+				continue
+			if laid.enabled and laid.pool in [&"field_guns", &"heavy_guns", &"wall_guns", &"crate"]:
+				weapon_sites += 1
+			if ours.has(sid) and not _over_something(game, laid.position):
+				site_floating.append("%s at %s" % [sid, laid.position])
+		var shelves: int = (game.spawners.get("_traders") as Dictionary).size()
+		_check(weapon_sites > 0, "it lays at least one weapon site", str(weapon_sites))
+		_check(site_floating.is_empty(), "every spawner and shelf the config adds stands over something", "; ".join(site_floating.slice(0, 6)))
+		_check(str(doc.get("mode", "")) == "exodus" or shelves > 0, "a survival world has a trader", str(shelves))
+
 	# The zombies' ground, every gate open: the first spawn reaches everything that matters.
 	var gates := PackedStringArray()
 
@@ -631,3 +659,8 @@ func _check(ok: bool, what: String, detail: String = "") -> void:
 	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
 	_failures.append(line)
 	print("  FAIL  %s" % line)
+
+
+## The `game:` block of the spawner config the map resolved to (its traders and spawners).
+func lay_block(game: ZzGame, _doc: Dictionary) -> Dictionary:
+	return game.spawners.spawner.game_block()
