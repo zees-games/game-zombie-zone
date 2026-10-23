@@ -1,6 +1,6 @@
 extends Node
-## Blood on the surface behind a body the local shooter hit. Visual only: the HIT event carries
-## a point and no normal, so no other client is told and the wire is unchanged.
+## Blood on the surface behind a body somebody hit. The shooter casts it from their own HIT; everybody
+## else gets the server's SPLAT (point and normal), so a client without that event just sees fewer decals.
 
 var decals := DotFxDecals.new()
 ## Layers the splatter may land on; the game's world, props and barricades.
@@ -48,6 +48,14 @@ func on_body_hit(victim: int, point: Vector3, from: Vector3, reach: float = 4.0)
 	if hit.is_empty():
 		return null
 	return decals.splatter(hit["position"], hit["normal"])
+
+
+## The server's word that blood landed at [param point] on a surface facing [param normal]; only near the camera.
+func on_splat(point: Vector3, normal: Vector3, within: float = 60.0) -> Node3D:
+	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+	if camera != null and camera.global_position.distance_to(point) > within:
+		return null
+	return decals.splatter(point, normal)
 
 
 func advance(delta: float) -> void:

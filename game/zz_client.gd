@@ -447,6 +447,9 @@ func _build_netcode() -> DotResult:
 			hud.set_effects(rows))
 	bridge.hurt_received.connect(_on_hurt)
 	bridge.hit_received.connect(_on_hit)
+	bridge.splat_received.connect(func(point: Vector3, normal: Vector3) -> void:
+		if blood != null:
+			var _splat := blood.on_splat(point, normal))
 	bridge.notice_received.connect(_on_notice)
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
 		_on_zombie(kind, true)

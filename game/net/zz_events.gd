@@ -106,6 +106,9 @@ enum Kind {
 	## A lift, door or other moving part of a converted map changed state: index, start tick,
 	## fraction then, direction, locked.
 	MOVER,
+	## Blood on a surface: a point and the surface's normal, to everybody but the shooter, who
+	## splatters it from their own HIT. An older client ignores a kind it does not know.
+	SPLAT,
 }
 
 enum Ask {
@@ -858,6 +861,41 @@ static func read_hit(r: DotNetReader) -> Dictionary:
 
 
 # --- Chat ------------------------------------------------------------------
+
+## The octahedral normal's bits per axis: 6 gives about 2 degrees, plenty for a blood decal.
+const NORMAL_BITS := 6
+
+
+static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
+	var w := _w()
+	_pos(w, point)
+	var n := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
+	var o := Vector2(n.x, n.z) / (absf(n.x) + absf(n.y) + absf(n.z))
+	if n.y < 0.0:
+		o = Vector2((1.0 - absf(o.y)) * _sign(o.x), (1.0 - absf(o.x)) * _sign(o.y))
+	var top := (1 << NORMAL_BITS) - 1
+	w.write_uint(clampi(roundi((o.x * 0.5 + 0.5) * top), 0, top), NORMAL_BITS)
+	w.write_uint(clampi(roundi((o.y * 0.5 + 0.5) * top), 0, top), NORMAL_BITS)
+	return w.to_bytes()
+
+
+static func _sign(v: float) -> float:
+	return -1.0 if v < 0.0 else 1.0
+
+
+static func read_splat(r: DotNetReader) -> Dictionary:
+	var point := _read_pos(r)
+	var top := float((1 << NORMAL_BITS) - 1)
+	var x := float(r.read_uint(NORMAL_BITS)) / top * 2.0 - 1.0
+	var z := float(r.read_uint(NORMAL_BITS)) / top * 2.0 - 1.0
+	var y := 1.0 - absf(x) - absf(z)
+	if y < 0.0:
+		var ox := x
+		x = (1.0 - absf(z)) * _sign(ox)
+		z = (1.0 - absf(ox)) * _sign(z)
+	var n := Vector3(x, y, z)
+	return {"point": point, "normal": n.normalized() if n.length_squared() > 0.0001 else Vector3.UP, "ok": r.ok()}
+
 
 ## A chat line's own field widths. Wider than the rules allow, so a rule can be raised
 ## without the wire silently truncating what it lets through.

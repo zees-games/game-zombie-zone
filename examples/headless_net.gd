@@ -31,7 +31,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 21
-const CHECKS := 114
+const CHECKS := 119
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -214,6 +214,13 @@ func _test_the_codec() -> void:
 
 	var effects := ZzEvents.read_effects(_r(ZzEvents.write_effects([
 		{"title": "Glass cannon", "stacks": 2, "seconds": 14.25, "who": "everybody", "scale": 1.5},
+	var splat_bytes := ZzEvents.write_splat(Vector3(1.0, 1.4, -6.0), Vector3(0.6, -0.64, -0.48).normalized())
+	var splat := ZzEvents.read_splat(_r(splat_bytes))
+	_check(bool(splat["ok"]) and (splat["normal"] as Vector3).dot(Vector3(0.6, -0.64, -0.48).normalized()) > 0.98
+		and (splat["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
+		"SPLAT (a point and a 12-bit octahedral normal, both hemispheres)", "%d bytes, %s" % [splat_bytes.size(), str(splat)])
+	var up_splat := ZzEvents.read_splat(_r(ZzEvents.write_splat(Vector3.ZERO, Vector3.UP)))
+	_check((up_splat["normal"] as Vector3).dot(Vector3.UP) > 0.99, "SPLAT keeps a floor facing up")
 	])))
 	var rows: Array = effects["effects"]
 	_check(bool(effects["ok"]) and rows.size() == 1 and int(rows[0]["stacks"]) == 2 and str(rows[0]["title"]) == "Glass cannon",
@@ -317,6 +324,8 @@ func _build() -> bool:
 		(_heard.get_or_add("hits", []) as Array).append([victim, amount, killed]))
 	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
 		_heard["npc_gone"] = [net_id, killed, body.get(&"death") if body != null else null])
+	_client_bridge.splat_received.connect(func(point: Vector3, normal: Vector3) -> void:
+		(_heard.get_or_add("splats", []) as Array).append([point, normal]))
 	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
 		_heard["down"] = who)
 	_client_bridge.revived_received.connect(func(who: int, _by: int) -> void:
@@ -583,6 +592,34 @@ func _test_zombies_replicate() -> void:
 
 	_hurt_npc(npc, 100000.0)
 	await _steps(6)
+	_check((_heard.get("splats", []) as Array).is_empty(),
+		"the shooter is not sent a SPLAT for their own hit (they splatter from the HIT)", str(_heard.get("splats", [])))
+
+	# Another survivor's client is told where blood landed: a floor 1 m under the point, seen from above.
+	var floor_at := Vector3(0.0, 0.0, 0.0)
+	var floor_shape := StaticBody3D.new()
+	var floor_col := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(20.0, 0.2, 20.0)
+	floor_col.shape = box
+	floor_shape.add_child(floor_col)
+	floor_shape.collision_layer = _server_game.world_mask()
+	_server_game.add_child(floor_shape)
+	floor_shape.global_position = floor_at - Vector3(0.0, 0.1, 0.0)
+	await _steps(2)
+	var sent := _server_bridge.splat(Vector3(2.0, 0.5, 3.0), Vector3(2.0, 2.5, 3.0), 0)
+	await _steps(4)
+	var splats: Array = _heard.get("splats", [])
+	_check(sent and splats.size() == 1 and (splats[0][0] as Vector3).distance_to(Vector3(2.0, 0.0, 3.0)) < 0.05
+		and (splats[0][1] as Vector3).dot(Vector3.UP) > 0.98,
+		"a SPLAT reaches another client with the surface point and its normal", str(splats))
+	var budget_sent := 0
+	for _i in 100:
+		if _server_bridge.splat(Vector3(2.0, 0.5, 3.0), Vector3(2.0, 2.5, 3.0), 0):
+			budget_sent += 1
+	_check(budget_sent <= int(ZzNetBridge.SPLAT_PER_SECOND), "SPLATs are rate limited", "%d of 100 in one burst" % budget_sent)
+	floor_shape.queue_free()
+
 	_check((_heard.get("hits", []) as Array).size() == 1,
 		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
 	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),

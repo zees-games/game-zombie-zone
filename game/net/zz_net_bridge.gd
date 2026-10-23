@@ -128,6 +128,8 @@ signal hurt_received(amount: float, from: Vector3)
 signal ammo_received()
 ## Your hit landed (see [signal ZzGame.hit_landed]); only ever to the shooter.
 signal hit_received(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
+## Somebody else's hit left blood on a surface here (see [method splat]); the shooter never gets this.
+signal splat_received(point: Vector3, normal: Vector3)
 
 ## Client side: a zombie mirror was built, or let go. [param body] is its scene, already in the
 ## world; the client hangs a [ZzZombieView] off it.
@@ -317,7 +319,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
-				_tell(peer_id, ZzEvents.Kind.HIT, ZzEvents.write_hit(victim, amount, point, killed, headshot)))
+				_tell(peer_id, ZzEvents.Kind.HIT, ZzEvents.write_hit(victim, amount, point, killed, headshot))
+			_splat_for_others(id, peer_id, point))
 		game.ammo_given.connect(func(id: StringName) -> void:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
@@ -1203,6 +1206,46 @@ func _broadcast(kind: int, body: PackedByteArray) -> void:
 		_tell(int(peer_id), kind, body)
 
 
+## Splatters per second the server will announce, all shooters together; a shotgun or a full-auto
+## crowd fight gets the first of them and the rest are only seen by the shooter.
+const SPLAT_PER_SECOND := 24.0
+const SPLAT_REACH := 4.0
+var _splat_budget := SPLAT_PER_SECOND
+var _splat_at := 0.0
+
+
+## Server: tells everybody but [param except_peer] that blood landed on the surface behind [param point] as
+## seen from [param from]. Returns whether it was sent (a surface was found and the budget allowed).
+func splat(point: Vector3, from: Vector3, except_peer: int = 0) -> bool:
+	if net == null or not net.is_server or game == null or _ready_peers.size() - (1 if _ready_peers.has(except_peer) else 0) <= 0:
+		return false
+	var now := Time.get_ticks_msec() * 0.001
+	_splat_budget = minf(SPLAT_PER_SECOND, _splat_budget + (now - _splat_at) * SPLAT_PER_SECOND)
+	_splat_at = now
+	var along := point - from
+	if _splat_budget < 1.0 or along.length() < 0.01:
+		return false
+	var world := game.get_world_3d()
+	if world == null:
+		return false
+	var query := PhysicsRayQueryParameters3D.create(point, point + along.normalized() * SPLAT_REACH, game.world_mask())
+	var found := world.direct_space_state.intersect_ray(query)
+	if found.is_empty():
+		return false
+	_splat_budget -= 1.0
+	var body := ZzEvents.write_splat(found["position"], found["normal"])
+	for peer_id in _ready_peers.keys():
+		if int(peer_id) != except_peer:
+			_tell(int(peer_id), ZzEvents.Kind.SPLAT, body)
+	return true
+
+
+func _splat_for_others(shooter: StringName, shooter_peer: int, point: Vector3) -> void:
+	var who := game.player_by_id(shooter)
+	if who != null:
+		var _sent := splat(point, who.eye_position(), shooter_peer)
+
+
 ## One peer, and never zero.
 ##
 ## `net.send(msg, 0)` is a BROADCAST in dot-net, so a helper that passed a missing peer id
@@ -1480,6 +1523,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				hurt_received.emit(float(hurt["amount"]), hurt["from"])
 		ZzEvents.Kind.AMMO:
 			ammo_received.emit()
+		ZzEvents.Kind.SPLAT:
+			var splat := ZzEvents.read_splat(reader)
+			if bool(splat["ok"]):
+				splat_received.emit(splat["point"], splat["normal"])
 		ZzEvents.Kind.HIT:
 			var hit := ZzEvents.read_hit(reader)
 			if bool(hit["ok"]):
