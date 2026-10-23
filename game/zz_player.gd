@@ -34,7 +34,8 @@ const EYE_DOWN := 0.45
 const BODY_RADIUS := 0.35
 const BODY_HEIGHT := 1.8
 const BODY_CROUCH := 0.95
-const BODY_STEP := 0.4
+## Above the 0.42 m rise of a converted map's stairs, so walking up one does not wait on a hop.
+const BODY_STEP := 0.45
 
 ## Where a survivor is in their life this map.
 enum Life { UP, DOWN, DEAD }

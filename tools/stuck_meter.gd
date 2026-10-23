@@ -98,6 +98,10 @@ func sample() -> void:
 func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, who: Variant = null) -> void:
 	var anchor: Dictionary = _anchors.get(key, {})
 
+	# Moving counts as goal time too, or a fast mover (a special) has next to no denominator.
+	if goal and not anchor.is_empty() and at.distance_to(anchor["at"]) > RADIUS:
+		(totals[kind] as Dictionary)["goal"] += EVERY
+
 	if not goal or anchor.is_empty() or at.distance_to(anchor["at"]) > RADIUS:
 		_anchors[key] = {"at": at, "since": now}
 		return
@@ -249,7 +253,8 @@ func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
 
 	var state: StringName = brain.get(&"state")
 
-	if state != &"chase" and state != &"investigate" and state != &"lure":
+	# A special's brain names its walking states approach and retreat, never chase.
+	if state != &"chase" and state != &"investigate" and state != &"lure" and state != &"approach" and state != &"retreat":
 		return false
 
 	# With no way to go (a shut gate between it and who it chases) it waits, which is the rule's

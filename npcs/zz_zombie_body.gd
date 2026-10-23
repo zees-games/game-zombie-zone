@@ -95,8 +95,8 @@ const FALL_FASTEST := 25.0
 ## steering) for 1804 ticks, then fell out of the map.
 const LEAP_LONGEST := 64 * 3
 
-## The highest lip a grounded mover is lifted over, and how far past it the lift goes.
-const STEP_UP := 0.25
+## The highest lip a grounded mover is lifted over (a converted map's stair rise is 0.42), and how far past it the lift goes.
+const STEP_UP := 0.45
 const STEP_REACH := 0.2
 
 var _shape: CollisionShape3D = null
@@ -247,14 +247,24 @@ func _step_up(direction: Vector3) -> void:
 		if hit != null and hit.has_meta(&"barricade"):
 			return
 
-	var lifted := global_transform
-	lifted.origin.y += STEP_UP
+	# Lowest lift first: a low lip under a ceiling slab has no room for the full height.
+	for rise: float in [0.15, 0.3, STEP_UP]:
+		var lifted := global_transform
+		lifted.origin.y += rise
 
-	if test_move(global_transform, Vector3(0.0, STEP_UP, 0.0)) or test_move(lifted, direction * STEP_REACH):
+		if test_move(global_transform, Vector3(0.0, rise, 0.0)) or test_move(lifted, direction * STEP_REACH):
+			continue
+
+		lifted.origin += direction * STEP_REACH
+
+		# Set back down on the tread, so a 0.1 m lip is not a 0.45 m pop.
+		var landing := KinematicCollision3D.new()
+
+		if test_move(lifted, Vector3(0.0, -rise, 0.0), landing):
+			lifted.origin.y -= landing.get_travel().length()
+
+		global_transform = lifted
 		return
-
-	lifted.origin += direction * STEP_REACH
-	global_transform = lifted
 
 
 ## Starts a leap with [param launch] as its velocity.
