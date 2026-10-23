@@ -114,7 +114,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Blood
 
-`ZzClient.blood` (`game/zz_blood.gd`, a node holding dot-fx's `DotFxDecals`, no autoload) splatters the first world, prop or barricade surface behind a zombie or survivor the local shooter hit: `_on_hit` casts from the hit point away from the camera. The `gore` setting (Video, Image; default on) and `fx_quality` feed `DotFxDecalConfig`; a map change clears it. The shooter splatters from their own HIT; everybody else from the server's SPLAT event (`ZzEvents.Kind.SPLAT`, appended last: a point and a 12-bit octahedral normal, 11 bytes, sent to every ready peer but the shooter, capped at 24 per second server-wide, only within 60 m of the camera; an older client ignores the unknown kind and sees only its own). `headless_look` holds it.
+`ZzClient.blood` (`game/zz_blood.gd`, a `DotFxBlood` from dot-fx, no autoload) splatters the first world, prop or barricade surface behind a zombie or survivor the local shooter hit: `_on_hit` casts from the hit point away from the camera. The `gore` setting (Video, Image; default on) and `fx_quality` feed `DotFxDecalConfig`; a map change clears it. The shooter splatters from their own HIT; everybody else from the server's SPLAT event (`ZzEvents.Kind.SPLAT`, appended last: a point and a 12-bit octahedral normal, 11 bytes, sent to every ready peer but the shooter, capped at 24 per second server-wide, only within 60 m of the camera; an older client ignores the unknown kind and sees only its own). `headless_look` holds it.
 
 ## Sound
 

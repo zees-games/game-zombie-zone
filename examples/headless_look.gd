@@ -68,17 +68,17 @@ func _blood() -> void:
 	_check(blood.decals.blood_count() == 0, "a map change clears the blood")
 
 	var surf := Vector3(0, 1.5, -3.7)
-	_check(blood.on_splat(surf, Vector3.BACK) == null, "a server splat with no camera is dropped, not drawn without the distance gate")
+	_check(blood.splat_at(surf, Vector3.BACK) == null, "a server splat with no camera is dropped, not drawn without the distance gate")
 	var cam := Camera3D.new()
 	add_child(cam)
 	cam.current = true
 	cam.global_position = Vector3(0, 1.7, 8)
 	var drawn := 0
 	for i in 40:
-		if blood.on_splat(surf + Vector3(i * 0.01, 0, 0), Vector3.BACK) != null:
+		if blood.splat_at(surf + Vector3(i * 0.01, 0, 0), Vector3.BACK) != null:
 			drawn += 1
 	_check(drawn == ZzBlood.SPLATS_PER_SECOND, "server splats are capped per second (%d drawn of 40, cap %d)" % [drawn, ZzBlood.SPLATS_PER_SECOND])
-	_check(blood.on_splat(Vector3(0, 1.5, -300), Vector3.BACK) == null, "a splat beyond 60 m of the camera is dropped")
+	_check(blood.splat_at(Vector3(0, 1.5, -300), Vector3.BACK) == null, "a splat beyond 60 m of the camera is dropped")
 	blood.clear()
 
 	var off := DotFxDecalConfig.new()
