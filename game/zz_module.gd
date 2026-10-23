@@ -1,5 +1,6 @@
 extends DotGameModule
 
+const ZzMapConfig := preload("zz_map_config.gd")
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzServices := preload("zz_services.gd")
 
@@ -70,6 +71,15 @@ var voteban: RefCounted = null
 
 ## The drawn ballot's notice topic. The client shell draws one menu per topic.
 const MAP_BALLOT_TOPIC := &"map_ballot"
+
+
+## The cvars a map's `dot_map/map/<name>.yml` may set (zz_map_config.gd).
+func _map_config_keys() -> Dictionary:
+	return ZzMapConfig.KEYS
+
+
+func _map_config_game() -> String:
+	return ZzMapConfig.GAME_ID
 
 
 func _module_name() -> String:

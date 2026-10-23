@@ -124,6 +124,8 @@ tools/               soak.tscn (bot soak, docs/soak.md), nav_probe, nav_render (
 - The maps pack is named by the server owner, never by `game.yml`; `ZzModule` adds every mount's `maps/` at load and after `zz_reload`.
 - **Workshop maps** (`provides.json`: `accepts.map_kinds` `survival` and `exodus`): a pack's `map` entry's `scene` is a ZZ map DOCUMENT (JSON, same as `maps/`) whose `id` equals the entry's. `ZzCatalogue.follow_content` reads `DotContentIndex.shared()` on every `playable()`, so a subscribed map (solo) is validated, nav-graphed and played like the game's own, shown "Name [Pack]"; the game's own ids win, a bad document lands in `catalogue.refused` and is not listed, and online lists none. The ballot lists them through dot-vote's `follow_content`, so `maps_fn` leaves them out. `headless_workshop` holds it.
 - Under MANUAL `ZzVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after the delivered maps; the match answers `round_in_progress_fn` by name.
+- **Per-map settings** (`game/zz_map_config.gd`, dot-game's `DotGameMapConfig`): `cfg/game/game-zombie-zone/dot_map/map/<name>.yml` (a glob covers a class; `cfg/server/...` overrides) may set only the `KEYS` whitelist, server rules (`zz_difficulty`, `zz_waves`, ...), never movement (`zz_gravity` is not replicated, so a client would mispredict). The converter's commented starters ship in that folder; `examples/headless_mapcfg` (8 checks) holds apply and restore.
+- **The killcam is off by default** (`mp_killcam_time` 0, `ZzConfig.killcam_seconds`): the code (`zz_killcam.gd`, dot-replay) stays for a server that sets the cvar; nothing changes for players until then.
 
 ## Team damage, votebans and barricades
 
