@@ -76,9 +76,7 @@ func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
 	var made := super.setup(store, with_menu)
 	if menu != null:
 		var video := menu.page(&"video")
-		if video != null:
-			video.section("Image").add(DotMenuRow.toggle(&"gore", "Blood splatters",
-				"Blood on the walls and floor behind a body you hit. Off draws none."))
+		DotMenuStock.add_gore_row(video)
 		var general := menu.page(&"general")
 		if general != null:
 			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",

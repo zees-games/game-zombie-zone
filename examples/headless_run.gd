@@ -38,7 +38,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 40
 
-const CHECKS := 277
+const CHECKS := 278
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1735,6 +1735,10 @@ func _test_the_map_menu() -> void:
 	add_child(settings)
 	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
 	var keys: DotMenuBindings = settings.bindings
+	var image := settings.menu.page(&"video").find_section(&"image")
+	var gore_row: DotMenuRow = image.find_row(&"gore") if image != null else null
+	_check(gore_row != null and gore_row.row_id() == &"gore" and settings.schema.has(&"gore"),
+		"the Video page's Image section has a Blood splatters row on the gore setting")
 	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table defaults to M",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
