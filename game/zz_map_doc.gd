@@ -24,6 +24,7 @@ const ZzFixtures := preload("zz_fixtures.gd")
 ## areas         {start: [area], end: [area]}: the safe rooms, each {min, max}
 ## route         the critical path the director spawns AHEAD along, start to end
 ## nav           {spacing, floors: [[x0, z0, x1, z1, y]], links: [[from xyz, to xyz]]}
+## terrain       a converted map's displacement ground (dot-map's DotMapTerrain), with the walk mask
 ## items         weapons, ammo, medkits, pills and boxes lying where a mapper left them
 ## mechanics     true when the document's boxes leave out the world's movers, so a global pack's lifts and doors run
 ## traders       shelves of priced stock: {at, yaw?, pool?, slots?, spacing?, restock?}, the stock from the spawner config's pool
@@ -419,7 +420,17 @@ static func validate(source: Dictionary) -> DotResult:
 	if (nav["floors"] as Array).size() > MAX_NAV_FLOORS or (nav["links"] as Array).size() > MAX_NAV_LINKS:
 		return _refuse("too many nav floors or links", source)
 
-	if (nav["floors"] as Array).is_empty():
+	var walked := 0
+	if source.has("terrain"):
+		if not (source["terrain"] is Dictionary):
+			return _refuse("terrain is not a dictionary", source)
+		var ground := DotMapTerrain.from_dict(source["terrain"])
+		if not ground.ok:
+			return _refuse("terrain: %s" % str(ground), source)
+		walked = (ground.value as DotMapTerrain).describe()["walk"]
+		doc["terrain"] = source["terrain"]
+
+	if (nav["floors"] as Array).is_empty() and walked == 0:
 		return _refuse("no nav floors: the zombies would have nowhere to walk", source)
 
 	doc["nav"] = nav

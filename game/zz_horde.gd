@@ -552,6 +552,11 @@ func _place_wanderers() -> void:
 	var area := 0.0
 	for f: Array in (_doc.get("nav", {}) as Dictionary).get("floors", []):
 		area += (float(f[2]) - float(f[0])) * (float(f[3]) - float(f[1]))
+	if _doc.has("terrain"):
+		var ground := DotMapTerrain.from_dict(_doc["terrain"])
+		if ground.ok:
+			var t: DotMapTerrain = ground.value
+			area += float(t.describe()["walk"]) * t.cell * t.cell
 
 	var share := SURVIVAL_WANDERER_SHARE if str(_doc.get("mode", "")) == "survival" else 0.8
 	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(_planned_team()) * share))

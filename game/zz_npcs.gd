@@ -460,6 +460,11 @@ static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedS
 			Vector3(float(f[2]) - float(f[0]), 0.0, float(f[3]) - float(f[1])))
 		builder.add_floor(area, float(f[4]))
 
+	if doc.has("terrain"):
+		var ground := DotMapTerrain.from_dict(doc["terrain"])
+		if ground.ok:
+			builder.add_points((ground.value as DotMapTerrain).walk_points(builder.spacing), DotMapTerrain.WALK_RISE)
+
 	var solids: Array[AABB] = []
 
 	for box: Dictionary in doc.get("boxes", []):
@@ -583,7 +588,7 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 ## A fingerprint of everything the graph was built from.
 static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> String:
 	return DotNpcNavData.digest_of([
-		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})),
+		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
 		",".join(open_gates), str(extra_solids),
 	])

@@ -110,6 +110,11 @@ func _ground_y(doc: Dictionary, at: Vector3) -> float:
 		if not found or absf(y - at.y) < absf(best - at.y):
 			best = y
 			found = true
+	if doc.has("terrain"):
+		var ground := DotMapTerrain.from_dict(doc["terrain"])
+		var y := (ground.value as DotMapTerrain).height_at(at.x, at.z) if ground.ok else NAN
+		if not is_nan(y) and (not found or absf(y - at.y) < absf(best - at.y)):
+			best = y
 	return best
 
 

@@ -167,6 +167,8 @@ var _night_light: Dictionary = {}
 var _day_light: Dictionary = {}
 var _daylight: float = 0.0
 var _bounds: AABB = AABB()
+## The converted map's displacement ground (the document's `terrain`), or null.
+var terrain: DotMapTerrain = null
 var _missing: PackedStringArray = PackedStringArray()
 var _lamps: Array[OmniLight3D] = []
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
@@ -208,6 +210,7 @@ func build(p_doc: Dictionary) -> DotResult:
 		add_child(_drawn)
 
 	_build_boxes()
+	_build_terrain()
 	_build_boundary()
 	_build_water_volumes()
 	_build_props()
@@ -274,6 +277,7 @@ func clear() -> void:
 	_pending_movers.clear()
 	_missing.clear()
 	_bounds = AABB()
+	terrain = null
 	_lamps.clear()
 	baked = null
 	world_drawn = false
@@ -379,8 +383,12 @@ func playable_region() -> AABB:
 	for f: Array in floors:
 		lo = Vector3(minf(lo.x, float(f[0])), minf(lo.y, float(f[4])), minf(lo.z, float(f[1])))
 		hi = Vector3(maxf(hi.x, float(f[2])), maxf(hi.y, float(f[4])), maxf(hi.z, float(f[3])))
+	var walked := terrain.walk_points(1.0) if terrain != null else PackedVector3Array()
+	for p in walked:
+		lo = Vector3(minf(lo.x, p.x), minf(lo.y, p.y), minf(lo.z, p.z))
+		hi = Vector3(maxf(hi.x, p.x), maxf(hi.y, p.y), maxf(hi.z, p.z))
 
-	if floors.is_empty():
+	if floors.is_empty() and walked.is_empty():
 		return AABB()
 
 	var points: Array = []
@@ -545,6 +553,33 @@ func _build_boxes() -> void:
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
 			if ZzMaterials.is_transparent(batch["mat"]) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_drawn.add_child(mesh)
+
+
+## The displacement ground: one triangle shape, and drawn as a "Boxes_" mesh so a drawn world
+## replaces it like the boxes.
+func _build_terrain() -> void:
+	if not doc.has("terrain"):
+		return
+	var res := DotMapTerrain.from_dict(doc["terrain"])
+	if not res.ok:
+		DotLog.warn(CHANNEL, "a map's terrain would not read; it has no ground there", {"map": String(id()), "error": str(res)})
+		return
+	terrain = res.value
+	var shape := CollisionShape3D.new()
+	shape.name = "Terrain"
+	shape.shape = terrain.build_shape()
+	shape.set_meta(&"surface", terrain.mat)
+	_solid.add_child(shape)
+	var box := terrain.bounds()
+	_bounds = box if _bounds == AABB() else _bounds.merge(box)
+	if not draw_world:
+		return
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Boxes_terrain"
+	mesh.mesh = terrain.build_mesh()
+	var mat := terrain.mat if terrain.mat != "" else "dirt"
+	mesh.material_override = ZzMaterials.material(mat, Color.WHITE, "floor", ZzMaterials.surface_for(str(id()), mat, ""))
+	_drawn.add_child(mesh)
 
 
 ## A box that belongs to a gate: its own body, its own mesh, so opening the gate removes it whole.
