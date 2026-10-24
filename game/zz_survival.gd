@@ -83,7 +83,7 @@ func begin() -> DotResult:
 	waves = DotNpcDirectorWaves.new()
 	waves.style = [DotNpcDirectorWaves.Style.ROUNDS, DotNpcDirectorWaves.Style.CYCLE, DotNpcDirectorWaves.Style.CLOCK][clampi(c.survival_style, 0, 2)]
 	waves.count = c.waves if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.nights
-	waves.first_quiet_seconds = c.survival_warmup_seconds if waves.style != DotNpcDirectorWaves.Style.CLOCK else 0.0
+	waves.first_quiet_seconds = c.setup_seconds() if waves.style != DotNpcDirectorWaves.Style.CLOCK else 0.0
 	waves.quiet_seconds = c.breather_seconds if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.day_seconds
 	waves.horde_seconds = c.night_seconds if waves.style == DotNpcDirectorWaves.Style.CYCLE else game.survival_goal
 	var scale: float = float(c.wave_scale_by_map.get(str(game.map_doc.get("id", "")), 1.0))
@@ -239,6 +239,9 @@ func _on_stage(stage: int, index: int) -> void:
 				game.notice.emit(_opening_line())
 
 		DotNpcDirectorWaves.Stage.HORDE:
+			# Nothing walks the map until the setup time is over.
+			horde.populate_map()
+
 			if waves.style == DotNpcDirectorWaves.Style.ROUNDS:
 				_begin_wave(index)
 			else:
@@ -321,7 +324,7 @@ func _breather() -> void:
 
 		if player.is_down():
 			game.stand_up(player)
-		elif player.life == ZzPlayer.Life.DEAD:
+		elif player.life == ZzPlayer.Life.DEAD and game.config.respawn_on_wave_end:
 			var _back: bool = game.rescue(player)
 
 		if player.is_up():

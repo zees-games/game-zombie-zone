@@ -608,8 +608,30 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.nights = clampi(int(value), 1, 20))
 	_tunable("zz_breather", config.breather_seconds, "Seconds of breather between waves",
 		func(value: float) -> void: config.breather_seconds = clampf(value, 0.0, 300.0))
-	_tunable("zz_survival_warmup", config.survival_warmup_seconds, "Seconds before the first wave or night",
-		func(value: float) -> void: config.survival_warmup_seconds = clampf(value, 0.0, 300.0))
+	_tunable("zz_prestart_time", config.prestart_seconds, "Setup seconds before a survival map's first wave: no zombies until it ends (0 skips)",
+		func(value: float) -> void: config.prestart_seconds = clampf(value, 0.0, 300.0))
+	_tunable("zz_survival_warmup", config.survival_warmup_seconds, "Overrides zz_prestart_time when 0 or more (-1 follows it)",
+		func(value: float) -> void: config.survival_warmup_seconds = clampf(value, -1.0, 300.0))
+	_tunable("zz_respawn_on_wave_end", 1.0 if config.respawn_on_wave_end else 0.0, "1: the dead return as each breather begins",
+		func(value: float) -> void: config.respawn_on_wave_end = value >= 0.5)
+	_tunable("zz_timed_respawn", 1.0 if config.timed_respawn else 0.0, "1: a dead survivor returns after a delay (zz_respawn_* )",
+		func(value: float) -> void: config.timed_respawn = value >= 0.5)
+	_tunable("zz_respawn_base", config.respawn_base_seconds, "Timed respawn: base seconds",
+		func(value: float) -> void: config.respawn_base_seconds = clampf(value, 0.0, 600.0))
+	_tunable("zz_respawn_min", config.respawn_min_seconds, "Timed respawn: shortest delay",
+		func(value: float) -> void: config.respawn_min_seconds = clampf(value, 0.0, 600.0))
+	_tunable("zz_respawn_max", config.respawn_max_seconds, "Timed respawn: longest delay",
+		func(value: float) -> void: config.respawn_max_seconds = clampf(value, 0.0, 600.0))
+	_tunable("zz_respawn_healthy_scale", config.respawn_healthy_scale, "Timed respawn: multiplier with the team all up",
+		func(value: float) -> void: config.respawn_healthy_scale = clampf(value, 0.0, 10.0))
+	_tunable("zz_respawn_scarce_scale", config.respawn_scarce_scale, "Timed respawn: multiplier with few survivors up",
+		func(value: float) -> void: config.respawn_scarce_scale = clampf(value, 0.0, 10.0))
+	_tunable("zz_respawn_per_wave", config.respawn_per_wave_seconds, "Timed respawn: seconds added per wave after the first",
+		func(value: float) -> void: config.respawn_per_wave_seconds = clampf(value, 0.0, 120.0))
+	_tunable("zz_respawn_difficulty_step", config.respawn_difficulty_step, "Timed respawn: delay fraction per difficulty step above normal",
+		func(value: float) -> void: config.respawn_difficulty_step = clampf(value, 0.0, 1.0))
+	_tunable("zz_respawn_protect", config.respawn_protect_seconds, "Timed respawn: seconds of invulnerability after returning",
+		func(value: float) -> void: config.respawn_protect_seconds = clampf(value, 0.0, 30.0))
 	_tunable("zz_day_seconds", config.day_seconds, "Seconds of day between nights",
 		func(value: float) -> void: config.day_seconds = clampf(value, 10.0, 900.0))
 	_tunable("zz_night_seconds", config.night_seconds, "Seconds a night lasts",

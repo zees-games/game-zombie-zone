@@ -69,8 +69,35 @@ extends DotConfig
 @export_range(1, 50, 1) var waves: int = 10
 @export_range(1, 20, 1) var nights: int = 5
 
-## Seconds of quiet before the first wave or night: time to find the doors and the caches.
-@export_range(0.0, 300.0, 5.0) var survival_warmup_seconds: float = 30.0
+## Seconds of setup before a survival map's first wave or night (buy, position, load out):
+## no zombie exists until it ends. 0 skips it. Cvar zz_prestart_time.
+@export_range(0.0, 300.0, 1.0) var prestart_seconds: float = 30.0
+
+## Overrides the prestart when 0 or more (zz_survival_warmup); -1 follows [member prestart_seconds].
+@export_range(-1.0, 300.0, 1.0) var survival_warmup_seconds: float = -1.0
+
+## Whether the dead come back as each breather begins (zz_respawn_on_wave_end).
+@export var respawn_on_wave_end: bool = true
+
+## Timed respawn (zz_timed_respawn), off by default: a dead survivor returns after
+## [method ZzRespawn.delay] seconds, replacing the slow rescue clock. See the README.
+@export var timed_respawn: bool = false
+@export_range(0.0, 600.0, 1.0) var respawn_base_seconds: float = 30.0
+@export_range(0.0, 600.0, 1.0) var respawn_min_seconds: float = 8.0
+@export_range(0.0, 600.0, 1.0) var respawn_max_seconds: float = 90.0
+## Delay multiplier with the whole team up, and with nearly everybody down.
+@export_range(0.0, 10.0, 0.05) var respawn_healthy_scale: float = 0.5
+@export_range(0.0, 10.0, 0.05) var respawn_scarce_scale: float = 2.0
+## Seconds added per wave after the first.
+@export_range(0.0, 120.0, 1.0) var respawn_per_wave_seconds: float = 2.0
+## Fraction of the delay added per difficulty step above normal (taken off below it).
+@export_range(0.0, 1.0, 0.05) var respawn_difficulty_step: float = 0.0
+## Seconds the returned survivor cannot be hurt.
+@export_range(0.0, 30.0, 0.5) var respawn_protect_seconds: float = 3.0
+
+## The setup seconds in force.
+func setup_seconds() -> float:
+	return survival_warmup_seconds if survival_warmup_seconds >= 0.0 else prestart_seconds
 
 ## Seconds of breather between waves: the downed are up, the dead are back, the caches
 ## restock, and the barricades want mending.

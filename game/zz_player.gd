@@ -139,6 +139,11 @@ var friendly_damage: float = 0.0
 ## Seconds this player has been in the game this session (server): the floor under their
 ## playtime when progress is not kept.
 var session_seconds: float = 0.0
+## When a timed respawn returns them (server, simulated seconds); -1 for none. And until when
+## they cannot be hurt after one.
+var respawn_at: float = -1.0
+var protected_until: float = -1.0
+
 
 ## Which weapon slot they have asked for, from this game's input message.
 var wanted_slot: int = 0
@@ -697,6 +702,8 @@ func reset_map() -> void:
 	submerged = false
 	water_level = WaterLevel.NONE
 
+	respawn_at = -1.0
+	protected_until = -1.0
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
 				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY,

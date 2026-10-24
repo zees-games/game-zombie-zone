@@ -28,6 +28,7 @@ const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
 const ZzTeamDamage := preload("zz_team_damage.gd")
+const ZzRespawn := preload("zz_respawn.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorkshop := preload("zz_workshop.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -2657,9 +2658,17 @@ func _advance_bodies(delta: float) -> void:
 		player.burning = player.burning_until > now_s
 		player.box_blind = boxes != null and boxes.is_blind(player.player_id)
 
-		if player.life == ZzPlayer.Life.DEAD and config.rescue_seconds > 0.0 \
-				and player.died_at >= 0.0 and now_s - player.died_at >= config.rescue_seconds:
-			var _back := rescue(player)
+		if player.protected_until >= 0.0 and now_s >= player.protected_until:
+			player.protected_until = -1.0
+			if player.health != null and not (boxes != null and boxes.is_active(&"invulnerable", player.player_id)):
+				player.health.invulnerable = false
+
+		if player.life == ZzPlayer.Life.DEAD:
+			if config.timed_respawn:
+				if player.respawn_at >= 0.0 and now_s >= player.respawn_at:
+					var _returned := rescue(player)
+			elif config.rescue_seconds > 0.0 and player.died_at >= 0.0 and now_s - player.died_at >= config.rescue_seconds:
+				var _back := rescue(player)
 
 		# Below the map is death, not a down.
 		if player.is_alive() and player.feet().y < map.kill_height():
@@ -2699,6 +2708,7 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 		if horde != null:
 			horde.blast(at, reach)
+	player.respawn_at = now() + respawn_delay_for(player) if config.timed_respawn else -1.0
 
 		exploded.emit(at, reach, &"bile")
 
@@ -2762,6 +2772,23 @@ func _advance_weapons() -> void:
 
 		if player.weapons == null or not player.is_alive() or player.watching:
 			continue
+## Seconds a survivor who just died waits under timed respawn ([ZzRespawn]).
+func respawn_delay_for(player: ZzPlayer) -> float:
+	var seated := 0
+	var up := 0
+
+	for other in survivors():
+		if other == player or other.watching:
+			continue
+
+		seated += 1
+		if other.is_alive():
+			up += 1
+
+	var wave: int = survival.waves.index if survival != null and survival.waves != null else 1
+	return ZzRespawn.delay(config, wave, up, seated)
+
+
 
 		var command := weapon_command_for(player)
 		command.yaw = player.controller.state.yaw
@@ -2786,6 +2813,11 @@ func _advance_weapons() -> void:
 
 
 ## What a weapon put into the world, as one of [ZzHazards]' projectiles.
+	if config.timed_respawn and config.respawn_protect_seconds > 0.0:
+		player.protected_until = now() + config.respawn_protect_seconds
+		player.health.invulnerable = true
+
+	player.respawn_at = -1.0
 ##
 ## [b]dot-weapon spawns nothing; it says what should exist.[/b] Until this was here every
 ## grenade, sticky charge and rocket in the game was a use that cost ammunition and did

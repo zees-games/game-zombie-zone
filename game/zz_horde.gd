@@ -154,6 +154,7 @@ var _by_entity: Dictionary = {}
 var _candidates: Array = []
 var _survivors: Dictionary = {}
 var _doc: Dictionary = {}
+var _populated: bool = true
 var _time: float = 0.0
 
 var _next_mob: float = INF
@@ -285,10 +286,24 @@ func build_for_map(doc: Dictionary) -> DotResult:
 		route.append(ZzMapDoc.v3(p))
 	director.flow = DotNpcDirectorFlow.new(route) if route.size() >= 2 else null
 
-	_place_sleepers()
-	_place_wanderers()
+	# A survival map is empty until its hold's first wave ([method populate_map]).
+	_populated = false
+
+	if str(doc.get("mode", "")) != "survival":
+		populate_map()
+
 	_begin_notes()
 	return DotResult.success(null)
+
+
+## Places the map's sleepers and wanderers, once per build.
+func populate_map() -> void:
+	if _populated:
+		return
+
+	_populated = true
+	_place_sleepers()
+	_place_wanderers()
 
 
 ## Starts annotating the map's colliders: bake, annotate, and then [method _plan_notes]. Survival

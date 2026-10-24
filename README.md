@@ -160,6 +160,17 @@ zz_bots 1                      // 0 to turn the stand-ins off
 ```
 
 Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-char](https://github.com/modcommunity/dot-player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
+zz_prestart_time 30            // survival: setup seconds before the first wave; no zombie exists until it ends (0 skips); zz_survival_warmup overrides it when 0 or more
+zz_respawn_on_wave_end 1       // survival: the dead return as each breather begins
+zz_timed_respawn 0             // 1: a dead survivor returns after a computed delay instead of the rescue clock (formula below)
+zz_respawn_base 30             // timed respawn: base seconds
+zz_respawn_min 8               // timed respawn: shortest delay
+zz_respawn_max 90              // timed respawn: longest delay
+zz_respawn_healthy_scale 0.5   // timed respawn: multiplier with the whole team up
+zz_respawn_scarce_scale 2.0    // timed respawn: multiplier with nobody else up (linear between)
+zz_respawn_per_wave 2          // timed respawn: seconds added per wave after the first
+zz_respawn_difficulty_step 0   // timed respawn: delay fraction per difficulty step above normal (below it, less)
+zz_respawn_protect 3           // timed respawn: seconds of invulnerability after returning
 
 The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
@@ -194,6 +205,8 @@ Admin commands, for seeing what happens (they need the `z` flag):
 
 ## Writing a map
 Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps/blob/main/maps/README.md).
+**Setup time and respawns (survival).** A survival map starts with a setup stage of `zz_prestart_time` seconds (the HUD counts it down as "Get ready"): no zombie exists in it, not a sleeper or a wanderer, and the horde and the map's own zombies appear when the first wave begins. `zz_respawn_on_wave_end` brings the dead back beside the team as each breather begins. Timed respawn (`zz_timed_respawn 1`, off by default) replaces the slow rescue clock: a survivor who dies returns after `delay = (base + per_wave x (wave - 1)) x lerp(scarce_scale, healthy_scale, fraction_up) x (1 + difficulty_step x (difficulty - 1))`, clamped to `[min, max]`, where `fraction_up` is the share of the other survivors still alive when they died (a healthy team brings them back sooner, a collapsing one later), and they are invulnerable for `zz_respawn_protect` seconds. The formula is `ZzRespawn.delay` in `game/zz_respawn.gd`. Start-early-when-all-ready is not built.
+
 
 ## Testing
 `./game.sh test` checks that every script parses and then runs every suite:

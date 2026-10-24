@@ -11,6 +11,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
+const ZzRespawn := preload("../game/zz_respawn.gd")
 
 ## Survival maps, held: the three styles a server picks (`zz_survival`), the breather, a wipe,
 ## the barricades, the team a map is built for, and then every big survival map played for a
@@ -64,6 +65,8 @@ func _run() -> void:
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 
 	await _test_waves()
+	await _test_prestart()
+	await _test_respawn()
 	await _test_nights()
 	await _test_clock()
 	await _test_wipe()
@@ -97,6 +100,115 @@ func _run() -> void:
 		await _dispose(game)
 
 	get_tree().quit(code)
+
+
+# --- Setup time and respawns -----------------------------------------------------------------
+
+## No zombie of any kind, not a sleeper or a wanderer, until the setup time is over.
+func _test_prestart() -> void:
+	_section("prestart: no zombies until the setup time ends")
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.wanderer_density = 3.0
+		c.sleepers_enabled = true
+		c.specials_base = 0
+		c.survival_style = 0
+		c.waves = 2
+		c.prestart_seconds = 4.0
+		c.wave_size = 6
+		c.wave_size_per_survivor = 0
+		c.brute_every_waves = 0)
+	var doc := ZzCatalogue.practice().duplicate(true)
+	doc["id"] = "zz_prestart"
+	doc["mode"] = ZzMapDoc.SURVIVAL
+	doc["objectives"] = []
+	doc["sleepers"] = [[0.0, 0.05, 6.0, 0.0]]
+	var checked := ZzMapDoc.validate(doc)
+	var _added := game.catalogue._add(checked.value, "test") if checked.ok else false
+	game.next_map_id = &"zz_prestart"
+	var player := game.add_player(&"u300", "Setup")
+	player.health.invulnerable = true
+	game.start()
+	await _sim(game, 0.3)
+	var stage_before: int = game.survival.waves.stage if game.survival != null else -1
+
+	await _sim(game, 2.0)
+	_check(game.survival != null and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET,
+		"the hold opens in its setup stage", str(game.survival_state()))
+	_check(game.horde.spawner.all_npcs().size() == 0, "and nothing walks the map in it (sleepers and wanderers included)",
+		"%d zombies" % game.horde.spawner.all_npcs().size())
+	_check(float(game.survival_state().get("left", -1.0)) > 0.0, "and the HUD has a countdown", str(game.survival_state()))
+	_check(stage_before != DotNpcDirectorWaves.Stage.HORDE, "the first wave is not already on")
+
+	await _sim(game, 4.0)
+	_check(game.survival.waves.stage == DotNpcDirectorWaves.Stage.HORDE and game.horde.spawner.all_npcs().size() > 0,
+		"when it ends the wave and the map's own zombies appear", "%d zombies" % game.horde.spawner.all_npcs().size())
+	await _dispose(game)
+	_finished()
+
+
+func _test_respawn() -> void:
+	_section("respawn: at the wave's end, and timed")
+	# The formula, on plain numbers.
+	var c := ZzConfig.new()
+	_check(not c.timed_respawn and c.respawn_on_wave_end, "timed respawn is off by default, the wave-end return on")
+	_check(is_equal_approx(ZzRespawn.delay(c, 1, 4, 4), 15.0), "whole team up, wave 1: base x healthy scale", str(ZzRespawn.delay(c, 1, 4, 4)))
+	_check(is_equal_approx(ZzRespawn.delay(c, 1, 0, 4), 60.0), "nobody else up: base x scarce scale", str(ZzRespawn.delay(c, 1, 0, 4)))
+	_check(is_equal_approx(ZzRespawn.delay(c, 6, 2, 4), 50.0), "half up at wave 6: (base + 5 x per wave) x 1.25", str(ZzRespawn.delay(c, 6, 2, 4)))
+	c.respawn_base_seconds = 600.0
+	_check(is_equal_approx(ZzRespawn.delay(c, 1, 0, 4), c.respawn_max_seconds), "the longest delay caps it")
+	c.respawn_base_seconds = 1.0
+	_check(is_equal_approx(ZzRespawn.delay(c, 1, 4, 4), c.respawn_min_seconds), "the shortest delay floors it")
+	c.respawn_base_seconds = 30.0
+	c.respawn_difficulty_step = 0.25
+	c.difficulty = 3
+	_check(is_equal_approx(ZzRespawn.delay(c, 1, 4, 4), 22.5), "expert stretches it by the difficulty step", str(ZzRespawn.delay(c, 1, 4, 4)))
+
+	# Wave end: the dead return as the breather begins; with the option off they do not.
+	for on in [true, false]:
+		var game := await _hold(func(cfg: ZzConfig) -> void:
+			cfg.survival_style = 0
+			cfg.waves = 2
+			cfg.survival_warmup_seconds = 1.0
+			cfg.breather_seconds = 3.0
+			cfg.wave_size = 4
+			cfg.wave_size_per_survivor = 0
+			cfg.brute_every_waves = 0
+			cfg.wave_twists = false
+			cfg.respawn_on_wave_end = on, 2)
+		await _sim(game, 1.5)
+		var dead: ZzPlayer = game.survivors()[1]
+		game._die(dead, &"", &"test")
+		_check(dead.life == ZzPlayer.Life.DEAD, "a survivor dies in wave 1 (wave-end respawn %s)" % on)
+		await _clear_wave(game, 1)
+		_check((dead.is_up()) == on, "and %s as the breather begins" % ("is back" if on else "stays dead"), str(dead.life))
+		await _dispose(game)
+
+	# Timed: off, a long wait changes nothing; on, the delay brings them back, protected.
+	for timed in [false, true]:
+		var game := await _hold(func(cfg: ZzConfig) -> void:
+			cfg.survival_style = 0
+			cfg.waves = 2
+			cfg.survival_warmup_seconds = 300.0
+			cfg.rescue_seconds = 0.0
+			cfg.timed_respawn = timed
+			cfg.respawn_base_seconds = 4.0
+			cfg.respawn_min_seconds = 3.0
+			cfg.respawn_max_seconds = 4.0
+			cfg.respawn_protect_seconds = 4.0, 2)
+		var dead: ZzPlayer = game.survivors()[1]
+		dead.health.invulnerable = false
+		game._die(dead, &"", &"test")
+		await _sim(game, 2.0)
+		_check(dead.life == ZzPlayer.Life.DEAD, "timed %s: still dead before the delay" % timed)
+		await _sim(game, 2.0)
+		if timed:
+			_check(dead.is_up() and dead.health.invulnerable, "timed on: back after the delay, protected", str(dead.life))
+			await _sim(game, 4.5)
+			_check(not dead.health.invulnerable, "and the protection ends")
+		else:
+			_check(dead.life == ZzPlayer.Life.DEAD, "timed off: no delay ever returns them")
+		await _dispose(game)
+	_finished()
 
 
 # --- The three styles --------------------------------------------------------------------------
