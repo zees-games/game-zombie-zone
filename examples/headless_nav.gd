@@ -16,8 +16,8 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 17
-const CHECKS := 74
+const SECTIONS := 19
+const CHECKS := 81
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -118,6 +118,22 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
+	if only == "thin":
+		_test_thin_props()
+		print("%d passed, %d failed" % [_passed, _failed])
+		for line in _failures:
+			print("  FAIL  %s" % line)
+		get_tree().quit(_failed)
+		return
+
+	if only == "lure":
+		await _test_lure_crowd()
+		print("%d passed, %d failed" % [_passed, _failed])
+		for line in _failures:
+			print("  FAIL  %s" % line)
+		get_tree().quit(_failed)
+		return
+
 	if only.begins_with("hold:"):
 		await _test_holding(StringName(only.substr(5)))
 		get_tree().quit(0)
@@ -146,6 +162,9 @@ func _run() -> void:
 
 	for id: String in STUCK_BANDS:
 		await _test_stuck(StringName(id))
+
+	await _test_lure_crowd()
+	_test_thin_props()
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -505,6 +524,89 @@ func _test_mend_gap() -> void:
 	var thin := (p.feet().z - box.get_center().z) if box.size.x > box.size.z else (p.feet().x - box.get_center().x)
 	var half := minf(box.size.x, box.size.z) * 0.5
 	_check(absf(thin) >= half + 0.4, "the survivor is out of the boards, a body's width clear", "%.2f from the middle of a %.2f board" % [absf(thin), half * 2.0])
+	_finished()
+
+
+## The lot's leaning door panel (0.22 x 1.26 m, turned 147 degrees) used to close the whole corner of the
+## doorway in one box, and a stand-in beside it stood in the cut with no line to the graph.
+func _test_thin_props() -> void:
+	_section("a turned thin prop is cut by its length, not its corners")
+	var size := Vector3(0.22, 1.4, 1.26)
+	var at := Vector3(0.458, 0.0, -5.205)
+	var boxes := ZzNpcs.prop_obstacles(at, 147.503, size)
+	var area := 0.0
+	var inside := false
+
+	for box in boxes:
+		area += box.size.x * box.size.z
+		inside = inside or Rect2(box.position.x, box.position.z, box.size.x, box.size.z).has_point(Vector2(0.8, -4.8))
+
+	var one := ZzNpcs.prop_obstacles(at, 90.0, size)
+	_check(boxes.size() >= 3 and area < 0.6, "it is several boxes covering well under the corner box", "%d boxes, %.2f m2 (the corner box is 0.83)" % [boxes.size(), area])
+	_check(not inside, "the doorway beside it is not cut", "(0.8, -4.8)")
+	_check(one.size() == 1 and absf(one[0].size.x - 1.26) < 0.01, "a prop square to the grid stays one box", "%s" % one)
+	var ends := true
+
+	for end in [Vector3(0.12, 0.0, -4.67), Vector3(0.8, 0.0, -5.74)]:
+		var covered := false
+
+		for box in boxes:
+			covered = covered or box.grow(0.02).has_point(end + Vector3(0.0, 0.5, 0.0))
+
+		ends = ends and covered
+
+	_check(ends, "both ends of the panel are still cut", "")
+	_finished()
+
+
+## A lure draws a crowd to a place, and each stops at its own ring: not twenty on one spot.
+func _test_lure_crowd() -> void:
+	_section("a lured crowd spreads round the lure instead of piling on it")
+	if not _linked:
+		for i in 3:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zz_blackout_2"])
+		c.survival_warmup_seconds = 10.0
+		c.wanderer_density = 0.0
+		c.sleepers_enabled = false)
+	var _p := game.add_player(&"u100", "Watcher")
+	game.start()
+	var ticks := 0
+
+	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+		game.simulate(TICK)
+		ticks += 1
+
+		if ticks % 8 == 0:
+			await get_tree().physics_frame
+
+	var at := Vector3(1.6, 0.0, 50.1)
+
+	for i in 20:
+		var _npc := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.nav.snap(at + Vector3(-12.0 + float(i % 5) * 1.5, 0.0, -10.0 - float(i / 5) * 1.5), 2.5), &"test")
+
+	await _sim(game, 6.0)
+	game.horde.lure(at, 40.0, 60.0)
+	await _sim(game, 25.0)
+	var gaps: Array[float] = []
+	var states := {}
+
+	for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+		var st := str(npc.brain.get(&"state")) if npc.brain != null else "-"
+		states[st] = int(states.get(st, 0)) + 1
+		if npc.brain != null and npc.brain.get(&"state") == &"lure" and npc.brain.call(&"at_lure"):
+			gaps.append(Vector2(npc.position().x - at.x, npc.position().z - at.z).length())
+
+	gaps.sort()
+	var detail := "%d arrived of %s, gaps %s" % [gaps.size(), states, gaps.map(func(g: float) -> float: return snappedf(g, 0.1))]
+	_check(gaps.size() >= 8, "most of the crowd reaches the lure", detail)
+	_check(not gaps.is_empty() and gaps[gaps.size() - 1] - gaps[0] >= 0.6, "they stop at different distances from it", detail)
+	_check(not gaps.is_empty() and gaps[gaps.size() / 2] >= 1.5, "the median one stands off the spot itself", detail)
+	await _dispose(game)
 	_finished()
 
 
