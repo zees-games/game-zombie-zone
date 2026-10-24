@@ -20,8 +20,8 @@ const ZzPlayer := preload("../game/zz_player.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 12
-const CHECKS := 108
+const SECTIONS := 13
+const CHECKS := 112
 
 var _passed := 0
 var _failed := 0
@@ -76,6 +76,7 @@ func _run() -> void:
 	await _test_real_zz_logic()
 	await _test_logic_blockfort()
 	await _test_logic_death_star()
+	await _test_trail_targets()
 	await _test_no_world()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
@@ -1028,6 +1029,25 @@ func _test_logic_death_star() -> void:
 	var says := events.filter(func(e: Array) -> bool: return e[0] == "say")
 	_check(not says.is_empty() and events.filter(func(e: Array) -> bool: return e[0] == "cvar").is_empty(), "the map's chat lines reach the game and its gravity command does not", "%d say" % says.size())
 	game.queue_free()
+	_finished += 1
+
+
+## A spritetrail's parentname finds a mover's drawn node (what DotMapFx.trail_target_fn calls).
+func _test_trail_targets() -> void:
+	_entered += 1
+	print("a trail finds the mover it follows")
+	var mech := _built()
+	_check(mech.node_named("door_a") == null, "before the world is drawn there is no node to follow")
+	var root := Node3D.new()
+	var drawn := Node3D.new()
+	drawn.set_meta(&"model", 2)
+	root.add_child(drawn)
+	mech.bind_drawn(root)
+	_check(mech.node_named("door_a") == drawn, "a mover is found by its targetname once drawn")
+	_check(mech.node_named("DOOR_A") == drawn, "whatever the case the map wrote")
+	_check(mech.node_named("door_b") == null and mech.node_named("nothing") == null, "a mover not drawn, or no mover, is null (the trail follows itself)")
+	root.free()
+	mech.queue_free()
 	_finished += 1
 
 

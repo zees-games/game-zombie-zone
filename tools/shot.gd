@@ -295,6 +295,31 @@ func _run() -> void:
 				var _felled = game.combat.apply_damage(blow)
 			game._decide(false, "the horde took the last survivor")
 			await _seconds_of(_seconds)
+		"ending", "trail":
+			# A map's ending camera 7 m ahead and up, mid-glide (--seconds in); `trail` instead follows a node
+			# the resolver found by name round a circle in front of the eyes, so the ribbon is in the frame.
+			if _view == "ending":
+				game.end_camera_rules.blend = 0.3
+				game.end_camera_rules.orbit = 30.0
+				game.map_ending.emit(true, 1.0, 20.0, stand + Vector3(5.0, 4.0, -7.0))
+			else:
+				var mover := Node3D.new()
+				mover.name = "shot_mover"
+				game.map.add_child(mover)
+				var trail := DotMapTrail.new()
+				trail.follow = mover
+				trail.lifetime = 1.6
+				trail.start_width = 0.25
+				trail.colour = Color(1.0, 0.6, 0.2)
+				game.map.add_child(trail)
+				var found: Node3D = game.map.find_child("shot_mover", true, false)
+				print("resolved ", found == mover)
+				var t := 0.0
+				while t < _seconds:
+					t += 0.02
+					mover.global_position = stand + Vector3(sin(t * 3.0) * 2.5, 1.5 + cos(t * 2.0) * 0.4, -5.0 + cos(t * 3.0) * 1.5)
+					await get_tree().create_timer(0.02).timeout
+			await _seconds_of(_seconds if _view == "ending" else 0.1)
 		"crawl", "crawl_third":
 			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
 			# effects strip is in the frame, and the status line saying you may crawl. The third

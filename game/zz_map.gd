@@ -1295,7 +1295,17 @@ func _attach_fx(world: RefCounted, node: Node3D) -> void:
 	fx.ray_fn = func(from: Vector3, to: Vector3) -> Dictionary:
 		var hit := node.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, mask))
 		return {} if hit.is_empty() else {"position": hit["position"], "normal": hit["normal"]}
+	fx.trail_target_fn = moving_node_named
 	node.add_child(fx.build((parsed as Dictionary).get("entities", [])))
+
+
+## What a spritetrail's parentname follows: a mover's drawn node, else the drawn world's brush-entity node of that targetname; null for neither.
+func moving_node_named(target: String) -> Node3D:
+	if mechanics != null:
+		var found: Node3D = mechanics.node_named(target)
+		if found != null:
+			return found
+	return _drawn.find_child(target.validate_node_name(), true, false) as Node3D if _drawn != null else null
 
 
 ## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders

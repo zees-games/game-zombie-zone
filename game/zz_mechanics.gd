@@ -281,6 +281,15 @@ func index_of_entity(entity: int) -> int:
 	return int((found as Dictionary)["i"])
 
 
+## The drawn node of the mover whose targetname is [param name] (case does not matter), or null before the world is drawn.
+func node_named(name: String) -> Node3D:
+	var wanted := name.to_lower()
+	for m in _movers:
+		if str(m["name"]).to_lower() == wanted and m["node"] is Node3D and is_instance_valid(m["node"]):
+			return m["node"]
+	return null
+
+
 ## The mover whose body is [param ground_id], or -1.
 func index_of_body(ground_id: int) -> int:
 	return int(_by_body.get(ground_id, -1))

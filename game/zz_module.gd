@@ -296,6 +296,9 @@ func _game_load() -> DotResult:
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
 	)
 
+	# The ending camera a map may ask for: the viewer's own, archived (see ZzEndCameraRules).
+	var _end_camera := world.end_camera_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+
 	_build_vote(world)
 	_build_voteban(world)
 

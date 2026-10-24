@@ -95,6 +95,11 @@ var _offline: bool = true
 ## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
 var _killcam_sec: float = -1.0
 var _map_ending: bool = false
+var _end_point := Vector3.ZERO
+var _end_left := 0.0
+var _end_elapsed := 0.0
+var _end_weight := 0.0
+var _end_active := false
 var _map_won: bool = false
 var _map_why: String = ""
 var _board_opened: bool = false
@@ -744,13 +749,61 @@ func _on_notice(text: String) -> void:
 		chat.notice(text)
 
 
-## A map's own ending slows the client's time for a moment; the game's clock is the server's, so only what is drawn and heard slows.
-func _on_map_ending(_won: bool, time_scale: float, seconds: float, _camera: Variant) -> void:
-	if time_scale >= 1.0 or seconds <= 0.0 or DisplayServer.get_name() == "headless":
+## A map's own ending slows the client's time for a moment and, with a camera point, takes the view there;
+## the game's clock is the server's, so only what is drawn and heard slows.
+func _on_map_ending(_won: bool, time_scale: float, seconds: float, camera_point: Variant) -> void:
+	var slow := time_scale < 1.0 and seconds > 0.0
+	var real_seconds := seconds * time_scale if slow else seconds
+	if camera_point is Vector3 and game != null and game.end_camera_rules.is_on():
+		begin_end_camera(camera_point, real_seconds if real_seconds > 0.0 else game.end_camera_rules.window)
+	if not slow or DisplayServer.get_name() == "headless":
 		return
 	Engine.time_scale = time_scale
-	var t := get_tree().create_timer(seconds * time_scale, true, false, true)
+	var t := get_tree().create_timer(real_seconds, true, false, true)
 	t.timeout.connect(func() -> void: Engine.time_scale = 1.0)
+
+
+## Starts the ending camera at [param point] for [param real_seconds] of unscaled time.
+func begin_end_camera(point: Vector3, real_seconds: float) -> void:
+	_end_point = point
+	_end_left = maxf(real_seconds, 0.1)
+	_end_elapsed = 0.0
+	_end_active = true
+
+
+## 0 on the survivor's own eyes, 1 on the map's ending camera.
+func end_camera_weight() -> float:
+	return _end_weight
+
+
+## Where the ending camera stands and looks: [param point] seen from [param focus], circling it [param orbit_deg] degrees.
+static func end_camera_pose(point: Vector3, focus: Vector3, orbit_deg: float) -> Transform3D:
+	var offset := point - focus
+	if offset.length() < 1.5:
+		offset = Vector3(0.0, 1.0, 3.0)
+	var at := focus + offset.rotated(Vector3.UP, deg_to_rad(orbit_deg))
+	var pose := Transform3D(Basis.IDENTITY, at)
+	return pose.looking_at(focus, Vector3.UP)
+
+
+## Glides the view to the ending camera and back; a map without a point never gets here.
+func _present_end_camera(delta: float, focus: Vector3) -> void:
+	if not _end_active and _end_weight <= 0.0:
+		return
+	var real := delta / maxf(Engine.time_scale, 0.01)
+	var rules := game.end_camera_rules
+	var glide := maxf(rules.blend, 0.05)
+	_end_elapsed += real
+	_end_left -= real
+	var goal := 1.0 if (_end_active and _end_left > 0.0 and rules.is_on()) else 0.0
+	_end_weight = move_toward(_end_weight, goal, real / glide)
+	if goal == 0.0:
+		_end_active = false
+	if _end_weight <= 0.0:
+		return
+	var smooth := smoothstep(0.0, 1.0, _end_weight)
+	var target := end_camera_pose(_end_point, focus, rules.orbit * _end_elapsed)
+	camera.global_transform = camera.global_transform.interpolate_with(target, smooth)
 
 
 func _on_phase(phase: int) -> void:
@@ -763,6 +816,8 @@ func _on_phase(phase: int) -> void:
 
 
 func _on_map(map_id: StringName) -> void:
+	_end_active = false
+	_end_weight = 0.0
 	if audio != null:
 		audio.on_map_doc(map_id, game.map_doc)
 		if game.map != null and not game.map.world_sounds.is_empty():
@@ -1777,13 +1832,14 @@ func _process(delta: float) -> void:
 	_rig_height = player.eye_position().y - state.position.y
 	var height := ZzPlayer.EYE_DOWN if player.is_down() else _rig_height
 	rig.global_position = drawn.position + Vector3(0.0, height, 0.0)
+	_present_end_camera(delta, drawn.position + Vector3(0.0, _rig_height, 0.0))
 
 	if weapons != null:
 		var speed := Vector2(state.velocity.x, state.velocity.z).length()
 		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != DotFpsState.Mode.AIR, state.crouch_fraction > 0.5)
 
 	if view_model != null and is_instance_valid(view_model):
-		view_model.visible = not third_person and not player.is_held()
+		view_model.visible = not third_person and not player.is_held() and _end_weight < 0.3
 
 	_present_defib_hands(delta)
 

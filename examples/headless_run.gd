@@ -5,6 +5,7 @@ const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzWaterRules := preload("../game/zz_water_rules.gd")
 const ZzClient := preload("../game/zz_client.gd")
+const ZzEndCameraRules := preload("../game/zz_end_camera_rules.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
 const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
@@ -39,7 +40,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 44
 
-const CHECKS := 319
+const CHECKS := 327
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2124,6 +2125,37 @@ func _test_the_client_platform() -> void:
 		await get_tree().physics_frame
 	var aim_bits: int = client._actions()
 	_check((aim_bits & ZzNetCommand.ACT_AIM) != 0, "an aim press in the client reaches the command's action bits", str(aim_bits))
+	var focus := Vector3(2.0, 1.6, -3.0)
+	var spot := Vector3(10.0, 5.0, 4.0)
+	var pose := ZzClient.end_camera_pose(spot, focus, 0.0)
+	var ahead := -pose.basis.z
+	_check(pose.origin.is_equal_approx(spot) and ahead.dot((focus - spot).normalized()) > 0.999,
+		"the ending camera stands at the map's point and looks at the survivor")
+	var turned := ZzClient.end_camera_pose(spot, focus, 90.0)
+	_check(is_equal_approx(turned.origin.distance_to(focus), spot.distance_to(focus)) and not turned.origin.is_equal_approx(spot)
+		and (-turned.basis.z).dot((focus - turned.origin).normalized()) > 0.999,
+		"orbiting keeps its distance and keeps looking at them")
+	var rules: ZzEndCameraRules = client.game.end_camera_rules
+	_check(rules.set_cvar("zz_end_camera_orbit", "500") and rules.orbit == 90.0 and not rules.set_cvar("zz_end_camera_orbit", "x") and not rules.set_cvar("zz_nope", "1"),
+		"the cvars clamp and refuse what is not theirs")
+	rules.blend = 0.05
+	client.game.map_ending.emit(true, 1.0, 0.0, null)
+	for _i in 5:
+		await get_tree().process_frame
+	_check(client.end_camera_weight() == 0.0, "a map with no camera point leaves the view alone")
+	client.game.map_ending.emit(true, 1.0, 0.4, spot)
+	for _i in 12:
+		await get_tree().process_frame
+	_check(client.end_camera_weight() > 0.99, "a point takes the view to it for the ending", str(client.end_camera_weight()))
+	_check(client.camera.global_position.distance_to(client.player.global_position) > 5.0, "the camera is there, away from the survivor's eyes")
+	await get_tree().create_timer(0.8).timeout
+	_check(client.end_camera_weight() == 0.0, "and gives the survivor's eyes back after it")
+	rules.enabled = 0.0
+	client.game.map_ending.emit(true, 1.0, 0.4, spot)
+	for _i in 5:
+		await get_tree().process_frame
+	_check(client.end_camera_weight() == 0.0, "zz_end_camera 0 keeps the view even then")
+	rules.enabled = 1.0
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame
