@@ -16,8 +16,8 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 16
-const CHECKS := 71
+const SECTIONS := 17
+const CHECKS := 74
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
