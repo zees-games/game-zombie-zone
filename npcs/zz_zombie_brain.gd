@@ -155,10 +155,8 @@ func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 func chase_to(at: Vector3, speed: float, spacing: float = 1.1) -> void:
 	var h := horde()
 
-	var _t := Time.get_ticks_usec()
 	if h != null and npc != null:
 		at = h.call(&"waypoint_for", npc.instance_id, npc.position(), at)
-	_t = _CP.add("zb.waypoint", _t)
 
 	go_to(at, speed, spacing)
 
@@ -325,9 +323,7 @@ func _npc_think(delta: float) -> void:
 	delta = _owed_delta
 	_owed_delta = 0.0
 	_since_thought = 0
-	var _t := Time.get_ticks_usec()
 	super(delta)
-	_t = _CP.add("zb.super", _t)
 
 	if npc == null or not npc.is_alive() or body() == null:
 		return
@@ -346,9 +342,7 @@ func _npc_think(delta: float) -> void:
 		return
 
 	_decide(delta)
-	_t = _CP.add("zb.decide", _t)
 	_bash_if_barred(delta)
-	_t = _CP.add("zb.bash", _t)
 
 
 ## Pressed against a barricade it was walking into: stop, face it, and tear at it. Checked

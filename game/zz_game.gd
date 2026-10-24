@@ -3056,9 +3056,7 @@ func simulate(delta: float) -> void:
 		_step_bodies_only(delta)
 		return
 
-	var _t := Time.get_ticks_usec()
 	_step(delta)
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.step", _t)
 
 
 ## A tick under a cover: the bodies move and settle, nothing else happens. A body the gate has
@@ -3092,10 +3090,8 @@ func now() -> float:
 func _step(delta: float) -> void:
 	_advance_phase(delta)
 
-	var _t := Time.get_ticks_usec()
 	if authoritative and bots != null:
 		bots.drive(delta)
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.bots", _t)
 
 	if pins != null:
 		pins.steer(delta)
@@ -3116,9 +3112,7 @@ func _step(delta: float) -> void:
 			if progress != null:
 				progress.add_playtime(id, delta)
 
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.players", _t)
 	_advance_weapons()
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.weapons", _t)
 
 	if map != null and map.mechanics != null:
 		map.mechanics.step(_tick)

@@ -645,9 +645,7 @@ func tick(delta: float) -> void:
 	_land_alerts()
 	_advance_lures()
 	_advance_bile()
-	var _t := Time.get_ticks_usec()
 	spawner.tick(delta)
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("h.spawner", _t)
 
 	var speed := zombie_speed_scale * wave_speed_scale
 
@@ -657,7 +655,6 @@ func tick(delta: float) -> void:
 			b.speed_scale = speed * b.limb_speed_scale() * (game.water_pace_at(b.global_position) if game != null else 1.0)
 			b.tick(delta)
 
-	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("h.bodies", _t)
 	squads.prune()
 	_release_pending()
 

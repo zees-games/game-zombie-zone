@@ -100,7 +100,6 @@ const STEP_UP := 0.45
 const STEP_REACH := 0.2
 
 var _shape: CollisionShape3D = null
-const _CP := preload("res://addons/dot_npc_ai/_crowd_prof.gd")
 
 ## Where and which way the last lift over a lip found no tread. The world there has not moved,
 ## so a body pressed against the same wall does not test it again every tick until it has.
@@ -228,9 +227,7 @@ func advance(delta: float, ticks: int = 1) -> void:
 		velocity.y = maxf(velocity.y - GRAVITY * delta, -FALL_FASTEST)
 
 	var before := global_position
-	var _t := Time.get_ticks_usec()
 	var _moved := _sweep(ticks)
-	_t = _CP.add("body.sweep", _t)
 
 	if is_on_floor() and horizontal.length_squared() > 0.04:
 		var flat := global_position - before
