@@ -1481,6 +1481,13 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 	var energy := float(env_doc["sun_energy"])
 	var fog := maxf(float(env_doc["fog"]), 0.01)
 	var start := 14.0
+	var end := start + 2.0 / fog
+	var thickest := clampf(fog * 20.0, 0.35, 0.85)
+	if env_doc.has("fog_start"):
+		# Clear air from a converted day map (ZzMapDoc.environment_from_world): a thin haze far off.
+		start = float(env_doc["fog_start"])
+		end = maxf(float(env_doc.get("fog_end", start * 10.0)), start + 1.0)
+		thickest = 0.25
 	return {
 		"sun": {
 			"colour": [sun.r, sun.g, sun.b],
@@ -1492,8 +1499,8 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 			"enabled": true,
 			"colour": [horizon.r, horizon.g, horizon.b],
 			"start": start / 0.01905,
-			"end": (start + 2.0 / fog) / 0.01905,
-			"max_density": clampf(fog * 20.0, 0.35, 0.85),
+			"end": end / 0.01905,
+			"max_density": thickest,
 		},
 	}
 

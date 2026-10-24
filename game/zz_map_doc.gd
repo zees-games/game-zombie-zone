@@ -173,8 +173,14 @@ static func environment_from_world(data: Dictionary) -> Dictionary:
 			env["fog"] = clampf(2.0 / maxf(float(f.get("end", 60.0)) - 14.0, 6.0), 0.01, 0.12)
 			fogged = true
 			break
-	if not fogged:
+	if not fogged and night:
 		env["fog"] = 0.012
+	elif not fogged:
+		# A day map without fog is clear air: the family's haze from 14 m washed out views hundreds of metres long.
+		var off: Dictionary = (data.get("fog", []) as Array)[0] if not (data.get("fog", []) as Array).is_empty() else {}
+		env["fog"] = 0.0
+		env["fog_start"] = maxf(float(off.get("start", 0.0)), 60.0)
+		env["fog_end"] = maxf(float(off.get("end", 0.0)), 600.0)
 	return env
 
 
