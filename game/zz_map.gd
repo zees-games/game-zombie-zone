@@ -1240,6 +1240,25 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	else:
 		drawn_props.free()
 
+	_attach_fx(world, node)
+
+
+## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's DotMapFx), capped per map.
+func _attach_fx(world: RefCounted, node: Node3D) -> void:
+	var path := local_world_prefix() + ".doc.json"
+	if DisplayServer.get_name() == "headless" or OS.get_environment("ZZ_NO_FX") != "" or "--zz-map-fx=false" in OS.get_cmdline_user_args() or not FileAccess.file_exists(path):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary:
+		return
+	var fx := DotMapFx.new()
+	fx.unit_scale = float(((world.get("manifest") as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", 0.0254))
+	var mask := physics.layer_mask(&"world") if physics != null else 1
+	fx.ray_fn = func(from: Vector3, to: Vector3) -> Dictionary:
+		var hit := node.get_world_3d().direct_space_state.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, mask))
+		return {} if hit.is_empty() else {"position": hit["position"], "normal": hit["normal"]}
+	node.add_child(fx.build((parsed as Dictionary).get("entities", [])))
+
 
 ## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
 ## for the solid ones, the outputs that drive them. A second call keeps the first.
