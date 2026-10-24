@@ -131,6 +131,52 @@ sites:
 # Per map, add `maps:` with a block per map id or glob, e.g. zm_lot: then game: shop: prices: ...
 game:
   shop:
+    # The trader at the start. Override in cfg/server/game/game-zombie-zone/dot_weapon/spawner.yml, or live with
+    # the cvars zz_trader, zz_trader_when, zz_trader_despawn, zz_start_points (-1 reads this file); docs/operators.md.
+    enabled: true            # false: no trader on any map
+    available: always        # setup (before the horde runs) | waves (setup and a survival map's breathers) | always
+    despawn: true            # true: the shelf is gone while closed; false: it stands there and says "closed"
+    fallback: true           # a map with no trader of its own gets one just ahead of the first survivor spawn
+    fallback_distance: 3.0   # metres ahead of that spawn
+    # Points every survivor starts a map with (a balance above it is kept). A number, or a table: `default`,
+    # a key per difficulty (easy, normal, advanced, expert) and a key per mode (exodus, survival); the mode wins.
+    start_points:
+      default: 0
+      easy: 400
+      normal: 250
+      advanced: 150
+      expert: 0
+    # The trader's menu (E within `radius` metres of the trader while it is open; Esc or walking away closes it).
+    menu: true               # false: only the ground shelf
+    radius: 3.5              # metres
+    price_multiplier: 1.0    # every price below, after the overrides
+    # The tabs, in order; leave one out to remove it.
+    categories:
+      - weapons
+      - grenades
+      - ammo
+      - supplies
+      - entities
+    # Item ids kept off the list (a weapon id, mag:<id>, refill:<id>, refill_all, medkit, pills, heal, armour, box:<type>).
+    # disabled:
+    #   - armour
+    # Per item, a price (shotgun: 300) or nested keys price and enabled (enabled: false removes it).
+    # items:
+    #   shotgun: 300
+    ammo:
+      magazine_share: 0.08   # a magazine costs this share of the gun's price (at least 5)
+      refill_share: 0.2      # a refill to the cap costs this share (at least 10)
+      refill_all: 150        # every carried gun
+    supplies:
+      medkit: 150
+      pills: 50
+      heal: 100
+      armour: 200
+      armour_amount: 50
+    boxes:                   # box types (boxes/boxes.json ids) sold as carried boxes; a type that does not exist is not listed
+      medical: 250
+      arsenal: 400
+      turret: 500
     prices:
       sidearm: 50
       primary: 250

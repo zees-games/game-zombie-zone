@@ -23,6 +23,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorldView := preload("zz_world_view.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzShopMenu := preload("zz_shop_menu.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
@@ -115,6 +116,9 @@ var _using: bool = false
 var _healing: bool = false
 var _pills: bool = false
 var _deploying: bool = false
+## The trader's list as the server last said it ({menu, open, radius, at, items}), and its menu.
+var shop_state: Dictionary = {}
+var _shop_menu: PanelContainer = null
 var _slot: int = 0
 
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
@@ -458,6 +462,7 @@ func _build_netcode() -> DotResult:
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
 		_on_zombie(kind, true)
 		world_view.add_zombie(net_id, kind, variant, body))
+	bridge.shop_received.connect(_on_shop_json)
 	bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
 		_on_zombie(StringName(str(body.get(&"kind"))) if body != null else &"", false)
 		world_view.remove_zombie(net_id, killed, body))
@@ -570,6 +575,11 @@ func _hear_the_world() -> void:
 	game.refused.connect(func(id: StringName, why: String) -> void:
 		if id == &"local":
 			_on_notice(why)
+	game.told.connect(func(id: StringName, text: String) -> void:
+		if id == &"local":
+			_on_notice(text))
+	if game.shop != null:
+		game.shop_changed.connect(func() -> void: _on_shop_json(game.shop.state_json()))
 			if audio != null:
 				var _denied := audio.deny())
 	game.objective_changed.connect(func(index: int, state: StringName) -> void:
@@ -1178,6 +1188,9 @@ func _build_hud() -> void:
 
 
 ## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
+	_shop_menu = ZzShopMenu.new()
+	_shop_menu.buy_requested.connect(_shop_buy)
+	hud.add_child(_shop_menu)
 ## every change. An older shell's link cannot say, and the config's default (off) stands.
 static func follow_roster(source: Object, config: ZzConfig) -> bool:
 	if source == null or not source.has_method(&"replicated_cvar") or not source.has_signal(&"replicated_cvar_changed"):
@@ -1689,7 +1702,11 @@ func _process(delta: float) -> void:
 		view_model.visible = not third_person and not player.is_held()
 
 	if hud != null:
-		hud.set_prompt(_prompt())
+		var prompt := _prompt()
+		if prompt == "" and _near_trader() and not (_shop_menu != null and _shop_menu.is_open()):
+			prompt = "%s — trade" % _key(ZzBindings.USE)
+		hud.set_prompt(prompt)
+		_follow_shop_menu()
 
 	_present_effects(delta)
 
@@ -1799,6 +1816,94 @@ func _prompt() -> String:
 			best_off = off
 			var cost := int(node.get_meta(&"price", 0))
 			best = "%s — %s%s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up")),
+func _on_shop_json(json: String) -> void:
+	var parsed: Variant = JSON.parse_string(json)
+	shop_state = parsed as Dictionary if parsed is Dictionary else {}
+	_follow_shop_menu()
+
+
+## Whether the local survivor stands within reach of an open trader.
+func _near_trader() -> bool:
+	if player == null or not player.can_act() or not bool(shop_state.get("menu", false)) or not bool(shop_state.get("open", false)):
+		return false
+	var feet := player.feet()
+	for at: Variant in shop_state.get("at", []):
+		var a := at as Array
+		if a.size() == 3 and feet.distance_to(Vector3(float(a[0]), float(a[1]), float(a[2]))) <= float(shop_state.get("radius", 3.5)):
+			return true
+	return false
+
+
+func is_shop_open() -> bool:
+	return _shop_menu != null and _shop_menu.is_open()
+
+
+func open_shop() -> void:
+	if _shop_menu == null or not _near_trader():
+		return
+	_using = false
+	_firing = false
+	_aiming = false
+	_suspend_input(true)
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_shop_menu.open(shop_state.get("items", []), player.points, _shop_item_state)
+
+
+func close_shop() -> void:
+	if not is_shop_open():
+		return
+	_shop_menu.close()
+	_suspend_input(false)
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Closes the menu when its trader goes or its customer leaves; keeps its balance and states current while it is up.
+func _follow_shop_menu() -> void:
+	if not is_shop_open():
+		return
+	if not _near_trader():
+		close_shop()
+		return
+	_shop_menu.refresh(shop_state.get("items", []), player.points)
+
+
+## "" when [param item] can be bought, else why not (Owned, Full).
+func _shop_item_state(item: Dictionary) -> String:
+	var rig: Variant = player.view_rig if player != null and player.view_rig != null else (player.weapons if player != null else null)
+	var arsenal: Variant = rig.arsenal if rig != null else null
+	var id := str(item.get("id", ""))
+	var weapon := StringName(str(item.get("w", "")))
+	var def := ZzWeapons.def_of(weapon) if weapon != &"" else null
+	if id == "medkit":
+		return "Carrying" if player.medkits >= 1 else ""
+	if id == "pills":
+		return "Carrying" if player.pills >= 1 else ""
+	if id == "heal":
+		return "Full" if player.health != null and player.health.health >= player.health.max_health else ""
+	if id == "armour":
+		return "Full" if player.health != null and player.health.armour >= player.health.max_armour else ""
+	if id.begins_with("box:"):
+		return "Hands full" if player.carried.size() >= game.config.box_carry else ""
+	if def == null or arsenal == null:
+		return ""
+	var owned: bool = arsenal.carries(weapon)
+	if id.begins_with("mag:") or id.begins_with("refill:"):
+		if not owned:
+			return "Not carried"
+		return "Full" if arsenal.ammo().count(def.ammo_type) >= def.reserve_cap() else ""
+	if owned and str(item.get("cat", "")) != "grenades":
+		return "Owned"
+	return ""
+
+
+func _shop_buy(item_id: String) -> void:
+	if bridge != null and not _offline:
+		bridge.ask_buy(item_id)
+	elif game.shop != null and player != null:
+		var _sold: bool = game.shop.buy(player, item_id)
+		_follow_shop_menu()
+
+
 				" (%d points)" % cost if cost > 0 else ""]
 
 	if best != "":
@@ -2006,6 +2111,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				spectate_step(-1)
 			return
 
+	if event.is_action_pressed("ui_cancel") and is_shop_open():
+		close_shop()
+		get_viewport().set_input_as_handled()
+		return
+
 		if button.button_index == MOUSE_BUTTON_LEFT:
 			_firing = button.pressed
 		elif button.is_action(ZzBindings.AIM):
@@ -2016,6 +2126,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cycle_slot(1)
 			elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
 				_cycle_slot(-1)
+	if is_shop_open():
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed(ZzBindings.USE):
+			close_shop()
+			get_viewport().set_input_as_handled()
+		return
+
 
 	if player == null:
 		return
@@ -2060,6 +2176,9 @@ func _key_event(event: InputEvent) -> bool:
 
 	if event.is_action_pressed(ZzBindings.VIEW):
 		if is_spectating():
+		if pressed and _near_trader() and _prompt() == "":
+			open_shop()
+			return true
 			spectate_step(0)
 		else:
 			toggle_view()

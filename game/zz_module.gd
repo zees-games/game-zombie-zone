@@ -442,6 +442,18 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void:
 			config.difficulty = clampi(int(value), 0, 3)
 			_apply_friendly_fire(world))
+	_tunable("zz_trader", float(config.trader_enabled),
+		"The trader: 0 none on any map, 1 one; -1 reads game.shop.enabled in spawner.yml",
+		func(value: float) -> void: config.trader_enabled = clampi(int(value), -1, 1))
+	_tunable("zz_trader_when", float(config.trader_when),
+		"When the trader sells: 0 the setup period only, 1 also a survival map's breathers, 2 always; -1 reads the file",
+		func(value: float) -> void: config.trader_when = clampi(int(value), -1, 2))
+	_tunable("zz_trader_despawn", float(config.trader_despawn),
+		"1 the shelf is gone while closed, 0 it stays standing and will not sell; -1 reads the file",
+		func(value: float) -> void: config.trader_despawn = clampi(int(value), -1, 1))
+	_tunable("zz_start_points", float(config.start_points),
+		"Points every survivor starts a map with (a prior balance above it is kept); -1 reads the file's per-difficulty values",
+		func(value: float) -> void: config.start_points = clampi(int(value), -1, 1000000))
 	_tunable("zz_friendly_fire", config.friendly_fire,
 		"A teammate's bullet as a share of what it does to a zombie, before difficulty",
 		func(value: float) -> void:

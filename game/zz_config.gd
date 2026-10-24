@@ -150,6 +150,20 @@ func setup_seconds() -> float:
 @export_range(1.0, 2000.0, 5.0) var barricade_repair: float = 120.0
 @export_range(0.2, 10.0, 0.1) var barricade_repair_seconds: float = 2.0
 
+# --- Trader ------------------------------------------------------------------
+
+@export_group("Trader")
+
+## Operator overrides of the `game: shop:` block of `dot_weapon/spawner.yml` (docs/operators.md); -1 leaves the file in charge.
+## `zz_trader`: 0 no trader on any map, 1 one.
+@export_range(-1, 1) var trader_enabled: int = -1
+## `zz_trader_when`: 0 the setup period only, 1 setup and a survival map's breathers, 2 always.
+@export_range(-1, 2) var trader_when: int = -1
+## `zz_trader_despawn`: 1 the shelf is gone when closed, 0 it stays standing and refuses to sell.
+@export_range(-1, 1) var trader_despawn: int = -1
+## `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode).
+@export_range(-1, 1000000) var start_points: int = -1
+
 # --- Difficulty ------------------------------------------------------------
 
 @export_group("Difficulty")

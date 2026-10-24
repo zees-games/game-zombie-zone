@@ -17,8 +17,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 8
-const CHECKS := 36
+const SECTIONS := 10
+const CHECKS := 56
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -50,6 +50,8 @@ func _run() -> void:
 		await _test_rearmed()
 		_test_spawner()
 
+		_test_trader()
+		_test_shop()
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -263,6 +265,7 @@ func _test_spawner() -> void:
 	game.spawners.start_round(world)
 	game.spawners.tick()
 	var kinds := {}
+	game.config.trader_enabled = 0
 	for id: int in game.spawners.loot_ids():
 		kinds[game.loot.kind_of(id)] = true
 	_check(kinds.has(ZzLoot.WEAPON) and (kinds.has(ZzLoot.MEDKIT) or kinds.has(ZzLoot.PILLS)) and kinds.has(ZzLoot.AMMO), "converter entities lay a gun, a medkit and ammo through the classes mapping", str(kinds.keys()))
@@ -285,6 +288,7 @@ func _test_spawner() -> void:
 	_check(again == 3 or game.now() < 30.0, "the slot restocks after its wait", str(again))
 	# A priced ammo pile is used up: charged once, and its site lays the next.
 	game.spawners.start_round({"id": "spawner_probe3", "spawners": [{"id": "am", "at": [0, 0, 0], "kind": "ammo", "item": "ammo", "respawn": 5, "data": {"price": 50}}],
+	game.config.trader_enabled = -1
 		"traders": [{"id": "empty_shop", "at": [0, 0, 20], "slots": 2, "pool": "no_such_pool", "restock": 5.0}]})
 	game.spawners.tick()
 	var amid: int = -1
@@ -351,3 +355,143 @@ func _check(ok: bool, what: String, detail: String = "") -> void:
 	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
 	_failures.append(line)
 	print("  FAIL  %s" % line)
+func _shelf_count(game) -> int:
+	var n := 0
+	for id: int in game.loot.entries:
+		if game.loot.price_of(id) > 0:
+			n += 1
+	return n
+
+
+func _test_shop() -> void:
+	_section("the trader's menu: the catalogue, reach, the price multiplier, a purchase, the window")
+	var game = _client.game
+	var me := _client.player
+	var cfg = game.config
+	cfg.trader_enabled = -1
+	cfg.trader_when = -1
+	game._set_phase(game.Phase.READY)
+	game.spawners.start_round({"id": "shop_probe", "traders": [{"id": "own", "at": [0, 0, 8], "slots": 2}]})
+	var cats := {}
+	for it: Dictionary in game.shop.items():
+		cats[str(it["cat"])] = true
+	_check(cats.has("weapons") and cats.has("grenades") and cats.has("ammo") and cats.has("supplies"), "the list has weapons, grenades, ammo and supplies", str(cats.keys()))
+
+	me.place_at(Vector3(0.0, 0.0, 8.0) + Vector3(20.0, 0.0, 0.0), 0.0)
+	me.points = 10000
+	_check(not game.shop.in_reach(me) and not game.shop.buy(me, "armour"), "out of reach nothing is sold")
+	me.place_at(game.spawners.trader_positions()[0], 0.0)
+	_check(game.shop.in_reach(me), "beside the trader it is in reach")
+
+	var armour := -1
+	for it: Dictionary in game.shop.items():
+		if str(it["id"]) == "armour":
+			armour = int(it["price"])
+	me.health.armour = 0.0
+	var before: int = me.points
+	_check(game.shop.buy(me, "armour") and me.points == before - armour and me.health.armour > 0.0, "a purchase deducts the price and hands the item over", "%d -> %d" % [before, me.points])
+	me.points = 1
+	_check(not game.shop.buy(me, "heal") and me.points == 1, "too few points buys nothing")
+
+	game.spawners.shop_block()["price_multiplier"] = 2.0
+	var doubled := -1
+	for it: Dictionary in game.shop.items():
+		if str(it["id"]) == "armour":
+			doubled = int(it["price"])
+	game.spawners.shop_block().erase("price_multiplier")
+	_check(doubled == armour * 2, "the global multiplier scales prices", "%d vs %d" % [doubled, armour])
+	game.spawners.shop_block()["disabled"] = ["armour"]
+	var listed := false
+	for it: Dictionary in game.shop.items():
+		listed = listed or str(it["id"]) == "armour"
+	game.spawners.shop_block().erase("disabled")
+	_check(not listed, "a disabled item is not listed")
+
+	cfg.trader_when = 0
+	game._set_phase(game.Phase.PLAY)
+	game.spawners.tick()
+	me.points = 10000
+	me.health.armour = 0.0
+	_check(not game.shop.in_reach(me) and not game.shop.buy(me, "armour"), "when the wave begins the trader is gone and sells nothing")
+	cfg.trader_when = -1
+	game._set_phase(game.Phase.READY)
+	game.spawners.start_round({"id": "spawner_probe"})
+	_finished()
+
+
+func _test_trader() -> void:
+	_section("the startup trader: present in the setup period, per config after it, starting points, a purchase")
+	var game = _client.game
+	var me := _client.player
+	var cfg = game.config
+	cfg.trader_enabled = -1
+	cfg.trader_when = -1
+	cfg.trader_despawn = -1
+	cfg.start_points = -1
+	var doc := {"id": "trader_probe", "traders": [{"id": "own", "at": [0, 0, 8], "slots": 3}]}
+
+	game._set_phase(game.Phase.READY)
+	game.spawners.start_round(doc)
+	_check(_shelf_count(game) == 3, "a map's own trader stands during setup", str(_shelf_count(game)))
+	game.spawners.start_round({"id": "trader_probe2"})
+	_check(_shelf_count(game) == 4 and game.spawners._traders.has(&"trader_start"), "a map with none gets one by the survivor spawn", str(_shelf_count(game)))
+
+	cfg.start_points = 120
+	me.points = 20
+	game.spawners.grant_start_points()
+	_check(me.points == 120, "starting points top a survivor up", str(me.points))
+	me.points = 500
+	game.spawners.grant_start_points()
+	_check(me.points == 500, "and keep a higher balance", str(me.points))
+	cfg.start_points = -1
+	cfg.difficulty = 0
+	var easy: int = game.spawners.start_points()
+	cfg.difficulty = 3
+	_check(easy > game.spawners.start_points(), "the file's starting points differ by difficulty", "%d easy, %d expert" % [easy, game.spawners.start_points()])
+	cfg.difficulty = 1
+
+	var shelf_id := -1
+	for id: int in game.loot.entries:
+		if game.loot.price_of(id) > 0:
+			shelf_id = id
+	var price: int = game.loot.price_of(shelf_id)
+	me.points = price + 7
+	_check(game.spawners.may_use(shelf_id, me), "an affordable item may be used")
+	game.loot.use(shelf_id, me)
+	_check(me.points == 7 and _shelf_count(game) == 3, "a purchase deducts the price and the shelf loses the item", str(me.points))
+
+	game.spawners.start_round(doc)
+	cfg.trader_when = 0
+	game._set_phase(game.Phase.PLAY)
+	game.spawners.tick()
+	_check(_shelf_count(game) == 0 and not game.spawners.trader_open(), "setup only: the shelf is gone once the horde runs")
+	game._set_phase(game.Phase.READY)
+	game.spawners.tick()
+	_check(_shelf_count(game) == 3, "and stands again in the next setup", str(_shelf_count(game)))
+
+	cfg.trader_despawn = 0
+	game._set_phase(game.Phase.PLAY)
+	game.spawners.tick()
+	var kept := _shelf_count(game)
+	var stocked: int = 0
+	for id: int in game.loot.entries:
+		if game.loot.price_of(id) > 0:
+			stocked = id
+	me.points = 100000
+	_check(kept == 3 and not game.spawners.may_use(stocked, me), "despawn off: the shelf stays but will not sell", str(kept))
+	cfg.trader_despawn = -1
+
+	cfg.trader_when = 2
+	game.spawners.tick()
+	_check(game.spawners.trader_open() and _shelf_count(game) == 3, "always: it sells while the horde runs", str(_shelf_count(game)))
+
+	cfg.trader_enabled = 0
+	game.spawners.start_round(doc)
+	_check(_shelf_count(game) == 0, "disabled: no trader on any map")
+	cfg.trader_enabled = -1
+	cfg.trader_when = -1
+	game._set_phase(game.Phase.READY)
+	game.spawners.start_round({"id": "spawner_probe"})
+	_finished()
+
+

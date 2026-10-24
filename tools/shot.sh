@@ -15,6 +15,7 @@
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=crawl                                       # down, crawling, the speed boxes in the strip (crawl_third: the figure)
 #   tools/shot.sh --view=killcam --seconds=3                         # the last stand replayed (--seconds=9: the podium)
+#   tools/shot.sh --view=trader                                      # the trader menu open at the start
 #   tools/shot.sh --view=deploy                                      # carrying a box, the deploy meter part full
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope

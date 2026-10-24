@@ -111,6 +111,8 @@ enum Kind {
 	SPLAT,
 	## A dead survivor was shocked back by a defibrillator: who, and by whom (a pair).
 	DEFIB,
+	## The trader menu: whether it is open, where, how far it reaches, and the items with their prices (JSON).
+	SHOP,
 }
 
 enum Ask {
@@ -120,6 +122,8 @@ enum Ask {
 	SAY,
 	## I am out: show me the next person, the previous one, or the other camera.
 	SPECTATE,
+	## I want to buy this item from the trader. The server checks reach, window, stock and points.
+	BUY,
 }
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.
@@ -992,6 +996,31 @@ static func read_say(r: DotNetReader) -> Dictionary:
 	}
 	out["ok"] = r.ok()
 	return out
+
+
+const SHOP_BYTES := 32768
+
+
+static func write_shop(json: String) -> PackedByteArray:
+	var w := _w()
+	w.write_bytes(json.to_utf8_buffer().slice(0, SHOP_BYTES))
+	return w.to_bytes()
+
+
+static func read_shop(r: DotNetReader) -> Dictionary:
+	var raw := r.read_bytes(SHOP_BYTES)
+	return {"json": raw.get_string_from_utf8(), "ok": r.ok()}
+
+
+static func write_buy(item_id: String) -> PackedByteArray:
+	var w := _w()
+	w.write_string(item_id, ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_buy(r: DotNetReader) -> Dictionary:
+	var id := r.read_string(ID_BYTES)
+	return {"id": id, "ok": r.ok()}
 
 
 static func write_notice(text: String) -> PackedByteArray:

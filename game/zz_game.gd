@@ -11,6 +11,7 @@ const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzDrops := preload("zz_drops.gd")
 const ZzSpawners := preload("zz_spawners.gd")
+const ZzShop := preload("zz_shop.gd")
 const ZzMap := preload("zz_map.gd")
 const ZzPacks := preload("zz_packs.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
@@ -127,6 +128,10 @@ signal gate_opened(gate: String)
 signal mover_changed(index: int)
 signal notice(text: String)
 signal refused(player_id: StringName, why: String)
+## A word to one player that is good news (a purchase), never the denied sound.
+signal told(player_id: StringName, text: String)
+## The trader opened, closed, moved or changed its list: clients are sent it again.
+signal shop_changed()
 signal achievement_earned(player_id: StringName, title: String, points: int)
 signal player_armed(player_id: StringName, weapon_id: StringName)
 
@@ -190,6 +195,10 @@ var hazards: ZzHazards = null
 ## Server only. The sentry turrets a box deployed.
 var turrets: ZzTurrets = null
 var loot: ZzLoot = null
+## What a dead zombie leaves (ammunition, health); server only.
+var drops: ZzDrops = null
+## The trader's menu (zz_shop.gd), server only.
+var shop = null
 ## The map's weapon and supply spawners (zz_spawners.gd), server only.
 var spawners: ZzSpawners = null
 var boxes: ZzBoxes = null
@@ -198,10 +207,6 @@ var bots: ZzBots = null
 ## player id -> [ZzPlayer].
 var players: Dictionary = {}
 
-## What a dead zombie leaves (ammunition, health); server only.
-var drops: ZzDrops = null
-## The trader's menu (zz_shop.gd), server only.
-var shop = null
 ## dot-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do survivors and stand-ins block each other). Bound by the module
 ## (REPLICATED) and followed by a client through its link.
@@ -338,6 +343,7 @@ func _ready() -> void:
 		loot = ZzLoot.new(self)
 		spawners = ZzSpawners.new(self)
 		spawners.load_config()
+		shop = ZzShop.new(self)
 		loot.removed.connect(spawners.on_loot_removed)
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
@@ -943,6 +949,8 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 			DotLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
 
 	place_one(player)
+	if authoritative and spawners != null and phase != Phase.PLAY:
+		spawners.grant_start_points_to(player)
 	DotLog.debug(CHANNEL, "player joined", {"id": String(player_id)})
 	player_added.emit(player_id)
 	return player
@@ -1178,6 +1186,7 @@ func _on_round_started(number: int) -> void:
 		loot.place_from_map(map_doc)
 	if spawners != null:
 		spawners.start_round(map_doc)
+		spawners.grant_start_points()
 	if boxes != null:
 		boxes.reset()
 

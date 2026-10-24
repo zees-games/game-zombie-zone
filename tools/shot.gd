@@ -361,6 +361,14 @@ func _run() -> void:
 		"ragdoll":
 			# A stand-in on their last life killed in front of a free camera, and [member _seconds]
 			# of the fall: `--seconds=0.15`, `0.6` and `2` are the start, the drop and the body at
+		"trader":
+			# The trader's menu open beside the start trader, the survivor holding some points.
+			game.config.trader_when = 2
+			game.spawners.start_round(game.map_doc)
+			local.points = 420
+			await _seconds_of(0.5)
+			_client.call("open_shop")
+			await _seconds_of(maxf(_seconds - 0.5, 0.3))
 			# rest. `--reaction=face_plant` forces one; the push is away from the camera. `--at` is where.
 			var victim = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
 			var feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)

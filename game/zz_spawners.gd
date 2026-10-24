@@ -79,19 +79,27 @@ func start_round(doc: Dictionary) -> void:
 	entities.append_array(world_pickups(doc))
 	var _added := spawner.add_entities(entities)
 
-	for source: Array in [doc.get("traders", []), game_block.get("traders", [])]:
-		for raw: Variant in source:
-			if raw is Dictionary:
-				_add_trader(raw as Dictionary, game_block.get("trader", {}) as Dictionary if game_block.get("trader") is Dictionary else {})
+	var trader_defaults: Dictionary = game_block.get("trader", {}) as Dictionary if game_block.get("trader") is Dictionary else {}
+
+	if trader_enabled():
+		for source: Array in [doc.get("traders", []), game_block.get("traders", [])]:
+			for raw: Variant in source:
+				if raw is Dictionary:
+					_add_trader(raw as Dictionary, trader_defaults)
+
+		if _traders.is_empty() and bool(shop_block().get("fallback", true)):
+			_add_trader(_fallback_trader(), trader_defaults)
 
 	spawner.begin_round(game.now(), game.round_number)
 
-	for id: StringName in _traders:
-		for slot in int(_traders[id]["slots"]):
-			_stock(id, slot)
+	if _present:
+		_stock_all()
+	game.shop_changed.emit()
 
 
 ## The `pickups` the converter wrote into the map's world manifest (weapon_*, item_*, ammo_* entities), read from the checkout's `world/`; empty for a map with no world.
+	_open = _window_open()
+	_present = _open or not trader_despawns()
 static func world_pickups(doc: Dictionary) -> Array:
 	var pack := str(doc.get("world", ""))
 	if pack == "":
@@ -132,6 +140,12 @@ func _stock(id: StringName, slot: int) -> void:
 	if rolled.is_empty():
 		var wait: float = maxf(float(t.get("restock", 0.0)), 10.0)
 		if int(_empty_tries.get(id, 0)) < 5:
+func _stock_all() -> void:
+	for id: StringName in _traders:
+		for slot in int(_traders[id]["slots"]):
+			_stock(id, slot)
+
+
 			_empty_tries[id] = int(_empty_tries.get(id, 0)) + 1
 			_restock.append({"at": game.now() + wait, "site": id, "slot": slot})
 		return
@@ -167,6 +181,7 @@ func tick() -> void:
 			_stock(r["site"], int(r["slot"]))
 		else:
 			i += 1
+	_follow_window()
 
 
 ## What using loot entry [param loot_id] costs, in points: the site's `data.price`, else `data.tier_price` looks the weapon's tier up in the config's `game: {shop: {prices: {tier: n}}}`. Zero for free and for anything the spawner did not lay.
@@ -178,6 +193,121 @@ func _price_for(item: StringName, data: Dictionary) -> int:
 	if data.has("price"):
 		return _clean_price(data["price"])
 	if data.get("tier_price", false):
+## The `game: shop:` block of the map's spawner config (operator keys: docs/operators.md).
+func shop_block() -> Dictionary:
+	var shop: Variant = spawner.game_block().get("shop", {})
+	return shop as Dictionary if shop is Dictionary else {}
+
+
+func trader_enabled() -> bool:
+	var forced: int = game.config.trader_enabled
+	return forced == 1 if forced >= 0 else bool(shop_block().get("enabled", true))
+
+
+## 0 setup only, 1 setup and a survival map's breathers, 2 always.
+func trader_when() -> int:
+	var forced: int = game.config.trader_when
+	if forced >= 0:
+		return forced
+	var v: Variant = shop_block().get("available", "always")
+	if v is int or v is float:
+		return clampi(int(v), WHEN_SETUP, WHEN_ALWAYS)
+	return {"setup": WHEN_SETUP, "waves": WHEN_WAVES, "always": WHEN_ALWAYS}.get(str(v).to_lower(), WHEN_ALWAYS)
+
+
+func trader_despawns() -> bool:
+	var forced: int = game.config.trader_despawn
+	return forced == 1 if forced >= 0 else bool(shop_block().get("despawn", true))
+
+
+## Points a survivor starts a map with: `shop.start_points` is a number, or a map with `default`, a key per difficulty (easy, normal, advanced, expert) and a key per mode (exodus, survival) that wins over the difficulty's.
+func start_points() -> int:
+	var forced: int = game.config.start_points
+	if forced >= 0:
+		return forced
+	var v: Variant = shop_block().get("start_points", 0)
+	if not v is Dictionary:
+		return _clean_price(v)
+	var d := v as Dictionary
+	var picked: Variant = d.get("default", 0)
+	var diff := str(game.config.difficulty_name())
+	if d.has(diff):
+		picked = d[diff]
+	var mode := "survival" if game.is_survival() else "exodus"
+	if d.has(mode):
+		picked = d[mode]
+	return _clean_price(picked)
+
+
+## Tops every survivor up to the starting points; a balance already higher is kept.
+func grant_start_points() -> void:
+	var start := start_points()
+	for id: StringName in game.players:
+		grant_start_points_to(game.players[id], start)
+
+
+func grant_start_points_to(player, start: int = -1) -> void:
+	var amount := start_points() if start < 0 else start
+	if int(player.points) < amount:
+		player.points = amount
+
+
+## True while the trader may sell: the setup period (before the horde runs), and by `available` a survival map's breathers or always.
+func trader_positions() -> Array:
+	var out: Array = []
+	if _present:
+		for id: StringName in _traders:
+			out.append(_traders[id]["at"])
+	return out
+
+
+func trader_open() -> bool:
+	return _open
+
+
+func _window_open() -> bool:
+	if game.phase != game.Phase.PLAY:
+		return true
+	match trader_when():
+		WHEN_ALWAYS:
+			return true
+		WHEN_WAVES:
+			var run = game.survival
+			if not game.is_survival():
+				return false
+			return run == null or run.waves == null or run.waves.stage != DotNpcDirectorWaves.Stage.HORDE
+	return false
+
+
+func _follow_window() -> void:
+	var open := _window_open() and trader_enabled()
+	if open != _open:
+		_open = open
+		DotLog.debug(CHANNEL, "the trader changed", {"open": open})
+		game.shop_changed.emit()
+	var present := _open or not trader_despawns()
+	if present == _present:
+		return
+	_present = present
+	if present:
+		_stock_all()
+		return
+	_restock.clear()
+	for lid: int in _shelf.keys():
+		game.loot.remove(lid, &"")
+
+
+## A trader for a map with none: a few metres ahead of the first survivor spawn, facing back at it.
+func _fallback_trader() -> Dictionary:
+	var at := Vector3(0.0, 0.8, 0.0)
+	var yaw := 0.0
+	if game.map != null:
+		var spot: Array = game.map.spawn("survivors", 0)
+		yaw = float(spot[1])
+		at = (spot[0] as Vector3) + Vector3(-sin(yaw), 0.0, -cos(yaw)) * float(shop_block().get("fallback_distance", 3.0)) - Vector3(0.0, 0.2, 0.0)
+	return {"id": "trader_start", "at": [at.x, at.y, at.z], "yaw": rad_to_deg(yaw)}
+
+
 		var prices: Variant = (spawner.game_block().get("shop", {}) as Dictionary).get("prices", {})
 		return _clean_price((prices as Dictionary).get(String(ZzWeapons.tier_of(item)), 0)) if prices is Dictionary else 0
 	return 0
@@ -208,6 +338,9 @@ func may_use(loot_id: int, player) -> bool:
 
 ## The game's loot entry went (used or removed): the buyer pays, and the spawner starts the item's timer (a trader's slot restocks instead).
 func on_loot_removed(loot_id: int, by: StringName) -> void:
+	if _shelf.has(loot_id) and not _open:
+		game.refused.emit(player.player_id, "The trader is closed.")
+		return false
 	var price: int = int(_price_of.get(loot_id, 0))
 	if price > 0 and game.players.has(by):
 		game.players[by].points = maxi(int(game.players[by].points) - price, 0)

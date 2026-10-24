@@ -41,3 +41,19 @@ A weapon is offered through a channel: `box`, `loot`, `cache` (the drops), `spaw
 Randomness: a draw depends on the seed, the map and the round, so the same seed gives the same items however sites tick, and every round is a new draw. Per-map scalars go in `cfg/game/game-zombie-zone/dot_map/map/<name>.yml` (or `cfg/server/...`, or `--dot-map.map.spawner_respawn_scale=2`): `spawner_enabled`, `spawner_respawn_scale`, `spawner_max_scale`, `spawner_seed` (0 derives it from the map), `spawner_pool`.
 
 The per-map blocks above are nested `game: traders:`/`spawners:` under `maps:` in `spawner.yml`. A map document may also carry its own top-level `spawners:` and `traders:` lists (`{at, yaw?, pool?, slots?, spacing?, restock?}`); the practice street has both.
+
+## The trader at the start
+
+A trader stands where the map's `traders:` say (the document or `game: traders:` per map); a map with none gets one a few metres ahead of the first survivor spawn. It sells during the setup period (the start area, before the horde runs) and, by `available`, in a survival map's breathers or always. Every key is under `game: shop:` in `cfg/game/game-zombie-zone/dot_weapon/spawner.yml` (override in `cfg/server/game/game-zombie-zone/dot_weapon/spawner.yml`, or per map under `maps:`), and the first four also have a live cvar (-1 reads the file):
+
+| Key | Cvar | Meaning |
+| --- | --- | --- |
+| `enabled` | `zz_trader` | 0 no trader on any map, 1 one |
+| `available` | `zz_trader_when` | `setup` (0) the setup period only, `waves` (1) also a survival map's breathers, `always` (2) |
+| `despawn` | `zz_trader_despawn` | true: the shelf is gone while closed; false: it stands there and says "The trader is closed." |
+| `start_points` | `zz_start_points` | points every survivor starts a map with (a higher balance is kept): a number, or a table with `default`, a key per difficulty (`easy`, `normal`, `advanced`, `expert`) and a key per mode (`exodus`, `survival`; the mode wins) |
+| `fallback`, `fallback_distance` | | the trader for a map with none, and how far ahead of the spawn |
+| `menu`, `radius` | | E near the trader opens the menu (weapons, grenades, ammo per gun and refill, supplies, deployable boxes), listed with price, owned/full state and stats |
+| `price_multiplier`, `categories`, `disabled`, `items`, `ammo`, `supplies`, `boxes`, `prices` | | prices and the list; `items: {shotgun: 300}` or `{shotgun: {enabled: false}}` per item |
+
+The price of a weapon is its tier's (`prices:`); a melee weapon is not sold unless `items` gives it a price. The ground shelf and the menu share the window, the stock pool (`trader_stock`) and the points.

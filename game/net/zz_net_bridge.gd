@@ -88,6 +88,7 @@ signal death_received(player_id: int, by: int, why: StringName, by_kind: StringN
 signal armed_received(player_id: int, weapon_id: StringName)
 
 signal notice_received(text: String)
+signal shop_received(json: String)
 
 ## Client side: the server moved this client's own camera. [param mode] is
 ## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
@@ -354,6 +355,13 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
 				notice(peer_id, why))
+		game.told.connect(func(id: StringName, text: String) -> void:
+			var peer_id := peer_for_player(session_of(id))
+			if peer_id > 0:
+				notice(peer_id, text))
+		game.shop_changed.connect(func() -> void:
+			if game.shop != null:
+				_broadcast(ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json())))
 
 		if game.pins != null:
 			game.pins.pinned.connect(func(victim: StringName, kind: StringName, attacker: int) -> void:
@@ -1035,6 +1043,12 @@ func _on_request(message: DotNetMessage) -> void:
 				say_requested.emit(
 					peer_id, StringName(str(said["channel"])), str(said["text"])
 				)
+		ZzEvents.Ask.BUY:
+			var buying := ZzEvents.read_buy(ask.reader())
+			var buyer: Variant = game.players.get(player_key(player_for_peer(peer_id)))
+
+			if bool(buying["ok"]) and buyer != null and game.shop != null:
+				var _sold: bool = game.shop.buy(buyer, str(buying["id"]))
 		ZzEvents.Ask.SPECTATE:
 			var step := ZzEvents.read_ask_spectate(ask.reader())
 
@@ -1097,6 +1111,8 @@ func _admit(peer_id: int) -> void:
 
 	_tell_the_world(peer_id)
 	_tell(peer_id, ZzEvents.Kind.PHASE, ZzEvents.write_phase(game.phase))
+	if game.shop != null:
+		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
 	_tell(peer_id, ZzEvents.Kind.CLOCK, _clock_body())
 
 
@@ -1273,6 +1289,11 @@ func ask_say(channel_id: StringName, text: String) -> void:
 		return
 
 	_ask(ZzEvents.Ask.SAY, ZzEvents.write_say(channel_id, text))
+
+
+## Asks the trader for [param item_id]. Client side.
+func ask_buy(item_id: String) -> void:
+	_ask(ZzEvents.Ask.BUY, ZzEvents.write_buy(item_id))
 
 
 ## Out, and asking to watch somebody else: +1 next, -1 previous, 0 the other camera.
@@ -1528,6 +1549,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var hurt := ZzEvents.read_hurt(reader)
 			if bool(hurt["ok"]):
 				hurt_received.emit(float(hurt["amount"]), hurt["from"])
+		ZzEvents.Kind.SHOP:
+			var shop := ZzEvents.read_shop(reader)
+			if bool(shop["ok"]):
+				shop_received.emit(str(shop["json"]))
 		ZzEvents.Kind.AMMO:
 			ammo_received.emit()
 		ZzEvents.Kind.SPLAT:
