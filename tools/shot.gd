@@ -444,11 +444,12 @@ func _run() -> void:
 			for body: DotPlayerRagdoll in yard.live():
 				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 		"action":
+			await _until_uncovered()
 			# A stand-in playing an avatar action, from the front, early in the clip.
 			var actor = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
 			var at_feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
 			actor.place_at(at_feet, 180.0)
-			await _seconds_of(0.5)
+			await _settle(actor)
 			at_feet = actor.feet()
 			local.place_at(at_feet + Vector3(0.0, 0.0, 9.0), 0.0)
 			var parts := _action.split(":")
@@ -456,7 +457,10 @@ func _run() -> void:
 			var ok: bool = actor.figure.body_node().play_action(StringName(parts[1]), bool(entry.get("loop", false)), 0.0)
 			print("action %s: played=%s" % [_action, ok])
 			_free_camera().look_at_from_position(at_feet + Vector3(0.0, 1.5, 3.0), at_feet + Vector3(0.0, 1.0, 0.0))
-			await _seconds_of(_seconds)
+			# Early and late frames of the clip: <out>_a.png now, the usual frame at the end.
+			await _pin_for(actor, 0.4)
+			await _save_extra("_a")
+			await _pin_for(actor, maxf(_seconds - 0.4, 0.1))
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
 			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
@@ -717,3 +721,33 @@ func _seconds_of(seconds: float) -> void:
 ## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.
 const _AimHolder := preload("shot_aim_holder.gd")
 const _ShotCamera := preload("shot_camera.gd")
+
+
+func _save_extra(suffix: String) -> void:
+	await RenderingServer.frame_post_draw
+	var path := ProjectSettings.globalize_path(_out.trim_suffix(".png") + suffix + ".png")
+	print("wrote ", path, ": ", error_string(get_viewport().get_texture().get_image().save_png(path)))
+
+
+## The clip must start after the loading cover lifts, or it is spent unseen.
+func _until_uncovered() -> void:
+	var gate: DotLoadGate = _client.get("gate")
+	for _i in range(1200):
+		if gate == null or gate.is_open():
+			break
+		await get_tree().process_frame
+
+
+## Stops a stand-in's bot, sets it down once and lets it settle, so the clip is not cancelled by a
+## walking or falling pose (a full-body action ends the moment its figure moves).
+func _settle(actor: Object) -> void:
+	actor.set("is_bot", false)
+	actor.place_at(actor.controller.state.position, actor.controller.state.yaw)
+	await _seconds_of(0.6)
+
+
+## Waits [param seconds], printing the figure's state at the end of it.
+func _pin_for(actor: Object, seconds: float) -> void:
+	await _seconds_of(seconds)
+	var body: Object = actor.figure.body_node()
+	print("actor action=", body.get("action"), " state=", body.get("state"))
