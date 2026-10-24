@@ -10,7 +10,6 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzAvatars := preload("zz_avatars.gd")
 const ZzVote := preload("zz_vote.gd")
 const ZzNpcs := preload("zz_npcs.gd")
-const ZzWorkbenchAuth := preload("zz_workbench_auth.gd")
 
 ## This game, as a module a dedicated server loads.
 ##
@@ -1568,5 +1567,3 @@ func _start_workbench(world: ZzGame) -> void:
 		return
 	if world.config_binder != null:
 		world.config_binder.attach(rt)
-	var auth := DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer
-	var _gate := ZzWorkbenchAuth.attach(workbench, ZzWorkbenchAuth.ticket_resolver(auth), admin_permit)
