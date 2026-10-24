@@ -34,8 +34,6 @@ const EntityMaker := preload("zz_entity_maker.gd")
 const NpcMaker := preload("zz_npc_maker.gd")
 const MapCommands := preload("zz_map_commands.gd")
 const LogicWaves := preload("zz_logic_waves.gd")
-const LogicWinLose := preload("zz_logic_winlose.gd")
-const LogicBeats := preload("zz_logic_beats.gd")
 const LogicGameRules := preload("zz_logic_gamerules.gd")
 ## A template copy of these brush classes is solid where it stands (the others are drawn only).
 const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer", "func_door"]
@@ -1070,8 +1068,6 @@ func _build_logic() -> void:
 	for cls: String in owned:
 		_r = io.register_handler(cls, _own_input)
 	_r = io.register_class("logic_waves", LogicWaves)
-	_r = io.register_class("logic_winlose", LogicWinLose)
-	_r = io.register_class("logic_beats", LogicBeats)
 	_r = io.register_class("logic_gamerules", LogicGameRules)
 	io.state_changed.connect(_on_logic_state)
 	var loaded := io.load_records(records)
@@ -1123,7 +1119,7 @@ func announcer_off() -> bool:
 	if _logic == null:
 		return false
 	for e: DotMapEntity in _logic.entities:
-		if e is LogicBeats and e.alive and e.announcer_off():
+		if e is DotMapBeats and e.alive and e.announcer_off():
 			return true
 	return false
 
@@ -1134,7 +1130,7 @@ func round_decided(won: bool) -> void:
 		return
 	_logic_to(_last_tick)
 	for e: DotMapEntity in _logic.entities:
-		if e is LogicWinLose and e.alive:
+		if e is DotMapWinLose and e.alive:
 			e.decided(_logic, won)
 	_logic.settle()
 

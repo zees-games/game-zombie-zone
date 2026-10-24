@@ -625,6 +625,7 @@ func _hear_the_world() -> void:
 		if id == &"local":
 			_on_hit(victim, amount, point, killed, headshot))
 	game.notice.connect(_on_notice)
+	game.map_ending.connect(_on_map_ending)
 	game.told.connect(func(id: StringName, text: String) -> void:
 		if id == &"local":
 			_on_notice(text))
@@ -741,6 +742,15 @@ func _on_notice(text: String) -> void:
 		hud.shout(text, 3.0)
 	if chat != null:
 		chat.notice(text)
+
+
+## A map's own ending slows the client's time for a moment; the game's clock is the server's, so only what is drawn and heard slows.
+func _on_map_ending(_won: bool, time_scale: float, seconds: float, _camera: Variant) -> void:
+	if time_scale >= 1.0 or seconds <= 0.0 or DisplayServer.get_name() == "headless":
+		return
+	Engine.time_scale = time_scale
+	var t := get_tree().create_timer(seconds * time_scale, true, false, true)
+	t.timeout.connect(func() -> void: Engine.time_scale = 1.0)
 
 
 func _on_phase(phase: int) -> void:

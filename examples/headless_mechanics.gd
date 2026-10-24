@@ -21,7 +21,7 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 12
-const CHECKS := 107
+const CHECKS := 108
 
 var _passed := 0
 var _failed := 0
@@ -872,6 +872,8 @@ func _test_zz_logic() -> void:
 	d = kinds.call("round_decide")
 	_check(d.size() == 2 and d[1][1]["won"] == false, "and Lose for the infected")
 	mech.round_decided(true)
+	var ends: Array = kinds.call("round_end")
+	_check(ends.size() == 1 and ends[0][1]["won"] == true and ends[0][1]["time_scale"] == 1.0, "a decided round tells the game how the map dresses its ending")
 	for t in range(6, 10):
 		mech.step(t)
 	_check(_texts(events) == ["Won"], "its OnWin fires once the round is decided", str(_texts(events)))
@@ -912,7 +914,7 @@ func _test_real_zz_logic() -> void:
 	if mech != null and mech.logic() != null:
 		var io := mech.logic()
 		var count := func(c: GDScript) -> int: return io.entities.filter(func(e: DotMapEntity) -> bool: return is_instance_of(e, c)).size()
-		_check(count.call(ZzMechanics.LogicWaves) > 0 and count.call(ZzMechanics.LogicWinLose) > 0 and count.call(ZzMechanics.LogicBeats) > 0,
+		_check(count.call(ZzMechanics.LogicWaves) > 0 and count.call(DotMapWinLose) > 0 and count.call(DotMapBeats) > 0,
 			"its logic_waves, logic_winlose and logic_beats are the live classes, not records")
 		mech.wave_changed(1)
 		mech.wave_changed(1, true)

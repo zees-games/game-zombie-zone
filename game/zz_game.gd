@@ -131,6 +131,10 @@ signal mover_changed(index: int)
 ## A brush the map's point_template made or killed: `(id, model, offset, alive)`; the bridge tells clients.
 signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 signal notice(text: String)
+## A map's logic_winlose dressed its ending: a time scale for some seconds and a camera point (or null).
+signal map_ending(won: bool, time_scale: float, seconds: float, camera: Variant)
+## A map's logic_beats ticked; no music ships, so this is only a signal a client may pulse to.
+signal map_beat(beat: int, downbeat: bool)
 signal refused(player_id: StringName, why: String)
 ## A word to one player that is good news (a purchase), never the denied sound.
 signal told(player_id: StringName, text: String)
@@ -713,6 +717,10 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 		"round_decide":
 			if authoritative and phase == Phase.PLAY:
 				_decide(bool(data.get("won", false)), str(data.get("why", "the map ended it")))
+		"round_end":
+			map_ending.emit(bool(data.get("won", false)), float(data.get("time_scale", 1.0)), float(data.get("seconds", 0.0)), data.get("camera"))
+		"beat":
+			map_beat.emit(int(data.get("beat", 0)), bool(data.get("downbeat", false)))
 		"score":
 			_map_score(data)
 		"ui_active":
