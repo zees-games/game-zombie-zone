@@ -137,6 +137,10 @@ signal notice(text: String)
 signal map_ending(won: bool, time_scale: float, seconds: float, camera: Variant)
 ## A map's logic_beats ticked; no music ships, so this is only a signal a client may pulse to.
 signal map_beat(beat: int, downbeat: bool)
+## A map's ambient_generic fades (`from` and `to` are -1 when the map gave none). No sound plays on a stand-in yet; this is where one would hear it.
+signal map_sound_fade(entity: int, fading_in: bool, seconds: float, from: float, to: float)
+## An ambient_generic spins its pitch up (-1 when the map gave none).
+signal map_sound_spin(entity: int, seconds: float, from: float, to: float)
 signal refused(player_id: StringName, why: String)
 ## A word to one player that is good news (a purchase), never the denied sound.
 signal told(player_id: StringName, text: String)
@@ -728,6 +732,10 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 			map_ending.emit(bool(data.get("won", false)), float(data.get("time_scale", 1.0)), float(data.get("seconds", 0.0)), data.get("camera"))
 		"beat":
 			map_beat.emit(int(data.get("beat", 0)), bool(data.get("downbeat", false)))
+		"sound_fade":
+			map_sound_fade.emit(int(data.get("entity", -1)), bool(data.get("in", false)), float(data.get("seconds", 0.0)), float(data.get("from", -1.0)), float(data.get("to", -1.0)))
+		"sound_spin":
+			map_sound_spin.emit(int(data.get("entity", -1)), float(data.get("seconds", 0.0)), float(data.get("from", -1.0)), float(data.get("to", -1.0)))
 		"score":
 			_map_score(data)
 		"ui_active":

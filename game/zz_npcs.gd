@@ -385,9 +385,6 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## corner stood there for a hundred seconds, sliding on six contacts, because the graph said the
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
-## A turned prop thinner than this is cut as a row of boxes along its length, not one box round its corners.
-const THIN_PROP := 0.6
-const THIN_STEP := 0.4
 ## Metres above the higher end a link is tested for a wall at (a counter top and a chest), and trimmed off each end of it.
 const LINK_TEST_HEIGHTS := [0.4, 0.9]
 const LINK_TEST_TRIM := 0.15
@@ -401,37 +398,6 @@ const LINK_TEST_TRIM := 0.15
 ## than a step. A gate is in the way while it is shut: the graph is built again when one opens
 ## ([param open_gates]), because a horde that pathed through a shut door would pile up against
 ## it, and one that never learned it had opened would never come through.
-## The boxes a prop of [param size] turned [param yaw] degrees at [param at] is cut out of the ground as.
-## One box round a turned door panel or fence closes the doorway beside it and leaves a mover
-## standing in the cut with no line to the graph; a thin one is cut as short boxes along its length.
-static func prop_obstacles(at: Vector3, yaw: float, size: Vector3) -> Array[AABB]:
-	var turn := Basis(Vector3.UP, deg_to_rad(yaw))
-	var half := size * 0.5
-	var out: Array[AABB] = []
-	var along := turn.z if half.z >= half.x else turn.x
-	var long_half := maxf(half.x, half.z)
-	var short_half := minf(half.x, half.z)
-	var skew := absf(absf(along.x) - 0.5) < 0.49 and short_half * 2.0 < THIN_PROP and long_half > THIN_STEP
-
-	if not skew:
-		var extent := Vector3(
-			absf(turn.x.x) * half.x + absf(turn.z.x) * half.z, half.y,
-			absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
-		out.append(AABB(at + Vector3(-extent.x, 0.0, -extent.z), Vector3(extent.x * 2.0, size.y, extent.z * 2.0)))
-		return out
-
-	var pieces := ceili(long_half * 2.0 / THIN_STEP)
-	var piece_half := long_half / float(pieces)
-	var across := turn.x if half.z >= half.x else turn.z
-	var reach := Vector2(absf(along.x) * piece_half + absf(across.x) * short_half, absf(along.z) * piece_half + absf(across.z) * short_half)
-
-	for i in pieces:
-		var centre := at + along * (-long_half + piece_half * (2.0 * float(i) + 1.0))
-		out.append(AABB(centre + Vector3(-reach.x, 0.0, -reach.y), Vector3(reach.x * 2.0, size.y, reach.y * 2.0)))
-
-	return out
-
-
 static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> DotNpcNavData:
 	var job := nav_job(doc, props_size, open_gates, extra_solids, cache, false)
 	var built := job.run_blocking()
@@ -585,8 +551,13 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 			if size.y < PROP_CUT_HEIGHT:
 				continue
 
-			for bounds in prop_obstacles(ZzMapDoc.v3(prop["at"]), float(prop.get("yaw", 0.0)), size):
-				builder.add_obstacle(bounds)
+			var at := ZzMapDoc.v3(prop["at"])
+			var turn := Basis(Vector3.UP, deg_to_rad(float(prop.get("yaw", 0.0))))
+			var half := size * 0.5
+			var extent := Vector3(
+				absf(turn.x.x) * half.x + absf(turn.z.x) * half.z, half.y,
+				absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
+			builder.add_obstacle(AABB(at + Vector3(-extent.x, 0.0, -extent.z), Vector3(extent.x * 2.0, size.y, extent.z * 2.0)))
 
 	for bounds in extra_solids:
 		builder.add_obstacle(bounds)

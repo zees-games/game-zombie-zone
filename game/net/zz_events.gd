@@ -117,7 +117,15 @@ enum Kind {
 	NAV,
 	## A brush the map's point_template copied, or removed: id, model, offset, alive.
 	COPY,
+	## A map's logic told its ears something: a sound fade or spin, or a beat (`MapFx`).
+	MAP_FX,
 }
+
+## What a MAP_FX says.
+enum MapFx { FADE, SPIN, BEAT }
+## Most entities a map names by index on the wire, and the longest fade or spin it may ask for.
+const MAP_FX_ENTITIES := 65535
+const MAP_FX_SECONDS := 600.0
 
 enum Ask {
 	## I have built my world and can receive. Tell me everything in it.
@@ -808,6 +816,46 @@ static func read_copy(r: DotNetReader) -> Dictionary:
 	var offset := _read_pos(r)
 	var alive := r.read_uint(1)
 	return {"id": id, "model": model, "offset": offset, "alive": alive != 0, "ok": r.ok()}
+
+
+## A sound fade ([param from] and [param to] are -1 when the map gave none), a spin (pitch, 1-255, -1 for none), or a beat.
+static func write_map_fx(fx: int, entity: int, flag: bool, seconds: float, from: float, to: float) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(fx, 2)
+	w.write_uint(clampi(entity, 0, MAP_FX_ENTITIES), 16)
+	w.write_bool(flag)
+	w.write_uint(clampi(int(round(clampf(seconds, 0.0, MAP_FX_SECONDS) * 10.0)), 0, 6000), 13)
+	w.write_uint(0 if from < 0.0 else clampi(int(round(from)) + 1, 1, 256), 9)
+	w.write_uint(0 if to < 0.0 else clampi(int(round(to)) + 1, 1, 256), 9)
+	return w.to_bytes()
+
+
+## Volumes travel as 0-200 (the entity's tenths of full, clamped); pitches as 1-255.
+static func write_map_fade(entity: int, fading_in: bool, seconds: float, from: float, to: float) -> PackedByteArray:
+	return write_map_fx(MapFx.FADE, entity, fading_in, seconds, -1.0 if from < 0.0 else clampf(from, 0.0, 1.0) * 200.0, -1.0 if to < 0.0 else clampf(to, 0.0, 1.0) * 200.0)
+
+
+static func write_map_spin(entity: int, seconds: float, from: float, to: float) -> PackedByteArray:
+	return write_map_fx(MapFx.SPIN, entity, true, seconds, -1.0 if from < 0.0 else clampf(from, 1.0, 255.0), -1.0 if to < 0.0 else clampf(to, 1.0, 255.0))
+
+
+static func write_map_beat(beat: int, downbeat: bool) -> PackedByteArray:
+	return write_map_fx(MapFx.BEAT, 0, downbeat, 0.0, float(clampi(beat, 0, 255)), -1.0)
+
+
+## Decoded and clamped again: a fade's volumes are 0-1, a spin's pitches 1-255, a beat's number 0-255, with -1 for none.
+static func read_map_fx(r: DotNetReader) -> Dictionary:
+	var fx := r.read_uint(2)
+	var entity := r.read_uint(16)
+	var flag := r.read_bool()
+	var seconds := float(r.read_uint(13)) / 10.0
+	var from := float(r.read_uint(9)) - 1.0
+	var to := float(r.read_uint(9)) - 1.0
+	if fx == MapFx.FADE:
+		from = -1.0 if from < 0.0 else clampf(from / 200.0, 0.0, 1.0)
+		to = -1.0 if to < 0.0 else clampf(to / 200.0, 0.0, 1.0)
+	return {"fx": fx, "entity": entity, "flag": flag, "seconds": clampf(seconds, 0.0, MAP_FX_SECONDS), "from": from, "to": to,
+		"ok": r.ok() and fx <= MapFx.BEAT}
 
 
 static func write_gate(gate: String) -> PackedByteArray:

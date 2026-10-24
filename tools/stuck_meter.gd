@@ -114,10 +114,6 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 
 	if kind == &"standin" and _queued(at, who):
 		(totals[kind] as Dictionary)["queued"] += EVERY
-
-		if still < AFTER + EVERY and cases.size() < 40:
-			cases.append("queued %s %s at %s: %s" % [kind, key, at.snappedf(0.1), _why(who)])
-
 		longest[kind] = maxf(float(longest[kind]), still)
 		return
 
@@ -207,8 +203,8 @@ func _why(who: Variant) -> String:
 		var brain = npc.brain
 		var body := npc.node as CharacterBody3D
 		var path: DotNpcPath = brain.get(&"path") if brain != null else null
-		return "%s state %s lure %s (%d active) target '%s' wish %s floor %s path %s next %s ends %s" % [
-			npc.def.id, brain.get(&"state"), (brain.get(&"lure") as Vector3).snappedf(0.1), game.horde._lures.size(), npc.target_id, (body.get(&"wish") as Vector3).snappedf(0.1) if body != null else "-",
+		return "%s state %s target '%s' wish %s floor %s path %s next %s ends %s" % [
+			npc.def.id, brain.get(&"state"), npc.target_id, (body.get(&"wish") as Vector3).snappedf(0.1) if body != null else "-",
 			body.is_on_floor() if body != null else "-", path.points.size() if path != null else -1,
 			path.current(Vector3.INF).snappedf(0.1) if path != null else "-",
 			path.points[path.points.size() - 1].snappedf(0.1) if path != null and not path.points.is_empty() else "-"] \
@@ -259,10 +255,6 @@ func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
 
 	# A special's brain names its walking states approach and retreat, never chase.
 	if state != &"chase" and state != &"investigate" and state != &"lure" and state != &"approach" and state != &"retreat":
-		return false
-
-	# At its place round a lure it stands by design.
-	if state == &"lure" and brain.has_method(&"at_lure") and brain.at_lure():
 		return false
 
 	# With no way to go (a shut gate between it and who it chases) it waits, which is the rule's

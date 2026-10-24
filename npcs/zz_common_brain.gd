@@ -132,11 +132,6 @@ func lure_to(at: Vector3) -> void:
 		_set_sight(ALERT_SIGHT)
 
 
-## Has this one reached its place round a lure? Each stops at its own ring, so a crowd spreads.
-func at_lure() -> bool:
-	return lure != Vector3.INF and flat_distance(npc.position(), lure) <= ring
-
-
 func _decide(_delta: float) -> void:
 	var b := body()
 	var c := context.conditions
@@ -210,7 +205,7 @@ func _decide(_delta: float) -> void:
 			else:
 				var gap := flat_distance(npc.position(), lure)
 
-				if gap > ring:
+				if gap > 1.8:
 					go_to(lure, npc.def.move_speed * pace, 1.0)
 					b.anim = ZzZombieBody.Anim.RUN
 					_unstick(b, lure)

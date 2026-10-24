@@ -31,8 +31,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 24
-const CHECKS := 149
+const SECTIONS := 25
+const CHECKS := 158
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -96,6 +96,7 @@ func _run() -> void:
 		await _test_a_box_reaches_the_client()
 		await _test_a_gate_reaches_the_client()
 		await _test_a_door_reaches_the_client()
+		await _test_map_cues_reach_the_client()
 		await _test_the_map_ends()
 		await _test_a_hold_reaches_the_client()
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
@@ -174,6 +175,17 @@ func _test_the_codec() -> void:
 	_check(bool(npc["ok"]) and int(npc["net_id"]) == 77 and npc["kind"] == ZzNpcs.STRANGLER and int(npc["variant"]) == 513
 		and (npc["at"] as Vector3).distance_to(Vector3(3.5, 0.0, -12.25)) < 0.05, "NPC", str(npc))
 
+	var fade := ZzEvents.read_map_fx(_r(ZzEvents.write_map_fade(7, true, 2.5, 0.0, 0.8)))
+	_check(bool(fade["ok"]) and int(fade["fx"]) == ZzEvents.MapFx.FADE and int(fade["entity"]) == 7 and bool(fade["flag"]) and absf(float(fade["seconds"]) - 2.5) < 0.01
+		and absf(float(fade["to"]) - 0.8) < 0.01 and float(fade["from"]) == 0.0, "MAP_FX fade", str(fade))
+	var spin := ZzEvents.read_map_fx(_r(ZzEvents.write_map_spin(9, 4.0, 40.0, 100.0)))
+	_check(bool(spin["ok"]) and int(spin["fx"]) == ZzEvents.MapFx.SPIN and float(spin["from"]) == 40.0 and float(spin["to"]) == 100.0, "MAP_FX spin", str(spin))
+	var beat := ZzEvents.read_map_fx(_r(ZzEvents.write_map_beat(5, true)))
+	_check(bool(beat["ok"]) and int(beat["fx"]) == ZzEvents.MapFx.BEAT and int(beat["from"]) == 5 and bool(beat["flag"]), "MAP_FX beat", str(beat))
+	var wild := ZzEvents.read_map_fx(_r(ZzEvents.write_map_fade(999999, true, 1.0e9, 7.0, -3.0)))
+	_check(bool(wild["ok"]) and float(wild["seconds"]) <= ZzEvents.MAP_FX_SECONDS and float(wild["from"]) <= 1.0 and float(wild["to"]) == -1.0 and int(wild["entity"]) <= ZzEvents.MAP_FX_ENTITIES,
+		"MAP_FX out-of-range numbers are clamped on both ends", str(wild))
+	_check(not bool(ZzEvents.read_map_fx(_r(PackedByteArray([0xFF])))["ok"]), "MAP_FX: a truncated or unknown body reads as not ok")
 	var copy := ZzEvents.read_copy(_r(ZzEvents.write_copy(412, 7, Vector3(12.5, 0.0, -3.0), true)))
 	_check(bool(copy["ok"]) and int(copy["id"]) == 412 and int(copy["model"]) == 7 and bool(copy["alive"])
 		and (copy["offset"] as Vector3).distance_to(Vector3(12.5, 0.0, -3.0)) < 0.05, "COPY", str(copy))
@@ -1026,6 +1038,39 @@ func _test_a_door_reaches_the_client() -> void:
 	await _steps(6)
 	_check(client_door.copies().is_empty(), "and goes from the client when it goes from the server")
 	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
+	_finished()
+
+
+func _test_map_cues_reach_the_client() -> void:
+	_section("a map's sound fades, spins and beats reach the client")
+	var heard_fx: Array = []
+	var on_fade := func(entity: int, fading_in: bool, seconds: float, from: float, to: float) -> void: heard_fx.append(["fade", entity, fading_in, seconds, from, to])
+	var on_spin := func(entity: int, seconds: float, from: float, to: float) -> void: heard_fx.append(["spin", entity, seconds, from, to])
+	var on_beat := func(beat: int, downbeat: bool) -> void: heard_fx.append(["beat", beat, downbeat])
+	_client_game.map_sound_fade.connect(on_fade)
+	_client_game.map_sound_spin.connect(on_spin)
+	_client_game.map_beat.connect(on_beat)
+
+	_server_game._on_map_logic_event("sound_fade", {"entity": 12, "name": "hum", "in": true, "seconds": 3.0, "from": 0.0, "to": 0.5})
+	_server_game._on_map_logic_event("sound_spin", {"entity": 12, "name": "hum", "seconds": 2.0, "from": 50.0, "to": 100.0})
+	_server_game._on_map_logic_event("beat", {"beat": 3, "downbeat": true})
+	await _steps(6)
+	var fades := heard_fx.filter(func(h: Array) -> bool: return h[0] == "fade")
+	var spins := heard_fx.filter(func(h: Array) -> bool: return h[0] == "spin")
+	var beats := heard_fx.filter(func(h: Array) -> bool: return h[0] == "beat")
+	_check(fades.size() == 1 and fades[0][1] == 12 and fades[0][2] == true and absf(float(fades[0][3]) - 3.0) < 0.11 and absf(float(fades[0][5]) - 0.5) < 0.01, "a sound_fade reaches the client with its entity, direction, seconds and volume", str(fades))
+	_check(spins.size() == 1 and spins[0][1] == 12 and float(spins[0][3]) == 50.0 and float(spins[0][4]) == 100.0, "a sound_spin reaches the client with its pitches", str(spins))
+	_check(beats.size() == 1 and beats[0][1] == 3 and beats[0][2] == true, "a beat reaches the client with its number and downbeat", str(beats))
+
+	heard_fx.clear()
+	for i in 200:
+		_server_game._on_map_logic_event("beat", {"beat": i % 256, "downbeat": false})
+	await _steps(6)
+	_check(heard_fx.size() > 0 and heard_fx.size() < 40, "a burst of 200 beats is rate-limited, not queued", str(heard_fx.size()))
+
+	_client_game.map_sound_fade.disconnect(on_fade)
+	_client_game.map_sound_spin.disconnect(on_spin)
+	_client_game.map_beat.disconnect(on_beat)
 	_finished()
 
 

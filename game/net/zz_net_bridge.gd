@@ -340,6 +340,14 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 				_broadcast(ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index)))
 		game.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void:
 			_broadcast(ZzEvents.Kind.COPY, ZzEvents.write_copy(id, model, offset, alive)))
+		game.map_sound_fade.connect(func(entity: int, fading_in: bool, seconds: float, from: float, to: float) -> void:
+			_remember_sound(ZzEvents.MapFx.FADE, entity, fading_in, to)
+			_map_fx(ZzEvents.write_map_fade(entity, fading_in, seconds, from, to)))
+		game.map_sound_spin.connect(func(entity: int, seconds: float, from: float, to: float) -> void:
+			_remember_sound(ZzEvents.MapFx.SPIN, entity, true, to)
+			_map_fx(ZzEvents.write_map_spin(entity, seconds, from, to)))
+		game.map_beat.connect(func(beat: int, downbeat: bool) -> void:
+			_map_fx(ZzEvents.write_map_beat(beat, downbeat)))
 		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
 			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
 		game.survival_changed.connect(func() -> void:
@@ -709,6 +717,7 @@ func _release_entity(session_id: int) -> void:
 
 ## A new map: the whole document, to everybody, before anything that stands on it.
 func _on_world_rebuilt() -> void:
+	_sound_last.clear()
 	if net == null or not net.is_server or game.map == null or game.map.doc.is_empty():
 		return
 
@@ -1180,6 +1189,13 @@ func _tell_the_world(peer_id: int) -> void:
 		for c: Dictionary in game.map.mechanics.copies():
 			_tell(peer_id, ZzEvents.Kind.COPY, ZzEvents.write_copy(int(c["id"]), int(c["model"]), c["offset"], true))
 
+	for key: int in _sound_last:
+		var kept: Array = _sound_last[key]
+		var fx := key / 65536
+		var end := float(kept[1])
+		_tell(peer_id, ZzEvents.Kind.MAP_FX, ZzEvents.write_map_fx(fx, key % 65536, bool(kept[0]), 0.0, end, end) if fx == ZzEvents.MapFx.SPIN
+			else ZzEvents.write_map_fx(fx, key % 65536, bool(kept[0]), 0.0, end * 200.0, end * 200.0))
+
 	for id: String in game.barricades:
 		var b: Dictionary = game.barricades[id]
 		if float(b["health"]) < float(b["max"]) or not bool(b["intact"]):
@@ -1252,6 +1268,45 @@ const SPLAT_PER_SECOND := 24.0
 const SPLAT_REACH := 4.0
 var _splat_budget := SPLAT_PER_SECOND
 var _splat_at := 0.0
+
+
+## Map-logic cues per second; a beat rate or a flapping fade past this is dropped, never queued.
+const MAP_FX_PER_SECOND := 16.0
+var _map_fx_budget := MAP_FX_PER_SECOND
+var _map_fx_at := 0.0
+
+
+## Where each sound's last fade or spin ended, so a joiner hears the state, not the history: `fx * 65536 + entity` -> [flag, end].
+var _sound_last: Dictionary = {}
+const MAX_SOUNDS_KEPT := 256
+
+
+func _remember_sound(fx: int, entity: int, flag: bool, end: float) -> void:
+	var key := fx * 65536 + clampi(entity, 0, ZzEvents.MAP_FX_ENTITIES)
+	if end >= 0.0 and (_sound_last.has(key) or _sound_last.size() < MAX_SOUNDS_KEPT):
+		_sound_last[key] = [flag, end]
+
+
+## Client: the same fade or spin the server's map ran, on the player the entity index names here (an index with none does nothing).
+func _drive_sound(kind: String, fx: Dictionary) -> void:
+	if game.map == null or game.map.sound_driver == null:
+		return
+	var data := {"entity": int(fx["entity"]), "name": "", "seconds": float(fx["seconds"]), "in": bool(fx["flag"])}
+	if float(fx["from"]) >= 0.0:
+		data["from"] = float(fx["from"])
+	if float(fx["to"]) >= 0.0:
+		data["to"] = float(fx["to"])
+	var _heard := game.map.sound_driver.handle(kind, data)
+
+
+func _map_fx(body: PackedByteArray) -> void:
+	var now := Time.get_ticks_msec() * 0.001
+	_map_fx_budget = minf(MAP_FX_PER_SECOND, _map_fx_budget + (now - _map_fx_at) * MAP_FX_PER_SECOND)
+	_map_fx_at = now
+	if _map_fx_budget < 1.0:
+		return
+	_map_fx_budget -= 1.0
+	_broadcast(ZzEvents.Kind.MAP_FX, body)
 
 
 ## Server: tells everybody but [param except_peer] that blood landed on the surface behind [param point] as
@@ -1557,6 +1612,18 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var cp := ZzEvents.read_copy(reader)
 			if bool(cp["ok"]) and game.map != null:
 				game.map.apply_copy(int(cp["id"]), int(cp["model"]), cp["offset"], bool(cp["alive"]))
+		ZzEvents.Kind.MAP_FX:
+			var fx := ZzEvents.read_map_fx(reader)
+			if bool(fx["ok"]):
+				match int(fx["fx"]):
+					ZzEvents.MapFx.FADE:
+						_drive_sound("sound_fade", fx)
+						game.map_sound_fade.emit(int(fx["entity"]), bool(fx["flag"]), float(fx["seconds"]), float(fx["from"]), float(fx["to"]))
+					ZzEvents.MapFx.SPIN:
+						_drive_sound("sound_spin", fx)
+						game.map_sound_spin.emit(int(fx["entity"]), float(fx["seconds"]), float(fx["from"]), float(fx["to"]))
+					ZzEvents.MapFx.BEAT:
+						game.map_beat.emit(int(fx["from"]), bool(fx["flag"]))
 		ZzEvents.Kind.BARRICADE:
 			var bar := ZzEvents.read_barricade(reader)
 			if bool(bar["ok"]):
