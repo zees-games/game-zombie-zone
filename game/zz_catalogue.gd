@@ -37,6 +37,8 @@ var _next: int = 0
 # A pack's `map` entry names a ZzMapDoc DOCUMENT in `scene` (the same JSON as maps/), so a
 # subscribed map goes through exactly the validation, nav graph, safe rooms and waves of the
 # game's own. Online the index answers for its session and lists none.
+## id -> the directory its document was read from (its maps pack's `hulls/` is beside it).
+var roots: Dictionary = {}
 var _index: DotContentIndex = null
 var _kinds: PackedStringArray = PackedStringArray()
 var _content_ids: Dictionary = {}    # id -> the document this follower added
@@ -48,6 +50,7 @@ var _content_docs: Dictionary = {}   # entry key -> document ({} when refused), 
 ## one built in. Forgets anything read before.
 func load_from(directory: String) -> int:
 	maps.clear()
+	roots.clear()
 	refused.clear()
 	_content_ids.clear()
 	_content_docs.clear()
@@ -105,6 +108,7 @@ func _read_directory(root: String) -> int:
 			continue
 
 		if _add(parsed.value, file):
+			roots[StringName(str(parsed.value["id"]))] = root
 			loaded += 1
 
 	return loaded

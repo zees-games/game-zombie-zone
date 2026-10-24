@@ -111,6 +111,8 @@ var visibility: Node = null
 
 ## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
 var mechanics: ZzMechanics = null
+## The world pack's hulls the document's `world_collision` names ([method attach_world_collision]).
+var world_collision: StaticBody3D = null
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
 ## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
@@ -278,6 +280,7 @@ func clear() -> void:
 	_gates.clear()
 	_barricades.clear()
 	mechanics = null
+	world_collision = null
 	_pending_movers.clear()
 	_missing.clear()
 	_bounds = AABB()
@@ -944,6 +947,67 @@ func local_world_prefix() -> String:
 	return ZzPaths.rebase(LOCAL_WORLD % [str(doc.get("world", "")), String(id())])
 
 
+## Collides with the hulls of [param world] (a [code]DotMapBspMesh[/code]) that the document's
+## `world_collision` selects: the solids the wire budget dropped from its boxes. Once per map.
+func attach_world_collision(world: RefCounted) -> void:
+	var sel: Dictionary = doc.get("world_collision", {})
+	if sel.is_empty() or world_collision != null:
+		return
+	var whole := {}
+	for m: Variant in sel.get("models", []):
+		whole[int(m)] = true
+	var flat := {}
+	for m: Variant in sel.get("flat", []):
+		if not whole.has(int(m)):
+			flat[int(m)] = true
+	var flat_height := float(sel.get("flat_height", 0.5))
+	var skips: Array[AABB] = []
+	for r: Array in sel.get("skip", []):
+		skips.append(AABB(Vector3(r[0], r[1], r[2]), Vector3(r[3] - r[0], r[4] - r[1], r[5] - r[2])))
+	var body := StaticBody3D.new()
+	body.name = "WorldCollision"
+	var kinds := PackedStringArray(["solid", "clip", "glass"])
+	for model: int in whole.keys() + flat.keys():
+		var origin: Vector3 = world.call(&"model_origin", model)
+		for h: Dictionary in world.call(&"hull_shapes", model, kinds):
+			var shape: ConvexPolygonShape3D = h["shape"]
+			var bounds := AABB(shape.points[0] + origin, Vector3.ZERO)
+			for p in shape.points:
+				bounds = bounds.expand(p + origin)
+			if flat.has(model) and bounds.size.y > flat_height:
+				continue
+			if skips.any(func(r: AABB) -> bool: return r.has_point(bounds.get_center())):
+				continue
+			var cs := CollisionShape3D.new()
+			cs.shape = shape
+			cs.position = origin
+			body.add_child(cs)
+	_put_on(body, &"world")
+	add_child(body)
+	world_collision = body
+	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count()})
+
+
+## [method attach_world_collision] on a server, which loads no world: from the maps pack's
+## `hulls/<id>` under [param root] (where the document was read), else the checkout's world.
+func build_world_collision_local(root: String = "") -> bool:
+	if doc.get("world_collision", {}).is_empty() or world_collision != null or not can_draw_world():
+		return false
+	var prefixes := PackedStringArray([ZzPaths.rebase("res://maps/hulls/" + String(id())), local_world_prefix()])
+	if root != "":
+		prefixes.insert(0, root.path_join("hulls").path_join(String(id())))
+	for prefix in prefixes:
+		if not FileAccess.file_exists(prefix + ".json"):
+			continue
+		var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+		if read.ok:
+			attach_world_collision(read.value)
+			return true
+		DotLog.warn(CHANNEL, "a map's hulls would not read", {"map": String(id()), "at": prefix, "why": read.error.message})
+	DotLog.warn(CHANNEL, "a map's hulls were not found; it collides with its boxes only", {"map": String(id())})
+	return false
+
+
 ## Draws the map with its own geometry ([member doc]'s `world`, zombie-zone-maps'
 ## tools/build_worlds.py) in place of its boxes, which still collide and still are the horde's
 ## ground: the mesh is what a survivor sees, never what anything stands on. From the checkout's
@@ -1016,6 +1080,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
+	attach_world_collision(world)
 	_light_from_world(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.

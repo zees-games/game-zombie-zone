@@ -249,6 +249,11 @@ static func validate(source: Dictionary) -> DotResult:
 		var key := str(source.get("world_key", ""))
 		if key != "" and _world_key_ok(key, world):
 			doc["world_key"] = key
+		# Which of the world's hulls collide where the boxes' budget dropped brushes (ZzMap.attach_world_collision).
+		var wc: Variant = source.get("world_collision", {})
+		if wc is Dictionary and not (wc as Dictionary).is_empty():
+			doc["world_collision"] = {"models": _ints(wc.get("models", [])), "flat": _ints(wc.get("flat", [])),
+					"flat_height": float(wc.get("flat_height", 0.5)), "skip": _boxes(wc.get("skip", []))}
 
 	var mode := str(source.get("mode", EXODUS))
 
@@ -779,6 +784,27 @@ static func _colour_list(value: Variant) -> Array:
 ## Millimetres, as a double JSON prints short.
 static func _r(value: float) -> float:
 	return snappedf(value, 0.001)
+
+
+## The numbers of a list as ints; anything else in it is dropped.
+static func _ints(value: Variant) -> Array:
+	var out: Array = []
+	if value is Array:
+		for v: Variant in value:
+			if v is int or v is float:
+				out.append(int(v))
+	return out
+
+
+## The six-number boxes (`[x0, y0, z0, x1, y1, z1]`) of a list; a malformed one is dropped.
+static func _boxes(value: Variant) -> Array:
+	var out: Array = []
+	if value is Array:
+		for v: Variant in value:
+			var f: Variant = _as_floats(v)
+			if f is Array and (f as Array).size() == 6:
+				out.append(f)
+	return out
 
 
 ## Whether [param key] is `<owner>/<world>@<version>` for exactly [param world].
