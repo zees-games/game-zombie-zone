@@ -152,6 +152,8 @@ func open(p_items: Array, p_money: int, p_state_fn: Callable) -> void:
 	money = p_money
 	state_fn = p_state_fn
 	visible = true
+	# Above the HUD's notices, which are later siblings.
+	move_to_front()
 	_signature = 0
 	_rebuild()
 	grab_focus_on_first()

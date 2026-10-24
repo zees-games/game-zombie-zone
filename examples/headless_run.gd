@@ -37,9 +37,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 43
+const SECTIONS := 44
 
-const CHECKS := 314
+const CHECKS := 319
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -80,6 +80,7 @@ func _run() -> void:
 	await _test_start_area()
 	await _test_a_common()
 	await _test_shots()
+	await _test_a_wedged_zombie()
 	await _test_zombie_loot()
 	await _test_zombie_drops()
 	await _test_toys()
@@ -329,6 +330,36 @@ func _test_a_common() -> void:
 	_finished()
 
 
+func _test_a_wedged_zombie() -> void:
+	_section("a zombie wedged against a wall is freed by the watchdog")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	# A wall the graph knows nothing of, wider than the street: the zombie walks straight into it and no hop can help.
+	var wall := StaticBody3D.new()
+	wall.collision_layer = game.world_mask()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(60.0, 4.0, 0.6)
+	shape.shape = box
+	wall.add_child(shape)
+	game.add_child(wall)
+	var wall_z := STREET.z - 5.0
+	wall.global_position = Vector3(0.0, 2.0, wall_z)
+	game.config.unstick_seconds = 0.0
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, Vector3(0.0, 0.05, wall_z - 3.0), &"test", Basis(Vector3.UP, PI))
+	npc.brain.call(&"force_target", me.player_id)
+	await _sim(game, 6.0)
+	var pinned := npc.position().z < wall_z
+	_check(pinned, "with the watchdog off it stays against the wall", "z %.2f wall %.2f" % [npc.position().z, wall_z])
+	game.config.unstick_seconds = 1.0
+	await _sim(game, 8.0)
+	_check(npc.position().z > wall_z, "with it on the zombie is put past the wall", "z %.2f wall %.2f" % [npc.position().z, wall_z])
+	_check(npc.position().distance_to(me.feet()) < 8.0 and npc.is_alive(), "and goes on toward the survivor", "%.1f m" % npc.position().distance_to(me.feet()))
+	wall.queue_free()
+	_finished()
+
+
 ## Why zombies seemed to drop nothing: the path works (a kill at certain odds lays a box and says
 ## so), and at the shipped odds a common is a one in eighty-odd drop, so a solo run that kills a
 ## few dozen mostly sees none.
@@ -437,6 +468,24 @@ func _test_zombie_drops() -> void:
 	drops.config["despawn_seconds"] = 5.0
 	var timed: int = drops.on_kill(ZzNpcs.BRUTE, STREET)[0]
 	_check(float(game.loot.entries[timed]["until"]) > 0.0 and float(game.loot.entries[id]["until"]) < 0.0, "despawn_seconds sets how long a drop lies")
+
+	# A pile of ammo and boxes on one spot is spread: none within SPACING of another, each on floor.
+	var pile: Array[int] = []
+	for n in 6:
+		pile.append(game.loot.add(ZzLoot.AMMO, &"", STREET, 60.0))
+	for n in 3:
+		pile.append(game.loot.add(ZzLoot.BOX, &"mystery", STREET, 60.0))
+	var closest := INF
+	var floating := 0
+	for a in pile.size():
+		var pa: Vector3 = game.loot.position_of(pile[a])
+		if game.ray_hit(pa + Vector3(0.0, 0.3, 0.0), pa + Vector3(0.0, -0.3, 0.0)) == Vector3.INF:
+			floating += 1
+		for b in range(a + 1, pile.size()):
+			var pb: Vector3 = game.loot.position_of(pile[b])
+			closest = minf(closest, Vector2(pa.x - pb.x, pa.z - pb.z).length())
+	_check(closest >= ZzLoot.SPACING - 0.01, "nine drops on one spot lie apart (ammo and boxes alike)", "closest %.2f" % closest)
+	_check(floating == 0, "every spread drop lies on the floor", "%d off it" % floating)
 	_finished()
 
 

@@ -31,8 +31,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 23
-const CHECKS := 141
+const SECTIONS := 24
+const CHECKS := 149
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -89,6 +89,7 @@ func _run() -> void:
 		await _test_a_head_shot_off_reaches_the_client()
 		await _test_a_down_reaches_the_client()
 		await _test_a_downed_crawl_is_predicted()
+		await _test_crouch_reaches_both_ends()
 		await _test_the_ads_rules_cross_to_the_client()
 		await _test_a_pin_reaches_the_client()
 		await _test_loot_reaches_the_client()
@@ -910,6 +911,48 @@ func _test_a_downed_crawl_is_predicted() -> void:
 	_check(roster_cfg.team_roster, "on again")
 	_check(ZzClient.health_text(_mine()) != "" and ZzClient.downs_text(_mine(), 3) != "", "the board has a health and a downs text for a replicated survivor",
 		"%s / %s" % [ZzClient.health_text(_mine()), ZzClient.downs_text(_mine(), 3)])
+	_finished()
+
+
+## Ctrl and C as key events through the real sampler, then the command on the wire: both ends crouch and lower the eye.
+func _test_crouch_reaches_both_ends() -> void:
+	_section("crouching: Ctrl and C reach the command, and both ends lower the body and the eye")
+	var sampler := DotFpsSampler.new(ZzPlayer.tunables_for(_server_game.config))
+	ZzPlayer.register_actions(sampler)
+
+	for code: Key in [KEY_CTRL, KEY_C]:
+		var press := InputEventKey.new()
+		press.physical_keycode = code
+		press.keycode = code
+		press.pressed = true
+		press.ctrl_pressed = code == KEY_CTRL
+		Input.parse_input_event(press)
+		Input.flush_buffered_events()
+		_check(sampler.sample(0.016).is_pressed(DotFpsCommand.BUTTON_CROUCH), "%s held sets the command's crouch bit" % OS.get_keycode_string(code))
+		var release := press.duplicate() as InputEventKey
+		release.pressed = false
+		release.ctrl_pressed = false
+		Input.parse_input_event(release)
+		Input.flush_buffered_events()
+		_check(not sampler.sample(0.016).is_pressed(DotFpsCommand.BUTTON_CROUCH), "%s released clears it" % OS.get_keycode_string(code))
+
+	var server_me := _server_me()
+	var mine := _mine()
+	server_me.place_at(STREET, 0.0)
+	await _steps(30)
+	var stand_server := server_me.eye_position().y - server_me.controller.state.position.y
+	var stand_client := mine.eye_position().y - mine.controller.state.position.y
+	var held := DotFpsCommand.new()
+	held.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	await _steps(40, held)
+	await _steps(10, held)
+	_check(server_me.controller.state.crouch_fraction > 0.99, "the server's survivor is crouched", str(server_me.controller.state.crouch_fraction))
+	_check(mine.controller.state.crouch_fraction > 0.99, "the client's predicted one is crouched", str(mine.controller.state.crouch_fraction))
+	var low_server := server_me.eye_position().y - server_me.controller.state.position.y
+	var low_client := mine.eye_position().y - mine.controller.state.position.y
+	_check(low_server < stand_server - 0.3 and low_client < stand_client - 0.3, "and both eyes are lower", "%.2f -> %.2f, %.2f -> %.2f" % [stand_server, low_server, stand_client, low_client])
+	await _steps(40)
+	_check(server_me.controller.state.crouch_fraction < 0.01 and mine.controller.state.crouch_fraction < 0.01, "released, both stand again")
 	_finished()
 
 

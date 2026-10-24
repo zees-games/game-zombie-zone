@@ -97,12 +97,26 @@ func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0
 	return id
 
 
-## [param at], or the nearest spot on a ring round it that is at least [constant SPACING] from every entry.
+## [param at], or the nearest spot on a ring round it that is at least [constant SPACING] from every entry, has floor under it and no wall between it and [param at].
 func _clear_spot(at: Vector3) -> Vector3:
 	for ring in 4:
 		for step in 8 if ring > 0 else 1:
 			var angle := TAU * float(step) / 8.0 + float(ring) * 0.4
 			var spot := at + Vector3(cos(angle), 0.0, sin(angle)) * SPACING * float(ring)
+
+			if ring > 0:
+				var up := Vector3(0.0, 0.5, 0.0)
+
+				if game.ray_hit(at + up, spot + up) != Vector3.INF:
+					continue
+
+				var floor_at: Vector3 = game.ray_hit(spot + Vector3(0.0, 1.0, 0.0), spot + Vector3(0.0, -2.0, 0.0))
+
+				if floor_at == Vector3.INF:
+					continue
+
+				spot = floor_at
+
 			var free := true
 			for other: Dictionary in entries.values():
 				var there: Vector3 = other["at"]

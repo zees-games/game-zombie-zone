@@ -1763,6 +1763,8 @@ func _process(delta: float) -> void:
 	rig.rotation = Vector3(pitch, yaw, roll)
 
 	var drawn := player.controller.render_state()
+	# Follows the crouch: the height taken when the camera was placed is the standing one.
+	_rig_height = player.eye_position().y - state.position.y
 	var height := ZzPlayer.EYE_DOWN if player.is_down() else _rig_height
 	rig.global_position = drawn.position + Vector3(0.0, height, 0.0)
 
@@ -1928,13 +1930,21 @@ func open_shop() -> void:
 	_aiming = false
 	_suspend_input(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_chat_shown(false)
 	_shop_menu.open(shop_state.get("items", []), player.points, _shop_item_state)
+
+
+## The chat log is its own layer above the HUD and wrote over the menu's lower cards.
+func _chat_shown(shown: bool) -> void:
+	if chat != null and chat.window != null:
+		chat.window.visible = shown
 
 
 func close_shop() -> void:
 	if not is_shop_open():
 		return
 	_shop_menu.close()
+	_chat_shown(true)
 	_suspend_input(false)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 

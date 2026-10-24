@@ -39,6 +39,8 @@ func _draw(id: StringName) -> Texture2D:
 	view.msaa_3d = Viewport.MSAA_4X
 	view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	view.add_child(model)
+	# In the tree before the camera is aimed: look_at refuses a node outside it and leaves the camera facing -Z.
+	add_child(view)
 
 	var environment := Environment.new()
 	environment.background_mode = Environment.BG_CLEAR_COLOR
@@ -62,5 +64,4 @@ func _draw(id: StringName) -> Texture2D:
 	view.add_child(key)
 	key.rotation_degrees = Vector3(-35.0, 40.0, 0.0)
 
-	add_child(view)
 	return view.get_texture()
