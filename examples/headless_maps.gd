@@ -55,6 +55,8 @@ var _failures := PackedStringArray()
 
 ## Shipped world maps whose spawner config was checked (three checks each).
 var _spawner_worlds := 0
+## Maps whose wire budget cut boxes: each adds the whole-floor check.
+var _nav_extra_maps := 0
 
 
 func _ready() -> void:
@@ -83,7 +85,7 @@ func _run() -> void:
 	var code := 1 if _failed > 0 else 0
 
 	var sections := 3 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds
+	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -442,6 +444,7 @@ func _test_map(id: StringName) -> void:
 
 	# A map whose wire budget cut boxes walks on the whole map's floor, not the document's.
 	if (nav_doc["boxes"] as Array).size() > (doc["boxes"] as Array).size():
+		_nav_extra_maps += 1
 		var plain := ZzNpcs.nav_for(doc, props_size, gates)
 		var floors_ok := open.data.points.size() >= plain.points.size() * 9 / 10
 		_check(floors_ok, "the whole map's floor gives the horde as much ground as the document's", "%d points against %d" % [open.data.points.size(), plain.points.size()])
