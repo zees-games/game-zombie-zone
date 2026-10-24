@@ -1831,7 +1831,7 @@ func _process(delta: float) -> void:
 	_present_water()
 	_present_aim()
 
-	if _drive_spectator_camera():
+	if _drive_spectator_camera(delta):
 		_present_effects(delta)
 		return
 
@@ -2178,7 +2178,7 @@ func _watched_through_eyes() -> ZzPlayer:
 	return game.players.get(game.spectate.watching(player.player_id))
 
 
-func _drive_spectator_camera() -> bool:
+func _drive_spectator_camera(delta: float) -> bool:
 	if not is_spectating():
 		if camera.get_parent() == self:
 			_place_camera()
@@ -2210,11 +2210,21 @@ func _drive_spectator_camera() -> bool:
 
 	if where != Transform3D.IDENTITY:
 		camera.global_transform = where
+		_present_end_camera(delta, _spectator_focus(where))
 
 	if hud != null:
 		hud.set_watching(game.spectate.line_for(player.player_id))
 
 	return true
+
+
+## What a spectator's ending camera looks at: the player being watched, else a point in front of the spectator camera.
+func _spectator_focus(where: Transform3D) -> Vector3:
+	var target := game.spectate.watching(player.player_id)
+	var who: Variant = game.players.get(target) if target != &"" else null
+	if who != null and is_instance_valid(who) and who.has_method("eye_position"):
+		return who.eye_position()
+	return where.origin - where.basis.z * 3.0
 
 
 func spectate_step(direction: int) -> void:

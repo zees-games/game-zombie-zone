@@ -303,23 +303,31 @@ func _run() -> void:
 				game.end_camera_rules.orbit = 30.0
 				game.map_ending.emit(true, 1.0, 20.0, stand + Vector3(5.0, 4.0, -7.0))
 			else:
+				# A free camera 5 m from a mover crossing the view at 3 m/s: the ribbon is seen from the side, with the
+				# stand-ins sent away so nothing else fills the frame.
+				_clear_view(game, local, stand)
+				var cam := _free_camera()
+				var eye := stand + Vector3(0.0, 1.7, 0.0)
+				cam.look_at_from_position(eye, eye + Vector3(0.0, 0.25, -5.0))
 				var mover := Node3D.new()
 				mover.name = "shot_mover"
 				game.map.add_child(mover)
 				var trail := DotMapTrail.new()
 				trail.follow = mover
-				trail.lifetime = 1.6
-				trail.start_width = 0.25
+				trail.lifetime = 1.4
+				trail.start_width = 0.4
 				trail.colour = Color(1.0, 0.6, 0.2)
 				game.map.add_child(trail)
 				var found: Node3D = game.map.find_child("shot_mover", true, false)
 				print("resolved ", found == mover)
+				# Real time, not a count of timer ticks: a slow software frame would otherwise outrun the trail's lifetime.
+				var began := Time.get_ticks_msec()
 				var t := 0.0
 				while t < _seconds:
-					t += 0.02
-					mover.global_position = stand + Vector3(sin(t * 3.0) * 2.5, 1.5 + cos(t * 2.0) * 0.4, -5.0 + cos(t * 3.0) * 1.5)
+					t = float(Time.get_ticks_msec() - began) / 1000.0
+					mover.global_position = eye + Vector3(-3.5 + t * 3.0, 0.4 + sin(t * 5.0) * 0.5, -5.0)
 					await get_tree().create_timer(0.02).timeout
-			await _seconds_of(_seconds if _view == "ending" else 0.1)
+			await _seconds_of(_seconds if _view == "ending" else 0.0)
 		"crawl", "crawl_third":
 			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
 			# effects strip is in the frame, and the status line saying you may crawl. The third

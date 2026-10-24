@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 44
 
-const CHECKS := 333
+const CHECKS := 336
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2212,6 +2212,21 @@ func _test_the_client_platform() -> void:
 	client.reset_slowmo()
 	client.slowmo_in_headless = false
 	_check(Engine.time_scale == 1.0, "and a reset brings it back")
+	rules.blend = 0.05
+	rules.orbit = 0.0
+	client.game.spectate.apply_view(client.player.player_id, DotSpectatorView.Mode.FIXED, &"", &"", Vector3.ZERO)
+	for _i in 4:
+		await get_tree().process_frame
+	_check(client.is_spectating(), "a dead survivor is a spectator", str(client.game.spectate.mode_of(client.player.player_id)))
+	var spec_spot := Vector3(40.0, 9.0, 31.0)
+	client.game.map_ending.emit(true, 1.0, 0.5, spec_spot)
+	for _i in 12:
+		await get_tree().process_frame
+	_check(client.end_camera_weight() > 0.99 and client.camera.global_position.distance_to(spec_spot) < 0.5,
+		"the ending camera takes a spectator's view too", "%s %s" % [str(client.end_camera_weight()), str(client.camera.global_position)])
+	await get_tree().create_timer(0.9).timeout
+	_check(client.end_camera_weight() == 0.0 and client.camera.global_position.distance_to(spec_spot) > 1.0,
+		"and a spectator's own camera comes back after it")
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame
