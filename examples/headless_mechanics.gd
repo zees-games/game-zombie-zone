@@ -459,12 +459,20 @@ func _test_brush_door(game: ZzGame, mech: ZzMechanics) -> void:
 	_check(closed_xf.is_equal_approx(shut_xf) and _body_covers(game, body, shut_at), "left alone, it closes onto the doorway again")
 
 
-## Whether a ray down through [param point] meets [param body].
+## Whether a ray down through [param point] meets [param body], past whatever else the world's hulls put above it.
 func _body_covers(game: ZzGame, body: CollisionObject3D, point: Vector3) -> bool:
-	var query := PhysicsRayQueryParameters3D.create(point + Vector3(0.0, 3.0, 0.0), point - Vector3(0.0, 3.0, 0.0))
-	query.collision_mask = 0xFFFFFFFF
-	var hit := game.get_world_3d().direct_space_state.intersect_ray(query)
-	return not hit.is_empty() and hit["collider"] == body
+	var exclude: Array[RID] = []
+	for attempt in 8:
+		var query := PhysicsRayQueryParameters3D.create(point + Vector3(0.0, 3.0, 0.0), point - Vector3(0.0, 3.0, 0.0))
+		query.collision_mask = 0xFFFFFFFF
+		query.exclude = exclude
+		var hit := game.get_world_3d().direct_space_state.intersect_ray(query)
+		if hit.is_empty():
+			return false
+		if hit["collider"] == body:
+			return true
+		exclude.append(hit["rid"])
+	return false
 
 
 ## Whether the first thing a ray from [param from] to [param to] meets is [param body].
