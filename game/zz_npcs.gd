@@ -5,6 +5,7 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzPackList := preload("zz_packs.gd")
 const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 const ZzPaths := preload("zz_paths.gd")
+const ZzNavJob := preload("zz_nav_job.gd")
 
 ## What can come at you, and the ground it walks on.
 ##
@@ -397,55 +398,41 @@ const LINK_TEST_TRIM := 0.15
 ## ([param open_gates]), because a horde that pathed through a shut door would pile up against
 ## it, and one that never learned it had opened would never come through.
 static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> DotNpcNavData:
-	if not cache:
-		return _nav_built(doc, props_size, open_gates, extra_solids)
-
-	var key := digest_of(doc, open_gates, extra_solids)
-	var path := "%s/%s-%s-v%d.nav" % [NAV_CACHE_DIR, str(doc.get("id", "map")).validate_filename(), key.left(16), NAV_CACHE_VERSION]
-	var cached: DotNpcNavData = null
-
-	if FileAccess.file_exists(path):
-		cached = DotNpcNavData.from_cache_bytes(FileAccess.get_file_as_bytes(path))
-
-	if cached != null and cached.matches(key):
-		DotLog.debug(CHANNEL, "navigation graph loaded from the cache", {"map": doc.get("id", ""), "points": cached.point_count()})
-		return cached
-
-	var built := _nav_built(doc, props_size, open_gates, extra_solids)
-	DirAccess.make_dir_recursive_absolute(NAV_CACHE_DIR)
-	var file := FileAccess.open(path, FileAccess.WRITE)
-
-	if file != null:
-		file.store_buffer(built.to_cache_bytes())
-		file.close()
-		DotWeb.sync_filesystem()
-	else:
-		DotLog.warn(CHANNEL, "the navigation cache could not be written", {"path": path, "error": FileAccess.get_open_error()})
-
+	var job := nav_job(doc, props_size, open_gates, extra_solids, cache, false)
+	var built := job.run_blocking()
+	job.flush_log()
 	return built
 
 
-static func _nav_built(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray, extra_solids: Array[AABB]) -> DotNpcNavData:
-	var info := {}
-	var strict := _nav_with(doc, props_size, open_gates, extra_solids, LINK_TEST_HEIGHTS, info)
+## The same graph as [method nav_for] as a job to be stepped or run on a thread ([ZzNavJob]).
+## [param isolate] copies the document, for a thread that must not see the game change it. The
+## props' sizes are asked here, on the calling thread, because a catalogue is not the job's to read.
+static func nav_job(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray, extra_solids: Array[AABB], cache: bool, isolate: bool) -> ZzNavJob:
+	var source := doc.duplicate(true) if isolate else doc
+	var sizes := {}
 
-	if int(info["rejected"]) == 0:
-		return strict
+	if props_size.is_valid():
+		for prop: Dictionary in source.get("props", []):
+			var id := StringName(str(prop["id"]))
 
-	# A link over a counter or through a wall is a hop nobody can make; but some maps have no other
-	# way between their rooms, and cutting those strands the posts. Keep the links that hold a map
-	# together: the strictest test that loses no post and under 1% of the ground.
-	var kept := _nav_with(doc, props_size, open_gates, extra_solids, [], info)
-	var floor_reach := _reach(kept, doc)
+			if not sizes.has(id):
+				sizes[id] = props_size.call(id)
 
-	for heights: Array in [LINK_TEST_HEIGHTS, [LINK_TEST_HEIGHTS[-1]]]:
-		var tried := strict if heights == LINK_TEST_HEIGHTS else _nav_with(doc, props_size, open_gates, extra_solids, heights, info)
-		var reach := _reach(tried, doc)
+	var job := ZzNavJob.new()
+	var known := props_size.is_valid()
+	job.make_builder = func(heights: Array, info: Dictionary) -> DotNpcNavBuilder:
+		return _builder_for(source, sizes if known else {}, known, open_gates, extra_solids, heights, info)
+	job.reach = func(nav: DotNpcNavData) -> Vector2i:
+		return _reach(nav, source)
+	job.map_id = StringName(str(source.get("id", "map")))
+	job.digest = digest_of(source, open_gates, extra_solids)
+	job.strict_heights = LINK_TEST_HEIGHTS
+	job.workers = 1
 
-		if reach.x >= floor_reach.x and reach.y * 100 >= floor_reach.y * 99:
-			return tried
+	if cache:
+		job.cache_path = "%s/%s-%s-v%d.nav" % [NAV_CACHE_DIR, str(source.get("id", "map")).validate_filename(), job.digest.left(16), NAV_CACHE_VERSION]
 
-	return kept
+	return job
 
 
 ## The posts and the points of the ground joined to the first survivor spawn on [param nav].
@@ -478,7 +465,7 @@ static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
 	return Vector2i(posts, points)
 
 
-static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> DotNpcNavData:
+static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> DotNpcNavBuilder:
 	var nav_doc: Dictionary = doc.get("nav", {})
 	var builder := DotNpcNavBuilder.new()
 	builder.spacing = float(nav_doc.get("spacing", 1.0))
@@ -519,9 +506,9 @@ static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedS
 		builder.add_obstacle(bounds)
 		solids.append(bounds)
 
-	if props_size.is_valid():
+	if sizes_known:
 		for prop: Dictionary in doc.get("props", []):
-			var size: Vector3 = props_size.call(StringName(str(prop["id"])))
+			var size: Vector3 = sizes.get(StringName(str(prop["id"])), Vector3.ZERO)
 
 			if size.y < PROP_CUT_HEIGHT:
 				continue
@@ -555,7 +542,7 @@ static func _nav_with(doc: Dictionary, props_size: Callable, open_gates: PackedS
 	if rejected > 0:
 		DotLog.debug(CHANNEL, "nav links through solid geometry dropped", {"map": doc.get("id", ""), "dropped": rejected})
 
-	return builder.build(StringName(str(doc.get("id", "map"))), digest_of(doc, open_gates, extra_solids))
+	return builder
 
 
 ## Whether the straight run from [param from] to [param to] goes through a wall: the importer

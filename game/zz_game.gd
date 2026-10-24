@@ -305,6 +305,9 @@ var remote_seconds_left: float = -1.0
 ## A client's copy of how long until the next map begins after a decided one, and which map
 ## (from ROUND); -1 while a map is being played. See [method next_round_seconds].
 var remote_next_round: float = -1.0
+
+## The navigation build's percent as the server last said (a client only), -1 for none.
+var remote_nav: int = -1
 var remote_next_map: StringName = &""
 var remote_playable: bool = false
 
@@ -1019,6 +1022,7 @@ func place_one(player: ZzPlayer) -> void:
 		player.place_at(spot[0], spot[1])
 
 	if authoritative:
+	horde.nav_async = nav_async
 		_equip(player, false)
 
 	if spectate != null:
@@ -1668,6 +1672,11 @@ func _check_round() -> void:
 	for player in survivors():
 		if player.watching or not player.is_alive():
 			continue
+	# The first graph of a map is still being built: survivors may walk, nothing else has begun.
+	if phase == Phase.READY and horde != null and horde.nav_blocks_play():
+		phase_elapsed = 0.0
+		return
+
 
 		alive += 1
 

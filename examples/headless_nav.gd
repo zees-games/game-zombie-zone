@@ -2,6 +2,8 @@ extends Node
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzNavGraph := preload("../game/zz_nav_graph.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
@@ -14,8 +16,8 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 15
-const CHECKS := 59
+const SECTIONS := 16
+const CHECKS := 71
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -134,6 +136,7 @@ func _run() -> void:
 	await _test_fallback()
 	await _test_spread(&"zz_high_school")
 	await _test_spread(&"zz_mall")
+	await _test_async_build()
 
 	for id: String in STUCK_BANDS:
 		await _test_stuck(StringName(id))
@@ -159,6 +162,73 @@ func _run() -> void:
 		await _dispose(game)
 
 	get_tree().quit(code)
+
+
+# --- The graph built off the frame ---------------------------------------------------------------
+
+const ASYNC_MAP := "zm_chaos_city"
+
+## The same graph three ways: on this thread, on worker tasks while frames go by, and in slices of a
+## frame's time. Every way must give the same points, edges and cover, the progress must only rise to 1,
+## and the frames must have run during the build (the point of doing it off the frame).
+func _test_async_build() -> void:
+	_section("the graph built off the frame is the graph built at once")
+	var path := "res://maps/%s.json" % ASYNC_MAP
+
+	if not _linked or not FileAccess.file_exists(path):
+		for i in 12:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var doc: Dictionary = ZzMapDoc.parse_json(FileAccess.get_file_as_string(path), path).value
+	var started := Time.get_ticks_msec()
+	var sync := ZzNpcs.nav_for(doc, Callable())
+	var sync_ms := Time.get_ticks_msec() - started
+
+	for mode in ["threads", "slices"]:
+		var job := ZzNpcs.nav_job(doc, Callable(), PackedStringArray(), [], false, mode == "threads")
+		job.workers = 3
+		var frames := 0
+		var rises := true
+		var last := 0.0
+		var stages := {}
+		started = Time.get_ticks_msec()
+
+		if mode == "threads":
+			job.start_thread()
+
+		while not job.advance(4.0):
+			await get_tree().process_frame
+			frames += 1
+			var now := job.progress()
+			rises = rises and now >= last
+			last = now
+			stages[job.stage()] = true
+
+		var took := Time.get_ticks_msec() - started
+		var built := job.nav
+		var same := built != null and built.source_digest == sync.source_digest and built.points == sync.points \
+			and built.edges == sync.edges and built.cover_positions == sync.cover_positions \
+			and built.cover_normals == sync.cover_normals and built.flags == sync.flags
+		_check(same, "%s: same digest, points, edges, cover and flags as the build at once" % mode,
+			"%d points, %d edges, %d cover" % [sync.point_count(), sync.edge_count(), sync.cover_positions.size()])
+		_check(rises and job.progress() == 1.0, "%s: progress only rises, and ends at 1.0" % mode,
+			"passes seen %s" % [stages.keys()])
+		_check(frames >= 2, "%s: the main loop ran %d frames during the build" % [mode, frames],
+			"%d ms against %d ms at once" % [took, sync_ms])
+		_check(job.nav != null and job.is_done(), "%s: the job reports done" % mode)
+
+	# A gate rebuild while a build runs: the older job is dropped without a trace.
+	var stale := ZzNpcs.nav_job(doc, Callable(), PackedStringArray(), [], false, true)
+	stale.start_thread()
+	stale.cancel()
+	_check(stale.nav == null, "a cancelled build leaves no graph")
+	var warned := ZzNpcs.nav_job(doc, Callable(), PackedStringArray(["no-such-gate"]), [], false, false)
+	_check(warned.run_blocking().point_count() == sync.point_count(), "a gate that is not there changes nothing")
+	_check(not warned.from_cache, "an uncached build says so")
+	_check(sync.point_count() > 100, "the map has a graph to compare")
+	_finished()
 
 
 # --- The graph ----------------------------------------------------------------------------------

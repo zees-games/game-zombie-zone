@@ -214,6 +214,15 @@ func setup_seconds() -> float:
 ## `zz_nav_cache`.
 @export var nav_cache: bool = true
 
+## Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large
+## map takes a minute or more to build. 1 builds on one background thread, more split the heavy passes
+## across that many; 0 (and every platform without threads) builds on the main thread in slices of
+## [member nav_budget_ms] a tick. `zz_nav_threads`.
+@export_range(0, 16, 1) var nav_threads: int = 2
+
+## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
+@export_range(0.5, 14.0, 0.5) var nav_budget_ms: float = 6.0
+
 ## Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its
 ## bake, and the bots and the horde use what it finds. Off plays as before the annotations.
 ## `zz_nav_notes`.

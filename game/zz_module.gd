@@ -493,6 +493,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_nav_cache", 1.0 if config.nav_cache else 0.0,
 		"Keep each built navigation graph on disk and load it next time; 0 builds every time",
 		func(value: float) -> void: config.nav_cache = value > 0.5)
+	_tunable("zz_nav_threads", float(config.nav_threads),
+		"Worker tasks a navigation build uses off the main thread; 0 builds on the main thread in slices",
+		func(value: float) -> void: config.nav_threads = clampi(int(value), 0, 16))
+	_tunable("zz_nav_budget_ms", config.nav_budget_ms,
+		"Milliseconds a tick a main-thread navigation build may take (zz_nav_threads 0, or no threads)",
+		func(value: float) -> void: config.nav_budget_ms = clampf(value, 0.5, 14.0))
 	_tunable("zz_unstick_seconds", config.unstick_seconds,
 		"Seconds a zombie may push without progress before it is nudged free; 0 turns it off",
 		func(value: float) -> void: config.unstick_seconds = clampf(value, 0.0, 30.0))

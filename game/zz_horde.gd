@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
+const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
@@ -279,24 +280,38 @@ func build_for_map(doc: Dictionary) -> DotResult:
 	# had the spawner refuse two of every three of a wave.
 	spawner.limits = ZzNpcs.limits(config, _planned_team())
 
+	_map_nav_pending = nav_async
+
+	if nav_async:
+		nav = null
+		spawner.nav = null
+
 	var built := rebuild_navigation()
 
 	if not built.ok:
 		return built
 
+	if _nav_job == null:
+		_finish_map_build()
+
+	return DotResult.success(null)
+
+
+## What waits on the first graph of a map: its route, its sleepers and wanderers, and the bake.
+func _finish_map_build() -> void:
+	_map_nav_pending = false
 	var route := PackedVector3Array()
-	for p: Array in doc.get("route", []):
+	for p: Array in _doc.get("route", []):
 		route.append(ZzMapDoc.v3(p))
 	director.flow = DotNpcDirectorFlow.new(route) if route.size() >= 2 else null
 
 	# A survival map is empty until its hold's first wave ([method populate_map]).
 	_populated = false
 
-	if str(doc.get("mode", "")) != "survival":
+	if str(_doc.get("mode", "")) != "survival":
 		populate_map()
 
 	_begin_notes()
-	return DotResult.success(null)
 
 
 ## Places the map's sleepers and wanderers, once per build.
@@ -363,6 +378,38 @@ func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
 	return notes.waypoint_for(key, from, goal)
 
 
+## Set by the hosts (the client and the server), not by a suite: the graph is then built off the
+## frame ([ZzConfig.nav_threads]) and play waits for the first one ([method nav_blocks_play]).
+var nav_async: bool = false
+
+var _nav_job: ZzNavJob = null
+var _map_nav_pending: bool = false
+var _nav_started: int = 0
+
+
+## Whether the map's first graph is still being built: nothing may spawn, and the round has not begun.
+func nav_blocks_play() -> bool:
+	return _map_nav_pending
+
+
+## Whether any graph (the first, or one rebuilt after a gate opened) is being built.
+func nav_building() -> bool:
+	return _nav_job != null
+
+
+## How far the build in progress has got, 0 to 1; 1 when none is.
+func nav_progress() -> float:
+	return _nav_job.progress() if _nav_job != null else 1.0
+
+
+## The pass the build is in ("points", "edges", "links", "cover").
+func nav_stage() -> String:
+	return _nav_job.stage() if _nav_job != null else ""
+
+
+## Builds (or starts building) the graph for the map and the gates now open. Synchronous unless
+## [member nav_async]; then the graph lands from [method tick] and a graph already in use stays in
+## use until the new one is ready.
 func rebuild_navigation() -> DotResult:
 	var props_size := Callable()
 
@@ -370,14 +417,61 @@ func rebuild_navigation() -> DotResult:
 		props_size = func(id: StringName) -> Vector3:
 			return game.props_catalogue.size_of(id) if game.props_catalogue.has(id) else Vector3.ZERO
 
-	var started := Time.get_ticks_msec()
 	var blockers: Array[AABB] = []
 
 	if game.map != null and game.map.mechanics != null:
 		blockers = game.map.mechanics.rest_blockers()
 
-	nav = ZzNpcs.nav_for(_doc, props_size, open_gates, blockers, config.nav_cache)
+	_drop_nav_job()
+	_nav_started = Time.get_ticks_msec()
+	var threads := config.nav_threads if DotPlatform.has_threads() else 0
+	var job := ZzNpcs.nav_job(_doc, props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
+	job.workers = maxi(threads, 1)
 
+	if not nav_async:
+		var graph := job.run_blocking()
+		job.flush_log()
+		return _apply_nav(graph, job)
+
+	_nav_job = job
+
+	if threads > 0:
+		job.start_thread()
+
+	DotLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
+	return DotResult.success(0)
+
+
+func _drop_nav_job() -> void:
+	if _nav_job != null:
+		_nav_job.cancel()
+		_nav_job = null
+
+
+## Once a tick: lets a sliced build work for its budget, and takes a finished graph in.
+func _poll_nav() -> void:
+	if _nav_job == null:
+		return
+
+	if not _nav_job.advance(config.nav_budget_ms):
+		return
+
+	var job := _nav_job
+	_nav_job = null
+	job.flush_log()
+	var applied := _apply_nav(job.nav, job)
+
+	if not applied.ok:
+		DotLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": applied.error.message})
+		_map_nav_pending = false
+		return
+
+	if _map_nav_pending:
+		_finish_map_build()
+
+
+func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
+	nav = graph
 	var valid := nav.validate()
 
 	if not valid.ok:
@@ -396,7 +490,7 @@ func rebuild_navigation() -> DotResult:
 
 	DotLog.info(CHANNEL, "navigation built", {
 		"map": str(_doc.get("id", "")), "points": nav.point_count(), "edges": nav.edge_count(),
-		"spawns": kept, "ms": Time.get_ticks_msec() - started,
+		"spawns": kept, "ms": Time.get_ticks_msec() - _nav_started, "cached": job.from_cache,
 	})
 	return DotResult.success(kept)
 
@@ -478,7 +572,14 @@ func open_gate(gate: String) -> void:
 	var _rebuilt := rebuild_navigation()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_drop_nav_job()
+
+
 func clear() -> void:
+	_drop_nav_job()
+	_map_nav_pending = false
 	notes.clear()
 
 	if spawner != null:
@@ -635,6 +736,11 @@ func _start_points() -> Array[Vector3]:
 ## before anything reads where a zombie is.
 func tick(delta: float, ticks: int = 1) -> void:
 	if spawner == null:
+		return
+
+	_poll_nav()
+
+	if _map_nav_pending:
 		return
 
 	var step := delta

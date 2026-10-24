@@ -113,6 +113,8 @@ enum Kind {
 	DEFIB,
 	## The trader menu: whether it is open, where, how far it reaches, and the items with their prices (JSON).
 	SHOP,
+	## The map's navigation graph is being built: percent done, or none when it is not.
+	NAV,
 }
 
 enum Ask {
@@ -437,6 +439,22 @@ static func write_phase(phase: int) -> PackedByteArray:
 static func read_phase(r: DotNetReader) -> Dictionary:
 	var phase := r.read_uint(PHASE_BITS)
 	return {"phase": phase, "ok": r.ok()}
+
+
+## 127 on the wire: no navigation build is running.
+const NAV_NONE := 127
+
+
+static func write_nav(percent: int) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(NAV_NONE if percent < 0 else clampi(percent, 0, 100), 7)
+	return w.to_bytes()
+
+
+## `percent` is -1 when no build is running.
+static func read_nav(r: DotNetReader) -> Dictionary:
+	var value := r.read_uint(7)
+	return {"percent": -1 if value > 100 else value, "ok": r.ok()}
 
 
 # --- Watching --------------------------------------------------------------

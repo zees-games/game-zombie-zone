@@ -175,6 +175,7 @@ func _ready() -> void:
 	game.register_service = _offline
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
 	game.draw_world = true
+	game.nav_async = true
 	# Before the world is added: a world that ticks itself must not run in front of a picture.
 	game.hold_clock = _covered
 	game.horde_per_frame = _offline and DisplayServer.get_name() != "headless"

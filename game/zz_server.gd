@@ -46,6 +46,7 @@ func _ready() -> void:
 	# config, so the number is already decided — and a game that picked its own would be a
 	# simulation running at one rate inside a process ticking at another.
 	game.tick_rate = Engine.physics_ticks_per_second
+	game.nav_async = true
 	add_child(game)
 
 	DotLog.info(CHANNEL, "the world is up", {

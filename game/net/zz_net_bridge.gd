@@ -801,6 +801,7 @@ func server_tick(tick: int) -> void:
 
 	if tick % CLOCK_EVERY == 0:
 		_broadcast(ZzEvents.Kind.CLOCK, _clock_body())
+		_broadcast_nav()
 		var held: Dictionary = game.survival_state()
 		if not held.is_empty():
 			_broadcast(ZzEvents.Kind.SURVIVAL, ZzEvents.write_survival(held))
@@ -1114,6 +1115,22 @@ func _admit(peer_id: int) -> void:
 	if game.shop != null:
 		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
 	_tell(peer_id, ZzEvents.Kind.CLOCK, _clock_body())
+
+	if _nav_sent >= 0:
+		_tell(peer_id, ZzEvents.Kind.NAV, ZzEvents.write_nav(_nav_sent))
+
+
+## Last percent of the navigation build sent, -1 when none was running.
+var _nav_sent: int = -1
+
+
+## Tells everybody how far the navigation build has got when it moved, and once more when it ended.
+func _broadcast_nav() -> void:
+	var now := game.nav_percent()
+
+	if now != _nav_sent:
+		_nav_sent = now
+		_broadcast(ZzEvents.Kind.NAV, ZzEvents.write_nav(now))
 
 
 ## Everything already in the world, to a joiner: every zombie, everything on the ground, every
@@ -1549,6 +1566,11 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var hurt := ZzEvents.read_hurt(reader)
 			if bool(hurt["ok"]):
 				hurt_received.emit(float(hurt["amount"]), hurt["from"])
+		ZzEvents.Kind.NAV:
+			var building := ZzEvents.read_nav(reader)
+
+			if bool(building["ok"]):
+				game.remote_nav = int(building["percent"])
 		ZzEvents.Kind.SHOP:
 			var shop := ZzEvents.read_shop(reader)
 			if bool(shop["ok"]):

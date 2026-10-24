@@ -5,6 +5,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzNavMeter := preload("zz_nav_meter.gd")
 
 ## What a survivor needs on screen, and nothing that would make a dark street less dark.
 ##
@@ -106,6 +107,7 @@ var hit_marker: DotHitMarker = null
 ## The confirmed hits' numbers, on the bodies they landed on.
 var damage_numbers: DotDamageNumbers = null
 var _status: Label = null
+var _nav_meter: PanelContainer = null
 ## The team, top left: a row per other survivor (name, a health bar, the number or DOWN /
 ## HELD / dead). The bar is drawn, not typed: as a row of block characters it came out as
 ## missing-glyph boxes on Windows, whose fallback fonts lack them (first play test).
@@ -270,6 +272,10 @@ func _build() -> void:
 	ammo.offset_top = -100.0
 	ammo.offset_bottom = -24.0
 	_root.add_child(ammo)
+
+	# While the map's graph is built: above the ammunition.
+	_nav_meter = ZzNavMeter.new()
+	_root.add_child(_nav_meter)
 
 	# What the boxes are doing, right side.
 	_effects = _label(15)
@@ -480,6 +486,7 @@ func _process(delta: float) -> void:
 	_banner.visible = _banner_for > 0.0
 	_banner_line.visible = _banner_for > 0.0
 
+	_nav_meter.show_percent(game.nav_percent())
 	_draw_top()
 	_draw_health()
 	_draw_team()
