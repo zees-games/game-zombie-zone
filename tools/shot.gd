@@ -35,6 +35,10 @@ var _aim := INF
 var _alone := false
 ## --door=INDEX:open|closed[:SIDE]: that door frozen in that state (side 1 or -1 is the way it swings), for a frame of it.
 var _doors: Array[String] = []
+## --fire=TARGETNAME:Input: that map-logic input sent before the frame (a maker's ForceSpawn, to see its copies).
+var _fires: Array[String] = []
+## --tint: the fired copies drawn flat red and their sources blue, to find them in a frame.
+var _tint := false
 ## `--reaction=<id>`: the ragdoll view forces that death reaction (sv_ragdoll_reactions).
 var _reaction := &""
 var _client: Node = null
@@ -79,6 +83,10 @@ func _ready() -> void:
 			_alone = true
 		elif arg.begins_with("--door="):
 			_doors.append(arg.trim_prefix("--door="))
+		elif arg == "--tint":
+			_tint = true
+		elif arg.begins_with("--fire="):
+			_fires.append(arg.trim_prefix("--fire="))
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--aim="):
@@ -214,6 +222,45 @@ func _run() -> void:
 			var bits := spec.split(":")
 			var opened := bits.size() > 1 and bits[1] == "open"
 			mech.apply_state(bits[0].to_int(), 0, 1000 if opened else 0, 0, false, bits[2].to_float() if bits.size() > 2 else 1.0)
+
+	if not _fires.is_empty() and game.map.mechanics != null and game.map.mechanics.logic() != null:
+		for spec in _fires:
+			var bits := spec.split(":")
+			var sent: DotResult = game.map.mechanics.logic().send(bits[0], bits[1])
+			print("fire ", spec, " -> ", sent.ok, " copies ", game.map.mechanics.copies())
+			for cid: int in (game.map.mechanics.get("_copies") as Dictionary):
+				var cn: Variant = (game.map.mechanics.get("_copies") as Dictionary)[cid]["node"]
+				var sn: Variant = (game.map.mechanics.get("_model_nodes") as Dictionary).get(int((game.map.mechanics.get("_copies") as Dictionary)[cid]["model"]))
+				var box := AABB()
+				var first := true
+				for mi in (cn as Node).find_children("*", "MeshInstance3D", true, false):
+					var a: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+					box = a if first else box.merge(a)
+					first = false
+				var sbox := AABB()
+				first = true
+				for mi in (sn as Node).find_children("*", "MeshInstance3D", true, false):
+					var a2: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+					sbox = a2 if first else sbox.merge(a2)
+					first = false
+				var vis := 0
+				for mi in (cn as Node).find_children("*", "MeshInstance3D", true, false):
+					vis += 1 if (mi as MeshInstance3D).is_visible_in_tree() else 0
+					if _tint:
+						var red := StandardMaterial3D.new()
+						red.albedo_color = Color(1, 0, 0)
+						red.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+						(mi as MeshInstance3D).material_override = red
+				if _tint and sn != null:
+					var blue := StandardMaterial3D.new()
+					blue.albedo_color = Color(0, 0, 1)
+					blue.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+					(sn as Node3D).visible = true
+					for mi in (sn as Node).find_children("*", "MeshInstance3D", true, false):
+						(mi as MeshInstance3D).material_override = blue
+				print("copy meshes visible ", vis, " in_tree ", (cn as Node3D).is_visible_in_tree())
+				print("copy aabb ", box, " src aabb ", sbox)
+				print("copy node ", cn, " ", (cn as Node3D).global_position if cn != null else "none", " src ", (sn as Node3D).global_position if sn != null else "none", " src visible ", (sn as Node3D).visible if sn != null else "-")
 
 	if _aim != INF:
 		# Written before anything else runs each frame: the stand-ins' empty commands would

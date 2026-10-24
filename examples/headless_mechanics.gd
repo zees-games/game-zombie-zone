@@ -23,7 +23,7 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 14
-const CHECKS := 130
+const CHECKS := 133
 
 var _passed := 0
 var _failed := 0
@@ -939,6 +939,23 @@ func _test_real_zz_logic() -> void:
 		_check(body is StaticBody3D and (body as Node).get_child_count() > 0, "and, as a breakable, it is solid where it stands")
 		mech.apply_copy(5000, model, Vector3.ZERO, false)
 		_check(mech.copies().is_empty(), "and goes again")
+	game.queue_free()
+	await get_tree().process_frame
+
+	game = await _game(&"zm_pathogen", true)
+	mech = game.map.mechanics
+	var tio: DotMapIO = mech.logic() if mech != null else null
+	_check(tio != null and not tio.find("template_transmission2").is_empty(), "zm_pathogen builds its transmission templates")
+	if tio != null and not tio.find("template_transmission2").is_empty():
+		var door := tio.find("transmission_door2")[0] as DotMapEntity
+		var _sent := tio.send("template_transmission2", "ForceSpawn")
+		tio.settle()
+		var made := tio.entities.filter(func(e: DotMapEntity) -> bool: return e.targetname.begins_with("transmission_door2&"))
+		_check(made.size() == 1 and (made[0] as DotMapEntity).links.any(func(l: Dictionary) -> bool: return str(l["target"]) == (made[0] as DotMapEntity).targetname),
+			"a door copy's own Kill names the copy, not the original", str(made.size()))
+		tio.advance(40)
+		var doorway: Dictionary = (mech.get("_copies") as Dictionary).get((made[0] as DotMapEntity).index, {}) if not made.is_empty() else {"body": 1}
+		_check(door.alive and doorway.is_empty(), "the copy ran its Open to the end and was killed, so no frozen door is left standing; the original stays", "%s unhandled %s alive %s" % [doorway, tio.unhandled, (made[0] as DotMapEntity).alive])
 	game.queue_free()
 	_finished += 1
 

@@ -36,7 +36,9 @@ const MapCommands := preload("zz_map_commands.gd")
 const LogicWaves := preload("zz_logic_waves.gd")
 const LogicGameRules := preload("zz_logic_gamerules.gd")
 ## A template copy of these brush classes is solid where it stands (the others are drawn only).
-const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer", "func_door"]
+const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer"]
+## A copy of one of these has no mover of its own: it is drawn where it was made and an Open reaches its end at once.
+const COPY_DOORS := ["func_door", "func_door_rotating", "func_movelinear"]
 ## Longest gap of ticks the map's logic is stepped through in one go.
 const MAX_LOGIC_STEP := 4096
 
@@ -1088,6 +1090,8 @@ func _build_logic() -> void:
 		owned[str(mv.classname).to_lower()] = true
 	for vol: Variant in _ents.volumes:
 		owned[str(vol.classname).to_lower()] = true
+	for cls: String in COPY_DOORS:
+		owned[cls] = true
 	for cls: String in owned:
 		_r = io.register_handler(cls, _own_input)
 	_r = io.register_class("logic_waves", LogicWaves)
@@ -1103,7 +1107,7 @@ func _build_logic() -> void:
 ## An input the logic delivers to one of this class's own entities (a lift, a button, a volume).
 func _own_input(e: DotMapEntity, input_name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	if not _by_entity.has(e.index):
-		return false
+		return _copy_door_input(e, input_name, activator)
 	var keep: Variant = _activator
 	if activator is Vector3:
 		_activator = activator
@@ -1112,6 +1116,20 @@ func _own_input(e: DotMapEntity, input_name: String, param: String, activator: V
 	_logic_busy -= 1
 	_activator = keep
 	return true
+
+
+## A door's copy is not a mover, so an Open on it is over at once (its OnFullyOpen then kills the streak or sprite it was made with).
+func _copy_door_input(e: DotMapEntity, input_name: String, activator: Variant) -> bool:
+	if not _copies.has(e.index) or not COPY_DOORS.has(e.classname.to_lower()):
+		return false
+	match input_name.to_lower():
+		"open", "toggle":
+			e.fire(_logic, "OnOpen", activator)
+			e.fire(_logic, "OnFullyOpen", activator)
+			return true
+		"close":
+			return true
+	return false
 
 
 func _on_logic_event(kind: String, data: Dictionary) -> void:
