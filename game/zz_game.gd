@@ -3081,6 +3081,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
+		rig.ads_rules = ZzWeapons.ads_rules()
 		player.add_child(rig)
 
 		var ready_now := rig.setup()
@@ -3107,7 +3108,6 @@ func _disarm(player: ZzPlayer) -> void:
 	player.remove_child(player.weapons)
 	player.weapons.queue_free()
 	player.weapons = null
-		rig.ads_rules = ZzWeapons.ads_rules()
 	player_disarmed.emit(player.player_id)
 
 
