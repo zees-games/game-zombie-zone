@@ -747,11 +747,7 @@ func _set_meta(world: ZzGame, kind: StringName, key: String, value: float) -> vo
 
 
 func _apply_friendly_fire(world: ZzGame) -> void:
-	if world.combat == null or world.combat.rules == null:
-		return
-
-	world.combat.rules.friendly_fire = world.config.friendly_fire_scale() > 0.0
-	world.combat.rules.friendly_scale = clampf(world.config.friendly_fire_scale(), 0.0, 2.0)
+	world.apply_friendly_fire()
 
 
 ## A number as an operator would type it: `34`, not `34.000000`.

@@ -700,6 +700,7 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 				config.friendly_fire = float(applied["value"])
 			elif applied.get("key", "") == "zz_difficulty":
 				config.difficulty = int(applied["value"])
+			apply_friendly_fire()
 		"npc_spawn":
 			if horde != null and authoritative:
 				var _made := horde.spawn_common_at(data["at"] as Vector3)
@@ -707,6 +708,15 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 			var npc: Variant = data.get("body")
 			if npc is DotNpcInstance and horde != null:
 				horde.throw_zombie(npc as DotNpcInstance, data["force"] as Vector3)
+
+
+## Pushes the config's friendly-fire scale (set by difficulty or a map's cvar) onto the combat rules.
+func apply_friendly_fire() -> void:
+	if combat == null or combat.rules == null:
+		return
+
+	combat.rules.friendly_fire = config.friendly_fire_scale() > 0.0
+	combat.rules.friendly_scale = clampf(config.friendly_fire_scale(), 0.0, 2.0)
 
 
 func _mechanics_of_map() -> Variant:

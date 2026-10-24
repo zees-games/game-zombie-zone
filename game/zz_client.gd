@@ -1631,8 +1631,12 @@ func _suspend_input(suspended: bool) -> void:
 
 
 ## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
+## Set by a headless suite, which has no pointer to capture.
+var pointer_forced := false
+
+
 func _pointer_ours() -> bool:
-	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	return pointer_forced or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 ## The hands' bits for this tick, from the held keys.
@@ -1646,9 +1650,9 @@ func _actions() -> int:
 		out |= ZzNetCommand.ACT_PILLS
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
-	return out
 	if _aim_sent():
 		out |= ZzNetCommand.ACT_AIM
+	return out
 
 
 # --- The frame -------------------------------------------------------------

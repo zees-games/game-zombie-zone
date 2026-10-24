@@ -943,6 +943,14 @@ func _fell_out(npc: DotNpcInstance) -> void:
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
 func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 	var out: Array[DotNpcInstance] = []
+	for i in crowd.near(point, radius, _near_scratch):
+		var npc := _crowd_npcs[i]
+		if npc.is_alive():
+			out.append(npc)
+
+	return out
+
+
 ## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
 ## there and not along the walk it had.
 func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
@@ -977,15 +985,6 @@ func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
 		return
 
 	b.leap(velocity)
-
-
-
-	for i in crowd.near(point, radius, _near_scratch):
-		var npc := _crowd_npcs[i]
-		if npc.is_alive():
-			out.append(npc)
-
-	return out
 
 
 ## Where the zombies round [param npc] are (dot-npc-ai's `neighbours`); spacing itself goes

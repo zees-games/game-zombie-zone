@@ -8,7 +8,7 @@ extends "shot.gd"
 var _count := 56
 var _bench_seed := 7
 var _measure := 20.0
-var _settle := 4.0
+var _warm := 4.0
 var _ring := Vector2(8.0, 40.0)
 var _clock := DotMenuFrameClock.new()
 var _rows: Array[PackedInt32Array] = []
@@ -53,7 +53,7 @@ func _run() -> void:
 	_clock.start(get_tree())
 	var start_yaw: float = local.controller.state.yaw
 	var began := Time.get_ticks_msec()
-	var total_ms := (_settle + _measure) * 1000.0
+	var total_ms := (_warm + _measure) * 1000.0
 	var draws := PackedInt32Array()
 	var objects := PackedInt32Array()
 	var prims := PackedInt32Array()
@@ -66,7 +66,7 @@ func _run() -> void:
 		if local.sampler != null:
 			local.sampler.look_at_angles(local.controller.state.yaw, -4.0)
 		await get_tree().process_frame
-		_recording = Time.get_ticks_msec() - began >= _settle * 1000.0
+		_recording = Time.get_ticks_msec() - began >= _warm * 1000.0
 		if _recording:
 			draws.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
 			objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))

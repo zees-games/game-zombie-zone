@@ -39,7 +39,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 43
 
-const CHECKS := 313
+const CHECKS := 314
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2069,6 +2069,12 @@ func _test_the_client_platform() -> void:
 		expected = slots[posmod((maxi(slots.find(before), 0)) + 1, slots.size())]
 	_check(after == expected and (slots.size() < 2 or after != before),
 		"the next-weapon step moves one slot", "slots %s, %d -> %d" % [str(slots), before, after])
+	client.pointer_forced = true
+	client._aiming = true
+	for _i in 4:
+		await get_tree().physics_frame
+	var aim_bits: int = client._actions()
+	_check((aim_bits & ZzNetCommand.ACT_AIM) != 0, "an aim press in the client reaches the command's action bits", str(aim_bits))
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame

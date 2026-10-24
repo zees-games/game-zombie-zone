@@ -1001,9 +1001,6 @@ func attach_world_collision(world: RefCounted) -> void:
 	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count()})
 
 
-## [method attach_world_collision] on a server, which loads no world: from the maps pack's
-## `hulls/<id>` under [param root] (where the document was read), else the checkout's world.
-func build_world_collision_local(root: String = "") -> bool:
 func _hull_prefixes(root: String) -> PackedStringArray:
 	var prefixes := PackedStringArray([ZzPaths.rebase("res://maps/hulls/" + String(id())), local_world_prefix()])
 	if root != "":
@@ -1027,6 +1024,9 @@ func read_nav_extra(root: String = "") -> Dictionary:
 	return {}
 
 
+## [method attach_world_collision] on a server, which loads no world: from the maps pack's
+## `hulls/<id>` under [param root] (where the document was read), else the checkout's world.
+func build_world_collision_local(root: String = "") -> bool:
 	if doc.get("world_collision", {}).is_empty() or world_collision != null or not can_draw_world():
 		return false
 	for prefix in _hull_prefixes(root):
@@ -1082,6 +1082,10 @@ func load_world() -> DotResult:
 	return DotResult.success(true)
 
 
+## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
+var world_sounds: Dictionary = {}
+
+
 ## Lays [param world] (a [code]DotMapBspMesh[/code]) over the map: its meshes in, the box batches
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
 ## drawn as boxes; they are not in the original's faces. A bake is made from the boxes, so it is
@@ -1092,6 +1096,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 
 	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
 	var mats: Dictionary = zz.get("materials", {})
+	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
 	var map_id := String(id())
 	var material_for := func(rec: Dictionary) -> Material:
 		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
@@ -1110,10 +1115,6 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 			_drawn.remove_child(child)
 			child.queue_free()
 
-## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
-var world_sounds: Dictionary = {}
-
-
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
@@ -1125,7 +1126,6 @@ var world_sounds: Dictionary = {}
 	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
 		attach_mechanics(world)
 	else:
-	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
 		attach_mechanics(world, true)
 	if mechanics != null:
 		mechanics.bind_drawn(node)
