@@ -113,6 +113,11 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
+	if only == "mend":
+		await _test_mend_gap()
+		get_tree().quit(0)
+		return
+
 	if only.begins_with("hold:"):
 		await _test_holding(StringName(only.substr(5)))
 		get_tree().quit(0)
@@ -137,6 +142,7 @@ func _run() -> void:
 	await _test_spread(&"zz_high_school")
 	await _test_spread(&"zz_mall")
 	await _test_async_build()
+	await _test_mend_gap()
 
 	for id: String in STUCK_BANDS:
 		await _test_stuck(StringName(id))
@@ -463,6 +469,42 @@ func _test_stuck(id: StringName) -> void:
 	_check(meter.ratio(&"standin", STANDIN_MIN_GOAL) <= STANDIN_BAND, "stand-ins are stuck under %d%% of their goal time" % int(STANDIN_BAND * 100.0), detail)
 	_check(meter.ratio(&"common") <= COMMON_BAND, "commons are stuck under %d%% of their goal time" % int(COMMON_BAND * 100.0), detail)
 	_check(maxf(meter.longest[&"standin"], meter.longest[&"common"]) <= LONGEST_BAND, "no mover is stuck longer than %.0f s" % LONGEST_BAND, detail)
+	_finished()
+
+
+# --- Mending round a body -----------------------------------------------------------------------
+
+func _test_mend_gap() -> void:
+	_section("a survivor standing in a broken barricade's gap is not walled in by the mend")
+	if not _linked:
+		for i in 3:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zz_high_school"])
+		c.survival_warmup_seconds = 300.0
+		c.wanderer_density = 0.0)
+	var p := game.add_player(&"u1", "Human")
+	p.health.invulnerable = true
+	game.start()
+	game.simulate(2.0)
+	await get_tree().physics_frame
+	var id := str((game.map_doc["barricades"] as Array)[0]["id"])
+	game.bash_barricade(id, 1.0e9)
+	await get_tree().physics_frame
+	var box := game.map.barricade_bounds(id)
+	(game.barricades[id] as Dictionary)["torn_at"] = -INF
+	p.place_at(Vector3(box.get_center().x, box.position.y + 0.05, box.get_center().z), 0.0)
+	await get_tree().physics_frame
+	_check(not game.barricades[id]["intact"], "the barricade is down", id)
+	_check(game.mend_barricade(0, null), "it is mended")
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var thin := (p.feet().z - box.get_center().z) if box.size.x > box.size.z else (p.feet().x - box.get_center().x)
+	var half := minf(box.size.x, box.size.z) * 0.5
+	_check(absf(thin) >= half + 0.4, "the survivor is out of the boards, a body's width clear", "%.2f from the middle of a %.2f board" % [absf(thin), half * 2.0])
 	_finished()
 
 

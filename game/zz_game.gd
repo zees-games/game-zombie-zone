@@ -2311,6 +2311,7 @@ func mend_barricade(index: int, by: ZzPlayer) -> bool:
 	map.set_barricade(id, true, fraction)
 
 	if was_broken:
+		_clear_gap(id)
 		_tell_horde_barricades()
 
 	barricade_changed.emit(id, fraction, true)
@@ -2319,6 +2320,33 @@ func mend_barricade(index: int, by: ZzPlayer) -> bool:
 		by.points += 1
 
 	return true
+
+
+## Steps survivors standing in the gap of barricade [param id] out of it, to the side they are
+## nearer: boards that come up round a body wedge it (a stand-in stood 30 s in one), and a zombie
+## in the gap already refuses the mend.
+func _clear_gap(id: String) -> void:
+	var box := map.barricade_bounds(id)
+	var across_x := box.size.x < box.size.z
+	var centre := box.get_center()
+
+	for player in survivors():
+		var at: Vector3 = player.feet()
+
+		if not player.is_alive() or at.y < box.position.y - 0.2 or at.y > box.end.y:
+			continue
+
+		if at.x < box.position.x - 0.4 or at.x > box.end.x + 0.4 or at.z < box.position.z - 0.4 or at.z > box.end.z + 0.4:
+			continue
+
+		var to := at
+
+		if across_x:
+			to.x = box.end.x + 0.5 if at.x >= centre.x else box.position.x - 0.5
+		else:
+			to.z = box.end.z + 0.5 if at.z >= centre.z else box.position.z - 0.5
+
+		player.place_at(to, player.controller.state.yaw)
 
 
 ## A client was told barricade [param id] is at [param fraction] and standing or not.
