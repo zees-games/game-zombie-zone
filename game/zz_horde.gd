@@ -122,8 +122,11 @@ var barricades: Dictionary = {}
 ## ask instead of the spawner's `npcs_near`, which walks every zombie: ninety commons each
 ## asking it for their neighbours every tick was eight thousand position reads, and most of a
 ## big map's tick.
-var _grid: Dictionary = {}
-var _grid_pos: Dictionary = {}
+## By path, like every brain: a pack shell older than the class would not know its name.
+const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
+var crowd: CrowdGrid = CrowdGrid.new(GRID)
+var _crowd_npcs: Array[DotNpcInstance] = []
+var _near_scratch := PackedInt32Array()
 const GRID := 4.0
 
 ## Grid cell -> barricade ids near it, so a zombie asks only about the ones beside it.
@@ -628,11 +631,14 @@ func _start_points() -> Array[Vector3]:
 
 # --- The tick --------------------------------------------------------------------------------
 
-## One tick. After the survivors moved and shot, before anything reads where a zombie is.
-func tick(delta: float) -> void:
+## One tick, or [param ticks] ticks of [param delta] at once. After the survivors moved and shot,
+## before anything reads where a zombie is.
+func tick(delta: float, ticks: int = 1) -> void:
 	if spawner == null:
 		return
 
+	var step := delta
+	delta *= ticks
 	_time += delta
 
 	if notes.tick():
@@ -653,7 +659,7 @@ func tick(delta: float) -> void:
 		if npc.is_alive() and npc.node is ZzZombieBody:
 			var b := npc.node as ZzZombieBody
 			b.speed_scale = speed * b.limb_speed_scale() * (game.water_pace_at(b.global_position) if game != null else 1.0)
-			b.tick(delta)
+			b.tick(step, ticks)
 
 	squads.prune()
 	_release_pending()
@@ -767,8 +773,8 @@ func survivor_ids() -> Array[StringName]:
 
 
 func _rebuild_grid() -> void:
-	_grid.clear()
-	_grid_pos.clear()
+	crowd.clear()
+	_crowd_npcs.clear()
 	var kill_y := float(_doc.get("kill_y", -30.0))
 	var fell: Array[DotNpcInstance] = []
 
@@ -782,14 +788,8 @@ func _rebuild_grid() -> void:
 			fell.append(npc)
 			continue
 
-		_grid_pos[npc.instance_id] = p
-		var key := Vector2i(floori(p.x / GRID), floori(p.z / GRID))
-		var cell: Variant = _grid.get(key)
-
-		if cell == null:
-			_grid[key] = [npc]
-		else:
-			(cell as Array).append(npc)
+		var _i := crowd.add(npc.instance_id, p)
+		_crowd_npcs.append(npc)
 
 	for npc in fell:
 		_fell_out(npc)
@@ -834,34 +834,25 @@ func _fell_out(npc: DotNpcInstance) -> void:
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
 func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 	var out: Array[DotNpcInstance] = []
-	var reach := radius * radius
-	var x0 := floori((point.x - radius) / GRID)
-	var x1 := floori((point.x + radius) / GRID)
-	var z0 := floori((point.z - radius) / GRID)
-	var z1 := floori((point.z + radius) / GRID)
 
-	for cx in range(x0, x1 + 1):
-		for cz in range(z0, z1 + 1):
-			var cell: Variant = _grid.get(Vector2i(cx, cz))
-
-			if cell == null:
-				continue
-
-			for npc: DotNpcInstance in cell:
-				if npc.is_alive() and (_grid_pos[npc.instance_id] as Vector3).distance_squared_to(point) <= reach:
-					out.append(npc)
+	for i in crowd.near(point, radius, _near_scratch):
+		var npc := _crowd_npcs[i]
+		if npc.is_alive():
+			out.append(npc)
 
 	return out
 
 
-## Where the zombies round [param npc] are, for its crowd spacing (dot-npc-ai's `neighbours`).
+## Where the zombies round [param npc] are (dot-npc-ai's `neighbours`); spacing itself goes
+## through [member crowd] without this array ([method ZzZombieBrain.separation]).
 func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
 	var out: Array = []
-	var here: Vector3 = _grid_pos.get(npc.instance_id, npc.position())
+	var own := crowd.index_of(npc.instance_id)
+	var here: Vector3 = crowd.position_of(own) if own >= 0 else npc.position()
 
-	for other in zombies_near(here, radius):
-		if other.instance_id != npc.instance_id:
-			out.append(_grid_pos[other.instance_id])
+	for i in crowd.near(here, radius, _near_scratch):
+		if i != own and _crowd_npcs[i].is_alive():
+			out.append(crowd.position_of(i))
 
 	return out
 
@@ -1913,6 +1904,7 @@ func _on_removed(npc: DotNpcInstance, _reason: StringName) -> void:
 
 
 func _on_died(npc: DotNpcInstance, by: StringName) -> void:
+	crowd.forget(crowd.index_of(npc.instance_id))
 	var health: DotHealth = npc.node.get_node_or_null(^"Health") if npc.node != null else null
 	var fatal: DotDamage = health.last_fatal if health != null else null
 	var b := npc.node as ZzZombieBody

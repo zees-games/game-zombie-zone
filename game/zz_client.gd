@@ -177,6 +177,7 @@ func _ready() -> void:
 	game.draw_world = true
 	# Before the world is added: a world that ticks itself must not run in front of a picture.
 	game.hold_clock = _covered
+	game.horde_per_frame = _offline and DisplayServer.get_name() != "headless"
 	_hold_for_maps()
 	add_child(game)
 

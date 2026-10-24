@@ -144,6 +144,23 @@ func neighbours(radius: float) -> Array:
 	return h.call(&"neighbour_positions", npc, radius * 2.0)
 
 
+## Spacing straight off the horde's crowd grid: the same push as [method neighbours] fed to
+## `DotNpcAiSteering.separate`, without building the array each think.
+func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
+	var h := horde()
+	var grid: Variant = h.get(&"crowd") if h != null and npc != null and npc.is_alive() else null
+
+	if grid == null:
+		return super(here, spacing, right)
+
+	var own: int = grid.index_of(npc.instance_id)
+
+	if own < 0:
+		return super(here, spacing, right)
+
+	return grid.separation(own, here, spacing, spacing * 2.0, right)
+
+
 ## Walks the graph to [param to], kept apart from the crowd.
 func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 	steer_with_spacing(to, speed, context.delta if context != null else 0.016, spacing)

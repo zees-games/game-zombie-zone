@@ -233,6 +233,11 @@ func setup_seconds() -> float:
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
 @export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
 
+## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
+## rather than once per physics step: a slow frame then pays for the crowd once, not once per
+## catch-up step. 0 keeps it on every step (servers and headless runs always do).
+@export_range(0, 8) var horde_frame_ticks: int = 4
+
 ## Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in
 ## place of a post at a window. `zz_bot_hold_chokes`.
 @export var bot_hold_chokes: bool = true

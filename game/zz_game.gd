@@ -3135,6 +3135,29 @@ func now() -> float:
 	return float(_tick) / float(maxi(tick_rate, 1))
 
 
+## Set by a drawn solo client: the horde moves once per drawn frame ([member ZzConfig.horde_frame_ticks]).
+var horde_per_frame: bool = false
+var _horde_frame: int = -1
+var _horde_owed: int = 0
+
+
+func _tick_horde(delta: float) -> void:
+	var most := config.horde_frame_ticks if config != null else 0
+
+	if not horde_per_frame or most <= 0 or external_tick:
+		horde.tick(delta)
+		return
+
+	# Ticks beyond the cap are dropped: under a slow frame the crowd slows instead of spiralling.
+	_horde_owed = mini(_horde_owed + 1, most)
+	var frame := Engine.get_process_frames()
+
+	if frame != _horde_frame:
+		_horde_frame = frame
+		horde.tick(delta, _horde_owed)
+		_horde_owed = 0
+
+
 func _step(delta: float) -> void:
 	_advance_phase(delta)
 
@@ -3168,7 +3191,7 @@ func _step(delta: float) -> void:
 	if authoritative:
 		_advance_toys(delta)
 		if horde != null:
-			horde.tick(delta)
+			_tick_horde(delta)
 		if pins != null:
 			pins.advance(delta)
 		if hazards != null:

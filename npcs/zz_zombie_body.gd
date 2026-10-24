@@ -172,9 +172,10 @@ func set_stride(ticks: int) -> void:
 
 ## The horde's call every tick: moves now, or counts the tick toward the next strided move. A
 ## body in the air or being shoved moves every tick whatever its stride.
-func tick(delta: float) -> void:
-	_waited += 1
-	ticks_since_leap += 1
+## [param count] steps of [param delta] each at once (a horde moved once per drawn frame).
+func tick(delta: float, count: int = 1) -> void:
+	_waited += count
+	ticks_since_leap += count
 
 	if _waited < stride and not flying and push.length_squared() < 0.0004:
 		landed_this_tick = false

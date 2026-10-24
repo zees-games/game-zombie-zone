@@ -88,6 +88,23 @@ Measured `--from=10 --profile`, seed 1, before (all four repos stashed, VM load 
 - **Crowd detail** (client, Video, `crowd_detail`: Low, Normal, High; `npcs/zz_zombie_lod.gd`): a zombie is animated every frame within 22 m, every second to 45 m and every fourth past it, every eighth outside the view, casts no shadow past 30 m and is not drawn past 120 m (Normal; Low 12/25/15/70, High 40/80/60/160). Normal is the old animation distances, so near zombies look the same.
 - **`zz_zombie_think_range`** (server, default 1) scales the distances past which zombies think and step less often. It saves little in this benchmark: a crowd in reach swings, and a swinging zombie thinks every tick.
 
+**The crowd's tick (zz-crowd-tick, 2026-10-24).** Same bench and box (shared with other runs; best of four baseline runs shown), plus the tick by part headless on the dev VM:
+
+| zm_abandoned_mall, 56 zombies | fps | frame ms (p99) | physics ms (steps) | render ms | brains ms/tick | bodies ms/tick |
+| --- | --- | --- | --- | --- | --- | --- |
+| before | 9.6 | 104.0 (150) | 70.0 (6.2) | 27.8 | 3.13 | 1.71 |
+| spacing grid | - | - | - | - | 3.03 | 1.46 |
+| horde per frame (solo) | 15.9 | 62.7 (83) | 28.1 (3.8) | 28.3 | - | - |
+| both, with the dropped swing tier | 15.9 | 63.1 (94) | 27.7 (3.8) | 29.0 | 3.07 | 1.80 |
+
+- **Crowd spacing asks a spatial hash** (dot-npc-ai's `DotNpcAiCrowdGrid`, through the brain's `separation` hook): the horde's grid holds each zombie's index, and a brain's spacing reads its neighbours' stored positions instead of a list built per question. Small: about 0.1 ms off the brains and 0.25 off the bodies.
+- **Solo, the horde ticks once a drawn frame** (`ZzGame._tick_horde`, `ZzConfig.horde_frame_ticks`, default 4): the physics steps a slow frame owes still move survivors, but the horde ticks once with the time they covered (at most four ticks of it). The spiral was the horde's 7 ms paid per step; now it is paid per frame, so physics fell from 70 to 28 ms and fps rose 1.66 times at the same render. Online and headless nothing changes: the server keeps one horde tick a step.
+- **Tried and dropped: a swinging zombie thinking every second tick.** Within the noise on both machines, and it moved which zombies reach the chokes in `headless_nav`.
+- **No shared flow field**: path steps were about 0.6 ms of the 7.9 ms headless tick (brains 3.0, bodies 1.5, senses 0.7, survivor 0.95, stand-ins 0.6, weapons 0.35), so one field for the crowd would save under a tenth.
+- **Jolt** (`3d/physics_engine`, not switched): the same tick headless, bodies 1.80 → 1.27 ms and the survivor 0.99 → 0.88, physics 3.8 → 3.3 ms; the web templates include it. It changes how a body slides along and steps up walls, so switching it is a decision of its own, after a play-test.
+
+60 fps here is out of reach on this box: under Xvfb the render alone is 28 ms. On the box the frame is now render plus one horde tick plus the physics steps' survivors and stand-ins.
+
 What is left is the tick: about 120 µs of script per zombie per tick on this CPU (thinking 70, of which the path step is 55 µs a call, the body's sweep 55 µs, senses 17), so 56 zombies in reach are 7 ms of the 10 ms tick, and the solo player and stand-ins most of the rest. 60 fps needs that tick near 4 ms; 100 needs it near 2 ms and a render near 7, which is the crowd stepped in native code, not more distance tiers. The physics engine's own `move_and_slide` costs 40% less under Jolt in a 56-capsule measurement; the game still runs GodotPhysics3D. Under Xvfb the laptop's render is about 6 ms more than its GPU time (15.6 against 7.7 with no zombies), so a frame on a desktop is faster than these numbers.
 
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
