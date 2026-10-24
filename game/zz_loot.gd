@@ -23,6 +23,7 @@ const MEDKIT := &"medkit"
 const PILLS := &"pills"
 const THROWABLE := &"throwable"
 const BOX := &"box"
+const DEFIB := &"defib"
 
 ## How close to the line of sight a thing must be to be the one looked at, in metres.
 const AIM_SLACK := 0.55
@@ -188,8 +189,8 @@ func use(id: int, player) -> void:
 		AMMO:
 			# A map's own pile stays for the next person; one a spawner laid or a shop prices is used up,
 			# so it is charged and its site respawns it.
-			var spent: bool = price_of(id) > 0 or (game.spawners != null and game.spawners.lays(id))
-			var filled := give_ammo(player)
+			var spent: bool = price_of(id) > 0 or e.has("fraction") or (game.spawners != null and game.spawners.lays(id))
+			var filled := give_ammo(player, float(e.get("fraction", 1.0)))
 			game.ammo_given.emit(player.player_id)
 			if spent and filled > 0:
 				remove(id, player.player_id)
@@ -204,6 +205,12 @@ func use(id: int, player) -> void:
 				game.refused.emit(player.player_id, "You already have pills.")
 				return
 			player.pills = 1
+			remove(id, player.player_id)
+		DEFIB:
+			if player.defibs >= 1:
+				game.refused.emit(player.player_id, "You already have a defibrillator.")
+				return
+			player.defibs = game.config.defib_charges
 			remove(id, player.player_id)
 		BOX:
 			if game.config.box_carry > 0:
@@ -220,8 +227,8 @@ func use(id: int, player) -> void:
 			game.boxes.open(item, player, at)
 
 
-## Fills every ammunition pool [param player] carries.
-static func give_ammo(player) -> int:
+## Adds [param fraction] of every ammunition pool's cap [param player] carries (1: fills them).
+static func give_ammo(player, fraction: float = 1.0) -> int:
 	if player.weapons == null or player.weapons.arsenal == null:
 		return 0
 
@@ -229,7 +236,7 @@ static func give_ammo(player) -> int:
 	var total := 0
 
 	for pool in arsenal.ammo().pools():
-		total += arsenal.add_ammo(pool, maxi(arsenal.ammo().cap(pool), 1))
+		total += arsenal.add_ammo(pool, maxi(ceili(arsenal.ammo().cap(pool) * fraction), 1))
 
 	return total
 

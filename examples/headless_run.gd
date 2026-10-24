@@ -37,9 +37,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 40
+const SECTIONS := 41
 
-const CHECKS := 284
+const CHECKS := 294
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -81,6 +81,7 @@ func _run() -> void:
 	await _test_a_common()
 	await _test_shots()
 	await _test_zombie_loot()
+	await _test_zombie_drops()
 	await _test_toys()
 	await _test_the_room_wakes()
 	await _test_downs()
@@ -373,6 +374,71 @@ func _test_zombie_loot() -> void:
 
 
 func _test_shots() -> void:
+## Zombies drop ammunition and health by default, a mutant more than a common, and the settings are honoured.
+func _test_zombie_drops() -> void:
+	_section("zombies drop ammo and health: commons a little, mutants more, all configurable")
+	var game := await _team(1, _quiet)
+	var told: Array = []
+	game.loot.added.connect(func(_id: int, kind: StringName, _item: StringName, _at: Vector3) -> void:
+		told.append(kind))
+	var drops: Object = game.drops
+	_check(drops != null and bool(drops.config["enabled"]), "the shipped drops are on")
+	game.config.max_boxes = 100000
+	drops.config["max_lying"] = 100000
+	drops.config["despawn_seconds"] = 0.0
+	var mutants: Array[StringName] = [ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM, ZzNpcs.SPITTER,
+		ZzNpcs.RIDER, ZzNpcs.SCREAMER, ZzNpcs.CRAWLER, ZzNpcs.RIOT, ZzNpcs.BRUTE]
+	var count := func(kind: StringName, n: int) -> Dictionary:
+		var got := {"all": 0, "ammo": 0, "health": 0}
+		for _i in n:
+			for id: int in drops.on_kill(kind, STREET):
+				got["all"] += 1
+				got["ammo" if game.loot.kind_of(id) == ZzLoot.AMMO else "health"] += 1
+		return got
+	var commons: Dictionary = count.call(ZzNpcs.COMMON, 600)
+	_check(commons["ammo"] > 0 and commons["health"] > 0 and commons["all"] < 600 * 0.4,
+		"600 commons drop some ammo and some health, a small amount", str(commons))
+	var richer := 0
+	for kind in mutants:
+		var got: Dictionary = count.call(kind, 600)
+		if got["all"] > commons["all"] * 1.5 and got["ammo"] > 0 and got["health"] > 0:
+			richer += 1
+	_check(richer == mutants.size(), "every mutant type drops more than a common, ammo and health both", "%d of %d" % [richer, mutants.size()])
+	var riot: Dictionary = count.call(ZzNpcs.RIOT, 600)
+	var crawler: Dictionary = count.call(ZzNpcs.CRAWLER, 600)
+	_check(riot["all"] > crawler["all"] * 1.5, "each type has its own ratio (riot over crawler)", "%d vs %d" % [riot["all"], crawler["all"]])
+	_check(drops.item_weights(ZzNpcs.RIOT)[&"ammo"] > drops.item_weights(ZzNpcs.STRANGLER)[&"ammo"]
+		and drops.item_weights(ZzNpcs.STRANGLER)[&"pills"] > drops.item_weights(ZzNpcs.RIOT)[&"pills"],
+		"per-category weights differ per type (riot ammo-heavy, strangler health-heavy)")
+	# A real kill through the game lays loot when the odds are certain.
+	drops.config["classes"]["common"]["chance"] = 1.0
+	var before := told.size()
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
+	await _sim(game, 0.1)
+	_hurt_npc(game, npc, 10000.0)
+	await _sim(game, 0.1)
+	_check(not npc.is_alive() and told.size() > before, "a real common kill lays a drop and the LOOT event goes out", "%d new" % (told.size() - before))
+	drops.config["multiplier"] = 3.0
+	var tripled: Dictionary = count.call(ZzNpcs.COMMON, 100)
+	_check(tripled["all"] >= 290, "the global multiplier scales the drops", str(tripled))
+	drops.config["multiplier"] = 1.0
+	drops.config["types"]["common"] = {"min": 2, "max": 2, "categories": {"ammo": 0.0}, "items": {"medkit": 1.0}}
+	var only_health: Dictionary = count.call(ZzNpcs.COMMON, 50)
+	_check(only_health["ammo"] == 0 and only_health["all"] == 100, "a per-type override sets the amount (2) and zeroes a category", str(only_health))
+	drops.config["types"].erase("common")
+	drops.config["enabled"] = false
+	var off: Dictionary = count.call(ZzNpcs.BRUTE, 20)
+	_check(off["all"] == 0, "enabled false drops nothing")
+	drops.config["enabled"] = true
+	var id: int = drops.on_kill(ZzNpcs.BRUTE, STREET)[0]
+	drops.config["despawn_seconds"] = 5.0
+	var timed: int = drops.on_kill(ZzNpcs.BRUTE, STREET)[0]
+	_check(float(game.loot.entries[timed]["until"]) > 0.0 and float(game.loot.entries[id]["until"]) < 0.0, "despawn_seconds sets how long a drop lies")
+	_finished()
+
+
 	_section("shots kill zombies and the kill is credited")
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]

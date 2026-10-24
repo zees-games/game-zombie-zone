@@ -9,6 +9,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
+const ZzDrops := preload("zz_drops.gd")
 const ZzSpawners := preload("zz_spawners.gd")
 const ZzMap := preload("zz_map.gd")
 const ZzPacks := preload("zz_packs.gd")
@@ -194,6 +195,10 @@ var bots: ZzBots = null
 ## player id -> [ZzPlayer].
 var players: Dictionary = {}
 
+## What a dead zombie leaves (ammunition, health); server only.
+var drops: ZzDrops = null
+## The trader's menu (zz_shop.gd), server only.
+var shop = null
 ## dot-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do survivors and stand-ins block each other). Bound by the module
 ## (REPLICATED) and followed by a client through its link.
@@ -340,6 +345,8 @@ func _ready() -> void:
 		catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
 			ZzWorkshop.accepted_map_kinds())
 		var _loaded := catalogue.load_from(config.map_directory)
+		drops = ZzDrops.new(self)
+		drops.load_config()
 		# Solo in the client shell: the map packs it mounted for this game, which a server
 		# would have named. See [method solo_map_dirs].
 		for root in solo_map_dirs("maps"):
@@ -2900,6 +2907,9 @@ func _step(delta: float) -> void:
 
 			if authoritative:
 				_advance_hands(player, delta)
+	if drops != null:
+		var _laid := drops.on_kill(kind, at)
+
 
 		if authoritative and not player.is_bot:
 			player.session_seconds += delta
