@@ -66,6 +66,8 @@ const HIT_MARGIN := 0.06
 
 ## How much deeper than drawn a ground slab collides (see `_build_boxes`).
 const GROUND_DEPTH := 1.8
+## An invisible slab this far above everything playable is a sky box: nobody reaches it, so it does not collide.
+const SKY_CLEARANCE := 30.0
 
 ## How far past the playable ground (the nav floors, spawns and route) the invisible boundary
 ## stands, its thickness, and how far above the highest floor it reaches. A converted map's
@@ -114,6 +116,8 @@ var visibility: Node = null
 var mechanics: ZzMechanics = null
 ## The world pack's hulls the document's `world_collision` names ([method attach_world_collision]).
 var world_collision: StaticBody3D = null
+## The clip-kind hulls of the same world, on the clip layer.
+var world_clip: StaticBody3D = null
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
 ## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
@@ -168,6 +172,8 @@ var gravity: float = 20.0
 
 var _solid: StaticBody3D = null
 var _furniture: StaticBody3D = null
+## Invisible solids (player clip, nodraw): movers stop at them, shots and sight pass.
+var _clip: StaticBody3D = null
 var _drawn: Node3D = null
 var _environment: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
@@ -216,6 +222,11 @@ func build(p_doc: Dictionary) -> DotResult:
 	_furniture.name = "Furniture"
 	add_child(_furniture)
 	_put_on(_furniture, &"prop")
+
+	_clip = StaticBody3D.new()
+	_clip.name = "Clip"
+	add_child(_clip)
+	_put_on(_clip, &"clip")
 
 	if draw_world:
 		_drawn = Node3D.new()
@@ -298,6 +309,8 @@ func clear() -> void:
 	toys = null
 	_solid = null
 	_furniture = null
+	_clip = null
+	world_clip = null
 	_drawn = null
 	_environment = null
 	_sun = null
@@ -470,6 +483,7 @@ func _build_boundary() -> void:
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
+	var sky_floor := playable_region().end.y + SKY_CLEARANCE
 
 	for box: Dictionary in doc["boxes"]:
 		var size := ZzMapDoc.v3(box["size"])
@@ -505,7 +519,12 @@ func _build_boxes() -> void:
 			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "asphalt" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
-			_solid.add_child(shape)
+			if bool(box.get("visible", true)):
+				_solid.add_child(shape)
+			elif at.y - size.y * 0.5 < sky_floor:
+				_clip.add_child(shape)
+			else:
+				shape.free()
 
 		if not draw_world or not bool(box.get("visible", true)):
 			continue
@@ -973,6 +992,8 @@ func attach_world_collision(world: RefCounted) -> void:
 		skips.append(AABB(Vector3(r[0], r[1], r[2]), Vector3(r[3] - r[0], r[4] - r[1], r[5] - r[2])))
 	var body := StaticBody3D.new()
 	body.name = "WorldCollision"
+	var clip := StaticBody3D.new()
+	clip.name = "WorldClip"
 	var kinds := PackedStringArray(["solid", "clip", "glass"])
 	var within: Array = sel.get("within", [])
 	var band: Array = sel.get("band", [])
@@ -994,11 +1015,14 @@ func attach_world_collision(world: RefCounted) -> void:
 				continue
 			cs.shape = shape
 			cs.position = origin
-			body.add_child(cs)
+			(clip if str(h["kind"]) == "clip" else body).add_child(cs)
 	_put_on(body, &"world")
 	add_child(body)
 	world_collision = body
-	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count()})
+	_put_on(clip, &"clip")
+	add_child(clip)
+	world_clip = clip
+	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
 
 
 func _hull_prefixes(root: String) -> PackedStringArray:

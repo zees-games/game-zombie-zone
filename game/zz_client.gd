@@ -284,7 +284,7 @@ func _build_world_view() -> void:
 	world_view = ZzWorldView.new()
 	world_view.name = "WorldView"
 	world_view.audio = audio
-	world_view.ragdoll_mask = game.world_mask()
+	world_view.ragdoll_mask = game.ground_mask()
 	world_view.ragdoll_rules = game.ragdoll_rules
 	game.add_child(world_view)
 	blood = ZzBlood.new()

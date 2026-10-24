@@ -526,7 +526,7 @@ func _test_map(id: StringName) -> void:
 			var query := PhysicsShapeQueryParameters3D.new()
 			query.shape = shape.shape
 			query.transform = shape.global_transform.translated(Vector3(0, 0.05, 0))
-			query.collision_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+			query.collision_mask = game.ground_mask() | game.physics.layer_mask(&"prop")
 			query.exclude = own
 			if not space.intersect_shape(query, 1).is_empty():
 				stuck.append("%s %d at %s" % [toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1)])
@@ -547,7 +547,7 @@ func _test_map(id: StringName) -> void:
 ## A ray down from just over [param at] finds a floor, a table or a prop within half a metre.
 func _over_something(game: ZzGame, at: Vector3) -> bool:
 	var space := game.get_world_3d().direct_space_state
-	var mask := game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
 	var query := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.3, 0.0), at + Vector3(0.0, -0.5, 0.0), mask)
 	return not space.intersect_ray(query).is_empty()
 
@@ -555,7 +555,7 @@ func _over_something(game: ZzGame, at: Vector3) -> bool:
 ## Why a person could not stand at [param at], or "" when they can.
 func _spawn_fault(game: ZzGame, at: Vector3) -> String:
 	var space := game.get_world_3d().direct_space_state
-	var mask := game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
 
 	var down := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.5, 0.0), at + Vector3(0.0, -0.6, 0.0), mask)
 	if space.intersect_ray(down).is_empty():
@@ -592,7 +592,7 @@ func _inside_world(game: ZzGame, point: Vector3) -> bool:
 ## a few centimetres. A tilted prop is tested from its lowest corner's height.
 func _rests_on_something(game: ZzGame, frame: Transform3D, size: Vector3) -> bool:
 	var space := game.get_world_3d().direct_space_state
-	var mask := game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
 	var base := frame.origin
 
 	for x in [-0.3, 0.0, 0.3]:

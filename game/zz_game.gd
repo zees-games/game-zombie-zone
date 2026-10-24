@@ -439,18 +439,18 @@ func _exit_tree() -> void:
 ## Zombies collide with the world and the furniture, and not with each other: a crowd is kept
 ## apart by steering, which is smooth, rather than by bodies, which jam in doorways.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary"])
+	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary", &"clip"])
 
 	for layer in physics.layers:
 		match layer.id:
 			&"player":
-				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary"]
+				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary", &"clip"]
 			&"zombie":
-				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary"]
+				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary", &"clip"]
 			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never
 			# a survivor or a zombie, who walk through it (a survivor pushes it, `_advance_toys`).
 			&"toy":
-				layer.collides_with = [&"world", &"prop", &"toy", &"barricade"]
+				layer.collides_with = [&"world", &"prop", &"toy", &"barricade", &"clip"]
 			# A toy's footprint, for a walkable mesh's bake only: nothing collides with it.
 			&"footprint":
 				layer.collides_with = []
@@ -558,6 +558,11 @@ func world_mask() -> int:
 		return 1
 
 	return physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"barricade")
+
+
+## What a body lands on: [method world_mask] and the clip a stair's ramp is made of.
+func ground_mask() -> int:
+	return world_mask() | (physics.layer_mask(&"clip") if physics != null else 0)
 
 
 ## The gravity the movement is tuned against, on this world's own physics SPACE: a project

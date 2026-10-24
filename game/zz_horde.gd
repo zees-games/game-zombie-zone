@@ -336,7 +336,7 @@ func _begin_notes() -> void:
 	if game == null or game.map == null or game.physics == null:
 		return
 
-	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), _note_seeds())
+	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
 
 
 func _note_seeds() -> PackedVector3Array:
