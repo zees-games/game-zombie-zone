@@ -45,6 +45,7 @@ const CHANNEL := "zz.npcs"
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
 const NAV_CACHE_VERSION := 2
+const NAV_COVER_RANGE := 1.2
 
 const COMMON := &"common"
 const LEAPER := &"leaper"
@@ -509,7 +510,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	builder.point_radius = builder.spacing * 1.25
 	builder.clearance = float(nav_doc.get("clearance", 0.35))
 	builder.generate_cover = true
-	builder.cover_range = 1.2
+	builder.cover_range = NAV_COVER_RANGE
 
 	var floors: Array = nav_doc.get("floors", [])
 
@@ -649,4 +650,5 @@ static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStr
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
 		",".join(open_gates), str(extra_solids),
+		float(doc.get("nav", {}).get("spacing", 1.0)), float(doc.get("nav", {}).get("clearance", 0.35)), NAV_COVER_RANGE,
 	])
