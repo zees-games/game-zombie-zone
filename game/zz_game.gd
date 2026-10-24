@@ -1676,6 +1676,11 @@ func _advance_phase(delta: float) -> void:
 
 	phase_elapsed += delta
 
+	# The first graph of a map is still being built: survivors may walk, nothing else has begun.
+	if phase == Phase.READY and horde != null and horde.nav_blocks_play():
+		phase_elapsed = 0.0
+		return
+
 	match phase:
 		Phase.READY:
 			if _anybody_left_start() or phase_elapsed >= config.start_grace_seconds:
@@ -1704,11 +1709,6 @@ func _anybody_left_start() -> bool:
 	for player in survivors():
 		if player.is_up() and not player.watching and not map.in_area("start", player.feet()):
 			return true
-
-	# The first graph of a map is still being built: survivors may walk, nothing else has begun.
-	if phase == Phase.READY and horde != null and horde.nav_blocks_play():
-		phase_elapsed = 0.0
-		return
 
 	return false
 
