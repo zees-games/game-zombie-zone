@@ -37,6 +37,9 @@ var game = null
 ## id -> {kind, item, at, until}
 var entries: Dictionary = {}
 
+## How far apart two dropped items lie, metres.
+const SPACING := 0.9
+
 var _next_id: int = 1
 var _rng := RandomNumberGenerator.new()
 
@@ -86,9 +89,29 @@ func shown(kind: StringName, item: StringName) -> StringName:
 func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0, price: int = 0) -> int:
 	var id := _next_id
 	_next_id += 1
+	# A drop never lands inside another one: two crates drawn through each other cannot be told apart or picked.
+	if lifetime > 0.0:
+		at = _clear_spot(at)
 	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0, "price": price}
 	added.emit(id, kind, item, at)
 	return id
+
+
+## [param at], or the nearest spot on a ring round it that is at least [constant SPACING] from every entry.
+func _clear_spot(at: Vector3) -> Vector3:
+	for ring in 4:
+		for step in 8 if ring > 0 else 1:
+			var angle := TAU * float(step) / 8.0 + float(ring) * 0.4
+			var spot := at + Vector3(cos(angle), 0.0, sin(angle)) * SPACING * float(ring)
+			var free := true
+			for other: Dictionary in entries.values():
+				var there: Vector3 = other["at"]
+				if Vector2(there.x - spot.x, there.z - spot.z).length() < SPACING and absf(there.y - spot.y) < 1.0:
+					free = false
+					break
+			if free:
+				return spot
+	return at
 
 
 func remove(id: int, by: StringName = &"") -> void:

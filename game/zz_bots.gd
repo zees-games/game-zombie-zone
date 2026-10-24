@@ -243,8 +243,10 @@ func _decide(player, command: DotFpsCommand) -> void:
 			command.set_button(ZzNetCommand.BUTTON_RELOAD, true)
 
 	# A box in the hands is opened where it is quiet: standing still for a few seconds is the cost.
-	if not player.carried.is_empty() and _crowd_within(player, 15.0) == 0:
-		player.actions |= ZzNetCommand.ACT_DEPLOY
+	if game.config.bot_open_boxes and not player.carried.is_empty() and _crowd_within(player, 15.0) == 0:
+		# Released for a tick now and then while nothing has begun: a begin needs a fresh press, and a key held since a refused first press never gives another.
+		if player.using == &"deploy" or game.current_tick() % 8 != 0:
+			player.actions |= ZzNetCommand.ACT_DEPLOY
 		return
 
 	# Something useful lying near.
@@ -989,7 +991,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			ZzLoot.AMMO:
 				wanted = _low_on_ammo(player)
 			ZzLoot.BOX:
-				wanted = game.config.box_carry <= 0 or (game.boxes != null and game.boxes.can_carry(player))
+				wanted = game.config.bot_open_boxes and (game.config.box_carry <= 0 or (game.boxes != null and game.boxes.can_carry(player)))
 			ZzLoot.WEAPON, ZzLoot.THROWABLE:
 				wanted = _wants_weapon(player, e["item"])
 

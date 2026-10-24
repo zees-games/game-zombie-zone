@@ -399,6 +399,14 @@ static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
 ## The movement actions, and the slow walk on shift.
 static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 	var _added := DotFpsSampler.register_default_actions(p_sampler)
+	var crouch := &"dot_fps_crouch"
+
+	# C beside Ctrl: Ctrl is a browser shortcut and a window manager's on some desktops.
+	if InputMap.has_action(crouch) and not _has_key(crouch, KEY_C):
+		var c := InputEventKey.new()
+		c.physical_keycode = KEY_C
+		InputMap.action_add_event(crouch, c)
+
 	var walk := &"dot_fps_walk"
 
 	if not InputMap.has_action(walk):
@@ -412,6 +420,15 @@ static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 	var shift := InputEventKey.new()
 	shift.physical_keycode = KEY_SHIFT
 	InputMap.action_add_event(walk, shift)
+
+
+static func _has_key(action: StringName, keycode: Key) -> bool:
+	for event in InputMap.action_get_events(action):
+		var key := event as InputEventKey
+		if key != null and key.physical_keycode == keycode:
+			return true
+
+	return false
 
 
 ## One simulated tick. On the server and offline; a client predicts through its behaviour.

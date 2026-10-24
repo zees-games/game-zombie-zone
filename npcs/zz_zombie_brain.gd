@@ -1,6 +1,7 @@
 extends "res://addons/dot_npc_ai/runtime/dot_npc_ai_brain.gd"
 
 const ZzZombieBody := preload("zz_zombie_body.gd")
+const ZzUnstick := preload("../game/zz_unstick.gd")
 
 ## What every zombie's mind shares: the horde it reports to, the body it moves, a swing that
 ## lands half a second after it starts, a stagger when shoved, and a target it may be given
@@ -61,6 +62,13 @@ var _nearest_at: float = -INF
 ## Whether its last thought ended tearing at a barricade: one at the boards thinks every other
 ## tick, because all it decides there is to keep tearing.
 var bashing: bool = false
+
+## The progress watchdog (`_unstick_watch`): where it was last seen to be going somewhere, for
+## how long it has stayed within [constant WATCH_RADIUS] of there, and how far its remedies went.
+const WATCH_RADIUS := 1.0
+var _watch_at: Vector3 = Vector3.INF
+var _watch_for: float = 0.0
+var _watch_stage: int = 0
 
 ## Metres from the nearest survivor past which a zombie thinks every second tick, and every
 ## fourth. Its body still moves every tick on the wish it last had.
@@ -360,6 +368,52 @@ func _npc_think(delta: float) -> void:
 
 	_decide(delta)
 	_bash_if_barred(delta)
+	_unstick_watch(delta)
+
+
+## The watchdog every kind shares: a zombie that is trying to move and has not got anywhere in
+## `unstick_seconds` is nudged along where it was going, then, if that did not free it, put on
+## the nearest clear ground toward its quarry. The kinds' own hops catch the common wedge; this
+## catches the rest (a brute against a car's flank, a crowd jammed at a wall).
+func _unstick_watch(delta: float) -> void:
+	var b := body()
+	var h := horde()
+	var config: Variant = h.get(&"config") if h != null else null
+	var limit: float = float(config.unstick_seconds) if config != null else 0.0
+
+	if limit <= 0.0 or b == null or bashing or b.flying or swinging() or b.wish.length() < 1.0:
+		_watch_at = Vector3.INF
+		_watch_for = 0.0
+		return
+
+	var here := npc.position()
+
+	if _watch_at == Vector3.INF or here.distance_to(_watch_at) > WATCH_RADIUS:
+		_watch_at = here
+		_watch_for = 0.0
+		_watch_stage = 0
+		return
+
+	_watch_for += delta
+
+	if _watch_for < limit:
+		return
+
+	_watch_for = 0.0
+	var goal := survivor_at(quarry()) if quarry() != &"" else Vector3.INF
+	var forward := b.wish if goal == Vector3.INF else goal - here
+
+	if _watch_stage == 0 and ZzUnstick.nudge(b, forward):
+		_watch_stage = 1
+		_watch_at = Vector3.INF
+		return
+
+	if ZzUnstick.relocate(b, goal if goal != Vector3.INF else here + forward.normalized() * 6.0):
+		_watch_at = Vector3.INF
+		_watch_stage = 0
+		return
+
+	_watch_stage = 1
 
 
 ## Pressed against a barricade it was walking into: stop, face it, and tear at it. Checked

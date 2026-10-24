@@ -1,7 +1,5 @@
 extends "zz_zombie_brain.gd"
 
-const ZzUnstick := preload("../game/zz_unstick.gd")
-
 ## The common infected: the crowd.
 ##
 ## [codeblock]

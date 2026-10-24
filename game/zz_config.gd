@@ -209,10 +209,18 @@ func setup_seconds() -> float:
 
 # --- Navigation notes ------------------------------------------------------
 
+## Whether a built navigation graph is kept in `user://nav_cache` and loaded next time, keyed by
+## the map's contents: a large map takes a minute or more to build and milliseconds to load.
+## `zz_nav_cache`.
+@export var nav_cache: bool = true
+
 ## Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its
 ## bake, and the bots and the horde use what it finds. Off plays as before the annotations.
 ## `zz_nav_notes`.
 @export var nav_notes: bool = true
+
+## Seconds a zombie may try to move without getting anywhere before it is freed; 0 turns it off. `zz_unstick_seconds`.
+@export_range(0.0, 30.0, 0.5) var unstick_seconds: float = 4.0
 
 ## The longest drop, in metres, a zombie takes off a ledge. `zz_nav_drop`.
 @export_range(1.0, 10.0, 0.5) var nav_drop_max: float = 4.0
@@ -245,6 +253,9 @@ func setup_seconds() -> float:
 ## Zombies within four and a half metres of a choke that make it overrun: the stand-ins holding it
 ## fall back along the route. `zz_bot_hold_overrun`.
 @export_range(2, 40, 1) var bot_hold_overrun: int = 6
+
+## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
+@export var bot_open_boxes: bool = true
 
 ## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing
 ## ones. The rest hold their posts; with every one walking to a single friend a ram at a dugout

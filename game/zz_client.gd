@@ -1451,7 +1451,7 @@ func _reveal_map() -> void:
 			"colour": game.side_colour(ZzGame.SURVIVORS)})
 
 	winner_reveal.reduced_motion = settings != null and settings.settings != null and settings.settings.get_bool(&"reduce_motion", false)
-	var shown := winner_reveal.present(entries, {"title": "SURVIVORS" if _map_won else "OVERRUN",
+	var shown := winner_reveal.present(entries, {"title": "SURVIVORS WON" if _map_won else "INFECTED WON",
 		"subtitle": _map_why.substr(0, 1).to_upper() + _map_why.substr(1) if _map_why != "" else "Map over", "hint": "Jump to skip"})
 
 	if not shown.ok:

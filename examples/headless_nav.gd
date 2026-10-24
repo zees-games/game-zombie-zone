@@ -15,7 +15,7 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ## Counts sections and checks (dot-settings' story).
 
 const SECTIONS := 15
-const CHECKS := 56
+const CHECKS := 59
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -183,6 +183,11 @@ func _test_graph() -> void:
 	for i in 2:
 		var _a := data.connect_points(high[i], high[i + 1])
 		var _b := data.connect_points(low[i], low[i + 1])
+
+	var cached := DotNpcNavData.from_cache_bytes(data.to_cache_bytes())
+	_check(cached != null and cached.matches("test"), "a graph survives the cache to the byte's digest")
+	_check(cached != null and cached.points == data.points and cached.edges == data.edges, "with its points and edges whole")
+	_check(DotNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
 
 	var graph := ZzNavGraph.new()
 	var built := graph.rebuild(data)

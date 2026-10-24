@@ -52,3 +52,38 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 
 	body.global_transform = lifted
 	return true
+
+
+## Puts [param body] on the clear, grounded spot within a few metres that is nearest
+## [param goal], when that is closer to it than the body is. The last resort after [method nudge]:
+## it moves farther, so it only takes a spot the body fits on, not over a drop. Returns whether it moved.
+static func relocate(body: CharacterBody3D, goal: Vector3) -> bool:
+	if body == null:
+		return false
+
+	var here := body.global_transform.origin
+	var best := Vector3.INF
+	var best_d := here.distance_to(goal) - 0.5
+
+	for radius: float in [1.5, 2.5, 3.5]:
+		for i in 12:
+			var a := TAU * float(i) / 12.0
+			var to := body.global_transform
+			to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius + Vector3(0.0, 0.08, 0.0)
+
+			if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
+				continue
+
+			var d := to.origin.distance_to(goal)
+
+			if d < best_d:
+				best_d = d
+				best = to.origin
+
+	if best == Vector3.INF:
+		return false
+
+	var moved := body.global_transform
+	moved.origin = best
+	body.global_transform = moved
+	return true

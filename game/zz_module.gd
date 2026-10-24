@@ -487,6 +487,15 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_nav_notes", 1.0 if config.nav_notes else 0.0,
 		"Annotate each map (drops, chokepoints, cover) after its bake and let bots and zombies use it; 0 off",
 		func(value: float) -> void: config.nav_notes = value > 0.5)
+	_tunable("zz_bot_open_boxes", 1.0 if config.bot_open_boxes else 0.0,
+		"Stand-ins pick up and open the boxes zombies drop; 0 leaves them to the humans",
+		func(value: float) -> void: config.bot_open_boxes = value > 0.5)
+	_tunable("zz_nav_cache", 1.0 if config.nav_cache else 0.0,
+		"Keep each built navigation graph on disk and load it next time; 0 builds every time",
+		func(value: float) -> void: config.nav_cache = value > 0.5)
+	_tunable("zz_unstick_seconds", config.unstick_seconds,
+		"Seconds a zombie may push without progress before it is nudged free; 0 turns it off",
+		func(value: float) -> void: config.unstick_seconds = clampf(value, 0.0, 30.0))
 	_tunable("zz_nav_drop", config.nav_drop_max, "The longest drop, in metres, a zombie takes off a ledge",
 		func(value: float) -> void: config.nav_drop_max = clampf(value, 1.0, 10.0))
 	_tunable("zz_zombie_drops", 1.0 if config.zombie_drops else 0.0,
@@ -1485,7 +1494,7 @@ const HAND_FIELDS := {
 	"zz_breather": "breather_seconds", "zz_brute_every": "brute_every_waves", "zz_brute_max": "brute_interval_max",
 	"zz_brute_min": "brute_interval_min", "zz_commons": "commons_base", "zz_defib_start": "start_defibs",
 	"zz_director": "director_enabled", "zz_min_players": "minimum_players", "zz_mob_max": "mob_interval_max",
-	"zz_mob_min": "mob_interval_min", "zz_nav_drop": "nav_drop_max", "zz_prestart_time": "prestart_seconds",
+	"zz_mob_min": "mob_interval_min", "zz_nav_drop": "nav_drop_max", "zz_unstick_seconds": "unstick_seconds", "zz_prestart_time": "prestart_seconds",
 	"zz_respawn_base": "respawn_base_seconds", "zz_respawn_max": "respawn_max_seconds",
 	"zz_respawn_min": "respawn_min_seconds", "zz_respawn_per_wave": "respawn_per_wave_seconds",
 	"zz_respawn_protect": "respawn_protect_seconds", "zz_sleepers": "sleepers_enabled",

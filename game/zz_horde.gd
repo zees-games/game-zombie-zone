@@ -376,7 +376,7 @@ func rebuild_navigation() -> DotResult:
 	if game.map != null and game.map.mechanics != null:
 		blockers = game.map.mechanics.rest_blockers()
 
-	nav = ZzNpcs.nav_for(_doc, props_size, open_gates, blockers)
+	nav = ZzNpcs.nav_for(_doc, props_size, open_gates, blockers, config.nav_cache)
 
 	var valid := nav.validate()
 

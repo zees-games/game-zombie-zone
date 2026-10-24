@@ -40,6 +40,11 @@ const ZzPaths := preload("zz_paths.gd")
 
 const CHANNEL := "zz.npcs"
 
+## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
+## builder's output changes for the same document (the digest cannot see code).
+const NAV_CACHE_DIR := "user://nav_cache"
+const NAV_CACHE_VERSION := 2
+
 const COMMON := &"common"
 const LEAPER := &"leaper"
 const STRANGLER := &"strangler"
@@ -391,7 +396,36 @@ const LINK_TEST_TRIM := 0.15
 ## than a step. A gate is in the way while it is shut: the graph is built again when one opens
 ## ([param open_gates]), because a horde that pathed through a shut door would pile up against
 ## it, and one that never learned it had opened would never come through.
-static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> DotNpcNavData:
+static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> DotNpcNavData:
+	if not cache:
+		return _nav_built(doc, props_size, open_gates, extra_solids)
+
+	var key := digest_of(doc, open_gates, extra_solids)
+	var path := "%s/%s-%s-v%d.nav" % [NAV_CACHE_DIR, str(doc.get("id", "map")).validate_filename(), key.left(16), NAV_CACHE_VERSION]
+	var cached: DotNpcNavData = null
+
+	if FileAccess.file_exists(path):
+		cached = DotNpcNavData.from_cache_bytes(FileAccess.get_file_as_bytes(path))
+
+	if cached != null and cached.matches(key):
+		DotLog.debug(CHANNEL, "navigation graph loaded from the cache", {"map": doc.get("id", ""), "points": cached.point_count()})
+		return cached
+
+	var built := _nav_built(doc, props_size, open_gates, extra_solids)
+	DirAccess.make_dir_recursive_absolute(NAV_CACHE_DIR)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+
+	if file != null:
+		file.store_buffer(built.to_cache_bytes())
+		file.close()
+		DotWeb.sync_filesystem()
+	else:
+		DotLog.warn(CHANNEL, "the navigation cache could not be written", {"path": path, "error": FileAccess.get_open_error()})
+
+	return built
+
+
+static func _nav_built(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray, extra_solids: Array[AABB]) -> DotNpcNavData:
 	var info := {}
 	var strict := _nav_with(doc, props_size, open_gates, extra_solids, LINK_TEST_HEIGHTS, info)
 
