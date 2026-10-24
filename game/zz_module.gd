@@ -284,6 +284,12 @@ func _game_load() -> DotResult:
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
 	)
 
+	# The creepy ambience: on/off, level, one-shot rate and mood (see ZzAmbientRules).
+	var _ambient := world.ambient_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
+
 	_build_vote(world)
 	_build_voteban(world)
 

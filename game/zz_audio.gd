@@ -1,6 +1,7 @@
 extends Node
 
 const ZzPaths := preload("zz_paths.gd")
+const ZzAmbientRules := preload("zz_ambient_rules.gd")
 
 ## What this game makes a noise about, and the noise, on the client.
 ##
@@ -81,10 +82,36 @@ const SPECIAL_VOICES := {
 
 var manager: DotAudioManager = null
 
-## Everybody's footsteps by what they stand on, and the bed under the whole game: dot-audio's
-## stock (Kenney's footsteps, generated beds, all CC0; the addon's stock/CREDITS.md).
+## Everybody's footsteps by what they stand on (dot-audio's stock: Kenney, CC0).
 var steps: DotAudioFootsteps = null
+
+## The creepy ambience under a map: quiet beds and distant one-shots by mood (`sounds/ambience/`,
+## CREDITS.md there). The old generated beds in [member ambience] only play when no mood loaded.
+var ambient: DotAmbience = null
 var ambience: DotAudioAmbience = null
+
+## Mood a map falls back to when neither its document nor its sounds say.
+const DEFAULT_MOOD := &"outdoor_night"
+
+## The hand-made maps' moods; a document's own `"ambient"` field wins over this, and a converted
+## map's sound names (see [method on_world_sounds]) decide for the rest.
+const MAP_MOOD := {
+	&"zz_blackout_1": &"outdoor_night", &"zz_blackout_2": &"industrial", &"zz_blackout_3": &"snow_wind",
+	&"zz_chapel": &"interior_horror", &"zz_high_school": &"indoor_hall", &"zz_lot": &"city_ruins",
+	&"zz_mall": &"indoor_hall", &"zz_relief_camp": &"outdoor_night", &"zz_stadium": &"city_ruins",
+}
+
+var _rules: ZzAmbientRules = null
+var _user_on := true
+var _user_volume := 1.0
+var _user_frequency := 1.0
+var _map_id: StringName = &""
+var _doc_mood: StringName = &""
+var _map_names: Array = []
+
+
+static func _ambience_dir() -> String:
+	return ZzPaths.rebase("res://sounds/ambience")
 
 
 static func ids() -> Array[StringName]:
@@ -323,12 +350,22 @@ func setup() -> DotResult:
 	steps.manager = manager
 	steps.default_surface = &"concrete"
 	add_child(steps)
+	ambient = DotAmbience.new()
+	ambient.name = "Ambient"
+	ambient.manager = manager
+	ambient.default_mood = DEFAULT_MOOD
+	add_child(ambient)
+	var made := ambient.add_set_dir(_ambience_dir())
+	if not made.ok:
+		DotLog.warn(CHANNEL, "no ambience set; the stock bed plays", {"why": made.error.message})
+	# Under the mood, only if there is none: the generated beds are the family's fallback.
 	ambience = DotAudioAmbience.new()
 	ambience.name = "Ambience"
 	ambience.manager = manager
 	ambience.fallback_bed = &"amb_night"
 	add_child(ambience)
-	ambience.set_map_bed(&"amb_night")
+	if ambient.mood_names().is_empty():
+		ambience.set_map_bed(&"amb_night")
 
 	var godot_sink := manager.sink as DotAudioSinkGodot
 
@@ -358,7 +395,11 @@ const MAP_SOUND := {
 ## room tone plays where there is something over your head, and no map lists its rooms twice.
 func on_map_doc(id: StringName, doc: Dictionary) -> void:
 	var row: Array = MAP_SOUND.get(id, [&"amb_night", &"concrete"])
+	_map_id = id
+	_doc_mood = StringName(str(doc.get("ambient", "")))
+	_map_names = [String(id), str(doc.get("name", ""))]
 	on_map(StringName(str(doc.get("ambience", row[0]))), StringName(str(doc.get("surface", row[1]))))
+	_choose_mood()
 	if ambience == null:
 		return
 	ambience.clear_zones()
@@ -379,9 +420,82 @@ func keep_walkers(bodies: Array) -> void:
 		steps.keep(bodies)
 
 
+## A converted map's `sounds` block (soundscapes and ambient sounds) arrived with its world; they
+## vote for the mood unless the document or the hand table named one.
+func on_world_sounds(sounds: Dictionary) -> void:
+	_map_names = [String(_map_id)] + DotAmbienceMoods.names_in(sounds)
+	_choose_mood()
+
+
+## The mood of the map playing now, and why: document field, hand table, sound-name vote, default.
+func mood_for_map() -> Dictionary:
+	if _doc_mood != &"":
+		return {"mood": _doc_mood, "why": "map document"}
+	if MAP_MOOD.has(_map_id):
+		return {"mood": MAP_MOOD[_map_id], "why": "hand-made map table"}
+	var voted := DotAmbienceMoods.vote(_map_names)
+	if voted != &"":
+		return {"mood": voted, "why": "sound names"}
+	return {"mood": DEFAULT_MOOD, "why": "default"}
+
+
+func _choose_mood() -> void:
+	if ambient == null or ambient.mood_names().is_empty():
+		return
+	var got := mood_for_map()
+	var made := ambient.set_mood(got["mood"])
+	if not made.ok:
+		DotLog.debug(CHANNEL, "ambience mood not available", {"mood": String(got["mood"]), "why": made.error.message})
+		var _fallback := ambient.set_mood(DEFAULT_MOOD)
+	else:
+		DotLog.debug(CHANNEL, "ambience mood", {"map": String(_map_id), "mood": String(got["mood"]), "why": got["why"]})
+
+
+## The server's cvars and the player's own sliders, multiplied: the player can only turn the
+## server's setting down, and a forced mood or an allowed list is the server's alone.
+func follow_settings(store: Object, rules: ZzAmbientRules) -> void:
+	_rules = rules
+	if rules != null and not rules.changed.is_connected(_apply_ambient):
+		rules.changed.connect(_apply_ambient)
+	if store != null:
+		_read_user(store)
+		if not store.changed.is_connected(_on_setting):
+			store.changed.connect(_on_setting.bind(store))
+	_apply_ambient()
+	if ambient != null and _rules != null and _rules.dir != "":
+		var custom := ambient.add_set_dir(_rules.dir)
+		DotLog.result(CHANNEL, "ambience set from zz_ambient_dir", custom)
+		_choose_mood()
+
+
+func _on_setting(key: StringName, _value: Variant, _why: StringName, store: Object) -> void:
+	if key in [&"ambient", &"ambient_volume", &"ambient_frequency"]:
+		_read_user(store)
+		_apply_ambient()
+
+
+func _read_user(store: Object) -> void:
+	_user_on = bool(store.call(&"get_bool", &"ambient", true))
+	_user_volume = float(store.call(&"get_float", &"ambient_volume", 1.0))
+	_user_frequency = float(store.call(&"get_float", &"ambient_frequency", 1.0))
+
+
+func _apply_ambient() -> void:
+	if ambient == null:
+		return
+	var c := ambient.config
+	var r := _rules if _rules != null else ZzAmbientRules.new()
+	c.enabled = r.is_on() and _user_on
+	c.volume = clampf(r.volume * _user_volume, 0.0, 1.0)
+	c.frequency = r.frequency * _user_frequency
+	c.mood = r.mood
+	c.allowed_moods = r.allowed
+	c.sound_dir = r.dir
+
+
 ## A map arrived: its bed and its ground. Empty keeps what is playing.
 func on_map(bed: StringName, surface: StringName = &"") -> void:
-	if ambience != null and bed != &"":
+	if ambience != null and bed != &"" and (ambient == null or ambient.mood_names().is_empty()):
 		ambience.set_map_bed(bed)
 	if steps != null and surface != &"":
 		steps.default_surface = surface
@@ -424,6 +538,13 @@ func music(id: StringName) -> void:
 	if manager == null:
 		return
 
+	# The horde's and the brute's music is the loudest thing the mix does: the ambience steps back.
+	if ambient != null:
+		if id == &"":
+			ambient.unduck(&"music")
+		else:
+			ambient.duck(&"music", 0.25)
+
 	if id == &"":
 		manager.stop_music(2.0)
 	elif manager.music_id() != id:
@@ -443,4 +564,6 @@ func describe() -> Dictionary:
 		"ids": ids().size(),
 		"device": manager != null and manager.sink is DotAudioSinkGodot,
 		"music": String(manager.music_id()) if manager != null else "",
+		"ambient": ambient.describe() if ambient != null else {},
+		"ambient_mood_from": mood_for_map(),
 	}

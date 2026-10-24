@@ -66,4 +66,29 @@ The workbench (F9 solo or hosting a game, `workbench` in the console) is dot-gam
 
 dot-team's block rules are on when the addon is linked: survivors pass through each other (`mp_teamblock`), and `!block` / `!noblock` ask to stop or pass. Without the addon players block each other and the server logs one WARN.
 
-Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/addons/zee_weapons/ads.yml` is the shipped default and `cfg/server/addons/zee_weapons/ads.yml` overrides it per server (zoom, walk pace and spread while aimed, toggle, per-weapon rows). The server applies the pace and the tighter spread from the aim bit in the player's command, so clients predict the same pace.
+Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/addons/zee_weapons/ads.yml` is the shipped default and `cfg/server/addons/zee_weapons/ads.yml` overrides it per server. Under `ads: default:` the keys are `enabled`, `aim_time` and `zoom` (0 takes the weapon's own art; zoom is a field-of-view multiplier), `move_speed_multiplier` (walk pace while aimed, 0.8), `spread_multiplier` (0.6), `sway_multiplier` (0.5), `toggle` (hold or press-to-toggle), `view_scale` and `view_shift_x/y/z` (the drawn gun's size and offset); a `weapons:` block overrides only the keys it lists, by weapon id. **The wire changed**: the aim bit is `ZzNetCommand.ACT_AIM` and `ACT_BITS` went from 5 to 6, so a client and a server must be the same build (the server applies the pace and the tighter spread from that bit, and the client predicts the same pace).
+
+## Navigation, stand-ins and stuck zombies
+
+Cvars, each also a key in `config/game.yml` (live from the console or the workbench):
+
+- `zz_nav_cache` (default 1): a built navigation graph is kept in `user://nav_cache`, keyed by the map's contents, and loaded next time; a large map takes a minute or more to build and milliseconds to load. 0 builds every time.
+- `zz_nav_threads` (default 2, 0 to 16): worker tasks a graph build uses, off the main thread, so a host keeps drawing and the first build holds READY (no wave starts before the ground exists). 0, and every platform without threads, builds on the main thread in slices.
+- `zz_nav_budget_ms` (default 6, 0.5 to 14): milliseconds a tick a main-thread build may take; only read when `zz_nav_threads` is 0 or there are no threads. A bottom-right "Navigation regenerating" panel shows progress.
+- `zz_bot_open_boxes` (default 1): stand-ins pick up and open the boxes zombies drop; 0 leaves every box to the humans.
+- `zz_unstick_seconds` (default 4, 0 to 30): every zombie kind frees itself after this long trying to move without getting anywhere (a nudge, then a relocation); 0 turns the watchdog off.
+
+## The creepy ambience
+
+Each map plays a quiet mood: beds under the level and sparse one-shots (creaks, far moans, frogs, a drip) placed round the listener. The server decides, the player can only turn it down. All are cvars (`cfg/server` or the console):
+
+| Cvar | Default | Meaning |
+| --- | --- | --- |
+| `zz_ambient` | 1 | 0 switches the ambience off for everyone |
+| `zz_ambient_volume` | 0.5 | level; 0.5 is the files' own quiet level |
+| `zz_ambient_frequency` | 1 | how often the one-shots come; 0 none, 2 twice as often |
+| `zz_ambient_mood` | empty | force one mood on every map: `outdoor_night`, `indoor_hall`, `industrial`, `cave_tunnel`, `snow_wind`, `swamp`, `city_ruins`, `interior_horror` |
+| `zz_ambient_allowed` | empty | comma list of moods a map may use |
+| `zz_ambient_dir` | empty | a directory with your own `moods.json` and sounds (format: dot-audio `docs/ambience.md`); its moods replace the built-in ones of the same name. Local to the machine that plays |
+
+A map's mood comes from an `"ambient"` field in its document, else the hand-made maps' table, else the sound names of a converted map, else `outdoor_night`. Players have Creepy ambience, Ambience volume and Distant sounds in the Audio page.

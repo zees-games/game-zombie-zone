@@ -74,6 +74,10 @@ static func schema_for() -> DotSettingsSchema:
 		"How near a zombie must be to be animated every frame, cast a shadow and be drawn at all."))
 	s.add(DotSettingsDef.integer(&"vis_mode", 3, 0, 3, &"video").with_description(
 		"Which hidden parts of a map are skipped when drawing: none, by precomputed visibility, by occluders, or both."))
+	s.add(DotSettingsDef.boolean(&"ambient", true, &"audio").with_description(
+		"The quiet creepy sounds under a map: beds and distant one-shots."))
+	s.add(DotSettingsDef.number(&"ambient_volume", 1.0, 0.0, 1.0, &"audio"))
+	s.add(DotSettingsDef.number(&"ambient_frequency", 1.0, 0.0, 2.0, &"audio"))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
 
 
@@ -95,6 +99,12 @@ func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
 			video.section("Image").add(DotMenuRow.select(&"vis_mode", "Map culling",
 				"Skips the parts of a map you cannot see. Off draws everything (slower, for checking).",
 				[[0, "Off"], [1, "Precomputed"], [2, "Occluders"], [3, "Both"]]))
+		var sound := menu.page(&"audio")
+		if sound != null:
+			var amb := sound.section("Ambience")
+			amb.add(DotMenuRow.toggle(&"ambient", "Creepy ambience", "Quiet beds and distant sounds under the map."))
+			amb.add(DotMenuRow.slider(&"ambient_volume", "Ambience volume", "Turns the server's level down; it cannot turn it up."))
+			amb.add(DotMenuRow.slider(&"ambient_frequency", "Distant sounds", "How often the one-shots come."))
 		var general := menu.page(&"general")
 		if general != null:
 			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",

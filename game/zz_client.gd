@@ -441,6 +441,7 @@ func _build_netcode() -> DotResult:
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _wading := game.water_rules.follow_cvars(link)
+		var _ambient := game.ambient_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
 		var _dead := game.ragdoll_rules.follow_cvars(link)
 		# And sv_toys*: a client hides the toys a server took away.
@@ -753,6 +754,8 @@ func _on_phase(phase: int) -> void:
 func _on_map(map_id: StringName) -> void:
 	if audio != null:
 		audio.on_map_doc(map_id, game.map_doc)
+		if game.map != null and not game.map.world_sounds.is_empty():
+			audio.on_world_sounds(game.map.world_sounds)
 
 	# The new map's toys are heard: a barrel's knock, a ball's bounce.
 	if game.map != null and game.map.toys != null and not game.map.toys.sound.is_connected(_toy_sound):
@@ -1589,6 +1592,7 @@ func _build_settings() -> void:
 
 	if audio != null:
 		settings.bind_audio(audio.manager)
+		audio.follow_settings(settings.settings, game.ambient_rules)
 
 	if settings.menu != null:
 		# The HUD in the menu's theme and at the player's HUD size, live.

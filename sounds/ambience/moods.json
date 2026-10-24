@@ -1,0 +1,546 @@
+{
+ "format": 1,
+ "moods": {
+  "outdoor_night": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "outdoor_night/crickets.ogg",
+     "volume": 0.8
+    },
+    {
+     "file": "outdoor_night/wind.ogg",
+     "volume": 0.6
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "outdoor_night/bird.ogg"
+     ],
+     "interval": [
+      40,
+      120
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      45
+     ]
+    },
+    {
+     "files": [
+      "outdoor_night/creak.ogg"
+     ],
+     "interval": [
+      30,
+      90
+     ],
+     "volume": 0.5,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      30
+     ]
+    },
+    {
+     "files": [
+      "outdoor_night/moan_far.ogg"
+     ],
+     "interval": [
+      70,
+      180
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      25,
+      60
+     ]
+    }
+   ]
+  },
+  "indoor_hall": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "indoor_hall/rumble.ogg",
+     "volume": 0.8
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "indoor_hall/creak_a.ogg",
+      "indoor_hall/creak_b.ogg"
+     ],
+     "interval": [
+      25,
+      80
+     ],
+     "volume": 0.5,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      30
+     ]
+    },
+    {
+     "files": [
+      "indoor_hall/elevator.ogg"
+     ],
+     "interval": [
+      90,
+      200
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      40
+     ]
+    },
+    {
+     "files": [
+      "indoor_hall/moan_far.ogg"
+     ],
+     "interval": [
+      70,
+      170
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      20,
+      50
+     ]
+    }
+   ]
+  },
+  "industrial": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "industrial/generator.ogg",
+     "volume": 0.7
+    },
+    {
+     "file": "industrial/machine_a.ogg",
+     "volume": 0.6
+    },
+    {
+     "file": "industrial/machine_b.ogg",
+     "volume": 0.5
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "industrial/creak.ogg"
+     ],
+     "interval": [
+      25,
+      70
+     ],
+     "volume": 0.5,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      30
+     ]
+    },
+    {
+     "files": [
+      "industrial/collapse.ogg"
+     ],
+     "interval": [
+      90,
+      220
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      20,
+      50
+     ]
+    }
+   ]
+  },
+  "cave_tunnel": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "cave_tunnel/dungeon.ogg",
+     "volume": 0.8
+    },
+    {
+     "file": "cave_tunnel/drip.ogg",
+     "volume": 0.5
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "cave_tunnel/breath.ogg"
+     ],
+     "interval": [
+      60,
+      150
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      8,
+      25
+     ]
+    },
+    {
+     "files": [
+      "cave_tunnel/collapse.ogg"
+     ],
+     "interval": [
+      100,
+      240
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      20,
+      50
+     ]
+    },
+    {
+     "files": [
+      "cave_tunnel/moan_a.ogg"
+     ],
+     "interval": [
+      70,
+      170
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      45
+     ]
+    }
+   ]
+  },
+  "snow_wind": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "snow_wind/wind_a.ogg",
+     "volume": 0.7
+    },
+    {
+     "file": "snow_wind/wind_b.ogg",
+     "volume": 0.6
+    },
+    {
+     "file": "snow_wind/wind_c.ogg",
+     "volume": 0.5
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "snow_wind/creak.ogg"
+     ],
+     "interval": [
+      30,
+      90
+     ],
+     "volume": 0.5,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      30
+     ]
+    },
+    {
+     "files": [
+      "snow_wind/moan.ogg"
+     ],
+     "interval": [
+      80,
+      200
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      25,
+      60
+     ]
+    }
+   ]
+  },
+  "swamp": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "swamp/swamp.ogg",
+     "volume": 0.8
+    },
+    {
+     "file": "swamp/atmosphere_a.ogg",
+     "volume": 0.5
+    },
+    {
+     "file": "swamp/atmosphere_b.ogg",
+     "volume": 0.5
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "swamp/frog_a.ogg",
+      "swamp/frog_b.ogg"
+     ],
+     "interval": [
+      15,
+      50
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      8,
+      30
+     ]
+    },
+    {
+     "files": [
+      "swamp/bubbling.ogg"
+     ],
+     "interval": [
+      40,
+      120
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      20
+     ]
+    },
+    {
+     "files": [
+      "swamp/bird.ogg"
+     ],
+     "interval": [
+      60,
+      150
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      45
+     ]
+    }
+   ]
+  },
+  "city_ruins": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "city_ruins/rain.ogg",
+     "volume": 0.6
+    },
+    {
+     "file": "city_ruins/storm.ogg",
+     "volume": 0.6
+    },
+    {
+     "file": "city_ruins/siren.ogg",
+     "volume": 0.4
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "city_ruins/creak.ogg"
+     ],
+     "interval": [
+      30,
+      90
+     ],
+     "volume": 0.5,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      6,
+      30
+     ]
+    },
+    {
+     "files": [
+      "city_ruins/moan_a.ogg",
+      "city_ruins/moan_b.ogg"
+     ],
+     "interval": [
+      70,
+      180
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      20,
+      55
+     ]
+    }
+   ]
+  },
+  "interior_horror": {
+   "volume": 1.0,
+   "beds": [
+    {
+     "file": "interior_horror/ghostly.ogg",
+     "volume": 0.7
+    },
+    {
+     "file": "interior_horror/horror.ogg",
+     "volume": 0.6
+    },
+    {
+     "file": "interior_horror/dark.ogg",
+     "volume": 0.6
+    }
+   ],
+   "oneshots": [
+    {
+     "files": [
+      "interior_horror/breath.ogg"
+     ],
+     "interval": [
+      50,
+      130
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      4,
+      14
+     ]
+    },
+    {
+     "files": [
+      "interior_horror/chant_a.ogg",
+      "interior_horror/chant_b.ogg"
+     ],
+     "interval": [
+      80,
+      200
+     ],
+     "volume": 0.4,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      40
+     ]
+    },
+    {
+     "files": [
+      "interior_horror/ghost_a.ogg",
+      "interior_horror/ghost_b.ogg",
+      "interior_horror/ghost_c.ogg"
+     ],
+     "interval": [
+      45,
+      120
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      8,
+      30
+     ]
+    },
+    {
+     "files": [
+      "interior_horror/ghoul_a.ogg",
+      "interior_horror/ghoul_b.ogg",
+      "interior_horror/ghoul_c.ogg",
+      "interior_horror/ghoul_d.ogg"
+     ],
+     "interval": [
+      60,
+      150
+     ],
+     "volume": 0.45,
+     "pitch": [
+      0.92,
+      1.08
+     ],
+     "distance": [
+      15,
+      40
+     ]
+    }
+   ]
+  }
+ }
+}

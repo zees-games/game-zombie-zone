@@ -1081,6 +1081,10 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 			_drawn.remove_child(child)
 			child.queue_free()
 
+## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
+var world_sounds: Dictionary = {}
+
+
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
@@ -1091,6 +1095,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
 		attach_mechanics(world)
 	else:
+	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
 		attach_mechanics(world, true)
 	if mechanics != null:
 		mechanics.bind_drawn(node)

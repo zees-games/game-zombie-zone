@@ -25,6 +25,7 @@ const ZzProps := preload("zz_props.gd")
 const ZzCrawlRules := preload("zz_crawl_rules.gd")
 const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzPassRules := preload("zz_pass_rules.gd")
+const ZzAmbientRules := preload("zz_ambient_rules.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
@@ -252,6 +253,9 @@ var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 var water_rules: ZzWaterRules = ZzWaterRules.new()
 
 ## Server: team damage, added up per player over a window ([ZzTeamDamage]); the module wires
+## The `zz_ambient*` settings: the creepy ambience under a map (see [ZzAmbientRules], [ZzAudio]).
+var ambient_rules: ZzAmbientRules = ZzAmbientRules.new()
+
 ## what a voteban and a ban do.
 var team_damage: ZzTeamDamage = ZzTeamDamage.new()
 

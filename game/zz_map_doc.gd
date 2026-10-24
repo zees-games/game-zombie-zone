@@ -237,6 +237,11 @@ static func validate(source: Dictionary) -> DotResult:
 		"survive_seconds": maxf(float(source.get("survive_seconds", 0.0)), 0.0),
 	}
 
+	# The creepy-ambience mood this map wants (ZzAudio); a name the sound set may not have is ignored there.
+	var ambient := str(source.get("ambient", ""))
+	if ambient != "" and _is_id(ambient):
+		doc["ambient"] = ambient
+
 	# The map's own drawn geometry, a pack of its own (ZzMap.load_world); without it the boxes are
 	# drawn. Only a name the converter makes, so a document cannot point a client at any pack.
 	var world := str(source.get("world", ""))
