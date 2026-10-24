@@ -4,6 +4,7 @@ const ZzAudio := preload("zz_audio.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzBots := preload("zz_bots.gd")
 const ZzBoxes := preload("zz_boxes.gd")
+const ZzDefibHands := preload("zz_defib_hands.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzSettings := preload("zz_settings.gd")
 const ZzBlood := preload("zz_blood.gd")
@@ -75,6 +76,8 @@ var blood: ZzBlood = null
 var weapons: ZeeWeaponRig = null
 var view_model: ZeeViewModel = null
 
+var defib_hands: Node3D = null
+var _defib_sound: bool = false
 var net: DotNetManager = null
 var bridge: ZzNetBridge = null
 var link: Node = null
@@ -437,6 +440,7 @@ func _build_netcode() -> DotResult:
 	bridge.ammo_received.connect(_on_ammo)
 	bridge.map_received.connect(_on_map)
 	bridge.pin_received.connect(func(session_id: int, npc_net_id: int, kind: StringName) -> void:
+	bridge.defibbed_received.connect(_on_defib)
 		_on_pin(session_id, bridge.zombie_mirror(npc_net_id), kind))
 	bridge.unpin_received.connect(_on_unpin)
 	bridge.box_received.connect(_on_box)
@@ -830,6 +834,38 @@ func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
 	var who := _player_of(session_id)
 
 	if who != null and world_view != null:
+func _on_defib(session_id: int, by: int) -> void:
+	var body := _player_of(session_id)
+
+	if audio != null:
+		var _zap := audio.at(ZzAudio.DEFIB_ZAP, body.feet() + Vector3(0.0, 0.3, 0.0)) if body != null else 0
+
+		if session_id == _watch_id:
+			var _up := audio.play(ZzAudio.YOU_ARE_UP)
+
+	if chat != null:
+		chat.say_locally("%s was shocked back by %s" % [_name_of(session_id), _name_of(by)], Color(0.6, 0.95, 0.6))
+
+
+## The defibrillator under the camera in first person while it is being charged at a body.
+func _present_defib_hands(delta: float) -> void:
+	if defib_hands == null or not is_instance_valid(defib_hands) or defib_hands.get_parent() != camera:
+		if defib_hands != null and is_instance_valid(defib_hands):
+			defib_hands.queue_free()
+
+		defib_hands = ZzDefibHands.new()
+		defib_hands.name = "DefibHands"
+		camera.add_child(defib_hands)
+
+	var out := player.using == &"defib" and player.is_alive() and not third_person and not is_spectating()
+	defib_hands.present(out, player.use_fraction, delta)
+
+	if out and not _defib_sound and audio != null:
+		var _charge := audio.play(ZzAudio.DEFIB_CHARGE)
+
+	_defib_sound = out
+
+
 		world_view.pin(who, holder, kind, session_id == _watch_id and not third_person)
 
 	if session_id == _watch_id and hud != null:
@@ -1665,6 +1701,8 @@ func _process(delta: float) -> void:
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
+	_present_defib_hands(delta)
+
 		hands.aim(_aiming and _pointer_ours() and not third_person and not is_spectating()
 			and player.is_alive() and not player.is_down() and not player.is_held())
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
@@ -1872,6 +1910,12 @@ func spectate_step(direction: int) -> void:
 	var moved := game.spectate.step(player.player_id, direction)
 
 	if not moved.ok and chat != null:
+	if player.defibs > 0:
+		for other in game.survivors():
+			if other != player and other.life == ZzPlayer.Life.DEAD \
+					and other.feet().distance_to(player.feet()) <= game.config.defib_range + 0.4:
+				return "%s — hold to shock %s back" % [_key(ZzBindings.USE), other.display_name]
+
 		chat.notice(moved.error.message)
 
 

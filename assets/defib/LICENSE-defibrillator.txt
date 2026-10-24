@@ -1,0 +1,5 @@
+Defibrillator (Low Poly)
+Author: yellowbeebee (Sketchfab)
+Source: https://sketchfab.com/3d-models/defibrillator-low-poly-54d46d07faab45778b10304fbc9debc3
+Licence: Creative Commons Attribution 4.0 International (CC BY 4.0), https://creativecommons.org/licenses/by/4.0/
+Changes: scaled to 0.42 m, re-centred, pivot moved to the floor, exported as a single glb by art-src/defib_prep.py.

@@ -650,6 +650,8 @@ func _draw_health() -> void:
 		rows.append(["medkit", _key(ZzBindings.HEAL)])
 	if player.pills > 0:
 		rows.append(["pills", _key(ZzBindings.PILLS)])
+	if player.defibs > 0:
+		rows.append(["defibrillator x%d" % player.defibs, _key(ZzBindings.USE)])
 	kits.show_hints(rows)
 
 	# Stacked upward from the plate: the kits' rows, then the line about downs.
@@ -809,7 +811,7 @@ func _draw_use() -> void:
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"deploy": "Deploying the box — stay put…"}.get(player.using, "")
+		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Deploying the box — stay put…"}.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"

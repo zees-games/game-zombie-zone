@@ -292,6 +292,32 @@ func _run() -> void:
 			var _c := game.boxes.carry(local, &"mystery")
 			_client.set("_deploying", true)
 			await _seconds_of(maxf(_seconds, 4.0))
+		"defib", "defib_third", "defib_ground":
+			# The defibrillator: in hand (first person, or the figure's view), or lying a step ahead.
+			for other in game.survivors():
+				if other != local:
+					other.place_at(stand + Vector3(0.0, 0.0, 400.0), 0.0)
+			if _view == "defib_ground":
+				var _id := game.loot.add(ZzLoot.DEFIB, &"defib", stand + Vector3(0.0, 0.1, -1.4))
+				await _seconds_of(0.6)
+				_face(local, stand + Vector3(0.0, 0.1, -1.4))
+				await _seconds_of(0.4)
+			else:
+				local.defibs = 1
+				if _view == "defib_third":
+					_client.call("toggle_view")
+				await _seconds_of(0.5)
+				game.config.defib_charge_seconds = 4.0
+				var corpse := game.add_player(&"u900", "Fallen")
+				corpse.place_at(stand + Vector3(0.0, 0.0, -1.2), 0.0)
+				corpse.incaps = game.config.max_incaps
+				corpse.health.invulnerable = false
+				var kill := DotDamage.make(0, corpse.entity_id, 9999.0, game.combat.damage_type(&"strike"))
+				var _k = game.combat.apply_damage(kill)
+				await _seconds_of(0.3)
+				game._begin_defib(local, corpse)
+				_client.set("_using", true)
+				await _seconds_of(maxf(_seconds - 0.8, 0.5))
 		"hit":
 			# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
 			# through dot-combat as a shot would go: the marker and the numbers the client draws

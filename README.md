@@ -85,6 +85,24 @@ There are ten maps: the **practice street** built into the game, and from [zombi
 | **V** | Talk (voice) |
 | **F5** | First or third person |
 | **Tab** | Scoreboard (hold) |
+### Defibrillators
+
+A defibrillator brings a dead teammate back where they lie. Pick one up (the world, a zombie's drop, or a spawner or shop with `kind: defib`), walk to the body and hold E: a charge bar fills while you stand still, then the shock revives them on a share of their health with a short shield. Taking a hit or drifting away cancels it and costs nothing. The server decides everything, so it works on a dedicated server. Each is a config key (cvar `zz_defib_<key>`, the start one is `zz_defib_start`):
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `start_defibs` | 0 | 1 to start each life with one |
+| `defib_charge_seconds` | 4.0 | Hold time to charge |
+| `defib_range` | 2.0 | Metres from the body |
+| `defib_revive_fraction` | 0.4 | Share of maximum health they come back with |
+| `defib_invulnerable_seconds` | 2.0 | Shield after the shock |
+| `defib_charges` | 1 | Shocks per item (1 to 7) |
+| `defib_cooldown_seconds` | 8.0 | Recharge between shocks |
+| `defib_max_body_age` | 60.0 | Seconds after death a body can be saved (0 never expires) |
+| `defib_move_tolerance` | 0.6 | Metres the user may drift while charging |
+
+Drop odds are the `defib` entry under `items` in `cfg/addons/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `DotDefib`; `tests: ./game.sh test headless_defib`.
+
 | **H** | Help: the goal, the rules and every key as you have it bound |
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
@@ -231,3 +249,5 @@ The zombies are from [Quaternius](https://quaternius.com)' [Zombie Apocalypse Ki
 
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.
+The defibrillator is [Defibrillator (Low Poly)](https://sketchfab.com/3d-models/defibrillator-low-poly-54d46d07faab45778b10304fbc9debc3) by yellowbeebee ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), scaled and re-pivoted by `art-src/defib_prep.py`; the notice is `assets/defib/LICENSE-defibrillator.txt`.
+

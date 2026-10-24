@@ -34,6 +34,8 @@ const MAP_LOST := &"map_lost"
 const BOX_OPEN := &"box_open"
 const PICKUP := &"pickup"
 const HEALED := &"healed"
+const DEFIB_CHARGE := &"defib_charge"
+const DEFIB_ZAP := &"defib_zap"
 const UI_CLICK := &"ui_click"
 const UI_DENY := &"ui_deny"
 const HURT := &"hurt"
@@ -110,6 +112,8 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	c.add(_flat(BOX_OPEN, &"SFX", 2, 85, "box_open"))
 	c.add(_flat(PICKUP, &"UI", 2, 70, ""))
 	c.add(_flat(HEALED, &"UI", 1, 70, ""))
+	c.add(_flat(DEFIB_CHARGE, &"SFX", 1, 80, ""))
+	c.add(_flat(DEFIB_ZAP, &"SFX", 2, 95, ""))
 	var hurt := _flat(HURT, &"SFX", 2, 75, "punch_1")
 	hurt.variants = PackedStringArray([_file("punch_1"), _file("punch_2")])
 	hurt.cooldown_ms = 150
@@ -220,6 +224,8 @@ static func sound_recipes() -> Dictionary:
 		MAP_LOST: DotAudioSynth.Voice.DENY,
 		PICKUP: DotAudioSynth.Voice.PICKUP,
 		HEALED: DotAudioSynth.Voice.PICKUP,
+		DEFIB_CHARGE: DotAudioSynth.Voice.SPAWN,
+		DEFIB_ZAP: DotAudioSynth.Voice.SHOT_TIGHT,
 		UI_CLICK: DotAudioSynth.Voice.CLICK,
 		UI_DENY: DotAudioSynth.Voice.DENY,
 		WEAPON_SHOT: DotAudioSynth.Voice.SHOT,

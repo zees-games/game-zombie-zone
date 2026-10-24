@@ -1,6 +1,7 @@
 extends Node3D
 
 const ZzPaths := preload("zz_paths.gd")
+const ZzDefibModel := preload("zz_defib_model.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
@@ -52,6 +53,7 @@ const TEAM_TINT := 0.62
 ## Which atlas this figure wears, and the side colour on it. Read by the suite.
 var atlas: String = ""
 var team_colour: Color = Color.WHITE
+var _defib: Node3D = null
 
 ## Whether the people's art loaded, or a capsule stands in.
 var from_art: bool = false
@@ -262,6 +264,26 @@ func attachment(point: StringName) -> Node3D:
 	if person == null:
 		return null
 	return person.attachment(point)
+
+## The defibrillator in the hands while it charges at a body, for whoever is watching.
+func show_defib(active: bool) -> void:
+	if not active and _defib == null:
+		return
+
+	if _defib == null:
+		_defib = ZzDefibModel.instantiate()
+
+		if _defib == null:
+			return
+
+		_defib.name = "Defib"
+		_defib.scale = Vector3.ONE * 0.9
+		_defib.position = Vector3(0.0, 0.95, -0.42)
+		_defib.rotation_degrees = Vector3(0.0, 180.0, 0.0)
+		add_child(_defib)
+
+	_defib.visible = active
+
 
 
 ## How far a watched gun kicks per kind of use, in the recoil's own degrees. The real

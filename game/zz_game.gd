@@ -115,6 +115,8 @@ signal player_downed(player_id: StringName, by: StringName, why: StringName)
 signal player_died(player_id: StringName, by: StringName, why: StringName)
 signal player_revived(player_id: StringName, by: StringName)
 signal player_rescued(player_id: StringName)
+## A dead survivor shocked back by [param by]'s defibrillator, where they lay.
+signal defibbed(player_id: StringName, by: StringName)
 signal player_healed(player_id: StringName, by: StringName, amount: float)
 signal player_biled(player_id: StringName, seconds: float)
 signal player_hurt(player_id: StringName, amount: float, from: Vector3)
@@ -704,6 +706,11 @@ func can_be_harmed(player_id: StringName) -> bool:
 ## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
 ## friendly-fire scale already applied). It is added to the shooter's window first, so a new
 ## player being reflected still runs up the total that earns a voteban or a ban, and then, when
+	var shocked := player_by_id(player_id)
+
+	if shocked != null and now() < shocked.shield_until:
+		return false
+
 ## the shooter's damage is reflected, it lands on the shooter instead: the one who was hit takes
 ## nothing. Server only.
 func _team_damage_hit(damage: DotDamage) -> void:
@@ -1457,6 +1464,7 @@ func _draw(player: ZzPlayer, weapon_id: StringName) -> void:
 		return
 
 	var def := player.weapons.arsenal.catalogue.get_def(weapon_id)
+		player.defibs = config.defib_charges if config.start_defibs > 0 else 0
 
 	if def != null:
 		var _selected := player.weapons.arsenal.select(def.slot, _tick)
@@ -2033,6 +2041,12 @@ func _begin_use(player: ZzPlayer) -> void:
 
 	if index >= 0 and phase == Phase.PLAY:
 		var o: Dictionary = (map_doc["objectives"] as Array)[index]
+	var body := _body_to_defib(player)
+
+	if body != null:
+		_begin_defib(player, body)
+		return
+
 
 		if o["kind"] == "use" and objective_states[index] == &"waiting" \
 				and player.eye_position().distance_to(ZzMapDoc.v3(o["at"])) <= float(o["radius"]) + 0.6:
@@ -2133,6 +2147,59 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 	if other != null and other != player:
 		other.helped_fraction = player.use_fraction
 
+## The dead teammate's body [param player] could shock back: the nearest within the defibrillator's
+## reach, or null (also when they carry none).
+func _body_to_defib(player: ZzPlayer) -> ZzPlayer:
+	if player.defibs <= 0:
+		return null
+
+	var best: ZzPlayer = null
+	var best_gap := config.defib_range + 0.8
+
+	for other in survivors():
+		if other == player or other.life != ZzPlayer.Life.DEAD:
+			continue
+
+		var gap := other.feet().distance_to(player.feet())
+
+		if gap < best_gap:
+			best_gap = gap
+			best = other
+
+	return best
+
+
+## The defibrillator in [param player]'s hands as [DotDefib] data, from the configuration now.
+func _defib_of(player: ZzPlayer) -> DotDefib:
+	var d := DotDefib.new()
+	d.charge_seconds = config.defib_charge_seconds
+	d.reach = config.defib_range
+	d.revive_fraction = config.defib_revive_fraction
+	d.invulnerable_seconds = config.defib_invulnerable_seconds
+	d.cooldown_seconds = config.defib_cooldown_seconds
+	d.max_body_age = config.defib_max_body_age
+	d.move_tolerance = config.defib_move_tolerance
+	d.charges = player.defibs
+	d.ready_at = player.defib_ready_at
+	return d
+
+
+func _defib_check(user: ZzPlayer, body: ZzPlayer) -> DotResult:
+	var age := now() - body.died_at if body.died_at >= 0.0 else 0.0
+	return _defib_of(user).check(now(), age, body.feet().distance_to(user.feet()))
+
+
+func _begin_defib(player: ZzPlayer, body: ZzPlayer) -> void:
+	var res := _defib_check(player, body)
+
+	if not res.ok:
+		refused.emit(player.player_id, res.error.message)
+		return
+
+	_start(player, &"defib", body.entity_id, config.defib_charge_seconds)
+	player.use_origin = player.feet()
+
+
 	if player.use_fraction < 1.0:
 		return
 
@@ -2153,6 +2220,11 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 		&"repair":
 			var _mended := mend_barricade(target, player)
 		&"deploy":
+		&"defib":
+			var body := player_for_entity(player.use_target)
+			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
+			return body != null and body.life == ZzPlayer.Life.DEAD and _defib_check(player, body).ok \
+				and drift.length() <= config.defib_move_tolerance
 			if boxes != null:
 				boxes.deploy(player)
 
@@ -2191,6 +2263,8 @@ func _looked_at_survivor(player: ZzPlayer, reach: float, down: bool) -> ZzPlayer
 
 		var middle := other.feet() + Vector3(0.0, 0.3 if down else 1.0, 0.0)
 
+		&"defib":
+			_defib_revive(player_for_entity(target), player)
 		if eye.distance_to(middle) > reach + 0.8:
 			continue
 
@@ -2443,7 +2517,7 @@ func _on_player_damaged(player: ZzPlayer, damage: DotDamage) -> void:
 
 	# Hurt while holding E: a revive or a heal is interrupted by a hit, as the genre has it,
 	# only when the hit is a real one.
-	if damage.health_lost >= 5.0 and player.using == &"heal":
+	if damage.health_lost >= 5.0 and (player.using == &"heal" or player.using == &"defib"):
 		cancel_use(player)
 
 
@@ -2570,6 +2644,49 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 ## seeded from the player and the tick. The killing hit's direction when it had one, else away
 ## from whoever did it (a zombie's claw carries none); bleeding out and falling push nothing.
 ## A friend's gun is a weapon def, so a heavy one may launch the body as it would a zombie.
+## [param by] shocks the dead [param body] back, where it lies: a charge spent, the cooldown begun,
+## health by [member ZzConfig.defib_revive_fraction], and [member ZzConfig.defib_invulnerable_seconds]
+## of not being hurt. They are one down from dead again, not a clean slate (a medkit is that).
+func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
+	if body == null or by == null or body.life != ZzPlayer.Life.DEAD:
+		return
+
+	var res := _defib_check(by, body)
+
+	if not res.ok:
+		refused.emit(by.player_id, res.error.message)
+		return
+
+	var d := _defib_of(by)
+	d.spend(now())
+	by.defibs = d.charges
+	by.defib_ready_at = d.ready_at
+
+	body.life = ZzPlayer.Life.UP
+	body.watching = false
+	body.incaps = maxi(config.max_incaps - 1, 0)
+	body.died_at = -1.0
+	body.temp_health = 0.0
+	body.health.max_health = config.max_health
+	body.health.revive(d.revive_fraction)
+	body.shield_until = now() + d.invulnerable_seconds
+	body.fit_hitboxes()
+	_equip(body, false)
+
+	if spectate != null:
+		spectate.on_spawned(body.player_id)
+
+	by.revives_done += 1
+	by.points += 5
+
+	if progress != null:
+		progress.on_revived(by.player_id)
+
+	defibbed.emit(body.player_id, by.player_id)
+	notice.emit("%s shocked %s back." % [by.display_name, body.display_name])
+	DotLog.debug(CHANNEL, "defibrillated", {"id": String(body.player_id), "by": String(by.player_id)})
+
+
 func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
 	var direction := Vector3.ZERO
 	var headshot := false

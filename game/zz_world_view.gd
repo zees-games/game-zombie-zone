@@ -3,6 +3,7 @@ extends Node3D
 const ZzAudio := preload("zz_audio.gd")
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzPaths := preload("zz_paths.gd")
+const ZzDefibModel := preload("zz_defib_model.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
@@ -252,6 +253,16 @@ func add_loot(id: int, kind: StringName, item: StringName, at: Vector3, box_colo
 			var cross_b := _box(Vector3(0.06, 0.02, 0.22), Color(0.85, 0.08, 0.08))
 			cross_b.position.y = 0.15
 			node.add_child(cross_b)
+		&"defib":
+			var unit := ZzDefibModel.instantiate()
+
+			if unit != null:
+				unit.name = "Defib"
+				unit.rotation_degrees.y = 180.0
+				unit.scale = Vector3.ONE * 1.5
+				node.add_child(unit)
+			else:
+				node.add_child(_box(Vector3(0.3, 0.16, 0.4), Color(0.85, 0.85, 0.88)))
 		&"pills":
 			var bottle := MeshInstance3D.new()
 			var cylinder := CylinderMesh.new()
@@ -289,6 +300,8 @@ static func _label(kind: StringName, item: StringName) -> String:
 			return "take the medkit"
 		&"pills":
 			return "take the pills"
+		&"defib":
+			return "take the defibrillator"
 		&"box":
 			return "take the box" if item == &"unknown" else "take the %s box" % String(item).replace("_", " ")
 	return "pick up"

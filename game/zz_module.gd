@@ -591,6 +591,24 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.gravity = value)
 	_tunable("zz_spectate_camera", float(config.spectate_camera),
 		"Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody",
+	_tunable("zz_defib_start", float(config.start_defibs), "Whether each survivor starts a map holding a defibrillator (0 or 1)",
+		func(value: float) -> void: config.start_defibs = clampi(int(value), 0, 1))
+	_tunable("zz_defib_charge_seconds", config.defib_charge_seconds, "Seconds E is held at a dead teammate's body before the shock (0.5 to 30)",
+		func(value: float) -> void: config.defib_charge_seconds = clampf(value, 0.5, 30.0))
+	_tunable("zz_defib_range", config.defib_range, "Metres from the body a defibrillator works (0.5 to 5)",
+		func(value: float) -> void: config.defib_range = clampf(value, 0.5, 5.0))
+	_tunable("zz_defib_revive_fraction", config.defib_revive_fraction, "Share of maximum health the revived come back with (0.05 to 1)",
+		func(value: float) -> void: config.defib_revive_fraction = clampf(value, 0.05, 1.0))
+	_tunable("zz_defib_invulnerable_seconds", config.defib_invulnerable_seconds, "Seconds the revived cannot be hurt (0 to 15)",
+		func(value: float) -> void: config.defib_invulnerable_seconds = clampf(value, 0.0, 15.0))
+	_tunable("zz_defib_charges", float(config.defib_charges), "Revives one defibrillator holds (1 to 7; applies to ones picked up from now)",
+		func(value: float) -> void: config.defib_charges = clampi(int(value), 1, 7))
+	_tunable("zz_defib_cooldown_seconds", config.defib_cooldown_seconds, "Seconds after a shock before the item may be used again (0 to 120)",
+		func(value: float) -> void: config.defib_cooldown_seconds = clampf(value, 0.0, 120.0))
+	_tunable("zz_defib_max_body_age", config.defib_max_body_age, "Seconds after death beyond which the body is past saving (0: never)",
+		func(value: float) -> void: config.defib_max_body_age = clampf(value, 0.0, 600.0))
+	_tunable("zz_defib_move_tolerance", config.defib_move_tolerance, "Metres the user may drift while charging before it is interrupted (0.1 to 3)",
+		func(value: float) -> void: config.defib_move_tolerance = clampf(value, 0.1, 3.0))
 		func(value: float) -> void:
 			config.spectate_camera = clampi(int(value), 0, 2)
 			if world.spectate != null:

@@ -13,7 +13,7 @@ const CHANNEL := "zz.spawners"
 const GAME_ID := "game-zombie-zone"
 
 ## Spawner kinds that are loot kinds already; anything else is laid as a weapon.
-const KINDS: Array[StringName] = [ZzLoot.WEAPON, ZzLoot.AMMO, ZzLoot.MEDKIT, ZzLoot.PILLS, ZzLoot.THROWABLE, ZzLoot.BOX]
+const KINDS: Array[StringName] = [ZzLoot.WEAPON, ZzLoot.AMMO, ZzLoot.MEDKIT, ZzLoot.PILLS, ZzLoot.THROWABLE, ZzLoot.BOX, ZzLoot.DEFIB]
 
 var game = null
 var spawner := DotWeaponSpawner.new()

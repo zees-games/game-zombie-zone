@@ -322,6 +322,24 @@ func setup_seconds() -> float:
 ## Reach and half-angle of a shove.
 @export_range(0.5, 5.0, 0.1) var shove_range: float = 2.0
 @export_range(10.0, 90.0, 1.0) var shove_half_angle: float = 55.0
+## The defibrillator: held E at a dead teammate's body shocks them back (a downed one is picked up
+## by hand as ever). Each key is also a cvar, `zz_defib_*`; see the README.
+## Whether each survivor starts a map holding one (0 or 1).
+@export_range(0, 1, 1) var start_defibs: int = 0
+## Seconds E is held at the body, and the metres from it.
+@export_range(0.5, 30.0, 0.1) var defib_charge_seconds: float = 4.0
+@export_range(0.5, 5.0, 0.1) var defib_range: float = 2.0
+## Share of maximum health the revived come back with, and seconds they cannot be hurt.
+@export_range(0.05, 1.0, 0.05) var defib_revive_fraction: float = 0.4
+@export_range(0.0, 15.0, 0.5) var defib_invulnerable_seconds: float = 2.0
+## Revives one item holds, and seconds after a shock before the next try.
+@export_range(1, 7, 1) var defib_charges: int = 1
+@export_range(0.0, 120.0, 0.5) var defib_cooldown_seconds: float = 8.0
+## Seconds after death beyond which the body is past saving (0: never).
+@export_range(0.0, 600.0, 1.0) var defib_max_body_age: float = 60.0
+## Metres the user may drift while charging before it is interrupted.
+@export_range(0.1, 3.0, 0.1) var defib_move_tolerance: float = 0.6
+
 
 ## Damage a shove does to a common, which is nothing much: it is for room, not for killing.
 @export_range(0.0, 100.0, 1.0) var shove_damage: float = 5.0

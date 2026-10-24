@@ -85,6 +85,11 @@ var pin_kind: StringName = &""
 ## What they carry besides weapons.
 var medkits: int = 0
 var pills: int = 0
+## Charges left in the defibrillator they carry (0: none), the time it is next ready (server), and
+## the time until which they cannot be hurt after being shocked back (server).
+var defibs: int = 0
+var defib_ready_at: float = 0.0
+var shield_until: float = -1.0
 
 ## The boxes in their hands, by type (server), and what everybody sees of them: how many, and
 ## which as an index into the box file's order plus one (0: none, or unknown because
@@ -703,6 +708,8 @@ func reset_map() -> void:
 	water_level = WaterLevel.NONE
 
 	respawn_at = -1.0
+	defib_ready_at = 0.0
+	shield_until = -1.0
 	protected_until = -1.0
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
@@ -780,6 +787,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 			"aim": deg_to_rad(controller.state.pitch),
 		})
 		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())
+		figure.show_defib(using == &"defib")
 		figure.show_box(carried_count, use_fraction if using == &"deploy" else 0.0)
 
 	return shown

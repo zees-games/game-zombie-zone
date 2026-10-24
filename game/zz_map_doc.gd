@@ -93,7 +93,7 @@ const MAX_CACHES := 32
 const MAX_BARRICADES := 96
 
 ## What a mapper may leave lying about. `box` is one of the random boxes (by `id`, or any).
-const ITEM_KINDS: Array[String] = ["weapon", "ammo", "medkit", "pills", "box", "throwable"]
+const ITEM_KINDS: Array[String] = ["weapon", "ammo", "medkit", "pills", "box", "throwable", "defib"]
 
 ## What an objective asks: `use` a thing (hold E on it for `seconds`), then optionally hold out
 ## for `holdout` seconds while the horde comes; or `reach` a place.

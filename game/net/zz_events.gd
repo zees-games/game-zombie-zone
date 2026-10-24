@@ -109,6 +109,8 @@ enum Kind {
 	## Blood on a surface: a point and the surface's normal, to everybody but the shooter, who
 	## splatters it from their own HIT. An older client ignores a kind it does not know.
 	SPLAT,
+	## A dead survivor was shocked back by a defibrillator: who, and by whom (a pair).
+	DEFIB,
 }
 
 enum Ask {
