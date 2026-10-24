@@ -113,7 +113,7 @@ var _aiming: bool = false
 
 ## The lens before an aim zooms it: the menu's field of view lands here, not on the camera, so
 ## the zoom always scales the player's own setting and never compounds frame to frame.
-var base_fov: float = 90.0
+var base_fov: float = DotMenuApplier.vertical_from_horizontal_4_3(ZzSettings.DEFAULT_FOV)
 var _reloading: bool = false
 var _using: bool = false
 ## The trader's list as the server last said it ({menu, open, radius, at, items}), and its menu.
@@ -1112,7 +1112,7 @@ func _build_camera() -> void:
 
 	camera = Camera3D.new()
 	camera.name = "Eye"
-	camera.fov = 90.0
+	camera.fov = base_fov
 	camera.current = true
 	camera.far = 400.0
 

@@ -25,7 +25,7 @@ const ZzBindings := preload("zz_bindings.gd")
 ## `field_of_view` is SERVER_CLAMPED: a wide view is an advantage a server may cap, and
 ## dot-settings gives a server no way to READ it. The volumes are this machine's.
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
 
 ## Where this game's own document lives. The shared account document is dot-settings'.
 const SETTINGS_DIR := "user://zombiezone_settings"
@@ -33,8 +33,9 @@ const SETTINGS_DIR := "user://zombiezone_settings"
 ## The app's namespace. ACCOUNT settings are shared under dot-menu's `tmc_account`.
 const APP_NAMESPACE := &"zombiezone"
 
-## The field of view the camera had before this existed, and still the default.
-const DEFAULT_FOV := 92
+## Horizontal degrees on a 4:3 frame (the family's measure), about 100 across a 16:9 window.
+## The old 92 went to the camera as the vertical angle: 120 across 16:9, a fisheye.
+const DEFAULT_FOV := 85
 
 ## Stock keys nothing here applies: every sound is on the SFX bus, the client binds no
 ## effects, and the chat box has no switch.
@@ -77,7 +78,13 @@ static func schema_for() -> DotSettingsSchema:
 
 
 func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
+	# v1 stored the vertical angle; a stored value would now mean a different view.
+	migrations[1] = func(doc: Dictionary) -> Dictionary:
+		doc.erase("field_of_view")
+		return doc
 	var made := super.setup(store, with_menu)
+	if applier != null:
+		applier.fov_transform = DotMenuApplier.vertical_from_horizontal_4_3
 	if menu != null:
 		var video := menu.page(&"video")
 		DotMenuStock.add_gore_row(video)

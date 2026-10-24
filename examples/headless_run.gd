@@ -39,7 +39,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 43
 
-const CHECKS := 310
+const CHECKS := 313
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1895,7 +1895,7 @@ func _test_help_and_menu() -> void:
 	# defaults, help keeps H, and a key the player chose stays where they put it.
 	var old_doc := DotSettingsStoreMemory.new()
 	var _saved := old_doc.save_document(ZzSettings.APP_NAMESPACE, &"local", {"version": 1, "values": {
-		"bind_heal": "H", "bind_help": "H", "bind_shove": "V", "bind_use": "J",
+		"bind_heal": "H", "bind_help": "H", "bind_shove": "V", "bind_use": "J", "field_of_view": 92,
 	}})
 	var returning := ZzSettings.new()
 	add_child(returning)
@@ -1907,6 +1907,18 @@ func _test_help_and_menu() -> void:
 	_check(rk.key_for(ZzBindings.SHOVE) == "F" and rk.key_for(ZzBindings.USE) == "J",
 		"the shove leaves V for push to talk, and a key the player chose is kept",
 		"%s %s" % [rk.key_for(ZzBindings.SHOVE), rk.key_for(ZzBindings.USE)])
+	var fov_cam := Camera3D.new()
+	returning.add_child(fov_cam)
+	returning.bind_camera(fov_cam)
+	_check(returning.settings.get_int(&"field_of_view", 0) == ZzSettings.DEFAULT_FOV,
+		"a v1 file's vertical field of view is dropped for the new default",
+		str(returning.settings.get_int(&"field_of_view", 0)))
+	var wide := 2.0 * atan(tan(deg_to_rad(fov_cam.fov * 0.5)) * 16.0 / 9.0)
+	_check(absf(rad_to_deg(wide) - 100.0) < 1.5,
+		"the default field of view is about 100 degrees across a 16:9 window", "%.1f" % rad_to_deg(wide))
+	var _w := returning.settings.set_value(&"field_of_view", 70)
+	_check(absf(fov_cam.fov - DotMenuApplier.vertical_from_horizontal_4_3(70.0)) < 0.01,
+		"the slider is horizontal degrees at 4:3, converted for the camera", "%.2f" % fov_cam.fov)
 	returning.queue_free()
 	await get_tree().process_frame
 	_finished()
