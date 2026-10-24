@@ -259,6 +259,9 @@ static func validate(source: Dictionary) -> DotResult:
 		if wc is Dictionary and not (wc as Dictionary).is_empty():
 			doc["world_collision"] = {"models": _ints(wc.get("models", [])), "flat": _ints(wc.get("flat", [])),
 					"flat_height": float(wc.get("flat_height", 0.5)), "skip": _boxes(wc.get("skip", []))}
+			for crop_key: String in ["within", "band"]:
+				if wc.has(crop_key) and wc[crop_key] is Array:
+					doc["world_collision"][crop_key] = (wc[crop_key] as Array).map(func(v: Variant) -> float: return float(v))
 
 	var mode := str(source.get("mode", EXODUS))
 

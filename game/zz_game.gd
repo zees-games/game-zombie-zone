@@ -1330,7 +1330,7 @@ func _on_round_started(number: int) -> void:
 	_reset_objectives()
 
 	if horde != null:
-		var built := horde.build_for_map(map_doc)
+		var built := horde.build_for_map(map_doc, map.read_nav_extra(str(catalogue.roots.get(StringName(str(map_doc.get("id", ""))), "")) if catalogue != null else "") if authoritative and map != null else {})
 		if not built.ok:
 			DotLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": built.error.message})
 

@@ -412,8 +412,9 @@ func _test_map(id: StringName) -> void:
 
 	var props_size := func(pid: StringName) -> Vector3:
 		return game.props_catalogue.size_of(pid) if game.props_catalogue.has(pid) else Vector3.ZERO
-	var open := DotNpcNavGraph.new(ZzNpcs.nav_for(doc, props_size, gates))
-	var shut := DotNpcNavGraph.new(ZzNpcs.nav_for(doc, props_size))
+	var nav_doc := ZzNpcs.with_nav_extra(doc, game.map.read_nav_extra(str(game.catalogue.roots.get(StringName(str(doc.get("id", ""))), ""))))
+	var open := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size, gates))
+	var shut := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size))
 	var from: Vector3 = game.map.spawn("survivors", 0)[0]
 	var unreached: Array = []
 	var places: Array = []
@@ -438,6 +439,12 @@ func _test_map(id: StringName) -> void:
 
 	_check(unreached.is_empty() and open.data.points.size() > 50, "the zombies' ground joins everything to the start",
 		"%d points; %s" % [open.data.points.size(), "; ".join(unreached.slice(0, 40))])
+
+	# A map whose wire budget cut boxes walks on the whole map's floor, not the document's.
+	if (nav_doc["boxes"] as Array).size() > (doc["boxes"] as Array).size():
+		var plain := ZzNpcs.nav_for(doc, props_size, gates)
+		var floors_ok := open.data.points.size() >= plain.points.size() * 9 / 10
+		_check(floors_ok, "the whole map's floor gives the horde as much ground as the document's", "%d points against %d" % [open.data.points.size(), plain.points.size()])
 
 	# With the gates shut, what lies past them is cut off: a gate the horde walks through is
 	# not one. A map without gates says so.

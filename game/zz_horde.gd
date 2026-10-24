@@ -158,6 +158,8 @@ var _by_entity: Dictionary = {}
 var _candidates: Array = []
 var _survivors: Dictionary = {}
 var _doc: Dictionary = {}
+## The server-only `hulls/<id>.nav.json` of a map whose boxes the wire budget cut ([method ZzMap.read_nav_extra]).
+var _nav_extra: Dictionary = {}
 var _populated: bool = true
 var _time: float = 0.0
 
@@ -272,9 +274,10 @@ func _rules() -> DotNpcDirectorRules:
 
 ## Builds the horde for a map: its graph, its spawn points, its route, its sleepers, and the
 ## commons standing about in it.
-func build_for_map(doc: Dictionary) -> DotResult:
+func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 	clear()
 	_doc = doc
+	_nav_extra = nav_extra
 	open_gates = PackedStringArray()
 	# Sized for the team the map is built for: a dozen survivors' cap on four survivors' budget
 	# had the spawner refuse two of every three of a wave.
@@ -425,7 +428,7 @@ func rebuild_navigation() -> DotResult:
 	_drop_nav_job()
 	_nav_started = Time.get_ticks_msec()
 	var threads := config.nav_threads if DotPlatform.has_threads() else 0
-	var job := ZzNpcs.nav_job(_doc, props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
+	var job := ZzNpcs.nav_job(ZzNpcs.with_nav_extra(_doc, _nav_extra), props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
 	job.workers = maxi(threads, 1)
 
 	if not nav_async:

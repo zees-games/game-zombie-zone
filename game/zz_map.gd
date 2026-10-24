@@ -971,6 +971,8 @@ func attach_world_collision(world: RefCounted) -> void:
 	var body := StaticBody3D.new()
 	body.name = "WorldCollision"
 	var kinds := PackedStringArray(["solid", "clip", "glass"])
+	var within: Array = sel.get("within", [])
+	var band: Array = sel.get("band", [])
 	for model: int in whole.keys() + flat.keys():
 		var origin: Vector3 = world.call(&"model_origin", model)
 		for h: Dictionary in world.call(&"hull_shapes", model, kinds):
@@ -983,6 +985,10 @@ func attach_world_collision(world: RefCounted) -> void:
 			if skips.any(func(r: AABB) -> bool: return r.has_point(bounds.get_center())):
 				continue
 			var cs := CollisionShape3D.new()
+			if within.size() == 4 and (bounds.end.x < within[0] or bounds.position.x > within[2] or bounds.end.z < within[1] or bounds.position.z > within[3]):
+				continue
+			if band.size() == 2 and (bounds.end.y <= band[0] or bounds.position.y >= band[1]):
+				continue
 			cs.shape = shape
 			cs.position = origin
 			body.add_child(cs)
@@ -995,12 +1001,32 @@ func attach_world_collision(world: RefCounted) -> void:
 ## [method attach_world_collision] on a server, which loads no world: from the maps pack's
 ## `hulls/<id>` under [param root] (where the document was read), else the checkout's world.
 func build_world_collision_local(root: String = "") -> bool:
-	if doc.get("world_collision", {}).is_empty() or world_collision != null or not can_draw_world():
-		return false
+func _hull_prefixes(root: String) -> PackedStringArray:
 	var prefixes := PackedStringArray([ZzPaths.rebase("res://maps/hulls/" + String(id())), local_world_prefix()])
 	if root != "":
 		prefixes.insert(0, root.path_join("hulls").path_join(String(id())))
-	for prefix in prefixes:
+	return prefixes
+
+
+## The maps pack's `hulls/<id>.nav.json` (the whole map's boxes, floors and links the budget cut from the
+## document, for the horde's graph), or {} when the map lost nothing or the file is not here.
+func read_nav_extra(root: String = "") -> Dictionary:
+	if doc.get("world_collision", {}).is_empty():
+		return {}
+	for prefix in _hull_prefixes(root):
+		if FileAccess.file_exists(prefix + ".nav.json"):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(prefix + ".nav.json"))
+			if parsed is Dictionary:
+				return parsed
+			DotLog.warn(CHANNEL, "a map's navigation extra would not read", {"map": String(id()), "at": prefix})
+			return {}
+	DotLog.warn(CHANNEL, "a map's navigation extra was not found; the horde walks the document's floor only", {"map": String(id())})
+	return {}
+
+
+	if doc.get("world_collision", {}).is_empty() or world_collision != null or not can_draw_world():
+		return false
+	for prefix in _hull_prefixes(root):
 		if not FileAccess.file_exists(prefix + ".json"):
 			continue
 		var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)

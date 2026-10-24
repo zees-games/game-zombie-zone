@@ -435,6 +435,43 @@ static func nav_job(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 	return job
 
 
+## [param doc] with the boxes of the whole map ([param extra], from the maps pack's `hulls/<id>.nav.json`)
+## added, and its floors and links joined to the document's (not replacing them: the full conversion's heights differ
+## a little and its graph wandered). The graph is the server's; the wire's limits are for the client's transport. Nothing to add leaves [param doc] as it is.
+static func with_nav_extra(doc: Dictionary, extra: Dictionary) -> Dictionary:
+	if extra.is_empty():
+		return doc
+
+	var out := doc.duplicate()
+	var boxes: Array = (doc.get("boxes", []) as Array).duplicate()
+	boxes.append_array(extra.get("boxes", []))
+	out["boxes"] = boxes
+	var nav: Dictionary = (doc.get("nav", {}) as Dictionary).duplicate()
+	nav["floors"] = _joined(nav.get("floors", []), extra.get("floors", []), 4)
+	nav["links"] = _joined(nav.get("links", []), extra.get("links", []), 6)
+	out["nav"] = nav
+	return out
+
+
+## [param have] and the rows of [param more] whose first [param keys] numbers match none of its rows to a centimetre.
+static func _joined(have: Array, more: Array, keys: int) -> Array:
+	var seen := {}
+	for row: Array in have:
+		seen[_row_key(row, keys)] = true
+	var out := have.duplicate()
+	for row: Array in more:
+		if not seen.has(_row_key(row, keys)):
+			out.append(row)
+	return out
+
+
+static func _row_key(row: Array, keys: int) -> String:
+	var parts := PackedStringArray()
+	for i in keys:
+		parts.append(str(roundi(float(row[i]) * 100.0)))
+	return ",".join(parts)
+
+
 ## The posts and the points of the ground joined to the first survivor spawn on [param nav].
 static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
 	var graph := DotNpcNavGraph.new(nav)
