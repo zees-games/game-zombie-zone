@@ -504,6 +504,10 @@ func setup_seconds() -> float:
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
+## How the client culls a world: off, pvs, occluders or both (dot-map's DotMapVisibility). Empty
+## leaves it to the client's video setting. `--zz-vis-mode=`.
+@export var vis_mode: String = ""
+
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 

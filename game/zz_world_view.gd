@@ -317,6 +317,8 @@ func set_loot_price(id: int, price: int) -> void:
 		tag.text = "%d" % price
 		tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		tag.no_depth_test = true
+		# Seen through walls on purpose, so the map's occluders must not hide it either.
+		tag.ignore_occlusion_culling = true
 		tag.fixed_size = true
 		tag.pixel_size = 0.0007
 		tag.font_size = 40

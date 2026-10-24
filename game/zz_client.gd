@@ -225,12 +225,23 @@ func _draw_world() -> void:
 	var ticket := _world_ticket
 	if gate != null:
 		gate.hold(&"world", "Loading the world")
+	game.map.vis_mode = _vis_mode()
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")
 
 
 var _world_ticket: int = 0
+
+
+## The map culling mode: the config's `vis_mode` when set (bench, server cfg), else the video setting.
+func _vis_mode() -> String:
+	if game != null and game.config != null and str(game.config.get(&"vis_mode")) != "":
+		return str(game.config.get(&"vis_mode"))
+	var names := ["off", "pvs", "occluders", "both"]
+	if settings == null or settings.settings == null:
+		return "both"
+	return names[clampi(settings.settings.get_int(&"vis_mode", 3), 0, 3)]
 ## The server has said what this survivor holds (a weapon or nothing); the load gate's `weapon` requirement.
 var _armed_told: bool = false
 
@@ -1550,6 +1561,10 @@ func _build_settings() -> void:
 
 	if world_view != null:
 		world_view.lod.follow(settings.settings)
+
+	settings.settings.changed.connect(func(key: StringName, _value: Variant, _why: StringName) -> void:
+		if key == &"vis_mode" and game != null and game.map != null:
+			game.map.set_vis_mode(_vis_mode()))
 
 	if _sampler != null:
 		settings.bind_look(_sampler.tunables)

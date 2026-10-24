@@ -71,6 +71,8 @@ static func schema_for() -> DotSettingsSchema:
 		"Blood splatters on the surface behind a zombie or survivor you hit."))
 	s.add(DotSettingsDef.integer(&"crowd_detail", 1, 0, 2, &"video").with_description(
 		"How near a zombie must be to be animated every frame, cast a shadow and be drawn at all."))
+	s.add(DotSettingsDef.integer(&"vis_mode", 3, 0, 3, &"video").with_description(
+		"Which hidden parts of a map are skipped when drawing: none, by precomputed visibility, by occluders, or both."))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
 
 
@@ -83,6 +85,9 @@ func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
 			video.section("Image").add(DotMenuRow.select(&"crowd_detail", "Crowd detail",
 				"Low animates, shadows and draws far zombies less: faster in a big horde.",
 				[[0, "Low"], [1, "Normal"], [2, "High"]]))
+			video.section("Image").add(DotMenuRow.select(&"vis_mode", "Map culling",
+				"Skips the parts of a map you cannot see. Off draws everything (slower, for checking).",
+				[[0, "Off"], [1, "Precomputed"], [2, "Occluders"], [3, "Both"]]))
 		var general := menu.page(&"general")
 		if general != null:
 			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",

@@ -98,12 +98,16 @@ static var use_worlds: bool = true
 ## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
 const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
+const VIS_SCRIPT := "res://addons/dot_map/bsp/dot_map_visibility.gd"
 
 ## Where a checkout keeps a map's world: `world/<pack>/<id>`.
 const LOCAL_WORLD := "res://world/%s/%s"
 
 ## True once [method attach_world] has drawn this map's own geometry.
 var world_drawn: bool = false
+## How a drawn world is culled (dot-map DotMapVisibility): off, pvs, occluders or both.
+var vis_mode: String = "both"
+var visibility: Node = null
 
 ## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
 var mechanics: ZzMechanics = null
@@ -1036,8 +1040,36 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		_drawn.add_child(kept)
 
 	_attach_world_extras(world, node)
+	_attach_visibility(world, node)
 	world_drawn = true
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## Culls the drawn world to what the camera's cluster can see, and adds its occluders; a pack
+## without visibility data, or a headless run, draws everything.
+func _attach_visibility(world: RefCounted, node: Node3D) -> void:
+	if visibility != null:
+		visibility.queue_free()
+		visibility = null
+	if DisplayServer.get_name() == "headless" or not ResourceLoader.exists(VIS_SCRIPT):
+		return
+	var vis: Node = (load(VIS_SCRIPT) as GDScript).new()
+	vis.name = "Visibility"
+	vis.set(&"mode", vis.call(&"parse_mode", vis_mode))
+	add_child(vis)
+	var res: DotResult = vis.call(&"setup", world, node)
+	if not res.ok:
+		DotLog.debug(CHANNEL, "the world is drawn without culling", {"why": res.error.message})
+		vis.queue_free()
+		return
+	visibility = vis
+
+
+## Follows the client's culling setting on a world already drawn.
+func set_vis_mode(text: String) -> void:
+	vis_mode = text
+	if visibility != null:
+		visibility.call(&"set_mode", visibility.call(&"parse_mode", text))
 
 
 ## A converted map whose document kept the converter's placeholder light takes the sky, sun,
