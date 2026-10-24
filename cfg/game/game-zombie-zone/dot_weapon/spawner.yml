@@ -810,3 +810,21 @@ maps:
           respawn: 0
           data:
             tier_price: true
+  zs_ravenstreet:
+    game:
+      traders:
+        - id: trader_a
+          at: [-12.5, 0.1, 1.2]
+          yaw: 0
+      spawners:
+        - id: field_a
+          at: [-9.5, 0.1, 1.9]
+          pool: field_guns
+          respawn: 90
+          max: 1
+        - id: crate_a
+          at: [-14.8, 0.1, 1.9]
+          pool: crate
+          respawn: 0
+          data:
+            tier_price: true
