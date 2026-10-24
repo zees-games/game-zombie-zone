@@ -96,6 +96,7 @@ static var use_bakes: bool = true
 static var use_worlds: bool = true
 
 ## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
+const SKY_ROOT := "res://assets/sky"
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
 const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
 const VIS_SCRIPT := "res://addons/dot_map/bsp/dot_map_visibility.gd"
@@ -1116,6 +1117,7 @@ var world_sounds: Dictionary = {}
 	_drawn.add_child(node)
 	attach_world_collision(world)
 	_light_from_world(world)
+	_dress_panorama_sky(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.
 	if not global_pack or bool(doc.get("mechanics", false)) or bring_global_mechanics:
@@ -1170,6 +1172,20 @@ func set_vis_mode(text: String) -> void:
 	vis_mode = text
 	if visibility != null:
 		visibility.call(&"set_mode", visibility.call(&"parse_mode", text))
+
+
+## The free sky panorama (assets/sky, CC0) for a day map's sky name, in place of the plain gradient.
+## Night and space skies keep the procedural sky and its stars.
+func _dress_panorama_sky(world: RefCounted) -> void:
+	if _environment == null or is_night(doc["environment"]) or not world.has_method(&"sky_panorama"):
+		return
+	var tex: Texture2D = world.call(&"sky_panorama", ZzPaths.rebase(SKY_ROOT))
+	var sky := _environment.environment.sky
+	if tex == null or sky == null:
+		return
+	var panorama := PanoramaSkyMaterial.new()
+	panorama.panorama = tex
+	sky.sky_material = panorama
 
 
 ## A converted map whose document kept the converter's placeholder light takes the sky, sun,
