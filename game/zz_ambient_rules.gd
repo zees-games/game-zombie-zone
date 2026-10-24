@@ -15,6 +15,8 @@ const VARS := {
 		"Level of the ambience. 0.5 is the files' own quiet level."],
 	"frequency": ["zz_ambient_frequency", 1.0, 0.0, 4.0, true,
 		"How often the distant one-shots come: 1 normal, 2 twice as often, 0 none."],
+	"indoor": ["zz_ambient_indoor", 1.0, 0.0, 1.0, true,
+		"Under a roof the ambience crossfades to the map's indoor mood: 1 on, 0 keeps the outdoor mood everywhere."],
 	"mood": ["zz_ambient_mood", "", null, null, true,
 		"Forces one mood on every map (outdoor_night, indoor_hall, industrial, cave_tunnel, snow_wind, swamp, city_ruins, interior_horror, or your own). Empty lets each map choose."],
 	"allowed": ["zz_ambient_allowed", "", null, null, true,
@@ -26,6 +28,7 @@ const VARS := {
 var enabled: float = 1.0
 var volume: float = 0.5
 var frequency: float = 1.0
+var indoor: float = 1.0
 var mood: String = ""
 var allowed: String = ""
 var dir: String = ""
@@ -33,6 +36,10 @@ var dir: String = ""
 
 func is_on() -> bool:
 	return enabled >= 0.5
+
+
+func follows_indoors() -> bool:
+	return indoor >= 0.5
 
 
 ## Registers every cvar ([param add] is the module's `add_cvar`, taking flags as a fourth argument).

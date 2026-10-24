@@ -88,6 +88,7 @@ Each map plays a quiet mood: beds under the level and sparse one-shots (creaks, 
 | `zz_ambient_volume` | 0.5 | level; 0.5 is the files' own quiet level |
 | `zz_ambient_frequency` | 1 | how often the one-shots come; 0 none, 2 twice as often |
 | `zz_ambient_mood` | empty | force one mood on every map: `outdoor_night`, `indoor_hall`, `industrial`, `cave_tunnel`, `snow_wind`, `swamp`, `city_ruins`, `interior_horror` |
+| `zz_ambient_indoor` | 1 | 0 stops the mood following the roof: a map's `indoor` mood is then never used |
 | `zz_ambient_allowed` | empty | comma list of moods a map may use |
 | `zz_ambient_dir` | empty | a directory with your own `moods.json` and sounds (format: dot-audio `docs/ambience.md`); its moods replace the built-in ones of the same name. Local to the machine that plays |
 

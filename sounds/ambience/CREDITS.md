@@ -1,6 +1,6 @@
 # Ambience credits
 
-Every file here is derived from a CC0 (public domain dedication) recording: normalised to a quiet level, converted to Ogg Vorbis, beds made seamless, long files cut, with ffmpeg by `tools/make_ambience_set.py`. None of them was auditioned before shipping; see the README for the ones flagged.
+Every file here is derived from a CC0 (public domain dedication) recording: normalised to a quiet level, converted to Ogg Vorbis, beds made seamless, long files cut, with ffmpeg by `tools/make_ambience_set.py`. They are measured, not auditioned: `tools/audit_ambience.py` checks level, peak, hiss and loop seams, and `docs/ambience-audit.md` lists what still needs a human ear.
 
 | Files | Source | Author | Licence |
 | --- | --- | --- | --- |

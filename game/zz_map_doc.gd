@@ -237,9 +237,9 @@ static func validate(source: Dictionary) -> DotResult:
 		"survive_seconds": maxf(float(source.get("survive_seconds", 0.0)), 0.0),
 	}
 
-	# The creepy-ambience mood this map wants (ZzAudio); a name the sound set may not have is ignored there.
-	var ambient := str(source.get("ambient", ""))
-	if ambient != "" and _is_id(ambient):
+	# The creepy-ambience this map wants (ZzAudio): a mood name, or {mood, indoor, extra, volume, frequency}. A name the sound set may not have is ignored there.
+	var ambient: Variant = _ambient(source.get("ambient", ""))
+	if not (ambient is String and (ambient as String) == ""):
 		doc["ambient"] = ambient
 
 	# The map's own drawn geometry, a pack of its own (ZzMap.load_world); without it the boxes are
@@ -830,6 +830,28 @@ static func _world_key_ok(key: String, world: String) -> bool:
 			if not (character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.+"):
 				return false
 	return not owner.contains("..") and not version.contains("..")
+
+
+## An `ambient` field in its safe form: a mood id, or a dictionary of ids and clamped scales; "" for nothing usable.
+static func _ambient(raw: Variant) -> Variant:
+	if raw is String:
+		return raw if _is_id(raw) else ""
+	if not (raw is Dictionary):
+		return ""
+	var src := raw as Dictionary
+	var mood := str(src.get("mood", ""))
+	if not _is_id(mood):
+		return ""
+	var out := {"mood": mood}
+	for key: String in ["indoor", "extra"]:
+		var id := str(src.get(key, ""))
+		if id != "" and _is_id(id):
+			out[key] = id
+	if src.has("volume") and (src["volume"] is float or src["volume"] is int):
+		out["volume"] = clampf(float(src["volume"]), 0.25, 2.0)
+	if src.has("frequency") and (src["frequency"] is float or src["frequency"] is int):
+		out["frequency"] = clampf(float(src["frequency"]), 0.0, 4.0)
+	return mood if out.size() == 1 else out
 
 
 static func _is_id(id: String) -> bool:

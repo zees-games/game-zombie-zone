@@ -9,7 +9,7 @@ extends Node
 const ZzAudio := preload("../game/zz_audio.gd")
 const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const CHECKS := 44
+const CHECKS := 65
 
 var _passed := 0
 var _failed := 0
@@ -125,6 +125,98 @@ func _run() -> void:
 	print("  ambience after 10 simulated minutes in zz_chapel: ", JSON.stringify(d))
 	_check(d["mood"] == "interior_horror" and int(d["beds"]) == 3, "the chapel plays its three beds", str(d["beds"]))
 	_check(int(d["oneshots_played"]) >= 2 and is_equal_approx(float(d["level"]), 0.4), "and some one-shots, faded in to the server level", str(d["oneshots_played"]))
+
+	# Every shipped map document carries a valid ambient field that validation keeps.
+	var shipped := 0
+	var lacking := PackedStringArray()
+	var changed_by_validate := PackedStringArray()
+	var scaled := 0
+	for fname in DirAccess.get_files_at("res://maps"):
+		if not fname.ends_with(".json"):
+			continue
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/" + fname))
+		if not (parsed is Dictionary):
+			continue
+		shipped += 1
+		var field: Variant = (parsed as Dictionary).get("ambient")
+		var v := ZzMapDoc.validate(parsed)
+		if field == null:
+			lacking.append(fname)
+		elif not v.ok or (v.value as Dictionary).get("ambient") != field:
+			changed_by_validate.append(fname)
+		if field is Dictionary and ((field as Dictionary).has("volume") or (field as Dictionary).has("frequency") or (field as Dictionary).has("extra")):
+			scaled += 1
+		var named: String = str((field as Dictionary).get("mood", "")) if field is Dictionary else str(field)
+		if field != null and not (named in audio.ambient.mood_names()):
+			lacking.append(fname + " (unknown mood)")
+			lacking.append(fname + " (unknown mood)")
+	_check(shipped >= 41 and lacking.is_empty(), "all %d shipped maps name a known mood" % shipped, ", ".join(lacking))
+	_check(changed_by_validate.is_empty(), "and validation keeps every field as written", ", ".join(changed_by_validate))
+	_check(scaled >= 10, "some maps scale or extend it (%d)" % scaled)
+	for pair: Array in [["zm_4way_tunnel", &"cave_tunnel"], ["zs_goth_house", &"interior_horror"], ["ze_jurassicpark", &"swamp"], ["zm_antarctic_hospital", &"snow_wind"], ["zz_mall", &"indoor_hall"]]:
+		var one: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/%s.json" % pair[0]))
+		audio.on_map_doc(StringName(pair[0]), (ZzMapDoc.validate(one).value as Dictionary))
+		_check(audio.ambient.effective_mood() == pair[1] or audio.ambient.effective_mood() == StringName("%s+%s" % [pair[1], (ZzMapDoc.validate(one).value as Dictionary)["ambient"].get("extra", "")]), "%s sounds %s from its document" % [pair[0], pair[1]], str(audio.ambient.effective_mood()))
+
+	# The object form: indoor mood, extra one-shots, scales.
+	var dict_doc := {"ambient": {"mood": "swamp", "indoor": "cave_tunnel", "volume": 0.5, "frequency": 2.0, "extra": "industrial"}}
+	audio.on_map_doc(&"zz_new_map", dict_doc)
+	_check(audio.ambient.effective_mood() == &"swamp+industrial", "an extra set joins the mood's one-shots", str(audio.ambient.effective_mood()))
+	var base_shots := audio.ambient.mood_def(&"swamp").oneshots.size()
+	_check(audio.ambient.mood_def(&"swamp+industrial").oneshots.size() == base_shots + audio.ambient.mood_def(&"industrial").oneshots.size(), "and the beds are the base's")
+	_check(is_equal_approx(audio.ambient.config.frequency, 2.0 * 1.0), "the map's frequency scales the setting", str(audio.ambient.config.frequency))
+	audio.ambient.set_indoors(true)
+	audio.ambient.advance(0.1)
+	_check(audio.ambient.effective_mood() == &"cave_tunnel+industrial", "under a roof the document's indoor mood plays, with the extra", str(audio.ambient.effective_mood()))
+	audio.ambient.set_indoors(false)
+	audio.on_map_doc(&"zz_new_map", {"ambient": "swamp"})
+	_check(audio.indoor_mood_for_map() == &"indoor_hall" and audio.ambient.config.frequency == 1.0, "a bare mood gets the default room tone and no scales")
+	src["ambient"] = {"mood": "swamp", "volume": 99, "frequency": -3, "indoor": "Bad Id", "junk": 1}
+	var v2 := ZzMapDoc.validate(src)
+	var kept: Variant = (v2.value as Dictionary).get("ambient") if v2.ok else null
+	_check(kept is Dictionary and kept["volume"] == 2.0 and kept["frequency"] == 0.0 and not kept.has("indoor") and not kept.has("junk"), "validation clamps scales and drops what is not an id", str(kept) + (" " + v2.error.message if not v2.ok else ""))
+
+	# The switch: a rule off keeps the outdoor mood; the probe flips on agreeing rays only.
+	var gate := ZzAmbientRules.new()
+	audio.follow_settings(null, gate)
+	_check(gate.follows_indoors() and gate.set_cvar("zz_ambient_indoor", "0") and not gate.follows_indoors(), "zz_ambient_indoor gates the switch")
+	audio.on_map_doc(&"zz_new_map", dict_doc)
+	var probe := DotAmbienceRoof.new()
+	_check(not probe.feed(true) and probe.feed(true) and probe.roofed, "the roof probe flips on a second agreeing ray")
+	gate.set_cvar("zz_ambient_indoor", "1")
+
+	# A real ray: a slab overhead is a roof, open sky is not (needs a physics frame to exist).
+	var slab := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(10, 0.2, 10)
+	shape.shape = box
+	slab.add_child(shape)
+	slab.position = Vector3(0, 4, 0)
+	add_child(slab)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var space := get_viewport().world_3d.direct_space_state
+	audio.on_map_doc(&"zz_new_map", dict_doc)
+	for _i in 12:
+		audio.follow_roof(0.25, Vector3(0, 1.5, 0), space, 1)
+	_check(audio.ambient.indoors(), "standing under a slab the ambience is indoors")
+	for _i in 12:
+		audio.follow_roof(0.25, Vector3(30, 1.5, 0), space, 1)
+	_check(not audio.ambient.indoors(), "walking out into the open it is not")
+	gate.set_cvar("zz_ambient_indoor", "0")
+	for _i in 12:
+		audio.follow_roof(0.25, Vector3(0, 1.5, 0), space, 1)
+	_check(not audio.ambient.indoors(), "with the cvar off the slab changes nothing")
+	slab.free()
+
+	var unlisted: Array[String] = []
+	for dir in DirAccess.get_directories_at("res://sounds/ambience"):
+		for f in DirAccess.get_files_at("res://sounds/ambience/" + dir):
+			if f.ends_with(".ogg") and not credits.contains(dir + "/" + f):
+				unlisted.append(dir + "/" + f)
+	_check(unlisted.is_empty(), "every shipped ambience file is credited: %s" % ", ".join(unlisted))
+	_check(FileAccess.file_exists("res://docs/ambience-audit.md"), "the loudness audit table is kept")
 
 	audio.free()
 	print("")

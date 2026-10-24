@@ -120,7 +120,7 @@ The maps are their own repository and pack, [zombie-zone-maps](../zombie-zone-ma
 
 ## Sound
 
-Sound follows the map document: each box's `mat` is its collision shape's `surface` meta, so survivors' footsteps go by surface (dot-audio's `DotAudioFootsteps`); every `ceiling` or `roof` box is an indoor ambience zone; the outdoor bed and ground come from `ZzAudio.MAP_SOUND` or the document's `ambience` and `surface`. Over that, `DotAmbience` plays a quiet mood chosen from the map (document `ambient`, `ZzAudio.MAP_MOOD`, or a vote over a converted map's sound names) and crossfades on a change. Levels are measured with `addons/dot_audio/tools/loudness.sh` and held in the family's −17 LUFS band by `loudness_trim_db`. A dead body's landing is dot-player-char's stock death sounds, in `ZzAudio`'s catalogue and played from the world view's ragdoll yard.
+Sound follows the map document: each box's `mat` is its collision shape's `surface` meta, so survivors' footsteps go by surface (dot-audio's `DotAudioFootsteps`); every `ceiling` or `roof` box is an indoor ambience zone; the outdoor bed and ground come from `ZzAudio.MAP_SOUND` or the document's `ambience` and `surface`. Over that, `DotAmbience` plays a quiet mood chosen from the map (document `ambient`, `ZzAudio.MAP_MOOD`, or a vote over a converted map's sound names) and crossfades on a change; under a roof (an upward ray from the camera, with hysteresis) the map's `indoor` mood plays instead. Levels are measured with `addons/dot_audio/tools/loudness.sh` and held in the family's −17 LUFS band by `loudness_trim_db`. A dead body's landing is dot-player-char's stock death sounds, in `ZzAudio`'s catalogue and played from the world view's ragdoll yard.
 
 ## A hold's day
 

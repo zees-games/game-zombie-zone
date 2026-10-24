@@ -93,6 +93,12 @@ var ambience: DotAudioAmbience = null
 ## Mood a map falls back to when neither its document nor its sounds say.
 const DEFAULT_MOOD := &"outdoor_night"
 
+## What plays under a roof when a map names no indoor mood: the outdoor moods give way to a room tone,
+## the rest are already enclosed.
+const INDOOR_OF := {
+	&"outdoor_night": &"indoor_hall", &"snow_wind": &"indoor_hall", &"swamp": &"indoor_hall", &"city_ruins": &"indoor_hall",
+}
+
 ## The hand-made maps' moods; a document's own `"ambient"` field wins over this, and a converted
 ## map's sound names (see [method on_world_sounds]) decide for the rest.
 const MAP_MOOD := {
@@ -107,6 +113,11 @@ var _user_volume := 1.0
 var _user_frequency := 1.0
 var _map_id: StringName = &""
 var _doc_mood: StringName = &""
+var _doc_indoor: StringName = &""
+var _doc_extra: StringName = &""
+var _doc_volume := 1.0
+var _doc_frequency := 1.0
+var _roof := DotAmbienceRoof.new()
 var _map_names: Array = []
 
 
@@ -396,7 +407,10 @@ const MAP_SOUND := {
 func on_map_doc(id: StringName, doc: Dictionary) -> void:
 	var row: Array = MAP_SOUND.get(id, [&"amb_night", &"concrete"])
 	_map_id = id
-	_doc_mood = StringName(str(doc.get("ambient", "")))
+	_read_ambient(doc.get("ambient", ""))
+	_roof.roofed = false
+	if ambient != null:
+		ambient.set_indoors(false)
 	_map_names = [String(id), str(doc.get("name", ""))]
 	on_map(StringName(str(doc.get("ambience", row[0]))), StringName(str(doc.get("surface", row[1]))))
 	_choose_mood()
@@ -439,16 +453,73 @@ func mood_for_map() -> Dictionary:
 	return {"mood": DEFAULT_MOOD, "why": "default"}
 
 
+## The mood under a roof on this map: the document's, else [constant INDOOR_OF] of the outdoor one.
+func indoor_mood_for_map() -> StringName:
+	if _doc_indoor != &"":
+		return _doc_indoor
+	var outdoor: StringName = mood_for_map()["mood"]
+	return INDOOR_OF.get(outdoor, outdoor)
+
+
+func _read_ambient(raw: Variant) -> void:
+	_doc_mood = &""
+	_doc_indoor = &""
+	_doc_extra = &""
+	_doc_volume = 1.0
+	_doc_frequency = 1.0
+	if raw is String:
+		_doc_mood = StringName(raw)
+	elif raw is Dictionary:
+		var d := raw as Dictionary
+		_doc_mood = StringName(str(d.get("mood", "")))
+		_doc_indoor = StringName(str(d.get("indoor", "")))
+		_doc_extra = StringName(str(d.get("extra", "")))
+		_doc_volume = clampf(float(d.get("volume", 1.0)), 0.25, 2.0)
+		_doc_frequency = clampf(float(d.get("frequency", 1.0)), 0.0, 4.0)
+	_apply_ambient()
+
+
 func _choose_mood() -> void:
 	if ambient == null or ambient.mood_names().is_empty():
 		return
 	var got := mood_for_map()
-	var made := ambient.set_mood(got["mood"])
+	var made := ambient.set_mood(_with_extra(got["mood"]))
 	if not made.ok:
 		DotLog.debug(CHANNEL, "ambience mood not available", {"mood": String(got["mood"]), "why": made.error.message})
 		var _fallback := ambient.set_mood(DEFAULT_MOOD)
 	else:
 		DotLog.debug(CHANNEL, "ambience mood", {"map": String(_map_id), "mood": String(got["mood"]), "why": got["why"]})
+	ambient.indoor_mood = _with_extra(indoor_mood_for_map())
+
+
+## [param id] with the map's `extra` mood's one-shots added, as a mood of its own; [param id] itself when
+## there is none, it is unknown, or the server restricts the moods (an allowed list names real ones only).
+func _with_extra(id: StringName) -> StringName:
+	if _doc_extra == &"" or _doc_extra == id or ambient.config.allowed_moods != "":
+		return id
+	var base := ambient.mood_def(id)
+	var more := ambient.mood_def(_doc_extra)
+	if base == null or more == null:
+		return id
+	var merged_name := StringName("%s+%s" % [id, _doc_extra])
+	if ambient.mood_def(merged_name) == null:
+		ambient.add_mood(base.with_oneshots_of(more, merged_name))
+	return merged_name
+
+
+## Once a frame with the listener's eye: under a roof the ambience crossfades to the indoor mood and back
+## ([member ZzAmbientRules.indoor] gates it). A ray up four times a second, nothing allocated between.
+func follow_roof(delta: float, eye: Vector3, space: PhysicsDirectSpaceState3D, world_mask: int) -> void:
+	if ambient == null:
+		return
+	if _rules != null and not _rules.follows_indoors():
+		if _roof.roofed:
+			_roof.roofed = false
+			ambient.set_indoors(false)
+		return
+	_roof.mask = world_mask
+	if _roof.step(delta, eye, space):
+		ambient.set_indoors(_roof.roofed)
 
 
 ## The server's cvars and the player's own sliders, multiplied: the player can only turn the
@@ -486,8 +557,8 @@ func _apply_ambient() -> void:
 	var c := ambient.config
 	var r := _rules if _rules != null else ZzAmbientRules.new()
 	c.enabled = r.is_on() and _user_on
-	c.volume = clampf(r.volume * _user_volume, 0.0, 1.0)
-	c.frequency = r.frequency * _user_frequency
+	c.volume = clampf(r.volume * _user_volume * _doc_volume, 0.0, 1.0)
+	c.frequency = r.frequency * _user_frequency * _doc_frequency
 	c.mood = r.mood
 	c.allowed_moods = r.allowed
 	c.sound_dir = r.dir

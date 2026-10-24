@@ -2060,6 +2060,8 @@ func _present_effects(delta: float) -> void:
 	if audio != null:
 		audio.listen_from(camera.global_position)
 		audio.keep_walkers(game.players.values())
+		if game.physics != null:
+			audio.follow_roof(delta, camera.global_position, camera.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
 
 	if game.effects != null:
 		game.effects.viewer_position = camera.global_position
