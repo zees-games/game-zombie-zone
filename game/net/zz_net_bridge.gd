@@ -338,6 +338,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		game.mover_changed.connect(func(index: int) -> void:
 			if game.map != null and game.map.mechanics != null:
 				_broadcast(ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index)))
+		game.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void:
+			_broadcast(ZzEvents.Kind.COPY, ZzEvents.write_copy(id, model, offset, alive)))
 		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
 			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
 		game.survival_changed.connect(func() -> void:
@@ -1175,6 +1177,8 @@ func _tell_the_world(peer_id: int) -> void:
 	if game.map != null and game.map.mechanics != null:
 		for index in game.map.mechanics.told_indices():
 			_tell(peer_id, ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index))
+		for c: Dictionary in game.map.mechanics.copies():
+			_tell(peer_id, ZzEvents.Kind.COPY, ZzEvents.write_copy(int(c["id"]), int(c["model"]), c["offset"], true))
 
 	for id: String in game.barricades:
 		var b: Dictionary = game.barricades[id]
@@ -1549,6 +1553,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var mv := ZzEvents.read_mover(reader)
 			if bool(mv["ok"]) and game.map != null:
 				game.map.apply_mover_state(int(mv["index"]), int(mv["start"]), int(mv["from"]), int(mv["dir"]), bool(mv["locked"]), float(mv["side"]))
+		ZzEvents.Kind.COPY:
+			var cp := ZzEvents.read_copy(reader)
+			if bool(cp["ok"]) and game.map != null:
+				game.map.apply_copy(int(cp["id"]), int(cp["model"]), cp["offset"], bool(cp["alive"]))
 		ZzEvents.Kind.BARRICADE:
 			var bar := ZzEvents.read_barricade(reader)
 			if bool(bar["ok"]):

@@ -32,7 +32,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 23
-const CHECKS := 138
+const CHECKS := 141
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -172,6 +172,10 @@ func _test_the_codec() -> void:
 	var npc := ZzEvents.read_npc(_r(ZzEvents.write_npc(77, ZzNpcs.STRANGLER, 513, Vector3(3.5, 0.0, -12.25))))
 	_check(bool(npc["ok"]) and int(npc["net_id"]) == 77 and npc["kind"] == ZzNpcs.STRANGLER and int(npc["variant"]) == 513
 		and (npc["at"] as Vector3).distance_to(Vector3(3.5, 0.0, -12.25)) < 0.05, "NPC", str(npc))
+
+	var copy := ZzEvents.read_copy(_r(ZzEvents.write_copy(412, 7, Vector3(12.5, 0.0, -3.0), true)))
+	_check(bool(copy["ok"]) and int(copy["id"]) == 412 and int(copy["model"]) == 7 and bool(copy["alive"])
+		and (copy["offset"] as Vector3).distance_to(Vector3(12.5, 0.0, -3.0)) < 0.05, "COPY", str(copy))
 
 	var gone := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(77, true)))
 	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]) and gone["death"] == null, "NPC_GONE")
@@ -972,6 +976,12 @@ func _test_a_door_reaches_the_client() -> void:
 	var body := client_door.mover(1)["body"] as CollisionObject3D
 	var posed := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
 	_check(posed.origin.y > 1.5 + 0.1, "and the client's collision body rose with it", str(posed.origin))
+	server_door.apply_copy(900, 1, Vector3(4.0, 0.0, 0.0), true)
+	await _steps(6)
+	_check(client_door.copies().size() == 1 and int(client_door.copies()[0]["id"]) == 900, "a brush copy the map's template made on the server stands on the client", str(client_door.copies()))
+	server_door.apply_copy(900, 1, Vector3.ZERO, false)
+	await _steps(6)
+	_check(client_door.copies().is_empty(), "and goes from the client when it goes from the server")
 	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
 	_finished()
 

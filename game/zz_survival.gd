@@ -231,6 +231,7 @@ func _on_stage(stage: int, index: int) -> void:
 				if game.boxes != null:
 					game.boxes.end_round()
 				game.notice.emit(_cleared_line(index - 1))
+				game.map_wave_changed(index - 1, true)
 				DotLog.info(CHANNEL, "a breather", {"after": index - 1, "tidied": straggled})
 			else:
 				# Four of the big maps have no loose items, only caches, and a cache was filled
@@ -257,6 +258,7 @@ func _on_stage(stage: int, index: int) -> void:
 			horde.stop_pacing()
 			_set_twist(&"")
 			cleared += 1
+			game.map_wave_changed(waves.count, true)
 			game.survival_finished(_won_line())
 
 
@@ -288,7 +290,9 @@ func _begin_wave(index: int) -> void:
 	var _called_in: int = horde.send_map_commons()
 
 	var title := "Wave %d of %d" % [index, waves.count] if not waves.is_last() else "The last wave"
-	game.notice.emit("%s%s" % [title, (" — %s" % str(TWISTS[twist]["title"])) if twist != &"" else ""])
+	game.map_wave_changed(index)
+	if not game.map_announcer_off():
+		game.notice.emit("%s%s" % [title, (" — %s" % str(TWISTS[twist]["title"])) if twist != &"" else ""])
 	DotLog.info(CHANNEL, "a wave", {"index": index, "size": waves.budget, "twist": String(twist),
 		"specials": _specials_owed, "brutes": _brutes_owed, "team": team})
 

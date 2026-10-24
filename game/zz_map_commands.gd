@@ -28,3 +28,18 @@ static func translate(name: String, args: String) -> Dictionary:
 	if limits.has("max"):
 		value = minf(value, float(limits["max"]))
 	return {"key": rule[0], "value": value}
+
+
+## Rules a map's `logic_gamerules` may set that are not a cvar of ours: key to `[rule, min, max]` (a multiplier on a runtime distance).
+const RUNTIME_RULES := {
+	"nestdistancemul": ["spawn_distance", 0.25, 3.0],
+}
+
+
+## `{key, value}` for a `logic_gamerules` key: a runtime rule, an allowed cvar, or {} (nothing here answers it).
+static func rule(name: String, value: String) -> Dictionary:
+	var lo := name.to_lower()
+	if RUNTIME_RULES.has(lo) and value.strip_edges().is_valid_float():
+		var r: Array = RUNTIME_RULES[lo]
+		return {"key": r[0], "value": clampf(value.strip_edges().to_float(), float(r[1]), float(r[2]))}
+	return translate(lo, value)

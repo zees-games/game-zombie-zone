@@ -66,6 +66,8 @@ const WANDERER_CLEARANCE := 28.0
 signal zombie_spawned(npc: DotNpcInstance)
 signal zombie_removed(npc: DotNpcInstance)
 signal zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
+## A zombie a map's spawner made is dead, gone, or never came to be: its spawner's live count drops.
+signal maker_child_gone(maker: int)
 signal mob_started(size: int)
 signal special_spawned(npc: DotNpcInstance)
 signal brute_spawned(npc: DotNpcInstance)
@@ -171,6 +173,10 @@ var _next_panic_mob: float = 0.0
 
 ## Mob commons still to come out: [kind, at, target, flags] per entry.
 var _pending: Array = []
+## How far from the survivors the director spawns, against its stock distances (a map's `nestdistancemul`).
+var spawn_distance_scale: float = 1.0
+## Map spawner index by zombie instance id, until it dies or goes.
+var _maker_of: Dictionary = {}
 var _next_pending: float = 0.0
 
 ## Alerts waiting to land: [instance_id, at_time, who, where].
@@ -259,9 +265,9 @@ func _rules() -> DotNpcDirectorRules:
 	rules.fade_seconds = 8.0
 	rules.relax_seconds = 25.0
 	rules.relax_distance = 45.0
-	rules.spawn_min_distance = 22.0
-	rules.spawn_max_distance = 60.0
-	rules.spawn_ahead = 35.0
+	rules.spawn_min_distance = 22.0 * spawn_distance_scale
+	rules.spawn_max_distance = 60.0 * spawn_distance_scale
+	rules.spawn_ahead = 35.0 * spawn_distance_scale
 	rules.behind_fraction = 0.2
 	rules.spawn_out_of_sight = true
 	rules.spawn_burst = 3
@@ -589,6 +595,8 @@ func clear() -> void:
 		var _cleared := spawner.clear_all(DotNpcSpawner.REASON_CLEANUP)
 
 	_pending.clear()
+	_maker_of.clear()
+	spawn_distance_scale = 1.0
 	_alerts.clear()
 	_lures.clear()
 	_bile.clear()
@@ -1281,13 +1289,13 @@ func spawn_mob(size: int, target: StringName = &"") -> int:
 
 
 ## One common zombie from a map's own spawner at [param at], going for a survivor. False with nobody to go for.
-func spawn_common_at(at: Vector3) -> bool:
+func spawn_common_at(at: Vector3, maker: int = -1) -> bool:
 	var ids := survivor_ids()
 
 	if ids.is_empty():
 		return false
 
-	_pending.append([ZzNpcs.COMMON, at, ids[_rng.randi() % ids.size()], ZzZombieBody.FLAG_MOB])
+	_pending.append([ZzNpcs.COMMON, at, ids[_rng.randi() % ids.size()], ZzZombieBody.FLAG_MOB, &"mob", maker])
 	return true
 
 
@@ -1303,10 +1311,17 @@ func _release_pending() -> void:
 		var owner: StringName = entry[4] if entry.size() > 4 else &"mob"
 		var npc := spawner.spawn(entry[0], nav.snap(at + Vector3(_rng.randf_range(-2.0, 2.0), 0.0, _rng.randf_range(-2.0, 2.0)), 2.5), owner)
 
+		var maker: int = int(entry[5]) if entry.size() > 5 else -1
+
 		if npc == null:
 			if owner == WAVE:
 				refused_wave += 1
+			if maker >= 0:
+				maker_child_gone.emit(maker)
 			continue
+
+		if maker >= 0:
+			_maker_of[npc.instance_id] = maker
 
 		(npc.node as ZzZombieBody).set_flag(int(entry[3]), true)
 
@@ -2053,12 +2068,31 @@ func _on_spawned(npc: DotNpcInstance) -> void:
 	zombie_spawned.emit(npc)
 
 
+## Spawns nearer or further than the stock distances; takes effect at once.
+func set_spawn_distance_scale(scale: float) -> void:
+	spawn_distance_scale = clampf(scale, 0.25, 3.0)
+	if director != null and director.rules != null:
+		director.rules.spawn_min_distance = 22.0 * spawn_distance_scale
+		director.rules.spawn_max_distance = 60.0 * spawn_distance_scale
+		director.rules.spawn_ahead = 35.0 * spawn_distance_scale
+
+
+## Tells the map's spawner (once) that its zombie is no more.
+func _release_maker_child(npc: DotNpcInstance) -> void:
+	if _maker_of.has(npc.instance_id):
+		var maker: int = _maker_of[npc.instance_id]
+		var _gone := _maker_of.erase(npc.instance_id)
+		maker_child_gone.emit(maker)
+
+
 func _on_removed(npc: DotNpcInstance, _reason: StringName) -> void:
+	_release_maker_child(npc)
 	zombie_removed.emit(npc)
 	_forget_combat(npc)
 
 
 func _on_died(npc: DotNpcInstance, by: StringName) -> void:
+	_release_maker_child(npc)
 	crowd.forget(crowd.index_of(npc.instance_id))
 	var health: DotHealth = npc.node.get_node_or_null(^"Health") if npc.node != null else null
 	var fatal: DotDamage = health.last_fatal if health != null else null

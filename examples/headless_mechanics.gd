@@ -20,8 +20,8 @@ const ZzPlayer := preload("../game/zz_player.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 10
-const CHECKS := 88
+const SECTIONS := 12
+const CHECKS := 107
 
 var _passed := 0
 var _failed := 0
@@ -72,6 +72,8 @@ func _run() -> void:
 	await _test_volume_and_unsupported()
 	await _test_volumes()
 	await _test_logic_fixture()
+	await _test_zz_logic()
+	await _test_real_zz_logic()
 	await _test_logic_blockfort()
 	await _test_logic_death_star()
 	await _test_no_world()
@@ -818,6 +820,120 @@ func _test_logic_fixture() -> void:
 
 	_check(npc_spawns == 2, "an NPC maker spawns MaxNPCCount zombies, a second apart, and stops", str(npc_spawns))
 	mech.queue_free()
+	_finished += 1
+
+
+## The recorded-only classes now act: waves, win/lose, beats, game rules, score, game_ui, the maker's live cap and a brush copy.
+func _test_zz_logic() -> void:
+	_entered += 1
+	print("the zombie logic: waves, win/lose, beats, rules, score, ui, maker cap, brush copies")
+	var fx := _logic_fixture()
+	fx["entities"] = [
+		_logic_rec(30, "logic_waves", "waves", {"wave": "2"}),
+		_logic_rec(31, "logic_winlose", "ending", {}),
+		_logic_rec(32, "logic_beats", "beats", {"disableannoucner": "1"}),
+		_logic_rec(33, "logic_gamerules", "rules", {"nestdistancemul": "2", "mp_friendlyfire": "1", "madeupkey": "7"}),
+		_logic_rec(34, "game_score", "score", {"points": "5"}),
+		_logic_rec(35, "game_ui", "ui", {}),
+		_logic_rec(36, "npc_template_maker", "cap", {"templatename": "normal", "maxnpccount": "3", "maxlivechildren": "1", "spawnfrequency": "1"}),
+		_logic_rec(37, "game_text", "t_wave", {"message": "Wave two"}),
+		_logic_rec(38, "game_text", "t_win", {"message": "Won"}),
+		_logic_rec(39, "logic_relay", "r", {}),
+		_logic_rec(40, "logic_collision_pair", "pair", {"attach1": "a", "attach2": "b", "startdisabled": "0"}),
+	]
+	var l := _logic_link
+	fx["links"] = [
+		l.call(30, "OnWaveStart", "t_wave", "Display", [37]),
+		l.call(31, "OnWin", "t_win", "Display", [38]),
+	]
+	var mech := _logic_mech(fx)
+	var events: Array = []
+	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data, mech.logic().now]))
+	var io := mech.logic()
+	var kinds := func(k: String) -> Array: return events.filter(func(e: Array) -> bool: return e[0] == k)
+	mech.step(1)
+	var rules: Array = kinds.call("game_rule")
+	_check(rules.size() == 3, "a logic_gamerules tells the game each rule key once", str(rules.size()))
+	_check(MapCommands.rule("nestdistancemul", "9").get("value", 0.0) == 3.0 and MapCommands.rule("nestdistancemul", "2").get("key", "") == "spawn_distance"
+			and MapCommands.rule("madeupkey", "7").is_empty() and MapCommands.rule("mp_friendlyfire", "1").get("key", "") == "zz_friendly_fire",
+			"the rule becomes a clamped runtime scale, a listed setting, or nothing")
+	events.clear()
+	mech.wave_changed(1)
+	mech.wave_changed(2)
+	for t in range(2, 6):
+		mech.step(t)
+	_check(_texts(events) == ["Wave two"], "a logic_waves fires only for the wave it names", str(_texts(events)))
+	_check(mech.announcer_off(), "a logic_beats that disables the announcer says so")
+	events.clear()
+	var _s := io.send("ending", "Win")
+	var d: Array = kinds.call("round_decide")
+	_check(d.size() == 1 and d[0][1]["won"] == true, "a logic_winlose Win asks the game to decide for the survivors", str(d.size()))
+	var _l := io.send("ending", "Lose")
+	d = kinds.call("round_decide")
+	_check(d.size() == 2 and d[1][1]["won"] == false, "and Lose for the infected")
+	mech.round_decided(true)
+	for t in range(6, 10):
+		mech.step(t)
+	_check(_texts(events) == ["Won"], "its OnWin fires once the round is decided", str(_texts(events)))
+	events.clear()
+	_s = io.send("score", "ApplyScore", "", 0.0, "who")
+	var sc: Array = kinds.call("score")
+	_check(sc.size() == 1 and sc[0][1]["points"] == 5 and sc[0][1]["activator"] == "who", "a game_score hands its points and activator to the game", str(sc))
+	_s = io.send("ui", "Activate", "", 0.0, "p1")
+	var ui: Array = kinds.call("ui_active")
+	_check(ui.size() == 1 and ui[0][1]["on"] == true and io.active_uis().size() == 1, "a game_ui Activate tells the game who holds the controls")
+	var pressed := []
+	mech.feed_uis(func(_e: int, _h: Variant) -> Dictionary: return {"attack": true})
+	pressed = io.active_uis()
+	_check(pressed.size() == 1, "feed_uis reaches the active ui")
+	events.clear()
+	var spawns := 0
+	for t in range(10, 10 + 64 * 5):
+		mech.step(t)
+	spawns = kinds.call("npc_spawn").size()
+	_check(spawns == 1, "a maker with one live child allowed stops spawning while it lives", str(spawns))
+	mech.maker_child_gone(36)
+	for t in range(10 + 64 * 5, 10 + 64 * 9):
+		mech.step(t)
+	spawns = kinds.call("npc_spawn").size()
+	_check(spawns >= 2, "and spawns again once the child is dead or gone", str(spawns))
+	mech.queue_free()
+	_finished += 1
+
+
+## Real maps: zs_lens ships waves, win/lose and beats; zm_4way_tunnel ships point_templates of brushes.
+func _test_real_zz_logic() -> void:
+	_entered += 1
+	print("zs_lens and zm_4way_tunnel: the wave classes and brush templates on real maps")
+	ZzMap.bring_global_mechanics = false
+	var game := await _game(&"zs_lens", true)
+	var mech: ZzMechanics = game.map.mechanics
+	_check(mech != null and mech.logic() != null, "zs_lens builds a logic runtime")
+	if mech != null and mech.logic() != null:
+		var io := mech.logic()
+		var count := func(c: GDScript) -> int: return io.entities.filter(func(e: DotMapEntity) -> bool: return is_instance_of(e, c)).size()
+		_check(count.call(ZzMechanics.LogicWaves) > 0 and count.call(ZzMechanics.LogicWinLose) > 0 and count.call(ZzMechanics.LogicBeats) > 0,
+			"its logic_waves, logic_winlose and logic_beats are the live classes, not records")
+		mech.wave_changed(1)
+		mech.wave_changed(1, true)
+		_check(true, "a wave start and end run its outputs without error")
+	game.queue_free()
+	await get_tree().process_frame
+
+	game = await _game(&"zm_4way_tunnel", true)
+	mech = game.map.mechanics
+	var models: Dictionary = mech.template_models() if mech != null else {}
+	_check(not models.is_empty(), "zm_4way_tunnel names brush models in its point_templates", str(models.size()))
+	if not models.is_empty():
+		var model := int(models.keys()[0])
+		mech.apply_copy(5000, model, Vector3(2.0, 0.0, 0.0), true, "func_breakable")
+		var made: Array = mech.copies()
+		_check(made.size() == 1, "a copy of one stands", str(made.size()))
+		var body: Variant = (mech.get("_copies") as Dictionary)[5000]["body"]
+		_check(body is StaticBody3D and (body as Node).get_child_count() > 0, "and, as a breakable, it is solid where it stands")
+		mech.apply_copy(5000, model, Vector3.ZERO, false)
+		_check(mech.copies().is_empty(), "and goes again")
+	game.queue_free()
 	_finished += 1
 
 

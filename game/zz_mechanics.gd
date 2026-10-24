@@ -33,6 +33,12 @@ const GameText := preload("zz_game_text.gd")
 const EntityMaker := preload("zz_entity_maker.gd")
 const NpcMaker := preload("zz_npc_maker.gd")
 const MapCommands := preload("zz_map_commands.gd")
+const LogicWaves := preload("zz_logic_waves.gd")
+const LogicWinLose := preload("zz_logic_winlose.gd")
+const LogicBeats := preload("zz_logic_beats.gd")
+const LogicGameRules := preload("zz_logic_gamerules.gd")
+## A template copy of these brush classes is solid where it stands (the others are drawn only).
+const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer", "func_door"]
 ## Longest gap of ticks the map's logic is stepped through in one go.
 const MAX_LOGIC_STEP := 4096
 
@@ -40,6 +46,8 @@ const MAX_LOGIC_STEP := 4096
 signal state_changed(index: int)
 ## The map's own logic asked the game for something: `hud_text`, `say`, `cvar`, `npc_spawn`, `maker_spawn`, `template_spawn`, `damage_force`.
 signal logic_event(kind: String, data: Dictionary)
+## A brush a point_template made (or killed): `(id, model, offset in metres from where the model stands, alive)`; the bridge tells clients.
+signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 
 var tick_rate: int = 64
 var authoritative: bool = true
@@ -85,6 +93,13 @@ var _unsupported_seen: Dictionary = {}
 var _activator: Variant = null
 ## Built with doors_only: the logic runs, but never drives a door the document's gates stand in for.
 var _doors_only: bool = false
+var _world: RefCounted = null
+var _put_on: Callable = Callable()
+## model number to the drawn node of that model, once the map is drawn.
+var _model_nodes: Dictionary = {}
+## Template copies by entity index: `{model, offset, node, body}`.
+var _copies: Dictionary = {}
+var _last_tick: int = 0
 
 
 ## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
@@ -95,6 +110,11 @@ var _doors_only: bool = false
 func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> void:
 	_ents = world.call(&"entities")
 	_doors_only = doors_only
+	_world = world
+	_put_on = put_on
+	var early: Variant = world.get("manifest")
+	_manifest = early if early is Dictionary else {}
+	var template_sources := template_models()
 	var models := {}
 	for model: int in world.call(&"models"):
 		models[model] = true
@@ -117,7 +137,7 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 		_movers.append(m)
 		_by_entity[mv.entity] = {"type": &"mover", "i": m["idx"]}
 
-		if SOLID_KINDS.has(mv.kind):
+		if SOLID_KINDS.has(mv.kind) and not template_sources.has(int(mv.model)):
 			if not shapes.is_empty():
 				var body := StaticBody3D.new()
 				body.name = "Mover%d" % m["idx"]
@@ -198,10 +218,16 @@ func bind_drawn(root: Node3D) -> void:
 	for child in root.get_children():
 		if not child.has_meta(&"model"):
 			continue
+		_model_nodes[int(child.get_meta(&"model"))] = child
 		for m in _movers:
 			if int(m["model"]) == int(child.get_meta(&"model")):
 				m["node"] = child
 	_posed_tick = -2147483648
+	for model in template_models():
+		if _model_nodes.has(model):
+			(_model_nodes[model] as Node3D).visible = false
+	for id: int in _copies:
+		_show_copy(_copies[id] as Dictionary)
 
 
 ## Whether the map has volumes or logic entities to run.
@@ -500,6 +526,7 @@ func reset(tick: int) -> void:
 
 ## One tick: the delayed outputs, doors, volumes. A client only poses.
 func step(tick: int) -> void:
+	_last_tick = tick
 	if authoritative:
 		if not _started:
 			_started = true
@@ -1042,6 +1069,11 @@ func _build_logic() -> void:
 		owned[str(vol.classname).to_lower()] = true
 	for cls: String in owned:
 		_r = io.register_handler(cls, _own_input)
+	_r = io.register_class("logic_waves", LogicWaves)
+	_r = io.register_class("logic_winlose", LogicWinLose)
+	_r = io.register_class("logic_beats", LogicBeats)
+	_r = io.register_class("logic_gamerules", LogicGameRules)
+	io.state_changed.connect(_on_logic_state)
 	var loaded := io.load_records(records)
 	if not loaded.ok:
 		DotLog.warn(CHANNEL, "the map's logic did not load", {"why": loaded.error.message})
@@ -1064,7 +1096,203 @@ func _own_input(e: DotMapEntity, input_name: String, param: String, activator: V
 
 
 func _on_logic_event(kind: String, data: Dictionary) -> void:
+	match kind:
+		"template_spawn":
+			_copy_made(data)
+		"collision_pair":
+			_set_pair(data)
 	logic_event.emit(kind, data)
+
+
+## The survival hold began wave [param number] (and [param ended] when it was cleared): every logic_waves naming it fires.
+func wave_changed(number: int, ended: bool = false) -> void:
+	if _logic == null:
+		return
+	_logic_to(_last_tick)
+	for e: DotMapEntity in _logic.entities:
+		if e is LogicWaves and e.alive:
+			if ended:
+				e.wave_ended(_logic, number)
+			else:
+				e.wave_started(_logic, number)
+	_logic.settle()
+
+
+## Whether a map's logic_beats has the wave announcer switched off.
+func announcer_off() -> bool:
+	if _logic == null:
+		return false
+	for e: DotMapEntity in _logic.entities:
+		if e is LogicBeats and e.alive and e.announcer_off():
+			return true
+	return false
+
+
+## The round was decided: every logic_winlose fires OnWin or OnLose.
+func round_decided(won: bool) -> void:
+	if _logic == null:
+		return
+	_logic_to(_last_tick)
+	for e: DotMapEntity in _logic.entities:
+		if e is LogicWinLose and e.alive:
+			e.decided(_logic, won)
+	_logic.settle()
+
+
+## A zombie of the map's npc_template_maker [param maker] (an entity index) is dead, gone or never came to be.
+func maker_child_gone(maker: int) -> void:
+	if _logic == null:
+		return
+	var e := _logic.entity_of(maker)
+	if e != null and e.has_method(&"child_gone"):
+		e.call(&"child_gone", _logic)
+		_logic.settle()
+
+
+## Hands every active game_ui the buttons its holder has down; [param held_fn] is `(entity index, holder) -> Dictionary` of button names.
+func feed_uis(held_fn: Callable) -> void:
+	if _logic == null:
+		return
+	for e: DotMapEntity in _logic.active_uis():
+		_logic.feed_ui(e.index, held_fn.call(e.index, (e as DotMapGameUi).player))
+
+
+func _on_logic_state(e: DotMapEntity, key: String, value: Variant, _tick: int) -> void:
+	if key == "alive" and value == false and _copies.has(e.index):
+		_drop_copy(e.index)
+
+
+# --- Template copies ---------------------------------------------------------------------------
+
+## The brush models a point_template names, from the manifest: they are not in the map until it is asked, so they are not drawn
+## or solid where they stand.
+func template_models() -> Dictionary:
+	var named := {}
+	for rec: Variant in _manifest.get("entities", []):
+		var d: Dictionary = rec
+		if str(d.get("classname", "")).to_lower() != "point_template":
+			continue
+		for k: Variant in (d.get("keys", {}) as Dictionary):
+			if str(k).to_lower().begins_with("template") and str(k).length() == 10:
+				named[str(d["keys"][k]).to_lower()] = true
+	var out := {}
+	if named.is_empty():
+		return out
+	for list: String in ["movers", "volumes", "breakables", "entities"]:
+		for rec: Variant in _manifest.get(list, []):
+			var d: Dictionary = rec
+			if d.get("model") != null and named.has(str(d.get("targetname", "")).to_lower()):
+				out[int(d["model"])] = true
+	return out
+
+
+func _copy_made(data: Dictionary) -> void:
+	var src := _logic.entity_of(int(data["source"]))
+	if src == null or not src.key("model").begins_with("*"):
+		return
+	var offset := Vector3.ZERO
+	if int(data.get("maker", -1)) >= 0:
+		var maker := _logic.entity_of(int(data["maker"]))
+		var tpl := _logic.entity_of(int(data["template"]))
+		if maker != null and tpl != null:
+			offset = maker.origin(_logic) - tpl.origin(_logic)
+	var id := int(data["entity"])
+	apply_copy(id, int(src.key("model").substr(1)), offset, true, src.classname)
+
+
+## A copy of brush [param model] stands [param offset] from where the model does ([param alive]), or goes. A client is told the same.
+func apply_copy(id: int, model: int, offset: Vector3, alive: bool, classname: String = "") -> void:
+	if not alive:
+		_drop_copy(id)
+		return
+	if _copies.has(id):
+		return
+	var c := {"id": id, "model": model, "offset": offset, "node": null, "body": null}
+	_copies[id] = c
+	_show_copy(c)
+	if authoritative and _world != null and COPY_SOLID.has(classname.to_lower()):
+		_solidify_copy(c)
+	if authoritative:
+		copy_changed.emit(id, model, offset, true)
+
+
+func _show_copy(c: Dictionary) -> void:
+	if c["node"] != null or not _model_nodes.has(int(c["model"])):
+		return
+	var from := _model_nodes[int(c["model"])] as Node3D
+	var made := from.duplicate() as Node3D
+	made.name = "Copy%d" % int(c["id"])
+	made.visible = true
+	from.get_parent().add_child(made)
+	made.position = from.position + (c["offset"] as Vector3)
+	c["node"] = made
+
+
+func _solidify_copy(c: Dictionary) -> void:
+	var shapes: Array = _world.call(&"hull_shapes", int(c["model"]))
+	if shapes.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = "CopyBody%d" % int(c["id"])
+	for s: Dictionary in shapes:
+		var cs := CollisionShape3D.new()
+		cs.shape = s["shape"]
+		body.add_child(cs)
+	add_child(body)
+	if _put_on.is_valid():
+		_put_on.call(body)
+	body.position = (_world.call(&"model_origin", int(c["model"])) as Vector3) + (c["offset"] as Vector3)
+	c["body"] = body
+
+
+func _drop_copy(id: int, tell: bool = true) -> void:
+	var c: Variant = _copies.get(id)
+	if c == null:
+		return
+	var _gone := _copies.erase(id)
+	for k: String in ["node", "body"]:
+		var n: Variant = (c as Dictionary)[k]
+		if n is Node and is_instance_valid(n):
+			(n as Node).queue_free()
+	if tell and authoritative:
+		copy_changed.emit(id, int((c as Dictionary)["model"]), (c as Dictionary)["offset"], false)
+
+
+## The copies standing now, for a client that joins: `[{id, model, offset}]`.
+func copies() -> Array:
+	var out: Array = []
+	for id: int in _copies:
+		var c: Dictionary = _copies[id]
+		out.append({"id": id, "model": c["model"], "offset": c["offset"]})
+	return out
+
+
+# --- Collision pairs ---------------------------------------------------------------------------
+
+## A logic_collision_pair: the bodies of the two named entities pass through each other, or collide again. Bodies are found by
+## targetname among the entities a node is bound to.
+func _set_pair(data: Dictionary) -> void:
+	var a := _body_named(str(data["a"]))
+	var b := _body_named(str(data["b"]))
+	if a == null or b == null:
+		_note_unsupported("collision_pair without bodies")
+		return
+	if bool(data["collide"]):
+		a.remove_collision_exception_with(b)
+	else:
+		a.add_collision_exception_with(b)
+
+
+func _body_named(targetname: String) -> PhysicsBody3D:
+	if _logic == null or targetname.is_empty():
+		return null
+	for e: DotMapEntity in _logic.find(targetname):
+		if e.node is PhysicsBody3D:
+			return e.node as PhysicsBody3D
+		if e.node != null:
+			for c in e.node.find_children("*", "PhysicsBody3D", true, false):
+				return c as PhysicsBody3D
+	return null
 
 
 ## What the map's links asked for that nothing here answers, for checks and the log:

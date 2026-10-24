@@ -115,6 +115,8 @@ enum Kind {
 	SHOP,
 	## The map's navigation graph is being built: percent done, or none when it is not.
 	NAV,
+	## A brush the map's point_template copied, or removed: id, model, offset, alive.
+	COPY,
 }
 
 enum Ask {
@@ -789,6 +791,23 @@ static func read_mover(r: DotNetReader) -> Dictionary:
 	var locked := r.read_uint(1)
 	var side := r.read_uint(1)
 	return {"index": index, "start": start, "from": from, "dir": dir, "locked": locked != 0, "side": 1.0 if side != 0 else -1.0, "ok": r.ok()}
+
+
+static func write_copy(id: int, model: int, offset: Vector3, alive: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_varint(model)
+	_pos(w, offset)
+	w.write_uint(1 if alive else 0, 1)
+	return w.to_bytes()
+
+
+static func read_copy(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var model := r.read_varint()
+	var offset := _read_pos(r)
+	var alive := r.read_uint(1)
+	return {"id": id, "model": model, "offset": offset, "alive": alive != 0, "ok": r.ok()}
 
 
 static func write_gate(gate: String) -> PackedByteArray:

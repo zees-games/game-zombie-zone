@@ -128,6 +128,8 @@ signal objective_changed(index: int, state: StringName)
 signal gate_opened(gate: String)
 ## A moving part of the map changed state ([method ZzMechanics.snapshot] has it).
 signal mover_changed(index: int)
+## A brush the map's point_template made or killed: `(id, model, offset, alive)`; the bridge tells clients.
+signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 signal notice(text: String)
 signal refused(player_id: StringName, why: String)
 ## A word to one player that is good news (a purchase), never the denied sound.
@@ -610,6 +612,7 @@ func _build_map() -> void:
 	map.volume_move_fn = _volume_move
 	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	map.logic_event.connect(_on_map_logic_event)
+	map.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void: copy_changed.emit(id, model, offset, alive))
 	add_child(map)
 
 
@@ -704,15 +707,21 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 			if line != "":
 				notice.emit(line)
 		"cvar":
-			var applied := ZzMapCommands.translate(str(data.get("name", "")), str(data.get("text", "")).get_slice(" ", 1))
-			if applied.get("key", "") == "zz_friendly_fire":
-				config.friendly_fire = float(applied["value"])
-			elif applied.get("key", "") == "zz_difficulty":
-				config.difficulty = int(applied["value"])
-			apply_friendly_fire()
+			_apply_map_setting(ZzMapCommands.translate(str(data.get("name", "")), str(data.get("text", "")).get_slice(" ", 1)))
+		"game_rule":
+			_apply_map_setting(ZzMapCommands.rule(str(data.get("key", "")), str(data.get("value", ""))))
+		"round_decide":
+			if authoritative and phase == Phase.PLAY:
+				_decide(bool(data.get("won", false)), str(data.get("why", "the map ended it")))
+		"score":
+			_map_score(data)
+		"ui_active":
+			_map_ui(data)
 		"npc_spawn":
 			if horde != null and authoritative:
-				var _made := horde.spawn_common_at(data["at"] as Vector3)
+				var _made := horde.spawn_common_at(data["at"] as Vector3, int(data.get("maker", -1)))
+				if not _made and map != null and map.mechanics != null:
+					map.mechanics.maker_child_gone(int(data.get("maker", -1)))
 		"damage_force":
 			var npc: Variant = data.get("body")
 			if npc is DotNpcInstance and horde != null:
@@ -726,6 +735,127 @@ func apply_friendly_fire() -> void:
 
 	combat.rules.friendly_fire = config.friendly_fire_scale() > 0.0
 	combat.rules.friendly_scale = clampf(config.friendly_fire_scale(), 0.0, 2.0)
+
+
+## One setting a map asked for, translated by [ZzMapCommands]: a config key or a runtime rule.
+func _apply_map_setting(applied: Dictionary) -> void:
+	match str(applied.get("key", "")):
+		"zz_friendly_fire":
+			config.friendly_fire = float(applied["value"])
+			apply_friendly_fire()
+		"zz_difficulty":
+			config.difficulty = int(applied["value"])
+			apply_friendly_fire()
+		"spawn_distance":
+			if horde != null:
+				horde.set_spawn_distance_scale(float(applied["value"]))
+
+
+## The survivor a map's output named by position (a button's presser stands there), or the only one.
+func _survivor_at(who: Variant) -> ZzPlayer:
+	var found: ZzPlayer = null
+	var best := 4.0
+
+	for player in survivors():
+		if not player.is_alive() or player.watching:
+			continue
+
+		if who is ZzPlayer:
+			if player == who:
+				return player
+		elif who is Vector3:
+			var d := (who as Vector3).distance_to(player.feet() + Vector3.UP * 0.9)
+
+			if d < best:
+				best = d
+				found = player
+		elif found == null:
+			found = player
+
+	return found
+
+
+## A game_score: points to the activator, to every survivor when the entity says team, or none when it is the other side's.
+func _map_score(data: Dictionary) -> void:
+	if not authoritative:
+		return
+
+	var points := int(data.get("points", 0))
+	var team := int(data.get("team", 0))
+	var winners: Array = []
+
+	if team == VOLUME_TEAM_ZOMBIES:
+		return
+
+	if bool(data.get("to_team", false)) or team == VOLUME_TEAM_SURVIVORS:
+		for player in survivors():
+			if player.is_alive() and not player.watching:
+				winners.append(player)
+	else:
+		var one := _survivor_at(data.get("activator"))
+
+		if one != null:
+			winners.append(one)
+
+	for player: ZzPlayer in winners:
+		player.points = player.points + points if bool(data.get("allow_negative", false)) else maxi(player.points + points, 0)
+
+
+## Which survivor holds a game_ui's controls, by entity index.
+var ui_holders: Dictionary = {}
+
+
+func _map_ui(data: Dictionary) -> void:
+	var entity := int(data.get("entity", -1))
+
+	if not bool(data.get("on", false)):
+		var _gone := ui_holders.erase(entity)
+		return
+
+	var who := _survivor_at(data.get("player"))
+
+	if who != null:
+		ui_holders[entity] = who.player_id
+
+
+## Whether a map's game_ui has the survivor's controls: their weapon is held while it does.
+func ui_holds(player: ZzPlayer) -> bool:
+	return ui_holders.values().has(player.player_id)
+
+
+func _feed_map_uis() -> void:
+	if ui_holders.is_empty() or map == null or map.mechanics == null:
+		return
+
+	map.mechanics.feed_uis(func(entity: int, _holder: Variant) -> Dictionary:
+		var player := player_by_id(ui_holders.get(entity, &""))
+		var held := {}
+		var command: Variant = player.controller.current_command if player != null and player.controller != null else null
+
+		if command == null:
+			return held
+
+		var c: DotFpsCommand = command
+		held["forward"] = c.move.y > 0.3
+		held["back"] = c.move.y < -0.3
+		held["right"] = c.move.x > 0.3
+		held["left"] = c.move.x < -0.3
+		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE)
+		held["attack2"] = (player.actions & ZzNetCommand.ACT_AIM) != 0
+		held["jump"] = c.is_pressed(DotFpsCommand.BUTTON_JUMP)
+		held["use"] = (player.actions & ZzNetCommand.ACT_USE) != 0
+		return held)
+
+
+## The survival hold began (or cleared) a wave: the map's logic_waves answer.
+func map_wave_changed(number: int, ended: bool = false) -> void:
+	if map != null and map.mechanics != null:
+		map.mechanics.wave_changed(number, ended)
+
+
+## A map's logic_beats switched the wave announcer off.
+func map_announcer_off() -> bool:
+	return map != null and map.mechanics != null and map.mechanics.announcer_off()
 
 
 func _mechanics_of_map() -> Variant:
@@ -1085,6 +1215,9 @@ func _build_horde() -> void:
 		return
 
 	horde.zombie_died.connect(_on_zombie_died)
+	horde.maker_child_gone.connect(func(maker: int) -> void:
+		if map != null and map.mechanics != null:
+			map.mechanics.maker_child_gone(maker))
 	_follow_ragdoll_reactions()
 	if not ragdoll_rules.changed.is_connected(_follow_ragdoll_reactions):
 		ragdoll_rules.changed.connect(_follow_ragdoll_reactions)
@@ -1899,6 +2032,9 @@ func _decide(won: bool, why: String) -> void:
 					progress.on_survived(player.player_id, is_survival())
 
 	DotLog.info(CHANNEL, "the map is decided", {"won": won, "why": why})
+
+	if map != null and map.mechanics != null:
+		map.mechanics.round_decided(won)
 
 
 static func _clock(seconds: float) -> String:
@@ -3231,14 +3367,15 @@ func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
 ## The command [param player]'s gun simulates this tick, from the buttons on their movement
 ## command. `ZzWeapons.command_for` is the rule, shared with the gun a client draws.
 func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
+	var held := player.is_held() or ui_holds(player)
 	var pending := player.controller.current_command
 	var arsenal := player.weapons.arsenal if player.weapons != null else null
 
 	if pending == null:
-		return ZzWeapons.command_for(false, false, player.is_held(), 0.0, 0.0, player.wanted_slot, arsenal, false)
+		return ZzWeapons.command_for(false, false, held, 0.0, 0.0, player.wanted_slot, arsenal, false)
 
 	return ZzWeapons.command_for(pending.is_pressed(ZzNetCommand.BUTTON_FIRE),
-		pending.is_pressed(ZzNetCommand.BUTTON_RELOAD), player.is_held(), pending.yaw, pending.pitch,
+		pending.is_pressed(ZzNetCommand.BUTTON_RELOAD), held, pending.yaw, pending.pitch,
 		player.wanted_slot, arsenal, (player.actions & ZzNetCommand.ACT_AIM) != 0)
 
 
@@ -3348,6 +3485,8 @@ func _step(delta: float) -> void:
 
 	if map != null and map.mechanics != null:
 		map.mechanics.step(_tick)
+		if authoritative:
+			_feed_map_uis()
 
 	if authoritative:
 		_advance_toys(delta)

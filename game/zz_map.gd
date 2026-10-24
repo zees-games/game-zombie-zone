@@ -132,10 +132,13 @@ var volume_bodies_fn: Callable = Callable()
 var volume_damage_fn: Callable = Callable()
 var volume_move_fn: Callable = Callable()
 var _pending_movers: Dictionary = {}
+var _pending_copies: Array = []
 
 signal built()
 ## A moving part changed state on the server (see [method ZzMechanics.snapshot]).
 signal mover_changed(index: int)
+## The map's point_template made or killed a brush copy; see [signal ZzMechanics.copy_changed].
+signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 ## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
 signal logic_event(kind: String, data: Dictionary)
 
@@ -300,6 +303,7 @@ func clear() -> void:
 	mechanics = null
 	world_collision = null
 	_pending_movers.clear()
+	_pending_copies.clear()
 	_missing.clear()
 	_bounds = AABB()
 	terrain = null
@@ -1307,8 +1311,12 @@ func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 		return
 	made.state_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	made.logic_event.connect(func(kind: String, data: Dictionary) -> void: logic_event.emit(kind, data))
+	made.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void: copy_changed.emit(id, model, offset, alive))
 	add_child(made)
 	mechanics = made
+	for c: Array in _pending_copies:
+		made.apply_copy(int(c[0]), int(c[1]), c[2], bool(c[3]))
+	_pending_copies.clear()
 	for index: int in _pending_movers:
 		var s: Array = _pending_movers[index]
 		made.apply_state(index, int(s[0]), int(s[1]), int(s[2]), int(s[3]) != 0, float(s[4]))
@@ -1339,6 +1347,14 @@ func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, 
 		mechanics.apply_state(index, start, from_thousandths, dir, locked, side)
 	else:
 		_pending_movers[index] = [start, from_thousandths, dir, 1 if locked else 0, side]
+
+
+## A brush copy as the server sent it; kept until the mechanics exist.
+func apply_copy(id: int, model: int, offset: Vector3, alive: bool) -> void:
+	if mechanics != null:
+		mechanics.apply_copy(id, model, offset, alive)
+	else:
+		_pending_copies.append([id, model, offset, alive])
 
 
 ## Takes a bake off: what was baked was the boxes.
