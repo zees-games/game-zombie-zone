@@ -447,8 +447,27 @@ func simulate(tick: int, delta: float) -> void:
 
 		controller.apply_command(sampled)
 
-	controller.simulate_tick(tick, delta)
+	step_controller(tick, delta)
 	global_position = controller.state.position
+
+
+## The motor's tick at the weapon's ADS pace while the rig says it is aimed. Server, offline and a
+## predicting client all come through here and read the same rig rule, so the prediction agrees.
+## The top speed is scaled for the one tick and put back (the tunables are shared, and every
+## motor modifier slot is taken: dot-player-controller's admin set fills the 32).
+func step_controller(tick: int, delta: float) -> void:
+	var rig := weapons if weapons != null else view_rig
+	var tunables := controller.tunables
+	var scale := rig.ads_move_scale() if rig != null else 1.0
+
+	if tunables == null or scale >= 1.0:
+		controller.simulate_tick(tick, delta)
+		return
+
+	var kept := tunables.max_speed
+	tunables.max_speed = kept * clampf(scale, 0.05, 1.0)
+	controller.simulate_tick(tick, delta)
+	tunables.max_speed = kept
 
 
 func delta_for_tick() -> float:
@@ -482,13 +501,13 @@ func is_held() -> bool:
 
 ## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig
 ## follows (`ZzWeapons.command_for`). [param delta] is the tick's simulated length.
-func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float) -> DotWeaponOutcome:
+func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float, aim: bool = false) -> DotWeaponOutcome:
 	if view_rig == null or view_rig.arsenal == null:
 		return DotWeaponOutcome.nothing("No drawn rig.")
 
 	var state := controller.state if controller != null else null
 	var command := ZzWeapons.command_for(fire, reload, is_held(), state.yaw if state != null else 0.0,
-		state.pitch if state != null else 0.0, slot, view_rig.arsenal)
+		state.pitch if state != null else 0.0, slot, view_rig.arsenal, aim)
 	var outcome := view_rig.simulate_tick(command, tick)
 	var arsenal := view_rig.arsenal
 

@@ -2995,6 +2995,7 @@ func _disarm(player: ZzPlayer) -> void:
 	player.remove_child(player.weapons)
 	player.weapons.queue_free()
 	player.weapons = null
+		rig.ads_rules = ZzWeapons.ads_rules()
 	player_disarmed.emit(player.player_id)
 
 
@@ -3074,11 +3075,11 @@ func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
 	var arsenal := player.weapons.arsenal if player.weapons != null else null
 
 	if pending == null:
-		return ZzWeapons.command_for(false, false, player.is_held(), 0.0, 0.0, player.wanted_slot, arsenal)
+		return ZzWeapons.command_for(false, false, player.is_held(), 0.0, 0.0, player.wanted_slot, arsenal, false)
 
 	return ZzWeapons.command_for(pending.is_pressed(ZzNetCommand.BUTTON_FIRE),
 		pending.is_pressed(ZzNetCommand.BUTTON_RELOAD), player.is_held(), pending.yaw, pending.pitch,
-		player.wanted_slot, arsenal)
+		player.wanted_slot, arsenal, (player.actions & ZzNetCommand.ACT_AIM) != 0)
 
 
 # --- The tick ------------------------------------------------------------------------------------

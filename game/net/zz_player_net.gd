@@ -229,7 +229,7 @@ func _net_simulate(tick: int, delta: float) -> void:
 		# The prediction: the controller's own tick, with the same modifiers the server's —
 		# down, held, limping, slowed — which travel in the movement state.
 		player.controller.apply_command(last_move.duplicate_command())
-		player.controller.simulate_tick(tick, delta)
+		player.step_controller(tick, delta)
 
 	pull()
 

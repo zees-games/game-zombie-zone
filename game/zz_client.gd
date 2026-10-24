@@ -1067,6 +1067,8 @@ func _arm_locally(weapon_id: StringName) -> void:
 		weapons.tick_rate = Engine.physics_ticks_per_second
 		weapons.view_model_ref = DotNodeRef.of_path(view_model.get_path())
 		weapons.player_ref = DotNodeRef.of_path(player.get_path())
+		weapons.ads_rules = ZzWeapons.ads_rules()
+		view_model.ads_rules = weapons.ads_rules
 		player.add_child(weapons)
 
 		var ready_now := weapons.setup()
@@ -1626,6 +1628,8 @@ func _actions() -> int:
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	return out
+	if _aim_sent():
+		out |= ZzNetCommand.ACT_AIM
 
 
 # --- The frame -------------------------------------------------------------
@@ -1696,7 +1700,8 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 		return
 
 	var _outcome := player.drive_view_rig(_firing, _reloading, _slot,
-		game.round_number * 100000 + Engine.get_physics_frames(), 1.0 / float(maxi(Engine.physics_ticks_per_second, 1)))
+		game.round_number * 100000 + Engine.get_physics_frames(), 1.0 / float(maxi(Engine.physics_ticks_per_second, 1)),
+		_aim_sent())
 
 
 func _process(delta: float) -> void:
@@ -1782,14 +1787,27 @@ func carried_colour(who: ZzPlayer) -> Color:
 
 
 ## Down the sights: the hands come up while the Aim key is held, the lens zooms by what the
+## Whether the Aim key counts: nobody aims with the pointer free, in third person, held, down,
+## dead or watching.
+func _aim_allowed() -> bool:
+	return _pointer_ours() and not third_person and not is_spectating() \
+		and player != null and player.is_alive() and not player.is_down() and not player.is_held()
+
+
+## What the command says about the sights: the view model's own state, so a toggle in the rules
+## reaches the server's spread and pace as it does the picture.
+func _aim_sent() -> bool:
+	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
+	return _aim_allowed() and (hands.is_aim_held() if hands != null else _aiming)
+
+
 ## weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the HUD
 ## fades its dot and shows a scope. Nobody aims down, held, dead, watching, in third person or
 ## with the pointer free. Presentation only, as in the arena: the server's shot ignores it.
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
-		hands.aim(_aiming and _pointer_ours() and not third_person and not is_spectating()
-			and player.is_alive() and not player.is_down() and not player.is_held())
+		hands.aim_input(_aiming and _aim_allowed())
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
 		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())

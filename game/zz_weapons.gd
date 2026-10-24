@@ -153,8 +153,9 @@ static func title_of(id: StringName) -> String:
 ## counter say one thing while the server's gun does another. [param held] is the server's own
 ## test: pinned, or using something with both hands. Down, you still shoot.
 static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch: float, slot: int,
-		arsenal: DotWeaponArsenal) -> DotWeaponCommand:
+		arsenal: DotWeaponArsenal, aim: bool = false) -> DotWeaponCommand:
 	var command := DotWeaponCommand.new()
+	command.set_button(DotWeaponCommand.BUTTON_USER_0, aim and not held)
 
 	if not held:
 		command.set_button(DotWeaponCommand.BUTTON_ATTACK, fire)
@@ -164,6 +165,18 @@ static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch:
 	command.pitch = pitch
 	command.slot = slot
 	return command
+
+
+static var _ads_rules: ZeeAdsRules = null
+
+
+## The aim-down-sights rules every rig and view model shares: `cfg/server/addons/zee_weapons/ads.yml`
+## over the shipped defaults, read once.
+static func ads_rules() -> ZeeAdsRules:
+	if _ads_rules == null:
+		_ads_rules = ZeeAdsRules.load_config()
+
+	return _ads_rules
 
 
 ## Whether the gun in hand is empty and has something to reload from.

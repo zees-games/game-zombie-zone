@@ -65,3 +65,5 @@ Every `ZzConfig` field is a `zz_<field>` cvar (`zz_` names that were hand-writte
 The workbench (F9 solo or hosting a game, `workbench` in the console) is dot-game's `DotGameWorkbench`; its HTTP page is off until `workbench.enabled` in `cfg/server.yml`, and a dot-auth connect ticket of an account in `workbench.admin_uids` or `admin_groups` is accepted as the bearer.
 
 dot-team's block rules are on when the addon is linked: survivors pass through each other (`mp_teamblock`), and `!block` / `!noblock` ask to stop or pass. Without the addon players block each other and the server logs one WARN.
+
+Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/addons/zee_weapons/ads.yml` is the shipped default and `cfg/server/addons/zee_weapons/ads.yml` overrides it per server (zoom, walk pace and spread while aimed, toggle, per-weapon rows). The server applies the pace and the tighter spread from the aim bit in the player's command, so clients predict the same pace.

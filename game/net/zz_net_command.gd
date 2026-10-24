@@ -36,7 +36,9 @@ const ACT_PILLS := 4
 const ACT_DEPLOY := 8
 ## Take the carried box out of, or put it back in, the hands (a press).
 const ACT_BOX := 16
-const ACT_BITS := 5
+## Aim down the sights, held (right mouse); it becomes the weapon command's ads button.
+const ACT_AIM := 32
+const ACT_BITS := 6
 
 var move: DotFpsCommand = DotFpsCommand.new()
 
