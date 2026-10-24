@@ -214,6 +214,11 @@ func _crouch() -> void:
 	for pair in [[KEY_CTRL, "ctrl"], [KEY_C, "c"]]:
 		_key(pair[0], true)
 		await _seconds(0.6)
+		# The eye eases down by frames, so a slow renderer needs longer than 0.6 s of wall time.
+		for _w in 20:
+			if cam.global_position.y - local.controller.state.position.y < base_eye - 0.3:
+				break
+			await _seconds(0.25)
 		var eye: float = cam.global_position.y - local.controller.state.position.y
 		var frac: float = local.controller.state.crouch_fraction
 		var hit_h: float = local.controller.tunables.height_at(frac)

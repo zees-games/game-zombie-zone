@@ -108,9 +108,8 @@ pack_all() {
     (cd "$deploy" && ./server pack "$PACK" --source "$ROOT") >/dev/null || die "could not pack $PACK"
 }
 
-# tools/verify_ui.sh checks that drive the real client under xvfb. "nav" is left out: it
-# reported a failing meter check in 2026-10 and is still a diagnostic.
-UI_CHECKS="trader crouch"
+# tools/verify_ui.sh checks that drive the real client under xvfb.
+UI_CHECKS="trader crouch nav"
 
 run_ui_check() {
     local check="$1" log=".godot/test-logs/verify_ui_$1.log" status
