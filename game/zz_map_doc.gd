@@ -386,7 +386,14 @@ static func validate(source: Dictionary) -> DotResult:
 	for raw: Variant in (spawns as Dictionary).get("survivors", []):
 		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
 			return _refuse("a survivor spawn has no 'at'", source)
-		list.append({"at": _floats((raw as Dictionary)["at"], 3), "yaw": _r(float((raw as Dictionary).get("yaw", 0.0)))})
+		var entry := {"at": _floats((raw as Dictionary)["at"], 3), "yaw": _r(float((raw as Dictionary).get("yaw", 0.0)))}
+		# The map's own start-point entity: a name an input can re-enable, and whether it begins disabled.
+		var spawn_name := str((raw as Dictionary).get("name", "")).strip_edges().left(64)
+		if spawn_name != "":
+			entry["name"] = spawn_name
+		if bool((raw as Dictionary).get("disabled", false)):
+			entry["disabled"] = true
+		list.append(entry)
 
 	if list.is_empty():
 		return _refuse("no spawns for the survivors", source)

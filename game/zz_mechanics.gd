@@ -832,6 +832,20 @@ func _build_toggles(world: RefCounted) -> void:
 		_build_volume_io(world)
 
 
+## The map's `info_player_*` entities as `[{name, origin, enabled}]`, live: an `Enable` or `Disable` input flips `enabled`.
+func spawn_entities() -> Array:
+	var out: Array = []
+
+	if _logic == null:
+		return out
+
+	for e: DotMapEntity in _logic.entities:
+		if e.classname.to_lower().begins_with("info_player"):
+			out.append({"name": e.targetname, "origin": e.origin(_logic), "enabled": e.enabled})
+
+	return out
+
+
 ## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links run in [member _logic].
 func _build_volume_io(world: RefCounted) -> void:
 	var from_doc := {}

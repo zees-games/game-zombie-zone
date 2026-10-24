@@ -1120,6 +1120,9 @@ func load_world() -> DotResult:
 	return DotResult.success(true)
 
 
+## Fades and spins the drawn world's ambient players on the map's `sound_fade` and `sound_spin` events; null without ambient sounds.
+var sound_driver: DotMapSoundDriver = null
+
 ## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
 var world_sounds: Dictionary = {}
 
@@ -1269,6 +1272,9 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	var sounds: Node3D = world.call(&"build_sounds")
 	if sounds.get_child_count() > 0:
 		node.add_child(sounds)
+		sound_driver = DotMapSoundDriver.new()
+		sound_driver.root = sounds
+		sounds.add_child(sound_driver)
 	else:
 		sounds.free()
 
@@ -1330,7 +1336,10 @@ func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 		made.free()
 		return
 	made.state_changed.connect(func(index: int) -> void: mover_changed.emit(index))
-	made.logic_event.connect(func(kind: String, data: Dictionary) -> void: logic_event.emit(kind, data))
+	made.logic_event.connect(func(kind: String, data: Dictionary) -> void:
+		if sound_driver != null:
+			var _driven := sound_driver.handle(kind, data)
+		logic_event.emit(kind, data))
 	made.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void: copy_changed.emit(id, model, offset, alive))
 	add_child(made)
 	mechanics = made
@@ -1747,6 +1756,9 @@ static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
 ## apart, so nobody starts inside anybody else.
 func spawn(side: String, seat: int) -> Array:
 	var list: Array = (doc.get("spawns", {}) as Dictionary).get(side, [])
+	var live := list.filter(spawn_enabled)
+	# A map that disabled every start point still starts somebody.
+	list = live if not live.is_empty() else list
 
 	if list.is_empty():
 		return [Vector3(0.0, 1.0, 0.0), 0.0]
@@ -1760,6 +1772,24 @@ func spawn(side: String, seat: int) -> Array:
 		at += Vector3(cos(angle), 0.0, sin(angle)) * (1.1 * ceilf(float(lap) / 6.0))
 
 	return [at, float(base.get("yaw", 0.0))]
+
+
+## Whether a start point is on: the map's `info_player_*` entity (found by name, else by standing within 0.75 m of it) says so live, else the document's `disabled`.
+func spawn_enabled(entry: Dictionary) -> bool:
+	if mechanics != null:
+		var named := str(entry.get("name", ""))
+		var at := ZzMapDoc.v3(entry["at"])
+
+		for point: Dictionary in mechanics.spawn_entities():
+			if named != "" and str(point["name"]) == named:
+				return bool(point["enabled"])
+
+			var o: Vector3 = point["origin"]
+
+			if named == "" and Vector2(o.x - at.x, o.z - at.z).length() < 0.75:
+				return bool(point["enabled"])
+
+	return not bool(entry.get("disabled", false))
 
 
 func kill_height() -> float:

@@ -10,6 +10,7 @@ const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzDrops := preload("zz_drops.gd")
+const ZzMapObjects := preload("zz_map_objects.gd")
 const ZzSpawners := preload("zz_spawners.gd")
 const ZzShop := preload("zz_shop.gd")
 const ZzMap := preload("zz_map.gd")
@@ -232,6 +233,8 @@ var turrets: ZzTurrets = null
 var loot: ZzLoot = null
 ## What a dead zombie leaves (ammunition, health); server only.
 var drops: ZzDrops = null
+## What a map's breakables leave when they break (`spawn_object`), whitelisted and capped.
+var map_objects: ZzMapObjects = null
 ## The trader's menu (zz_shop.gd), server only.
 var shop = null
 ## The map's weapon and supply spawners (zz_spawners.gd), server only.
@@ -393,6 +396,7 @@ func _ready() -> void:
 		shop = ZzShop.new(self)
 		loot.removed.connect(spawners.on_loot_removed)
 		drops = ZzDrops.new(self)
+		map_objects = ZzMapObjects.new(self)
 		drops.load_config()
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
@@ -733,10 +737,39 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 				var _made := horde.spawn_common_at(data["at"] as Vector3, int(data.get("maker", -1)))
 				if not _made and map != null and map.mechanics != null:
 					map.mechanics.maker_child_gone(int(data.get("maker", -1)))
+		"spawn_object":
+			if authoritative and map_objects != null:
+				var _laid := map_objects.spawn(int(data.get("object", 0)), _object_place(data))
 		"damage_force":
 			var npc: Variant = data.get("body")
 			if npc is DotNpcInstance and horde != null:
 				horde.throw_zombie(npc as DotNpcInstance, data["force"] as Vector3)
+
+
+## Where a broken thing's piece lies: the event's place, else the middle of the breakable's drawn node (a shatter by input has no hit point); the origin means unknown.
+func _object_place(data: Dictionary) -> Vector3:
+	var at: Variant = data.get("at")
+
+	if at is Vector3 and (at as Vector3) != Vector3.ZERO:
+		return at as Vector3
+
+	var node: Node3D = null if map == null else map.moving_node_named(str(data.get("name", "")))
+
+	if node == null or str(data.get("name", "")) == "":
+		return Vector3.INF
+
+	var box := AABB()
+	var first := true
+
+	for m in node.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+
+		if mi.mesh != null:
+			var b := mi.global_transform * mi.mesh.get_aabb()
+			box = b if first else box.merge(b)
+			first = false
+
+	return Vector3.INF if first else box.get_center()
 
 
 ## Pushes the config's friendly-fire scale (set by difficulty or a map's cvar) onto the combat rules.
@@ -1529,6 +1562,8 @@ func _on_round_started(number: int) -> void:
 		turrets.clear()
 	if loot != null:
 		loot.clear()
+		if map_objects != null:
+			map_objects.reset()
 		loot.place_from_map(map_doc)
 	if spawners != null:
 		spawners.start_round(map_doc)

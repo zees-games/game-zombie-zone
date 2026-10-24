@@ -5,6 +5,8 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const MapCommands := preload("../game/zz_map_commands.gd")
 const ZzMap := preload("../game/zz_map.gd")
+const ZzLoot := preload("../game/zz_loot.gd")
+const ZzMapObjects := preload("../game/zz_map_objects.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
@@ -20,8 +22,8 @@ const ZzPlayer := preload("../game/zz_player.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 13
-const CHECKS := 112
+const SECTIONS := 14
+const CHECKS := 128
 
 var _passed := 0
 var _failed := 0
@@ -77,6 +79,7 @@ func _run() -> void:
 	await _test_logic_blockfort()
 	await _test_logic_death_star()
 	await _test_trail_targets()
+	await _test_map_events()
 	await _test_no_world()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
@@ -1060,6 +1063,90 @@ func _test_no_world() -> void:
 			"%s has none" % id)
 		game.queue_free()
 	_check(true, "and no input to press")
+	_finished += 1
+
+
+## The events dot-map added: a breakable's spawn_object, the ambient fade and spin, and a start point that begins disabled and is switched on by an input.
+func _test_map_events() -> void:
+	_entered += 1
+	print("map events: spawn_object, sound fade and spin, disabled start points")
+	var fx := _fixture()
+	fx["volumes"] = []
+	fx["movers"] = [fx["movers"][1]]
+	fx["entities"] = [
+		_logic_rec(10, "logic_relay", "switch", {}),
+		_logic_rec(11, "info_player_human", "late", {"origin": "100 200 0", "startdisabled": "1", "angles": "0 90 0"}),
+		_logic_rec(12, "info_player_human", "other", {"origin": "500 200 0"}),
+		_logic_rec(13, "func_breakable", "crate", {"health": "5", "spawnobject": "2"}),
+	]
+	fx["links"] = [_logic_link(10, "OnTrigger", "late", "Enable", [11])]
+	var mech := _logic_mech(fx)
+	var events: Array = []
+	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data]))
+	var io := mech.logic()
+	var points := mech.spawn_entities()
+	_check(points.size() == 2 and points[0]["name"] == "late" and not points[0]["enabled"] and points[1]["enabled"], "both start points are read, the first disabled", str(points))
+
+	var map := ZzMap.new()
+	map.doc = {"spawns": {"survivors": [{"at": [100.0 * 0.0254, 0.0, -200.0 * 0.0254], "yaw": 0.0}, {"at": [500.0 * 0.0254, 0.0, -200.0 * 0.0254], "yaw": 0.0}]}}
+	map.mechanics = mech
+	var seat0: Array = map.spawn("survivors", 0)
+	_check(is_equal_approx((seat0[0] as Vector3).x, 500.0 * 0.0254), "a disabled start point is skipped by spawn selection", str(seat0[0]))
+	var _s := io.send("switch", "Trigger")
+	mech.step(1)
+	mech.step(2)
+	_check(map.spawn("survivors", 0)[0].x < 3.0 and map.spawn_enabled(map.doc["spawns"]["survivors"][0]), "the Enable input brings it back, found by position", str(map.spawn("survivors", 0)[0]))
+	_s = io.send("late", "Disable")
+	_s = io.send("other", "Disable")
+	_check(map.spawn("survivors", 0).size() == 2 and not map.spawn_enabled(map.doc["spawns"]["survivors"][1]), "a map that disabled everything still starts somebody")
+	map.doc["spawns"]["survivors"][1]["name"] = "ghost"
+	_check(not map.spawn_enabled({"at": [9.0, 0.0, 9.0], "name": "ghost", "disabled": true}), "a named point nothing matches falls back to the document's disabled flag")
+	map.free()
+
+	_s = io.send("crate", "Break")
+	var made := events.filter(func(e: Array) -> bool: return e[0] == "spawn_object")
+	_check(made.size() == 1 and int(made[0][1]["object"]) == 2, "a broken crate says which object it leaves", str(made))
+	mech.queue_free()
+
+	var driver_root := Node3D.new()
+	add_child(driver_root)
+	var player := AudioStreamPlayer3D.new()
+	player.name = "hum"
+	player.set_meta(&"dot_map_entity", 7)
+	player.set_meta(&"dot_map_gain_scale", 1.0)
+	driver_root.add_child(player)
+	var driver := DotMapSoundDriver.new()
+	driver.root = driver_root
+	driver_root.add_child(driver)
+	var _d := driver.handle("sound_fade", {"entity": 7, "name": "hum", "seconds": 0.0, "from": 1.0, "to": 0.5})
+	_check(absf(player.volume_db - linear_to_db(0.5)) < 0.01, "sound_fade reaches the map's player by entity", str(player.volume_db))
+	_d = driver.handle("sound_spin", {"entity": 7, "seconds": 90000.0, "from": 100.0, "to": 150.0})
+	_check(is_equal_approx(player.pitch_scale, 1.0), "sound_spin starts at its pitch and a huge duration is clamped, not trusted")
+	_check(not driver.handle("sound_spin", {"entity": 99, "name": "../x"}), "an unknown player is ignored")
+	driver_root.queue_free()
+
+	var game := await _game(&"zz_practice")
+	var objects: Variant = game.map_objects
+	var floor_at := Vector3(0.0, 0.2, 0.0)
+	_check(objects.spawn(0, floor_at) == -1 and objects.spawn(1, floor_at) == -1 and objects.spawn(10, floor_at) == -1 and objects.spawn(-4, floor_at) == -1, "unknown objects (nothing, battery, past the list, negative) lay nothing")
+	var before: int = game.loot.entries.size()
+	var medkit: int = objects.spawn(2, floor_at)
+	_check(medkit > 0 and game.loot.kind_of(medkit) == ZzLoot.MEDKIT and game.loot.entries.size() == before + 1, "object 2 lays a medkit")
+	var ammo: int = objects.spawn(5, floor_at)
+	_check(ammo > 0 and game.loot.kind_of(ammo) == ZzLoot.AMMO and float(game.loot.entries[ammo]["fraction"]) > 0.0, "object 5 lays a part-filled ammo pile")
+	_check(objects.spawn(2, Vector3(INF, 0.0, 0.0)) == -1 and objects.spawn(2, Vector3(1.0e9, 0.0, 0.0)) == -1, "a non-finite or absurd place lays nothing")
+	var held: int = game.loot.entries.size()
+	game._on_map_logic_event("spawn_object", {"entity": 1, "name": "nothing_by_this_name", "object": 2, "at": Vector3.ZERO})
+	_check(game.loot.entries.size() == held, "an event with no place and no node to find lays nothing")
+	game._on_map_logic_event("spawn_object", {"entity": 1, "name": "", "object": 2, "at": floor_at})
+	_check(game.loot.entries.size() == held + 1, "the game's handler lays the piece at the event's place")
+	for i in 40:
+		var _laid: int = objects.spawn(3, floor_at)
+	var lying := 0
+	for e: Dictionary in game.loot.entries.values():
+		lying += 1 if e["until"] > 0.0 else 0
+	_check(lying <= ZzMapObjects.MAX_LYING, "pieces lying at once are capped", str(lying))
+	game.queue_free()
 	_finished += 1
 
 
