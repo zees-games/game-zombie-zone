@@ -388,18 +388,6 @@ static func _bot_name(index: int) -> String:
 	return DotBotNames.pick(taken, index, ZzBots.BOT_NAMES)
 
 
-# --- Connected -------------------------------------------------------------
-
-func _build_netcode() -> DotResult:
-	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this
-	# end traces its own shots for tracers and impacts, and on its default 1 against a server
-	# on 0 or 2 they ended in (or went through) a team-mate where the server's did the
-	# opposite. An older shell's link cannot say, and the manager keeps its default.
-	if game.combat != null and link != null:
-		var _following := game.combat.follow_cvars(link)
-	# The server's mp_forceview and mp_solidplayers: this end places its own camera and
-	# predicts its own player.
-	if link != null:
 ## dot-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
 func _add_noblock_and_workbench() -> void:
 	if game == null:
@@ -421,6 +409,18 @@ func _add_noblock_and_workbench() -> void:
 	platform.add_workbench(wb)
 
 
+# --- Connected -------------------------------------------------------------
+
+func _build_netcode() -> DotResult:
+	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this
+	# end traces its own shots for tracers and impacts, and on its default 1 against a server
+	# on 0 or 2 they ended in (or went through) a team-mate where the server's did the
+	# opposite. An older shell's link cannot say, and the manager keeps its default.
+	if game.combat != null and link != null:
+		var _following := game.combat.follow_cvars(link)
+	# The server's mp_forceview and mp_solidplayers: this end places its own camera and
+	# predicts its own player.
+	if link != null:
 		var _view := game.view_rules.follow_cvars(link)
 		if link.has_method(&"replicated_cvar"):
 			_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
@@ -1546,6 +1546,7 @@ func _build_settings() -> void:
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
+	_add_noblock_and_workbench()
 	# Walking is off while the cover is up, a menu is open or a line is typed.
 	platform.input_blocked_changed.connect(_suspend_input)
 	_suspend_input(platform.is_input_blocked())
@@ -1558,7 +1559,6 @@ func _build_settings() -> void:
 
 	if blood != null:
 		blood.follow(settings.settings)
-	_add_noblock_and_workbench()
 
 	if world_view != null:
 		world_view.lod.follow(settings.settings)

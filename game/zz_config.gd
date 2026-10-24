@@ -628,15 +628,6 @@ func validate() -> DotResult:
 
 
 ## The survival style's name, as the cvar and the HUD say it.
-func survival_style_name() -> String:
-	return ["waves", "nights", "clock"][clampi(survival_style, 0, 2)]
-
-
-func survival_description() -> String:
-	match survival_style:
-		0:
-			return "%d waves, %.0f s breathers" % [waves, breather_seconds]
-		1:
 ## The layered load through [DotGameConfigBinder] (JSON, cfg/ yml, env, argv; strict on a server). The value is the binder.
 static func boot(config: DotConfig, json_path: String) -> DotResult:
 	var binder := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
@@ -646,6 +637,15 @@ static func boot(config: DotConfig, json_path: String) -> DotResult:
 	return DotResult.success(binder)
 
 
+func survival_style_name() -> String:
+	return ["waves", "nights", "clock"][clampi(survival_style, 0, 2)]
+
+
+func survival_description() -> String:
+	match survival_style:
+		0:
+			return "%d waves, %.0f s breathers" % [waves, breather_seconds]
+		1:
 			return "%d nights of %.0f s, %.0f s days" % [nights, night_seconds, day_seconds]
 	return "a clock" if survive_seconds <= 0.0 else "%.0f s clock" % survive_seconds
 
