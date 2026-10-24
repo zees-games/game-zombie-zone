@@ -30,11 +30,14 @@ const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
 const SHOVE := &"zz_shove"
-## Hold to open the box in your hands (deploying takes a few seconds, and moving off cancels it).
-const DEPLOY := &"zz_deploy"
+## Takes a carried box out of the pack into the hands, or puts it away; the box in the hands is
+## deployed with primary fire, held.
+const BOX := &"zz_box"
 ## Down the sights while held: the view model comes up and the lens zooms. Presentation only;
 ## nothing the server simulates reads it.
 const AIM := &"zz_aim"
+## Primary fire: shoots the gun in the hands, or deploys the box when that is what they hold.
+const FIRE := &"zz_fire"
 const RELOAD := &"zz_reload"
 const VIEW := &"zz_view"
 const SCOREBOARD := &"zz_scoreboard"
@@ -53,7 +56,8 @@ static func make() -> DotMenuBindings:
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "F", "Hands")
-	keys.add(DEPLOY, &"bind_deploy", "Deploy the box you carry (hold)", "B", "Hands")
+	keys.add(BOX, &"bind_box", "Take out or put away a carried box", "X", "Hands")
+	keys.add(FIRE, &"bind_fire", "Primary fire (hold to deploy a box)", "Mouse 1", "Weapons")
 	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Weapons")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
 	for i in range(SLOTS.size()):

@@ -811,7 +811,7 @@ func _draw_use() -> void:
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Deploying the box — stay put…"}.get(player.using, "")
+		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"
@@ -845,7 +845,10 @@ func _draw_carry() -> void:
 	var id: StringName = box_order[player.carried_index - 1] if player.carried_index > 0 and player.carried_index <= box_order.size() else &""
 	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
 	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
-	_carry.text = "%s%s — hold %s to deploy" % [title, more, _key(ZzBindings.DEPLOY)]
+	if player.box_out:
+		_carry.text = "%s%s — hold %s to deploy (%s puts it away)" % [title, more, _key(ZzBindings.FIRE), _key(ZzBindings.BOX)]
+	else:
+		_carry.text = "%s%s — %s takes it out" % [title, more, _key(ZzBindings.BOX)]
 	_carry.add_theme_color_override("font_color", (box_colours.get(id, Color(0.98, 0.84, 0.5)) as Color).lightened(0.2))
 	# The meter pulses while it fills: the first-person cue that something is happening.
 	if player.using == &"deploy":

@@ -4,6 +4,7 @@ const ZzAudio := preload("zz_audio.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzBots := preload("zz_bots.gd")
 const ZzBoxes := preload("zz_boxes.gd")
+const ZzBoxHands := preload("zz_box_hands.gd")
 const ZzDefibHands := preload("zz_defib_hands.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzSettings := preload("zz_settings.gd")
@@ -22,8 +23,8 @@ const ZzPaths := preload("zz_paths.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorldView := preload("zz_world_view.gd")
-const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzShopMenu := preload("zz_shop_menu.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
@@ -76,9 +77,11 @@ var blood: ZzBlood = null
 ## Your own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
 var view_model: ZeeViewModel = null
-
 var defib_hands: Node3D = null
 var _defib_sound: bool = false
+## The crate in the hands while a box is out, a sibling of the gun under the camera.
+var box_hands: Node3D = null
+
 var net: DotNetManager = null
 var bridge: ZzNetBridge = null
 var link: Node = null
@@ -113,12 +116,12 @@ var _aiming: bool = false
 var base_fov: float = 90.0
 var _reloading: bool = false
 var _using: bool = false
-var _healing: bool = false
-var _pills: bool = false
-var _deploying: bool = false
 ## The trader's list as the server last said it ({menu, open, radius, at, items}), and its menu.
 var shop_state: Dictionary = {}
 var _shop_menu: PanelContainer = null
+var _healing: bool = false
+var _pills: bool = false
+var _box_key: bool = false
 var _slot: int = 0
 
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
@@ -440,11 +443,11 @@ func _build_netcode() -> DotResult:
 	bridge.downed_received.connect(_on_down)
 	bridge.revived_received.connect(_on_revive)
 	bridge.rescued_received.connect(_on_rescue)
+	bridge.defibbed_received.connect(_on_defib)
 	bridge.armed_received.connect(_on_armed)
 	bridge.ammo_received.connect(_on_ammo)
 	bridge.map_received.connect(_on_map)
 	bridge.pin_received.connect(func(session_id: int, npc_net_id: int, kind: StringName) -> void:
-	bridge.defibbed_received.connect(_on_defib)
 		_on_pin(session_id, bridge.zombie_mirror(npc_net_id), kind))
 	bridge.unpin_received.connect(_on_unpin)
 	bridge.box_received.connect(_on_box)
@@ -459,10 +462,10 @@ func _build_netcode() -> DotResult:
 		if blood != null:
 			var _splat := blood.splat_at(point, normal))
 	bridge.notice_received.connect(_on_notice)
+	bridge.shop_received.connect(_on_shop_json)
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
 		_on_zombie(kind, true)
 		world_view.add_zombie(net_id, kind, variant, body))
-	bridge.shop_received.connect(_on_shop_json)
 	bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
 		_on_zombie(StringName(str(body.get(&"kind"))) if body != null else &"", false)
 		world_view.remove_zombie(net_id, killed, body))
@@ -572,14 +575,14 @@ func _hear_the_world() -> void:
 		if id == &"local":
 			_on_hit(victim, amount, point, killed, headshot))
 	game.notice.connect(_on_notice)
-	game.refused.connect(func(id: StringName, why: String) -> void:
-		if id == &"local":
-			_on_notice(why)
 	game.told.connect(func(id: StringName, text: String) -> void:
 		if id == &"local":
 			_on_notice(text))
 	if game.shop != null:
 		game.shop_changed.connect(func() -> void: _on_shop_json(game.shop.state_json()))
+	game.refused.connect(func(id: StringName, why: String) -> void:
+		if id == &"local":
+			_on_notice(why)
 			if audio != null:
 				var _denied := audio.deny())
 	game.objective_changed.connect(func(index: int, state: StringName) -> void:
@@ -834,16 +837,6 @@ func _on_revive(session_id: int, by: int) -> void:
 			" by %s" % _name_of(by) if by != 0 else ""], Color(0.6, 0.95, 0.6))
 
 
-func _on_rescue(session_id: int) -> void:
-	if chat != null:
-		chat.say_locally(feed_line(_name_of(session_id), "is back", "", &"", &"", session_id == _watch_id),
-			Color(0.6, 0.95, 0.6))
-
-
-func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
-	var who := _player_of(session_id)
-
-	if who != null and world_view != null:
 func _on_defib(session_id: int, by: int) -> void:
 	var body := _player_of(session_id)
 
@@ -876,6 +869,16 @@ func _present_defib_hands(delta: float) -> void:
 	_defib_sound = out
 
 
+func _on_rescue(session_id: int) -> void:
+	if chat != null:
+		chat.say_locally(feed_line(_name_of(session_id), "is back", "", &"", &"", session_id == _watch_id),
+			Color(0.6, 0.95, 0.6))
+
+
+func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
+	var who := _player_of(session_id)
+
+	if who != null and world_view != null:
 		world_view.pin(who, holder, kind, session_id == _watch_id and not third_person)
 
 	if session_id == _watch_id and hud != null:
@@ -1185,12 +1188,12 @@ func _build_hud() -> void:
 	hud.name = "Hud"
 	hud.key_fn = _key
 	add_child(hud)
-
-
-## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
+
+
+## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
 ## every change. An older shell's link cannot say, and the config's default (off) stands.
 static func follow_roster(source: Object, config: ZzConfig) -> bool:
 	if source == null or not source.has_method(&"replicated_cvar") or not source.has_signal(&"replicated_cvar_changed"):
@@ -1580,8 +1583,8 @@ func _actions() -> int:
 		out |= ZzNetCommand.ACT_HEAL
 	if _pills:
 		out |= ZzNetCommand.ACT_PILLS
-	if _deploying:
-		out |= ZzNetCommand.ACT_DEPLOY
+	if _box_key:
+		out |= ZzNetCommand.ACT_BOX
 	return out
 
 
@@ -1701,6 +1704,10 @@ func _process(delta: float) -> void:
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = not third_person and not player.is_held()
 
+	_present_defib_hands(delta)
+
+	_present_box_hands(delta)
+
 	if hud != null:
 		var prompt := _prompt()
 		if prompt == "" and _near_trader() and not (_shop_menu != null and _shop_menu.is_open()):
@@ -1711,6 +1718,29 @@ func _process(delta: float) -> void:
 	_present_effects(delta)
 
 
+## The box in the hands, drawn under the camera in first person while one is out.
+func _present_box_hands(delta: float) -> void:
+	if box_hands == null or not is_instance_valid(box_hands) or box_hands.get_parent() != camera:
+		if box_hands != null and is_instance_valid(box_hands):
+			box_hands.queue_free()
+
+		box_hands = ZzBoxHands.new()
+		box_hands.name = "BoxHands"
+		camera.add_child(box_hands)
+
+	var out := player.box_out and player.carried_count > 0 and player.is_alive() and not third_person \
+		and not player.is_down() and not is_spectating()
+	box_hands.present(out, player.use_fraction if player.using == &"deploy" else 0.0, carried_colour(player), delta)
+
+
+## The colour of the box [param who] carries: its type's when the server tells it, a crate's own otherwise.
+func carried_colour(who: ZzPlayer) -> Color:
+	if who.carried_index > 0 and who.carried_index <= _box_order.size():
+		return _box_colours.get(_box_order[who.carried_index - 1], ZzBoxHands.DEFAULT_COLOUR)
+
+	return ZzBoxHands.DEFAULT_COLOUR
+
+
 ## Down the sights: the hands come up while the Aim key is held, the lens zooms by what the
 ## weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the HUD
 ## fades its dot and shows a scope. Nobody aims down, held, dead, watching, in third person or
@@ -1718,8 +1748,6 @@ func _process(delta: float) -> void:
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
-	_present_defib_hands(delta)
-
 		hands.aim(_aiming and _pointer_ours() and not third_person and not is_spectating()
 			and player.is_alive() and not player.is_down() and not player.is_held())
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
@@ -1788,34 +1816,6 @@ func _follow_daylight(delta: float) -> void:
 	game.map.set_daylight(move_toward(now_light, wanted, delta * 0.35))
 
 
-func _prompt() -> String:
-	if player == null or not player.can_act():
-		return ""
-
-	var eye := player.eye_position()
-	var aim := player.aim_direction()
-
-	for other in game.survivors():
-		if other != player and other.is_down() and other.feet().distance_to(player.feet()) <= game.config.revive_range + 0.4:
-			return "%s — pick up %s" % [_key(ZzBindings.USE), other.display_name]
-
-	var best := ""
-	var best_off := 0.7
-
-	for id: int in world_view._loot:
-		var node: Node3D = world_view._loot[id]
-		var to := node.global_position + Vector3(0.0, 0.25, 0.0) - eye
-		var along := to.dot(aim)
-
-		if along < 0.0 or along > game.config.use_reach + 0.3:
-			continue
-
-		var off := (to - aim * along).length()
-
-		if off < best_off:
-			best_off = off
-			var cost := int(node.get_meta(&"price", 0))
-			best = "%s — %s%s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up")),
 func _on_shop_json(json: String) -> void:
 	var parsed: Variant = JSON.parse_string(json)
 	shop_state = parsed as Dictionary if parsed is Dictionary else {}
@@ -1904,6 +1904,40 @@ func _shop_buy(item_id: String) -> void:
 		_follow_shop_menu()
 
 
+func _prompt() -> String:
+	if player == null or not player.can_act():
+		return ""
+
+	var eye := player.eye_position()
+	var aim := player.aim_direction()
+
+	for other in game.survivors():
+		if other != player and other.is_down() and other.feet().distance_to(player.feet()) <= game.config.revive_range + 0.4:
+			return "%s — pick up %s" % [_key(ZzBindings.USE), other.display_name]
+
+	if player.defibs > 0:
+		for other in game.survivors():
+			if other != player and other.life == ZzPlayer.Life.DEAD \
+					and other.feet().distance_to(player.feet()) <= game.config.defib_range + 0.4:
+				return "%s — hold to shock %s back" % [_key(ZzBindings.USE), other.display_name]
+
+	var best := ""
+	var best_off := 0.7
+
+	for id: int in world_view._loot:
+		var node: Node3D = world_view._loot[id]
+		var to := node.global_position + Vector3(0.0, 0.25, 0.0) - eye
+		var along := to.dot(aim)
+
+		if along < 0.0 or along > game.config.use_reach + 0.3:
+			continue
+
+		var off := (to - aim * along).length()
+
+		if off < best_off:
+			best_off = off
+			var cost := int(node.get_meta(&"price", 0))
+			best = "%s — %s%s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up")),
 				" (%d points)" % cost if cost > 0 else ""]
 
 	if best != "":
@@ -2015,12 +2049,6 @@ func spectate_step(direction: int) -> void:
 	var moved := game.spectate.step(player.player_id, direction)
 
 	if not moved.ok and chat != null:
-	if player.defibs > 0:
-		for other in game.survivors():
-			if other != player and other.life == ZzPlayer.Life.DEAD \
-					and other.feet().distance_to(player.feet()) <= game.config.defib_range + 0.4:
-				return "%s — hold to shock %s back" % [_key(ZzBindings.USE), other.display_name]
-
 		chat.notice(moved.error.message)
 
 
@@ -2083,6 +2111,11 @@ static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
+	if event.is_action_pressed("ui_cancel") and is_shop_open():
+		close_shop()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("ui_cancel"):
 		# Opens the settings when the menu left this Escape alone.
 		if settings != null:
@@ -2091,6 +2124,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Nothing below acts while the cover is up: no shot, jump, look or use.
 	if _covered():
+		return
+
+	if is_shop_open():
+		if event.is_action_pressed("ui_cancel") or event.is_action_pressed(ZzBindings.USE):
+			close_shop()
+			get_viewport().set_input_as_handled()
 		return
 
 	if event is InputEventKey and not event.is_echo():
@@ -2111,12 +2150,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				spectate_step(-1)
 			return
 
-	if event.is_action_pressed("ui_cancel") and is_shop_open():
-		close_shop()
-		get_viewport().set_input_as_handled()
-		return
-
-		if button.button_index == MOUSE_BUTTON_LEFT:
+		if button.is_action(ZzBindings.FIRE):
 			_firing = button.pressed
 		elif button.is_action(ZzBindings.AIM):
 			_aiming = button.pressed
@@ -2126,12 +2160,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cycle_slot(1)
 			elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
 				_cycle_slot(-1)
-	if is_shop_open():
-		if event.is_action_pressed("ui_cancel") or event.is_action_pressed(ZzBindings.USE):
-			close_shop()
-			get_viewport().set_input_as_handled()
-		return
-
 
 	if player == null:
 		return
@@ -2148,6 +2176,9 @@ func _key_event(event: InputEvent) -> bool:
 	var pressed := event.is_pressed()
 
 	if event.is_action(ZzBindings.USE):
+		if pressed and _near_trader() and _prompt() == "":
+			open_shop()
+			return true
 		_using = pressed
 		return true
 
@@ -2159,8 +2190,12 @@ func _key_event(event: InputEvent) -> bool:
 		_pills = pressed
 		return true
 
-	if event.is_action(ZzBindings.DEPLOY):
-		_deploying = pressed
+	if event.is_action(ZzBindings.FIRE):
+		_firing = pressed
+		return true
+
+	if event.is_action(ZzBindings.BOX):
+		_box_key = pressed
 		return true
 
 	if event.is_action(ZzBindings.RELOAD):
@@ -2176,9 +2211,6 @@ func _key_event(event: InputEvent) -> bool:
 
 	if event.is_action_pressed(ZzBindings.VIEW):
 		if is_spectating():
-		if pressed and _near_trader() and _prompt() == "":
-			open_shop()
-			return true
 			spectate_step(0)
 		else:
 			toggle_view()

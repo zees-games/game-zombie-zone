@@ -46,6 +46,7 @@ var stagger_until: float = -1.0
 var _swing_at: float = INF
 var _swing_victim: StringName = &""
 var _swing_landed: bool = false
+var _swing_down: bool = false
 var _next_swing: float = 0.0
 
 var _horde: Object = null
@@ -154,8 +155,10 @@ func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 func chase_to(at: Vector3, speed: float, spacing: float = 1.1) -> void:
 	var h := horde()
 
+	var _t := Time.get_ticks_usec()
 	if h != null and npc != null:
 		at = h.call(&"waypoint_for", npc.instance_id, npc.position(), at)
+	_t = _CP.add("zb.waypoint", _t)
 
 	go_to(at, speed, spacing)
 
@@ -212,12 +215,24 @@ func swing_at(victim: StringName) -> bool:
 	_swing_at = now()
 	_swing_victim = victim
 	_swing_landed = false
+	_swing_down = strikes_down(victim)
 	var b := body()
 
 	if b != null:
-		b.anim = ZzZombieBody.Anim.ATTACK
+		b.anim = ZzZombieBody.Anim.STRIKE_DOWN if _swing_down else ZzZombieBody.Anim.ATTACK
 
 	return true
+
+
+## Whether a swing at [param victim] is a ground strike: they are downed and the rule is on. A
+## crawler is already low and keeps its own swing.
+func strikes_down(victim: StringName) -> bool:
+	var h := horde()
+
+	if h == null or body() == null or body().kind == &"crawler" or not survivor_is(victim, &"down"):
+		return false
+
+	return (h.call(&"down_attack_rules") as Vector2).x > 0.5
 
 
 func swinging() -> bool:
@@ -240,7 +255,8 @@ func _advance_swing() -> void:
 				and absf(npc.position().y - at.y) < 1.6:
 			var h := horde()
 			if h != null:
-				h.call(&"melee", npc, _swing_victim, tune(&"damage", 2.0))
+				var mult := (h.call(&"down_attack_rules") as Vector2).y if _swing_down else 1.0
+				h.call(&"melee", npc, _swing_victim, tune(&"damage", 2.0) * mult)
 
 	if t >= (SWING_WINDUP + SWING_RECOVER) * _attack_scale():
 		_swing_at = INF
@@ -309,7 +325,9 @@ func _npc_think(delta: float) -> void:
 	delta = _owed_delta
 	_owed_delta = 0.0
 	_since_thought = 0
+	var _t := Time.get_ticks_usec()
 	super(delta)
+	_t = _CP.add("zb.super", _t)
 
 	if npc == null or not npc.is_alive() or body() == null:
 		return
@@ -328,7 +346,9 @@ func _npc_think(delta: float) -> void:
 		return
 
 	_decide(delta)
+	_t = _CP.add("zb.decide", _t)
 	_bash_if_barred(delta)
+	_t = _CP.add("zb.bash", _t)
 
 
 ## Pressed against a barricade it was walking into: stop, face it, and tear at it. Checked
@@ -421,6 +441,10 @@ func melee_chase(speed: float) -> bool:
 
 	var reach := tune(&"reach", 1.5)
 	var gap := flat_distance(npc.position(), at)
+
+	# Over a downed survivor it closes to stand beside the body rather than swing from full reach.
+	if strikes_down(target):
+		reach = minf(reach, 1.1)
 
 	if gap <= reach and absf(npc.position().y - at.y) < 1.6:
 		halt()

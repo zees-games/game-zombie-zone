@@ -45,11 +45,28 @@ Anybody pinned needs a friend: shoot what holds them or shove it off. Every spec
 
 **The zombies are animated models**: they walk, shamble, run with their arms out, swing, flinch when hit, stagger, crawl, jump down from ledges, and fall when they die (thrown back by a headshot, folded up, or launched by something heavy). The crowd is five different bodies in different skin, clothes, height and blood, so a horde is not one person repeated.
 
+**What each zombie animates.** Every kind is the same rigged kit body (Quaternius Zombie Apocalypse Kit, CC0) with its own proportions; the clips are the kit's, and the states the kit has no clip for are bone poses written over a clip in `npcs/zz_zombie_view.gd`. `headless_run` checks that every state of every kind resolves to a clip and that each pose moves the arms.
+
+| Kind | Idle | Walk / run | Attack | Leap | Hold | Stagger | Death | Crawl |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Common | idle, sit, feed | walk, shamble, run | swing (three clips, own tempo), ground strike on a downed survivor | jump | - | hit | death, ragdoll | feed (crawl clip) |
+| Leaper | crawl clip, low | crawl clip, fast | swing, ground strike | pounce pose | pounce: alternate claws | hit | death | its walk |
+| Strangler | idle | run | swing | - | choke: hands at the throat; tongue: hand over hand reel | hit | death | - |
+| Bloater | idle | walk | swing, vomit | - | - | hit | death | - |
+| Ram | idle, rage | run, charge | swing | - | carry (run), then fists slamming the floor | hit | death | - |
+| Spitter | idle | run | swing, spit (open jaw) | - | - | hit | death | - |
+| Rider | idle | run (arms), crouch | swing | leap pose | ride: legs wrapped round the head, arms gripping, rocking | hit | death | crouch |
+| Brute | idle | run | swing, throw | - | - | hit | death | - |
+| Sleeper | sitting, crying (still on purpose) | run | swing, rage | - | - | hit | death | sitting |
+| Screamer | idle | run | swing, scream (open jaw) | - | - | hit | death | - |
+| Crawler | crawl | crawl | lunge on the crawl clip, ground strike | - | grab: one arm hooked to the ankle, the other clawing | crawl | death | crawl |
+| Riot | idle | walk, run | swing | - | shield block | hit | death | - |
+
 **Downs.** At zero health you go down, not out: you can still shoot your pistol while you bleed out, and a friend holding **E** on you gets you up on borrowed health that drains away. Go down a third time and you are dead. Dead survivors are rescued beside the team after a while. A medkit heals most of what is missing and clears your downs; pills give borrowed health now.
 
 **Drops.** Every zombie can leave ammunition and health (pills, and now and then a medkit) where it falls: about one common in six leaves one small pile, a mutant (any special, the sleeper, the brute) leaves more, each type with its own odds and its own lean towards ammo or health, and the brute always leaves several. A drop lies 90 seconds. All of it is `cfg/addons/zombie_zone/drops.yml` (the keys are listed there; a server keeps its changes in `cfg/server/addons/zombie_zone/90-drops.yml`, or sets `ZOMBIE_ZONE_DROPS_MULTIPLIER=2`): `enabled`, `multiplier` (times every chance), `despawn_seconds`, `max_lying`, `ammo_fraction`, the global `categories` (`ammo`, `health`) and `items` (`ammo`, `pills`, `medkit`) weights, then `classes.common` / `classes.mutant` and `types.<zombie id>` (a pack's monster too) each with `chance`, `min`, `max`, `ammo_fraction`, `categories` and `items`. A type's setting beats its class's, which beats the top level. The defaults are in `game/zz_drops.gd`. Boxes are separate (`zz_box_drops`).
 
-**Boxes.** Zombies sometimes drop a box, and specials drop them more often. There are eight kinds and seventy-six things they can do: an airstrike on whoever is closest, a ring of fire, healing for the team, a bigger horde, a swarm of specials, a minigun, low gravity, swapping places with a friend, or a curse. Many of them last a while and stack with the same effect from another box, and the HUD lists what is running. The box file is `boxes/boxes.json` and a server owner can change or add to it.
+**Boxes.** Zombies sometimes drop a box, and specials drop them more often. There are eight kinds and seventy-six things they can do: an airstrike on whoever is closest, a ring of fire, healing for the team, a bigger horde, a swarm of specials, a minigun, low gravity, swapping places with a friend, or a curse. Many of them last a while and stack with the same effect from another box, and the HUD lists what is running. A box you pick up (E) comes straight into your hands in place of the gun: hold primary fire to set it down and open it (about a second, `box_deploy_seconds`; stay put, and let go, walk off or ask for another weapon to cancel), and your team sees the crate lifted, set down and its lid come up. X puts it away (the gun comes back) and takes it out again. Both keys are rebindable on the Controls page (Primary fire, Take out or put away a carried box). The box file is `boxes/boxes.json` and a server owner can change or add to it.
 
 | Box | What to expect |
 | --- | --- |
@@ -68,23 +85,6 @@ Anybody pinned needs a friend: shoot what holds them or shove it off. Every spec
 
 There are ten maps: the **practice street** built into the game, and from [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps) the three-map **Blackout** exodus (Corner Shop, The Depot, The Pier) and six survival maps: **Westbrook High** (a school at night, twenty-one boarded doors and windows, for twelve), **Riverside Galleria** (a shopping mall with sixteen shops, a food court and eight ways in, for fourteen), **Harbor Park** (a ballpark under its floodlights: the concourse is theirs, the field is yours while the tunnels hold, for sixteen), **Relief Camp** (tents and trucks behind a plywood wall in the woods, for ten), **Parking Lot** and **Chapel Yard**. At the end of an exodus series or a survival map the players vote for what is next, and **M** opens the map list.
 
-## Controls
-
-| Key | Action |
-| --- | --- |
-| **WASD** / mouse | Move and look |
-| **Space** | Jump |
-| **Ctrl** | Duck |
-| **Mouse 1** / **R** | Fire / reload |
-| **Mouse 2** | Aim down the sights (hold) |
-| **1**-**5** / mouse wheel | Weapons |
-| **E** | Use, pick up, revive a friend (hold) |
-| **F** | Shove |
-| **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
-| **Q** | Take pills |
-| **V** | Talk (voice) |
-| **F5** | First or third person |
-| **Tab** | Scoreboard (hold) |
 ### Defibrillators
 
 A defibrillator brings a dead teammate back where they lie. Pick one up (the world, a zombie's drop, or a spawner or shop with `kind: defib`), walk to the body and hold E: a charge bar fills while you stand still, then the shock revives them on a share of their health with a short shield. Taking a hit or drifting away cancels it and costs nothing. The server decides everything, so it works on a dedicated server. Each is a config key (cvar `zz_defib_<key>`, the start one is `zz_defib_start`):
@@ -103,6 +103,23 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 
 Drop odds are the `defib` entry under `items` in `cfg/addons/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `DotDefib`; `tests: ./game.sh test headless_defib`.
 
+## Controls
+
+| Key | Action |
+| --- | --- |
+| **WASD** / mouse | Move and look |
+| **Space** | Jump |
+| **Ctrl** | Duck |
+| **Mouse 1** / **R** | Fire / reload |
+| **Mouse 2** | Aim down the sights (hold) |
+| **1**-**5** / mouse wheel | Weapons |
+| **E** | Use, pick up, revive a friend (hold) |
+| **F** | Shove |
+| **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
+| **Q** | Take pills |
+| **V** | Talk (voice) |
+| **F5** | First or third person |
+| **Tab** | Scoreboard (hold) |
 | **H** | Help: the goal, the rules and every key as you have it bound |
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
@@ -143,6 +160,17 @@ zz_difficulty 1                // 0 easy, 1 normal, 2 advanced, 3 expert
 zz_friendly_fire 0.1           // a teammate's bullet as a share of what it does to a zombie, before difficulty
 zz_max_incaps 2                // downs before the next one is death
 zz_rescue_seconds 75           // seconds before a dead survivor is rescued beside the team (0 never)
+zz_prestart_time 30            // survival: setup seconds before the first wave; no zombie exists until it ends (0 skips); zz_survival_warmup overrides it when 0 or more
+zz_respawn_on_wave_end 1       // survival: the dead return as each breather begins
+zz_timed_respawn 0             // 1: a dead survivor returns after a computed delay instead of the rescue clock (formula below)
+zz_respawn_base 30             // timed respawn: base seconds
+zz_respawn_min 8               // timed respawn: shortest delay
+zz_respawn_max 90              // timed respawn: longest delay
+zz_respawn_healthy_scale 0.5   // timed respawn: multiplier with the whole team up
+zz_respawn_scarce_scale 2.0    // timed respawn: multiplier with nobody else up (linear between)
+zz_respawn_per_wave 2          // timed respawn: seconds added per wave after the first
+zz_respawn_difficulty_step 0   // timed respawn: delay fraction per difficulty step above normal (below it, less)
+zz_respawn_protect 3           // timed respawn: seconds of invulnerability after returning
 zz_start_grace 60              // seconds the start room holds the horde off unless somebody leaves it
 zz_survive_seconds 480         // how long a survival map is held when the map does not say
 zz_map_on_loss 0               // after a lost map: 0 play it again, 1 move on
@@ -177,18 +205,9 @@ bot_reaction 0.3               // any single setting of the preset, e.g. seconds
 zz_bots 1                      // 0 to turn the stand-ins off
 ```
 
+**Setup time and respawns (survival).** A survival map starts with a setup stage of `zz_prestart_time` seconds (the HUD counts it down as "Get ready"): no zombie exists in it, not a sleeper or a wanderer, and the horde and the map's own zombies appear when the first wave begins. `zz_respawn_on_wave_end` brings the dead back beside the team as each breather begins. Timed respawn (`zz_timed_respawn 1`, off by default) replaces the slow rescue clock: a survivor who dies returns after `delay = (base + per_wave x (wave - 1)) x lerp(scarce_scale, healthy_scale, fraction_up) x (1 + difficulty_step x (difficulty - 1))`, clamped to `[min, max]`, where `fraction_up` is the share of the other survivors still alive when they died (a healthy team brings them back sooner, a collapsing one later), and they are invulnerable for `zz_respawn_protect` seconds. The formula is `ZzRespawn.delay` in `game/zz_respawn.gd`. Start-early-when-all-ready is not built.
+
 Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-char](https://github.com/modcommunity/dot-player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
-zz_prestart_time 30            // survival: setup seconds before the first wave; no zombie exists until it ends (0 skips); zz_survival_warmup overrides it when 0 or more
-zz_respawn_on_wave_end 1       // survival: the dead return as each breather begins
-zz_timed_respawn 0             // 1: a dead survivor returns after a computed delay instead of the rescue clock (formula below)
-zz_respawn_base 30             // timed respawn: base seconds
-zz_respawn_min 8               // timed respawn: shortest delay
-zz_respawn_max 90              // timed respawn: longest delay
-zz_respawn_healthy_scale 0.5   // timed respawn: multiplier with the whole team up
-zz_respawn_scarce_scale 2.0    // timed respawn: multiplier with nobody else up (linear between)
-zz_respawn_per_wave 2          // timed respawn: seconds added per wave after the first
-zz_respawn_difficulty_step 0   // timed respawn: delay fraction per difficulty step above normal (below it, less)
-zz_respawn_protect 3           // timed respawn: seconds of invulnerability after returning
 
 The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
@@ -223,8 +242,6 @@ Admin commands, for seeing what happens (they need the `z` flag):
 
 ## Writing a map
 Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps/blob/main/maps/README.md).
-**Setup time and respawns (survival).** A survival map starts with a setup stage of `zz_prestart_time` seconds (the HUD counts it down as "Get ready"): no zombie exists in it, not a sleeper or a wanderer, and the horde and the map's own zombies appear when the first wave begins. `zz_respawn_on_wave_end` brings the dead back beside the team as each breather begins. Timed respawn (`zz_timed_respawn 1`, off by default) replaces the slow rescue clock: a survivor who dies returns after `delay = (base + per_wave x (wave - 1)) x lerp(scarce_scale, healthy_scale, fraction_up) x (1 + difficulty_step x (difficulty - 1))`, clamped to `[min, max]`, where `fraction_up` is the share of the other survivors still alive when they died (a healthy team brings them back sooner, a collapsing one later), and they are invulnerable for `zz_respawn_protect` seconds. The formula is `ZzRespawn.delay` in `game/zz_respawn.gd`. Start-early-when-all-ready is not built.
-
 
 ## Testing
 `./game.sh test` checks that every script parses and then runs every suite:
@@ -247,7 +264,7 @@ Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps
 ## Credits
 The zombies are from [Quaternius](https://quaternius.com)' [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html) (CC0): its three zombies and its four survivors, turned into zombies, with the kit's animations, simplified and recoloured by `tools/build_zombie_models.py`; the survivors are the same kit's people, through dot-player-char (which credits them), so the living and the dead are one style. The construction-worker zombie wears gear modelled for this game (`art-src/zombie_worker.py`) on that kit's rig, and the sentry turret of the Turret Box is modelled here too (`art-src/turret.py`); both are ours, MIT. The cars, street furniture, crates, gravestones, furniture and the shops' shelves, freezers, tills and trolleys are Kenney's Car Kit, Retro Urban Kit, City Kit (Roads), Survival Kit, Graveyard Kit, Nature Kit, Furniture Kit and Mini Market, and the first-person arms are his Blocky Characters ([kenney.nl](https://kenney.nl), CC0). The zombie moans are from [Darsycho](https://opengameart.org/content/zombie-moans) and [ianzazz](https://opengameart.org/content/zombie-noises-and-moans) on OpenGameArt (CC0), and the specials' voices are made from them (the riot zombie's with one of Kenney's metal impacts); the rest of the sounds and the music are Kenney's. `sounds/CREDITS.md` lists every file. The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (Kenney's Blaster Kit, Weapon Pack and Food Kit, CC0). Walls, floors, roads and roofs are photographic materials from [ambientCG](https://ambientcg.com) (Lennart Demes and contributors, CC0), drawn by dot-map's `DotMapSurfaces` and shipped in this game's own pack (`assets/surfaces`): Concrete047A (concrete), Concrete034 (clean concrete), PaintedPlaster017 (plaster), Bricks097 (brick), Tiles107 (white tile), Tiles074 (checker tile), WoodFloor041 (wood floor), Planks039 (planks), Asphalt012 (asphalt), Metal063 (metal), CorrugatedSteel009 (corrugated roofs), Grass004 (grass) and Ground037 (ground), each at `https://ambientcg.com/view?id=<name>`; `assets/surfaces/CREDITS.md` has the table. Kenney's Prototype Textures remain the fallback where those are absent and under the surfaces that have no photograph yet (carpet, lockers, hedges, rubber); the rest (glass, water, lines) are drawn in code. Each kit's licence is next to its files. Footsteps are Kenney's Impact Sounds and the ambience beds are generated by dot-audio, both CC0 and shipped in dot-audio (`addons/dot_audio/stock/CREDITS.md`). The maps' toys (barrels, tyres, balls, a bowling set) are dot-props', drawn in code, with Kenney's sounds (CC0) credited in `addons/dot_props/toys/sounds/CREDITS.md`.
 
-## License
-MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.
 The defibrillator is [Defibrillator (Low Poly)](https://sketchfab.com/3d-models/defibrillator-low-poly-54d46d07faab45778b10304fbc9debc3) by yellowbeebee ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), scaled and re-pivoted by `art-src/defib_prep.py`; the notice is `assets/defib/LICENSE-defibrillator.txt`.
 
+## License
+MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.

@@ -17,8 +17,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 10
-const CHECKS := 56
+const SECTIONS := 11
+const CHECKS := 59
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -48,10 +48,11 @@ func _run() -> void:
 		await _test_empty_reloads()
 		await _test_ammo_pile()
 		await _test_rearmed()
+		await _test_box_guns_are_drawn()
 		_test_spawner()
-
 		_test_trader()
 		_test_shop()
+
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -230,10 +231,41 @@ func _test_rearmed() -> void:
 	_finished()
 
 
+func _test_box_guns_are_drawn() -> void:
+	_section("a gun a box hands over, from any pack, is the gun in the view model")
+	var me := _client.player
+	var game := _client.game
+	var settle := 12
+
+	for tier in [&"sidearm", &"primary", &"heavy"]:
+		var bad := PackedStringArray()
+		var ids := ZzWeapons.ids_of(tier)
+
+		for id in ids:
+			game.boxes.run([{"do": "give_weapon", "id": String(id)}], {"opener": me, "at": me.global_position, "box": &"upgrade"})
+			await _frames(settle)
+			var waited := 0
+
+			while me.view_rig.arsenal.is_switching() and waited < 200:
+				await _frames(1)
+				waited += 1
+
+			await _frames(2)
+			var shown: StringName = _client.view_model.equipped() if _client.view_model != null else &""
+
+			if shown != id or not _client.view_model.visible or me.view_rig.arsenal.current().def.id != id:
+				bad.append("%s (showing '%s')" % [id, shown])
+
+		_check(not ids.is_empty() and bad.is_empty(), "every %s the boxes hand out is drawn (%d)" % [tier, ids.size()], ", ".join(bad))
+
+	_finished()
+
+
 func _test_spawner() -> void:
 	_section("a map spawner lays a gun as loot; using it starts the timer, the timer lays the next")
 	var game = _client.game
 	var me := _client.player
+	game.config.trader_enabled = 0
 	var doc := {"id": "spawner_probe", "spawners": [{"id": "wall", "at": [0, 0, 0], "pool": "wall_guns", "filter": {"ids": ["shotgun"]}, "respawn": 20, "max": 1}]}
 	game.spawners.start_round(doc)
 	game.spawners.tick()
@@ -256,6 +288,7 @@ func _test_spawner() -> void:
 	game.loot.use(buy, me)
 	_check(me.points == 100, "and takes the price when the item is used", str(me.points))
 
+	game.config.trader_enabled = -1
 	# A converter's weapon_* and item_* entities lay what the config's classes say; a trader shelves priced stock.
 	var world := {"id": "spawner_probe2", "entities": [
 		{"classname": "weapon_m3", "origin": [4, 0, 0], "angle": 0},
@@ -265,7 +298,6 @@ func _test_spawner() -> void:
 	game.spawners.start_round(world)
 	game.spawners.tick()
 	var kinds := {}
-	game.config.trader_enabled = 0
 	for id: int in game.spawners.loot_ids():
 		kinds[game.loot.kind_of(id)] = true
 	_check(kinds.has(ZzLoot.WEAPON) and (kinds.has(ZzLoot.MEDKIT) or kinds.has(ZzLoot.PILLS)) and kinds.has(ZzLoot.AMMO), "converter entities lay a gun, a medkit and ammo through the classes mapping", str(kinds.keys()))
@@ -288,7 +320,6 @@ func _test_spawner() -> void:
 	_check(again == 3 or game.now() < 30.0, "the slot restocks after its wait", str(again))
 	# A priced ammo pile is used up: charged once, and its site lays the next.
 	game.spawners.start_round({"id": "spawner_probe3", "spawners": [{"id": "am", "at": [0, 0, 0], "kind": "ammo", "item": "ammo", "respawn": 5, "data": {"price": 50}}],
-	game.config.trader_enabled = -1
 		"traders": [{"id": "empty_shop", "at": [0, 0, 20], "slots": 2, "pool": "no_such_pool", "restock": 5.0}]})
 	game.spawners.tick()
 	var amid: int = -1
@@ -341,20 +372,6 @@ func _section(name: String) -> void:
 	print(name)
 
 
-func _finished() -> void:
-	_sections_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
-	_failures.append(line)
-	print("  FAIL  %s" % line)
 func _shelf_count(game) -> int:
 	var n := 0
 	for id: int in game.loot.entries:
@@ -495,3 +512,17 @@ func _test_trader() -> void:
 	_finished()
 
 
+func _finished() -> void:
+	_sections_finished += 1
+
+
+func _check(ok: bool, what: String, detail: String = "") -> void:
+	if ok:
+		_passed += 1
+		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
+		return
+
+	_failed += 1
+	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
+	_failures.append(line)
+	print("  FAIL  %s" % line)

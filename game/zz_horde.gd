@@ -645,7 +645,9 @@ func tick(delta: float) -> void:
 	_land_alerts()
 	_advance_lures()
 	_advance_bile()
+	var _t := Time.get_ticks_usec()
 	spawner.tick(delta)
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("h.spawner", _t)
 
 	var speed := zombie_speed_scale * wave_speed_scale
 
@@ -655,6 +657,7 @@ func tick(delta: float) -> void:
 			b.speed_scale = speed * b.limb_speed_scale() * (game.water_pace_at(b.global_position) if game != null else 1.0)
 			b.tick(delta)
 
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("h.bodies", _t)
 	squads.prune()
 	_release_pending()
 
@@ -738,6 +741,11 @@ func survivor_position(id: StringName) -> Vector3:
 func survivor_eye(id: StringName) -> Vector3:
 	var info: Variant = _survivors.get(id)
 	return (info as Dictionary)["eye"] if info != null else Vector3.INF
+
+
+## Whether zombies strike a downed survivor on the ground, and the damage multiplier of that blow.
+func down_attack_rules() -> Vector2:
+	return Vector2(1.0 if game.config.down_attack else 0.0, game.config.down_attack_damage)
 
 
 func survivor_alive(id: StringName) -> bool:

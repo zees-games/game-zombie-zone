@@ -106,8 +106,8 @@ signal map_received(map_id: StringName)
 signal downed_received(player_id: int, by: int, why: StringName, by_kind: StringName)
 signal revived_received(player_id: int, by: int)
 signal rescued_received(player_id: int)
-signal pin_received(player_id: int, npc_net_id: int, kind: StringName)
 signal defibbed_received(player_id: int, by: int)
+signal pin_received(player_id: int, npc_net_id: int, kind: StringName)
 signal unpin_received(player_id: int, why: StringName)
 signal box_received(player_id: int, type_id: StringName, title: String, message: String)
 signal loot_added(id: int, kind: StringName, item: StringName, at: Vector3)
@@ -308,9 +308,9 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_broadcast(ZzEvents.Kind.DOWN, ZzEvents.write_death(session_of(id), _session_or_zero(by), why, _kind_or_empty(by))))
 		game.player_revived.connect(func(id: StringName, by: StringName) -> void:
 			_broadcast(ZzEvents.Kind.REVIVE, ZzEvents.write_pair(session_of(id), _session_or_zero(by))))
-		game.player_rescued.connect(func(id: StringName) -> void:
 		game.defibbed.connect(func(id: StringName, by: StringName) -> void:
 			_broadcast(ZzEvents.Kind.DEFIB, ZzEvents.write_pair(session_of(id), _session_or_zero(by))))
+		game.player_rescued.connect(func(id: StringName) -> void:
 			_broadcast(ZzEvents.Kind.RESCUE, ZzEvents.write_player(session_of(id))))
 		game.player_biled.connect(func(id: StringName, seconds: float) -> void:
 			_broadcast(ZzEvents.Kind.BILE, ZzEvents.write_bile(session_of(id), seconds)))
@@ -1455,6 +1455,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				revived_received.emit(int(up["player_id"]), int(up["other"]))
 		ZzEvents.Kind.RESCUE:
 			rescued_received.emit(ZzEvents.read_player(reader))
+		ZzEvents.Kind.DEFIB:
+			var shocked := ZzEvents.read_pair(reader)
+			if bool(shocked["ok"]):
+				defibbed_received.emit(int(shocked["player_id"]), int(shocked["other"]))
 		ZzEvents.Kind.PIN:
 			var pin := ZzEvents.read_pin(reader)
 			if bool(pin["ok"]):
@@ -1476,10 +1480,6 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 		ZzEvents.Kind.BOX:
 			var box := ZzEvents.read_box(reader)
 			if bool(box["ok"]):
-		ZzEvents.Kind.DEFIB:
-			var shocked := ZzEvents.read_pair(reader)
-			if bool(shocked["ok"]):
-				defibbed_received.emit(int(shocked["player_id"]), int(shocked["other"]))
 				box_received.emit(int(box["player_id"]), box["type"], str(box["title"]), str(box["message"]))
 		ZzEvents.Kind.HAZARD:
 			var h := ZzEvents.read_hazard(reader)

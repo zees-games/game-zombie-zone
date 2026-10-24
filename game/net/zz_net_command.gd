@@ -32,9 +32,11 @@ const SLOT_BITS := 3
 const ACT_USE := 1
 const ACT_HEAL := 2
 const ACT_PILLS := 4
-## Hold to deploy the carried box.
+## Deploy the carried box without the fire button (bots; a client deploys with primary fire).
 const ACT_DEPLOY := 8
-const ACT_BITS := 4
+## Take the carried box out of, or put it back in, the hands (a press).
+const ACT_BOX := 16
+const ACT_BITS := 5
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

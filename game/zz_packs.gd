@@ -210,6 +210,8 @@ static func _take(pack: String, provider: Object) -> void:
 
 		if provider.has_method(&"weapon_art"):
 			ZeeWeaponArtTable.add_source(source, Callable(provider.get_script(), &"weapon_art"))
+		else:
+			ZeeWeaponArtTable.add_source(source, Callable(load("res://game/zz_packs.gd"), &"_stand_in_art").bind(provider.get_script()))
 
 	var seen := 0
 
@@ -241,6 +243,33 @@ static func _take(pack: String, provider: Object) -> void:
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row)
+
+
+## The art of a pack that ships none: a copy of a zee gun of the same tier under the pack weapon's id,
+## so the hands are never empty (a weapon with no art equipped nothing, and the HUD still counted its ammo).
+static func _stand_in_art(provider_script: Script) -> Array[ZeeWeaponArt]:
+	var out: Array[ZeeWeaponArt] = []
+	var tiers := _tiered(ZeeWeaponDamage.table(), provider_script)
+
+	for def in tiers:
+		var copy: ZeeWeaponArt
+
+		# Built, never read back from the table: this runs while the table is being built.
+		if def.tags.has(&"sidearm"):
+			copy = ZeeWeaponArtTable.pistol()
+		elif def.tags.has(&"heavy"):
+			copy = ZeeWeaponArtTable.launcher()
+		elif def.tags.has(&"melee"):
+			copy = ZeeWeaponArtTable.knife()
+		elif def.tags.has(&"thrown"):
+			copy = ZeeWeaponArtTable.frag()
+		else:
+			copy = ZeeWeaponArtTable.rifle()
+
+		copy.id = def.id
+		out.append(copy)
+
+	return out
 
 
 ## A pack weapon's definitions with a tier. The game draws boxes, loot and stand-in kits by tier

@@ -24,8 +24,8 @@ const ZzRespawn := preload("../game/zz_respawn.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 13
-const CHECKS := 71
+const SECTIONS := 15
+const CHECKS := 92
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)

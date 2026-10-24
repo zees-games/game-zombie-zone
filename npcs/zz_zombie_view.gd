@@ -109,7 +109,8 @@ const LOOKS := {
 	&"bloater": {"body": &"chubby", "height": 1.85, "girth": 1.4, "skin": "a8a45a", "bottom": "4a3f30",
 		"bones": {"Abdomen": Vector3(1.45, 1.0, 1.45), "Torso": Vector3(1.25, 1.0, 1.3), "Head": 0.9}, "hunch": 0.0, "wear": [&"boils"], "blood": 0.7},
 	&"ram": {"body": &"arm", "height": 2.05, "girth": 1.1, "skin": "6e6152", "bottom": "2e3440",
-		"bones": {}, "hunch": 0.2, "wear": [], "blood": 0.64},
+		"bones": {}, "hunch": 0.2, "wear": [], "blood": 0.64,
+		"clips": {"attack_idle": &"attack", "crawl": &"walk"}},
 	&"spitter": {"body": &"lis", "height": 1.95, "girth": 0.8, "skin": "9fb35a", "top": "3d4a2e", "bottom": "2c2e26", "hair": "1c1d18",
 		"bones": {"Neck": Vector3(0.9, 2.4, 0.9), "Head": 0.9}, "hunch": 0.15, "wear": [&"acid_mouth"], "blood": 0.65, "glow": "4f8a12"},
 	&"rider": {"body": &"basic", "height": 1.2, "girth": 1.0, "skin": "8a7a66", "bottom": "4a3a2a", "belt": "2a221a",
@@ -157,7 +158,14 @@ const CLIPS := {
 	ZzZombieBody.Anim.SCREAM: [&"attack_idle", 0.6],
 	ZzZombieBody.Anim.GRAB: [&"crawl", 2.2],
 	ZzZombieBody.Anim.BLOCK: [&"walk", 0.8],
+	ZzZombieBody.Anim.STRIKE_DOWN: [&"attack", 1.25],
 }
+
+## A swing's length in seconds (the brain's windup plus recover) and the fraction of it at which the
+## blow lands, so the overlay's strike frame is the brain's damage frame.
+const SWING_PERIOD := 0.87
+const HIT_AT := 0.37
+
 
 ## Clips that loop; the rest play once and hold their last frame.
 const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run"]
@@ -242,6 +250,9 @@ var _frame: int = 0
 var _flinch: float = 0.0
 var _flinch_side: float = 1.0
 var _hunch: float = 0.0
+## Seconds since the attack state began, and where in the swing that puts it (0 to 1).
+var _strike_t: float = 0.0
+var _strike_phase: float = 0.0
 var _scale: float = 1.0
 
 ## A death being drawn: the reaction's id, which way the hit pushed, how hard, and the seed.
@@ -896,8 +907,24 @@ func present(delta: float, anim: int, flags: int) -> void:
 	elif anim == ZzZombieBody.Anim.ATTACK and kind == &"common" and (variant & 8) != 0:
 		clip = &"attack_idle"
 
+	var striking := anim == ZzZombieBody.Anim.ATTACK or anim == ZzZombieBody.Anim.STRIKE_DOWN
+	var prior := _strike_phase
+
+	if striking:
+		_strike_t += delta
+		_strike_phase = fposmod(_strike_t / SWING_PERIOD, 1.0)
+		# Attack variety: a body's own tempo, so a crowd does not swing in step.
+		rate *= 0.9 + 0.1 * float(variant & 7) / 3.5
+	else:
+		_strike_t = 0.0
+		_strike_phase = 0.0
+
 	var overrides: Dictionary = _look.get("clips", {})
 	clip = overrides.get(clip, clip)
+
+	# A new swing starts its clip over, so the swing's frames follow the brain's swing.
+	if striking and _strike_phase < prior and _anim != null and _anim.has_animation(_qualified(clip)):
+		_clip = &""
 
 	if clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"crawl":
 		var natural := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}[clip] as float
@@ -994,6 +1021,19 @@ func _pose(anim: int) -> void:
 
 	var head: int = _bones.get(&"Head", -1)
 
+	if anim == ZzZombieBody.Anim.STRIKE_DOWN:
+		_pose_ground_strike()
+	elif anim == ZzZombieBody.Anim.ATTACK and _look.get("clips", {}).get(&"attack", &"") == &"crawl":
+		_pose_lunge()
+	elif anim == ZzZombieBody.Anim.PIN:
+		_pose_hold()
+	elif anim == ZzZombieBody.Anim.LEAP:
+		_pose_leap()
+	elif anim == ZzZombieBody.Anim.TONGUE:
+		_pose_reel()
+	elif anim == ZzZombieBody.Anim.GRAB:
+		_pose_reach()
+
 	if head >= 0 and anim != ZzZombieBody.Anim.DEAD:
 		var loll := 0.18 * sin(float(Time.get_ticks_msec()) * 0.0013 + float(variant))
 		_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.FORWARD, loll) * _skeleton.get_bone_pose_rotation(head))
@@ -1012,6 +1052,119 @@ func _pose(anim: int) -> void:
 			_skeleton.set_bone_pose_rotation(spine, Quaternion(Vector3(-1.0, 0.0, _flinch_side * 0.4).normalized(), snap) * _skeleton.get_bone_pose_rotation(spine))
 		if head >= 0:
 			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
+
+
+## How far into the blow it is: 0 at rest, rising to 1 on the swing's landing frame.
+func _strike_curve() -> float:
+	var p := _strike_phase
+
+	if p < HIT_AT:
+		return -0.35 * sin(p / HIT_AT * PI * 0.5)
+
+	var q := (p - HIT_AT) / (1.0 - HIT_AT)
+	return lerpf(1.0, 0.0, clampf(q * 1.6, 0.0, 1.0)) if q < 0.625 else 0.0
+
+
+## Swings [param bone]'s tip forward by [param angle] (negative backward) about the body's own side
+## axis, whatever the bone's own axes are. The kit faces +Z in skeleton space.
+func _pitch(bone: StringName, angle: float) -> void:
+	var index: int = _bones.get(bone, -1)
+
+	if index < 0:
+		return
+
+	var parent := _skeleton.get_bone_parent(index)
+	var parent_basis := _skeleton.get_bone_global_pose(parent).basis.orthonormalized() if parent >= 0 else Basis.IDENTITY
+	var global := _skeleton.get_bone_global_pose(index).basis.orthonormalized()
+	var local := parent_basis.inverse() * Basis(Vector3.RIGHT, -angle) * global
+	_skeleton.set_bone_pose_rotation(index, local.orthonormalized().get_rotation_quaternion())
+
+
+## Kneeling over a downed survivor: knees bent, chest folded over, both arms raised on the windup
+## and driven down on the landing frame.
+func _pose_ground_strike() -> void:
+	var hit := _strike_curve()
+	var hips: int = _bones.get(&"Hips", -1)
+
+	if hips >= 0:
+		_skeleton.set_bone_pose_position(hips, _skeleton.get_bone_pose_position(hips) + Vector3(0.0, -0.32 * float(_look["height"]) / 1.75, 0.0))
+
+	_pitch(&"Abdomen", 0.5 + 0.5 * hit)
+	_pitch(&"Torso", 0.4 + 0.4 * hit)
+	_pitch(&"Head", 0.3)
+
+	for side in [&".L", &".R"]:
+		_pitch(StringName("UpperLeg" + side), 0.9)
+		_pitch(StringName("LowerLeg" + side), -1.3)
+		_pitch(StringName("UpperArm" + side), 1.7 - 0.7 * hit)
+
+
+## A crawler's swing: a lunge of the chest and both arms onto the landing frame.
+func _pose_lunge() -> void:
+	var hit := _strike_curve()
+	_pitch(&"Torso", 0.35 * hit)
+
+	for side in [&".L", &".R"]:
+		_pitch(StringName("UpperArm" + side), 0.9 * hit)
+
+
+## A special holding a survivor: the rider grips the head with its legs wrapped and rocks, the ram
+## slams both fists down, the strangler squeezes, every other (the leaper's pounce) claws.
+func _pose_hold() -> void:
+	var t := float(Time.get_ticks_msec()) * 0.001 + float(variant)
+
+	if kind == &"rider":
+		_pitch(&"Torso", 0.25 + 0.12 * sin(t * 5.0))
+
+		for side in [&".L", &".R"]:
+			_pitch(StringName("UpperLeg" + side), 1.2)
+			_pitch(StringName("LowerLeg" + side), -1.0)
+			_pitch(StringName("UpperArm" + side), 2.5 + 0.25 * sin(t * 9.0))
+	elif kind == &"strangler":
+		_pitch(&"Torso", 0.2)
+
+		for side in [&".L", &".R"]:
+			_pitch(StringName("UpperArm" + side), 1.5 + 0.1 * sin(t * 7.0))
+	elif kind == &"ram":
+		var slam := maxf(sin(t * 6.0), 0.0)
+		_pitch(&"Torso", 0.5 * slam)
+
+		for side in [&".L", &".R"]:
+			_pitch(StringName("UpperArm" + side), 2.6 - 2.2 * slam)
+	else:
+		_pitch(&"Torso", 0.45)
+
+		for i in 2:
+			var swipe := maxf(sin(t * 11.0 + float(i) * PI), 0.0)
+			_pitch(StringName("UpperArm" + (&".L" if i == 0 else &".R")), 1.9 - 1.3 * swipe)
+
+
+## The strangler's tongue out: hands over hands hauling the line in.
+func _pose_reel() -> void:
+	var t := float(Time.get_ticks_msec()) * 0.001 + float(variant)
+	_pitch(&"Torso", -0.12)
+
+	for i in 2:
+		var pull := 0.5 + 0.5 * sin(t * 6.0 + float(i) * PI)
+		_pitch(StringName("UpperArm" + (&".L" if i == 0 else &".R")), 0.8 + 0.8 * pull)
+
+
+## Airborne: arms thrown forward, knees tucked, chest leaning in.
+func _pose_leap() -> void:
+	_pitch(&"Torso", 0.3)
+
+	for side in [&".L", &".R"]:
+		_pitch(StringName("UpperArm" + side), 2.0)
+		_pitch(StringName("UpperLeg" + side), 0.7)
+		_pitch(StringName("LowerLeg" + side), -1.0)
+
+
+## A crawler holding an ankle: the near arm hooked out and pulling, the other clawing.
+func _pose_reach() -> void:
+	var t := float(Time.get_ticks_msec()) * 0.001 + float(variant)
+	_pitch(&"Torso", 0.25)
+	_pitch(&"UpperArm.L", 1.6 + 0.4 * sin(t * 4.0))
+	_pitch(&"UpperArm.R", 1.0 + 0.5 * sin(t * 4.0 + PI))
 
 
 ## Hit: a flinch over whatever it is doing. [param from_side] is -1 or 1 for which side the hit

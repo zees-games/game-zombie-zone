@@ -97,6 +97,11 @@ var shield_until: float = -1.0
 var carried: Array[StringName] = []
 var carried_count: int = 0
 var carried_index: int = 0
+## Whether the box is in the hands (the gun is put away, primary fire deploys), replicated; the
+## slot the player had asked for when it came out, server side: asking for another puts it away.
+var box_out: bool = false
+var box_slot: int = 0
+var previous_fire: bool = false
 
 ## Where they stood when they began deploying a box, which they may drift from by only so far.
 var use_origin: Vector3 = Vector3.ZERO
@@ -134,6 +139,11 @@ var box_blind: bool = false
 ## When they died, for the rescue clock. Simulated seconds.
 var died_at: float = -1.0
 
+## When a timed respawn returns them (server, simulated seconds); -1 for none. And until when
+## they cannot be hurt after one.
+var respawn_at: float = -1.0
+var protected_until: float = -1.0
+
 ## What they did this map, for the scoreboard and the end-of-map card.
 var commons_killed: int = 0
 var specials_killed: int = 0
@@ -144,11 +154,6 @@ var friendly_damage: float = 0.0
 ## Seconds this player has been in the game this session (server): the floor under their
 ## playtime when progress is not kept.
 var session_seconds: float = 0.0
-## When a timed respawn returns them (server, simulated seconds); -1 for none. And until when
-## they cannot be hurt after one.
-var respawn_at: float = -1.0
-var protected_until: float = -1.0
-
 
 ## Which weapon slot they have asked for, from this game's input message.
 var wanted_slot: int = 0
@@ -452,10 +457,10 @@ func is_pinned() -> bool:
 	return pinned_by != 0
 
 
-## Pinned, or using something with both hands: the gun does nothing (down, you still shoot; and
-## grabbed by the ankle, too, which is the one pin you fight your own way out of).
+## Pinned, using something with both hands, or a box in them: the gun does nothing (down, you
+## still shoot; and grabbed by the ankle, too, which is the one pin you fight your own way out of).
 func is_held() -> bool:
-	return (is_pinned() and pin_kind != &"grab") or using != &""
+	return (is_pinned() and pin_kind != &"grab") or using != &"" or (box_out and carried_count > 0)
 
 
 ## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig
@@ -697,20 +702,20 @@ func reset_map() -> void:
 	biled = false
 	burning = false
 	died_at = -1.0
+	respawn_at = -1.0
+	protected_until = -1.0
 	in_end_area = false
 	commons_killed = 0
 	specials_killed = 0
 	revives_done = 0
+	defib_ready_at = 0.0
+	shield_until = -1.0
 	damage_taken_map = 0.0
 	friendly_damage = 0.0
 	air = 12.0
 	submerged = false
 	water_level = WaterLevel.NONE
 
-	respawn_at = -1.0
-	defib_ready_at = 0.0
-	shield_until = -1.0
-	protected_until = -1.0
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
 				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY,
@@ -788,7 +793,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 		})
 		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())
 		figure.show_defib(using == &"defib")
-		figure.show_box(carried_count, use_fraction if using == &"deploy" else 0.0)
+		figure.show_box(carried_count, use_fraction if using == &"deploy" else 0.0, box_out)
 
 	return shown
 

@@ -5,7 +5,9 @@ extends "shot.gd"
 ## Prints one BENCH line (wall, physics, script, render, GPU and render-CPU time, draw calls, objects, primitives) so
 ## runs on the same box compare. `tools/bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56`.
 
+const _CP := preload("res://addons/dot_npc_ai/_crowd_prof.gd")
 var _count := 56
+var _pf0 := 0
 var _bench_seed := 7
 var _measure := 20.0
 var _settle := 4.0
@@ -67,6 +69,9 @@ func _run() -> void:
 			local.sampler.look_at_angles(local.controller.state.yaw, -4.0)
 		await get_tree().process_frame
 		_recording = Time.get_ticks_msec() - began >= _settle * 1000.0
+		if _recording and not _CP.on:
+			_pf0 = Engine.get_physics_frames()
+		_CP.on = _recording
 		if _recording:
 			draws.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
 			objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
@@ -75,6 +80,7 @@ func _run() -> void:
 			gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp))
 			cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu())
 	_clock.stop()
+	_CP.dump(Engine.get_physics_frames() - _pf0)
 	if _profiler != null:
 		var parts: Dictionary = _profiler.get(&"_parts")
 		for part: String in parts:

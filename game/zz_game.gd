@@ -28,8 +28,8 @@ const ZzPassRules := preload("zz_pass_rules.gd")
 const ZzRules := preload("zz_rules.gd")
 const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
-const ZzTeamDamage := preload("zz_team_damage.gd")
 const ZzRespawn := preload("zz_respawn.gd")
+const ZzTeamDamage := preload("zz_team_damage.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorkshop := preload("zz_workshop.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -115,9 +115,9 @@ signal phase_changed(phase: int)
 signal player_downed(player_id: StringName, by: StringName, why: StringName)
 signal player_died(player_id: StringName, by: StringName, why: StringName)
 signal player_revived(player_id: StringName, by: StringName)
-signal player_rescued(player_id: StringName)
 ## A dead survivor shocked back by [param by]'s defibrillator, where they lay.
 signal defibbed(player_id: StringName, by: StringName)
+signal player_rescued(player_id: StringName)
 signal player_healed(player_id: StringName, by: StringName, amount: float)
 signal player_biled(player_id: StringName, seconds: float)
 signal player_hurt(player_id: StringName, amount: float, from: Vector3)
@@ -345,6 +345,8 @@ func _ready() -> void:
 		spawners.load_config()
 		shop = ZzShop.new(self)
 		loot.removed.connect(spawners.on_loot_removed)
+		drops = ZzDrops.new(self)
+		drops.load_config()
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
 		bots = ZzBots.new(self)
@@ -354,8 +356,6 @@ func _ready() -> void:
 		catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
 			ZzWorkshop.accepted_map_kinds())
 		var _loaded := catalogue.load_from(config.map_directory)
-		drops = ZzDrops.new(self)
-		drops.load_config()
 		# Solo in the client shell: the map packs it mounted for this game, which a server
 		# would have named. See [method solo_map_dirs].
 		for root in solo_map_dirs("maps"):
@@ -706,17 +706,17 @@ func _adjust_damage(damage: DotDamage) -> void:
 ## is behind its loading cover. True for anybody the gate does not know (a stand-in is never
 ## loading; offline there is no gate).
 func can_be_harmed(player_id: StringName) -> bool:
+	var shocked := player_by_id(player_id)
+
+	if shocked != null and now() < shocked.shield_until:
+		return false
+
 	return not harm_gate.is_valid() or bool(harm_gate.call(player_id))
 
 
 ## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
 ## friendly-fire scale already applied). It is added to the shooter's window first, so a new
 ## player being reflected still runs up the total that earns a voteban or a ban, and then, when
-	var shocked := player_by_id(player_id)
-
-	if shocked != null and now() < shocked.shield_until:
-		return false
-
 ## the shooter's damage is reflected, it lands on the shooter instead: the one who was hit takes
 ## nothing. Server only.
 func _team_damage_hit(damage: DotDamage) -> void:
@@ -1464,6 +1464,7 @@ func _equip(player: ZzPlayer, fresh: bool) -> void:
 	if fresh:
 		player.medkits = config.start_medkits
 		player.pills = config.start_pills
+		player.defibs = config.defib_charges if config.start_defibs > 0 else 0
 
 	_draw(player, StringName(kit[0]))
 
@@ -1473,7 +1474,6 @@ func _draw(player: ZzPlayer, weapon_id: StringName) -> void:
 		return
 
 	var def := player.weapons.arsenal.catalogue.get_def(weapon_id)
-		player.defibs = config.defib_charges if config.start_defibs > 0 else 0
 
 	if def != null:
 		var _selected := player.weapons.arsenal.select(def.slot, _tick)
@@ -1989,11 +1989,17 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	var shove_pressed := player.shove_held and not player.previous_shove
 	player.previous_shove = player.shove_held
 
+	var fire_now := _fire_held(player)
+	var fire_pressed := fire_now and not player.previous_fire
+	player.previous_fire = fire_now
+
 	_sync_carry(player)
 
 	if player.is_down() or not player.is_alive() or player.watching or player.is_pinned():
 		cancel_use(player)
 		return
+
+	_box_in_hands(player, pressed)
 
 	if shove_pressed:
 		_shove(player)
@@ -2010,13 +2016,16 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		elif player.using == &"deploy":
 			key = ZzNetCommand.ACT_DEPLOY
 
-		if (held & key) == 0 or not _use_still_valid(player):
+		var keyed := (held & key) != 0 or (player.using == &"deploy" and fire_now)
+
+		if not keyed or not _use_still_valid(player):
 			cancel_use(player)
 		else:
 			_advance_use(player, delta)
 		return
 
-	if (held & ZzNetCommand.ACT_DEPLOY) != 0 and (pressed & ZzNetCommand.ACT_DEPLOY) != 0 and boxes != null:
+	if boxes != null and (((held & ZzNetCommand.ACT_DEPLOY) != 0 and (pressed & ZzNetCommand.ACT_DEPLOY) != 0) \
+			or (fire_pressed and player.box_out and not player.carried.is_empty())):
 		_begin_deploy(player)
 	elif (held & ZzNetCommand.ACT_HEAL) != 0 and player.medkits > 0:
 		_begin_heal(player)
@@ -2030,6 +2039,12 @@ func _begin_use(player: ZzPlayer) -> void:
 
 	if downed != null:
 		_start(player, &"revive", downed.entity_id, config.revive_seconds)
+		return
+
+	var body := _body_to_defib(player)
+
+	if body != null:
+		_begin_defib(player, body)
 		return
 
 	var thing := loot.looked_at(player.eye_position(), player.aim_direction(), config.use_reach) if loot != null else -1
@@ -2050,12 +2065,6 @@ func _begin_use(player: ZzPlayer) -> void:
 
 	if index >= 0 and phase == Phase.PLAY:
 		var o: Dictionary = (map_doc["objectives"] as Array)[index]
-	var body := _body_to_defib(player)
-
-	if body != null:
-		_begin_defib(player, body)
-		return
-
 
 		if o["kind"] == "use" and objective_states[index] == &"waiting" \
 				and player.eye_position().distance_to(ZzMapDoc.v3(o["at"])) <= float(o["radius"]) + 0.6:
@@ -2072,11 +2081,39 @@ func _begin_use(player: ZzPlayer) -> void:
 		_start(player, &"repair", mend, config.barricade_repair_seconds)
 
 
+## Whether the survivor's primary fire is down this tick, from the movement command.
+func _fire_held(player: ZzPlayer) -> bool:
+	var pending := player.controller.current_command if player.controller != null else null
+	return pending != null and pending.is_pressed(ZzNetCommand.BUTTON_FIRE)
+
+
+## A carried box comes into the hands when picked up and goes back in the pack when the survivor
+## asks for another weapon or presses the box key (which brings it out again). Server side.
+func _box_in_hands(player: ZzPlayer, pressed: int) -> void:
+	if player.carried.is_empty():
+		player.box_out = false
+		return
+
+	var toggled := (pressed & ZzNetCommand.ACT_BOX) != 0
+
+	if player.box_out and (toggled or player.wanted_slot != player.box_slot):
+		player.box_out = false
+		cancel_use(player)
+	elif not player.box_out and (toggled or (pressed & ZzNetCommand.ACT_DEPLOY) != 0):
+		player.box_out = true
+		player.box_slot = player.wanted_slot
+
+
 ## What everybody is told about the boxes in [param player]'s hands: how many, and which (not
 ## which when `box_labels` is off: the type does not leave the server).
 func _sync_carry(player: ZzPlayer) -> void:
+	var had := player.carried_count
 	player.carried_count = player.carried.size()
 	player.carried_index = 0
+
+	if had == 0 and player.carried_count > 0:
+		player.box_out = true
+		player.box_slot = player.wanted_slot
 
 	if not player.carried.is_empty() and boxes != null and config.box_labels:
 		player.carried_index = boxes.order.find(player.carried.back()) + 1
@@ -2109,52 +2146,6 @@ func _begin_heal(player: ZzPlayer) -> void:
 
 	_start(player, &"heal", who.entity_id, config.medkit_seconds)
 
-
-func _start(player: ZzPlayer, what: StringName, target: int, seconds: float) -> void:
-	player.using = what
-	player.use_target = target
-	player.use_started = now()
-	player.use_needs = maxf(seconds, 0.01)
-	player.use_fraction = 0.0
-	var _busy := player.controller.add_modifier(ZzController.BUSY)
-
-	if what == &"revive":
-		var downed := player_for_entity(target)
-		if downed != null:
-			downed.helped_fraction = 0.0
-
-
-func _use_still_valid(player: ZzPlayer) -> bool:
-	match player.using:
-		&"revive":
-			var downed := player_for_entity(player.use_target)
-			return downed != null and downed.is_down() and not downed.is_pinned() \
-				and downed.feet().distance_to(player.feet()) <= config.revive_range + 0.6
-		&"heal":
-			var who := player_for_entity(player.use_target)
-			return player.medkits > 0 and who != null and who.is_up() \
-				and (who == player or who.feet().distance_to(player.feet()) <= config.use_reach + 0.6)
-		&"loot":
-			return loot != null and loot.exists(player.use_target) \
-				and loot.position_of(player.use_target).distance_to(player.eye_position()) <= config.use_reach + 0.8
-		&"objective":
-			return current_objective() == player.use_target and objective_states[player.use_target] == &"waiting"
-		&"repair":
-			return barricade_to_mend(player) == player.use_target
-		&"deploy":
-			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
-			return not player.carried.is_empty() and drift.length() <= config.box_deploy_radius
-
-	return false
-
-
-func _advance_use(player: ZzPlayer, _delta: float) -> void:
-	player.use_fraction = clampf((now() - player.use_started) / player.use_needs, 0.0, 1.0)
-
-	var other := player_for_entity(player.use_target) if player.using == &"revive" or player.using == &"heal" else null
-
-	if other != null and other != player:
-		other.helped_fraction = player.use_fraction
 
 ## The dead teammate's body [param player] could shock back: the nearest within the defibrillator's
 ## reach, or null (also when they carry none).
@@ -2209,6 +2200,57 @@ func _begin_defib(player: ZzPlayer, body: ZzPlayer) -> void:
 	player.use_origin = player.feet()
 
 
+func _start(player: ZzPlayer, what: StringName, target: int, seconds: float) -> void:
+	player.using = what
+	player.use_target = target
+	player.use_started = now()
+	player.use_needs = maxf(seconds, 0.01)
+	player.use_fraction = 0.0
+	var _busy := player.controller.add_modifier(ZzController.BUSY)
+
+	if what == &"revive":
+		var downed := player_for_entity(target)
+		if downed != null:
+			downed.helped_fraction = 0.0
+
+
+func _use_still_valid(player: ZzPlayer) -> bool:
+	match player.using:
+		&"revive":
+			var downed := player_for_entity(player.use_target)
+			return downed != null and downed.is_down() and not downed.is_pinned() \
+				and downed.feet().distance_to(player.feet()) <= config.revive_range + 0.6
+		&"defib":
+			var body := player_for_entity(player.use_target)
+			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
+			return body != null and body.life == ZzPlayer.Life.DEAD and _defib_check(player, body).ok \
+				and drift.length() <= config.defib_move_tolerance
+		&"heal":
+			var who := player_for_entity(player.use_target)
+			return player.medkits > 0 and who != null and who.is_up() \
+				and (who == player or who.feet().distance_to(player.feet()) <= config.use_reach + 0.6)
+		&"loot":
+			return loot != null and loot.exists(player.use_target) \
+				and loot.position_of(player.use_target).distance_to(player.eye_position()) <= config.use_reach + 0.8
+		&"objective":
+			return current_objective() == player.use_target and objective_states[player.use_target] == &"waiting"
+		&"repair":
+			return barricade_to_mend(player) == player.use_target
+		&"deploy":
+			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
+			return not player.carried.is_empty() and drift.length() <= config.box_deploy_radius
+
+	return false
+
+
+func _advance_use(player: ZzPlayer, _delta: float) -> void:
+	player.use_fraction = clampf((now() - player.use_started) / player.use_needs, 0.0, 1.0)
+
+	var other := player_for_entity(player.use_target) if player.using == &"revive" or player.using == &"heal" else null
+
+	if other != null and other != player:
+		other.helped_fraction = player.use_fraction
+
 	if player.use_fraction < 1.0:
 		return
 
@@ -2221,6 +2263,8 @@ func _begin_defib(player: ZzPlayer, body: ZzPlayer) -> void:
 			_revive(player_for_entity(target), player)
 		&"heal":
 			_heal_with_kit(player_for_entity(target), player)
+		&"defib":
+			_defib_revive(player_for_entity(target), player)
 		&"loot":
 			if spawners == null or spawners.may_use(target, player):
 				loot.use(target, player)
@@ -2229,11 +2273,6 @@ func _begin_defib(player: ZzPlayer, body: ZzPlayer) -> void:
 		&"repair":
 			var _mended := mend_barricade(target, player)
 		&"deploy":
-		&"defib":
-			var body := player_for_entity(player.use_target)
-			var drift := (player.feet() - player.use_origin) * Vector3(1.0, 0.0, 1.0)
-			return body != null and body.life == ZzPlayer.Life.DEAD and _defib_check(player, body).ok \
-				and drift.length() <= config.defib_move_tolerance
 			if boxes != null:
 				boxes.deploy(player)
 
@@ -2272,8 +2311,6 @@ func _looked_at_survivor(player: ZzPlayer, reach: float, down: bool) -> ZzPlayer
 
 		var middle := other.feet() + Vector3(0.0, 0.3 if down else 1.0, 0.0)
 
-		&"defib":
-			_defib_revive(player_for_entity(target), player)
 		if eye.distance_to(middle) > reach + 0.8:
 			continue
 
@@ -2607,52 +2644,6 @@ func _revive(player: ZzPlayer, by: ZzPlayer) -> void:
 	player_revived.emit(player.player_id, by.player_id if by != null else &"")
 
 
-## Stands a downed survivor up without anybody holding E: a box's doing.
-func stand_up(player: ZzPlayer) -> void:
-	_revive(player, null)
-
-
-func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage = null) -> void:
-	if player.life == ZzPlayer.Life.DEAD:
-		return
-
-	player.life = ZzPlayer.Life.DEAD
-	player.health.health = 0.0
-	player.health.alive = false
-	player.died_at = now()
-	player.temp_health = 0.0
-	cancel_use(player)
-
-	if boxes != null:
-		boxes.drop_carried(player)
-		_sync_carry(player)
-
-	if pins != null:
-		pins.release(player.player_id, &"died")
-
-	for id in [ZzController.DOWN, ZzController.PINNED, ZzController.LIMP, ZzController.BUSY]:
-		var _off := player.controller.remove_modifier(id)
-
-	if spectate != null and authoritative:
-		spectate.on_died(player.player_id, by, why == BY_FELL, player.feet(), map.kill_height() + 8.0, _tick)
-
-	if progress != null:
-		progress.on_died(player.player_id)
-
-	if match_node != null:
-		match_node.report_kill(String(by), String(player.player_id), why, _tick)
-
-	# How the body falls, picked once, here, and carried on DEATH to every client.
-	player.death = decide_death(player, damage)
-
-	player_died.emit(player.player_id, by, why)
-	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
-
-
-## The fall a survivor's death gets: dot-player-char's reaction rule over the server's weights,
-## seeded from the player and the tick. The killing hit's direction when it had one, else away
-## from whoever did it (a zombie's claw carries none); bleeding out and falling push nothing.
-## A friend's gun is a weapon def, so a heavy one may launch the body as it would a zombie.
 ## [param by] shocks the dead [param body] back, where it lies: a charge spent, the cooldown begun,
 ## health by [member ZzConfig.defib_revive_fraction], and [member ZzConfig.defib_invulnerable_seconds]
 ## of not being hurt. They are one down from dead again, not a clean slate (a medkit is that).
@@ -2696,6 +2687,53 @@ func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
 	DotLog.debug(CHANNEL, "defibrillated", {"id": String(body.player_id), "by": String(by.player_id)})
 
 
+## Stands a downed survivor up without anybody holding E: a box's doing.
+func stand_up(player: ZzPlayer) -> void:
+	_revive(player, null)
+
+
+func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage = null) -> void:
+	if player.life == ZzPlayer.Life.DEAD:
+		return
+
+	player.life = ZzPlayer.Life.DEAD
+	player.health.health = 0.0
+	player.health.alive = false
+	player.died_at = now()
+	player.respawn_at = now() + respawn_delay_for(player) if config.timed_respawn else -1.0
+	player.temp_health = 0.0
+	cancel_use(player)
+
+	if boxes != null:
+		boxes.drop_carried(player)
+		_sync_carry(player)
+
+	if pins != null:
+		pins.release(player.player_id, &"died")
+
+	for id in [ZzController.DOWN, ZzController.PINNED, ZzController.LIMP, ZzController.BUSY]:
+		var _off := player.controller.remove_modifier(id)
+
+	if spectate != null and authoritative:
+		spectate.on_died(player.player_id, by, why == BY_FELL, player.feet(), map.kill_height() + 8.0, _tick)
+
+	if progress != null:
+		progress.on_died(player.player_id)
+
+	if match_node != null:
+		match_node.report_kill(String(by), String(player.player_id), why, _tick)
+
+	# How the body falls, picked once, here, and carried on DEATH to every client.
+	player.death = decide_death(player, damage)
+
+	player_died.emit(player.player_id, by, why)
+	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
+
+
+## The fall a survivor's death gets: dot-player-char's reaction rule over the server's weights,
+## seeded from the player and the tick. The killing hit's direction when it had one, else away
+## from whoever did it (a zombie's claw carries none); bleeding out and falling push nothing.
+## A friend's gun is a weapon def, so a heavy one may launch the body as it would a zombie.
 func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
 	var direction := Vector3.ZERO
 	var headshot := false
@@ -2726,6 +2764,23 @@ func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
 	)
 
 
+## Seconds a survivor who just died waits under timed respawn ([ZzRespawn]).
+func respawn_delay_for(player: ZzPlayer) -> float:
+	var seated := 0
+	var up := 0
+
+	for other in survivors():
+		if other == player or other.watching:
+			continue
+
+		seated += 1
+		if other.is_alive():
+			up += 1
+
+	var wave: int = survival.waves.index if survival != null and survival.waves != null else 1
+	return ZzRespawn.delay(config, wave, up, seated)
+
+
 ## A dead survivor back in, beside whoever is furthest along. A box's, or the rescue clock's.
 func rescue(player: ZzPlayer) -> bool:
 	if player == null or player.life != ZzPlayer.Life.DEAD or phase == Phase.IDLE:
@@ -2750,6 +2805,11 @@ func rescue(player: ZzPlayer) -> bool:
 	if spectate != null:
 		spectate.on_spawned(player.player_id)
 
+	if config.timed_respawn and config.respawn_protect_seconds > 0.0:
+		player.protected_until = now() + config.respawn_protect_seconds
+		player.health.invulnerable = true
+
+	player.respawn_at = -1.0
 	player_rescued.emit(player.player_id)
 	notice.emit("%s was rescued." % player.display_name)
 	return true
@@ -2834,13 +2894,15 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 		if horde != null:
 			horde.blast(at, reach)
-	player.respawn_at = now() + respawn_delay_for(player) if config.timed_respawn else -1.0
 
 		exploded.emit(at, reach, &"bile")
 
 	# A spitter leaves a little of itself.
 	if kind == ZzNpcs.SPITTER and hazards != null:
 		var _pool := hazards.add(ZzHazards.ACID, at, 1.6, 4.0, 3.0, 0)
+
+	if drops != null:
+		var _laid := drops.on_kill(kind, at)
 
 	if boxes != null and config.boxes_enabled:
 		boxes.maybe_drop(kind, at)
@@ -2898,23 +2960,6 @@ func _advance_weapons() -> void:
 
 		if player.weapons == null or not player.is_alive() or player.watching:
 			continue
-## Seconds a survivor who just died waits under timed respawn ([ZzRespawn]).
-func respawn_delay_for(player: ZzPlayer) -> float:
-	var seated := 0
-	var up := 0
-
-	for other in survivors():
-		if other == player or other.watching:
-			continue
-
-		seated += 1
-		if other.is_alive():
-			up += 1
-
-	var wave: int = survival.waves.index if survival != null and survival.waves != null else 1
-	return ZzRespawn.delay(config, wave, up, seated)
-
-
 
 		var command := weapon_command_for(player)
 		command.yaw = player.controller.state.yaw
@@ -2939,11 +2984,6 @@ func respawn_delay_for(player: ZzPlayer) -> float:
 
 
 ## What a weapon put into the world, as one of [ZzHazards]' projectiles.
-	if config.timed_respawn and config.respawn_protect_seconds > 0.0:
-		player.protected_until = now() + config.respawn_protect_seconds
-		player.health.invulnerable = true
-
-	player.respawn_at = -1.0
 ##
 ## [b]dot-weapon spawns nothing; it says what should exist.[/b] Until this was here every
 ## grenade, sticky charge and rocket in the game was a use that cost ammunition and did
@@ -3016,7 +3056,9 @@ func simulate(delta: float) -> void:
 		_step_bodies_only(delta)
 		return
 
+	var _t := Time.get_ticks_usec()
 	_step(delta)
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.step", _t)
 
 
 ## A tick under a cover: the bodies move and settle, nothing else happens. A body the gate has
@@ -3050,8 +3092,10 @@ func now() -> float:
 func _step(delta: float) -> void:
 	_advance_phase(delta)
 
+	var _t := Time.get_ticks_usec()
 	if authoritative and bots != null:
 		bots.drive(delta)
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.bots", _t)
 
 	if pins != null:
 		pins.steer(delta)
@@ -3065,9 +3109,6 @@ func _step(delta: float) -> void:
 
 			if authoritative:
 				_advance_hands(player, delta)
-	if drops != null:
-		var _laid := drops.on_kill(kind, at)
-
 
 		if authoritative and not player.is_bot:
 			player.session_seconds += delta
@@ -3075,7 +3116,9 @@ func _step(delta: float) -> void:
 			if progress != null:
 				progress.add_playtime(id, delta)
 
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.players", _t)
 	_advance_weapons()
+	_t = preload("res://addons/dot_npc_ai/_crowd_prof.gd").add("game.weapons", _t)
 
 	if map != null and map.mechanics != null:
 		map.mechanics.step(_tick)

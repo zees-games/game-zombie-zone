@@ -37,9 +37,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 41
+const SECTIONS := 43
 
-const CHECKS := 294
+const CHECKS := 310
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -85,6 +85,8 @@ func _run() -> void:
 	await _test_toys()
 	await _test_the_room_wakes()
 	await _test_downs()
+	await _test_ground_strike()
+	await _test_every_kind_animates()
 	await _test_borrowed_health()
 	await _test_the_shove()
 	await _test_team_damage()
@@ -373,7 +375,6 @@ func _test_zombie_loot() -> void:
 	_finished()
 
 
-func _test_shots() -> void:
 ## Zombies drop ammunition and health by default, a mutant more than a common, and the settings are honoured.
 func _test_zombie_drops() -> void:
 	_section("zombies drop ammo and health: commons a little, mutants more, all configurable")
@@ -439,6 +440,7 @@ func _test_zombie_drops() -> void:
 	_finished()
 
 
+func _test_shots() -> void:
 	_section("shots kill zombies and the kill is credited")
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
@@ -554,6 +556,88 @@ func _test_downs() -> void:
 	_check(me.on_last_life(), "two downs and the screen says the next is the last")
 	_hurt(game, me, 500.0)
 	_check(me.life == ZzPlayer.Life.DEAD and not me.is_alive(), "and it is")
+	_finished()
+
+
+## A zombie over a downed survivor kneels and strikes the body, harder by the cfg multiplier; the rule switches it off.
+func _test_ground_strike() -> void:
+	_section("a zombie strikes a downed survivor on the ground")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var hurts: Array = []
+	game.player_hurt.connect(func(_who: StringName, amount: float, _from: Vector3) -> void: hurts.append(amount))
+	_hurt(game, me, 500.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -1.0), &"test")
+	npc.brain.call(&"force_target", me.player_id)
+	var seen := {"down": false}
+	for _i in 12:
+		await _sim(game, 0.25)
+		if is_instance_valid(npc.node) and npc.node.get(&"anim") == ZzZombieBody.Anim.STRIKE_DOWN:
+			seen["down"] = true
+	_check(seen["down"], "its animation is the ground strike while the target is down")
+	_check(not hurts.is_empty(), "and the blow lands")
+	if not hurts.is_empty():
+		var want: float = game.config.common_damage * game.config.damage_scale() * game.config.down_attack_damage
+		_check(absf(float(hurts[0]) - want) < want * 0.06, "for the downed-attack multiplier", "%.2f vs %.2f" % [hurts[0], want])
+	_check(ZzZombieView.CLIPS.has(ZzZombieBody.Anim.STRIKE_DOWN), "the view has a clip for it")
+	_check(ZzZombieView.LOOKS[&"crawler"]["clips"][&"attack"] == &"crawl" and ZzZombieView.LOOKS[&"crawler"]["clips"][&"walk"] == &"crawl",
+		"a crawler moves and attacks on the crawl clip")
+	game.config.down_attack = false
+	hurts.clear()
+	seen["down"] = false
+	var other := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -1.0), &"test")
+	other.brain.call(&"force_target", me.player_id)
+	for _i in 8:
+		await _sim(game, 0.25)
+		if is_instance_valid(other.node) and other.node.get(&"anim") == ZzZombieBody.Anim.STRIKE_DOWN:
+			seen["down"] = true
+	_check(not seen["down"], "with down_attack off it swings as usual")
+	_finished()
+
+
+func _test_every_kind_animates() -> void:
+	_section("every zombie kind has a clip for every state it uses, and the holds are posed")
+	var kinds: Array = ZzZombieView.LOOKS.keys()
+	var missing: Array = []
+	var flat: Array = []
+	var root := Node3D.new()
+	add_child(root)
+
+	for kind: StringName in kinds:
+		var view := ZzZombieView.new()
+		root.add_child(view)
+		view.build(kind, 5)
+		var player := view.find_child("AnimationPlayer", true, false) as AnimationPlayer
+		var overrides: Dictionary = ZzZombieView.look_for(kind, 5).get("clips", {})
+
+		for anim: int in ZzZombieView.CLIPS:
+			var clip: StringName = ZzZombieView.CLIPS[anim][0]
+			clip = overrides.get(clip, clip)
+
+			if player == null or not player.has_animation("zz/" + String(clip)):
+				missing.append("%s/%d" % [kind, anim])
+
+		var arm: int = view._bones.get(&"UpperArm.L", -1)
+
+		if arm < 0:
+			continue
+
+		var base := Quaternion.IDENTITY
+		view._pose(ZzZombieBody.Anim.IDLE)
+		base = view._skeleton.get_bone_pose_rotation(arm)
+
+		for anim: int in [ZzZombieBody.Anim.PIN, ZzZombieBody.Anim.LEAP, ZzZombieBody.Anim.GRAB, ZzZombieBody.Anim.TONGUE, ZzZombieBody.Anim.STRIKE_DOWN]:
+			view._skeleton.set_bone_pose_rotation(arm, base)
+			view._pose(anim)
+
+			if view._skeleton.get_bone_pose_rotation(arm).is_equal_approx(base):
+				flat.append("%s/%d" % [kind, anim])
+
+	_check(kinds.size() == 12, "all twelve kinds are looked at", "%d" % kinds.size())
+	_check(missing.is_empty(), "every state of every kind resolves to a clip the kit has", str(missing))
+	_check(flat.is_empty(), "the pin, leap, reach, reel and ground strike each pose the arms", str(flat))
+	root.queue_free()
 	_finished()
 
 
@@ -1269,41 +1353,81 @@ func _test_box_framework() -> void:
 	_check(game.loot.exists(second) and me.carried.size() == 1, "a second box stays on the ground when the hands are full")
 	game.loot.remove(second)
 
-	# Deploy: nothing until the time is up, and the meter climbs.
+	# Deploy is primary fire, held, with the box in the hands. B (the old key) does nothing.
+	_check(me.box_out and me.carried_count == 1, "a picked-up box comes straight into the hands")
 	var deploy := game.config.box_deploy_seconds
-	me.actions = ZzNetCommand.ACT_DEPLOY
-	await _sim(game, deploy * 0.5)
-	_check(me.using == &"deploy" and absf(me.use_fraction - 0.5) < 0.1 and seen.is_empty(),
-		"holding the key fills a meter and opens nothing early", "%.2f" % me.use_fraction)
-	await _sim(game, deploy * 0.6)
+	_fire(me, false)
+	me.actions = ZzNetCommand.ACT_BOX
+	await _sim(game, 0.2)
 	me.actions = 0
-	_check(seen == [&"medical"] and me.carried.is_empty() and me.using == &"", "after box_deploy_seconds it opens", str(seen))
+	await _sim(game, 0.1)
+	_check(not me.box_out and me.is_held() == false, "the box key puts it away: the gun is free again")
+	_fire(me, true)
+	await _sim(game, 0.3)
+	_check(me.using == &"", "primary fire with the box packed shoots, it does not deploy")
+	_fire(me, false)
+	me.actions = ZzNetCommand.ACT_BOX
+	await _sim(game, 0.2)
+	me.actions = 0
+	await _sim(game, 0.1)
+	_check(me.box_out, "the box key takes it out again")
+
+	_fire(me, true)
+	await _sim(game, deploy * 0.5)
+	_check(me.using == &"deploy" and absf(me.use_fraction - 0.5) < 0.1 and seen.is_empty() and me.is_held(),
+		"holding primary fire fills a meter and opens nothing early, and the gun is held", "%.2f" % me.use_fraction)
+	await _sim(game, deploy * 0.6)
+	_fire(me, false)
+	_check(seen == [&"medical"] and me.carried.is_empty() and me.using == &"" and not me.box_out,
+		"after box_deploy_seconds it opens", str(seen))
 
 	# Cancel by letting go.
 	var _c1 := game.boxes.carry(me, &"medical")
-	me.actions = ZzNetCommand.ACT_DEPLOY
+	await _sim(game, 0.2)
+	_fire(me, true)
 	await _sim(game, deploy * 0.4)
-	me.actions = 0
+	_fire(me, false)
 	await _sim(game, deploy * 2.0)
 	_check(me.using == &"" and me.carried.size() == 1 and seen.size() == 1, "letting go cancels it, and the box is kept")
 
+	# The old key does nothing: no bit from a client reaches a deploy, and the box stays.
+	var legacy := true
+	for row in ZzBindings.make().rows:
+		if str(row["action"]) == "zz_deploy" or str(row["default"]) == "B" and str(row["setting"]) == "bind_deploy":
+			legacy = false
+	_check(legacy and me.using == &"", "B is no longer a binding")
+
+	# Cancel by switching weapon mid-deploy.
+	_fire(me, true)
+	await _sim(game, deploy * 0.4)
+	_check(me.using == &"deploy", "a deploy under way (before the switch)")
+	me.wanted_slot = me.wanted_slot + 1 if me.wanted_slot < 5 else 1
+	await _sim(game, 0.2)
+	_check(me.using == &"" and not me.box_out and me.carried.size() == 1,
+		"asking for another weapon puts the box away and cancels the deploy")
+	_fire(me, false)
+	me.actions = ZzNetCommand.ACT_BOX
+	await _sim(game, 0.2)
+	me.actions = 0
+	await _sim(game, 0.1)
+
 	# Cancel by walking off.
-	me.actions = ZzNetCommand.ACT_DEPLOY
+	_fire(me, true)
 	await _sim(game, deploy * 0.4)
 	me.place_at(STREET + Vector3(0, 0, -3.0), 0.0)
 	await _sim(game, 0.3)
 	_check(me.using == &"" and me.carried.size() == 1, "moving out of the radius cancels it")
-	me.actions = 0
+	_fire(me, false)
 	me.place_at(STREET, 0.0)
 	await _sim(game, 0.2)
 
 	# Cancel by a down, which drops the box where they fall.
-	me.actions = ZzNetCommand.ACT_DEPLOY
+	_fire(me, true)
 	await _sim(game, deploy * 0.4)
 	var lying := game.loot.count_of(ZzLoot.BOX)
 	game._go_down(me, &"", &"test")
 	await _sim(game, 0.2)
-	me.actions = 0
+	_fire(me, false)
 	_check(me.using == &"" and me.carried.is_empty() and game.loot.count_of(ZzLoot.BOX) == lying + 1,
 		"a down cancels it and drops what they carried")
 	game.stand_up(me)
@@ -2265,6 +2389,13 @@ func _sim(game: ZzGame, seconds: float) -> void:
 			await get_tree().physics_frame
 
 	await get_tree().physics_frame
+
+
+## Holds or releases the survivor's primary fire on the command the server reads this tick.
+func _fire(who: ZzPlayer, on: bool) -> void:
+	var command := DotFpsCommand.new()
+	command.set_button(ZzNetCommand.BUTTON_FIRE, on)
+	who.controller.current_command = command
 
 
 func _aim(player: ZzPlayer, target: Vector3) -> void:

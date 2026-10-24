@@ -31,6 +31,13 @@ var _restock: Array = []
 var _traders: Dictionary = {}
 ## Trader id -> how many shelf rolls it has had, so each restock is a new draw.
 var _generation: Dictionary = {}
+## Whether the shelves are standing, and whether they sell, as of the last tick.
+var _present := true
+var _open := true
+
+const WHEN_SETUP := 0
+const WHEN_WAVES := 1
+const WHEN_ALWAYS := 2
 
 
 func _init(p_game: Object) -> void:
@@ -91,6 +98,8 @@ func start_round(doc: Dictionary) -> void:
 			_add_trader(_fallback_trader(), trader_defaults)
 
 	spawner.begin_round(game.now(), game.round_number)
+	_open = _window_open()
+	_present = _open or not trader_despawns()
 
 	if _present:
 		_stock_all()
@@ -98,8 +107,6 @@ func start_round(doc: Dictionary) -> void:
 
 
 ## The `pickups` the converter wrote into the map's world manifest (weapon_*, item_*, ammo_* entities), read from the checkout's `world/`; empty for a map with no world.
-	_open = _window_open()
-	_present = _open or not trader_despawns()
 static func world_pickups(doc: Dictionary) -> Array:
 	var pack := str(doc.get("world", ""))
 	if pack == "":
@@ -133,19 +140,21 @@ func _add_trader(raw: Dictionary, defaults: Dictionary) -> void:
 	_generation[id] = 0
 
 
-func _stock(id: StringName, slot: int) -> void:
-	var t: Dictionary = _traders[id]
-	var rolled := spawner.roll(id, int(_generation[id]))
-	_generation[id] = int(_generation[id]) + 1
-	if rolled.is_empty():
-		var wait: float = maxf(float(t.get("restock", 0.0)), 10.0)
-		if int(_empty_tries.get(id, 0)) < 5:
 func _stock_all() -> void:
 	for id: StringName in _traders:
 		for slot in int(_traders[id]["slots"]):
 			_stock(id, slot)
 
 
+func _stock(id: StringName, slot: int) -> void:
+	if not _present:
+		return
+	var t: Dictionary = _traders[id]
+	var rolled := spawner.roll(id, int(_generation[id]))
+	_generation[id] = int(_generation[id]) + 1
+	if rolled.is_empty():
+		var wait: float = maxf(float(t.get("restock", 0.0)), 10.0)
+		if int(_empty_tries.get(id, 0)) < 5:
 			_empty_tries[id] = int(_empty_tries.get(id, 0)) + 1
 			_restock.append({"at": game.now() + wait, "site": id, "slot": slot})
 		return
@@ -172,6 +181,7 @@ func loot_ids() -> Array:
 
 func tick() -> void:
 	spawner.tick(game.now())
+	_follow_window()
 
 	var i := 0
 	while i < _restock.size():
@@ -181,18 +191,8 @@ func tick() -> void:
 			_stock(r["site"], int(r["slot"]))
 		else:
 			i += 1
-	_follow_window()
 
 
-## What using loot entry [param loot_id] costs, in points: the site's `data.price`, else `data.tier_price` looks the weapon's tier up in the config's `game: {shop: {prices: {tier: n}}}`. Zero for free and for anything the spawner did not lay.
-func price_of(loot_id: int) -> int:
-	return int(_price_of.get(loot_id, 0))
-
-
-func _price_for(item: StringName, data: Dictionary) -> int:
-	if data.has("price"):
-		return _clean_price(data["price"])
-	if data.get("tier_price", false):
 ## The `game: shop:` block of the map's spawner config (operator keys: docs/operators.md).
 func shop_block() -> Dictionary:
 	var shop: Variant = spawner.game_block().get("shop", {})
@@ -308,6 +308,15 @@ func _fallback_trader() -> Dictionary:
 	return {"id": "trader_start", "at": [at.x, at.y, at.z], "yaw": rad_to_deg(yaw)}
 
 
+## What using loot entry [param loot_id] costs, in points: the site's `data.price`, else `data.tier_price` looks the weapon's tier up in the config's `game: {shop: {prices: {tier: n}}}`. Zero for free and for anything the spawner did not lay.
+func price_of(loot_id: int) -> int:
+	return int(_price_of.get(loot_id, 0))
+
+
+func _price_for(item: StringName, data: Dictionary) -> int:
+	if data.has("price"):
+		return _clean_price(data["price"])
+	if data.get("tier_price", false):
 		var prices: Variant = (spawner.game_block().get("shop", {}) as Dictionary).get("prices", {})
 		return _clean_price((prices as Dictionary).get(String(ZzWeapons.tier_of(item)), 0)) if prices is Dictionary else 0
 	return 0
@@ -329,6 +338,9 @@ func lays(loot_id: int) -> bool:
 
 ## False, with the reason sent to [param player], when they cannot pay for [param loot_id]. The charge is taken when the entry is used up.
 func may_use(loot_id: int, player) -> bool:
+	if _shelf.has(loot_id) and not _open:
+		game.refused.emit(player.player_id, "The trader is closed.")
+		return false
 	var price := price_of(loot_id)
 	if price > 0 and player.points < price:
 		game.refused.emit(player.player_id, "That costs %d points." % price)
@@ -338,9 +350,6 @@ func may_use(loot_id: int, player) -> bool:
 
 ## The game's loot entry went (used or removed): the buyer pays, and the spawner starts the item's timer (a trader's slot restocks instead).
 func on_loot_removed(loot_id: int, by: StringName) -> void:
-	if _shelf.has(loot_id) and not _open:
-		game.refused.emit(player.player_id, "The trader is closed.")
-		return false
 	var price: int = int(_price_of.get(loot_id, 0))
 	if price > 0 and game.players.has(by):
 		game.players[by].points = maxi(int(game.players[by].points) - price, 0)

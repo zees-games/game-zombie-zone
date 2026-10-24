@@ -250,6 +250,9 @@ func _chase(b: ZzZombieBody) -> bool:
 	var gap := flat_distance(npc.position(), at)
 	var reach := tune(&"reach", 1.55)
 
+	if strikes_down(target):
+		reach = minf(reach, 1.1)
+
 	# Close enough to matter: only the slot holders go in, the rest hold the ring. A forced
 	# zombie (a mob, bile) skips the queue: a mob is supposed to swamp you.
 	var attacking := forced != &"" or gap > ring + 3.0 or claim_attack_slot()

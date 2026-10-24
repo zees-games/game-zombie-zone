@@ -9,6 +9,7 @@
 #   tools/shot.sh --view=third --spawn=brute:1                       # third person
 #   tools/shot.sh --view=room --aim=40 --at=0,0.05,12          # the stand-ins aiming 40 degrees up, from the side
 #   tools/shot.sh --view=down --spawn=common:6                       # on the floor
+#   tools/shot.sh --view=strike_down --zombie=common --seconds=1.2     # a zombie kneeling over a downed survivor (strike: standing)
 #   tools/shot.sh --view=ragdoll --seconds=0.6 --reaction=face_plant  # a stand-in killed, its body 0.6 s into the fall
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
@@ -16,7 +17,7 @@
 #   tools/shot.sh --view=crawl                                       # down, crawling, the speed boxes in the strip (crawl_third: the figure)
 #   tools/shot.sh --view=killcam --seconds=3                         # the last stand replayed (--seconds=9: the podium)
 #   tools/shot.sh --view=trader                                      # the trader menu open at the start
-#   tools/shot.sh --view=deploy                                      # carrying a box, the deploy meter part full
+#   tools/shot.sh --view=deploy --seconds=2.5                        # carrying a box, primary fire held that long (deploy_third, deploy_side)
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope
 #   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
@@ -40,7 +41,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--reaction=*|--no-bake|--no-world|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--reaction=*|--no-bake|--no-world|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

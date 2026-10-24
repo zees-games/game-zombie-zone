@@ -322,20 +322,6 @@ func setup_seconds() -> float:
 ## Temporary health a bottle of pills gives.
 @export_range(1.0, 100.0, 1.0) var pills_health: float = 50.0
 
-## Metres from the eye an item may be picked up or a box opened.
-@export_range(0.5, 5.0, 0.1) var use_reach: float = 2.2
-
-# --- The shove -------------------------------------------------------------
-
-@export_group("The shove")
-
-## Seconds between shoves, and how much each shove in a row adds to it after the fourth.
-@export_range(0.1, 5.0, 0.05) var shove_cooldown: float = 0.7
-@export_range(0.0, 2.0, 0.05) var shove_fatigue: float = 0.35
-
-## Reach and half-angle of a shove.
-@export_range(0.5, 5.0, 0.1) var shove_range: float = 2.0
-@export_range(10.0, 90.0, 1.0) var shove_half_angle: float = 55.0
 ## The defibrillator: held E at a dead teammate's body shocks them back (a downed one is picked up
 ## by hand as ever). Each key is also a cvar, `zz_defib_*`; see the README.
 ## Whether each survivor starts a map holding one (0 or 1).
@@ -354,6 +340,20 @@ func setup_seconds() -> float:
 ## Metres the user may drift while charging before it is interrupted.
 @export_range(0.1, 3.0, 0.1) var defib_move_tolerance: float = 0.6
 
+## Metres from the eye an item may be picked up or a box opened.
+@export_range(0.5, 5.0, 0.1) var use_reach: float = 2.2
+
+# --- The shove -------------------------------------------------------------
+
+@export_group("The shove")
+
+## Seconds between shoves, and how much each shove in a row adds to it after the fourth.
+@export_range(0.1, 5.0, 0.05) var shove_cooldown: float = 0.7
+@export_range(0.0, 2.0, 0.05) var shove_fatigue: float = 0.35
+
+## Reach and half-angle of a shove.
+@export_range(0.5, 5.0, 0.1) var shove_range: float = 2.0
+@export_range(10.0, 90.0, 1.0) var shove_half_angle: float = 55.0
 
 ## Damage a shove does to a common, which is nothing much: it is for room, not for killing.
 @export_range(0.0, 100.0, 1.0) var shove_damage: float = 5.0
@@ -385,6 +385,10 @@ func setup_seconds() -> float:
 
 ## Seconds between a common's swings.
 @export_range(0.2, 5.0, 0.05) var common_attack_interval: float = 0.9
+
+## Whether zombies kneel and strike a downed survivor, and the damage that blow does compared to a standing hit.
+@export var down_attack: bool = true
+@export_range(0.0, 10.0, 0.1) var down_attack_damage: float = 1.5
 
 ## Commons that may be on one survivor at once; the rest wait their turn round them.
 @export_range(1, 20, 1) var attackers_per_survivor: int = 6
@@ -450,11 +454,11 @@ func setup_seconds() -> float:
 @export_range(0.0, 10.0, 0.1) var box_open_seconds: float = 0.8
 @export_range(5.0, 1200.0, 5.0) var box_lifetime: float = 150.0
 
-## How many boxes a survivor carries (E picks one up; the deploy key opens it). 0: no carrying, E
+## How many boxes a survivor carries (E picks one up into the hands; primary fire held opens it). 0: no carrying, E
 ## opens a box on the ground as it did before boxes could be carried.
 @export_range(0, 6, 1) var box_carry: int = 1
 
-## Seconds the deploy key is held to open a carried box (server file key `box_deploy_seconds`,
+## Seconds primary fire is held to open a carried box (server file key `box_deploy_seconds`,
 ## cvar `zz_box_deploy_seconds`, 0.5 to 15), and the radius (metres) the survivor may drift in
 ## meanwhile before it is cancelled. 1 s is quick enough to open one mid-fight; it was 3.5, which
 ## nobody did with a horde about, so boxes were only ever opened in the safe room.

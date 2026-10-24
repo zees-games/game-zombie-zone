@@ -36,7 +36,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 ## [method effects_summary] is what the HUD shows ("Horde frenzy x4, 1:12").
 ##
 ## [b]A box is carried, then deployed.[/b] E on a box lying about puts it in the carried slot
-## ([member ZzConfig.box_carry] of them); holding the deploy key for `box_deploy_seconds` opens it.
+## ([member ZzConfig.box_carry] of them); holding primary fire for `box_deploy_seconds` opens it.
 ## With `box_labels` off the type of a box on the ground and in the slot is not sent
 ## ([method shown_item]).
 ##

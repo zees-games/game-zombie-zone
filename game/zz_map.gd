@@ -520,6 +520,7 @@ func _build_boxes() -> void:
 				"sheet": (load(SHEET_SCRIPT) as GDScript).new() if bakeable and can_bake() else null}
 
 		var batch_of: Dictionary = batches[key]
+		batch_of["trim"] = bool(batch_of.get("trim", true)) and ZzMapDoc.is_trim(box)
 		if batch_of["sheet"] != null:
 			_add_box_faces(batch_of["sheet"], frame, size)
 		else:
@@ -542,7 +543,8 @@ func _build_boxes() -> void:
 		index += 1
 		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so, and a player is meant to walk through it.
-		if bool(batch["ghost"]):
+		# a batch of nothing but trim has no shape by ZzMapDoc.is_trim's rule, not by a loss
+		if bool(batch["ghost"]) or bool(batch.get("trim", false)):
 			mesh.set_meta(&"dot_no_collision", true)
 		var arrays := tool.commit()
 		if sheet != null:

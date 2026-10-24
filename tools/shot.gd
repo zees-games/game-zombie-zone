@@ -14,6 +14,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 var _view := "survivor"
+var _zombie := &"common"
 var _seconds := 3.0
 var _board := false
 var _out := "res://screenshots/shot.png"
@@ -60,6 +61,8 @@ func _ready() -> void:
 			for part in arg.trim_prefix("--spawn=").split(","):
 				var bits := part.split(":")
 				_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
+		elif arg.begins_with("--zombie="):
+			_zombie = StringName(arg.trim_prefix("--zombie="))
 		elif arg.begins_with("--sever="):
 			_sever = arg.trim_prefix("--sever=").split(",", false)
 		elif arg.begins_with("--pin="):
@@ -258,6 +261,26 @@ func _run() -> void:
 			var _applied = game.combat.apply_damage(hit)
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
+		"strike", "strike_down", "pin":
+			# One zombie (--zombie=common|crawler|...) a step from the survivor, swinging at them
+			# standing or, for strike_down, downed; a free camera from the side.
+			if _view == "strike_down":
+				local.health.invulnerable = false
+				var floored := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+				var _felled = game.combat.apply_damage(floored)
+				local.health.invulnerable = true
+			var foe: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -1.2)), &"shot", Basis(Vector3.UP, PI))
+			if foe != null and foe.brain != null:
+				foe.brain.call(&"force_target", local.player_id)
+			if _view == "pin" and foe != null:
+				var how: StringName = {&"rider": &"ride", &"crawler": &"grab", &"ram": &"carry"}.get(_zombie, &"pounce")
+				print("pin: ", how, " held ", game.horde.pin(foe, local.player_id, how))
+			await _seconds_of(_seconds)
+			var mid: Vector3 = local.feet().lerp(foe.position(), 0.5) if foe != null else local.feet()
+			print("strike: survivor ", local.feet(), " zombie ", foe.position() if foe != null else "none", " anim ", foe.node.get(&"anim") if foe != null else "")
+			var side := -1.0 if _view == "pin" else 1.0
+			_free_camera().look_at_from_position(mid + Vector3(3.2 * side, 1.8, 1.2), mid + Vector3(0.0, 0.8 if _view == "pin" else 0.6, 0.0))
+			await _seconds_of(0.2)
 		"killcam", "reveal":
 			# The last survivor falls and the map is lost; --seconds is how long after, so ~3 is the
 			# replay and ~9 the podium.
@@ -285,13 +308,33 @@ func _run() -> void:
 			await _seconds_of(_seconds)
 			print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
 			Input.action_release(&"dot_fps_forward")
-		"deploy":
-			# Carrying a box and holding the deploy key partway through a long deploy: the meter,
-			# the carried line and (in third person) the pack and the shrinking ring.
-			game.config.box_deploy_seconds = 10.0
+		"deploy", "deploy_third", "deploy_side":
+			_clear_view(game, local, stand)
+			# Carrying a box: --seconds is how long primary fire has been held, of a 4 s deploy
+			# (0 shows it held, 4.6 shows it deployed). deploy_third is the figure's view of it.
+			game.config.box_deploy_seconds = 4.0
 			var _c := game.boxes.carry(local, &"mystery")
-			_client.set("_deploying", true)
-			await _seconds_of(maxf(_seconds, 4.0))
+			if _view == "deploy_third":
+				_client.call("toggle_view")
+			await _seconds_of(0.5)
+			if _seconds > 0.6:
+				_client.set("_firing", true)
+				await _seconds_of(_seconds - 0.5)
+			if _view == "deploy_side":
+				# From in front and to one side, where the figure's crate shows.
+				var yaw := deg_to_rad(local.controller.state.yaw)
+				var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+				var right := Vector3(cos(yaw), 0.0, -sin(yaw))
+				var at: Vector3 = local.feet()
+				_free_camera().look_at_from_position(at + ahead * 2.4 + right * 1.0 + Vector3(0.0, 1.5, 0.0), at + Vector3(0.0, 0.9, 0.0))
+		"boxgun":
+			# A box that grants a weapon, opened on the local survivor: the gun must be drawn after it.
+			_clear_view(game, local, stand)
+			# Over a gun already in the same slot, the case a swap of one primary for another is.
+			game.boxes.run([{"do": "give_weapon", "id": "rifle"}], {"opener": local, "at": stand, "box": &"upgrade"})
+			await _seconds_of(1.0)
+			game.boxes.run([{"do": "give_weapon", "id": "smg"}], {"opener": local, "at": stand, "box": &"upgrade"})
+			await _seconds_of(maxf(_seconds, 1.0))
 		"defib", "defib_third", "defib_ground":
 			# The defibrillator: in hand (first person, or the figure's view), or lying a step ahead.
 			for other in game.survivors():
@@ -318,6 +361,14 @@ func _run() -> void:
 				game._begin_defib(local, corpse)
 				_client.set("_using", true)
 				await _seconds_of(maxf(_seconds - 0.8, 0.5))
+		"trader":
+			# The trader's menu open beside the start trader, the survivor holding some points.
+			game.config.trader_when = 2
+			game.spawners.start_round(game.map_doc)
+			local.points = 420
+			await _seconds_of(0.5)
+			_client.call("open_shop")
+			await _seconds_of(maxf(_seconds - 0.5, 0.3))
 		"hit":
 			# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
 			# through dot-combat as a shot would go: the marker and the numbers the client draws
@@ -361,14 +412,6 @@ func _run() -> void:
 		"ragdoll":
 			# A stand-in on their last life killed in front of a free camera, and [member _seconds]
 			# of the fall: `--seconds=0.15`, `0.6` and `2` are the start, the drop and the body at
-		"trader":
-			# The trader's menu open beside the start trader, the survivor holding some points.
-			game.config.trader_when = 2
-			game.spawners.start_round(game.map_doc)
-			local.points = 420
-			await _seconds_of(0.5)
-			_client.call("open_shop")
-			await _seconds_of(maxf(_seconds - 0.5, 0.3))
 			# rest. `--reaction=face_plant` forces one; the push is away from the camera. `--at` is where.
 			var victim = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
 			var feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
@@ -586,6 +629,13 @@ func _survival_frame(game: ZzGame, local) -> void:
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	get_tree().quit(0 if saved == OK else 1)
+
+
+## The stand-ins sent out of the frame, so a close first-person shot is not a head.
+func _clear_view(game: ZzGame, local, stand: Vector3) -> void:
+	for p in game.survivors():
+		if p != local:
+			p.place_at(stand + Vector3(0.0, 0.0, 400.0), 0.0)
 
 
 func _face(player, target: Vector3) -> void:

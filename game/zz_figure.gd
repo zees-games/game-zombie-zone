@@ -2,6 +2,7 @@ extends Node3D
 
 const ZzPaths := preload("zz_paths.gd")
 const ZzDefibModel := preload("zz_defib_model.gd")
+const ZzBoxCrate := preload("zz_box_crate.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
@@ -58,9 +59,11 @@ var _defib: Node3D = null
 ## Whether the people's art loaded, or a capsule stands in.
 var from_art: bool = false
 
-var _pack: MeshInstance3D = null
+var _pack: Node3D = null
+var _crate: Dictionary = {}
+## Whether a box is in the hands: the weapon is not drawn while it is.
+var box_in_hands: bool = false
 var _ring: MeshInstance3D = null
-var _pack_material: StandardMaterial3D = null
 
 ## The clip playing, for the suite and for `describe()`.
 var clip: StringName = &""
@@ -169,7 +172,7 @@ func hold(id: StringName, switching: bool) -> void:
 		else:
 			held.clear()
 
-	held.visible = true
+	held.visible = not box_in_hands
 	held.on_switching(switching)
 	_set_hold_kind()
 
@@ -219,23 +222,17 @@ func fired(times: int, kind: int) -> void:
 		person.swing(DotHumanoidClips.SLASH)
 
 
-## The box on the back while one is carried, and a ring on the ground that fills while the box
-## is being deployed ([param deploying] 0..1). What a team-mate sees of the other half of the
-## box: that somebody is carrying one, and that they are standing still doing something with it.
-func show_box(carrying: int, deploying: float, colour: Color = Color(0.95, 0.7, 0.2)) -> void:
+## The carried box: on the back while it is packed, in front of the chest once it is out (the
+## gun is put away), lowered to the ground and opened as [param deploying] (0..1) fills, with a
+## ring that closes in on the survivor. What a team-mate sees of the deploy.
+func show_box(carrying: int, deploying: float, out: bool = false, colour: Color = Color(0.95, 0.7, 0.2)) -> void:
 	if carrying <= 0 and _pack == null:
 		return
 
 	if _pack == null:
-		_pack = MeshInstance3D.new()
+		_crate = ZzBoxCrate.build(colour)
+		_pack = _crate["root"]
 		_pack.name = "BoxPack"
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.38, 0.32, 0.3)
-		_pack.mesh = mesh
-		_pack.position = Vector3(0.0, 1.2, 0.3)
-		_pack_material = StandardMaterial3D.new()
-		_pack_material.emission_enabled = true
-		_pack.material_override = _pack_material
 		add_child(_pack)
 
 		_ring = MeshInstance3D.new()
@@ -252,18 +249,22 @@ func show_box(carrying: int, deploying: float, colour: Color = Color(0.95, 0.7, 
 		add_child(_ring)
 
 	_pack.visible = carrying > 0
-	_pack_material.albedo_color = colour
-	_pack_material.emission = colour * 0.4
+	box_in_hands = out and carrying > 0
+
+	if box_in_hands:
+		var lower := ZzBoxCrate.lowered(deploying)
+		_pack.position = Vector3(0.0, 1.05, -0.42).lerp(Vector3(0.0, 0.14, -0.7), lower)
+		_pack.rotation_degrees = Vector3(-10.0, 0.0, 0.0).lerp(Vector3.ZERO, lower)
+		ZzBoxCrate.set_open(_crate, ZzBoxCrate.opened(deploying))
+	else:
+		_pack.position = Vector3(0.0, 1.2, 0.3)
+		_pack.rotation_degrees = Vector3.ZERO
+		ZzBoxCrate.set_open(_crate, 0.0)
+
 	_ring.visible = deploying > 0.0
 	# It closes in on the survivor as the box comes open.
 	_ring.scale = Vector3.ONE * lerpf(1.6, 0.5, clampf(deploying, 0.0, 1.0))
 
-
-## The node a held weapon hangs from, by the name [ZeeWorldModel] asks for: the person's hand.
-func attachment(point: StringName) -> Node3D:
-	if person == null:
-		return null
-	return person.attachment(point)
 
 ## The defibrillator in the hands while it charges at a body, for whoever is watching.
 func show_defib(active: bool) -> void:
@@ -284,6 +285,12 @@ func show_defib(active: bool) -> void:
 
 	_defib.visible = active
 
+
+## The node a held weapon hangs from, by the name [ZeeWorldModel] asks for: the person's hand.
+func attachment(point: StringName) -> Node3D:
+	if person == null:
+		return null
+	return person.attachment(point)
 
 
 ## How far a watched gun kicks per kind of use, in the recoil's own degrees. The real
