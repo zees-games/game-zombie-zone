@@ -348,6 +348,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_map_fx(ZzEvents.write_map_spin(entity, seconds, from, to)))
 		game.map_beat.connect(func(beat: int, downbeat: bool) -> void:
 			_map_fx(ZzEvents.write_map_beat(beat, downbeat)))
+		game.map_ending.connect(func(won: bool, time_scale: float, seconds: float, camera: Variant) -> void:
+			_broadcast(ZzEvents.Kind.MAP_FX, ZzEvents.write_map_end(won, time_scale, seconds, camera)))
 		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
 			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
 		game.survival_changed.connect(func() -> void:
@@ -1624,6 +1626,8 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 						game.map_sound_spin.emit(int(fx["entity"]), float(fx["seconds"]), float(fx["from"]), float(fx["to"]))
 					ZzEvents.MapFx.BEAT:
 						game.map_beat.emit(int(fx["from"]), bool(fx["flag"]))
+					ZzEvents.MapFx.END:
+						game.map_ending.emit(bool(fx["won"]), float(fx["time_scale"]), float(fx["seconds"]), fx["camera"])
 		ZzEvents.Kind.BARRICADE:
 			var bar := ZzEvents.read_barricade(reader)
 			if bool(bar["ok"]):

@@ -122,10 +122,13 @@ enum Kind {
 }
 
 ## What a MAP_FX says.
-enum MapFx { FADE, SPIN, BEAT }
+enum MapFx { FADE, SPIN, BEAT, END }
 ## Most entities a map names by index on the wire, and the longest fade or spin it may ask for.
 const MAP_FX_ENTITIES := 65535
 const MAP_FX_SECONDS := 600.0
+## A map's ending (`MapFx.END`): the slow motion's scale and length, and the camera point, as far as a client believes them.
+const END_SCALE_MIN := 0.05
+const END_SECONDS_MAX := 15.0
 
 enum Ask {
 	## I have built my world and can receive. Tell me everything in it.
@@ -843,9 +846,43 @@ static func write_map_beat(beat: int, downbeat: bool) -> PackedByteArray:
 	return write_map_fx(MapFx.BEAT, 0, downbeat, 0.0, float(clampi(beat, 0, 255)), -1.0)
 
 
+## Whether a point is a finite place inside the world's wire range.
+static func sane_point(p: Variant) -> bool:
+	return p is Vector3 and is_finite((p as Vector3).x) and is_finite((p as Vector3).y) and is_finite((p as Vector3).z) \
+		and absf((p as Vector3).x) <= WORLD_EXTENT and absf((p as Vector3).y) <= WORLD_EXTENT and absf((p as Vector3).z) <= WORLD_EXTENT
+
+
+## The one clamp both ends use: scale 0.05-1 (NaN is 1), seconds 0-15 (NaN is 0), the point or null when it is not finite and inside the world.
+static func sane_end(time_scale: float, seconds: float, camera: Variant) -> Dictionary:
+	return {"time_scale": 1.0 if is_nan(time_scale) else clampf(time_scale, END_SCALE_MIN, 1.0),
+		"seconds": 0.0 if is_nan(seconds) else clampf(seconds, 0.0, END_SECONDS_MAX),
+		"camera": camera if sane_point(camera) else null}
+
+
+## A map's ending: who won, the slow motion and the camera point (none when absent or not sane).
+static func write_map_end(won: bool, time_scale: float, seconds: float, camera: Variant) -> PackedByteArray:
+	var e := sane_end(time_scale, seconds, camera)
+	var w := _w()
+	w.write_uint(MapFx.END, 2)
+	w.write_bool(won)
+	w.write_uint(clampi(int(round(float(e["seconds"]) * 10.0)), 0, 150), 8)
+	w.write_uint(clampi(int(round(float(e["time_scale"]) * 200.0)), 10, 200), 8)
+	w.write_bool(e["camera"] != null)
+	if e["camera"] != null:
+		_pos(w, e["camera"])
+	return w.to_bytes()
+
+
 ## Decoded and clamped again: a fade's volumes are 0-1, a spin's pitches 1-255, a beat's number 0-255, with -1 for none.
 static func read_map_fx(r: DotNetReader) -> Dictionary:
 	var fx := r.read_uint(2)
+	if fx == MapFx.END:
+		var won := r.read_bool()
+		var seconds := float(r.read_uint(8)) / 10.0
+		var scale := float(r.read_uint(8)) / 200.0
+		var camera: Variant = _read_pos(r) if r.read_bool() else null
+		var e := sane_end(scale, seconds, camera)
+		return {"fx": fx, "won": won, "time_scale": e["time_scale"], "seconds": e["seconds"], "camera": e["camera"], "ok": r.ok()}
 	var entity := r.read_uint(16)
 	var flag := r.read_bool()
 	var seconds := float(r.read_uint(13)) / 10.0

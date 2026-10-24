@@ -1,5 +1,6 @@
 extends Node
 
+const ZzEvents := preload("net/zz_events.gd")
 const ZzAudio := preload("zz_audio.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzBots := preload("zz_bots.gd")
@@ -758,7 +759,11 @@ func _on_notice(text: String) -> void:
 
 ## A map's own ending slows the client's time for a moment and, with a camera point, takes the view there;
 ## the game's clock is the server's, so only what is drawn and heard slows.
-func _on_map_ending(_won: bool, time_scale: float, seconds: float, camera_point: Variant) -> void:
+func _on_map_ending(_won: bool, raw_scale: float, raw_seconds: float, raw_point: Variant) -> void:
+	var sane := ZzEvents.sane_end(raw_scale, raw_seconds, raw_point)
+	var time_scale: float = sane["time_scale"]
+	var seconds: float = sane["seconds"]
+	var camera_point: Variant = sane["camera"]
 	var slow := time_scale < 1.0 and seconds > 0.0
 	var real_seconds := minf(seconds * time_scale if slow else seconds, END_HOLD_MAX)
 	if camera_point is Vector3 and game != null and game.end_camera_rules.is_on():

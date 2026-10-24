@@ -32,7 +32,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 25
-const CHECKS := 158
+const CHECKS := 162
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -186,6 +186,14 @@ func _test_the_codec() -> void:
 	_check(bool(wild["ok"]) and float(wild["seconds"]) <= ZzEvents.MAP_FX_SECONDS and float(wild["from"]) <= 1.0 and float(wild["to"]) == -1.0 and int(wild["entity"]) <= ZzEvents.MAP_FX_ENTITIES,
 		"MAP_FX out-of-range numbers are clamped on both ends", str(wild))
 	_check(not bool(ZzEvents.read_map_fx(_r(PackedByteArray([0xFF])))["ok"]), "MAP_FX: a truncated or unknown body reads as not ok")
+	var ended := ZzEvents.read_map_fx(_r(ZzEvents.write_map_end(true, 0.25, 3.0, Vector3(10.0, 2.0, -5.0))))
+	_check(bool(ended["ok"]) and int(ended["fx"]) == ZzEvents.MapFx.END and bool(ended["won"]) and absf(float(ended["time_scale"]) - 0.25) < 0.01
+		and absf(float(ended["seconds"]) - 3.0) < 0.11 and (ended["camera"] as Vector3).distance_to(Vector3(10.0, 2.0, -5.0)) < 0.05, "MAP_FX end", str(ended))
+	var wild_end := ZzEvents.read_map_fx(_r(ZzEvents.write_map_end(false, -4.0, 1.0e9, Vector3(1.0e12, 0.0, 0.0))))
+	_check(bool(wild_end["ok"]) and float(wild_end["time_scale"]) == ZzEvents.END_SCALE_MIN and float(wild_end["seconds"]) == ZzEvents.END_SECONDS_MAX and wild_end["camera"] == null,
+		"MAP_FX end: out-of-range scale, seconds and camera are clamped or dropped", str(wild_end))
+	var nan_end := ZzEvents.read_map_fx(_r(ZzEvents.write_map_end(true, NAN, NAN, Vector3(NAN, 0.0, 0.0))))
+	_check(bool(nan_end["ok"]) and float(nan_end["time_scale"]) == 1.0 and float(nan_end["seconds"]) == 0.0 and nan_end["camera"] == null, "MAP_FX end: NaN is rejected", str(nan_end))
 	var copy := ZzEvents.read_copy(_r(ZzEvents.write_copy(412, 7, Vector3(12.5, 0.0, -3.0), true)))
 	_check(bool(copy["ok"]) and int(copy["id"]) == 412 and int(copy["model"]) == 7 and bool(copy["alive"])
 		and (copy["offset"] as Vector3).distance_to(Vector3(12.5, 0.0, -3.0)) < 0.05, "COPY", str(copy))
@@ -1061,6 +1069,15 @@ func _test_map_cues_reach_the_client() -> void:
 	_check(fades.size() == 1 and fades[0][1] == 12 and fades[0][2] == true and absf(float(fades[0][3]) - 3.0) < 0.11 and absf(float(fades[0][5]) - 0.5) < 0.01, "a sound_fade reaches the client with its entity, direction, seconds and volume", str(fades))
 	_check(spins.size() == 1 and spins[0][1] == 12 and float(spins[0][3]) == 50.0 and float(spins[0][4]) == 100.0, "a sound_spin reaches the client with its pitches", str(spins))
 	_check(beats.size() == 1 and beats[0][1] == 3 and beats[0][2] == true, "a beat reaches the client with its number and downbeat", str(beats))
+
+	var endings: Array = []
+	var on_end := func(won: bool, scale: float, seconds: float, camera: Variant) -> void: endings.append([won, scale, seconds, camera])
+	_client_game.map_ending.connect(on_end)
+	_server_game._on_map_logic_event("round_end", {"won": true, "time_scale": 0.0, "seconds": 99.0, "camera": Vector3(4.0, 1.0, 2.0)})
+	await _steps(6)
+	_client_game.map_ending.disconnect(on_end)
+	_check(endings.size() == 1 and endings[0][0] == true and endings[0][1] == ZzEvents.END_SCALE_MIN and endings[0][2] == ZzEvents.END_SECONDS_MAX
+		and (endings[0][3] as Vector3).distance_to(Vector3(4.0, 1.0, 2.0)) < 0.05, "a round_end reaches the client with its slow motion and camera point, clamped", str(endings))
 
 	heard_fx.clear()
 	for i in 200:
