@@ -122,6 +122,10 @@ static var bring_global_mechanics: bool = false
 var occupants_fn: Callable = Callable()
 var points_fn: Callable = Callable()
 var opener_fn: Callable = Callable()
+## The game's side of hurt, push and teleport volumes (see [ZzMechanics]).
+var volume_bodies_fn: Callable = Callable()
+var volume_damage_fn: Callable = Callable()
+var volume_move_fn: Callable = Callable()
 var _pending_movers: Dictionary = {}
 
 signal built()
@@ -1225,6 +1229,11 @@ func build_mechanics_local() -> bool:
 	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
+	made.bodies_fn = volume_bodies_fn
+	made.damage_fn = volume_damage_fn
+	made.move_fn = volume_move_fn
+	if authoritative and str(doc.get("world", "")) != "":
+		made.source_doc_path = local_world_prefix() + ".doc.json"
 		return false
 	var own := (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics
 	attach_mechanics(read.value, not own)

@@ -335,6 +335,33 @@ func _ride(tick: int, state: DotFpsState) -> void:
 		global_position = state.position
 
 
+## A map's push and gravity volumes, in the state so a replayed tick gives the server's answer. A push lifts the velocity along
+## its direction to its speed (standing in it adds no more), a gravity volume scales the fall that tick's gravity took.
+func _volume_forces(state: DotFpsState) -> void:
+	var mech: Variant = mechanics_fn.call() if mechanics_fn.is_valid() else null
+
+	if mech == null or state.mode == DotFpsState.Mode.NOCLIP:
+		return
+
+	var tunables := controller.tunables
+	var push: Vector3 = mech.push_at(state.position, tunables.stand_height)
+
+	if push != Vector3.ZERO:
+		var dir := push.normalized()
+		var along := state.velocity.dot(dir)
+
+		if along < push.length():
+			state.velocity += dir * (push.length() - along)
+
+			if state.velocity.y > 0.0 and state.mode == DotFpsState.Mode.GROUND:
+				controller.motor.set_mode(state, DotFpsState.Mode.AIR)
+
+	var scale: float = mech.gravity_at(state.position, tunables.stand_height)
+
+	if scale != 1.0 and state.mode == DotFpsState.Mode.AIR:
+		state.velocity.y += tunables.gravity * (1.0 - scale) / float(maxi(tick_rate, 1))
+
+
 ## Once per simulated tick, after the move, a replay's included: into the water at the waist,
 ## and the wading slowdown while the feet are wet and the waist is not.
 func _on_simulated(tick: int, state: DotFpsState) -> void:
@@ -342,6 +369,7 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 		return
 
 	_ride(tick, state)
+	_volume_forces(state)
 
 	swim.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())

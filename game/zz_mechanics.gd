@@ -24,6 +24,11 @@ const VOLUME_EVERY := 2
 const PRESS_PAD := 0.3
 const DOOR_PAD := 1.5
 const MAX_FIRES := 256
+## Volumes the server runs through dot-map's DotMapVolumes; push and gravity are also read by prediction.
+const VOLUME_KINDS := ["hurt", "push", "teleport", "gravity"]
+const PREDICTED_KINDS := ["push", "gravity"]
+## How far past a volume's brushes a body is still handed to it (its column and a margin).
+const BODY_PAD := 1.0
 
 ## A mover changed state (it was told, or it settled); the bridge broadcasts this index.
 signal state_changed(index: int)
@@ -36,10 +41,23 @@ var occupants_fn: Callable = Callable()
 var points_fn: Callable = Callable()
 ## Where whoever is in a box (survivor or zombie) stands, nearest its centre, or null: which way a door swings away from.
 var opener_fn: Callable = Callable()
+## Server: where the entities' source document is (`<prefix>.doc.json`), for their keys and filters.
+var source_doc_path: String = ""
+## Server: every body a volume may touch, as `{id, body, position (feet), height, kind, name, class, team}`.
+var bodies_fn: Callable = Callable()
+## Server: `(body, amount, kind, entity_index)` for a hurt volume's hit.
+var damage_fn: Callable = Callable()
+## Server: `(body, Transform3D)` for a teleport and `(body, Vector3 m/s)` for a push; a player's push is predicted instead.
+var move_fn: Callable = Callable()
 
 var _ents: Variant = null
 var _movers: Array[Dictionary] = []
 var _volumes: Array[Dictionary] = []
+var _toggles: Array[Dictionary] = []
+var _toggle_base: int = 0
+var _predicted: Array[Dictionary] = []
+var _vol_io: DotMapIO = null
+var _vols: DotMapVolumes = null
 var _generic: Dictionary = {}
 var _by_entity: Dictionary = {}
 var _by_body: Dictionary = {}
@@ -52,15 +70,18 @@ var _posed_tick: int = -2147483648
 var _unsupported_seen: Dictionary = {}
 ## Who pressed the input being run (a survivor's eye), for a door's side.
 var _activator: Variant = null
+## Built with doors_only: the logic runs, but never drives a door the document's gates stand in for.
+var _doors_only: bool = false
 
 
 ## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
 ## it the world's physics layer.
-## [param doors_only] builds just the doors (a world from the global converter has no switches run): the hinged
-## prop doors and the brush doors whose hulls the pack carries (a boxed gate has none, so nothing collides twice).
-## Each opens to anyone near it.
+## [param doors_only] builds the doors a world from the global converter carries (the hinged prop doors and the
+## brush doors with hulls; a boxed gate has none, so nothing collides twice), each open to anyone near it, and
+## its triggers, hurts and relays, whose outputs never drive those doors.
 func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> void:
 	_ents = world.call(&"entities")
+	_doors_only = doors_only
 	var models := {}
 	for model: int in world.call(&"models"):
 		models[model] = true
@@ -98,15 +119,14 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 				_by_body[body.get_instance_id()] = m["idx"]
 				_place(body, _transform_of(m, float(m["from"])))
 
-	if doors_only:
-		return
+	_build_toggles(world)
 
 	for vol: Variant in _ents.volumes:
 		var v := {"vol": vol, "entity": vol.entity, "inside": false, "ready": 0, "enabled": not vol.disabled}
 		if vol.kind == "multiple" or vol.kind == "once":
 			_by_entity[vol.entity] = {"type": &"volume", "i": _volumes.size()}
 			_volumes.append(v)
-		else:
+		elif not VOLUME_KINDS.has(vol.kind):
 			_note_unsupported("volume " + vol.kind)
 
 	for g: Dictionary in _ents.generic:
@@ -169,7 +189,7 @@ func bind_drawn(root: Node3D) -> void:
 
 ## Whether the map has volumes or logic entities to run.
 func has_logic() -> bool:
-	return not _volumes.is_empty() or not _generic.is_empty()
+	return not _volumes.is_empty() or not _generic.is_empty() or not _toggles.is_empty() or not _toggles.is_empty()
 
 
 func mover_count() -> int:
@@ -387,6 +407,8 @@ func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
 
 ## The state of mover [param index] as `[start tick, fraction in thousandths, direction, locked]`.
 func snapshot(index: int) -> Array:
+	if index >= _toggle_base and index - _toggle_base < _toggles.size():
+		return [0, 0, 0, 0 if bool(_toggles[index - _toggle_base]["enabled"]) else 1, 1]
 	var m: Dictionary = _movers[index]
 	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0,
 			1 if float(m.get("side", 1.0)) > 0.0 else 0]
@@ -403,6 +425,10 @@ func told_indices() -> PackedInt32Array:
 
 ## Takes a state the server sent.
 func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
+	if index >= _toggle_base and index < _toggle_base + _toggles.size():
+		_toggles[index - _toggle_base]["enabled"] = not locked
+		_told[index] = true
+		return
 	if index < 0 or index >= _movers.size():
 		return
 	var m: Dictionary = _movers[index]
@@ -435,6 +461,9 @@ func reset(tick: int) -> void:
 		m["ready"] = 0
 		m["close_at"] = -1
 		m["posed"] = -1.0
+	for t in _toggles:
+		_set_toggle(t, bool(t["initial"]))
+	_told.clear()
 	for v in _volumes:
 		v["inside"] = false
 		v["ready"] = 0
@@ -460,6 +489,7 @@ func step(tick: int) -> void:
 			_proximity(tick)
 		if tick % VOLUME_EVERY == 0:
 			_volume_step(tick)
+			_hazard_step()
 		_run_queue(tick)
 	pose_at(tick)
 
@@ -634,9 +664,12 @@ func _apply_input(entity: int, input_name: String, _param: String, tick: int) ->
 	var i := int((found as Dictionary)["i"])
 	var name := input_name.to_lower()
 	if what == "mover":
-		_mover_input(_movers[i], name, tick)
+		if not _doors_only:
+			_mover_input(_movers[i], name, tick)
 	elif what == "volume":
 		_volume_input(_volumes[i], name)
+	elif what == "toggle":
+		_toggle_input(_toggles[i], name, _param)
 	else:
 		_generic_input(_generic[i], name, tick)
 
@@ -759,3 +792,167 @@ func _note_unsupported(what: String) -> void:
 		return
 	_unsupported_seen[what] = true
 	DotLog.debug(CHANNEL, "an output this map uses is not run", {"what": what})
+
+
+# --- Hurt, push, teleport and gravity ------------------------------------------------------
+
+func _build_toggles(world: RefCounted) -> void:
+	_toggle_base = _movers.size()
+	for vol: Variant in _ents.volumes:
+		if not VOLUME_KINDS.has(vol.kind):
+			continue
+		var t := {"vol": vol, "entity": vol.entity, "kind": vol.kind, "enabled": not vol.disabled,
+				"initial": not vol.disabled, "bounds": (vol.bounds() as AABB).grow(BODY_PAD), "idx": _toggle_base + _toggles.size()}
+		_by_entity[vol.entity] = {"type": &"toggle", "i": _toggles.size()}
+		_toggles.append(t)
+		if PREDICTED_KINDS.has(vol.kind):
+			_predicted.append(t)
+	if authoritative and not _toggles.is_empty():
+		_build_volume_io(world)
+
+
+## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links stay with this class.
+func _build_volume_io(world: RefCounted) -> void:
+	var from_doc := {}
+	var filters: Array = []
+	if source_doc_path != "" and FileAccess.file_exists(source_doc_path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(source_doc_path))
+		if parsed is Dictionary:
+			for rec: Variant in (parsed as Dictionary).get("entities", []):
+				var cls := str((rec as Dictionary).get("classname", ""))
+				if cls.begins_with("filter_"):
+					filters.append(rec)
+				from_doc[int((rec as Dictionary).get("index", -1))] = rec
+	var records: Array = []
+	for t in _toggles:
+		var vol: Variant = t["vol"]
+		var rec: Dictionary = (from_doc[int(t["entity"])] as Dictionary).duplicate() if from_doc.has(int(t["entity"])) else _synth_record(vol)
+		rec["outputs"] = []
+		records.append(rec)
+	for f: Variant in filters:
+		var copy: Dictionary = (f as Dictionary).duplicate()
+		copy["outputs"] = []
+		records.append(copy)
+	_vol_io = DotMapIO.new()
+	_vol_io.rate = maxi(tick_rate / VOLUME_EVERY, 1)
+	var units: Variant = world.get("manifest")
+	if units is Dictionary:
+		_vol_io.unit_scale = float(((units as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", _vol_io.unit_scale))
+		_vol_io.destinations = (units as Dictionary).get("destinations", {})
+	var loaded := _vol_io.load_records(records)
+	if not loaded.ok:
+		DotLog.warn(CHANNEL, "the map's volumes did not load", {"why": loaded.error.message})
+		_vol_io = null
+		return
+	_vol_io.damage_fn = _volume_hurt
+	_vol_io.move_fn = _volume_move
+	_vols = DotMapVolumes.new()
+	_vols.io = _vol_io
+	for t in _toggles:
+		var node := DotMapVolumeNode.new(t["vol"], _vol_io.entity_of(int(t["entity"])))
+		_vols.nodes.append(node)
+		var e := node.entity
+		if e != null:
+			e.enabled = bool(t["enabled"])
+
+
+## The manifest record of a volume as an entity record, when no source document is shipped: its damage, flags, speed and gravity.
+static func _synth_record(vol: Variant) -> Dictionary:
+	var pairs: Array = [["spawnflags", str(vol.spawnflags)], ["target", vol.target], ["filtername", vol.filter]]
+	var r: Dictionary = vol.record
+	for key: String in ["damage", "gravity"]:
+		if r.has(key):
+			pairs.append([key, str(r[key])])
+	return {"index": vol.entity, "classname": vol.classname, "targetname": vol.targetname, "pairs": pairs, "outputs": []}
+
+
+func _hazard_step() -> void:
+	if _vols == null or not bodies_fn.is_valid():
+		return
+	var near: Array = []
+	for b: Dictionary in bodies_fn.call():
+		var feet: Vector3 = b["position"]
+		var column := AABB(feet - Vector3(0.05, 0.0, 0.05), Vector3(0.1, float(b.get("height", 1.8)), 0.1))
+		for t in _toggles:
+			if bool(t["enabled"]) and (t["bounds"] as AABB).intersects(column):
+				near.append(b)
+				break
+	_vol_io.advance(1)
+	_vols.step(near)
+
+
+func _volume_hurt(body: Variant, amount: float, kind: String, by: Variant) -> void:
+	if damage_fn.is_valid():
+		damage_fn.call(body, amount, kind, (by as DotMapEntity).index if by is DotMapEntity else -1)
+
+
+func _volume_move(body: Variant, motion: Variant) -> void:
+	if move_fn.is_valid():
+		move_fn.call(body, motion)
+
+
+func _toggle_input(t: Dictionary, name: String, param: String) -> void:
+	match name:
+		"enable", "turnon":
+			_set_toggle(t, true)
+		"disable", "turnoff":
+			_set_toggle(t, false)
+		"toggle":
+			_set_toggle(t, not bool(t["enabled"]))
+		_:
+			var e: DotMapEntity = _vol_io.entity_of(int(t["entity"])) if _vol_io != null else null
+			if e == null or not e.accept(_vol_io, name, param, null, null):
+				_note_unsupported("%s input %s" % [str(t["kind"]), name])
+
+
+func _set_toggle(t: Dictionary, on: bool) -> void:
+	if bool(t["enabled"]) == on:
+		return
+	t["enabled"] = on
+	if _vol_io != null:
+		var e := _vol_io.entity_of(int(t["entity"]))
+		if e != null:
+			e.set_enabled(_vol_io, on)
+	if PREDICTED_KINDS.has(str(t["kind"])):
+		_told[int(t["idx"])] = true
+		state_changed.emit(int(t["idx"]))
+
+
+## The push in m/s a survivor whose column stands at [param feet] feels from the live push volumes. Pure of the tick, so prediction and the server agree.
+func push_at(feet: Vector3, height: float) -> Vector3:
+	var out := Vector3.ZERO
+	for t in _predicted:
+		if str(t["kind"]) == "push" and _touches_player(t, feet, height):
+			out += (t["vol"] as DotMapVolume).push_velocity()
+	return out
+
+
+## The gravity scale a survivor at [param feet] is under (1 outside every gravity volume).
+func gravity_at(feet: Vector3, height: float) -> float:
+	for t in _predicted:
+		if str(t["kind"]) == "gravity" and _touches_player(t, feet, height):
+			return float((t["vol"] as DotMapVolume).record.get("gravity", 1.0))
+	return 1.0
+
+
+func _touches_player(t: Dictionary, feet: Vector3, height: float) -> bool:
+	if not bool(t["enabled"]):
+		return false
+	var vol: DotMapVolume = t["vol"]
+	var flags := vol.spawnflags & 15
+	if flags != 0 and (flags & 1) == 0:
+		return false
+	return (t["bounds"] as AABB).intersects(AABB(feet - Vector3(0.05, 0.0, 0.05), Vector3(0.1, height, 0.1))) and vol.touches_column(feet, height)
+
+
+## Counts for checks: volumes by kind, and how many are live.
+func volume_counts() -> Dictionary:
+	var out := {}
+	for t in _toggles:
+		out[t["kind"]] = int(out.get(t["kind"], 0)) + 1
+	return out
+
+
+## The toggle volumes as plain data (checks): `{kind, entity, enabled, bounds}`.
+func volume_toggles() -> Array[Dictionary]:
+	return _toggles

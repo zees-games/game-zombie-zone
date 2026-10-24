@@ -595,8 +595,89 @@ func _build_map() -> void:
 	add_child(map)
 
 
+	map.volume_bodies_fn = _volume_bodies
+	map.volume_damage_fn = _volume_damage
+	map.volume_move_fn = _volume_move
 func _mechanics_of_map() -> Variant:
 	return map.mechanics if map != null else null
+
+
+## Survivors' team and the horde's in a converted map's team filters (the source game's CT and T).
+const VOLUME_TEAM_SURVIVORS := 3
+const VOLUME_TEAM_ZOMBIES := 2
+## A hurt volume's hit at or above this kills outright: a kill floor is "damage 99999", not a bleed.
+const VOLUME_LETHAL := 500.0
+
+
+## Every living body a map's hurt, push or teleport volume can touch. A zombie counts as a client of the source game (it was
+## one), so a volume made for "clients" reaches it and the map's own team filter picks who.
+func _volume_bodies() -> Array:
+	var out: Array = []
+
+	for id: StringName in players:
+		var p: ZzPlayer = players[id]
+
+		if p.is_alive() and not p.watching:
+			out.append({"id": id, "body": p, "position": p.feet(), "height": 1.8, "kind": "player",
+					"name": String(id), "class": "player", "team": VOLUME_TEAM_SURVIVORS})
+
+	if horde != null and horde.spawner != null:
+		for npc in horde.spawner.all_npcs():
+			if npc.is_alive():
+				out.append({"id": npc.instance_id, "body": npc, "position": npc.position(), "height": 1.75, "kind": "player",
+						"name": "", "class": "npc", "team": VOLUME_TEAM_ZOMBIES})
+
+	return out
+
+
+## A hurt volume's hit on a survivor or a zombie. Lethal ones kill outright (a down is for being bitten); the rest go through combat,
+## and count as a hazard's down.
+func _volume_damage(body: Variant, amount: float, kind: String, entity: int) -> void:
+	if body is ZzPlayer:
+		var player: ZzPlayer = body
+
+		if not player.is_alive() or player.watching or not can_be_harmed(player.player_id):
+			return
+
+		if amount >= VOLUME_LETHAL:
+			_die(player, &"", BY_HAZARD)
+			return
+
+		var type := &"fire" if kind in ["burn", "slowburn"] else (&"blast" if kind == "blast" else &"acid")
+		var hit := DotDamage.make(0, player.entity_id, amount, combat.damage_type(type))
+		hit.tick = _tick
+		hit.weapon_id = type
+		hit.context = {"why": BY_HAZARD, "volume": entity}
+		var _applied := combat.apply_damage(hit)
+		player_hurt.emit(player.player_id, amount, player.feet())
+	elif body is DotNpcInstance and horde != null:
+		var npc: DotNpcInstance = body
+
+		if not npc.is_alive():
+			return
+
+		var victim := horde.entity_id_for(npc)
+		var health := npc.node.get_node_or_null(^"Health") as DotHealth
+		var dealt := amount if health == null or amount < VOLUME_LETHAL else health.health + health.armour + 1.0
+		var hit := DotDamage.make(0, victim, dealt, combat.damage_type(&"fire" if kind in ["burn", "slowburn"] else &"acid"))
+		hit.tick = _tick
+		hit.context = {"volume": entity}
+		var _applied := combat.apply_damage(hit)
+
+
+## A teleport moves a survivor with nothing carried (their velocity is dropped) and a zombie where it is sent, to repath from
+## there; a push on a zombie throws it, while a survivor's is predicted by their own controller ([method ZzPlayer._volume_forces]).
+func _volume_move(body: Variant, motion: Variant) -> void:
+	if motion is Transform3D:
+		var at := (motion as Transform3D).origin
+		var yaw := rad_to_deg((motion as Transform3D).basis.get_euler().y)
+
+		if body is ZzPlayer:
+			(body as ZzPlayer).place_at(at, yaw)
+		elif body is DotNpcInstance and horde != null:
+			horde.warp(body as DotNpcInstance, at, yaw)
+	elif motion is Vector3 and body is DotNpcInstance and horde != null:
+		horde.throw_zombie(body as DotNpcInstance, motion as Vector3)
 
 
 ## Living survivors' body points, for the map's triggers.

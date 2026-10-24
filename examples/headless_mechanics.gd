@@ -6,6 +6,7 @@ const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzPlayer := preload("../game/zz_player.gd")
 
 ## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
 ## survivor up, a door blocks and opens, a button's outputs run after their delays, and a map
@@ -18,8 +19,8 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 6
-const CHECKS := 48
+const SECTIONS := 7
+const CHECKS := 61
 
 var _passed := 0
 var _failed := 0
@@ -68,6 +69,7 @@ func _run() -> void:
 	await _test_prop_doors()
 	await _test_button_and_delay()
 	await _test_volume_and_unsupported()
+	await _test_volumes()
 	await _test_no_world()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
@@ -268,8 +270,11 @@ func _fixture() -> Dictionary:
 				"brushes": [[[1.0, 0.0, 0.0, 21.0], [-1.0, 0.0, 0.0, -19.0], [0.0, 1.0, 0.0, 3.0], [0.0, -1.0, 0.0, 1.0],
 					[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, -1.0, 1.0]]],
 				"outputs": []},
-			{"entity": 6, "model": 6, "kind": "hurt", "classname": "trigger_hurt", "targetname": "", "wait": 0.0, "disabled": false,
+			{"entity": 6, "model": 6, "kind": "water", "classname": "func_water", "targetname": "", "wait": 0.0, "disabled": false,
 				"brushes": [], "outputs": []},
+			{"entity": 7, "model": 7, "kind": "hurt", "classname": "trigger_hurt", "targetname": "pit", "wait": 0.0, "disabled": true,
+				"damage": 1000.0, "brushes": [[[1.0, 0.0, 0.0, 31.0], [-1.0, 0.0, 0.0, -29.0], [0.0, 1.0, 0.0, 3.0], [0.0, -1.0, 0.0, 1.0],
+					[0.0, 0.0, 1.0, 1.0], [0.0, 0.0, -1.0, 1.0]]], "outputs": []},
 		],
 		"entities": [{"entity": 3, "classname": "logic_relay", "targetname": "relay", "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": {}}],
 		"links": [
@@ -536,10 +541,147 @@ func _test_volume_and_unsupported() -> void:
 	var seen: Dictionary = mech.get("_unsupported_seen")
 	var noted := 0
 	for key: String in seen:
-		if key.to_lower().contains("frobnicate") or key.begins_with("volume hurt"):
+		if key.to_lower().contains("frobnicate") or key.begins_with("volume water"):
 			noted += 1
-	_check(noted == 2, "an unknown input and a hurt volume are each noted once", str(seen.keys()))
+	_check(noted == 2, "an unknown input and a water volume are each noted once", str(seen.keys()))
+
+	var hurts: Array[float] = []
+	mech.bodies_fn = func() -> Array:
+		return [{"id": 1, "body": null, "position": Vector3(30.0, 0.0, 0.0), "height": 1.8, "kind": "player", "name": "", "class": "player", "team": 3}]
+	mech.damage_fn = func(_body: Variant, amount: float, _kind: String, _entity: int) -> void:
+		hurts.append(amount)
+	for t in range(320, 340):
+		mech.step(t)
+	_check(hurts.is_empty(), "a disabled trigger_hurt hurts nobody", str(hurts))
+	mech.input(7, "Enable", 340)
+	for t in range(340, 372):
+		mech.step(t)
+	_check(not hurts.is_empty() and hurts[0] == 500.0, "an enabled trigger_hurt hurts who stands in it, damage a second times the hit period", str(hurts))
 	mech.queue_free()
+	_finished += 1
+
+
+const VOLUME_MAP := &"ze_death_star_escape"
+
+
+func _first_volume(mech: ZzMechanics, kind: String, want_enabled := true, least := -1.0, most := 1e9, filtered := false) -> Dictionary:
+	for t in mech.volume_toggles():
+		var rec: Dictionary = (t["vol"] as DotMapVolume).record
+		var damage := float(rec.get("damage", 0.0))
+		if str(t["kind"]) == kind and bool(t["enabled"]) == want_enabled and damage >= least and damage <= most \
+				and (str(rec.get("filter", "")) != "") == filtered:
+			return t
+	return {}
+
+
+func _volume_spot(t: Dictionary, lift := 0.1) -> Vector3:
+	var box: AABB = (t["vol"] as DotMapVolume).bounds()
+	return Vector3(box.get_center().x, box.position.y + lift, box.get_center().z)
+
+
+## The map's hurt, teleport, push and gravity volumes, run on the server on a real map: they hurt, move and push survivors and
+## zombies, a fall below the map kills, and the enabled state of a push or gravity volume survives the wire.
+func _test_volumes() -> void:
+	_entered += 1
+	print("%s: hurt, teleport, push and gravity volumes" % VOLUME_MAP)
+	ZzMap.bring_global_mechanics = true
+	var game := await _game(VOLUME_MAP)
+	var deaths: Array = []
+	game.player_died.connect(func(id: StringName, _by: StringName, why: StringName) -> void: deaths.append([id, why]))
+	var rider := game.add_player(&"u1", "Rider")
+	var bystander := game.add_player(&"u0", "Bystander")
+	bystander.health.invulnerable = true
+	game.next_map_id = VOLUME_MAP
+	game.start()
+	await _sim(game, 8)
+	var mech: ZzMechanics = game.map.mechanics
+	var counts: Dictionary = mech.volume_counts() if mech != null else {}
+	print("    volumes by kind: %s" % str(counts))
+	_check(int(counts.get("hurt", 0)) > 0 and int(counts.get("teleport", 0)) > 0 and int(counts.get("push", 0)) > 0 and int(counts.get("gravity", 0)) > 0,
+		"the map's hurt, teleport, push and gravity volumes are all built", str(counts))
+	if mech == null:
+		game.queue_free()
+		_finished += 1
+		return
+
+	var mild := _first_volume(mech, "hurt", true, 0.0, 499.0)
+	rider.place_at(_volume_spot(mild), 0.0)
+	await _sim(game, 4 * TICK_RATE)
+	print("    mild hurt entity %d: survivor life %s, health %.0f, deaths %s" % [int(mild["entity"]), str(rider.life), rider.health.health, str(deaths)])
+	_check(rider.life != ZzPlayer.Life.UP and rider.life != ZzPlayer.Life.DEAD, "a mild hurt volume downs a survivor as a bite does", str(rider.life))
+
+	var lethal := _first_volume(mech, "hurt", true, 500.0)
+	var victim := game.add_player(&"u5", "Victim")
+	victim.place_at(_volume_spot(lethal), 0.0)
+	await _sim(game, 3 * TICK_RATE)
+	var why: StringName = deaths[0][1] if not deaths.is_empty() else &""
+	print("    lethal hurt entity %d: alive %s, deaths %s" % [int(lethal["entity"]), str(victim.is_alive()), str(deaths)])
+	_check(not victim.is_alive() and why == ZzGame.BY_HAZARD, "a lethal hurt volume kills a survivor as a hazard death", str(deaths))
+
+	rider = game.add_player(&"u2", "Faller")
+	deaths.clear()
+	var start := rider.feet()
+	rider.place_at(Vector3(start.x, game.map.kill_height() - 3.0, start.z), 0.0)
+	await _sim(game, 2 * TICK_RATE)
+	print("    below kill_y %.1f: deaths %s" % [game.map.kill_height(), str(deaths)])
+	_check(not rider.is_alive() and not deaths.is_empty() and deaths.any(func(d: Array) -> bool: return d[0] == &"u2" and d[1] == ZzGame.BY_FELL), "a fall below the map's kill height kills", str(deaths))
+
+	var tele := _first_volume(mech, "teleport")
+	var tele_zombie := _first_volume(mech, "teleport", true, -1.0, 1e9, true)
+	var walker := game.add_player(&"u3", "Walker")
+	var from := _volume_spot(tele)
+	walker.place_at(from, 0.0)
+	await _sim(game, 2 * TICK_RATE)
+	var moved := walker.feet().distance_to(from)
+	print("    teleport entity %d: survivor moved %.1f m to %s" % [int(tele["entity"]), moved, str(walker.feet())])
+	_check(moved > 5.0 or not walker.is_alive(), "a teleport volume moves a survivor to its destination", "%.1f m" % moved)
+
+	var zfrom := _volume_spot(tele_zombie)
+	var zombie := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(bystander.feet()), &"test")
+	_check(zombie != null, "a zombie stands on the map")
+	if zombie == null:
+		game.queue_free()
+		_finished += 1
+		return
+	game.horde.warp(zombie, zfrom, 0.0)
+	zombie.brain.path.set_points(PackedVector3Array([zfrom + Vector3.RIGHT, zfrom + Vector3.RIGHT * 2.0]), 0.0, zfrom)
+	await _sim(game, 2 * TICK_RATE)
+	var zmoved := zombie.position().distance_to(zfrom)
+	print("    teleport: zombie moved %.1f m, path left %d" % [zmoved, zombie.brain.path.points.size()])
+	var stale: bool = zombie.brain.path.points.size() > 0 and zombie.brain.path.points[0].distance_to(zfrom + Vector3.RIGHT) < 0.01
+	_check((zmoved > 5.0 or not zombie.is_alive()) and not stale, "and a zombie, which must find its way again from there", "%.1f m, stale path %s" % [zmoved, str(stale)])
+
+	var push := _first_volume(mech, "push", false)
+	if push.is_empty():
+		push = _first_volume(mech, "push")
+	mech.input(int(push["entity"]), "Enable", game.current_tick())
+	var pushed := game.add_player(&"u4", "Pushed")
+	pushed.health.invulnerable = true
+	pushed.place_at(_volume_spot(push, 0.05), 0.0)
+	var feet := pushed.feet()
+	var force := mech.push_at(feet, 1.8)
+	await _sim(game, 6)
+	var speed := Vector2(pushed.controller.state.velocity.x, pushed.controller.state.velocity.z).length()
+	print("    push entity %d: %.1f m/s asked, survivor at %.1f m/s, push_at stable %s" % [int(push["entity"]), force.length(), speed, str(mech.push_at(feet, 1.8) == force)])
+	_check(force.length() > 0.0 and mech.push_at(feet, 1.8) == force, "a push volume answers the same for the same place (prediction and server agree)", str(force))
+	_check(pushed.feet().distance_to(feet) > 0.2 or speed > 1.0, "and a survivor in it is pushed", "%.1f m/s" % speed)
+
+	var grav := _first_volume(mech, "gravity")
+	var gbox: AABB = (grav["vol"] as DotMapVolume).bounds()
+	var high := Vector3(gbox.get_center().x, gbox.end.y - 0.3, gbox.get_center().z)
+	var scale := mech.gravity_at(high, 1.8)
+	print("    gravity entity %d: scale %.2f at %s" % [int(grav["entity"]), scale, str(high)])
+	_check(scale != 1.0 and mech.gravity_at(Vector3(1e5, 1e5, 1e5), 1.8) == 1.0, "a gravity volume scales gravity inside it and not outside", "%.2f" % scale)
+
+	var wire_ok := true
+	for off in [false, true]:
+		mech.input(int(push["entity"]), "Disable" if not off else "Enable", game.current_tick())
+		var snap: Array = mech.snapshot(int(push["idx"]))
+		var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, int(push["idx"]))))
+		wire_ok = wire_ok and bool(wire["ok"]) and int(wire["index"]) == int(push["idx"]) and bool(wire["locked"]) == (not off)
+	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
+
+	game.queue_free()
 	_finished += 1
 
 

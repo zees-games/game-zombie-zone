@@ -940,6 +940,42 @@ func _fell_out(npc: DotNpcInstance) -> void:
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
 func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 	var out: Array[DotNpcInstance] = []
+## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
+## there and not along the walk it had.
+func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
+	var b := npc.node as ZzZombieBody
+
+	if b == null or not is_instance_valid(b) or b.anchored:
+		return
+
+	b.global_position = at
+	b.velocity = Vector3.ZERO
+	b.push = Vector3.ZERO
+	b.wish = Vector3.ZERO
+	b.flying = false
+	b.last_floor_at = at
+	b.rotation.y = deg_to_rad(yaw_degrees)
+	var brain: Variant = npc.brain
+
+	if brain != null and brain.get(&"path") != null:
+		(brain.get(&"path") as DotNpcPath).clear()
+
+
+## A push volume's throw: [param velocity] (m/s) as a leap, unless it is already moving that way at least as fast.
+func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
+	var b := npc.node as ZzZombieBody
+
+	if b == null or not is_instance_valid(b) or b.anchored:
+		return
+
+	var along := b.velocity.dot(velocity.normalized())
+
+	if b.flying and along >= velocity.length() * 0.9:
+		return
+
+	b.leap(velocity)
+
+
 
 	for i in crowd.near(point, radius, _near_scratch):
 		var npc := _crowd_npcs[i]
