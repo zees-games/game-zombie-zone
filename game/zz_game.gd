@@ -1006,9 +1006,27 @@ func _follow_ragdoll_reactions() -> void:
 		horde.death_reactions = ragdoll_rules.reactions()
 
 
+## Set by the hosts (client, server) before the world is added: a map's navigation graph is then built
+## off the frame and a round waits in its ready phase for it. A suite leaves it off and gets the graph at once.
+var nav_async: bool = false
+
+
+## How far the navigation graph build has got, 0 to 100, or -1 when none is running. The server's own
+## answer on an authoritative world, the last one received on a client.
+func nav_percent() -> int:
+	if not authoritative:
+		return remote_nav
+
+	if horde == null or not horde.nav_building():
+		return -1
+
+	return clampi(int(horde.nav_progress() * 100.0), 0, 99)
+
+
 func _build_horde() -> void:
 	horde = ZzHorde.new()
 	horde.name = "Horde"
+	horde.nav_async = nav_async
 	add_child(horde)
 	var ready_now := horde.setup(self, config)
 
@@ -1035,27 +1053,9 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 	player.name = "Player_%s" % String(player_id)
 	player.player_id = player_id
 	player.display_name = display_name
-## Set by the hosts (client, server) before the world is added: a map's navigation graph is then built
-## off the frame and a round waits in its ready phase for it. A suite leaves it off and gets the graph at once.
-var nav_async: bool = false
-
-
-## How far the navigation graph build has got, 0 to 100, or -1 when none is running. The server's own
-## answer on an authoritative world, the last one received on a client.
-func nav_percent() -> int:
-	if not authoritative:
-		return remote_nav
-
-	if horde == null or not horde.nav_building():
-		return -1
-
-	return clampi(int(horde.nav_progress() * 100.0), 0, 99)
-
-
 	player.samples_input = samples_input
 	player.tick_rate = tick_rate
 	player.config = config
-	horde.nav_async = nav_async
 	player.mechanics_fn = _mechanics_of_map
 	player.team = SURVIVORS
 	add_child(player)
