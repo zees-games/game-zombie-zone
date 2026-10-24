@@ -804,12 +804,14 @@ static func read_mover(r: DotNetReader) -> Dictionary:
 	return {"index": index, "start": start, "from": from, "dir": dir, "locked": locked != 0, "side": 1.0 if side != 0 else -1.0, "ok": r.ok()}
 
 
-static func write_copy(id: int, model: int, offset: Vector3, alive: bool) -> PackedByteArray:
+## [param mover] is the copy's mover index in the MOVER stream, -1 for a copy that does not move.
+static func write_copy(id: int, model: int, offset: Vector3, alive: bool, mover: int = -1) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(id)
 	w.write_varint(model)
 	_pos(w, offset)
 	w.write_uint(1 if alive else 0, 1)
+	w.write_varint(maxi(mover + 1, 0))
 	return w.to_bytes()
 
 
@@ -818,7 +820,8 @@ static func read_copy(r: DotNetReader) -> Dictionary:
 	var model := r.read_varint()
 	var offset := _read_pos(r)
 	var alive := r.read_uint(1)
-	return {"id": id, "model": model, "offset": offset, "alive": alive != 0, "ok": r.ok()}
+	var mover := r.read_varint() - 1
+	return {"id": id, "model": model, "offset": offset, "alive": alive != 0, "mover": mover, "ok": r.ok()}
 
 
 ## A sound fade ([param from] and [param to] are -1 when the map gave none), a spin (pitch, 1-255, -1 for none), or a beat.

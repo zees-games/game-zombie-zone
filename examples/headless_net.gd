@@ -32,7 +32,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 25
-const CHECKS := 162
+const CHECKS := 169
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -1039,10 +1039,28 @@ func _test_a_door_reaches_the_client() -> void:
 	var body := client_door.mover(1)["body"] as CollisionObject3D
 	var posed := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
 	_check(posed.origin.y > 1.5 + 0.1, "and the client's collision body rose with it", str(posed.origin))
-	server_door.apply_copy(900, 1, Vector3(4.0, 0.0, 0.0), true)
+	server_door.apply_copy(900, int(server_door.mover(1)["model"]), Vector3(4.0, 0.0, 0.0), true)
 	await _steps(6)
 	_check(client_door.copies().size() == 1 and int(client_door.copies()[0]["id"]) == 900, "a brush copy the map's template made on the server stands on the client", str(client_door.copies()))
-	server_door.apply_copy(900, 1, Vector3.ZERO, false)
+	var slot := server_door.copy_mover_index(900)
+	_check(slot >= 0 and int(client_door.copies()[0]["mover"]) == slot, "the copy carries the same mover index on both ends", "server %d, client %s" % [slot, str(client_door.copies())])
+	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
+	await _steps(30)
+	var rest_y := (client_door.mover(slot)["body"] as Node3D).global_position.y if client_door.mover(slot)["body"] != null else NAN
+	_check(not is_nan(rest_y) and int(client_door.mover(slot)["dir"]) == 0 and float(client_door.mover(slot)["from"]) == 0.0, "armed: the copy door is shut and has a body on the client", str(rest_y))
+	server_door.input(900, "Open", _tick)
+	await _steps(120)
+	_check(float(server_door.mover(slot)["from"]) >= 1.0 or int(server_door.mover(slot)["dir"]) > 0, "a copy door opens on the server")
+	_check(float(client_door.mover(slot)["from"]) >= 1.0 or int(client_door.mover(slot)["dir"]) > 0, "and the client was told: its copy moves too")
+	var copy_body := client_door.mover(slot)["body"] as CollisionObject3D
+	var copy_posed := PhysicsServer3D.body_get_state(copy_body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
+	_check(copy_posed.origin.y > rest_y + 0.1, "the client's copy body rose with it", str(copy_posed.origin))
+	server_door.reset(_tick)
+	await _steps(6)
+	_check(client_door.copies().is_empty() and server_door.copies().is_empty(), "a new round clears the copies on both ends")
+	server_door.apply_copy(901, int(server_door.mover(1)["model"]), Vector3(4.0, 0.0, 0.0), true)
+	_check(server_door.copy_mover_index(901) == slot, "and the copy mover indices start over", str(server_door.copy_mover_index(901)))
+	server_door.apply_copy(901, int(server_door.mover(1)["model"]), Vector3.ZERO, false)
 	await _steps(6)
 	_check(client_door.copies().is_empty(), "and goes from the client when it goes from the server")
 	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)

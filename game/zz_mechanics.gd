@@ -38,6 +38,7 @@ const LogicGameRules := preload("zz_logic_gamerules.gd")
 ## A template copy of these brush classes is solid where it stands (the others are drawn only).
 const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer"]
 ## A copy of one of these has no mover of its own: it is drawn where it was made and an Open reaches its end at once.
+const MAX_COPY_MOVERS := 256
 const COPY_DOORS := ["func_door", "func_door_rotating", "func_movelinear"]
 ## Longest gap of ticks the map's logic is stepped through in one go.
 const MAX_LOGIC_STEP := 4096
@@ -99,6 +100,9 @@ var _put_on: Callable = Callable()
 var _model_nodes: Dictionary = {}
 ## Template copies by entity index: `{model, offset, node, body}`.
 var _copies: Dictionary = {}
+## Movers of template copies by wire index (after the toggles'); the next index is handed out in spawn order and restarts each round.
+var _cmovers: Dictionary = {}
+var _copy_next: int = 0
 var _last_tick: int = 0
 
 
@@ -264,7 +268,24 @@ func rest_blockers() -> Array[AABB]:
 
 ## The mover at [param index] as plain data (for checks and the debug overlay).
 func mover(index: int) -> Dictionary:
-	return _movers[index]
+	return _mover_at(index)
+
+
+## Mover [param index] of the map or of a template copy, else null.
+func _mover_at(index: int) -> Variant:
+	if index >= 0 and index < _movers.size():
+		return _movers[index]
+	return _cmovers.get(index)
+
+
+## The map's movers and its copies' movers.
+func _each_mover() -> Array:
+	return _movers if _cmovers.is_empty() else _movers + _cmovers.values()
+
+
+## The wire index the first template copy's mover takes.
+func _copy_base() -> int:
+	return _toggle_base + _toggles.size()
 
 
 ## Index of the first mover whose targetname is [param name], or -1.
@@ -299,12 +320,12 @@ func index_of_body(ground_id: int) -> int:
 
 ## Where mover [param index] is along its travel (0 at rest) at [param tick].
 func fraction_at(index: int, tick: int) -> float:
-	return _fraction(_movers[index], tick)
+	return _fraction(_mover_at(index), tick)
 
 
 ## The mover's world transform at [param tick].
 func transform_at(index: int, tick: int) -> Transform3D:
-	var m: Dictionary = _movers[index]
+	var m: Dictionary = _mover_at(index)
 	return _transform_of(m, _fraction(m, tick))
 
 
@@ -437,7 +458,7 @@ func pose_at(tick: int) -> void:
 	if tick == _posed_tick:
 		return
 	_posed_tick = tick
-	for m in _movers:
+	for m in _each_mover():
 		if m["body"] != null or m["node"] != null:
 			_pose_mover(m, tick)
 
@@ -447,8 +468,8 @@ func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
 	var i := index_of_body(ground_id)
 	if i < 0:
 		return Vector3.ZERO
-	var m: Dictionary = _movers[i]
-	if int(m["dir"]) == 0:
+	var m: Variant = _mover_at(i)
+	if m == null or int(m["dir"]) == 0:
 		return Vector3.ZERO
 	var now := _transform_of(m, _fraction(m, tick))
 	var next := _transform_of(m, _fraction(m, tick + 1))
@@ -462,7 +483,7 @@ func snapshot(index: int) -> Array:
 	if index >= _toggle_base and index - _toggle_base < _toggles.size():
 		var t: Dictionary = _toggles[index - _toggle_base]
 		return [int(t.get("packed", 0)), 0, 0, 0 if bool(t["enabled"]) else 1, 1]
-	var m: Dictionary = _movers[index]
+	var m: Dictionary = _mover_at(index)
 	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0,
 			1 if float(m.get("side", 1.0)) > 0.0 else 0]
 
@@ -486,9 +507,10 @@ func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked
 			t["push"] = unpack_push(start)
 		_told[index] = true
 		return
-	if index < 0 or index >= _movers.size():
+	var found: Variant = _mover_at(index)
+	if found == null:
 		return
-	var m: Dictionary = _movers[index]
+	var m: Dictionary = found
 	m["start"] = start
 	m["from"] = float(from_thousandths) / 1000.0
 	m["dir"] = clampi(dir, -1, 1)
@@ -506,6 +528,9 @@ func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked
 func reset(tick: int) -> void:
 	if authoritative:
 		_build_logic()
+	for id: int in _copies.keys():
+		_drop_copy(id)
+	_copy_next = 0
 	var touched := told_indices()
 	_told.clear()
 	for m in _movers:
@@ -541,7 +566,7 @@ func step(tick: int) -> void:
 			_started = true
 			_start(tick)
 		_logic_to(tick)
-		for m in _movers:
+		for m in _each_mover():
 			_advance(m, tick)
 		if tick % NEAR_EVERY == 0:
 			_proximity(tick)
@@ -589,7 +614,7 @@ func _occupied(zone: AABB) -> bool:
 
 
 func _proximity(tick: int) -> void:
-	for m in _movers:
+	for m in _each_mover():
 		if not bool(m["auto"]) or bool(m["locked"]):
 			continue
 		var near := _occupied((m["zone"] as AABB).grow(DOOR_PAD))
@@ -705,7 +730,10 @@ func _apply_input(entity: int, input_name: String, _param: String, tick: int) ->
 	var what := str((found as Dictionary)["type"])
 	var i := int((found as Dictionary)["i"])
 	var name := input_name.to_lower()
-	if what == "mover":
+	if what == "cmover":
+		if _cmovers.has(i):
+			_mover_input(_cmovers[i], name, tick)
+	elif what == "mover":
 		if not _doors_only:
 			_mover_input(_movers[i], name, tick)
 	elif what == "volume":
@@ -1238,19 +1266,70 @@ func _copy_made(data: Dictionary) -> void:
 
 
 ## A copy of brush [param model] stands [param offset] from where the model does ([param alive]), or goes. A client is told the same.
-func apply_copy(id: int, model: int, offset: Vector3, alive: bool, classname: String = "") -> void:
+func apply_copy(id: int, model: int, offset: Vector3, alive: bool, classname: String = "", mover_index: int = -1) -> void:
 	if not alive:
 		_drop_copy(id)
 		return
 	if _copies.has(id):
 		return
-	var c := {"id": id, "model": model, "offset": offset, "node": null, "body": null}
+	var c := {"id": id, "model": model, "offset": offset, "node": null, "body": null, "mover": -1}
 	_copies[id] = c
+	var source: Variant = _source_mover(model)
+	if source != null:
+		_make_copy_mover(c, source, mover_index)
 	_show_copy(c)
-	if authoritative and _world != null and COPY_SOLID.has(classname.to_lower()):
+	if _world != null and (c["mover"] != -1 or (authoritative and COPY_SOLID.has(classname.to_lower()))):
 		_solidify_copy(c)
 	if authoritative:
 		copy_changed.emit(id, model, offset, true)
+
+
+## The mover that stands for brush [param model] in the map (a door or lift a template names), else null.
+func _source_mover(model: int) -> Variant:
+	for m in _movers:
+		if int(m["model"]) == model and not m.has("door"):
+			return m
+	return null
+
+
+## Gives copy [param c] a mover of its own, posed like its source. The server hands out the next index; a client takes the one
+## it was sent, which must lie in the copy range.
+func _make_copy_mover(c: Dictionary, source: Dictionary, wanted: int) -> void:
+	var index := wanted
+	if authoritative:
+		index = _copy_base() + _copy_next
+	if _cmovers.size() >= MAX_COPY_MOVERS or index < _copy_base() or index >= _copy_base() + MAX_COPY_MOVERS or _cmovers.has(index):
+		return
+	if authoritative:
+		_copy_next += 1
+	var m := source.duplicate()
+	var offset: Vector3 = c["offset"]
+	var zone: AABB = source["zone"]
+	zone.position += offset
+	var mv: Variant = source["mv"]
+	m["entity"] = int(c["id"])
+	m["idx"] = index
+	m["origin"] = (source["origin"] as Vector3) + offset
+	m["zone"] = zone
+	m["body"] = null
+	m["node"] = null
+	m["posed"] = -1.0
+	m["from"] = mv.rest_fraction() if str(m["kind"]) != "path" else 0.0
+	m["dir"] = 0
+	m["start"] = _last_tick
+	m["locked"] = m["initial_locked"]
+	m["ready"] = 0
+	m["close_at"] = -1
+	m["copy"] = true
+	_cmovers[index] = m
+	_by_entity[int(c["id"])] = {"type": &"cmover", "i": index}
+	c["mover"] = index
+
+
+## The wire index of copy [param id]'s mover, or -1.
+func copy_mover_index(id: int) -> int:
+	var c: Variant = _copies.get(id)
+	return -1 if c == null else int((c as Dictionary)["mover"])
 
 
 func _show_copy(c: Dictionary) -> void:
@@ -1263,6 +1342,9 @@ func _show_copy(c: Dictionary) -> void:
 	from.get_parent().add_child(made)
 	made.position = from.position + (c["offset"] as Vector3)
 	c["node"] = made
+	if int(c["mover"]) != -1:
+		_cmovers[int(c["mover"])]["node"] = made
+		_posed_tick = -2147483648
 
 
 func _solidify_copy(c: Dictionary) -> void:
@@ -1278,8 +1360,16 @@ func _solidify_copy(c: Dictionary) -> void:
 	add_child(body)
 	if _put_on.is_valid():
 		_put_on.call(body)
-	body.position = (_world.call(&"model_origin", int(c["model"])) as Vector3) + (c["offset"] as Vector3)
+	if int(c["mover"]) != -1:
+		body.position = _cmovers[int(c["mover"])]["origin"]
+	else:
+		body.position = (_world.call(&"model_origin", int(c["model"])) as Vector3) + (c["offset"] as Vector3)
 	c["body"] = body
+	if int(c["mover"]) != -1:
+		var m: Dictionary = _cmovers[int(c["mover"])]
+		m["body"] = body
+		_by_body[body.get_instance_id()] = int(c["mover"])
+		_posed_tick = -2147483648
 
 
 func _drop_copy(id: int, tell: bool = true) -> void:
@@ -1287,6 +1377,14 @@ func _drop_copy(id: int, tell: bool = true) -> void:
 	if c == null:
 		return
 	var _gone := _copies.erase(id)
+	var slot := int((c as Dictionary)["mover"])
+	if slot != -1:
+		var _m := _cmovers.erase(slot)
+		var _t := _told.erase(slot)
+		var _e := _by_entity.erase(id)
+		var body: Variant = (c as Dictionary)["body"]
+		if body is Node:
+			var _b := _by_body.erase((body as Node).get_instance_id())
 	for k: String in ["node", "body"]:
 		var n: Variant = (c as Dictionary)[k]
 		if n is Node and is_instance_valid(n):
@@ -1300,7 +1398,7 @@ func copies() -> Array:
 	var out: Array = []
 	for id: int in _copies:
 		var c: Dictionary = _copies[id]
-		out.append({"id": id, "model": c["model"], "offset": c["offset"]})
+		out.append({"id": id, "model": c["model"], "offset": c["offset"], "mover": c["mover"]})
 	return out
 
 

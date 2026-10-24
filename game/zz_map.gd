@@ -1344,7 +1344,7 @@ func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 	add_child(made)
 	mechanics = made
 	for c: Array in _pending_copies:
-		made.apply_copy(int(c[0]), int(c[1]), c[2], bool(c[3]))
+		made.apply_copy(int(c[0]), int(c[1]), c[2], bool(c[3]), "", int(c[4]))
 	_pending_copies.clear()
 	for index: int in _pending_movers:
 		var s: Array = _pending_movers[index]
@@ -1379,11 +1379,11 @@ func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, 
 
 
 ## A brush copy as the server sent it; kept until the mechanics exist.
-func apply_copy(id: int, model: int, offset: Vector3, alive: bool) -> void:
+func apply_copy(id: int, model: int, offset: Vector3, alive: bool, mover: int = -1) -> void:
 	if mechanics != null:
-		mechanics.apply_copy(id, model, offset, alive)
+		mechanics.apply_copy(id, model, offset, alive, "", mover)
 	else:
-		_pending_copies.append([id, model, offset, alive])
+		_pending_copies.append([id, model, offset, alive, mover])
 
 
 ## Takes a bake off: what was baked was the boxes.

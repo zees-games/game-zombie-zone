@@ -339,7 +339,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			if game.map != null and game.map.mechanics != null:
 				_broadcast(ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index)))
 		game.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void:
-			_broadcast(ZzEvents.Kind.COPY, ZzEvents.write_copy(id, model, offset, alive)))
+			var slot := game.map.mechanics.copy_mover_index(id) if game.map != null and game.map.mechanics != null else -1
+			_broadcast(ZzEvents.Kind.COPY, ZzEvents.write_copy(id, model, offset, alive, slot)))
 		game.map_sound_fade.connect(func(entity: int, fading_in: bool, seconds: float, from: float, to: float) -> void:
 			_remember_sound(ZzEvents.MapFx.FADE, entity, fading_in, to)
 			_map_fx(ZzEvents.write_map_fade(entity, fading_in, seconds, from, to)))
@@ -1189,7 +1190,7 @@ func _tell_the_world(peer_id: int) -> void:
 		for index in game.map.mechanics.told_indices():
 			_tell(peer_id, ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index))
 		for c: Dictionary in game.map.mechanics.copies():
-			_tell(peer_id, ZzEvents.Kind.COPY, ZzEvents.write_copy(int(c["id"]), int(c["model"]), c["offset"], true))
+			_tell(peer_id, ZzEvents.Kind.COPY, ZzEvents.write_copy(int(c["id"]), int(c["model"]), c["offset"], true, int(c["mover"])))
 
 	for key: int in _sound_last:
 		var kept: Array = _sound_last[key]
@@ -1613,7 +1614,7 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 		ZzEvents.Kind.COPY:
 			var cp := ZzEvents.read_copy(reader)
 			if bool(cp["ok"]) and game.map != null:
-				game.map.apply_copy(int(cp["id"]), int(cp["model"]), cp["offset"], bool(cp["alive"]))
+				game.map.apply_copy(int(cp["id"]), int(cp["model"]), cp["offset"], bool(cp["alive"]), int(cp["mover"]))
 		ZzEvents.Kind.MAP_FX:
 			var fx := ZzEvents.read_map_fx(reader)
 			if bool(fx["ok"]):
