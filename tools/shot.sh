@@ -11,6 +11,7 @@
 #   tools/shot.sh --view=down --spawn=common:6                       # on the floor
 #   tools/shot.sh --view=strike_down --zombie=common --seconds=1.2     # a zombie kneeling over a downed survivor (strike: standing)
 #   tools/shot.sh --view=ragdoll --seconds=0.6 --reaction=face_plant  # a stand-in killed, its body 0.6 s into the fall
+#   tools/shot.sh --view=action --action=emote:dance --seconds=0.5   # a stand-in playing an avatar action (pose:sit)
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
@@ -41,7 +42,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--reaction=*|--no-bake|--no-world|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--reaction=*|--action=*|--no-bake|--no-world|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

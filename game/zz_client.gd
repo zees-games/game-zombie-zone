@@ -266,6 +266,16 @@ func _covered() -> bool:
 	return gate != null and not gate.is_open()
 
 
+## The figure an avatar action plays on (the drawn person): that peer's player, or the local one offline.
+func _avatar_figure(peer_id: int) -> Object:
+	var who: ZzPlayer = null
+	if bridge != null and peer_id != 0:
+		who = game.players.get(ZzNetBridge.player_key(bridge.player_for_peer(peer_id)))
+	if who == null and player != null and (net == null or peer_id == net.local_peer_id):
+		who = player
+	return who.figure.body_node() if who != null and who.figure != null else null
+
+
 func _exit_tree() -> void:
 	ZeeModelCache.set_asset_root("res://")
 
@@ -469,6 +479,8 @@ func _build_netcode() -> DotResult:
 		return attached
 
 	bridge.open_link(link)
+	# Before the seal and in the server's order (after the bridge), or the actions stay local.
+	DotLog.result(CHANNEL, "avatar action message", DotGameAvatarActionMessage.register(net))
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -1549,6 +1561,8 @@ func _build_settings() -> void:
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
+	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
+	DotLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
 	# Walking is off while the cover is up, a menu is open or a line is typed.
 	platform.input_blocked_changed.connect(_suspend_input)

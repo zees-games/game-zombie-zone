@@ -14,6 +14,8 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 var _view := "survivor"
+## `--action=emote:dance` (`pose:sit`): the avatar action `--view=action` plays on a stand-in.
+var _action := ""
 var _zombie := &"common"
 var _seconds := 3.0
 var _board := false
@@ -47,6 +49,8 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--view="):
 			_view = arg.trim_prefix("--view=")
+		elif arg.begins_with("--action="):
+			_action = arg.trim_prefix("--action=")
 		elif arg == "--board":
 			_board = true
 		elif arg.begins_with("--seconds="):
@@ -439,6 +443,20 @@ func _run() -> void:
 			var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
 			for body: DotPlayerRagdoll in yard.live():
 				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
+		"action":
+			# A stand-in playing an avatar action, from the front, early in the clip.
+			var actor = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+			var at_feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+			actor.place_at(at_feet, 180.0)
+			await _seconds_of(0.5)
+			at_feet = actor.feet()
+			local.place_at(at_feet + Vector3(0.0, 0.0, 9.0), 0.0)
+			var parts := _action.split(":")
+			var entry: Dictionary = DotAvatarActions.defaults().find(StringName(parts[0]), parts[1])
+			var ok: bool = actor.figure.body_node().play_action(StringName(parts[1]), bool(entry.get("loop", false)), 0.0)
+			print("action %s: played=%s" % [_action, ok])
+			_free_camera().look_at_from_position(at_feet + Vector3(0.0, 1.5, 3.0), at_feet + Vector3(0.0, 1.0, 0.0))
+			await _seconds_of(_seconds)
 		"pinned":
 			var kind := _pin if _pin != &"" else &"pounce"
 			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
