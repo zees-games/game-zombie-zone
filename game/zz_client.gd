@@ -158,10 +158,11 @@ func _ready() -> void:
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
 	var config := ZzConfig.new()
-	var loaded := config.load_layered(config_file)
+	var loaded := ZzConfig.boot(config, config_file)
 
 	if not loaded.ok:
-		DotLog.warn(CHANNEL, "falling back to defaults", {"why": loaded.error.message})
+		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		return
 
 	link = platform.link as Node
 	_offline = platform.offline
@@ -169,6 +170,7 @@ func _ready() -> void:
 	game = ZzGame.new()
 	game.name = "World"
 	game.config = config
+	game.config_binder = loaded.value
 	game.authoritative = _offline
 	game.register_service = _offline
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
@@ -386,6 +388,27 @@ func _build_netcode() -> DotResult:
 	# The server's mp_forceview and mp_solidplayers: this end places its own camera and
 	# predicts its own player.
 	if link != null:
+## dot-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
+func _add_noblock_and_workbench() -> void:
+	if game == null:
+		return
+	if link != null:
+		DotLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
+		return
+	var rt := game.ensure_runtime()
+	var wb := DotGameWorkbench.new()
+	wb.name = "Workbench"
+	wb.listen_host_fn = func() -> bool: return true
+	if game.config_binder != null:
+		wb.add_set(game.config_binder.profile_set(), "Game settings")
+	add_child(wb)
+	var started := wb.start(rt)
+	DotLog.result(CHANNEL, "the workbench", started)
+	if started.ok and game.config_binder != null:
+		game.config_binder.attach(rt)
+	platform.add_workbench(wb)
+
+
 		var _view := game.view_rules.follow_cvars(link)
 		if link.has_method(&"replicated_cvar"):
 			_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
@@ -1523,6 +1546,7 @@ func _build_settings() -> void:
 
 	if blood != null:
 		blood.follow(settings.settings)
+	_add_noblock_and_workbench()
 
 	if world_view != null:
 		world_view.lod.follow(settings.settings)

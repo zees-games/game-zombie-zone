@@ -10,6 +10,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzAvatars := preload("zz_avatars.gd")
 const ZzVote := preload("zz_vote.gd")
 const ZzNpcs := preload("zz_npcs.gd")
+const ZzWorkbenchAuth := preload("zz_workbench_auth.gd")
 
 ## This game, as a module a dedicated server loads.
 ##
@@ -321,6 +322,8 @@ func _game_load() -> DotResult:
 		var peer := int((bridge as ZzNetBridge).peer_for_player(ZzNetBridge.session_of(player_id)))
 		return peer <= 0 or can_peer_be_harmed(peer)
 
+	_bind_config(world)
+	_start_workbench(world)
 	world.start()
 
 	log_info("the map is up", world.describe())
@@ -771,6 +774,10 @@ func _tunable(
 ## the map going away, which is what `module reload` is for.
 func _game_unload() -> void:
 	_bot_ids.clear()
+
+	if workbench != null:
+		workbench.queue_free()
+		workbench = null
 
 	if vote != null:
 		vote.queue_free()
@@ -1471,3 +1478,95 @@ func describe() -> Dictionary:
 		out.merge({"round": world.round_number, "world": world.describe()}, true)
 
 	return out
+
+
+## Hand-written cvars whose name is not `zz_<field>`: cvar -> config field.
+const HAND_FIELDS := {
+	"zz_box_common": "box_drop_common", "zz_box_drops": "boxes_enabled", "zz_box_special": "box_drop_special",
+	"zz_breather": "breather_seconds", "zz_brute_every": "brute_every_waves", "zz_brute_max": "brute_interval_max",
+	"zz_brute_min": "brute_interval_min", "zz_commons": "commons_base", "zz_defib_start": "start_defibs",
+	"zz_director": "director_enabled", "zz_min_players": "minimum_players", "zz_mob_max": "mob_interval_max",
+	"zz_mob_min": "mob_interval_min", "zz_nav_drop": "nav_drop_max", "zz_prestart_time": "prestart_seconds",
+	"zz_respawn_base": "respawn_base_seconds", "zz_respawn_max": "respawn_max_seconds",
+	"zz_respawn_min": "respawn_min_seconds", "zz_respawn_per_wave": "respawn_per_wave_seconds",
+	"zz_respawn_protect": "respawn_protect_seconds", "zz_sleepers": "sleepers_enabled",
+	"zz_special_max": "special_interval_max", "zz_special_min": "special_interval_min",
+	"zz_specials": "specials_base", "zz_start_grace": "start_grace_seconds", "zz_survival": "survival_style",
+	"zz_survival_warmup": "survival_warmup_seconds", "zz_trader": "trader_enabled",
+	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
+}
+
+## The admin web page and F9 panel over the config; HTTP only with `workbench.enabled` in cfg/server.yml.
+var workbench: DotGameWorkbench = null
+
+
+## Every [ZzConfig] field as a `zz_<field>` cvar, a cfg/ yml key and a workbench set. A hand-written cvar keeps its own code; a workbench or yml edit is pushed through it.
+func _bind_config(world: ZzGame) -> void:
+	var binder := world.config_binder
+	if binder == null:
+		return
+	var hand := {}
+	for entry: Dictionary in binder.schema():
+		var key: String = entry["key"]
+		if console.has_name("zz_" + key):
+			hand[key] = "zz_" + key
+	for cvar_name: String in HAND_FIELDS:
+		if console.has_name(cvar_name):
+			hand[HAND_FIELDS[cvar_name]] = cvar_name
+	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(n: String) -> bool:
+		return console.has_name(n) or hand.has(n.trim_prefix("zz_")))
+	binder.bind_commands(add_command)
+	binder.field_changed.connect(func(key: String, value: Variant, source: String) -> void:
+		if source == "cvar" or not hand.has(key):
+			return
+		var text := world.config.survival_style_name() if key == "survival_style" else DotGameConfigBinder._to_text(value)
+		console.set_cvar(hand[key], text))
+
+
+func _noblock_side(id: Variant) -> Variant:
+	var game_world := game as ZzGame
+	var side := int(game_world.sides.get(id, 0)) if game_world != null else 0
+	return str(side) if side > 0 else ""
+
+
+func _noblock_runtime() -> Object:
+	return (game as ZzGame).ensure_runtime()
+
+
+## `!block` and `!noblock` find a player by `u<userid>`, the key every survivor is seated under.
+func _build_noblock() -> DotResult:
+	var built := super()
+	if built.ok and noblock != null and noblock.commands != null:
+		noblock.commands.set(&"key_fn", func(ctx: Object) -> Variant:
+			var session: Variant = ctx.get("session")
+			return ZzNetBridge.player_key(int(session.get("userid"))) if session is Object else null)
+	return built
+
+
+func _start_workbench(world: ZzGame) -> void:
+	var rt := world.ensure_runtime()
+	var admin_permit := Callable()
+	if server != null and server.admins != null:
+		admin_permit = server.admins.uid_has_permission
+	rt.permit = func(actor: Variant, flag: String) -> bool:
+		if typeof(actor) == TYPE_STRING_NAME and actor == ZzGame.LOCAL_ACTOR:
+			return true
+		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
+	rt.actor_name = func(actor: Variant) -> String: return str(actor)
+	workbench = DotGameWorkbench.new()
+	workbench.name = "Workbench"
+	workbench.dedicated = DisplayServer.get_name() == "headless"
+	workbench.listen_host_fn = func() -> bool: return DisplayServer.get_name() != "headless"
+	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
+		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
+	if world.config_binder != null:
+		workbench.add_set(world.config_binder.profile_set(), "Game settings")
+	add_child(workbench)
+	var started := workbench.start(rt)
+	if not started.ok:
+		log_warn("the workbench", {"why": started.error.message})
+		return
+	if world.config_binder != null:
+		world.config_binder.attach(rt)
+	var auth := DotRegistry.get_node_service(DotAuthServer.SERVICE) as DotAuthServer
+	var _gate := ZzWorkbenchAuth.attach(workbench, ZzWorkbenchAuth.ticket_resolver(auth), admin_permit)

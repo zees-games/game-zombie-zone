@@ -158,6 +158,32 @@ signal barricade_changed(id: String, fraction: float, intact: bool)
 signal survival_changed()
 
 @export var config: ZzConfig = null
+
+## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by whoever loaded the config.
+var config_binder: DotGameConfigBinder = null
+
+## The runtime layer the workbench edits through (the config set and dot-team's noblock kind); made on demand.
+var profile_runtime: DotProfileRuntime = null
+
+## The actor of an edit made on the process itself: the server console, or offline play.
+const LOCAL_ACTOR := &"__local"
+
+
+func ensure_runtime() -> DotProfileRuntime:
+	if profile_runtime == null:
+		profile_runtime = DotProfileRuntime.new()
+		profile_runtime.permit = func(actor: Variant, _flag: String) -> bool:
+			return typeof(actor) == TYPE_STRING_NAME and actor == LOCAL_ACTOR
+	return profile_runtime
+
+## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
+var block_rules: Object = null:
+	set(value):
+		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
+			block_rules.disconnect(&"changed", body_rules.refresh)
+		block_rules = value
+		if block_rules != null and block_rules.has_signal(&"changed"):
+			block_rules.connect(&"changed", body_rules.refresh)
 @export var authoritative: bool = true
 @export_range(1, 240, 1) var tick_rate: int = 64
 @export var external_tick: bool = false
@@ -496,6 +522,23 @@ func _advance_water(player: ZzPlayer, delta: float) -> void:
 func _on_body_rules_changed() -> void:
 	for id in players:
 		_apply_body_mask(players[id] as ZzPlayer)
+	apply_pass_through()
+
+
+## The side a player is on for dot-team's block rules: survivors are one side, so they pass each other.
+func team_of_side(id: Variant) -> Variant:
+	var side := int(sides.get(id, 0))
+	return str(side) if side > 0 else ""
+
+
+## Hands every controller the bodies it passes through under `block_rules`; the same call on every machine, or a client predicts a wall.
+func apply_pass_through() -> void:
+	var entries := {}
+	for id: Variant in players:
+		var who := players[id] as ZzPlayer
+		if who != null and who.controller != null:
+			entries[id] = {"body": who, "controller": who.controller}
+	body_rules.apply_exceptions(entries)
 
 
 func world_mask() -> int:
@@ -941,6 +984,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 
 	players[player_id] = player
 	sides[player_id] = SURVIVORS
+	apply_pass_through()
 
 	if match_node != null:
 		var seated := match_node.add_player(String(player_id), display_name, _tick, SURVIVORS)
@@ -999,6 +1043,10 @@ func remove_player(player_id: StringName) -> void:
 
 	players.erase(player_id)
 	sides.erase(player_id)
+
+	if block_rules != null:
+		block_rules.call(&"forget", player_id)
+	apply_pass_through()
 
 	if bots != null:
 		bots.forget(player_id)

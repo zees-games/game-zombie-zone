@@ -57,3 +57,11 @@ A trader stands where the map's `traders:` say (the document or `game: traders:`
 | `price_multiplier`, `categories`, `disabled`, `items`, `ammo`, `supplies`, `boxes`, `prices` | | prices and the list; `items: {shotgun: 300}` or `{shotgun: {enabled: false}}` per item |
 
 The price of a weapon is its tier's (`prices:`); a melee weapon is not sold unless `items` gives it a price. The ground shelf and the menu share the window, the stock pool (`trader_stock`) and the points.
+
+## Configuration, the workbench and passing through teammates
+
+Every `ZzConfig` field is a `zz_<field>` cvar (`zz_` names that were hand-written keep their code), a key in `cfg/game/game-zombie-zone/config/game.yml` (a server's own in `cfg/server/game/game-zombie-zone/config/game.yml`; a flat mapping of field names, for example `waves: 12`) and a set in the workbench. On a dedicated server an unknown key or a bad value refuses the boot. `zz_config_dump` lists every field with the layer it came from; `zz_config_diff save` writes what differs from the code defaults to `user://config_diff_game-zombie-zone.yml`, which copied to `cfg/game/game-zombie-zone/config/game.yml` becomes the shipped defaults. The per-map dictionaries (`wave_scale_by_map`, `wave_alive_share_by_map`) are not scalar and stay in the JSON file or a map's own yml.
+
+The workbench (F9 solo or hosting a game, `workbench` in the console) is dot-game's `DotGameWorkbench`; its HTTP page is off until `workbench.enabled` in `cfg/server.yml`, and a dot-auth connect ticket of an account in `workbench.admin_uids` or `admin_groups` is accepted as the bearer.
+
+dot-team's block rules are on when the addon is linked: survivors pass through each other (`mp_teamblock`), and `!block` / `!noblock` ask to stop or pass. Without the addon players block each other and the server logs one WARN.
