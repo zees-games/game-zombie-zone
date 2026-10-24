@@ -31,8 +31,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 22
-const CHECKS := 130
+const SECTIONS := 23
+const CHECKS := 138
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -89,6 +89,7 @@ func _run() -> void:
 		await _test_a_head_shot_off_reaches_the_client()
 		await _test_a_down_reaches_the_client()
 		await _test_a_downed_crawl_is_predicted()
+		await _test_the_ads_rules_cross_to_the_client()
 		await _test_a_pin_reaches_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
@@ -716,6 +717,53 @@ func _test_a_down_reaches_the_client() -> void:
 	await _steps(8)
 	_check(_mine().is_up() and not _mine().is_down(), "stood up on the server, up on the client")
 	_finished()
+
+
+func _test_the_ads_rules_cross_to_the_client() -> void:
+	_section("the server's aim-down-sights numbers reach the client, and the aim bit reaches the server")
+	var server_me := _server_me()
+	var mine := _mine()
+	var id := server_me.weapons.current_def().id
+	var server_rules := _server_game.ads_rules
+	var client_rules := _client_game.ads_rules
+	_check(server_rules != client_rules, "each game holds its own rules, so a client in the server's process is not the server")
+	var kept := server_rules.to_wire()
+	var _a := server_rules.set_value(&"", "spread_multiplier", 0.2)
+	var _b := server_rules.set_value(&"", "move_speed_multiplier", 0.5)
+	_check(client_rules.wire_hash() != server_rules.wire_hash(), "the client starts out disagreeing with the override")
+	var link := FakeLink.new()
+	link.held[ZeeAdsRules.CVAR] = server_rules.to_wire()
+	_check(client_rules.follow_cvars(link), "a client follows the server's zee_ads_rules")
+	_check(client_rules.wire_hash() == server_rules.wire_hash()
+		and is_equal_approx(client_rules.spread_for(id), 0.2) and is_equal_approx(client_rules.move_speed_for(id), 0.5),
+		"and holds the server's spread and pace", "%s vs %s" % [client_rules.wire_hash(), server_rules.wire_hash()])
+	var _c := server_rules.set_value(&"", "spread_multiplier", 0.9)
+	link.replicated_cvar_changed.emit(ZeeAdsRules.CVAR, server_rules.to_wire())
+	_check(is_equal_approx(client_rules.spread_for(id), 0.9), "and follows every change")
+	_check(not client_rules.adopt_wire("not json") and is_equal_approx(client_rules.spread_for(id), 0.9), "a bad value is refused and changes nothing")
+	await _steps(8)
+	var aim_pace: float = 1.0
+	for _i in 40:
+		await _step_with_actions(ZzNetCommand.ACT_AIM)
+		aim_pace = server_me.weapons.ads_move_scale()
+	_check(is_equal_approx(aim_pace, 0.5), "the aim bit from the client puts the server's gun at the server's pace", "%.2f" % aim_pace)
+	if mine.view_rig != null:
+		_check(is_equal_approx(mine.view_rig.ads_move_scale(), aim_pace), "and the predicting rig agrees", "%.2f" % mine.view_rig.ads_move_scale())
+	await _steps(8)
+	_check(is_equal_approx(server_me.weapons.ads_move_scale(), 1.0), "letting go of the sights restores full pace")
+	var _d := server_rules.adopt_wire(kept)
+	var _e := client_rules.adopt_wire(kept)
+	_finished()
+
+
+func _step_with_actions(actions: int) -> void:
+	_tick += 1
+	var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
+	_server_bridge.server_tick(_tick)
+	_flush()
+	_client_bridge.client_tick(_tick + INPUT_LEAD, DotFpsCommand.new(), 0, actions)
+	_flush()
+	await get_tree().physics_frame
 
 
 func _test_a_pin_reaches_the_client() -> void:

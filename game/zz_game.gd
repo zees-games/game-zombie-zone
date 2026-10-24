@@ -249,6 +249,10 @@ var pass_rules: ZzPassRules = ZzPassRules.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
+## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults. One per game, not
+## per process, so a client in the same process as its server adopts the server's rather than sharing them.
+var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
+
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
 ## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
 var water_rules: ZzWaterRules = ZzWaterRules.new()
@@ -3120,7 +3124,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
-		rig.ads_rules = ZzWeapons.ads_rules()
+		rig.ads_rules = ads_rules
 		player.add_child(rig)
 
 		var ready_now := rig.setup()

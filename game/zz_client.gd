@@ -440,6 +440,7 @@ func _build_netcode() -> DotResult:
 		var _solid := game.body_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
+		var _ads := game.ads_rules.follow_cvars(link)
 		var _wading := game.water_rules.follow_cvars(link)
 		var _ambient := game.ambient_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
@@ -1083,7 +1084,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 		weapons.tick_rate = Engine.physics_ticks_per_second
 		weapons.view_model_ref = DotNodeRef.of_path(view_model.get_path())
 		weapons.player_ref = DotNodeRef.of_path(player.get_path())
-		weapons.ads_rules = ZzWeapons.ads_rules()
+		weapons.ads_rules = game.ads_rules
 		view_model.ads_rules = weapons.ads_rules
 		player.add_child(weapons)
 

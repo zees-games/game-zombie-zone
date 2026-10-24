@@ -277,6 +277,12 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# Aim down sights: spread and pace while aimed are part of the prediction, so the numbers the
+	# simulation reads cross as one JSON cvar (see ZeeAdsRules.PREDICTED).
+	var _ads := world.ads_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# Water: how survivors wade, swim and drown, and how the horde wades (see ZzWaterRules). The
 	# movement ones are REPLICATED, because a client predicts its own swim.
 	var _water := world.water_rules.bind_cvars(

@@ -167,18 +167,6 @@ static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch:
 	return command
 
 
-static var _ads_rules: ZeeAdsRules = null
-
-
-## The aim-down-sights rules every rig and view model shares: `cfg/server/addons/zee_weapons/ads.yml`
-## over the shipped defaults, read once.
-static func ads_rules() -> ZeeAdsRules:
-	if _ads_rules == null:
-		_ads_rules = ZeeAdsRules.load_config()
-
-	return _ads_rules
-
-
 ## Whether the gun in hand is empty and has something to reload from.
 ##
 ## [b]An empty magazine reloads itself, trigger held or not.[/b] dot-weapon starts a reload only
