@@ -2382,14 +2382,81 @@ func _clear_gap(id: String) -> void:
 		if at.x < box.position.x - 0.4 or at.x > box.end.x + 0.4 or at.z < box.position.z - 0.4 or at.z > box.end.z + 0.4:
 			continue
 
-		var to := at
+		var to := _gap_exit(box, at, across_x)
 
-		if across_x:
-			to.x = box.end.x + 0.5 if at.x >= centre.x else box.position.x - 0.5
-		else:
-			to.z = box.end.z + 0.5 if at.z >= centre.z else box.position.z - 0.5
+		if to.is_finite():
+			player.place_at(to, player.controller.state.yaw)
 
-		player.place_at(to, player.controller.state.yaw)
+
+## Where a survivor in a mended barricade's gap steps out to: the nearer side of the thin axis, else the other, else the nearest free spot round the box; INF when none is free (they stay put rather than end inside a wall).
+func _gap_exit(box: AABB, at: Vector3, across_x: bool) -> Vector3:
+	var lo := box.position.x if across_x else box.position.z
+	var hi := box.end.x if across_x else box.end.z
+	var here := at.x if across_x else at.z
+	var near_hi := absf(hi - here) <= absf(here - lo)
+	var offsets: Array[float] = [0.5, 0.9, 1.4]
+	var cands: Array[Vector3] = []
+
+	for margin in offsets:
+		for high in [near_hi, not near_hi]:
+			var edge: float = hi + margin if high else lo - margin
+			cands.append(Vector3(edge, at.y, at.z) if across_x else Vector3(at.x, at.y, edge))
+
+	# Past the thin sides: along the barricade's long axis, nearest first.
+	var ends: Array[Vector3] = []
+
+	for margin in offsets:
+		for high in [true, false]:
+			if across_x:
+				ends.append(Vector3(at.x, at.y, (box.end.z + margin) if high else (box.position.z - margin)))
+			else:
+				ends.append(Vector3((box.end.x + margin) if high else (box.position.x - margin), at.y, at.z))
+
+	ends.sort_custom(func(a: Vector3, b: Vector3) -> bool: return a.distance_squared_to(at) < b.distance_squared_to(at))
+	cands.append_array(ends)
+
+	for c in cands:
+		var ok := _gap_spot(c, at, box)
+
+		if ok.is_finite():
+			return ok
+
+	return Vector3.INF
+
+
+## [param c] with its y set to the floor under it, or INF when it is outside the map, has no floor within a step of [param from], or a wall stands within a body's width of it or between it and the barricade's edge.
+func _gap_spot(c: Vector3, from: Vector3, box: AABB) -> Vector3:
+	var world := get_world_3d()
+	var bounds := map.bounds()
+
+	if bounds.size != Vector3.ZERO and not (c.x >= bounds.position.x and c.x <= bounds.end.x and c.z >= bounds.position.z and c.z <= bounds.end.z):
+		return Vector3.INF
+
+	if world == null:
+		return c
+
+	var space := world.direct_space_state
+	var down := PhysicsRayQueryParameters3D.create(c + Vector3.UP * 0.5, c + Vector3.DOWN * 1.0)
+	down.collision_mask = ground_mask()
+	var floor_hit := space.intersect_ray(down)
+
+	if floor_hit.is_empty() or absf(float(floor_hit["position"].y) - from.y) > 0.6:
+		return Vector3.INF
+
+	var spot: Vector3 = floor_hit["position"]
+	var chest := Vector3.UP * 0.9
+	var edge := Vector3(clampf(spot.x, box.position.x, box.end.x), spot.y, clampf(spot.z, box.position.z, box.end.z))
+
+	var step := (spot - edge).normalized() * 0.1 if spot != edge else Vector3.ZERO
+
+	if not clear_between(edge + step + chest, spot + chest):
+		return Vector3.INF
+
+	for dir in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+		if not clear_between(spot + chest, spot + chest + (dir as Vector3) * 0.4):
+			return Vector3.INF
+
+	return spot
 
 
 ## A client was told barricade [param id] is at [param fraction] and standing or not.

@@ -23,7 +23,7 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 14
-const CHECKS := 128
+const CHECKS := 130
 
 var _passed := 0
 var _failed := 0
@@ -1102,6 +1102,24 @@ func _test_map_events() -> void:
 	map.doc["spawns"]["survivors"][1]["name"] = "ghost"
 	_check(not map.spawn_enabled({"at": [9.0, 0.0, 9.0], "name": "ghost", "disabled": true}), "a named point nothing matches falls back to the document's disabled flag")
 	map.free()
+
+	var long_name := "x".repeat(70)
+	var fx2 := _fixture()
+	fx2["volumes"] = []
+	fx2["movers"] = [fx2["movers"][1]]
+	fx2["entities"] = [
+		_logic_rec(11, "info_player_human", "dup", {"origin": "100 200 0", "startdisabled": "1"}),
+		_logic_rec(12, "info_player_human", "dup", {"origin": "500 200 0"}),
+		_logic_rec(13, "info_player_human", long_name, {"origin": "900 200 0", "startdisabled": "1"}),
+	]
+	fx2["links"] = []
+	var map2 := ZzMap.new()
+	map2.mechanics = _logic_mech(fx2)
+	var dup_a := {"at": [100.0 * 0.0254, 0.0, -200.0 * 0.0254], "name": "dup"}
+	var dup_b := {"at": [500.0 * 0.0254, 0.0, -200.0 * 0.0254], "name": "dup"}
+	_check(not map2.spawn_enabled(dup_a) and map2.spawn_enabled(dup_b), "start points sharing a targetname each keep their own state", "%s %s" % [map2.spawn_enabled(dup_a), map2.spawn_enabled(dup_b)])
+	_check(not map2.spawn_enabled({"at": [900.0 * 0.0254, 0.0, -200.0 * 0.0254], "name": long_name.left(64)}), "a name the document cut to 64 characters still matches")
+	map2.free()
 
 	_s = io.send("crate", "Break")
 	var made := events.filter(func(e: Array) -> bool: return e[0] == "spawn_object")

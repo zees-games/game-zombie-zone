@@ -17,7 +17,7 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ## Counts sections and checks (dot-settings' story).
 
 const SECTIONS := 19
-const CHECKS := 81
+const CHECKS := 83
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -524,6 +524,37 @@ func _test_mend_gap() -> void:
 	var thin := (p.feet().z - box.get_center().z) if box.size.x > box.size.z else (p.feet().x - box.get_center().x)
 	var half := minf(box.size.x, box.size.z) * 0.5
 	_check(absf(thin) >= half + 0.4, "the survivor is out of the boards, a body's width clear", "%.2f from the middle of a %.2f board" % [absf(thin), half * 2.0])
+	var inb := game.map.bounds()
+	_check(p.feet().x >= inb.position.x and p.feet().x <= inb.end.x and p.feet().z >= inb.position.z and p.feet().z <= inb.end.z, "and inside the map", str(p.feet()))
+	# A wall 0.3 m beyond the near side must send them to the other side, never into it.
+	var across_x := box.size.x < box.size.z
+	var wall := StaticBody3D.new()
+	wall.collision_layer = game.world_mask()
+	var shape := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	bs.size = Vector3(box.size.x + 6.0, 3.0, box.size.z + 6.0)
+	if across_x:
+		bs.size.x = 1.0
+	else:
+		bs.size.z = 1.0
+	shape.shape = bs
+	wall.add_child(shape)
+	game.add_child(wall)
+	var c := box.get_center()
+	var inside_at := Vector3(c.x, box.position.y + 0.05, c.z)
+	if across_x:
+		wall.global_position = Vector3(box.end.x + 0.3 + 0.5, box.position.y + 1.0, c.z)
+		inside_at.x = box.end.x - 0.05
+	else:
+		wall.global_position = Vector3(c.x, box.position.y + 1.0, box.end.z + 0.3 + 0.5)
+		inside_at.z = box.end.z - 0.05
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var out := game._gap_exit(box, inside_at, across_x)
+	var side := (out.x if across_x else out.z)
+	var lo := box.position.x if across_x else box.position.z
+	_check(out.is_finite() and side < lo, "a wall 0.3 m beyond the near side sends them to the far side", "%s from %s" % [out, inside_at])
+	wall.free()
 	_finished()
 
 
