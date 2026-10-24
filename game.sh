@@ -77,6 +77,14 @@ check_addons() {
     done < <(sed -n 's|^/addons/\([^/]*\)/\{0,1\}$|\1|p' .gitignore 2>/dev/null)
     [ -z "$missing" ] || die "Missing addons:$missing
 Run dot-bootstrap first: https://github.com/modcommunity/dot-bootstrap" 2
+    # Content links (maps, world): without them the suites run on an empty level set. A git
+    # worktree gets them from tools/link_worktree.sh.
+    local path src gone=""
+    while IFS=$'\t' read -r path src; do
+        [ -n "$path" ] && [ ! -e "${path#/}" ] && gone="$gone ${path#/} (from $src)"
+    done < <(awk '/^# bootstrap-link: /{src=$3; next} src!="" && /^\//{print $0 "\t" src} {src=""}' .gitignore 2>/dev/null)
+    [ -z "$gone" ] || die "Content not linked:$gone
+Run dot-bootstrap, or in a git worktree: tools/link_worktree.sh <main checkout>" 2
 }
 
 deploy_dir() {
@@ -98,6 +106,25 @@ pack_all() {
     "$GODOT" --headless --path . --import >/dev/null 2>&1
     echo "packing $PACK"
     (cd "$deploy" && ./server pack "$PACK" --source "$ROOT") >/dev/null || die "could not pack $PACK"
+}
+
+# tools/verify_ui.sh checks that drive the real client under xvfb. "nav" is left out: it
+# reported a failing meter check in 2026-10 and is still a diagnostic.
+UI_CHECKS="trader crouch"
+
+run_ui_check() {
+    local check="$1" log=".godot/test-logs/verify_ui_$1.log" status
+    mkdir -p .godot/test-logs
+    timeout "$TIMEOUT" tools/verify_ui.sh "$check" >"$log" 2>&1
+    status=$?
+    if [ "$status" -eq 0 ] && ! grep -qE 'SCRIPT ERROR|Parse Error' "$log"; then
+        printf '  %sok%s   verify_ui %s  %s\n' "$GRN" "$OFF" "$check" "$(grep -E '^VERIFY .*[0-9]+ passed' "$log" | tail -1)"
+        return 0
+    fi
+    printf '  %sFAIL%s verify_ui %s: exited %s\n' "$RED" "$OFF" "$check" "$status"
+    grep -E 'VERIFY FAIL|SCRIPT ERROR|Parse Error' "$log" | head -10 | sed 's/^/       /'
+    printf '       full log: %s\n' "$log"
+    return 1
 }
 
 run_suite() {
@@ -202,6 +229,11 @@ do_test() {
     for scene in ${*:-$SUITES}; do
         run_suite "${scene%.tscn}" || fails=$((fails + 1))
     done
+    if [ $# -eq 0 ] && command -v xvfb-run >/dev/null 2>&1; then
+        for scene in $UI_CHECKS; do
+            run_ui_check "$scene" || fails=$((fails + 1))
+        done
+    fi
 
     echo
     [ "$fails" -eq 0 ] && { printf '%sall passed%s\n' "$GRN" "$OFF"; return 0; }
