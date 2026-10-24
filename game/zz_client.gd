@@ -1472,6 +1472,9 @@ func _build_settings() -> void:
 	if blood != null:
 		blood.follow(settings.settings)
 
+	if world_view != null:
+		world_view.lod.follow(settings.settings)
+
 	if _sampler != null:
 		settings.bind_look(_sampler.tunables)
 

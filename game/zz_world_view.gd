@@ -7,6 +7,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
+const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
 
 ## Everything a client draws in the world that is not a survivor or a wall: the zombies and their
 ## bodies, what lies on the ground, pools of acid and fire, things thrown, explosions, and a
@@ -80,6 +81,8 @@ var ragdoll_mask: int = 1
 ## The server's `sv_ragdoll*` rules (`ZzGame.ragdoll_rules`, followed through the link), set
 ## before this enters the tree. Null: the stock rules with [constant CORPSE_SECONDS].
 var ragdoll_rules: DotPlayerRagdollRules = null
+## How far each zombie is animated, shadowed and drawn; the client points it at `crowd_detail`.
+var lod := ZzZombieLod.new()
 
 
 func _ready() -> void:
@@ -117,6 +120,7 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 
 	var view := ZzZombieView.new()
 	view.name = "View"
+	view.lod = lod
 	body.add_child(view)
 	view.build(kind, variant)
 	# A mirror has no limbs yet (the server's body has them from its spawn); the view cuts them.
@@ -684,6 +688,7 @@ func present(delta: float, listener: Vector3) -> void:
 
 
 func _present_zombies(delta: float, listener: Vector3) -> void:
+	lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
 	for key: int in _zombies.keys():
 		var entry: Dictionary = _zombies[key]
 		var body: Node3D = entry["body"]

@@ -101,6 +101,11 @@ const STEP_REACH := 0.2
 
 var _shape: CollisionShape3D = null
 
+## Where and which way the last lift over a lip found no tread. The world there has not moved,
+## so a body pressed against the same wall does not test it again every tick until it has.
+var _no_step_at := Vector3.INF
+var _no_step_dir := Vector3.ZERO
+
 
 func _ready() -> void:
 	floor_snap_length = 0.5
@@ -247,6 +252,9 @@ func _step_up(direction: Vector3) -> void:
 		if hit != null and hit.has_meta(&"barricade"):
 			return
 
+	if global_position.distance_squared_to(_no_step_at) < 0.0025 and direction.dot(_no_step_dir) > 0.97:
+		return
+
 	# Lowest lift first: a low lip under a ceiling slab has no room for the full height.
 	for rise: float in [0.15, 0.3, STEP_UP]:
 		var lifted := global_transform
@@ -264,7 +272,11 @@ func _step_up(direction: Vector3) -> void:
 			lifted.origin.y -= landing.get_travel().length()
 
 		global_transform = lifted
+		_no_step_at = Vector3.INF
 		return
+
+	_no_step_at = global_position
+	_no_step_dir = direction
 
 
 ## Starts a leap with [param launch] as its velocity.

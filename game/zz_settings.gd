@@ -69,6 +69,8 @@ static func schema_for() -> DotSettingsSchema:
 		.with_description("The end-of-map announcement appears at once, with nothing sliding, rising or bursting."))
 	s.add(DotSettingsDef.boolean(&"gore", true, &"video").with_description(
 		"Blood splatters on the surface behind a zombie or survivor you hit."))
+	s.add(DotSettingsDef.integer(&"crowd_detail", 1, 0, 2, &"video").with_description(
+		"How near a zombie must be to be animated every frame, cast a shadow and be drawn at all."))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
 
 
@@ -77,6 +79,10 @@ func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
 	if menu != null:
 		var video := menu.page(&"video")
 		DotMenuStock.add_gore_row(video)
+		if video != null:
+			video.section("Image").add(DotMenuRow.select(&"crowd_detail", "Crowd detail",
+				"Low animates, shadows and draws far zombies less: faster in a big horde.",
+				[[0, "Low"], [1, "Normal"], [2, "High"]]))
 		var general := menu.page(&"general")
 		if general != null:
 			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",

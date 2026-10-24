@@ -72,6 +72,24 @@ What is left is the brains' own thinking (path following, the ring, the swing) a
 
 Measured `--from=10 --profile`, seed 1, before (all four repos stashed, VM load 2.5) and after (load 4 to 7): school 16.5 → 9.1 ms mean, worst 140 → 22; mall 17.4 → 10.0 to 10.2, worst over 100 → 24 to 33; ballpark 18.9 → 8.7, worst 150 → 25. After, brains are 2.2 to 2.5 ms, bodies 1.0 to 2.2, perception 0.8 to 1.1, and the stand-ins (bots and players) about 2. `headless_survival`'s wave-1 minute is 2.4 to 4.4 ms on every big map. The slowest ticks left are a few parts at once over their means, which is the machine more than the game.
 
+**A solo frame on a converted map (zz-perf, 2026-10-23).** Reported at wave 7 on zm_abandoned_mall, solo with 56 zombies: 35 fps, physics 15.6 ms over 1.7 steps, 6013 draws. `tools/shot_bench.sh` is the fixed-seed benchmark (`--zombies=56 --seed=7`, every zombie forced onto the player from 8 to 40 m out, 20 s measured after 4 s; `--profile` adds the tick by part); it prints one BENCH line and runs on a GPU box through `../gpu.sh shot`. On the laptop box (GTX 1660 Ti, Forward+ under Xvfb), the same seed before and after (the box is shared: its GPU time ranged 9 to 20 ms between runs, so compare physics and draws first):
+
+| zm_abandoned_mall | fps | frame ms (p99) | physics ms (steps) | render ms | draws | objects |
+| --- | --- | --- | --- | --- | --- | --- |
+| 56 zombies, before | 9.0 | 110.8 (165) | 72.2 (6.6) | 31.8 | 3173 | 5010 |
+| 56 zombies, after | 16.9 | 59.2 (108) | 36.0 (3.5) | 17.0 | 1497 | 2384 |
+| no zombies, before | 39.5 | 25.3 (38.5) | 4.9 (1.5) | 17.2 | 3007 | 4829 |
+| no zombies, after | 42.1 | 23.8 (29.4) | 4.9 (1.4) | 15.6 | 1312 | 2149 |
+
+- **The frame is a spiral, not a sum.** Solo, the game's tick runs in the physics step, and a frame owes one step per 16.7 ms it took: a frame of R ms of drawing with a tick of T ms settles at R / (1 − T / 16.7). The reported 28 ms is about that formula with R 12 and T 9.2, and every millisecond off the tick is worth two or three off the frame.
+- **One draw per material, not per brush face** (dot-map's `build_meshes`): a world chunk's faces that share a material are one surface. Draws halved and the render went from 32 to 17 ms.
+- **Stand-in props are drawn to a range by their size** (dot-map's `prop_view_per_metre`, 60 m per metre, at least 30 m): a can is gone at 30 m, a shelf at 120.
+- **A body pressed against a wall stops testing a step-up there** (`ZzZombieBody._step_up`) until it moves or turns: the three lifted sweeps per failed step were a third of the bodies' cost in a crowd at the shop fronts.
+- **Crowd detail** (client, Video, `crowd_detail`: Low, Normal, High; `npcs/zz_zombie_lod.gd`): a zombie is animated every frame within 22 m, every second to 45 m and every fourth past it, every eighth outside the view, casts no shadow past 30 m and is not drawn past 120 m (Normal; Low 12/25/15/70, High 40/80/60/160). Normal is the old animation distances, so near zombies look the same.
+- **`zz_zombie_think_range`** (server, default 1) scales the distances past which zombies think and step less often. It saves little in this benchmark: a crowd in reach swings, and a swinging zombie thinks every tick.
+
+What is left is the tick: about 120 µs of script per zombie per tick on this CPU (thinking 70, of which the path step is 55 µs a call, the body's sweep 55 µs, senses 17), so 56 zombies in reach are 7 ms of the 10 ms tick, and the solo player and stand-ins most of the rest. 60 fps needs that tick near 4 ms; 100 needs it near 2 ms and a render near 7, which is the crowd stepped in native code, not more distance tiers. The physics engine's own `move_and_slide` costs 40% less under Jolt in a 56-capsule measurement; the game still runs GodotPhysics3D. Under Xvfb the laptop's render is about 6 ms more than its GPU time (15.6 against 7.7 with no zombies), so a frame on a desktop is faster than these numbers.
+
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
 
 `tools/survival_long_run.tscn` plays a whole hold on one map with its full team of stand-ins, headless, and prints a row per wave: seconds, sent, most alive, downs and deaths (and what downed them), barricades broken, the team up at its end, the tick's mean and worst, and a `RESULT` JSON line. `--from=K` starts at wave K (barricades whole, nobody hurt, the caches at K's tier), `--profile` splits the tick by part, `--watch=S --detail` says where the wave's zombies are and why. A school's ten waves are about 35 minutes of play and longer than that on a shared VM, so the runs were split: from wave 1 as far as nine minutes go, and from 4, 7, 9 and 10, several seeds, eight at a time.

@@ -484,6 +484,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_zombie_spread", 1.0 if config.zombie_spread else 0.0,
 		"Send each zombie through the least used choke on its way, not all down one route; 0 off",
 		func(value: float) -> void: config.zombie_spread = value > 0.5)
+	_tunable("zz_zombie_think_range", config.think_range,
+		"Scales the distances past which far zombies think and move less often; below 1 is cheaper",
+		func(value: float) -> void: config.think_range = clampf(value, 0.25, 4.0))
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)

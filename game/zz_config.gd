@@ -215,6 +215,10 @@ func setup_seconds() -> float:
 ## arrives by every way in and not down one in a line. `zz_zombie_spread`.
 @export var zombie_spread: bool = true
 
+## Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its
+## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
+@export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
+
 ## Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in
 ## place of a post at a window. `zz_bot_hold_chokes`.
 @export var bot_hold_chokes: bool = true

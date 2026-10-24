@@ -28,15 +28,17 @@ const ZzZombieBody := preload("zz_zombie_body.gd")
 ## hand ([method present]) and the bone shapes and the flinch applied after it, because left to
 ## the engine the clip and the override run in an order nothing controls and the clip wins.
 ##
-## [b]Far zombies animate less often.[/b] [method present] advances a zombie past
-## [constant LOD_NEAR] metres every second frame and past [constant LOD_FAR] every fourth, with
-## the time it skipped, so its feet stay where its walk puts them. Skinning forty bodies is most
-## of what a horde costs a browser; nobody can see a step at sixty metres.
+## [b]Far and unseen zombies animate less often[/b] ([member lod], `zz_zombie_lod.gd`): past its
+## `near` every second frame, past `far` every fourth, outside the view every eighth, with the
+## time skipped, so its feet stay where its walk puts them. Past `shadow_until` it casts none.
 
 const CHANNEL := "zz.zombie_view"
+const ZzZombieLod := preload("zz_zombie_lod.gd")
 
-const LOD_NEAR := 22.0
-const LOD_FAR := 45.0
+## The world view's shared level-of-detail rules; a view without one makes its own.
+var lod: ZzZombieLod = null
+var _shadowed := true
+var _own_lod := false
 
 ## Below 1, the mesh switches to its simpler levels sooner. A crowd is small on screen.
 const LOD_BIAS := 0.4
@@ -317,7 +319,7 @@ func build(p_kind: StringName, p_variant: int) -> void:
 	_material = _mesh.material_override as ShaderMaterial
 	# A zombie a long way off is not drawn at all: the far end of a street is where a horde
 	# is thickest and where nobody can make one out.
-	_mesh.visibility_range_end = 120.0
+	_mesh.visibility_range_end = lod.draw_until if lod != null else 120.0
 	_mesh.lod_bias = LOD_BIAS
 	_mesh.visibility_range_end_margin = 10.0
 
@@ -905,13 +907,21 @@ func present(delta: float, anim: int, flags: int) -> void:
 
 	_play(clip, rate)
 
-	# Level of detail: how often this one is advanced, by how far it is from the camera.
+	# Level of detail: how often this one is advanced, by where it is from the camera.
 	var every := 1
-	var camera := get_viewport().get_camera_3d() if is_inside_tree() else null
 
-	if camera != null and _death.is_empty():
-		var far := camera.global_position.distance_to(at)
-		every = 4 if far > LOD_FAR else (2 if far > LOD_NEAR else 1)
+	if _death.is_empty():
+		if lod == null or _own_lod:
+			_own_lod = true
+			lod = lod if lod != null else ZzZombieLod.new()
+			lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
+		every = lod.every(at)
+		if _mesh != null and lod.camera_at != Vector3.INF:
+			var shadowed := lod.camera_at.distance_to(at) < lod.shadow_until
+			if shadowed != _shadowed:
+				_shadowed = shadowed
+				_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadowed \
+						else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	_owed += delta
 	_flinch = maxf(_flinch - delta * 4.0, 0.0)

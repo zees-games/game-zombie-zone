@@ -139,6 +139,7 @@ tools/               soak.tscn (bot soak, docs/soak.md), nav_probe, nav_render (
 python3 ../zombie-zone-maps/tools/build_maps.py --check
 tools/bake_lightmaps.sh zz_lot                           # rebake one map's light (the GPU box); BAKE_LOCAL=1 for here
 godot --headless --path . res://tools/survival_long_run.tscn -- --map=zz_high_school [--from=7] [--profile] [--watch=30 --detail]
+../gpu.sh shot game-zombie-zone tools/shot_bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56 [--profile]   # solo frame ([survival](docs/survival.md#the-cost-of-a-crowd))
 tools/server_probe.sh [16 32 64 100 128]   # server tick by phase, N peers plus the horde, 64 and 33 Hz ([survival](docs/survival.md#the-server-tick-at-16-to-128-survivors-zz-scale-probe-1-2026-10-19))
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --zz-map-ids=zz_blackout_1

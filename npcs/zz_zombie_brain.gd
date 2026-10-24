@@ -379,7 +379,10 @@ func _think_every() -> int:
 
 	if now_s - _nearest_at >= 0.3:
 		_nearest_at = now_s
-		_nearest = float(h.call(&"nearest_survivor_distance", npc.position()))
+		var config: Variant = h.get(&"config")
+		var scale := float(config.think_range) if config != null else 1.0
+		# Distances are compared divided by `ZzConfig.think_range` (zz_zombie_think_range).
+		_nearest = float(h.call(&"nearest_survivor_distance", npc.position())) / scale
 		var b := body()
 		if b != null:
 			b.set_stride(1 if _nearest < BODY_STRIDE_FROM else 2)
