@@ -97,6 +97,12 @@ var _killcam_sec: float = -1.0
 var _map_ending: bool = false
 var _end_point := Vector3.ZERO
 var _end_left := 0.0
+## The longest an ending holds the clock slow or the camera away, in real seconds (the window cvar's own ceiling).
+const END_HOLD_MAX := 20.0
+## Lets a headless run apply the slow motion, which it skips by default.
+var slowmo_in_headless := false
+var _slowed := false
+var _slow_gen := 0
 var _end_elapsed := 0.0
 var _end_weight := 0.0
 var _end_active := false
@@ -282,6 +288,7 @@ func _avatar_figure(peer_id: int) -> Object:
 
 
 func _exit_tree() -> void:
+	reset_slowmo()
 	ZeeModelCache.set_asset_root("res://")
 
 
@@ -753,14 +760,28 @@ func _on_notice(text: String) -> void:
 ## the game's clock is the server's, so only what is drawn and heard slows.
 func _on_map_ending(_won: bool, time_scale: float, seconds: float, camera_point: Variant) -> void:
 	var slow := time_scale < 1.0 and seconds > 0.0
-	var real_seconds := seconds * time_scale if slow else seconds
+	var real_seconds := minf(seconds * time_scale if slow else seconds, END_HOLD_MAX)
 	if camera_point is Vector3 and game != null and game.end_camera_rules.is_on():
 		begin_end_camera(camera_point, real_seconds if real_seconds > 0.0 else game.end_camera_rules.window)
-	if not slow or DisplayServer.get_name() == "headless":
+	if not slow or (DisplayServer.get_name() == "headless" and not slowmo_in_headless):
 		return
+	reset_slowmo()
+	_slowed = true
 	Engine.time_scale = time_scale
+	# Only the newest ending's timer may restore the clock: an older one would end this one early.
+	var gen := _slow_gen
 	var t := get_tree().create_timer(real_seconds, true, false, true)
-	t.timeout.connect(func() -> void: Engine.time_scale = 1.0)
+	t.timeout.connect(func() -> void:
+		if gen == _slow_gen:
+			reset_slowmo())
+
+
+## Gives the clock back to normal speed and drops any pending slow-motion timer.
+func reset_slowmo() -> void:
+	_slow_gen += 1
+	if _slowed:
+		Engine.time_scale = 1.0
+		_slowed = false
 
 
 ## Starts the ending camera at [param point] for [param real_seconds] of unscaled time.
@@ -816,6 +837,7 @@ func _on_phase(phase: int) -> void:
 
 
 func _on_map(map_id: StringName) -> void:
+	reset_slowmo()
 	_end_active = false
 	_end_weight = 0.0
 	if audio != null:

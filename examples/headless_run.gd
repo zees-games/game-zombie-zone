@@ -5,6 +5,7 @@ const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzWaterRules := preload("../game/zz_water_rules.gd")
 const ZzClient := preload("../game/zz_client.gd")
+const ZzUnstick := preload("../game/zz_unstick.gd")
 const ZzEndCameraRules := preload("../game/zz_end_camera_rules.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
@@ -40,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 44
 
-const CHECKS := 327
+const CHECKS := 333
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -355,9 +356,50 @@ func _test_a_wedged_zombie() -> void:
 	_check(pinned, "with the watchdog off it stays against the wall", "z %.2f wall %.2f" % [npc.position().z, wall_z])
 	game.config.unstick_seconds = 1.0
 	await _sim(game, 8.0)
-	_check(npc.position().z > wall_z, "with it on the zombie is put past the wall", "z %.2f wall %.2f" % [npc.position().z, wall_z])
-	_check(npc.position().distance_to(me.feet()) < 8.0 and npc.is_alive(), "and goes on toward the survivor", "%.1f m" % npc.position().distance_to(me.feet()))
+	_check(npc.position().z < wall_z and npc.is_alive(), "with it on the zombie is still not put through a solid wall", "z %.2f wall %.2f" % [npc.position().z, wall_z])
 	wall.queue_free()
+	var origin := Vector3(300.0, 0.0, 300.0)
+	var floor_body := StaticBody3D.new()
+	floor_body.collision_layer = game.world_mask()
+	var floor_shape := CollisionShape3D.new()
+	var floor_box := BoxShape3D.new()
+	floor_box.size = Vector3(40.0, 1.0, 40.0)
+	floor_shape.shape = floor_box
+	floor_body.add_child(floor_shape)
+	game.add_child(floor_body)
+	floor_body.global_position = origin + Vector3(0.0, -0.5, 0.0)
+	var thin := StaticBody3D.new()
+	thin.collision_layer = game.world_mask()
+	var thin_shape := CollisionShape3D.new()
+	var thin_box := BoxShape3D.new()
+	thin_box.size = Vector3(0.1, 3.0, 8.0)
+	thin_shape.shape = thin_box
+	thin.add_child(thin_shape)
+	game.add_child(thin)
+	thin.global_position = origin + Vector3(1.0, 1.5, 0.0)
+	var mover := CharacterBody3D.new()
+	mover.collision_layer = 0
+	mover.collision_mask = game.world_mask()
+	var cap_shape := CollisionShape3D.new()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.35
+	capsule.height = 1.8
+	cap_shape.shape = capsule
+	cap_shape.position.y = 0.9
+	mover.add_child(cap_shape)
+	game.add_child(mover)
+	mover.global_position = origin + Vector3(0.3, 0.0, 0.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var behind := origin + Vector3(3.5, 0.0, 0.0)
+	var start := mover.global_position
+	_check(not ZzUnstick.relocate(mover, behind) and mover.global_position.is_equal_approx(start),
+		"a mover at a thin wall is not relocated to the far side where its goal is", str(mover.global_position))
+	_check(ZzUnstick.relocate(mover, origin + Vector3(-3.5, 0.0, 0.0)) and mover.global_position.x < start.x - 1.0,
+		"but an open way toward the goal still is taken", str(mover.global_position))
+	mover.queue_free()
+	thin.queue_free()
+	floor_body.queue_free()
 	_finished()
 
 
@@ -2156,6 +2198,20 @@ func _test_the_client_platform() -> void:
 		await get_tree().process_frame
 	_check(client.end_camera_weight() == 0.0, "zz_end_camera 0 keeps the view even then")
 	rules.enabled = 1.0
+	client.slowmo_in_headless = true
+	client._on_map_ending(true, 0.5, 1.0, null)
+	_check(is_equal_approx(Engine.time_scale, 0.5), "an ending with slow motion slows the clock", str(Engine.time_scale))
+	await get_tree().create_timer(0.3, true, false, true).timeout
+	client._on_map_ending(true, 0.5, 2.0, null)
+	await get_tree().create_timer(0.35, true, false, true).timeout
+	_check(is_equal_approx(Engine.time_scale, 0.5), "a second ending is not cut short by the first one's timer", str(Engine.time_scale))
+	client.reset_slowmo()
+	_check(Engine.time_scale == 1.0, "leaving or changing map gives the clock back")
+	client._on_map_ending(true, 0.05, 9999.0, null)
+	_check(client._slowed and Engine.time_scale == 0.05, "a huge slow-motion request still arms a bounded hold")
+	client.reset_slowmo()
+	client.slowmo_in_headless = false
+	_check(Engine.time_scale == 1.0, "and a reset brings it back")
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame

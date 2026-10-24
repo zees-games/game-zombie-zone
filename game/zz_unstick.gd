@@ -30,21 +30,11 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	if body.test_move(lifted, Vector3.ZERO):
 		return false
 
-	# And nothing solid between here and there. `test_move` at the destination only asks whether
-	# the body fits THERE, so a wedged zombie tearing at a 0.14 m barricade (stuck for a second by
-	# design) was nudged clean through the boards, standing intact: the destination was free,
-	# the wall in between was never looked at. Rays at knee and chest height catch a thin wall
-	# that a swept shape would also catch, without refusing the sill or chamfer the sweep clips.
-	var space := body.get_world_3d().direct_space_state
-	var from := body.global_transform.origin
-
-	for height: float in [0.4, 1.2]:
-		var query := PhysicsRayQueryParameters3D.create(
-			from + Vector3(0.0, height, 0.0), lifted.origin + Vector3(0.0, height - 0.08, 0.0),
-			body.collision_mask, [body.get_rid()])
-
-		if not space.intersect_ray(query).is_empty():
-			return false
+	# `test_move` at the destination only asks whether the body fits THERE, so a wedged zombie
+	# tearing at a 0.14 m barricade was once nudged clean through the boards. Rays at knee and chest
+	# height catch a thin wall without refusing the sill or chamfer a swept shape clips.
+	if walled_off(body, body.global_transform.origin, lifted.origin - Vector3(0.0, 0.08, 0.0)):
+		return false
 
 	# And ground within a step below, so a nudge is never off a ledge.
 	if not body.test_move(lifted, Vector3(0.0, -0.6, 0.0)):
@@ -54,9 +44,23 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	return true
 
 
+## Whether something solid lies between [param from] and [param to] at knee or chest height.
+static func walled_off(body: CharacterBody3D, from: Vector3, to: Vector3) -> bool:
+	var space := body.get_world_3d().direct_space_state
+
+	for height: float in [0.4, 1.2]:
+		var query := PhysicsRayQueryParameters3D.create(from + Vector3(0.0, height, 0.0),
+			to + Vector3(0.0, height, 0.0), body.collision_mask, [body.get_rid()])
+
+		if not space.intersect_ray(query).is_empty():
+			return true
+
+	return false
+
+
 ## Puts [param body] on the clear, grounded spot within a few metres that is nearest
 ## [param goal], when that is closer to it than the body is. The last resort after [method nudge]:
-## it moves farther, so it only takes a spot the body fits on, not over a drop. Returns whether it moved.
+## it moves farther, so it only takes a spot the body fits on, not over a drop, and in sight of here through no wall. Returns whether it moved.
 static func relocate(body: CharacterBody3D, goal: Vector3) -> bool:
 	if body == null:
 		return false
@@ -72,6 +76,9 @@ static func relocate(body: CharacterBody3D, goal: Vector3) -> bool:
 			to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius + Vector3(0.0, 0.08, 0.0)
 
 			if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
+				continue
+
+			if walled_off(body, here, to.origin - Vector3(0.0, 0.08, 0.0)):
 				continue
 
 			var d := to.origin.distance_to(goal)
