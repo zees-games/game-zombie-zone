@@ -66,7 +66,7 @@ const HIT_MARGIN := 0.06
 
 ## How much deeper than drawn a ground slab collides (see `_build_boxes`).
 const GROUND_DEPTH := 1.8
-## An invisible slab this far above everything playable is a sky box: nobody reaches it, so it does not collide.
+## A hidden box with no `kind` (an older document) this far above everything playable is a sky box.
 const SKY_CLEARANCE := 30.0
 
 ## How far past the playable ground (the nav floors, spawns and route) the invisible boundary
@@ -484,6 +484,16 @@ func _build_boundary() -> void:
 		body.add_child(shape)
 
 
+## Whether an invisible box stops movers: its `kind` says (sky never does), else its height does.
+func _collides_hidden(box: Dictionary, bottom: float, sky_floor: float) -> bool:
+	match str(box.get("kind", "")):
+		"sky":
+			return false
+		"clip", "nodraw":
+			return true
+	return bottom < sky_floor
+
+
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
@@ -525,7 +535,7 @@ func _build_boxes() -> void:
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			if bool(box.get("visible", true)):
 				_solid.add_child(shape)
-			elif at.y - size.y * 0.5 < sky_floor:
+			elif _collides_hidden(box, at.y - size.y * 0.5, sky_floor):
 				_clip.add_child(shape)
 			else:
 				shape.free()

@@ -58,6 +58,8 @@ const FORMAT := 1
 const TRIM_SIZE := 0.3
 
 const KIND := "zombiezone_map"
+## The words a hidden box's `kind` may take.
+const HIDDEN_KINDS: PackedStringArray = ["clip", "nodraw", "sky"]
 
 ## The largest a document may be on the wire, compressed. A WebSocket's outbound buffer is
 ## sixty-four kilobytes and a message past it is never sent (mg-look-at-me's finding), so a map
@@ -617,6 +619,10 @@ static func _box(raw: Variant) -> Dictionary:
 	# Drawn unless the map says not: an invisible wall that keeps people in the map.
 	if b.has("visible") and not bool(b["visible"]):
 		out["visible"] = false
+
+	# What an invisible box is (`clip`, `nodraw`, `sky`); older documents say nothing.
+	if b.has("kind") and HIDDEN_KINDS.has(str(b["kind"])):
+		out["kind"] = str(b["kind"])
 
 	# A door an objective opens: removed, collision and all, when it does.
 	if b.has("gate"):
