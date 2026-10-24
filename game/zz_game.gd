@@ -15,6 +15,7 @@ const ZzShop := preload("zz_shop.gd")
 const ZzMap := preload("zz_map.gd")
 const ZzPacks := preload("zz_packs.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzMapCommands := preload("zz_map_commands.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPaths := preload("zz_paths.gd")
@@ -595,15 +596,12 @@ func _build_map() -> void:
 	map.occupants_fn = _mechanics_occupied
 	map.points_fn = _mechanics_points
 	map.opener_fn = _mechanics_opener
-	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
-	add_child(map)
-
-
 	map.volume_bodies_fn = _volume_bodies
 	map.volume_damage_fn = _volume_damage
 	map.volume_move_fn = _volume_move
-func _mechanics_of_map() -> Variant:
-	return map.mechanics if map != null else null
+	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
+	map.logic_event.connect(_on_map_logic_event)
+	add_child(map)
 
 
 ## Survivors' team and the horde's in a converted map's team filters (the source game's CT and T).
@@ -682,6 +680,37 @@ func _volume_move(body: Variant, motion: Variant) -> void:
 			horde.warp(body as DotNpcInstance, at, yaw)
 	elif motion is Vector3 and body is DotNpcInstance and horde != null:
 		horde.throw_zombie(body as DotNpcInstance, motion as Vector3)
+
+
+## What a map's own logic asks for: its text on the HUD, a zombie from its spawner, a setting from the short list
+## ([ZzMapCommands]) and the force a hurt volume throws a zombie with.
+func _on_map_logic_event(kind: String, data: Dictionary) -> void:
+	match kind:
+		"hud_text":
+			var text := str(data.get("message", "")).strip_edges()
+			if text != "":
+				notice.emit(text)
+		"say":
+			var line := str(data.get("text", "")).strip_edges().trim_prefix("say ").strip_edges()
+			if line != "":
+				notice.emit(line)
+		"cvar":
+			var applied := ZzMapCommands.translate(str(data.get("name", "")), str(data.get("text", "")).get_slice(" ", 1))
+			if applied.get("key", "") == "zz_friendly_fire":
+				config.friendly_fire = float(applied["value"])
+			elif applied.get("key", "") == "zz_difficulty":
+				config.difficulty = int(applied["value"])
+		"npc_spawn":
+			if horde != null and authoritative:
+				var _made := horde.spawn_common_at(data["at"] as Vector3)
+		"damage_force":
+			var npc: Variant = data.get("body")
+			if npc is DotNpcInstance and horde != null:
+				horde.throw_zombie(npc as DotNpcInstance, data["force"] as Vector3)
+
+
+func _mechanics_of_map() -> Variant:
+	return map.mechanics if map != null else null
 
 
 ## Living survivors' body points, for the map's triggers.

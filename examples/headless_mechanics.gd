@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
+const MapCommands := preload("../game/zz_map_commands.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
@@ -19,8 +20,8 @@ const ZzPlayer := preload("../game/zz_player.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 7
-const CHECKS := 61
+const SECTIONS := 10
+const CHECKS := 88
 
 var _passed := 0
 var _failed := 0
@@ -70,6 +71,9 @@ func _run() -> void:
 	await _test_button_and_delay()
 	await _test_volume_and_unsupported()
 	await _test_volumes()
+	await _test_logic_fixture()
+	await _test_logic_blockfort()
+	await _test_logic_death_star()
 	await _test_no_world()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
@@ -257,7 +261,7 @@ func _fixture() -> Dictionary:
 			"distance": 3.0, "travel_time": 1.0, "speed": 3.0, "wait": -1.0, "locked": false, "toggle": false, "start_open": false,
 			"use": false, "touch": false, "solid": true}
 	var link := func(from: int, output: String, input: String, to: int, delay: float) -> Dictionary:
-		return {"from": from, "from_name": "", "output": output, "target": "t%d" % to, "input": input, "param": "", "delay": delay, "times": -1, "special": false, "to": [to]}
+		return {"from": from, "from_name": "", "output": output, "target": {1: "pad", 2: "door_a", 3: "relay", 4: "door_b"}.get(to, "t%d" % to), "input": input, "param": "", "delay": delay, "times": -1, "special": false, "to": [to]}
 	return {
 		"movers": [
 			{"entity": 1, "model": 1, "kind": "button", "classname": "func_button", "targetname": "pad", "origin": [0.0, 1.0, 0.0],
@@ -540,10 +544,11 @@ func _test_volume_and_unsupported() -> void:
 
 	var seen: Dictionary = mech.get("_unsupported_seen")
 	var noted := 0
-	for key: String in seen:
-		if key.to_lower().contains("frobnicate") or key.begins_with("volume water"):
+	var gone: Dictionary = mech.logic().unhandled if mech.logic() != null else {}
+	for key: Variant in seen.keys() + gone.keys():
+		if str(key).to_lower().contains("frobnicate") or str(key).begins_with("volume water"):
 			noted += 1
-	_check(noted == 2, "an unknown input and a water volume are each noted once", str(seen.keys()))
+	_check(noted == 2, "an unknown input and a water volume are each noted once", str(seen.keys()) + str(gone.keys()))
 
 	var hurts: Array[float] = []
 	mech.bodies_fn = func() -> Array:
@@ -681,6 +686,221 @@ func _test_volumes() -> void:
 		wire_ok = wire_ok and bool(wire["ok"]) and int(wire["index"]) == int(push["idx"]) and bool(wire["locked"]) == (not off)
 	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
 
+	game.queue_free()
+	_finished += 1
+
+
+# --- The map's logic (dot-map's DotMapIO under the mechanics) -----------------------------------
+
+func _logic_rec(entity: int, classname: String, targetname: String, keys: Dictionary) -> Dictionary:
+	return {"entity": entity, "classname": classname, "targetname": targetname, "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": keys}
+
+
+func _logic_link(from: int, output: String, target: String, input: String, to: Array, delay := 0.0, param := "") -> Dictionary:
+	return {"from": from, "from_name": "", "output": output, "target": target, "input": input, "param": param, "delay": delay, "times": -1, "special": false, "to": to}
+
+
+func _logic_fixture() -> Dictionary:
+	var fx := _fixture()
+	fx["volumes"] = []
+	fx["movers"] = [fx["movers"][1]]
+	fx["entities"] = [
+		_logic_rec(10, "logic_relay", "relay_a", {}),
+		_logic_rec(11, "math_counter", "cnt", {"min": "0", "max": "3"}),
+		_logic_rec(12, "logic_relay", "relay_b", {}),
+		_logic_rec(13, "game_text", "msg", {"message": "Hold!", "spawnflags": "1"}),
+		_logic_rec(14, "logic_case", "case", {"case01": "a", "case02": "b"}),
+		_logic_rec(15, "game_text", "msg_b", {"message": "Case B"}),
+		_logic_rec(16, "logic_compare", "cmp", {"initialvalue": "1", "comparevalue": "1"}),
+		_logic_rec(17, "logic_branch", "br", {"initialvalue": "0"}),
+		_logic_rec(18, "env_entity_maker", "maker", {"entitytemplate": "tpl", "origin": "100 200 300"}),
+		_logic_rec(19, "point_template", "tpl", {"template01": "prop_a", "spawnflags": "2"}),
+		_logic_rec(20, "logic_relay", "prop_a", {}),
+		_logic_rec(21, "npc_template_maker", "zmaker", {"templatename": "normal", "maxnpccount": "2", "spawnfrequency": "1", "origin": "100 200 300"}),
+		_logic_rec(22, "point_servercommand", "cmd", {}),
+		_logic_rec(23, "game_text", "msg_c", {"message": "Equal"}),
+		_logic_rec(24, "game_text", "msg_d", {"message": "True"}),
+		_logic_rec(25, "game_text", "msg_e", {"message": "Copy spawned"}),
+	]
+	var l := _logic_link
+	fx["links"] = [
+		l.call(10, "OnTrigger", "cnt", "Add", [11], 0.0, "1"),
+		l.call(10, "OnTrigger", "relay_b", "Trigger", [12], 2.0),
+		l.call(10, "OnTrigger", "msg", "Display", [13], 0.5),
+		l.call(10, "OnTrigger", "ghost", "Trigger", [], 0.0),
+		l.call(10, "OnTrigger", "cmd", "Command", [22], 0.0, "say Hello"),
+		l.call(10, "OnTrigger", "cmd", "Command", [22], 0.0, "mp_friendlyfire 1"),
+		l.call(10, "OnTrigger", "cmd", "Command", [22], 0.0, "sv_gravity 100"),
+		l.call(10, "OnTrigger", "cmd", "Command", [22], 0.0, "quit"),
+		l.call(12, "OnTrigger", "cnt", "Add", [11], 1.0, "2"),
+		l.call(11, "OnHitMax", "door_a", "Open", [2]),
+		l.call(14, "OnCase02", "msg_b", "Display", [15], 0.25),
+		l.call(16, "OnEqualTo", "msg_c", "Display", [23]),
+		l.call(17, "OnTrue", "msg_d", "Display", [24]),
+		l.call(20, "OnSpawn", "msg_e", "Display", [25]),
+	]
+	return fx
+
+
+func _logic_mech(fx: Dictionary) -> ZzMechanics:
+	var mech := ZzMechanics.new()
+	mech.tick_rate = TICK_RATE
+	add_child(mech)
+	mech.build(FakeWorld.new(fx), Callable())
+	return mech
+
+
+func _texts(events: Array) -> Array:
+	return events.filter(func(e: Array) -> bool: return e[0] == "hud_text").map(func(e: Array) -> String: return str(e[1]["message"]))
+
+
+func _test_logic_fixture() -> void:
+	_entered += 1
+	print("the map's logic: relays, counters, cases, compare, branch, texts, makers, commands")
+	var mech := _logic_mech(_logic_fixture())
+	var events: Array = []
+	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data, mech.logic().now]))
+	var io := mech.logic()
+	_check(io != null and io.entities.size() >= 16, "every entity of the manifest is in the runtime", str(io.entities.size() if io != null else -1))
+	mech.step(1)
+	events.clear()
+	var door := mech.index_of("door_a")
+	var _r := io.send("relay_a", "Trigger")
+	var at_text := -1
+	var at_door := -1
+	for t in range(2, 260):
+		mech.step(t)
+		if at_text < 0 and not _texts(events).is_empty():
+			at_text = io.now
+		if at_door < 0 and mech.fraction_at(door, t) > 0.0:
+			at_door = io.now
+	_check(at_text == 32, "a relay's output waits its 0.5 s (32 ticks) before the text shows", str(at_text))
+	_check(_texts(events) == ["Hold!"], "and the text is the entity's message", str(_texts(events)))
+	var counter := io.entity_of(11) as DotMapCounter
+	_check(counter.value == 3.0, "the counter took 1 now and 2 after the second relay's 2 s + 1 s", str(counter.value))
+	_check(at_door >= 192 and at_door <= 195, "its OnHitMax opened the door at the 3 s mark (delays add: 2 s + 1 s)", str(at_door))
+	var npc_spawns := events.filter(func(e: Array) -> bool: return e[0] == "npc_spawn").size()
+	var says := events.filter(func(e: Array) -> bool: return e[0] == "say")
+	var cvars := events.filter(func(e: Array) -> bool: return e[0] == "cvar")
+	_check(says.size() == 1 and cvars.size() == 1, "a chat line and the listed setting went to the game", "%d say, %d cvar" % [says.size(), cvars.size()])
+	_check(io.commands.filter(func(c: Dictionary) -> bool: return not c["allowed"]).size() == 2, "a gravity change and a quit were denied, never run")
+	var translated := MapCommands.translate("mp_friendlyfire", "1")
+	_check(translated.get("key", "") == "zz_friendly_fire" and translated.get("value", -1.0) == 1.0 and MapCommands.translate("sv_gravity", "100").is_empty()
+			and MapCommands.translate("zz_difficulty", "9").get("value", -1.0) == 3.0, "the whitelist maps a cvar onto a tunable and clamps it")
+	var report := mech.logic_report()
+	_check((report["unresolved"] as Dictionary).has("ghost") and (report["unresolved"] as Dictionary).size() == 1, "a link to a name nothing carries is reported", str(report["unresolved"]))
+
+	events.clear()
+	var _s := io.send("case", "InValue", "b")
+	_s = io.send("case", "InValue", "zzz")
+	_s = io.send("cmp", "Compare")
+	_s = io.send("br", "SetValueTest", "1")
+	for t in range(260, 260 + 20):
+		mech.step(t)
+	_check(_texts(events) == ["Equal", "True", "Case B"], "a case picks by value, a compare and a branch fire their branch", str(_texts(events)))
+
+	events.clear()
+	var before := io.entities.size()
+	_s = io.send("maker", "ForceSpawn")
+	var made := events.filter(func(e: Array) -> bool: return e[0] == "template_spawn").size()
+	var at: Vector3 = (events.filter(func(e: Array) -> bool: return e[0] == "maker_spawn")[0][1]["at"]) if made > 0 else Vector3.ZERO
+	_check(made == 1 and io.entities.size() == before + 1, "a maker's ForceSpawn copies its template's entity", "%d copies, %d entities" % [made, io.entities.size() - before])
+	_check(at.distance_to(Vector3(100.0, 300.0, -200.0) * 0.0254) < 0.01, "and tells the game where the maker stands", str(at))
+	_check(_texts(events) == ["Copy spawned"], "the copy runs its own OnSpawn output", str(_texts(events)))
+
+	_check(npc_spawns == 2, "an NPC maker spawns MaxNPCCount zombies, a second apart, and stops", str(npc_spawns))
+	mech.queue_free()
+	_finished += 1
+
+
+## zm_blockfort ships its logic: a counter that triggers a relay that shows text, a random-case modifier and template makers.
+func _test_logic_blockfort() -> void:
+	_entered += 1
+	print("zm_blockfort: counter, relay, case, text and template makers on the real map")
+	ZzMap.bring_global_mechanics = false
+	var game := await _game(&"zm_blockfort", true)
+	var mech: ZzMechanics = game.map.mechanics
+	_check(mech != null and mech.logic() != null, "a global pack builds the logic runtime")
+	if mech == null or mech.logic() == null:
+		game.queue_free()
+		_finished += 1
+		return
+	var io := mech.logic()
+	var report := mech.logic_report()
+	var manifest_unresolved: int = mech.get("_ents").links.unresolved().size()
+	var left := 0
+	for n: Variant in (report["unresolved"] as Dictionary).values():
+		left += int(n)
+	print("    %d entities, links with no target: %d in the manifest, %d in the runtime; unhandled %s" % [int(report["entities"]), manifest_unresolved, left, str(report["unhandled"])])
+	_check(int(report["entities"]) > 500 and left <= manifest_unresolved, "the runtime leaves no link to a name nothing carries", "%d -> %d" % [manifest_unresolved, left])
+
+	var events: Array = []
+	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data]))
+	var counter := io.entities.filter(func(e: DotMapEntity) -> bool: return e.targetname == "mod_counter")[0] as DotMapCounter
+	for i in 3:
+		var _r := io.send("mod_counter", "Add", "1")
+	_check(_texts(events).is_empty() and counter.value == 3.0, "three adds to a counter that stops at 4 show nothing yet")
+	var _s := io.send("mod_counter", "Add", "1")
+	_check(_texts(events).size() == 1 and _texts(events)[0].begins_with("Round modifier activated"), "the fourth hits max, triggers the relay and shows its text", str(_texts(events)))
+
+	events.clear()
+	var before := io.entities.size()
+	_s = io.send("base_snowman_spawner", "ForceSpawn")
+	_check(events.filter(func(e: Array) -> bool: return e[0] == "template_spawn").size() >= 1 and io.entities.size() > before,
+		"a template maker spawns its template on ForceSpawn", "%d entities" % (io.entities.size() - before))
+
+	events.clear()
+	_s = io.send("mod_random", "PickRandom")
+	await _sim(game, 6 * TICK_RATE)
+	_check(_texts(events).size() == 1, "a random case starts one of the round modifiers after its 5 s", str(_texts(events)))
+	game.queue_free()
+	_finished += 1
+
+
+## ze_death_star_escape in a global pack: the compare that switches the push volumes on later, and the push speed set by the map.
+func _test_logic_death_star() -> void:
+	_entered += 1
+	print("%s: the map's links run in a global pack, pushes switch on later and carry their speed" % VOLUME_MAP)
+	ZzMap.bring_global_mechanics = false
+	var game := await _game(VOLUME_MAP, true)
+	var mech: ZzMechanics = game.map.mechanics
+	if mech == null or mech.logic() == null:
+		_check(false, "the global pack builds its logic")
+		game.queue_free()
+		_finished += 1
+		return
+	var io := mech.logic()
+	var events: Array = []
+	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data]))
+	var push := {}
+	for t in mech.volume_toggles():
+		if str(t["kind"]) == "push" and (t["vol"] as DotMapVolume).targetname == "push":
+			push = t
+	_check(not push.is_empty(), "the map's pushes are built", str(mech.volume_counts()))
+	var _r := io.send("push", "Disable")
+	_check(not bool(push["enabled"]), "a map output can switch a push off")
+	_r = io.send("compare", "SetValue", "1")
+	_r = io.send("compare", "Compare")
+	_check(bool(push["enabled"]), "the map's compare switches it on", "")
+	await _sim(game, 6 * TICK_RATE + 8)
+	_check(not bool(push["enabled"]), "and its delayed Disable switches it off again 5 s later")
+
+	var spot := _volume_spot(push, 0.05)
+	_r = io.send("push", "Enable")
+	var before := mech.push_at(spot, 1.8)
+	_r = io.send("push", "SetPushSpeed", "1000")
+	var after := mech.push_at(spot, 1.8)
+	_check(absf(after.length() - 19.0) < 0.2 and not is_equal_approx(before.length(), after.length()), "SetPushSpeed changes what prediction asks for", "%.1f -> %.1f m/s" % [before.length(), after.length()])
+	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(mech.snapshot(int(push["idx"])), int(push["idx"]))))
+	var client := ZzMechanics.new()
+	client.authoritative = false
+	client.name = "Client"
+	add_child(client)
+	_check(int(wire["start"]) != 0 and absf(ZzMechanics.unpack_push(int(wire["start"])).length() - after.length()) < 0.01, "and the new push crosses the wire", str(wire))
+	client.queue_free()
+
+	var says := events.filter(func(e: Array) -> bool: return e[0] == "say")
+	_check(not says.is_empty() and events.filter(func(e: Array) -> bool: return e[0] == "cvar").is_empty(), "the map's chat lines reach the game and its gravity command does not", "%d say" % says.size())
 	game.queue_free()
 	_finished += 1
 

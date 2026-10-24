@@ -132,6 +132,8 @@ var _pending_movers: Dictionary = {}
 signal built()
 ## A moving part changed state on the server (see [method ZzMechanics.snapshot]).
 signal mover_changed(index: int)
+## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
+signal logic_event(kind: String, data: Dictionary)
 
 var physics: DotPhysicsLayout = null
 
@@ -1251,11 +1253,17 @@ func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 	made.occupants_fn = occupants_fn
 	made.points_fn = points_fn
 	made.opener_fn = opener_fn
+	made.bodies_fn = volume_bodies_fn
+	made.damage_fn = volume_damage_fn
+	made.move_fn = volume_move_fn
+	if authoritative and str(doc.get("world", "")) != "":
+		made.source_doc_path = local_world_prefix() + ".doc.json"
 	made.build(world, func(body: CollisionObject3D) -> void: _put_on(body, &"world"), doors_only)
 	if made.mover_count() == 0 and not made.has_logic():
 		made.free()
 		return
 	made.state_changed.connect(func(index: int) -> void: mover_changed.emit(index))
+	made.logic_event.connect(func(kind: String, data: Dictionary) -> void: logic_event.emit(kind, data))
 	add_child(made)
 	mechanics = made
 	for index: int in _pending_movers:
@@ -1276,11 +1284,6 @@ func build_mechanics_local() -> bool:
 	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
-	made.bodies_fn = volume_bodies_fn
-	made.damage_fn = volume_damage_fn
-	made.move_fn = volume_move_fn
-	if authoritative and str(doc.get("world", "")) != "":
-		made.source_doc_path = local_world_prefix() + ".doc.json"
 		return false
 	var own := (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics
 	attach_mechanics(read.value, not own)

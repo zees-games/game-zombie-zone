@@ -1281,6 +1281,17 @@ func spawn_mob(size: int, target: StringName = &"") -> int:
 	return size
 
 
+## One common zombie from a map's own spawner at [param at], going for a survivor. False with nobody to go for.
+func spawn_common_at(at: Vector3) -> bool:
+	var ids := survivor_ids()
+
+	if ids.is_empty():
+		return false
+
+	_pending.append([ZzNpcs.COMMON, at, ids[_rng.randi() % ids.size()], ZzZombieBody.FLAG_MOB])
+	return true
+
+
 func _release_pending() -> void:
 	if _pending.is_empty() or _time < _next_pending:
 		return

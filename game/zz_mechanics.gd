@@ -29,9 +29,17 @@ const VOLUME_KINDS := ["hurt", "push", "teleport", "gravity"]
 const PREDICTED_KINDS := ["push", "gravity"]
 ## How far past a volume's brushes a body is still handed to it (its column and a margin).
 const BODY_PAD := 1.0
+const GameText := preload("zz_game_text.gd")
+const EntityMaker := preload("zz_entity_maker.gd")
+const NpcMaker := preload("zz_npc_maker.gd")
+const MapCommands := preload("zz_map_commands.gd")
+## Longest gap of ticks the map's logic is stepped through in one go.
+const MAX_LOGIC_STEP := 4096
 
 ## A mover changed state (it was told, or it settled); the bridge broadcasts this index.
 signal state_changed(index: int)
+## The map's own logic asked the game for something: `hud_text`, `say`, `cvar`, `npc_spawn`, `maker_spawn`, `template_spawn`, `damage_force`.
+signal logic_event(kind: String, data: Dictionary)
 
 var tick_rate: int = 64
 var authoritative: bool = true
@@ -57,13 +65,18 @@ var _toggles: Array[Dictionary] = []
 var _toggle_base: int = 0
 var _predicted: Array[Dictionary] = []
 var _vol_io: DotMapIO = null
+## Every entity of the map as a dot-map runtime, which owns the links: the lifts, buttons and volumes below are its targets.
+var _logic: DotMapIO = null
+var _logic_base: int = 0
+var _logic_synced: bool = false
+var _logic_busy: int = 0
+var _source: Array = []
+var _source_read: bool = false
+var _manifest: Dictionary = {}
 var _vols: DotMapVolumes = null
 var _generic: Dictionary = {}
 var _by_entity: Dictionary = {}
 var _by_body: Dictionary = {}
-var _queue: Array[Array] = []
-var _seq: int = 0
-var _fired: Dictionary = {}
 var _told: Dictionary = {}
 var _started: bool = false
 var _posed_tick: int = -2147483648
@@ -130,8 +143,12 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 			_note_unsupported("volume " + vol.kind)
 
 	for g: Dictionary in _ents.generic:
-		_by_entity[int(g["entity"])] = {"type": &"generic", "i": int(g["entity"])}
-		_generic[int(g["entity"])] = {"rec": g, "enabled": true}
+		_generic[int(g["entity"])] = {"rec": g}
+
+	var manifest: Variant = world.get("manifest")
+	_manifest = manifest if manifest is Dictionary else {}
+	if authoritative:
+		_build_logic()
 
 
 static func _is_brush_door(mv: Variant) -> bool:
@@ -189,7 +206,7 @@ func bind_drawn(root: Node3D) -> void:
 
 ## Whether the map has volumes or logic entities to run.
 func has_logic() -> bool:
-	return not _volumes.is_empty() or not _generic.is_empty() or not _toggles.is_empty() or not _toggles.is_empty()
+	return not _volumes.is_empty() or not _generic.is_empty() or not _toggles.is_empty()
 
 
 func mover_count() -> int:
@@ -408,7 +425,8 @@ func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
 ## The state of mover [param index] as `[start tick, fraction in thousandths, direction, locked]`.
 func snapshot(index: int) -> Array:
 	if index >= _toggle_base and index - _toggle_base < _toggles.size():
-		return [0, 0, 0, 0 if bool(_toggles[index - _toggle_base]["enabled"]) else 1, 1]
+		var t: Dictionary = _toggles[index - _toggle_base]
+		return [int(t.get("packed", 0)), 0, 0, 0 if bool(t["enabled"]) else 1, 1]
 	var m: Dictionary = _movers[index]
 	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0,
 			1 if float(m.get("side", 1.0)) > 0.0 else 0]
@@ -426,7 +444,11 @@ func told_indices() -> PackedInt32Array:
 ## Takes a state the server sent.
 func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
 	if index >= _toggle_base and index < _toggle_base + _toggles.size():
-		_toggles[index - _toggle_base]["enabled"] = not locked
+		var t: Dictionary = _toggles[index - _toggle_base]
+		t["enabled"] = not locked
+		if start != 0 and str(t["kind"]) == "push":
+			t["packed"] = start
+			t["push"] = unpack_push(start)
 		_told[index] = true
 		return
 	if index < 0 or index >= _movers.size():
@@ -447,8 +469,8 @@ func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked
 
 ## Everything back to the round's start. Clients are told each mover that had moved.
 func reset(tick: int) -> void:
-	_queue.clear()
-	_fired.clear()
+	if authoritative:
+		_build_logic()
 	var touched := told_indices()
 	_told.clear()
 	for m in _movers:
@@ -462,14 +484,14 @@ func reset(tick: int) -> void:
 		m["close_at"] = -1
 		m["posed"] = -1.0
 	for t in _toggles:
+		t.erase("push")
+		t.erase("packed")
 		_set_toggle(t, bool(t["initial"]))
 	_told.clear()
 	for v in _volumes:
 		v["inside"] = false
 		v["ready"] = 0
 		v["enabled"] = not (v["vol"] as Variant).disabled
-	for e: Dictionary in _generic.values():
-		e["enabled"] = true
 	_started = false
 	_posed_tick = -2147483648
 	for i in touched:
@@ -482,7 +504,7 @@ func step(tick: int) -> void:
 		if not _started:
 			_started = true
 			_start(tick)
-		_run_queue(tick)
+		_logic_to(tick)
 		for m in _movers:
 			_advance(m, tick)
 		if tick % NEAR_EVERY == 0:
@@ -490,15 +512,13 @@ func step(tick: int) -> void:
 		if tick % VOLUME_EVERY == 0:
 			_volume_step(tick)
 			_hazard_step()
-		_run_queue(tick)
 	pose_at(tick)
 
 
 func _start(tick: int) -> void:
-	for e: Dictionary in _generic.values():
-		if str(e["rec"].get("classname", "")) == "logic_auto":
-			_fire(int(e["rec"]["entity"]), "OnMapSpawn", tick)
-			_fire(int(e["rec"]["entity"]), "OnNewGame", tick)
+	if _logic != null:
+		_logic_to(tick)
+		_logic.start()
 
 
 func _advance(m: Dictionary, tick: int) -> void:
@@ -612,42 +632,28 @@ func try_press(eye: Vector3, look: Vector3, reach: float, tick: int) -> bool:
 # --- Outputs and inputs --------------------------------------------------------------------
 
 func _fire(entity: int, output: String, tick: int) -> void:
-	if _ents == null:
+	if _logic == null:
 		return
-	for link: Dictionary in _ents.links.fired_by(entity, output):
-		var times := int(link.get("times", -1))
-		if times > 0:
-			var key := "%d/%s/%s/%s/%s" % [entity, output, str(link["input"]), str(link["target"]), str(link["delay"])]
-			var n := int(_fired.get(key, 0))
-			if n >= times:
-				continue
-			_fired[key] = n + 1
-		var due := tick + roundi(float(link.get("delay", 0.0)) * float(tick_rate))
-		var targets: Array = link.get("to", [])
-		if targets.is_empty():
-			_note_unsupported("target " + str(link.get("target", "")))
-		for t in targets:
-			_seq += 1
-			_queue.append([due, _seq, int(t), str(link["input"]), str(link.get("param", ""))])
+	if _logic_busy == 0:
+		_logic_to(tick)
+	var _r := _logic.raise(entity, output, _activator)
 
 
-func _run_queue(tick: int) -> void:
-	var guard := 0
-	while guard < MAX_FIRES:
-		var due: Array[Array] = []
-		var keep: Array[Array] = []
-		for q in _queue:
-			if int(q[0]) <= tick:
-				due.append(q)
-			else:
-				keep.append(q)
-		if due.is_empty():
-			return
-		_queue = keep
-		due.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) < int(b[0]) or (int(a[0]) == int(b[0]) and int(a[1]) < int(b[1])))
-		for q in due:
-			guard += 1
-			_apply_input(int(q[2]), str(q[3]), str(q[4]), tick)
+## Steps the map's logic up to [param tick] (its clock starts at the first tick it is asked about), delivering what falls due.
+func _logic_to(tick: int) -> void:
+	if _logic == null or _logic_busy > 0:
+		return
+	if not _logic_synced:
+		_logic_synced = true
+		_logic_base = tick - _logic.now
+	var behind := tick - _logic_base - _logic.now
+	if behind > 0:
+		_logic.advance(mini(behind, MAX_LOGIC_STEP))
+
+
+## The tick the logic is at, for an input it delivers.
+func _logic_tick() -> int:
+	return _logic_base + (_logic.now if _logic != null else 0)
 
 
 ## Runs [param input] on [param entity] now. Public so a check can drive one.
@@ -670,8 +676,6 @@ func _apply_input(entity: int, input_name: String, _param: String, tick: int) ->
 		_volume_input(_volumes[i], name)
 	elif what == "toggle":
 		_toggle_input(_toggles[i], name, _param)
-	else:
-		_generic_input(_generic[i], name, tick)
 
 
 func _mover_input(m: Dictionary, name: String, tick: int) -> void:
@@ -712,23 +716,6 @@ func _volume_input(v: Dictionary, name: String) -> void:
 			v["enabled"] = not bool(v["enabled"])
 		_:
 			_note_unsupported("volume input " + name)
-
-
-func _generic_input(e: Dictionary, name: String, tick: int) -> void:
-	var cls := str(e["rec"].get("classname", ""))
-	if cls != "logic_relay":
-		_note_unsupported(cls + " input " + name)
-		return
-	match name:
-		"trigger":
-			if bool(e["enabled"]):
-				_fire(int(e["rec"]["entity"]), "OnTrigger", tick)
-		"enable":
-			e["enabled"] = true
-		"disable":
-			e["enabled"] = false
-		_:
-			_note_unsupported(cls + " input " + name)
 
 
 func _press(m: Dictionary, tick: int) -> void:
@@ -811,18 +798,15 @@ func _build_toggles(world: RefCounted) -> void:
 		_build_volume_io(world)
 
 
-## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links stay with this class.
+## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links run in [member _logic].
 func _build_volume_io(world: RefCounted) -> void:
 	var from_doc := {}
 	var filters: Array = []
-	if source_doc_path != "" and FileAccess.file_exists(source_doc_path):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(source_doc_path))
-		if parsed is Dictionary:
-			for rec: Variant in (parsed as Dictionary).get("entities", []):
-				var cls := str((rec as Dictionary).get("classname", ""))
-				if cls.begins_with("filter_"):
-					filters.append(rec)
-				from_doc[int((rec as Dictionary).get("index", -1))] = rec
+	for rec: Variant in _source_records():
+		var cls := str((rec as Dictionary).get("classname", ""))
+		if cls.begins_with("filter_"):
+			filters.append(rec)
+		from_doc[int((rec as Dictionary).get("index", -1))] = rec
 	var records: Array = []
 	for t in _toggles:
 		var vol: Variant = t["vol"]
@@ -835,10 +819,7 @@ func _build_volume_io(world: RefCounted) -> void:
 		records.append(copy)
 	_vol_io = DotMapIO.new()
 	_vol_io.rate = maxi(tick_rate / VOLUME_EVERY, 1)
-	var units: Variant = world.get("manifest")
-	if units is Dictionary:
-		_vol_io.unit_scale = float(((units as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", _vol_io.unit_scale))
-		_vol_io.destinations = (units as Dictionary).get("destinations", {})
+	_scale_io(_vol_io, world.get("manifest"))
 	var loaded := _vol_io.load_records(records)
 	if not loaded.ok:
 		DotLog.warn(CHANNEL, "the map's volumes did not load", {"why": loaded.error.message})
@@ -846,6 +827,7 @@ func _build_volume_io(world: RefCounted) -> void:
 		return
 	_vol_io.damage_fn = _volume_hurt
 	_vol_io.move_fn = _volume_move
+	_vol_io.event_fn = _on_logic_event
 	_vols = DotMapVolumes.new()
 	_vols.io = _vol_io
 	for t in _toggles:
@@ -903,6 +885,8 @@ func _toggle_input(t: Dictionary, name: String, param: String) -> void:
 			var e: DotMapEntity = _vol_io.entity_of(int(t["entity"])) if _vol_io != null else null
 			if e == null or not e.accept(_vol_io, name, param, null, null):
 				_note_unsupported("%s input %s" % [str(t["kind"]), name])
+			elif e is DotMapPush:
+				_set_push(t, (e as DotMapPush).velocity())
 
 
 func _set_toggle(t: Dictionary, on: bool) -> void:
@@ -918,12 +902,38 @@ func _set_toggle(t: Dictionary, on: bool) -> void:
 		state_changed.emit(int(t["idx"]))
 
 
+## A push volume's velocity changed (SetPushSpeed, SetPushDirection): kept at the precision the wire carries, so prediction agrees.
+func _set_push(t: Dictionary, velocity: Vector3) -> void:
+	var packed := pack_push(velocity)
+	if t.get("packed", 0) == packed:
+		return
+	t["packed"] = packed
+	t["push"] = unpack_push(packed)
+	_told[int(t["idx"])] = true
+	state_changed.emit(int(t["idx"]))
+
+
+## A push velocity as one integer for the MOVER event's start field: bit 29 set, speed in 0.1 m/s (12 bits), yaw (9) and pitch + 90 (8) in degrees.
+static func pack_push(v: Vector3) -> int:
+	var speed := clampi(roundi(v.length() * 10.0), 0, 4095)
+	var yaw := posmod(roundi(rad_to_deg(atan2(v.z, v.x))), 360)
+	var pitch := clampi(roundi(rad_to_deg(asin(clampf(v.y / maxf(v.length(), 0.0001), -1.0, 1.0)))) + 90, 0, 180)
+	return (1 << 29) | speed | (yaw << 12) | (pitch << 21)
+
+
+static func unpack_push(packed: int) -> Vector3:
+	var speed := float(packed & 4095) / 10.0
+	var yaw := deg_to_rad(float((packed >> 12) & 511))
+	var pitch := deg_to_rad(float((packed >> 21) & 255) - 90.0)
+	return Vector3(cos(pitch) * cos(yaw), sin(pitch), cos(pitch) * sin(yaw)) * speed
+
+
 ## The push in m/s a survivor whose column stands at [param feet] feels from the live push volumes. Pure of the tick, so prediction and the server agree.
 func push_at(feet: Vector3, height: float) -> Vector3:
 	var out := Vector3.ZERO
 	for t in _predicted:
 		if str(t["kind"]) == "push" and _touches_player(t, feet, height):
-			out += (t["vol"] as DotMapVolume).push_velocity()
+			out += t["push"] if t.has("push") else (t["vol"] as DotMapVolume).push_velocity()
 	return out
 
 
@@ -956,3 +966,125 @@ func volume_counts() -> Dictionary:
 ## The toggle volumes as plain data (checks): `{kind, entity, enabled, bounds}`.
 func volume_toggles() -> Array[Dictionary]:
 	return _toggles
+
+
+# --- The map's logic -------------------------------------------------------------------------
+
+func _scale_io(io: DotMapIO, manifest: Variant) -> void:
+	if manifest is Dictionary:
+		io.unit_scale = float(((manifest as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", io.unit_scale))
+		io.destinations = (manifest as Dictionary).get("destinations", {})
+
+
+## Every entity of the source document (`entities[]`), or [] when it is not shipped beside the world.
+func _source_records() -> Array:
+	if _source_read:
+		return _source
+	_source_read = true
+	if source_doc_path != "" and FileAccess.file_exists(source_doc_path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(source_doc_path))
+		if parsed is Dictionary and (parsed as Dictionary).get("entities") is Array:
+			_source = (parsed as Dictionary)["entities"]
+	return _source
+
+
+## Without the source document, entity records made from what the manifest keeps: every mover, volume and unknown class, with its outputs.
+func _manifest_records() -> Array:
+	var out: Array = []
+	var seen := {}
+	for g: Dictionary in _ents.generic:
+		var pairs: Array = []
+		for k: Variant in (g.get("keys", {}) as Dictionary):
+			pairs.append([str(k), str(g["keys"][k])])
+		out.append(_record_of(int(g["entity"]), str(g["classname"]), str(g.get("targetname", "")), pairs))
+		seen[int(g["entity"])] = true
+	for mv: Variant in _ents.movers:
+		out.append(_record_of(mv.entity, str(mv.classname), str(mv.targetname), []))
+		seen[mv.entity] = true
+	for vol: Variant in _ents.volumes:
+		if vol.entity >= 0 and not seen.has(vol.entity):
+			out.append(_record_of(vol.entity, str(vol.classname), str(vol.targetname), _synth_record(vol)["pairs"]))
+	return out
+
+
+func _record_of(entity: int, classname: String, targetname: String, pairs: Array) -> Dictionary:
+	var outs: Array = []
+	for link: Dictionary in _ents.links.fired_by(entity):
+		outs.append({"output": str(link["output"]), "target": str(link["target"]), "input": str(link["input"]),
+				"param": str(link.get("param", "")), "delay": float(link.get("delay", 0.0)), "times": int(link.get("times", -1))})
+	return {"index": entity, "classname": classname, "targetname": targetname, "pairs": pairs, "outputs": outs}
+
+
+## Builds (or rebuilds, for a new round) the logic runtime from the source document, else the manifest. The mover, button and
+## volume classes hand their inputs to this class; the logic classes, the makers and the texts run in dot-map and here.
+func _build_logic() -> void:
+	_logic = null
+	_logic_synced = false
+	_logic_busy = 0
+	var records := _source_records()
+	if records.is_empty():
+		records = _manifest_records()
+	if records.is_empty():
+		return
+	var io := DotMapIO.new()
+	io.rate = tick_rate
+	io.command_allow = MapCommands.allow()
+	_scale_io(io, _manifest)
+	io.event_fn = _on_logic_event
+	var _r := io.register_class("game_text", GameText)
+	_r = io.register_class("game_text_tooltip", GameText)
+	_r = io.register_class("env_entity_maker", EntityMaker)
+	_r = io.register_class("npc_template_maker", NpcMaker)
+	var owned := {}
+	for mv: Variant in _ents.movers:
+		owned[str(mv.classname).to_lower()] = true
+	for vol: Variant in _ents.volumes:
+		owned[str(vol.classname).to_lower()] = true
+	for cls: String in owned:
+		_r = io.register_handler(cls, _own_input)
+	var loaded := io.load_records(records)
+	if not loaded.ok:
+		DotLog.warn(CHANNEL, "the map's logic did not load", {"why": loaded.error.message})
+		return
+	_logic = io
+
+
+## An input the logic delivers to one of this class's own entities (a lift, a button, a volume).
+func _own_input(e: DotMapEntity, input_name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+	if not _by_entity.has(e.index):
+		return false
+	var keep: Variant = _activator
+	if activator is Vector3:
+		_activator = activator
+	_logic_busy += 1
+	_apply_input(e.index, input_name, param, _logic_tick())
+	_logic_busy -= 1
+	_activator = keep
+	return true
+
+
+func _on_logic_event(kind: String, data: Dictionary) -> void:
+	logic_event.emit(kind, data)
+
+
+## What the map's links asked for that nothing here answers, for checks and the log:
+## `{entities, unresolved (targets nothing carries), unhandled (class|input), denied commands, loop trips}`.
+func logic_report() -> Dictionary:
+	if _logic == null:
+		return {}
+	var gone := {}
+	for e: DotMapEntity in _logic.entities:
+		for link: Dictionary in e.links:
+			var target: String = link["target"]
+			if target.begins_with("!") or target.begins_with("#"):
+				continue
+			if _logic.resolve(target, e, null).is_empty():
+				gone[target] = int(gone.get(target, 0)) + 1
+	var cover := _logic.coverage()
+	return {"entities": _logic.entities.size(), "unresolved": gone, "unhandled": cover["unhandled"],
+			"commands_denied": cover["commands_denied"], "loop_trips": cover["loop_trips"]}
+
+
+## The logic runtime itself, for checks.
+func logic() -> DotMapIO:
+	return _logic
