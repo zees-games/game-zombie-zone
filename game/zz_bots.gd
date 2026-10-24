@@ -965,6 +965,8 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		memory["pick"] = -1
 		memory["pick_ignore"] = kept if loot.entries.has(kept) else -1
 		memory["pick_ignore_until"] = game.now() + 30.0
+		# A shelf behind boards holds several goods: giving up one gives up its neighbours too, or each costs a full give-up in turn.
+		memory["pick_ignore_at"] = (loot.entries[kept]["at"] as Vector3) if loot.entries.has(kept) else Vector3.INF
 		kept = -1
 
 	for id: int in loot.entries:
@@ -972,6 +974,9 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		var gap: float = (e["at"] as Vector3).distance_to(player.feet())
 
 		if id == int(memory.get("pick_ignore", -1)) and game.now() < float(memory.get("pick_ignore_until", 0.0)):
+			continue
+
+		if game.now() < float(memory.get("pick_ignore_until", 0.0)) and (e["at"] as Vector3).distance_to(memory.get("pick_ignore_at", Vector3.INF)) < 6.5:
 			continue
 
 		if gap > best_gap and id != kept:

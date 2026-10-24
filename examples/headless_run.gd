@@ -1776,7 +1776,12 @@ func _test_stand_ins() -> void:
 	var over := "" if played >= 60.0 else ", round over by %.0f s" % played
 	_check(kills > 0, "they shoot what comes at them", "%d kills%s" % [kills, over])
 	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f%s" % [furthest, over])
-	_check(weapons_left < 3, "picking up what was left for them", "%d left" % weapons_left)
+	# The practice street's spawners put a gun back after it is taken, so the shelf is never emptier than "3 free"; what shows pickup is a primary in a stand-in's hands that nobody started with.
+	var primary_slot: int = ZzWeapons.def_of(&"shotgun").slot
+	var armed := 0
+	for player in game.survivors():
+		armed += 1 if player.weapons != null and player.weapons.arsenal != null and player.weapons.arsenal.has_slot(primary_slot) else 0
+	_check(armed > 0, "picking up what was left for them", "%d armed with a primary, %d free guns lying%s" % [armed, weapons_left, over])
 	# Survivors do not collide, so stand-ins stack up shoulder to shoulder or inside each other.
 	# Before dot-combat's pass-through and the hitbox-based friend check, every shot from inside a friend hit
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
