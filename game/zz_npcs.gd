@@ -385,6 +385,9 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## corner stood there for a hundred seconds, sliding on six contacts, because the graph said the
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
+## A drawn world's solid prop is cut only above a zombie's step (STEP_UP 0.45) and below head height: a low crate in a corridor is stepped over.
+const SOLID_PROP_CUT_HEIGHT := 0.5
+const SOLID_PROP_HEAD := 1.8
 ## A turned prop thinner than this is cut as a row of boxes along its length, not one box round its corners.
 const THIN_PROP := 0.6
 const THIN_STEP := 0.4
@@ -590,7 +593,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 
 	# A drawn world's solid props (the boxes the bodies collide with), cut like a doc prop of that size.
 	for rec: Array in doc.get("solid_props", []):
-		if float(rec[4]) < PROP_CUT_HEIGHT:
+		if float(rec[4]) < SOLID_PROP_CUT_HEIGHT or float(rec[1]) - float(rec[4]) * 0.5 > SOLID_PROP_HEAD:
 			continue
 
 		var base := Vector3(rec[0], float(rec[1]) - float(rec[4]) * 0.5, rec[2])
