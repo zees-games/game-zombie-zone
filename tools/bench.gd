@@ -19,6 +19,8 @@ var _profile := false
 var _profiler: Node = null
 var _ticks := 0
 var _load_s := 0.0
+## Engine monitors per measured frame: physics-process ms (the scripts' _physics_process), active bodies, pairs, islands.
+var _monitors: Array[PackedFloat64Array] = []
 
 
 func _run() -> void:
@@ -41,6 +43,35 @@ func _run() -> void:
 	local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
 	await _seconds_of(1.0)
 
+	if "--micro" in OS.get_cmdline_user_args():
+		var g := game
+		var n := 200
+		var t0 := Time.get_ticks_usec()
+		for i in n:
+			g.bots.drive(1.0 / 60.0)
+		print("MICRO bots.drive %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+		var survs = g.survivors()
+		print("MICRO survivors %d" % survs.size())
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			for pl in survs:
+				pl.controller.simulate_tick(1000 + i, 1.0 / 60.0)
+		print("MICRO simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			g._advance_weapons()
+		print("MICRO advance_weapons %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			for pl in survs:
+				g._advance_hands(pl, 1.0 / 60.0)
+		print("MICRO advance_hands %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			g.combat.tick(g._tick, 1.0 / 60.0)
+		print("MICRO combat.tick %.1f us" % [float(Time.get_ticks_usec() - t0) / n])
+		get_tree().quit(0)
+		return
 	if _profile:
 		_profiler = (load("res://tools/survival_long_run.gd") as GDScript).new()
 		_profiler.set(&"_game", game)
@@ -74,6 +105,9 @@ func _run() -> void:
 			objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
 			prims.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
 			alive_sum += _alive(game)
+			_monitors.append(PackedFloat64Array([Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+				Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS), Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS),
+				Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT)]))
 			gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp))
 			cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu())
 	_clock.stop()
@@ -82,6 +116,11 @@ func _run() -> void:
 		for part: String in parts:
 			print("PROFILE %-10s %.3f ms/tick" % [part, float(parts[part]) / 1000.0 / maxf(1.0, _ticks)])
 		_profiler.free()
+	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
+	for m in _monitors:
+		for i in 4:
+			sums[i] += m[i] / maxf(1.0, _monitors.size())
+	print("MONITORS physics_process_ms=%.2f active_3d=%.1f pairs=%.1f islands=%.1f" % [sums[0], sums[1], sums[2], sums[3]])
 	_report(draws, objects, prims, float(alive_sum) / maxf(1.0, draws.size()), game, gpu, cpu)
 	# The last frame, to look at: the numbers say nothing about what a crowd detail level looks like.
 	var path := ProjectSettings.globalize_path(_out)
