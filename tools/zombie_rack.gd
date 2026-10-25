@@ -88,6 +88,9 @@ func _initialize() -> void:
 	elif _set == "deaths":
 		_deaths(root)
 		return
+	elif _set == "gore":
+		_gore(root)
+		return
 	else:
 		for kind in SPECIALS:
 			if _kinds.is_empty() or _kinds.has(String(kind)):
@@ -169,6 +172,40 @@ func _deaths(root: Node3D) -> void:
 	var middle := Vector3(wide * 0.5 - cell.x * 0.5, -tall * 0.5 + cell.y * 0.6, 0.0)
 	camera.look_at_from_position(middle + Vector3(0.0, 8.0, 30.0), middle)
 	get_root().size = Vector2i(1500, int(1500.0 * tall / wide))
+
+
+## Dismemberment: a common with no limb, then one each, then several, side by side, standing and walking.
+## `--level=N` sets DotNpcGore.level first.
+func _gore(root: Node3D) -> void:
+	var ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
+	var defs := ZzZombieLimbs.defs_for(&"common", 100.0)
+	var sets := [[], ["head"], ["armL"], ["legR"], ["armL", "armR"], ["legL", "legR"], ["head", "armR", "legL"]]
+	var ground := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(sets.size() * 2.4, 6.0)
+	ground.mesh = plane
+	ground.position = Vector3(sets.size() * 1.2 - 1.2, 0.0, 0.0)
+	root.add_child(ground)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--level="):
+			DotNpcGore.level = int(arg.trim_prefix("--level="))
+	for i in sets.size():
+		var view := ZzZombieView.new()
+		root.add_child(view)
+		view.position = Vector3(float(i) * 2.4, 0.0, 0.0)
+		view.rotation.y = deg_to_rad(180.0 - 30.0)
+		view.build(&"common", 4111 + i)
+		_cells.append([view, ZzZombieBody.Anim.IDLE])
+		for limb: String in sets[i]:
+			view.sever_limb(StringName(limb), defs[limb], Vector3(0.0, 1.0, 2.0))
+	var camera := Camera3D.new()
+	root.add_child(camera)
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.size = 7.0
+	var mid := Vector3(sets.size() * 1.2 - 1.2, 2.2, 0.0)
+	camera.look_at_from_position(mid + Vector3(0.0, 2.0, 30.0), mid)
+	get_root().size = Vector2i(1800, 720)
 
 
 ## Sixty commons in a crowd walking at the camera, for the frame time and draw calls.
