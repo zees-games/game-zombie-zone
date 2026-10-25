@@ -44,13 +44,46 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	return true
 
 
+## [method nudge] for a survivor: its controller owns the position (the node is copied from it every
+## tick), so the step goes through [method ZzPlayer.place_at] or it is undone at once.
+static func nudge_player(player: CharacterBody3D, direction: Vector3, yaw_degrees: float) -> bool:
+	if not nudge(player, direction):
+		return false
+
+	player.call(&"place_at", player.global_position, yaw_degrees)
+	return true
+
+
+## [method relocate] for a survivor, through [method ZzPlayer.place_at] for the reason [method nudge_player] is.
+static func relocate_player(player: CharacterBody3D, goal: Vector3, yaw_degrees: float) -> bool:
+	if not relocate(player, goal):
+		return false
+
+	player.call(&"place_at", player.global_position, yaw_degrees)
+	return true
+
+
 ## Whether something solid lies between [param from] and [param to] at knee or chest height.
-static func walled_off(body: CharacterBody3D, from: Vector3, to: Vector3) -> bool:
+## [param through_furniture] lets the map's furniture not count: a brute can be stepped over a chair, not a wall.
+static func walled_off(body: CharacterBody3D, from: Vector3, to: Vector3, through_furniture := false) -> bool:
 	var space := body.get_world_3d().direct_space_state
+	var skip: Array[RID] = [body.get_rid()]
 
 	for height: float in [0.4, 1.2]:
 		var query := PhysicsRayQueryParameters3D.create(from + Vector3(0.0, height, 0.0),
-			to + Vector3(0.0, height, 0.0), body.collision_mask, [body.get_rid()])
+			to + Vector3(0.0, height, 0.0), body.collision_mask, skip)
+		var hit := space.intersect_ray(query)
+
+		if hit.is_empty():
+			continue
+
+		var collider := hit.get(&"collider") as Node
+
+		if not through_furniture or collider == null or collider.name != &"Furniture":
+			return true
+
+		skip.append(hit.get(&"rid") as RID)
+		query.exclude = skip
 
 		if not space.intersect_ray(query).is_empty():
 			return true
@@ -59,33 +92,50 @@ static func walled_off(body: CharacterBody3D, from: Vector3, to: Vector3) -> boo
 
 
 ## Puts [param body] on the clear, grounded spot within a few metres that is nearest
-## [param goal], when that is closer to it than the body is. The last resort after [method nudge]:
-## it moves farther, so it only takes a spot the body fits on, not over a drop, and in sight of here through no wall. Returns whether it moved.
-static func relocate(body: CharacterBody3D, goal: Vector3) -> bool:
+## [param goal]: one closer to it than the body is, else (a big body wedged among furniture, with
+## its goal behind it) the nearest spot that frees it. The last resort after [method nudge]:
+## it only takes a spot the body fits on, not over a drop, and in sight of here through no wall. Returns whether it moved.
+static func relocate(body: CharacterBody3D, goal: Vector3, through_furniture := false) -> bool:
 	if body == null:
 		return false
 
 	var here := body.global_transform.origin
 	var best := Vector3.INF
 	var best_d := here.distance_to(goal) - 0.5
+	var out := Vector3.INF
+	var out_d := INF
 
-	for radius: float in [1.5, 2.5, 3.5]:
-		for i in 12:
-			var a := TAU * float(i) / 12.0
-			var to := body.global_transform
-			to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius + Vector3(0.0, 0.08, 0.0)
+	# The second lift is for a body sunk into the floor, whose own height collides at every spot.
+	for lift: float in [0.08, 0.45]:
+		for radius: float in [1.5, 2.5, 3.5]:
+			for i in 12:
+				var a := TAU * float(i) / 12.0
+				var to := body.global_transform
+				to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius + Vector3(0.0, lift, 0.0)
 
-			if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
-				continue
+				if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
+					continue
 
-			if walled_off(body, here, to.origin - Vector3(0.0, 0.08, 0.0)):
-				continue
+				if walled_off(body, here, to.origin - Vector3(0.0, lift, 0.0), through_furniture):
+					continue
 
-			var d := to.origin.distance_to(goal)
+				var d := to.origin.distance_to(goal)
 
-			if d < best_d:
-				best_d = d
-				best = to.origin
+				if d < best_d:
+					best_d = d
+					best = to.origin
+
+				if d < out_d:
+					out_d = d
+					out = to.origin
+
+		if out != Vector3.INF:
+			break
+
+	# Nothing nearer the goal: a wedged brute's goal lies behind the furniture that holds it, and
+	# staying put (as this once did, 36 s) is worse than stepping out to where it can turn.
+	if best == Vector3.INF:
+		best = out
 
 	if best == Vector3.INF:
 		return false

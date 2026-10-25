@@ -8,6 +8,7 @@ const ZzNavGraph := preload("../game/zz_nav_graph.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const StuckMeter := preload("../tools/stuck_meter.gd")
+const ZzUnstick := preload("../game/zz_unstick.gd")
 
 ## The annotations in use: where the stand-ins stand before a wave, where the horde goes, and the
 ## graph's one-way drops. Every check that compares a behaviour with the old one runs both (the
@@ -130,6 +131,15 @@ func _run() -> void:
 
 	if only == "wedge":
 		await _test_hop_wedge()
+		await _test_unstick_steps()
+		print("%d passed, %d failed" % [_passed, _failed])
+		for line in _failures:
+			print("  FAIL  %s" % line)
+		get_tree().quit(_failed)
+		return
+
+	if only == "steps":
+		await _test_unstick_steps()
 		print("%d passed, %d failed" % [_passed, _failed])
 		for line in _failures:
 			print("  FAIL  %s" % line)
@@ -174,6 +184,7 @@ func _run() -> void:
 		await _test_stuck(StringName(id))
 
 	await _test_hop_wedge()
+	await _test_unstick_steps()
 	await _test_lure_crowd()
 	_test_thin_props()
 
@@ -676,6 +687,103 @@ func _test_hop_wedge() -> void:
 	watched.call(&"_unstick_watch", 0.1)
 	_check(is_equal_approx(float(watched.get(&"_watch_for")), 2.0), "a hop pauses the unstick watchdog instead of restarting it",
 		"watched %.2f s at %s" % [float(watched.get(&"_watch_for")), watched.get(&"_watch_at")])
+
+	await _dispose(game)
+	_finished()
+
+
+## Where a brute stood wedged among the school's furniture for 36 s (its goal was behind it).
+const BRUTE_CORNER := Vector3(17.73, 0.02, 8.08)
+
+## The last-resort steps: a brute wedged among furniture with its goal behind the furniture is
+## stepped out (it was left in place, 36 s), and a stand-in's step is its controller's, not the
+## node's (the node is copied from the controller every tick, so the step was undone at once).
+func _test_unstick_steps() -> void:
+	_section("a wedged brute is stepped out, a stand-in's step sticks and its path keeps off the door frames")
+	if not _linked:
+		for i in 9:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zz_high_school"])
+		c.survival_warmup_seconds = 600.0
+		c.wanderer_density = 0.0
+		c.sleepers_enabled = false)
+	var quarry := game.add_player(&"u100", "Quarry")
+	game.start()
+	var ticks := 0
+
+	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+		game.simulate(TICK)
+		ticks += 1
+
+		if ticks % 8 == 0:
+			await get_tree().physics_frame
+
+	var graph_size: int = game.horde.spawner.nav.data.points.size()
+	_check(game.horde.narrow_points > 0 and game.horde.narrow_points < graph_size / 4, "the points a brute does not fit at are flagged, not the whole map",
+		"%d of %d" % [game.horde.narrow_points, graph_size])
+	_check(game.horde.spawner.catalogue.get_npc(ZzNpcs.BRUTE).nav_exclude_flags & game.horde.spawner.nav.NARROW != 0, "and the brute's paths keep off them")
+	var brute := game.horde.spawner.spawn(ZzNpcs.BRUTE, BRUTE_CORNER, &"test")
+	await _sim(game, 0.5)
+	var body: CharacterBody3D = brute.brain.call(&"body")
+	var start := body.global_position
+
+	for goal: Vector3 in [Vector3(17.5, 0.0, 8.6), Vector3(25.0, 0.0, 8.0)]:
+		var moved := ZzUnstick.relocate(body, goal)
+		var went := body.global_position.distance_to(start)
+		_check(moved and went > 1.4 and went < 4.0, "relocate frees the brute even with its goal behind the furniture (%s)" % goal,
+			"moved %s, %.1f m from %s" % [moved, went, start])
+		body.global_position = start
+
+	body.global_position = start
+
+	await _sim(game, 0.2)
+	var from := quarry.feet()
+	var stepped := false
+
+	for heading: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+		if ZzUnstick.nudge_player(quarry, heading, 0.0):
+			stepped = true
+			break
+
+	var at_once := quarry.feet().distance_to(from)
+	game.simulate(TICK)
+	var after := quarry.feet().distance_to(from)
+	_check(stepped and at_once > 0.5, "a survivor's nudge moves its controller", "moved %.2f m" % at_once)
+	_check(after > 0.5, "and a tick later it is still there", "%.2f m from %s" % [after, from])
+
+	# Where stand-ins stood 100 s and 15 s on the school: smoothing cut across the corner of a door
+	# frame, so the first legs of their path ran through the wall.
+	var nav: DotNpcNavGraph = game.horde.spawner.nav
+	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
+
+	for pair: Array in [[Vector3(-4.57, 0.0, 4.35), Vector3(39.6, 0.0, -9.8)], [Vector3(6.35, 0.0, 3.73), Vector3(-39.4, 0.0, -10.3)]]:
+		var kept = nav.filter
+		nav.filter = nav.bot_filter
+		var path := nav.find_smooth_path(pair[0], pair[1], 2.5, true)
+		nav.filter = kept
+		var sphere := SphereShape3D.new()
+		sphere.radius = 0.25
+		var query := PhysicsShapeQueryParameters3D.new()
+		query.shape = sphere
+		query.collision_mask = game.world_mask() | game.ground_mask()
+		var prev: Vector3 = pair[0]
+		var blocked := PackedStringArray()
+
+		for pt: Vector3 in path.slice(1, 5):
+			query.transform = Transform3D(Basis.IDENTITY, prev + Vector3(0.0, 0.6, 0.0))
+			query.motion = pt - prev
+			var fractions := space.cast_motion(query)
+
+			if fractions[0] < 0.999:
+				blocked.append("%s to %s" % [prev.snappedf(0.1), pt.snappedf(0.1)])
+
+			prev = pt
+
+		_check(blocked.is_empty(), "a stand-in's path from %s keeps clear of the door frame" % pair[0], "legs through the wall: %s" % ", ".join(blocked))
 
 	await _dispose(game)
 	_finished()

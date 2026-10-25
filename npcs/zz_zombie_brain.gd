@@ -412,11 +412,16 @@ func _unstick_watch(delta: float) -> void:
 
 	if _watch_stage == 0 and ZzUnstick.nudge(b, forward):
 		note_unstick("watch nudge")
+		# Kept where it now stands, not cleared: clearing reset the stage, so a nudge that never
+		# freed it was repeated for ever and the relocate after it was never reached.
 		_watch_stage = 1
-		_watch_at = Vector3.INF
+		_watch_at = npc.position()
 		return
 
-	if ZzUnstick.relocate(b, goal if goal != Vector3.INF else here + forward.normalized() * 6.0):
+	var aim := goal if goal != Vector3.INF else here + forward.normalized() * 6.0
+
+	# Boxed in by furniture, every clear spot lies behind a piece of it: step over that.
+	if ZzUnstick.relocate(b, aim) or ZzUnstick.relocate(b, aim, true):
 		note_unstick("watch relocate")
 		_watch_at = Vector3.INF
 		_watch_stage = 0

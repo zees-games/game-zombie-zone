@@ -1079,15 +1079,30 @@ func _get_out_of_hazards(player, command: DotFpsCommand) -> void:
 ## Hops that have not freed a stand-in before the game steps it along (`ZzUnstick`).
 const HOPS_BEFORE_NUDGE := 2
 
+## Seconds a stand-in stays put, hopping and stepping, before it is put on clear ground.
+const STUCK_BEFORE_RELOCATE := 8.0
+
+## Metres from where it began that count as having got away.
+const STUCK_AREA := 2.5
+
+## Metres a stand-in may jitter and still be stuck (the stuck meter's own 0.75, with a little over).
+const STUCK_RADIUS := 0.8
+
 
 func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var mark: Vector3 = memory["stuck_at"]
 
-	if mark == Vector3.INF or here.distance_to(mark) > 0.5:
+	if mark == Vector3.INF or here.distance_to(mark) > STUCK_RADIUS:
 		memory["stuck_at"] = here
 		memory["stuck_time"] = game.now()
 		memory["hops"] = 0
+
+		# A step does not end the spell: only getting away from where it began does.
+		if not memory.has("first_at") or here.distance_to(memory["first_at"]) > STUCK_AREA:
+			memory["first_at"] = here
+			memory["stuck_first"] = game.now()
+
 		return
 
 	if command.move.length() > 0.5 and game.now() - float(memory["stuck_time"]) > 1.0:
@@ -1100,6 +1115,14 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 		if int(memory["hops"]) > HOPS_BEFORE_NUDGE:
 			var yaw := deg_to_rad(command.yaw)
 			var heading := Vector3(cos(yaw), 0.0, -sin(yaw)) * command.move.x + Vector3(-sin(yaw), 0.0, -cos(yaw)) * command.move.y
-			var moved := ZzUnstick.nudge(player, heading)
+			var moved := ZzUnstick.nudge_player(player, heading, command.yaw)
 			memory["hops"] = 0
 			memory["nudges"] = int(memory.get("nudges", 0)) + (1 if moved else 0)
+
+		# Steps have not freed it either (inside a barricade, in the lee of a prop): onto clear ground.
+		if game.now() - float(memory.get("stuck_first", game.now())) > STUCK_BEFORE_RELOCATE:
+			var aim: Vector3 = memory["goal"] if (memory["goal"] as Vector3) != Vector3.INF else here
+			memory["stuck_first"] = game.now()
+
+			if ZzUnstick.relocate_player(player, aim, command.yaw):
+				memory["relocations"] = int(memory.get("relocations", 0)) + 1

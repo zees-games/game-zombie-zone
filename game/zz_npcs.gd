@@ -3,6 +3,7 @@ extends RefCounted
 const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzPackList := preload("zz_packs.gd")
+const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
@@ -302,6 +303,7 @@ static func _rider(c: ZzConfig) -> DotNpcDef:
 ## The boss. Its health is set at spawn from how many survivors there are; see [method brute_health].
 static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
 	var def := _def(BRUTE, "Brute", BRUTE_BRAIN, brute_health(c, survivors), 6.1, 12, DotNpcDef.Weight.HEAVY)
+	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 80.0
 	def.sight_half_angle_deg = 120.0
 	def.hearing_range = 40.0

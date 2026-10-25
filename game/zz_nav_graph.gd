@@ -55,6 +55,57 @@ func _init(p_data: DotNpcNavData = null) -> void:
 	super(p_data)
 
 
+## Half the width a smoothed leg must keep clear, in metres: a body is not a line. Smoothing
+## cut across the corner of a door frame the graph goes round, and whoever followed it (a stand-in
+## 100 s, a common 124 s) ended on the frame, pushing.
+const LEG_FLANK := 0.35
+
+
+## A leg is walkable when its centre line and both flanks are, not the line alone.
+func can_walk_straight(a: Vector3, b: Vector3, corridor: float = -1.0) -> bool:
+	if not super(a, b, corridor):
+		return false
+
+	var along := b - a
+	along.y = 0.0
+
+	if along.length() < 0.5:
+		return true
+
+	var side := Vector3(-along.z, 0.0, along.x).normalized() * LEG_FLANK
+	return super(a + side, b + side, corridor) and super(a - side, b - side, corridor)
+
+
+## The flag on a point a brute's body does not fit at; the brute's definition excludes it.
+const NARROW := 1 << 12
+
+
+## Flags every point where a body of [param radius] would overlap [param mask] (furniture packed
+## into a classroom leaves gaps the graph walks through and a brute cannot). Returns how many.
+func mark_narrow(space: PhysicsDirectSpaceState3D, mask: int, radius: float = 0.65) -> int:
+	var shape := CapsuleShape3D.new()
+	shape.radius = radius
+	shape.height = 1.9
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = mask
+	var count := 0
+
+	if data.flags.size() != data.points.size():
+		data.flags.resize(data.points.size())
+
+	for i in data.points.size():
+		query.transform = Transform3D(Basis.IDENTITY, data.points[i] + Vector3(0.0, 0.12 + shape.height * 0.5, 0.0))
+		var narrow := not space.intersect_shape(query, 1).is_empty()
+		var flags := data.flags[i]
+		data.flags[i] = (flags | NARROW) if narrow else (flags & ~NARROW)
+		count += 1 if narrow else 0
+
+	_native.clear()
+	_patched.clear()
+	return count
+
+
 ## A drop from [param high] down to [param low]. Both are graph points. A zombie goes down it;
 ## nobody goes back up it.
 func add_drop(high: int, low: int) -> void:

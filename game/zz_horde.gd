@@ -89,6 +89,9 @@ var nav: DotNpcNavData = null
 
 ## The map's annotations worked into chokes, drops and holds (`ZzNavNotes`); never null.
 var notes: ZzNavNotes = ZzNavNotes.new()
+
+## Graph points a brute does not fit at (kept off its paths), for suites and describe.
+var narrow_points: int = 0
 var catalogue: DotNpcCatalogue = null
 
 ## Whether the pacing runs: false in a start area, between maps, in warmup.
@@ -368,6 +371,14 @@ func _adopt_links() -> void:
 
 	if notes.is_ready():
 		notes.apply_links(graph)
+		_mark_narrow()
+
+
+## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
+func _mark_narrow() -> void:
+	if spawner.nav.has_method(&"mark_narrow"):
+		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
+			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"))
 
 
 func _plan_notes() -> void:
@@ -376,6 +387,7 @@ func _plan_notes() -> void:
 	for p: Array in _doc.get("posts", []):
 		posts.append(ZzMapDoc.v3(p))
 
+	_mark_narrow()
 	notes.plan(spawner.nav, director.spawn_points, posts)
 
 
