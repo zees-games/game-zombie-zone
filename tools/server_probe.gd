@@ -56,6 +56,8 @@ var _acks := false
 ## --split: the inline snapshot path run here instead of the manager's, lapped as
 ## si_relevant, si_thin, si_scores, si_prioritise, si_budget and snap_build (_send_to_peer) per peer.
 var _split := false
+## Snapshots built, for the prep/join/apply means of a native or pooled run.
+var _snaps := 0
 ## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot.
 var _far_every := 1
 var _far := 0.0
@@ -206,6 +208,7 @@ func _run() -> void:
 		if _acks and method == &"snapshot" and peer_id >= 2:
 			_ack_later(peer_id, payload)
 	var _s := _net.start()
+	_net.snapshot_sent.connect(func(_t: int, _n2: int) -> void: _snaps += 1)
 	await get_tree().physics_frame
 
 	_game.next_map_id = _map
@@ -308,6 +311,7 @@ func _run() -> void:
 	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
+		"snapshot_ms": _snapshot_split(),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
 		"us_per_search": snappedf(us_per_search, 0.1),
 		"path_ms_derived": snappedf(float(searches) / float(measured) * us_per_search / 1000.0, 0.01),
@@ -604,3 +608,12 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 	var t1 := Time.get_ticks_usec()
 	sp.answer_paths()
 	_accum("paths", Time.get_ticks_usec() - t1)
+
+
+## Mean ms per snapshot (all peers) spent preparing, joining the workers and applying the results.
+func _snapshot_split() -> Dictionary:
+	var n := float(maxi(_snaps, 1))
+	return {"snapshots": _snaps, "interest": snappedf(_net._snapshot_interest_usec_total / n / 1000.0, 0.01),
+		"submit": snappedf(_net._snapshot_submit_usec_total / n / 1000.0, 0.01), "prep": snappedf(_net._snapshot_prep_usec_total / n / 1000.0, 0.01),
+		"join": snappedf(_net._snapshot_join_usec_total / n / 1000.0, 0.01),
+		"apply": snappedf(_net._snapshot_apply_usec_total / n / 1000.0, 0.01)}
