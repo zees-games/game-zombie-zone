@@ -65,6 +65,8 @@ const HIDDEN_KINDS: PackedStringArray = ["clip", "nodraw", "sky"]
 ## sixty-four kilobytes and a message past it is never sent (mg-look-at-me's finding), so a map
 ## must fit with room for the header.
 const WIRE_LIMIT := 60000
+## Kept free under the limit so a small edit to a map does not tip it over.
+const WIRE_HEADROOM := 500
 
 ## A map's drawn world is the pack `zz_world_<id>` (zombie-zone-maps' tools/build_worlds.py).
 const WORLD_PREFIX := "zz_world_"
@@ -751,10 +753,22 @@ static func wire_form(doc: Dictionary) -> Dictionary:
 		return doc
 
 	var out := doc.duplicate()
-	out["lights"] = all.slice(0, keep)
 	out["lights_total"] = all.size()
 	out["lights_digest"] = JSON.stringify(all, "", true).sha256_text().substr(0, 16)
+
+	# Lamps are the one part of a document that can shrink: a map that fits a browser's message only
+	# by a few hundred bytes is one a longer name or an extra lamp pushes over, and then no web client gets it.
+	out["lights"] = all.slice(0, keep)
+
+	while keep > 0 and _deflated_size(out) > WIRE_LIMIT - WIRE_HEADROOM:
+		keep /= 2
+		out["lights"] = all.slice(0, keep)
+
 	return out
+
+
+static func _deflated_size(doc: Dictionary) -> int:
+	return JSON.stringify(doc, "", false).to_utf8_buffer().compress(FileAccess.COMPRESSION_DEFLATE).size()
 
 
 ## What a bake of the lamps is checked against: the lamps themselves, or for a map with `wire_lamps` a digest
