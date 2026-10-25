@@ -98,6 +98,9 @@ static var use_bakes: bool = true
 ## draws the boxes, as before the worlds existed.
 static var use_worlds: bool = true
 
+## Whether a checkout's own `world/` is read when it is there; off, the world is always fetched through dot-cloud by `world_key` (the delivery check).
+static var local_worlds: bool = true
+
 ## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
 const SKY_ROOT := "res://assets/sky"
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
@@ -115,6 +118,8 @@ var vis_mode: String = "both"
 ## Draw the world pack's baked lightmap when it has one (`zz_lightmaps`).
 var use_lightmaps: bool = true
 var visibility: Node = null
+## The client platform's `attach_visibility(world, drawn)`; unset (a test, a bench) uses the culling built here.
+var cull_fn := Callable()
 
 ## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
 var mechanics: ZzMechanics = null
@@ -1182,7 +1187,7 @@ func load_world() -> DotResult:
 	var wanted := id()
 	var prefix := local_world_prefix()
 
-	if not FileAccess.file_exists(prefix + ".json"):
+	if not local_worlds or not FileAccess.file_exists(prefix + ".json"):
 		var key := str(doc.get("world_key", ""))
 		if key == "":
 			return DotResult.success(false)
@@ -1197,6 +1202,14 @@ func load_world() -> DotResult:
 		prefix = DotGameContent.mount_of(key) + "/" + String(wanted)
 
 	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+
+	if read.ok:
+		# The shared PBR and model slice this world names (dot-map's store); a world without one reads its own folder.
+		var stored: DotResult = await DotMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"))
+		if not stored.ok:
+			DotLog.warn(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
+		if id() != wanted or _drawn == null:
+			return DotResult.success(false)
 
 	if not read.ok:
 		DotLog.warn(CHANNEL, "a map's world would not read; its boxes are drawn", {
@@ -1214,6 +1227,9 @@ var sound_driver: DotMapSoundDriver = null
 ## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
 var world_sounds: Dictionary = {}
 
+## The drawn world's credit line (DotMapCredits.line): the map's author and the art whose licence asks for a name.
+var world_credits: String = ""
+
 
 ## Lays [param world] (a [code]DotMapBspMesh[/code]) over the map: its meshes in, the box batches
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
@@ -1226,6 +1242,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
 	var mats: Dictionary = zz.get("materials", {})
 	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
+	world_credits = DotMapCredits.line(world.get("manifest") as Dictionary)
 	var map_id := String(id())
 	var material_for := func(rec: Dictionary) -> Material:
 		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
@@ -1236,6 +1253,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		# The vendored kinds, rebased onto the mount: the addon's own folder never ships to a client.
 		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
 		surfaces.set(&"use_lightmap", use_lightmaps)
+		DotMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"), surfaces, world)
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
 	var lit: bool = global_pack and use_lightmaps and world.call(&"has_lightmap")
@@ -1292,6 +1310,9 @@ func _attach_visibility(world: RefCounted, node: Node3D) -> void:
 		visibility.queue_free()
 		visibility = null
 	if DisplayServer.get_name() == "headless" or not ResourceLoader.exists(VIS_SCRIPT):
+		return
+	if cull_fn.is_valid():
+		visibility = cull_fn.call(world, node)
 		return
 	var vis: Node = (load(VIS_SCRIPT) as GDScript).new()
 	vis.name = "Visibility"

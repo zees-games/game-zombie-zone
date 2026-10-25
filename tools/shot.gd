@@ -49,6 +49,31 @@ var _weapons: PackedStringArray = PackedStringArray()
 var _day := -1.0
 
 
+## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A dot-cloud client reads packs published
+## into <dir> (<id>/<version>/manifest.json), trusting that key, and the map's world is fetched as <id>@<version>
+## (its shared art slice follows as a dependency) instead of being read from the checkout.
+var _world_key := ""
+
+
+func _cloud_store(spec: String) -> void:
+	var parts := spec.split(",")
+	var config := DotCloudConfig.new()
+	config.cache_dir = "user://store_e2e_cache"
+	DotPaths.remove_tree(config.cache_dir)
+	config.require_signed_manifests = true
+	var pub := FileAccess.get_file_as_string(parts[1])
+	config.trusted_keys = {"e2e": pub, "default": pub}
+	var cloud := DotCloudClient.new()
+	cloud.name = "Cloud"
+	cloud.config = config
+	cloud.config_file = ""
+	cloud.local_search_dirs = PackedStringArray([parts[0]])
+	cloud.allow_netchan_fallback = false
+	add_child(cloud)
+	ZzMap.local_worlds = false
+	_world_key = parts[2]
+
+
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--view="):
@@ -99,6 +124,8 @@ func _ready() -> void:
 			ZzMap.use_bakes = false
 		elif arg == "--no-world":
 			ZzMap.use_worlds = false
+		elif arg.begins_with("--cloud-store="):
+			_cloud_store(arg.trim_prefix("--cloud-store="))
 		elif arg.begins_with("--day="):
 			_day = arg.trim_prefix("--day=").to_float()
 
@@ -107,6 +134,8 @@ func _ready() -> void:
 	_client.set("force_offline", true)
 	_client.set("offline_bots", 3)
 	add_child(_client)
+	if _world_key != "":
+		_client.get("game").world_key_fn = func(_doc: Dictionary) -> String: return _world_key
 	# --view=cover: the loading cover dot-game's DotGameClient puts up first, before it lifts.
 	if _view == "cover":
 		for _i in 2:
@@ -184,6 +213,13 @@ func _run() -> void:
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
 	var local = _client.get("player")
+	if _world_key != "":
+		# The delivered world (and its art slice, hundreds of MB) arrives under the cover: wait for it, as a player does.
+		var waited := 0.0
+		while not game.map.world_drawn and waited < 300.0:
+			await get_tree().create_timer(1.0).timeout
+			waited += 1.0
+		print("delivered world drawn=%s after %.0f s; credits: %s" % [game.map.world_drawn, waited, game.map.world_credits])
 
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)

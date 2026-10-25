@@ -240,6 +240,8 @@ func _draw_world() -> void:
 	if gate != null:
 		gate.hold(&"world", "Loading the world")
 	game.map.vis_mode = _vis_mode()
+	var _mode := platform.set_vis_mode(game.map.vis_mode)
+	game.map.cull_fn = platform.attach_visibility
 	game.map.use_lightmaps = bool(game.config.get(&"lightmaps")) if game.config != null else true
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:
@@ -1435,6 +1437,8 @@ func _prepare_board(snap: Dictionary) -> void:
 	if game == null:
 		return
 	snap["header"] = {"Map": str(game.map_doc.get("name", "")), "Difficulty": game.config.difficulty_name().capitalize()}
+	if game.map != null and game.map.world_credits != "":
+		snap["header"]["Credits"] = game.map.world_credits
 	snap["teams"] = [{"id": ZzGame.SURVIVORS, "name": "Survivors", "color": game.side_colour(ZzGame.SURVIVORS)}]
 
 
@@ -1679,7 +1683,8 @@ func _build_settings() -> void:
 
 	settings.settings.changed.connect(func(key: StringName, _value: Variant, _why: StringName) -> void:
 		if key == &"vis_mode" and game != null and game.map != null:
-			game.map.set_vis_mode(_vis_mode()))
+			game.map.set_vis_mode(_vis_mode())
+			var _mode := platform.set_vis_mode(_vis_mode()))
 
 	if _sampler != null:
 		settings.bind_look(_sampler.tunables)
