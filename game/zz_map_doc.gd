@@ -72,7 +72,10 @@ const WORLD_PREFIX := "zz_world_"
 const MAX_BOXES := 6000
 const MAX_PROPS := 2000
 const MAX_TOYS := 96
-const MAX_LIGHTS := 128
+## Every lamp of the source is kept (the bake uses all of them); the game lights only the nearest few
+## at once ([constant ZzMap.REALTIME_LAMPS]), so this bounds the document, not the frame.
+const MAX_LIGHTS := 1024
+
 const MAX_WATER := 24
 const MAX_SOLID_PROPS := 600
 const MAX_SPAWNS := 64
@@ -344,17 +347,33 @@ static func validate(source: Dictionary) -> DotResult:
 		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
 			return _refuse("light %d has no 'at'" % lights.size(), source)
 		var light := raw as Dictionary
-		lights.append({
+		var lamp := {
 			"at": _floats(light["at"], 3),
 			"range": clampf(float(light.get("range", 8.0)), 0.5, 80.0),
 			"energy": clampf(float(light.get("energy", 1.0)), 0.0, 16.0),
 			"colour": _floats(light.get("colour", [1.0, 0.95, 0.85]), 3),
-		})
+		}
+
+		# A spot: `dir` (where it points) and `cone` (half angle, degrees). Left out of an omni.
+		if light.has("dir") and light.has("cone"):
+			lamp["dir"] = _floats(light["dir"], 3)
+			lamp["cone"] = clampf(float(light["cone"]), 5.0, 90.0)
+
+		lights.append(lamp)
 
 	if lights.size() > MAX_LIGHTS:
 		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
 
 	doc["lights"] = lights
+
+	# `wire_lamps`: how many lamps go over the wire (the importer writes it for a map of hundreds, its
+	# lamps farthest-point first so the first few cover the map). The wire form adds the other two keys.
+	if int(source.get("wire_lamps", 0)) > 0:
+		doc["wire_lamps"] = int(source["wire_lamps"])
+
+	if int(source.get("lights_total", 0)) > lights.size() and str(source.get("lights_digest", "")) != "":
+		doc["lights_total"] = int(source["lights_total"])
+		doc["lights_digest"] = str(source["lights_digest"])
 
 	# Water: axis-aligned volumes, `{at, size, tint?}` like a box (its top is the surface). Left
 	# out of a map that has none, so a map without water keeps the document it always had.
@@ -722,9 +741,35 @@ static func _prop(raw: Variant) -> Dictionary:
 	return out
 
 
+## The document as the wire carries it: a map with `wire_lamps` sends only that many of its lamps, the total
+## and a digest of all. Applying it twice changes nothing, so both ends digest the same text.
+static func wire_form(doc: Dictionary) -> Dictionary:
+	var all: Array = doc.get("lights", [])
+	var keep := int(doc.get("wire_lamps", 0))
+
+	if keep <= 0 or all.size() <= keep:
+		return doc
+
+	var out := doc.duplicate()
+	out["lights"] = all.slice(0, keep)
+	out["lights_total"] = all.size()
+	out["lights_digest"] = JSON.stringify(all, "", true).sha256_text().substr(0, 16)
+	return out
+
+
+## What a bake of the lamps is checked against: the lamps themselves, or for a map with `wire_lamps` a digest
+## of all of them (a client holds only the first few, and has the digest it was sent).
+static func lamps_key(doc: Dictionary) -> Variant:
+	if doc.has("lights_digest"):
+		return doc["lights_digest"]
+
+	var wired := wire_form(doc)
+	return wired["lights_digest"] if wired.has("lights_digest") else doc.get("lights", [])
+
+
 ## A normalised document as bytes: JSON, deflated, behind both its lengths.
 static func encode(doc: Dictionary) -> PackedByteArray:
-	var raw := JSON.stringify(doc, "", false).to_utf8_buffer()
+	var raw := JSON.stringify(wire_form(doc), "", false).to_utf8_buffer()
 	var packed := raw.compress(FileAccess.COMPRESSION_DEFLATE)
 
 	var out := PackedByteArray()
@@ -758,7 +803,7 @@ static func decode(bytes: PackedByteArray) -> DotResult:
 
 ## A short fingerprint of a document, for a log line and for two ends to compare.
 static func digest(doc: Dictionary) -> String:
-	return JSON.stringify(doc, "", true).sha256_text().substr(0, 12)
+	return JSON.stringify(wire_form(doc), "", true).sha256_text().substr(0, 12)
 
 
 # --- Small readers ----------------------------------------------------------

@@ -141,8 +141,10 @@ func _bake_scene(map: ZzMap) -> Node3D:
 			mesh.material_override = _with_emission((child as MeshInstance3D).material_override, ambient, emit_gain)
 			mesh.gi_mode = GeometryInstance3D.GI_MODE_STATIC
 			drawn.add_child(mesh)
-		elif child is OmniLight3D:
-			var lamp := (child as OmniLight3D).duplicate() as OmniLight3D
+		elif child is Light3D:
+			var lamp := (child as Light3D).duplicate() as Light3D
+			lamp.visible = true
+			lamp.light_energy = float(lamp.get_meta(&"zz_base_energy", lamp.light_energy))    # every lamp, whatever the runtime budget lights
 			lamp.light_bake_mode = Light3D.BAKE_STATIC
 			lamp.shadow_enabled = bool(settings.get("lamp_shadow", true))
 			lamp.light_size = 0.15

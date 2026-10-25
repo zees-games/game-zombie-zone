@@ -3,6 +3,7 @@ extends Node3D
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
+const ZzLampBudget := preload("zz_lamp_budget.gd")
 const ZzFixtures := preload("zz_fixtures.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzMechanics := preload("zz_mechanics.gd")
@@ -194,7 +195,10 @@ var _bounds: AABB = AABB()
 ## The converted map's displacement ground (the document's `terrain`), or null.
 var terrain: DotMapTerrain = null
 var _missing: PackedStringArray = PackedStringArray()
-var _lamps: Array[OmniLight3D] = []
+var _lamps: Array[Light3D] = []
+var _lamp_budget := ZzLampBudget.new()
+## The most lamps lit at once (the nearest to the camera); a map may have many more, all in its bake.
+@export var realtime_lamps := 128
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
 
@@ -921,15 +925,45 @@ func _build_props() -> void:
 
 func _build_lights() -> void:
 	for light: Dictionary in doc["lights"]:
-		var omni := OmniLight3D.new()
-		omni.position = ZzMapDoc.v3(light["at"])
-		omni.omni_range = float(light["range"])
-		omni.light_energy = float(light["energy"])
-		omni.light_color = ZzMapDoc.colour(light["colour"])
-		omni.omni_attenuation = 1.2
-		omni.shadow_enabled = false
-		_drawn.add_child(omni)
-		_lamps.append(omni)
+		var lamp: Light3D
+
+		if light.has("cone"):
+			var spot := SpotLight3D.new()
+			spot.spot_range = float(light["range"])
+			spot.spot_angle = float(light["cone"])
+			spot.spot_attenuation = 1.2
+			lamp = spot
+		else:
+			var omni := OmniLight3D.new()
+			omni.omni_range = float(light["range"])
+			omni.omni_attenuation = 1.2
+			lamp = omni
+
+		lamp.position = ZzMapDoc.v3(light["at"])
+		lamp.light_energy = float(light["energy"])
+		lamp.light_color = ZzMapDoc.colour(light["colour"])
+		lamp.shadow_enabled = false
+		_drawn.add_child(lamp)
+
+		if light.has("cone"):
+			var aim := ZzMapDoc.v3(light["dir"]).normalized()
+			var up := Vector3.RIGHT if absf(aim.y) > 0.99 else Vector3.UP
+			lamp.basis = Basis.looking_at(aim, up)
+
+		_lamps.append(lamp)
+
+	_lamp_budget.limit = realtime_lamps
+	_lamp_budget.setup(_lamps)
+	set_process(_lamps.size() > realtime_lamps)
+
+
+## Frame by frame the lamps nearest the camera are the ones lit, so a map of hundreds costs what
+## [member realtime_lamps] do; the bake and the document still hold them all.
+func _process(delta: float) -> void:
+	var camera := get_viewport().get_camera_3d()
+
+	if camera != null and _drawn != null:
+		_lamp_budget.update(_lamps, _drawn.to_local(camera.global_position), delta)
 
 
 ## Whether the host's dot-lighting can lay a bake (API level 5: DotLightBake, DotLightmapSheet). Those
@@ -949,7 +983,7 @@ func light_fingerprint() -> String:
 		return ""
 
 	return (load(BAKE_SCRIPT) as GDScript).call(&"fingerprint", {
-		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "props": doc.get("props", []), "lights": doc.get("lights", []),
+		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "props": doc.get("props", []), "lights": ZzMapDoc.lamps_key(doc),
 		"environment": doc.get("environment", {}),
 	})
 
@@ -1452,7 +1486,7 @@ func _unbake() -> void:
 
 
 ## The lamps, for the bake scene and the suites.
-func lamps() -> Array[OmniLight3D]:
+func lamps() -> Array[Light3D]:
 	return _lamps
 
 

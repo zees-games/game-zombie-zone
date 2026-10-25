@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzLampBudget := preload("../game/zz_lamp_budget.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzPaths := preload("../game/zz_paths.gd")
@@ -28,6 +29,7 @@ const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3",
 const CHECKS_PER_MAP := 17
 const BAKE_CHECKS := 7
 const WORLD_CHECKS := 4
+const LAMP_CHECKS := 8
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -70,6 +72,7 @@ func _run() -> void:
 
 	await _test_the_catalogue()
 	await _test_baked_light()
+	await _test_lamp_budget()
 	await _test_worlds()
 
 	for id: String in _maps:
@@ -84,8 +87,8 @@ func _run() -> void:
 
 	var code := 1 if _failed > 0 else 0
 
-	var sections := 3 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := 4 + _maps.size()
+	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -145,6 +148,84 @@ func _test_the_catalogue() -> void:
 		"every map is in it, and no file was refused", "have %s, missing %s, refused %s" % [ids, missing, game.catalogue.refused])
 	await _dispose(game)
 	_finished()
+
+
+## The document keeps every lamp; only the nearest few are lit, and a lamp fades rather than pops.
+func _test_lamp_budget() -> void:
+	_section("lamp budget")
+	var game := await _world(&"")
+	var source := (game.catalogue.maps[&"zz_practice"] as Dictionary).duplicate(true)
+	var lights: Array = []
+	for i in 300:
+		lights.append({"at": [i * 2.0, 3.0, 0.0], "range": 6.0, "energy": 1.0, "colour": [1, 1, 1]})
+	lights.append({"at": [0, 3, 5], "range": 6.0, "energy": 1.0, "colour": [1, 1, 1], "dir": [0, -1, 0], "cone": 40.0})
+	source["lights"] = lights
+	var res := ZzMapDoc.validate(source)
+	_check(res.ok and (res.value["lights"] as Array).size() == 301, "a document keeps all 301 lamps", "%s" % [res.error if not res.ok else ""])
+	var kept: Array = res.value["lights"] if res.ok else []
+	_check(not kept.is_empty() and (kept[300] as Dictionary).get("cone", 0.0) == 40.0 and (kept[0] as Dictionary).has("cone") == false,
+		"a spot keeps its cone and direction, an omni gets none")
+
+	var host := Node3D.new()
+	add_child(host)
+	var lamps: Array[Light3D] = []
+	for light: Dictionary in lights:
+		var omni := OmniLight3D.new()
+		omni.position = ZzMapDoc.v3(light["at"])
+		omni.omni_range = 6.0
+		host.add_child(omni)
+		lamps.append(omni)
+	var budget := ZzLampBudget.new()
+	budget.limit = 40
+	budget.setup(lamps)
+	_check(budget.lit_count() == 40 and _visible(lamps) == 40, "301 lamps start with only the limit lit", "%d lit, %d visible" % [budget.lit_count(), _visible(lamps)])
+	budget.update(lamps, Vector3(0, 0, 0), 0.016)
+	var near := true
+	# The spot beside the first lamp is among the 40 nearest, so lamp 39 is not.
+	for i in 39:
+		near = near and lamps[i].visible
+	near = near and lamps[300].visible
+	_check(near and _visible(lamps) == 40, "the first pass lights the 40 nearest at once", "%d visible" % _visible(lamps))
+
+	# Walk 400 m along the row at 8 m/s in frames of 1/60 s: no lamp's energy jumps by more than a fade step.
+	var worst := 0.0
+	var peak := 0
+	var previous: Array = lamps.map(func(l: Light3D) -> float: return l.light_energy)
+	for frame in 3000:
+		budget.update(lamps, Vector3(8.0 * frame / 60.0, 0, 0), 1.0 / 60.0)
+		peak = maxi(peak, _visible(lamps))
+		for i in lamps.size():
+			worst = maxf(worst, absf(lamps[i].light_energy - float(previous[i])))
+			previous[i] = lamps[i].light_energy
+	_check(worst <= ZzLampBudget.FADE_PER_SECOND / 60.0 + 0.001, "no lamp pops while walking past (largest step %.3f)" % worst)
+	_check(peak <= 40 + 12, "lamps still fading out stay few while walking (peak %d visible)" % peak)
+	for i in 100:
+		budget.update(lamps, Vector3(400, 0, 0), 0.05)
+	var lit_near := 0
+	for i in lamps.size():
+		if lamps[i].visible:
+			lit_near += 1 if absf(lamps[i].position.x - 400.0) <= 40.0 + ZzLampBudget.KEEP_BONUS else 0
+	_check(_visible(lamps) == 40 and lit_near == 40, "standing still, exactly the 40 nearest are lit", "%d visible, %d of them near" % [_visible(lamps), lit_near])
+
+	var few: Array[Light3D] = []
+	for i in 10:
+		var l := OmniLight3D.new()
+		host.add_child(l)
+		few.append(l)
+	var small := ZzLampBudget.new()
+	small.setup(few)
+	small.update(few, Vector3(900, 0, 0), 0.1)
+	_check(_visible(few) == 10, "a map under the limit lights every lamp wherever the camera is")
+	host.queue_free()
+	game.free()
+	_finished()
+
+
+func _visible(lamps: Array[Light3D]) -> int:
+	var n := 0
+	for lamp in lamps:
+		n += 1 if lamp.visible else 0
+	return n
 
 
 ## The committed bakes against the maps as they are now. A map edited without a rebake still
