@@ -1310,13 +1310,26 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		_drawn.add_child(kept)
 
 	lap = _lap(stages, "mechanics_kept", lap)
-	_attach_world_extras(world, node)
-	lap = _lap(stages, "extras", lap)
 	_attach_visibility(world, node)
 	_lap(stages, "visibility", lap)
 	DotLog.info(CHANNEL, "world attached", {"map": map_id, "ms": stages})
 	world_drawn = true
+	_attach_extras_later(world, node)
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## Probes, sounds, prop stand-ins and fx after the first drawn frames: they cost about 3 s on the biggest map and nothing needs them to play.
+func _attach_extras_later(world: RefCounted, node: Node3D) -> void:
+	if not is_inside_tree():
+		_attach_world_extras(world, node)
+		return
+	for i in 3:
+		await get_tree().process_frame
+		if not is_instance_valid(node) or not node.is_inside_tree():
+			return
+	var started := Time.get_ticks_msec()
+	_attach_world_extras(world, node)
+	DotLog.info(CHANNEL, "world extras attached", {"map": String(id()), "ms": Time.get_ticks_msec() - started})
 
 
 ## Adds the milliseconds since [param since] to [param stages] under [param name]; returns now.
