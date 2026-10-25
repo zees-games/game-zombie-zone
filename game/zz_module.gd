@@ -823,6 +823,8 @@ func _game_hibernation(hibernating: bool) -> void:
 ## with one person on it fills the rest with stand-ins, and takes one out the moment a person
 ## takes their place.
 func _game_tick(_tick: int, delta: float) -> void:
+	_follow_npc_threads()
+
 	if vote != null:
 		vote.advance(delta)
 
@@ -837,6 +839,15 @@ func _game_tick(_tick: int, delta: float) -> void:
 	_since_roster_check = 0.0
 	_keep_the_round_full()
 	_note_pings()
+
+
+## The horde's sense workers follow `sv_threads_npc` / `sv_worker_threads` (live cvars).
+func _follow_npc_threads() -> void:
+	var world := game as ZzGame
+	if world == null or world.horde == null or world.horde.spawner == null:
+		return
+	if server != null and server.config != null and server.config.has_method(&"npc_workers"):
+		world.horde.spawner.sense_workers = int(server.config.call(&"npc_workers"))
 
 
 ## Each session's ping onto its player, for the Tab board. dot-server already keeps it.
@@ -1555,6 +1566,7 @@ func _bind_config(world: ZzGame) -> void:
 func _apply_gore(config: DotConfig) -> void:
 	DotNpcGore.level = int(config.get(&"gore_level"))
 	DotNpcGore.max_gibs = int(config.get(&"gore_max_gibs"))
+	DotNpcGore.max_wounds = int(config.get(&"gore_max_wounds"))
 
 
 func _noblock_side(id: Variant) -> Variant:

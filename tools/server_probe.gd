@@ -6,7 +6,7 @@ extends Node
 ## [codeblock]
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
-##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--acks] [--native]
+##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--native]
 ##     [--detail] [--cfg=field=value]
 ## [/codeblock]
 ##
@@ -46,6 +46,8 @@ var _fill := true
 var _relevance := true
 ## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
 var _workers := 0
+## --npc-workers=N: DotNpcSpawner.sense_workers (what sv_threads_npc sets on a server).
+var _npc_workers := 0
 ## --native: DotNetConfig.native, snapshots built by dot-net's native core.
 var _native := false
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
@@ -102,6 +104,8 @@ func _ready() -> void:
 			_native = true
 		elif arg == "--relevance=off":
 			_relevance = false
+		elif arg.begins_with("--npc-workers="):
+			_npc_workers = arg.trim_prefix("--npc-workers=").to_int()
 		elif arg.begins_with("--workers="):
 			_workers = arg.trim_prefix("--workers=").to_int()
 		elif arg.begins_with("--far-every="):
@@ -279,7 +283,7 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
@@ -348,6 +352,7 @@ func _one_tick(tick: int) -> void:
 		var sp: DotNpcSpawner = h.spawner
 		sp._now += delta
 		sp._ticks += 1
+		sp.sense_workers = _npc_workers
 		sp._perceive()
 		at = _add("senses", at)
 		if _detail:

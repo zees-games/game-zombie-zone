@@ -225,6 +225,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	spawner.seed_base = config.seed_value
 	# Before add_child: DotNpcSpawner._ready makes its own senses when it finds none.
 	spawner.senses = senses
+	squads.pull_reports = config.squad_pull_reports
 	squads.attach(spawner)
 	sounds.attach(spawner)
 	skill.attach(spawner)

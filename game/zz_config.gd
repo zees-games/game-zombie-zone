@@ -246,6 +246,10 @@ func setup_seconds() -> float:
 ## arrives by every way in and not down one in a line. `zz_zombie_spread`.
 @export var zombie_spread: bool = true
 
+## Whether a zombie reads its squad's sightings when it thinks instead of each sighting calling
+## the whole horde (DotNpcAiSquads.pull_reports). Read at map load.
+@export var squad_pull_reports: bool = false
+
 ## Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
 @export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
@@ -519,6 +523,9 @@ func setup_seconds() -> float:
 
 ## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
 @export_range(0, 200, 1) var gore_max_gibs: int = 24
+
+## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
+@export_range(0, 400, 1) var gore_max_wounds: int = 48
 
 @export_group("The maps")
 
