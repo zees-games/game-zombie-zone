@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 44
+const SECTIONS := 45
 
-const CHECKS := 336
+const CHECKS := 340
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -118,6 +118,7 @@ func _run() -> void:
 	await _test_the_first_play_test()
 	await _test_crawling_and_speed_boxes()
 	await _test_water()
+	await _test_solid_props()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -400,6 +401,58 @@ func _test_a_wedged_zombie() -> void:
 	mover.queue_free()
 	thin.queue_free()
 	floor_body.queue_free()
+	_finished()
+
+
+## A drawn world's solid prop (prop_dynamic the source makes solid) stops a survivor's and a zombie's body, a non-solid one of the same model does not.
+func _test_solid_props() -> void:
+	_section("a solid prop of a drawn world blocks bodies, a non-solid one does not")
+	var game := await _world(_quiet)
+	var origin := Vector3(300.0, 0.0, 300.0)
+	var world := DotMapBspMesh.new()
+	world.manifest = {"props": [
+		{"at": [origin.x, 0.0, origin.z], "stand_in": "cabinet", "yaw": 0.0, "scale": 1.0, "size": 1.0, "solid": 6},
+		{"at": [origin.x, 0.0, origin.z + 10.0], "stand_in": "cabinet", "yaw": 0.0, "scale": 1.0, "size": 1.0, "solid": 0},
+	]}
+	var map := ZzMap.new()
+	map.physics = game.physics
+	game.add_child(map)
+	map.attach_world_props(world)
+	_check(map.world_props != null and map.world_props.get_child_count() == 1,
+		"only the solid prop gets a box", str(map.world_props.get_child_count() if map.world_props != null else -1))
+	map.attach_world_props(world)
+	_check(map.world_props.get_child_count() == 1, "attaching twice adds nothing")
+	await get_tree().physics_frame
+
+	for kind: StringName in [&"player", &"zombie"]:
+		var walkers: Array[float] = []
+		for lane: float in [0.0, 10.0]:
+			var body := CharacterBody3D.new()
+			body.collision_layer = 0
+			body.collision_mask = game.physics.collision_mask(kind)
+			var cap_shape := CollisionShape3D.new()
+			var capsule := CapsuleShape3D.new()
+			capsule.radius = 0.35
+			capsule.height = 1.8
+			cap_shape.shape = capsule
+			cap_shape.position.y = 0.9
+			body.add_child(cap_shape)
+			game.add_child(body)
+			body.global_position = origin + Vector3(0.0, 0.0, lane - 4.0)
+			await get_tree().physics_frame
+			var left := 8.0
+			while left > 0.0:
+				var step := minf(left, 0.2)
+				var got := body.move_and_collide(Vector3(0.0, 0.0, step))
+				if got != null:
+					break
+				left -= step
+			walkers.append(body.global_position.z - (origin.z + lane - 4.0))
+			body.queue_free()
+		_check(walkers[0] < 5.0 and walkers[1] > 7.9,
+			"a %s stops at the solid prop and walks through the non-solid one" % kind, "%s" % [walkers])
+
+	map.queue_free()
 	_finished()
 
 

@@ -118,6 +118,8 @@ var mechanics: ZzMechanics = null
 var world_collision: StaticBody3D = null
 ## The clip-kind hulls of the same world, on the clip layer.
 var world_clip: StaticBody3D = null
+## A box per solid prop of the drawn world (prop_dynamic and prop_physics the source makes solid), on the prop layer.
+var world_props: StaticBody3D = null
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
 ## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
@@ -302,6 +304,7 @@ func clear() -> void:
 	_barricades.clear()
 	mechanics = null
 	world_collision = null
+	world_props = null
 	_pending_movers.clear()
 	_pending_copies.clear()
 	_missing.clear()
@@ -1039,6 +1042,34 @@ func attach_world_collision(world: RefCounted) -> void:
 	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
 
 
+## Collides with the solid props of [param world]'s manifest (dot-map's `build_prop_collision`): a server and a client build the same boxes, so a survivor is stopped on both ends. Once per map.
+func attach_world_props(world: RefCounted) -> void:
+	if world_props != null:
+		return
+	var body: StaticBody3D = world.call(&"build_prop_collision")
+	if body == null:
+		return
+	_put_on(body, &"prop")
+	add_child(body)
+	world_props = body
+	DotLog.debug(CHANNEL, "the map collides with its solid props", {"map": String(id()), "boxes": body.get_child_count()})
+
+
+## [method attach_world_props] on a server, which draws no world: from the checkout's world when it is there (a deployed maps pack ships hulls only).
+func build_world_props_local() -> bool:
+	if world_props != null or not can_draw_world() or str(doc.get("world", "")) == "":
+		return false
+	var prefix := local_world_prefix()
+	if not FileAccess.file_exists(prefix + ".json"):
+		return false
+	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	if not read.ok:
+		DotLog.warn(CHANNEL, "a map's world would not read for its props", {"map": String(id()), "at": prefix, "why": read.error.message})
+		return false
+	attach_world_props(read.value)
+	return world_props != null
+
+
 func _hull_prefixes(root: String) -> PackedStringArray:
 	var prefixes := PackedStringArray([ZzPaths.rebase("res://maps/hulls/" + String(id())), local_world_prefix()])
 	if root != "":
@@ -1160,6 +1191,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	node.name = "World"
 	_drawn.add_child(node)
 	attach_world_collision(world)
+	attach_world_props(world)
 	_light_from_world(world)
 	_dress_panorama_sky(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own

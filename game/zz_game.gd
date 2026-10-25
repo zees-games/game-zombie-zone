@@ -1800,6 +1800,7 @@ func build_map(doc: Dictionary) -> DotResult:
 	map_doc = map.doc
 	if authoritative:
 		var _hulls := map.build_world_collision_local(str(catalogue.roots.get(StringName(str(doc.get("id", ""))), "")) if catalogue != null else "")
+		var _props := map.build_world_props_local()
 		var _moving := map.build_mechanics_local()
 	_push_water()
 	_reset_barricades()
