@@ -215,11 +215,17 @@ func _run() -> void:
 	var local = _client.get("player")
 	if _world_key != "":
 		# The delivered world (and its art slice, hundreds of MB) arrives under the cover: wait for it, as a player does.
+		# The client's first round began before world_key_fn was set, so that map has no key: ask for the world now,
+		# or this waits out a whole round (261 s on the GPU box) for the next map to carry the key.
+		var started := Time.get_ticks_msec()
+		if not game.map.world_drawn:
+			game.map.doc["world_key"] = _world_key
+			await game.map.load_world()
 		var waited := 0.0
 		while not game.map.world_drawn and waited < 300.0:
 			await get_tree().create_timer(1.0).timeout
 			waited += 1.0
-		print("delivered world drawn=%s after %.0f s; credits: %s" % [game.map.world_drawn, waited, game.map.world_credits])
+		print("delivered world drawn=%s after %.1f s; credits: %s" % [game.map.world_drawn, (Time.get_ticks_msec() - started) / 1000.0, game.map.world_credits])
 
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)

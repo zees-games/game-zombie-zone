@@ -1201,11 +1201,15 @@ func load_world() -> DotResult:
 			return got
 		prefix = DotGameContent.mount_of(key) + "/" + String(wanted)
 
+	var t_read := Time.get_ticks_msec()
 	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	var read_ms := Time.get_ticks_msec() - t_read
 
 	if read.ok:
 		# The shared PBR and model slice this world names (dot-map's store); a world without one reads its own folder.
+		var t_store := Time.get_ticks_msec()
 		var stored: DotResult = await DotMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"))
+		DotLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
 		if not stored.ok:
 			DotLog.warn(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
 		if id() != wanted or _drawn == null:
@@ -1239,6 +1243,8 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	if _drawn == null:
 		return
 
+	var lap := Time.get_ticks_msec()
+	var stages := {}
 	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
 	var mats: Dictionary = zz.get("materials", {})
 	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
@@ -1256,6 +1262,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		DotMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"), surfaces, world)
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
+	lap = _lap(stages, "store_apply", lap)
 	var lit: bool = global_pack and use_lightmaps and world.call(&"has_lightmap")
 	if not lit:
 		_unbake()
@@ -1265,15 +1272,20 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 			_drawn.remove_child(child)
 			child.queue_free()
 
+	lap = _lap(stages, "unbake", lap)
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)
+	lap = _lap(stages, "build_node", lap)
 	attach_world_collision(world)
+	lap = _lap(stages, "collision", lap)
 	attach_world_props(world)
+	lap = _lap(stages, "props", lap)
 	_light_from_world(world)
 	if lit and _environment != null:
 		(load(LIT_SCRIPT) as GDScript).call(&"attach", self, world, _environment.environment, _lamps.duplicate(), true)
 		_lamps.clear()
+	lap = _lap(stages, "light_lit", lap)
 	_dress_panorama_sky(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.
@@ -1297,10 +1309,21 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 			ZzMaterials.surface_for(map_id, mat, ""))
 		_drawn.add_child(kept)
 
+	lap = _lap(stages, "mechanics_kept", lap)
 	_attach_world_extras(world, node)
+	lap = _lap(stages, "extras", lap)
 	_attach_visibility(world, node)
+	_lap(stages, "visibility", lap)
+	DotLog.info(CHANNEL, "world attached", {"map": map_id, "ms": stages})
 	world_drawn = true
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+
+
+## Adds the milliseconds since [param since] to [param stages] under [param name]; returns now.
+static func _lap(stages: Dictionary, name: String, since: int) -> int:
+	var now := Time.get_ticks_msec()
+	stages[name] = now - since
+	return now
 
 
 ## Culls the drawn world to what the camera's cluster can see, and adds its occluders; a pack
