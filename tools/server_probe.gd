@@ -6,7 +6,7 @@ extends Node
 ## [codeblock]
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
-##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--native]
+##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--native] [--native-interest] [--net=field=value]
 ##     [--detail] [--cfg=field=value] [--cvar=name=value]
 ## [/codeblock]
 ##
@@ -50,6 +50,9 @@ var _workers := 0
 var _npc_workers := 0
 ## --native: DotNetConfig.native, snapshots built by dot-net's native core.
 var _native := false
+## --native-interest: also DotNetConfig.native_interest. --net=field=value (repeatable): any other DotNetConfig field.
+var _native_interest := false
+var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
 ## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
 var _acks := false
@@ -112,6 +115,13 @@ func _ready() -> void:
 			_acks = true
 		elif arg == "--native":
 			_native = true
+		elif arg == "--native-interest":
+			_native = true
+			_native_interest = true
+		elif arg.begins_with("--net="):
+			var kv := arg.trim_prefix("--net=").split("=", true, 1)
+			if kv.size() == 2:
+				_net_fields[kv[0]] = kv[1]
 		elif arg == "--relevance=off":
 			_relevance = false
 		elif arg.begins_with("--npc-workers="):
@@ -184,6 +194,9 @@ func _run() -> void:
 	nc.world_extent = ZzGame.NET_WORLD_EXTENT
 	nc.snapshot_workers = _workers
 	nc.native = _native
+	nc.native_interest = _native_interest
+	for field: String in _net_fields:
+		nc.set(field, type_convert(_net_fields[field], typeof(nc.get(field))))
 	_net.config = nc
 	add_child(_net)
 	var _ok := _net.setup()
