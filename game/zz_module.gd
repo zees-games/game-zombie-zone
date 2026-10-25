@@ -847,7 +847,9 @@ func _follow_npc_threads() -> void:
 	if world == null or world.horde == null or world.horde.spawner == null:
 		return
 	if server != null and server.config != null and server.config.has_method(&"npc_workers"):
-		world.horde.spawner.sense_workers = int(server.config.call(&"npc_workers"))
+		var workers := int(server.config.call(&"npc_workers"))
+		world.horde.spawner.sense_workers = workers
+		world.horde.spawner.path_workers = workers
 
 
 ## Each session's ping onto its player, for the Tab board. dot-server already keeps it.

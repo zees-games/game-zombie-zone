@@ -77,7 +77,7 @@ Everything here defaults to the small-server behaviour and changes live (console
 - `zz_net_far_every` (1, off) and `zz_net_far_distance` (40): everything farther than that from a survivor (other players included) is sent in one snapshot of N. 4 with 15 m is the setting for a crowded map at 100 players (see `docs/survival.md`).
 - `zz_net_far_coherent` (false) and `zz_net_far_tiers` (1): with coherent on, every survivor far from a zombie skips the same snapshots of it, so the server encodes it once for all of them instead of once each; tiers add bands past `zz_net_far_distance`, each twice as far and sent half as often (`far_every` 2, tiers 3: every 2nd snapshot past 15 m, 4th past 30 m, 8th past 60 m). Keep the slowest band's gap under a second, or a client hides the zombie as unsent.
 - `sv_threads_net` (off) with `sv_worker_threads` (-1, cores less one): builds each player's snapshot on worker threads, from the next snapshot. Not on the web.
-- `sv_threads_npc` exists but nothing reads it yet: NPC decisions stay on the main thread.
+- `sv_threads_npc` (off) with `sv_worker_threads`: runs the horde's perception passes and its repath searches on worker threads; a repath lands at the end of the think that asked it. Decisions and movement stay on the main thread. Not on the web.
 
 `tools/server_probe.tscn -- --n=100 --acks --split --far-every=4 --far=15 --workers=4` measures a tick at a given player count.
 

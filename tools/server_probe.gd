@@ -46,7 +46,7 @@ var _fill := true
 var _relevance := true
 ## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
 var _workers := 0
-## --npc-workers=N: DotNpcSpawner.sense_workers (what sv_threads_npc sets on a server).
+## --npc-workers=N: DotNpcSpawner.sense_workers and path_workers (what sv_threads_npc sets on a server).
 var _npc_workers := 0
 ## --native: DotNetConfig.native, snapshots built by dot-net's native core.
 var _native := false
@@ -353,6 +353,7 @@ func _one_tick(tick: int) -> void:
 		sp._now += delta
 		sp._ticks += 1
 		sp.sense_workers = _npc_workers
+		sp.path_workers = _npc_workers
 		sp._perceive()
 		at = _add("senses", at)
 		if _detail:
@@ -563,3 +564,6 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 				best = minf(best, at.distance_to(q))
 			var bucket := "<10" if best < 10.0 else "<20" if best < 20.0 else "<40" if best < 40.0 else "<80" if best < 80.0 else ">=80"
 			_near_hist[bucket] = int(_near_hist.get(bucket, 0)) + 1
+	var t1 := Time.get_ticks_usec()
+	sp.answer_paths()
+	_accum("paths", Time.get_ticks_usec() - t1)
