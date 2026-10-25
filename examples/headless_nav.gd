@@ -16,8 +16,8 @@ const StuckMeter := preload("../tools/stuck_meter.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 19
-const CHECKS := 83
+const SECTIONS := 20
+const CHECKS := 86
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -109,6 +109,8 @@ func _run() -> void:
 				print("      %s worst cells %s" % [kind, meter.worst_cells(kind)])
 			for line in meter.cases.slice(0, 8):
 				print("      case %s" % line)
+			for block in meter.captures:
+				print(block)
 
 		get_tree().quit(0)
 		return
@@ -120,6 +122,14 @@ func _run() -> void:
 
 	if only == "thin":
 		_test_thin_props()
+		print("%d passed, %d failed" % [_passed, _failed])
+		for line in _failures:
+			print("  FAIL  %s" % line)
+		get_tree().quit(_failed)
+		return
+
+	if only == "wedge":
+		await _test_hop_wedge()
 		print("%d passed, %d failed" % [_passed, _failed])
 		for line in _failures:
 			print("  FAIL  %s" % line)
@@ -163,6 +173,7 @@ func _run() -> void:
 	for id: String in STUCK_BANDS:
 		await _test_stuck(StringName(id))
 
+	await _test_hop_wedge()
 	await _test_lure_crowd()
 	_test_thin_props()
 
@@ -453,7 +464,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 
 # --- Stuck -------------------------------------------------------------------------------------
 
-## A team of stand-ins plays [param id] against its horde for [constant STUCK_SECONDS], and a
+## A team of stand-ins plays [param id] against its horde for [constant STUCK_SECONDS] (`--stuck-seconds=` to hunt a rare snag), and a
 ## [StuckMeter] says how long movers with a goal stood still.
 func _stuck(id: StringName) -> StuckMeter:
 	var game := await _world(func(c: ZzConfig) -> void:
@@ -468,7 +479,11 @@ func _stuck(id: StringName) -> StuckMeter:
 
 	game.start()
 	var meter := StuckMeter.new(game)
-	var ticks := int(STUCK_SECONDS * float(TICK_RATE))
+	var seconds := STUCK_SECONDS
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--stuck-seconds="):
+			seconds = float(arg.substr(16))
+	var ticks := int(seconds * float(TICK_RATE))
 
 	for i in ticks:
 		game.simulate(TICK)
@@ -485,6 +500,8 @@ func _test_stuck(id: StringName) -> void:
 	_section("%s: movers with a goal do not stand still" % id)
 	var meter: StuckMeter = await _stuck(id)
 	var detail := meter.line()
+	for block in meter.captures:
+		print(block)
 	_check(meter.ratio(&"standin", STANDIN_MIN_GOAL) <= STANDIN_BAND, "stand-ins are stuck under %d%% of their goal time" % int(STANDIN_BAND * 100.0), detail)
 	_check(meter.ratio(&"common") <= COMMON_BAND, "commons are stuck under %d%% of their goal time" % int(COMMON_BAND * 100.0), detail)
 	_check(maxf(meter.longest[&"standin"], meter.longest[&"common"]) <= LONGEST_BAND, "no mover is stuck longer than %.0f s" % LONGEST_BAND, detail)
@@ -587,6 +604,80 @@ func _test_thin_props() -> void:
 		ends = ends and covered
 
 	_check(ends, "both ends of the panel are still cut", "")
+	_finished()
+
+
+## [where the common stood, where its quarry stood] for two snags the stuck meter caught (18 s, 124 s).
+const WEDGES := [[Vector3(29.84, 0.0, -24.84), Vector3(21.6, 0.2, -2.0)], [Vector3(41.34, 0.0, 13.92), Vector3(24.0, 0.2, 14.3)]]
+
+## The 30 s snags the stuck meter caught on the school: a common heading past a corner its path cut
+## hopped on the spot for ever, and every hop read as progress to the brain's go-rough watch and
+## reset the game's unstick watchdog, so neither remedy ever ran.
+func _test_hop_wedge() -> void:
+	_section("commons hopping against a corner their path cut are still seen as stuck and get round it")
+	if not _linked:
+		for i in WEDGES.size() + 1:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zz_high_school"])
+		c.survival_warmup_seconds = 600.0
+		c.wanderer_density = 0.0
+		c.sleepers_enabled = false)
+	var quarries: Array = []
+	for i in WEDGES.size():
+		var p := game.add_player(StringName("u%d" % (100 + i)), "Quarry%d" % i)
+		p.health.invulnerable = true
+		quarries.append(p)
+	game.start()
+	var ticks := 0
+
+	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+		game.simulate(TICK)
+		ticks += 1
+
+		if ticks % 8 == 0:
+			await get_tree().physics_frame
+
+	var npcs: Array = []
+	var furthest: Array[float] = []
+	for i in WEDGES.size():
+		quarries[i].place_at(WEDGES[i][1], 0.0)
+		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, WEDGES[i][0], &"test")
+		npc.brain.call(&"force_target", StringName("u%d" % (100 + i)))
+		npcs.append(npc)
+		furthest.append(0.0)
+
+	for step in 30:
+		await _sim(game, 0.5)
+		for i in npcs.size():
+			var npc: DotNpcInstance = npcs[i]
+			if npc.is_alive():
+				var start: Vector3 = WEDGES[i][0]
+				furthest[i] = maxf(furthest[i], Vector2(npc.position().x - start.x, npc.position().z - start.z).length())
+
+	for i in npcs.size():
+		var npc: DotNpcInstance = npcs[i]
+		var remedies: PackedStringArray = npc.brain.get(&"unstick_log") if npc.is_alive() else PackedStringArray()
+		var detail := "from %s furthest %.1f m, remedies [%s]" % [WEDGES[i][0], furthest[i], ", ".join(remedies)]
+		_check(npc.is_alive() and furthest[i] > 3.0, "the common caught at %s gets 3 m clear within 15 s" % WEDGES[i][0], detail)
+
+	# The hop itself zeroes wish; the watchdog must pause through it, not start again.
+	var hopper: DotNpcInstance = npcs[0]
+	var watched: Object = hopper.brain
+	var hop_body: Object = watched.call(&"body")
+	watched.set(&"bashing", false)
+	watched.set(&"_watch_at", hopper.position())
+	watched.set(&"_watch_for", 2.0)
+	hop_body.set(&"wish", Vector3(3.0, 0.0, 0.0))
+	hop_body.call(&"leap", Vector3(0.0, 7.0, 0.0))
+	watched.call(&"_unstick_watch", 0.1)
+	_check(is_equal_approx(float(watched.get(&"_watch_for")), 2.0), "a hop pauses the unstick watchdog instead of restarting it",
+		"watched %.2f s at %s" % [float(watched.get(&"_watch_for")), watched.get(&"_watch_at")])
+
+	await _dispose(game)
 	_finished()
 
 

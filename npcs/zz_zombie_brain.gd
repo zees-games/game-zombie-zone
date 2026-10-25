@@ -69,6 +69,8 @@ const WATCH_RADIUS := 1.0
 var _watch_at: Vector3 = Vector3.INF
 var _watch_for: float = 0.0
 var _watch_stage: int = 0
+## The last few remedies tried ("t what result"), for tools/stuck_meter.gd's capture.
+var unstick_log: PackedStringArray = PackedStringArray()
 
 ## Metres from the nearest survivor past which a zombie thinks every second tick, and every
 ## fourth. Its body still moves every tick on the wish it last had.
@@ -381,14 +383,19 @@ func _unstick_watch(delta: float) -> void:
 	var config: Variant = h.get(&"config") if h != null else null
 	var limit: float = float(config.unstick_seconds) if config != null else 0.0
 
-	if limit <= 0.0 or b == null or bashing or b.flying or swinging() or b.wish.length() < 1.0:
+	# In the air the clock pauses, ahead of the wish test because a leap zeroes wish: a common
+	# hopping on the spot never stays grounded for limit.
+	if b != null and b.flying:
+		return
+
+	if limit <= 0.0 or b == null or bashing or swinging() or b.wish.length() < 1.0:
 		_watch_at = Vector3.INF
 		_watch_for = 0.0
 		return
 
 	var here := npc.position()
 
-	if _watch_at == Vector3.INF or here.distance_to(_watch_at) > WATCH_RADIUS:
+	if _watch_at == Vector3.INF or flat_distance(here, _watch_at) > WATCH_RADIUS:
 		_watch_at = here
 		_watch_for = 0.0
 		_watch_stage = 0
@@ -404,16 +411,26 @@ func _unstick_watch(delta: float) -> void:
 	var forward := b.wish if goal == Vector3.INF else goal - here
 
 	if _watch_stage == 0 and ZzUnstick.nudge(b, forward):
+		note_unstick("watch nudge")
 		_watch_stage = 1
 		_watch_at = Vector3.INF
 		return
 
 	if ZzUnstick.relocate(b, goal if goal != Vector3.INF else here + forward.normalized() * 6.0):
+		note_unstick("watch relocate")
 		_watch_at = Vector3.INF
 		_watch_stage = 0
 		return
 
+	note_unstick("watch failed stage %d" % _watch_stage)
 	_watch_stage = 1
+
+
+## Remembers a remedy tried, keeping the last six.
+func note_unstick(what: String) -> void:
+	unstick_log.append("%.1f %s at %s" % [now(), what, npc.position().snappedf(0.1)])
+	if unstick_log.size() > 6:
+		unstick_log.remove_at(0)
 
 
 ## Pressed against a barricade it was walking into: stop, face it, and tear at it. Checked

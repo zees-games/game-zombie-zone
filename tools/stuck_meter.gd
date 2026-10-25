@@ -30,6 +30,10 @@ const FIGHT := 3.0
 const ARRIVED := 2.5
 ## A stand-in this close to another survivor while still is queueing (a doorway taken in turns), not snagged.
 const QUEUE := 1.0
+## Seconds a still mover's goal may drop out without ending its stretch.
+const GRACE := 1.5
+## Seconds still at which a mover's whole state is written to [member captures] (once each per stretch).
+const CAPTURE_AT := [15.0, 28.0]
 
 var game = null
 
@@ -48,6 +52,10 @@ var spots: Dictionary = {}
 var cases: Array[String] = []
 ## Seconds stand-ins had a goal and no path to it, summed over the team (not counted as stuck).
 var unreachable: float = 0.0
+## One text block per long stretch (see [constant CAPTURE_AT]): the evidence for a 30 s snag.
+var captures: Array[String] = []
+## kind -> times a still mover's goal dropped out for a moment (see [constant GRACE]).
+var flickers: Dictionary = {}
 
 
 func _init(p_game: Object) -> void:
@@ -102,9 +110,19 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 	if goal and not anchor.is_empty() and at.distance_to(anchor["at"]) > RADIUS:
 		(totals[kind] as Dictionary)["goal"] += EVERY
 
+	# A goal that drops out for a moment (a path cleared and asked for again) does not end the stretch.
+	if not goal and not anchor.is_empty() and at.distance_to(anchor["at"]) <= RADIUS:
+		if not anchor.has("off"):
+			anchor["off"] = now
+			flickers[kind] = int(flickers.get(kind, 0)) + 1
+		if now - float(anchor["off"]) < GRACE:
+			return
+
 	if not goal or anchor.is_empty() or at.distance_to(anchor["at"]) > RADIUS:
 		_anchors[key] = {"at": at, "since": now}
 		return
+
+	var _was_off := anchor.erase("off")
 
 	(totals[kind] as Dictionary)["goal"] += EVERY
 	var still: float = now - float(anchor["since"])
@@ -119,6 +137,7 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 			cases.append("queued %s %s at %s: %s" % [kind, key, at.snappedf(0.1), _why(who)])
 
 		longest[kind] = maxf(float(longest[kind]), still)
+		_capture_at(key, kind, who, still)
 		return
 
 	(totals[kind] as Dictionary)["stuck"] += EVERY
@@ -128,10 +147,102 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 
 	(ever[kind] as Dictionary)[key] = true
 	longest[kind] = maxf(float(longest[kind]), still)
+
+	_capture_at(key, kind, who, still)
 	var cell := Vector3(snappedf(at.x, 4.0), 0.0, snappedf(at.z, 4.0))
 	var tally: Dictionary = spots.get(kind, {})
 	tally[cell] = float(tally.get(cell, 0.0)) + EVERY
 	spots[kind] = tally
+
+
+## Everything about a long-stuck mover, as one block of lines starting `CAPTURE`.
+func _capture_at(key: String, kind: StringName, who: Variant, still: float) -> void:
+	for at_s: float in CAPTURE_AT:
+		if still >= at_s and still < at_s + EVERY and who != null and captures.size() < 30:
+			captures.append(_capture(key, kind, who, still))
+
+
+func _capture(key: String, kind: StringName, who: Variant, still: float) -> String:
+	var out := PackedStringArray()
+	var head := "CAPTURE %s %s t %.1f still %.1f s" % [kind, key, game.now(), still]
+	var body: CharacterBody3D = null
+
+	if who is DotNpcInstance:
+		var npc: DotNpcInstance = who
+		var brain = npc.brain
+		body = npc.node as CharacterBody3D
+		out.append("%s %s at %s" % [head, npc.def.id, npc.position().snappedf(0.01)])
+		out.append("  body vel %s wish %s push %s flying %s floor %s stride %s" % [body.velocity.snappedf(0.01), (body.get(&"wish") as Vector3).snappedf(0.01),
+			(body.get(&"push") as Vector3).snappedf(0.01), body.get(&"flying"), body.is_on_floor(), body.get(&"stride")])
+		out.append("  brain state %s target '%s' quarry '%s' bashing %s swinging %s staggered %s watch %.1f s stage %s hops %s" % [
+			brain.get(&"state"), npc.target_id, brain.quarry(), brain.get(&"bashing"), brain.swinging(), brain.staggered(),
+			float(brain.get(&"_watch_for")), brain.get(&"_watch_stage"), brain.get(&"_hops")])
+		out.append("  remedies [%s]" % ", ".join(brain.get(&"unstick_log") if brain.get(&"unstick_log") != null else PackedStringArray()))
+		var path: DotNpcPath = brain.get(&"path")
+		if path != null:
+			var pts := PackedStringArray()
+			for i in mini(path.points.size(), 14):
+				pts.append(("*" if i == path.index else "") + str(path.points[i].snappedf(0.1)))
+			out.append("  path %d points index %d partial %s rough %s computed %.1f goal %s: %s" % [path.points.size(), path.index, path.partial,
+				path.is_rough(game.now()), path.computed_at, path.goal_at_compute.snappedf(0.1), " ".join(pts)])
+		var h = game.horde
+		if h != null and h.has_method(&"barricade_in_way"):
+			out.append("  barricade_in_way '%s'" % h.barricade_in_way(npc.position(), body.get(&"wish")))
+		var crowd := 0
+		for other: DotNpcInstance in h.spawner.all_npcs():
+			if other != npc and other.position().distance_to(npc.position()) < 1.5:
+				crowd += 1
+		out.append("  zombies within 1.5 m: %d" % crowd)
+		out.append("  " + _why(who))
+	else:
+		body = who as CharacterBody3D
+		out.append("%s at %s" % [head, (who.feet() as Vector3).snappedf(0.01)])
+		out.append("  " + _why(who))
+
+	if body != null:
+		out.append("  rays " + _ray_ring(body))
+		out.append("  within 1 m " + _near(body, 1.0))
+
+	return "\n".join(out)
+
+
+## Eight flat rays of 1.5 m at knee and chest height: what each hits first and how far.
+func _ray_ring(body: CharacterBody3D) -> String:
+	var space := body.get_world_3d().direct_space_state
+	var parts := PackedStringArray()
+
+	for height: float in [0.4, 1.2]:
+		for i in 8:
+			var a := TAU * float(i) / 8.0
+			var from := body.global_position + Vector3(0.0, height, 0.0)
+			var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(cos(a), 0.0, sin(a)) * 1.5, body.collision_mask, [body.get_rid()])
+			var hit := space.intersect_ray(query)
+			if not hit.is_empty():
+				var c: Object = hit["collider"]
+				parts.append("%dm%d:%s@%.2f" % [int(height * 10.0), i * 45, c.name if c is Node else "?", from.distance_to(hit["position"])])
+
+	return "[%s]" % ", ".join(parts)
+
+
+## Colliders within [param radius] of the body (a sphere at waist height), with their groups:
+## a barricade, a gate or a prop shows up here by name (one entry per shape touched).
+func _near(body: CharacterBody3D, radius: float) -> String:
+	var shape := SphereShape3D.new()
+	shape.radius = radius
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.transform = Transform3D(Basis(), body.global_position + Vector3(0.0, 0.6, 0.0))
+	query.collision_mask = body.collision_mask
+	query.exclude = [body.get_rid()]
+	var names := PackedStringArray()
+
+	for hit: Dictionary in body.get_world_3d().direct_space_state.intersect_shape(query, 12):
+		var c: Object = hit["collider"]
+		if c is Node:
+			var n := c as Node
+			names.append("%s%s" % [n.name, n.get_groups() if not n.get_groups().is_empty() else ""])
+
+	return "[%s]" % ", ".join(names)
 
 
 func _queued(at: Vector3, who: Variant) -> bool:
@@ -272,6 +383,11 @@ func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
 	if path == null or path.partial or path.points.is_empty() or path.current(Vector3.INF) == Vector3.INF:
 		return false
 
+	# At the boards, even between two blows or in the hop the body takes there.
+	var b := npc.node
+	if game.horde.has_method(&"barricade_in_way") and b != null and game.horde.barricade_in_way(npc.position(), b.get(&"wish")) != "":
+		return false
+
 	if bool(brain.get(&"bashing")) or brain.has_method(&"staggered") and brain.staggered() \
 			or brain.has_method(&"swinging") and brain.swinging():
 		return false
@@ -300,7 +416,7 @@ func line() -> String:
 		parts.append("%s %.1f%% of %.0f s goal (%d stuck, worst %.0f s)" % [
 			kind, 100.0 * ratio(kind), float(t["goal"]), (ever[kind] as Dictionary).size(), float(longest[kind])])
 
-	parts.append("queued %.0f s, no path to goal %.0f s" % [float((totals[&"standin"] as Dictionary)["queued"]), unreachable])
+	parts.append("queued %.0f s, no path to goal %.0f s, goal flickers %s" % [float((totals[&"standin"] as Dictionary)["queued"]), unreachable, flickers])
 	return " | ".join(parts)
 
 

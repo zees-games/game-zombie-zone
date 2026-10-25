@@ -309,10 +309,12 @@ func _unstick(b: ZzZombieBody, toward: Vector3) -> void:
 
 		# Two hops that did not free it: a step along where it was going, if it fits (`ZzUnstick`).
 		if _hops > HOPS_BEFORE_NUDGE and ZzUnstick.nudge(b, forward):
+			note_unstick("hop nudge")
 			_hops = 0
 			_stuck_at = Vector3.INF
 			return
 
+		note_unstick("hop %d" % _hops)
 		b.leap(forward.normalized() * 3.0 + Vector3(0.0, 7.0, 0.0))
 		b.anim = ZzZombieBody.Anim.LEAP
 		_stuck_at = Vector3.INF
