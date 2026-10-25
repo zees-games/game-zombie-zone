@@ -390,6 +390,8 @@ func setup_seconds() -> float:
 ## Common infected alive at once, for one survivor and for each more.
 @export_range(0, 400, 1) var commons_base: int = 24
 @export_range(0, 50, 1) var commons_per_survivor: int = 6
+## Most commons alive at once whatever the survivor count; 0 leaves [method commons_cap] uncapped.
+@export_range(0, 2000, 1) var commons_max: int = 0
 
 ## Commons standing about a map at its start, per hundred square metres of walkable floor.
 @export_range(0.0, 10.0, 0.05) var wanderer_density: float = 0.55
@@ -540,6 +542,19 @@ func setup_seconds() -> float:
 ## and bile jars) is carried beside zee-dot-weapons. Read when a world is built.
 @export var second_weapon_pack: bool = true
 
+# --- Netcode ----------------------------------------------------------------
+
+@export_group("Netcode")
+
+## Metres within which a survivor is sent a common's and a special's updates (live). A client hides
+## a mirror the server stopped sending, so either can change mid-round.
+@export_range(40.0, 1000.0, 5.0) var net_common_radius: float = 80.0
+@export_range(40.0, 1000.0, 5.0) var net_special_radius: float = 260.0
+## Anything past [member net_far_distance] metres from a survivor (players included, never their
+## own) is sent every Nth snapshot only. 1 is off; dot-net's DotNetInterest.far_every.
+@export_range(1, 16, 1) var net_far_every: int = 1
+@export_range(0.0, 1000.0, 5.0) var net_far_distance: float = 40.0
+
 # --- Bots ------------------------------------------------------------------
 
 @export_group("Bots")
@@ -607,7 +622,8 @@ func friendly_fire_scale() -> float:
 func commons_cap(survivors: int) -> int:
 	var first := mini(maxi(survivors - 1, 0), 7)
 	var past := maxi(survivors - 8, 0)
-	return commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 3
+	var cap := commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 3
+	return mini(cap, commons_max) if commons_max > 0 else cap
 
 
 ## Specials alive at once, for [param survivors].

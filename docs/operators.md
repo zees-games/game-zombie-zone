@@ -68,6 +68,18 @@ dot-team's block rules are on when the addon is linked: survivors pass through e
 
 Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/addons/zee_weapons/ads.yml` is the shipped default and `cfg/server/addons/zee_weapons/ads.yml` overrides it per server. Under `ads: default:` the keys are `enabled`, `aim_time` and `zoom` (0 takes the weapon's own art; zoom is a field-of-view multiplier), `move_speed_multiplier` (walk pace while aimed, 0.8), `spread_multiplier` (0.6), `sway_multiplier` (0.5), `toggle` (hold or press-to-toggle), `view_scale` and `view_shift_x/y/z` (the drawn gun's size and offset); a `weapons:` block overrides only the keys it lists, by weapon id. **The numbers the simulation reads cross to every client** as the replicated cvar `zee_ads_rules` (a JSON line: `enabled`, `aim_time`, `move_speed_multiplier` and `spread_multiplier`, default and per weapon), so a client predicts the server's pace and spread; set it live with `zee_ads_rules '<json>'`, or edit the yml. The other keys (`zoom`, `sway_multiplier`, `toggle`, `view_*`) are the player's view and stay local. **The wire changed**: the aim bit is `ZzNetCommand.ACT_AIM` and `ACT_BITS` went from 5 to 6, so a client and a server must be the same build (the server applies the pace and the tighter spread from that bit, and the client predicts the same pace).
 
+## Large servers: players, the horde and threads
+
+Everything here defaults to the small-server behaviour and changes live (console, rcon, the workbench's Game settings, or a key in `cfg/server/game/game-zombie-zone/config/game.yml`).
+
+- `zz_commons_max` (0, none): commons alive at once whatever the survivor count; `commons_cap` otherwise grows by `commons_per_survivor`.
+- `zz_net_common_radius` (80) and `zz_net_special_radius` (260): metres within which a survivor is sent a common's or a special's updates. A client hides a zombie it has had no snapshot of for a second, so changing these needs no client update.
+- `zz_net_far_every` (1, off) and `zz_net_far_distance` (40): everything farther than that from a survivor (other players included) is sent in one snapshot of N. 4 with 15 m is the setting for a crowded map at 100 players (see `docs/survival.md`).
+- `sv_threads_net` (off) with `sv_worker_threads` (-1, cores less one): builds each player's snapshot on worker threads, from the next snapshot. Not on the web.
+- `sv_threads_npc` exists but nothing reads it yet: NPC decisions stay on the main thread.
+
+`tools/server_probe.tscn -- --n=100 --acks --split --far-every=4 --far=15 --workers=4` measures a tick at a given player count.
+
 ## Navigation, stand-ins and stuck zombies
 
 Cvars, each also a key in `config/game.yml` (live from the console or the workbench):

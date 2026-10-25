@@ -28,6 +28,8 @@ var net_state: int = 0
 var net_anim: int = 0
 var net_flags: int = 0
 var net_limbs: int = 0
+## Client: wall-clock msec of the last snapshot that carried or listed this zombie.
+var state_msec: int = 0
 
 
 func _register_net_vars() -> void:
@@ -63,6 +65,7 @@ func _net_simulate(_tick: int, _delta: float) -> void:
 
 
 func _net_state_applied(_tick: int) -> void:
+	state_msec = Time.get_ticks_msec()
 	_draw()
 
 	if body != null and identity != null and not identity.is_authoritative:

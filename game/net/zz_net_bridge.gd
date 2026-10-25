@@ -1,5 +1,6 @@
 extends Node
 
+const ZzConfig := preload("../zz_config.gd")
 const ZzEvent := preload("zz_event.gd")
 const ZzEvents := preload("zz_events.gd")
 const ZzNetCommand := preload("zz_net_command.gd")
@@ -227,6 +228,7 @@ var _map_body: PackedByteArray = PackedByteArray()
 var _zombie_nets: Dictionary = {}
 var _zombie_mirrors: Dictionary = {}
 var _stale_clock := 0.0
+var _interest_applied: Array = []
 var _zombie_world: Node3D = null
 
 ## Whether the last thing that removed a zombie was its death, so NPC_GONE can say so.
@@ -261,7 +263,9 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 	net.send_fn = _send
 
 	if net.is_server:
-		net.interest = make_interest()
+		net.interest = make_interest(game.config if game != null else null)
+		_interest_applied = [game.config.net_common_radius, game.config.net_special_radius,
+			game.config.net_far_every, game.config.net_far_distance] if game != null and game.config != null else []
 
 	var event := net.messages.register(
 		ZzEvent.NAME, ZzEvent,
@@ -1687,9 +1691,10 @@ const DEFAULT_RADIUS := 200.0
 ## (dot-net's strategies have one radius), so a zombie pacing along the edge is not a spawn and a
 ## despawn several times a second. Eight metres of walking at a common's pace.
 const ZOMBIE_LINGER_SEC := 3.0
-## A client hides a mirror this far past its kind's radius: the server stopped sending it, so the
-## body would stand frozen where it was last told to be.
-const STALE_MARGIN := 12.0
+## A client hides a mirror with no snapshot for this long (the server's radius is its own config,
+## so the client cannot tell by distance), unless it is within [constant NEAR_KEPT] metres.
+const STALE_MSEC := 1000
+const NEAR_KEPT := 30.0
 
 ## The server's interest rule. [b]What is always relevant, and why.[/b] Players (four to a few
 ## dozen; a teammate's outline, health and position are the HUD), the boss (one entity), and
@@ -1698,15 +1703,42 @@ const STALE_MARGIN := 12.0
 ## sent every one of them. Not [DotNetInterestGrid]: it has one radius for everything, and a
 ## special needs a wider one than a common; [DotNetInterestDistance] has one per tag, and its
 ## query over a few hundred entities is cached for a quarter of a second per peer.
-static func make_interest() -> DotNetInterest:
+static func make_interest(config: ZzConfig = null) -> DotNetInterest:
 	var interest := DotNetInterestDistance.new()
 	interest.radius = DEFAULT_RADIUS
 	interest.radius_by_tag = {TAG_COMMON: COMMON_RADIUS, TAG_SPECIAL: SPECIAL_RADIUS}
+	apply_interest_config(interest, config)
 	return interest
 
 
+## Copies [param config]'s net_* radii and thinning into [param interest]; nothing without a config.
+static func apply_interest_config(interest: DotNetInterest, config: ZzConfig) -> void:
+	if config == null or interest == null:
+		return
+	if interest is DotNetInterestDistance:
+		(interest as DotNetInterestDistance).radius_by_tag = {
+			TAG_COMMON: config.net_common_radius, TAG_SPECIAL: config.net_special_radius,
+		}
+	interest.far_every = config.net_far_every
+	interest.far_distance = config.net_far_distance
+
+
+## The shipped radius for [param kind]; the live one is the server's ZzConfig.
 static func zombie_radius(kind: StringName) -> float:
 	return SPECIAL_RADIUS if ZzNpcs.is_special(kind) else COMMON_RADIUS
+
+
+## Server: re-applies the interest settings when a net_* field changed (cvar, yml or workbench).
+## Compared, not re-applied each second, so a rule a suite edits in place is left alone.
+func _follow_interest_config() -> void:
+	var c := game.config if game != null else null
+	if c == null or net == null or net.interest == null:
+		return
+	var now := [c.net_common_radius, c.net_special_radius, c.net_far_every, c.net_far_distance]
+	if now == _interest_applied:
+		return
+	_interest_applied = now
+	apply_interest_config(net.interest, c)
 
 
 ## Client: hides a zombie the server has stopped telling about. A mirror is made by an event sent
@@ -1718,6 +1750,7 @@ func _hide_unsent_zombies() -> void:
 		return
 
 	var eye := mine.player.global_position
+	var now := Time.get_ticks_msec()
 
 	for net_id in _zombie_mirrors:
 		var behaviour: ZzNpcNet = _zombie_mirrors[net_id]
@@ -1726,12 +1759,15 @@ func _hide_unsent_zombies() -> void:
 		if body == null or not is_instance_valid(body) or body.kind == ZzNpcs.BRUTE:
 			continue
 
-		var far := body.global_position.distance_to(eye) > zombie_radius(body.kind) + STALE_MARGIN
-		body.visible = not far
+		var stale := now - behaviour.state_msec > STALE_MSEC
+		body.visible = not (stale and body.global_position.distance_to(eye) > NEAR_KEPT)
 
 
 func _process(delta: float) -> void:
-	if net == null or net.is_server:
+	if net == null:
+		return
+	if net.is_server:
+		_follow_interest_config()
 		return
 
 	_stale_clock += delta

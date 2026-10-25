@@ -6,7 +6,7 @@ extends Node
 ## [codeblock]
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
-##     [--commons=250] [--seconds=12] [--wave=10]
+##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--acks]
 ## [/codeblock]
 ##
 ## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
@@ -41,6 +41,21 @@ var _wave := 10
 ## the commons up to the cap itself (the stand-ins kill them as fast as a wave releases them).
 var _lead := 90.0
 var _fill := true
+## --relevance=off sends every entity to every peer (DotNetInterestAll), the before of the lever.
+var _relevance := true
+## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
+var _workers := 0
+## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
+## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
+var _acks := false
+## --split: the inline snapshot path run here instead of the manager's, lapped as
+## si_relevant, si_thin, si_scores, si_prioritise, si_budget and snap_build (_send_to_peer) per peer.
+var _split := false
+## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot.
+var _far_every := 1
+var _far := 0.0
+const ACK_LAG := 2
+var _sent_ticks: Dictionary = {}
 var _game: ZzGame
 var _net: DotNetManager
 var _bridge: ZzNetBridge
@@ -65,6 +80,18 @@ func _ready() -> void:
 			_seconds = arg.trim_prefix("--seconds=").to_float()
 		elif arg.begins_with("--lead="):
 			_lead = arg.trim_prefix("--lead=").to_float()
+		elif arg == "--split":
+			_split = true
+		elif arg == "--acks":
+			_acks = true
+		elif arg == "--relevance=off":
+			_relevance = false
+		elif arg.begins_with("--workers="):
+			_workers = arg.trim_prefix("--workers=").to_int()
+		elif arg.begins_with("--far-every="):
+			_far_every = arg.trim_prefix("--far-every=").to_int()
+		elif arg.begins_with("--far="):
+			_far = arg.trim_prefix("--far=").to_float()
 		elif arg == "--no-fill":
 			_fill = false
 		elif arg.begins_with("--wave="):
@@ -109,6 +136,7 @@ func _run() -> void:
 	nc.enable_lag_compensation = false
 	nc.max_entities_per_snapshot = 192
 	nc.world_extent = ZzGame.NET_WORLD_EXTENT
+	nc.snapshot_workers = _workers
 	_net.config = nc
 	add_child(_net)
 	var _ok := _net.setup()
@@ -119,11 +147,17 @@ func _run() -> void:
 		push_error("bridge refused: %s" % attached.error)
 		get_tree().quit(2)
 		return
+	if not _relevance:
+		_net.interest = DotNetInterestAll.new()
+	_net.interest.far_every = _far_every
+	_net.interest.far_distance = _far
 	_bridge.open_link(self)
 	_net.messages.seal()
-	_bridge.link.loopback = func(_method: StringName, peer_id: int, payload: PackedByteArray) -> void:
+	_bridge.link.loopback = func(method: StringName, peer_id: int, payload: PackedByteArray) -> void:
 		if peer_id == _watched_peer or peer_id == 0:
 			_bytes += payload.size()
+		if _acks and method == &"snapshot" and peer_id >= 2:
+			_ack_later(peer_id, payload)
 	var _s := _net.start()
 	await get_tree().physics_frame
 
@@ -209,7 +243,7 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "workers": _workers, "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
@@ -311,11 +345,66 @@ func _one_tick(tick: int) -> void:
 		_net._ticks_since_snapshot = 0
 		_net.history.record(identities, tick)
 		at = _add("net_history", at)
-		_net._send_snapshots(tick, identities)
+		if _split and _workers == 0:
+			_split_snapshots(tick, identities)
+		else:
+			_net._send_snapshots(tick, identities)
 	if tick % ZzNetBridge.CLOCK_EVERY == 0:
 		_bridge._broadcast(ZzEvents.Kind.CLOCK, _bridge._clock_body())
 	at = _add("net_snapshot", at)
 	_lap["total"] = at - total_start
+
+
+## DotNetManager._send_snapshots' inline path (workers 0), the same calls, lapped by part.
+func _split_snapshots(tick: int, identities: Array[DotNetIdentity]) -> void:
+	var n := _net
+	var context := {"tick": tick, "config": n.config, "now_ms": Time.get_ticks_msec()}
+	var at := Time.get_ticks_usec()
+	n.interest._prepare(identities, context)
+	n._last_snapshot_tick = tick
+	for identity in identities:
+		for behaviour in identity.behaviours:
+			behaviour.begin_snapshot_reads(int(context["now_ms"]), false)
+	at = _add("snap_reads", at)
+	for peer_id in n._peers:
+		n.budget.begin_tick(peer_id)
+		var observer := n._observer_for(peer_id)
+		var relevant := n.interest.relevant_for(observer, identities, peer_id, context)
+		at = _add("si_relevant", at)
+		if n.interest.thins():
+			var kept: Array[DotNetIdentity] = []
+			n.interest.thin_into(kept, observer, relevant, peer_id, context)
+			relevant = kept
+		at = _add("si_thin", at)
+		var scores := {}
+		for identity in relevant:
+			scores[identity.net_id] = n.interest._score(observer, identity, context)
+		at = _add("si_scores", at)
+		relevant = n.interest.prioritise(observer, relevant, n.config.entity_cap(), context, peer_id)
+		at = _add("si_prioritise", at)
+		relevant = n.budget.accumulate(peer_id, relevant, scores)
+		at = _add("si_budget", at)
+		var _sent := n._send_to_peer(peer_id, tick, relevant)
+		at = _add("snap_build", at)
+	for identity in identities:
+		for behaviour in identity.behaviours:
+			behaviour.end_snapshot_reads()
+	at = _add("snap_reads", at)
+	n.snapshot_sent.emit(tick, n._peers.size())
+
+
+## What a client does with a snapshot, ACK_LAG snapshots late: the ack its encode_ack would send.
+func _ack_later(peer_id: int, payload: PackedByteArray) -> void:
+	var tick := DotNetReader.new(payload).read_uint(32)
+	var list: Array = _sent_ticks.get_or_add(peer_id, [])
+	if not list.is_empty() and list.back() == tick:
+		return
+	list.append(tick)
+	if list.size() <= ACK_LAG:
+		return
+	var ack := DotNetWriter.new()
+	ack.write_uint(int(list.pop_front()), 32)
+	var _taken := _net.receive_ack_payload(peer_id, ack.to_bytes())
 
 
 func _add(phase: String, since: int) -> int:
