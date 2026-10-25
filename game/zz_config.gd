@@ -535,6 +535,10 @@ func setup_seconds() -> float:
 ## leaves it to the client's video setting. `--zz-vis-mode=`.
 @export var vis_mode: String = ""
 
+## Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the
+## lit materials and the document's lamps. `--zz-lightmaps=`.
+@export var lightmaps: bool = true
+
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 

@@ -101,6 +101,7 @@ static var use_worlds: bool = true
 ## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
 const SKY_ROOT := "res://assets/sky"
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
+const LIT_SCRIPT := "res://addons/dot_map/bsp/dot_map_lit_world.gd"
 const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
 const VIS_SCRIPT := "res://addons/dot_map/bsp/dot_map_visibility.gd"
 
@@ -111,6 +112,8 @@ const LOCAL_WORLD := "res://world/%s/%s"
 var world_drawn: bool = false
 ## How a drawn world is culled (dot-map DotMapVisibility): off, pvs, occluders or both.
 var vis_mode: String = "both"
+## Draw the world pack's baked lightmap when it has one (`zz_lightmaps`).
+var use_lightmaps: bool = true
 var visibility: Node = null
 
 ## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
@@ -1232,9 +1235,12 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	if global_pack:
 		# The vendored kinds, rebased onto the mount: the addon's own folder never ships to a client.
 		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
+		surfaces.set(&"use_lightmap", use_lightmaps)
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
-	_unbake()
+	var lit: bool = global_pack and use_lightmaps and world.call(&"has_lightmap")
+	if not lit:
+		_unbake()
 
 	for child in _drawn.get_children():
 		if child is MeshInstance3D and (String(child.name).begins_with("Boxes_") or String(child.name).begins_with("Shiny_")):
@@ -1247,6 +1253,9 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	attach_world_collision(world)
 	attach_world_props(world)
 	_light_from_world(world)
+	if lit and _environment != null:
+		(load(LIT_SCRIPT) as GDScript).call(&"attach", self, world, _environment.environment, _lamps.duplicate(), true)
+		_lamps.clear()
 	_dress_panorama_sky(world)
 	# The document stands up the gates and movers the horde and the objectives drive; a global pack's own
 	# doors would collide a second time, so only a pack made for this game brings mechanics.

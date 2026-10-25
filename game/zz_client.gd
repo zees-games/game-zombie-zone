@@ -240,6 +240,7 @@ func _draw_world() -> void:
 	if gate != null:
 		gate.hold(&"world", "Loading the world")
 	game.map.vis_mode = _vis_mode()
+	game.map.use_lightmaps = bool(game.config.get(&"lightmaps")) if game.config != null else true
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")
