@@ -264,8 +264,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 	if net.is_server:
 		net.interest = make_interest(game.config if game != null else null)
-		_interest_applied = [game.config.net_common_radius, game.config.net_special_radius,
-			game.config.net_far_every, game.config.net_far_distance] if game != null and game.config != null else []
+		_interest_applied = interest_key(game.config if game != null else null)
 
 	var event := net.messages.register(
 		ZzEvent.NAME, ZzEvent,
@@ -1721,6 +1720,16 @@ static func apply_interest_config(interest: DotNetInterest, config: ZzConfig) ->
 		}
 	interest.far_every = config.net_far_every
 	interest.far_distance = config.net_far_distance
+	interest.far_coherent = config.net_far_coherent
+	interest.far_tiers = config.net_far_tiers
+
+
+## The net_* fields [method apply_interest_config] copies, to tell when one changed.
+static func interest_key(config: ZzConfig) -> Array:
+	if config == null:
+		return []
+	return [config.net_common_radius, config.net_special_radius, config.net_far_every,
+		config.net_far_distance, config.net_far_coherent, config.net_far_tiers]
 
 
 ## The shipped radius for [param kind]; the live one is the server's ZzConfig.
@@ -1734,7 +1743,7 @@ func _follow_interest_config() -> void:
 	var c := game.config if game != null else null
 	if c == null or net == null or net.interest == null:
 		return
-	var now := [c.net_common_radius, c.net_special_radius, c.net_far_every, c.net_far_distance]
+	var now := interest_key(c)
 	if now == _interest_applied:
 		return
 	_interest_applied = now

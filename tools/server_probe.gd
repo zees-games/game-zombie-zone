@@ -54,6 +54,9 @@ var _split := false
 ## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot.
 var _far_every := 1
 var _far := 0.0
+## --far-coherent, --far-tiers=T: DotNetInterest.far_coherent and far_tiers.
+var _far_coherent := false
+var _far_tiers := 1
 const ACK_LAG := 2
 var _sent_ticks: Dictionary = {}
 var _game: ZzGame
@@ -92,6 +95,10 @@ func _ready() -> void:
 			_far_every = arg.trim_prefix("--far-every=").to_int()
 		elif arg.begins_with("--far="):
 			_far = arg.trim_prefix("--far=").to_float()
+		elif arg == "--far-coherent":
+			_far_coherent = true
+		elif arg.begins_with("--far-tiers="):
+			_far_tiers = arg.trim_prefix("--far-tiers=").to_int()
 		elif arg == "--no-fill":
 			_fill = false
 		elif arg.begins_with("--wave="):
@@ -151,6 +158,8 @@ func _run() -> void:
 		_net.interest = DotNetInterestAll.new()
 	_net.interest.far_every = _far_every
 	_net.interest.far_distance = _far
+	_net.interest.far_coherent = _far_coherent
+	_net.interest.far_tiers = _far_tiers
 	_bridge.open_link(self)
 	_net.messages.seal()
 	_bridge.link.loopback = func(method: StringName, peer_id: int, payload: PackedByteArray) -> void:
@@ -243,7 +252,7 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "workers": _workers, "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
@@ -270,11 +279,13 @@ func _one_tick(tick: int) -> void:
 		g.bots.drive(delta)
 	if g.pins != null:
 		g.pins.steer(delta)
+	at = _add("bots", at)
 	for id: StringName in g.players:
 		var player = g.players[id]
 		if player.is_alive() and not player.watching:
 			player.simulate(g._tick, delta)
 			g._advance_hands(player, delta)
+	at = _add("players", at)
 	g._advance_weapons()
 	g._advance_toys(delta)
 	at = _add("logic", at)

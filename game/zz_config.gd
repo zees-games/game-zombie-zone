@@ -558,6 +558,11 @@ func setup_seconds() -> float:
 ## own) is sent every Nth snapshot only. 1 is off; dot-net's DotNetInterest.far_every.
 @export_range(1, 16, 1) var net_far_every: int = 1
 @export_range(0.0, 1000.0, 5.0) var net_far_distance: float = 40.0
+## Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once
+## for all of them (DotNetInterest.far_coherent). Off staggers each survivor's turns.
+@export var net_far_coherent: bool = false
+## Bands past [member net_far_distance], each twice as far and sent half as often (1 is one band).
+@export_range(1, 4, 1) var net_far_tiers: int = 1
 
 # --- Bots ------------------------------------------------------------------
 

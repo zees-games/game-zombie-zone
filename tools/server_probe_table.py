@@ -7,7 +7,7 @@ for path in sys.argv[1:]:
         if line.startswith("RESULT "):
             r = json.loads(line[7:]); r["tag"] = os.path.basename(path); rows.append(r)
 rows.sort(key=lambda r: (r["tag"].count("_c"), r["rate"] * -1, r["n"]))
-P = ["logic", "senses", "brains", "bodies", "horde_other", "net_pull", "net_history", "net_snapshot", "total"]
+P = ["bots", "players", "logic", "senses", "brains", "bodies", "horde_other", "net_pull", "net_history", "net_snapshot", "total"]
 print("| survivors | Hz | commons | budget ms | total mean / p50 / p95 / max | " + " | ".join(p for p in P[:-1]) + " (mean) | engine step | B/s/peer | MB peak |")
 print("|" + "---|" * (9 + len(P) - 1 + 1))
 for r in rows:
