@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 45
+const SECTIONS := 46
 
-const CHECKS := 340
+const CHECKS := 345
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -119,6 +119,7 @@ func _run() -> void:
 	await _test_crawling_and_speed_boxes()
 	await _test_water()
 	await _test_solid_props()
+	await _test_solid_props_from_document()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -453,6 +454,51 @@ func _test_solid_props() -> void:
 			"a %s stops at the solid prop and walks through the non-solid one" % kind, "%s" % [walkers])
 
 	map.queue_free()
+	_finished()
+
+
+## A server with no world pack (a deployed maps pack ships none) gets the same solid boxes from the document.
+func _test_solid_props_from_document() -> void:
+	_section("a document's solid_props block a body with no world/ at all")
+	var game := await _world(_quiet)
+	var origin := Vector3(300.0, 0.0, 300.0)
+	var src: Dictionary = game.map_doc.duplicate(true)
+	src["solid_props"] = [[origin.x, 0.5, origin.z, 1.0, 1.0, 1.0, 30.0]]
+	var checked := ZzMapDoc.validate(src)
+	_check(checked.ok and (checked.value as Dictionary).get("solid_props", []).size() == 1, "the document keeps its solid prop", str(checked.error.message if not checked.ok else ""))
+	var bad := src.duplicate(true)
+	bad["solid_props"] = [[1, 2, 3]]
+	_check(not ZzMapDoc.validate(bad).ok, "a malformed solid prop refuses the document")
+	var map := ZzMap.new()
+	map.physics = game.physics
+	game.add_child(map)
+	var built := map.build(checked.value)
+	_check(built.ok and map.world_props != null and map.world_props.get_child_count() == 1, "building the document makes the box, no world attached")
+	_check(not map.build_world_props_local(), "no world/ for it to read")
+	await get_tree().physics_frame
+	var body := CharacterBody3D.new()
+	body.collision_layer = 0
+	body.collision_mask = game.physics.collision_mask(&"player")
+	var cap_shape := CollisionShape3D.new()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.35
+	capsule.height = 1.8
+	cap_shape.shape = capsule
+	cap_shape.position.y = 0.9
+	body.add_child(cap_shape)
+	game.add_child(body)
+	body.global_position = origin + Vector3(0.0, 0.0, -4.0)
+	await get_tree().physics_frame
+	var left := 8.0
+	while left > 0.0:
+		var step := minf(left, 0.2)
+		if body.move_and_collide(Vector3(0.0, 0.0, step)) != null:
+			break
+		left -= step
+	var moved := body.global_position.z - (origin.z - 4.0)
+	_check(moved > 2.5 and moved < 4.0, "a survivor stops at the document's solid prop", str(moved))
+	map.queue_free()
+	body.queue_free()
 	_finished()
 
 

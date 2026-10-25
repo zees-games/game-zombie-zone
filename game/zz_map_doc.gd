@@ -74,6 +74,7 @@ const MAX_PROPS := 2000
 const MAX_TOYS := 96
 const MAX_LIGHTS := 128
 const MAX_WATER := 24
+const MAX_SOLID_PROPS := 600
 const MAX_SPAWNS := 64
 const MAX_ITEMS := 400
 const MAX_OBJECTIVES := 16
@@ -375,6 +376,24 @@ static func validate(source: Dictionary) -> DotResult:
 
 	if not water.is_empty():
 		doc["water"] = water
+
+	# Solid props of a drawn world: `[x, y, z, sx, sy, sz, yaw]` (box centre, size, degrees about Y),
+	# boxes only, so a server with no world pack collides exactly where a client does. Left out of
+	# a map that has none.
+	var solid_props: Array = []
+	for raw: Variant in source.get("solid_props", []):
+		if not (raw is Array) or (raw as Array).size() != 7:
+			return _refuse("solid prop %d is not [x, y, z, sx, sy, sz, yaw]" % solid_props.size(), source)
+		var rec := _floats(raw, 7)
+		if rec[3] <= 0.0 or rec[4] <= 0.0 or rec[5] <= 0.0:
+			return _refuse("solid prop %d has no volume" % solid_props.size(), source)
+		solid_props.append(rec)
+
+	if solid_props.size() > MAX_SOLID_PROPS:
+		return _refuse("%d solid props; the most is %d" % [solid_props.size(), MAX_SOLID_PROPS], source)
+
+	if not solid_props.is_empty():
+		doc["solid_props"] = solid_props
 
 	var spawns: Variant = source.get("spawns", {})
 	if not (spawns is Dictionary):

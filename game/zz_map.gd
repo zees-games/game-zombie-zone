@@ -243,6 +243,7 @@ func build(p_doc: Dictionary) -> DotResult:
 	_build_boundary()
 	_build_water_volumes()
 	_build_props()
+	_build_solid_props()
 	_build_toys()
 
 	if draw_world:
@@ -1042,7 +1043,26 @@ func attach_world_collision(world: RefCounted) -> void:
 	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
 
 
-## Collides with the solid props of [param world]'s manifest (dot-map's `build_prop_collision`): a server and a client build the same boxes, so a survivor is stopped on both ends. Once per map.
+## The document's `solid_props` as one body of boxes on the prop layer, the same on a server and a client.
+func _build_solid_props() -> void:
+	var boxes: Array = doc.get("solid_props", [])
+	if boxes.is_empty():
+		return
+	var body := StaticBody3D.new()
+	body.name = "SolidProps"
+	for rec: Array in boxes:
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(rec[3], rec[4], rec[5])
+		var cs := CollisionShape3D.new()
+		cs.shape = shape
+		cs.transform = Transform3D(Basis(Vector3.UP, deg_to_rad(float(rec[6]))), Vector3(rec[0], rec[1], rec[2]))
+		body.add_child(cs)
+	_put_on(body, &"prop")
+	add_child(body)
+	world_props = body
+
+
+## Collides with the solid props of [param world]'s manifest (dot-map's `build_prop_collision`) when the document carries no `solid_props` of its own. Once per map.
 func attach_world_props(world: RefCounted) -> void:
 	if world_props != null:
 		return
@@ -1055,7 +1075,7 @@ func attach_world_props(world: RefCounted) -> void:
 	DotLog.debug(CHANNEL, "the map collides with its solid props", {"map": String(id()), "boxes": body.get_child_count()})
 
 
-## [method attach_world_props] on a server, which draws no world: from the checkout's world when it is there (a deployed maps pack ships hulls only).
+## [method attach_world_props] on a dev server from the checkout's world, for a document with no `solid_props`.
 func build_world_props_local() -> bool:
 	if world_props != null or not can_draw_world() or str(doc.get("world", "")) == "":
 		return false

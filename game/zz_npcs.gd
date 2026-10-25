@@ -588,6 +588,16 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 			for bounds in prop_obstacles(ZzMapDoc.v3(prop["at"]), float(prop.get("yaw", 0.0)), size):
 				builder.add_obstacle(bounds)
 
+	# A drawn world's solid props (the boxes the bodies collide with), cut like a doc prop of that size.
+	for rec: Array in doc.get("solid_props", []):
+		if float(rec[4]) < PROP_CUT_HEIGHT:
+			continue
+
+		var base := Vector3(rec[0], float(rec[1]) - float(rec[4]) * 0.5, rec[2])
+
+		for bounds in prop_obstacles(base, float(rec[6]), Vector3(rec[3], rec[4], rec[5])):
+			builder.add_obstacle(bounds)
+
 	for bounds in extra_solids:
 		builder.add_obstacle(bounds)
 		solids.append(bounds)
