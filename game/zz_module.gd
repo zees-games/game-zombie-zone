@@ -841,13 +841,13 @@ func _game_tick(_tick: int, delta: float) -> void:
 	_note_pings()
 
 
-## The horde's sense workers follow `sv_threads_npc` / `sv_worker_threads` (live cvars).
+## The horde's sense workers and level of detail follow the cvars (dot-game's DotGameNpcLod).
 func _follow_npc_threads() -> void:
 	var world := game as ZzGame
 	if world == null or world.horde == null or world.horde.spawner == null:
 		return
-	if server != null and server.config != null and server.config.has_method(&"npc_workers"):
-		world.horde.spawner.sense_workers = int(server.config.call(&"npc_workers"))
+	if npc_lod == null or npc_lod.spawner != world.horde.spawner:
+		var _lod := attach_npc_lod(world.horde.spawner)
 
 
 ## Each session's ping onto its player, for the Tab board. dot-server already keeps it.
