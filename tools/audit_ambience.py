@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measures every shipped ambience file and flags the ones a listener would notice for the wrong reasons.
 
-    python3 -I tools/audit_ambience.py                 # table of sounds/ambience/**/*.ogg, exit 1 on a flag
+    python3 -I tools/audit_ambience.py                 # table of dot-audio stock/moods/**/*.ogg, exit 1 on a flag
     python3 -I tools/audit_ambience.py --dir /tmp/amb  # a set make_ambience_set.py --out wrote, before it ships
     python3 -I tools/audit_ambience.py --md out.md     # also write the table (docs/ambience-audit.md)
 
@@ -19,7 +19,7 @@ import sys
 import numpy as np
 
 RATE = 44100
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sounds", "ambience")
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "dot-audio", "addons", "dot_audio", "stock", "moods")
 SET = ROOT  # moods.json is read from the shipped set; --dir measures files of the same names elsewhere
 BED_TARGET = -30.0      # tools/make_ambience_set.py BED_LUFS
 SHOT_TARGET = -26.0

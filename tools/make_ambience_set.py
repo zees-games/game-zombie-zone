@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds sounds/ambience/ from the CC0 candidates (SOURCES.tsv beside them).
+"""Builds dot-audio's stock/moods/ from the CC0 candidates (SOURCES.tsv beside them).
 
     tools/make_ambience_set.py ~/godot/_ambient_candidates
 
@@ -24,7 +24,7 @@ MAX_BED = 90.0
 MAX_BOOST_DB = 14.0
 BED_PEAK_DB = -9.0
 RATE = 44100
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "sounds", "ambience")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "dot-audio", "addons", "dot_audio", "stock", "moods")
 SLOW_LEVELLER = "dynaudnorm=f=1500:g=31:p=0.8:m=12:s=8"
 
 # out name -> (source file, options). "cut" = (start, end) seconds of the source.

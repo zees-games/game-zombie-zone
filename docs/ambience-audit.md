@@ -1,6 +1,6 @@
 # Ambience audit
 
-`python3 -I tools/audit_ambience.py --md docs/ambience-audit.md` measures every file of `sounds/ambience/` with ffmpeg (ebur128 loudness and range, sample peak, the share of energy above 6 kHz, spectral flatness, the loop seam) and exits non-zero on a flag. Flags are hard faults: a bed more than 4 LU over -30 LUFS or under -45, a peak above -3 dBFS, hiss above 25%, a loop seam jump, a one-shot that is both quiet and peaky. `tools/make_ambience_set.py` rebuilds the set with a 14 dB boost cap, a -9 dBFS bed peak ceiling, a slow leveller (`dyn`) on gusty beds, low-pass on creaks and the swamp atmospheres, and a longer loop crossfade. The last column is what a number cannot settle.
+`python3 -I tools/audit_ambience.py --md docs/ambience-audit.md` measures every file of dot-audio's `stock/moods/` with ffmpeg (ebur128 loudness and range, sample peak, the share of energy above 6 kHz, spectral flatness, the loop seam) and exits non-zero on a flag. Flags are hard faults: a bed more than 4 LU over -30 LUFS or under -45, a peak above -3 dBFS, hiss above 25%, a loop seam jump, a one-shot that is both quiet and peaky. `tools/make_ambience_set.py` rebuilds the set with a 14 dB boost cap, a -9 dBFS bed peak ceiling, a slow leveller (`dyn`) on gusty beds, low-pass on creaks and the swamp atmospheres, and a longer loop crossfade. The last column is what a number cannot settle.
 
 | File | Kind | Secs | LUFS | LRA | Peak | Hiss >6k | Flatness | Flags | Needs an ear |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

@@ -47,7 +47,7 @@ func _run() -> void:
 	_check(rules.describe().has("allowed") and rules.describe()["mood"] == "swamp", "describe lists the values")
 
 	var doc := JSON.new()
-	var file := FileAccess.get_file_as_string("res://sounds/ambience/moods.json")
+	var file := FileAccess.get_file_as_string(DotAudioStock.moods_directory() + "/moods.json")
 	_check(doc.parse(file) == OK, "moods.json parses")
 	var moods: Dictionary = (doc.data as Dictionary).get("moods", {})
 	_check(moods.size() == 8, "eight moods ship", str(moods.size()))
@@ -62,11 +62,11 @@ func _run() -> void:
 			files.append_array(s["files"])
 		for f: String in files:
 			used[f] = true
-			if not FileAccess.file_exists("res://sounds/ambience/" + f) and not FileAccess.file_exists("res://sounds/ambience/" + f + ".import"):
+			if not FileAccess.file_exists(DotAudioStock.moods_directory() + "/" + f) and not FileAccess.file_exists(DotAudioStock.moods_directory() + "/" + f + ".import"):
 				missing.append(f)
 		_check(not (m.get("beds", []) as Array).is_empty() and not (m.get("oneshots", []) as Array).is_empty(), "%s has beds and one-shots" % mood_name)
 	_check(missing.is_empty(), "every file moods.json names exists", ", ".join(missing))
-	var credits := FileAccess.get_file_as_string("res://sounds/ambience/CREDITS.md")
+	var credits := FileAccess.get_file_as_string(DotAudioStock.moods_directory() + "/CREDITS.md")
 	var uncredited := PackedStringArray()
 	for f: String in used:
 		if not credits.contains("`" + f + "`"):
@@ -211,8 +211,8 @@ func _run() -> void:
 	slab.free()
 
 	var unlisted: Array[String] = []
-	for dir in DirAccess.get_directories_at("res://sounds/ambience"):
-		for f in DirAccess.get_files_at("res://sounds/ambience/" + dir):
+	for dir in DirAccess.get_directories_at(DotAudioStock.moods_directory()):
+		for f in DirAccess.get_files_at(DotAudioStock.moods_directory() + "/" + dir):
 			if f.ends_with(".ogg") and not credits.contains(dir + "/" + f):
 				unlisted.append(dir + "/" + f)
 	_check(unlisted.is_empty(), "every shipped ambience file is credited: %s" % ", ".join(unlisted))
