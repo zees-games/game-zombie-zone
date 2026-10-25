@@ -512,6 +512,14 @@ func setup_seconds() -> float:
 
 # --- The maps --------------------------------------------------------------
 
+@export_group("Gore")
+
+## How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
+@export_range(0, 3, 1) var gore_level: int = 2
+
+## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
+@export_range(0, 200, 1) var gore_max_gibs: int = 24
+
 @export_group("The maps")
 
 ## Which maps this server may play, by id. Empty means every one it has.

@@ -1541,11 +1541,20 @@ func _bind_config(world: ZzGame) -> void:
 	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(n: String) -> bool:
 		return console.has_name(n) or hand.has(n.trim_prefix("zz_")))
 	binder.bind_commands(add_command)
+	_apply_gore(world.config)
 	binder.field_changed.connect(func(key: String, value: Variant, source: String) -> void:
+		if key.begins_with("gore_"):
+			_apply_gore(world.config)
 		if source == "cvar" or not hand.has(key):
 			return
 		var text := world.config.survival_style_name() if key == "survival_style" else DotGameConfigBinder._to_text(value)
 		console.set_cvar(hand[key], text))
+
+
+## Puts the gore cvars on dot-npc's process-wide dial; live, so a workbench edit takes effect on the next shot.
+func _apply_gore(config: DotConfig) -> void:
+	DotNpcGore.level = int(config.get(&"gore_level"))
+	DotNpcGore.max_gibs = int(config.get(&"gore_max_gibs"))
 
 
 func _noblock_side(id: Variant) -> Variant:

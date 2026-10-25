@@ -31,8 +31,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 25
-const CHECKS := 169
+const SECTIONS := 26
+const CHECKS := 171
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -87,6 +87,7 @@ func _run() -> void:
 		await _test_shots_count_online()
 		await _test_zombies_replicate()
 		await _test_a_head_shot_off_reaches_the_client()
+		await _test_gore_off_takes_no_limb()
 		await _test_a_down_reaches_the_client()
 		await _test_a_downed_crawl_is_predicted()
 		await _test_crouch_reaches_both_ends()
@@ -1295,6 +1296,31 @@ func _test_a_head_shot_off_reaches_the_client() -> void:
 	_check(body.limbs.is_severed(&"head"), "a head shot severs the head")
 	_check(not npc.is_alive(), "and a lost head kills it")
 	await _steps(SERVER_TICK_RATE * 2)
+	_finished()
+
+
+func _test_gore_off_takes_no_limb() -> void:
+	_section("gore level 0: a shot at a limb takes none and a head shot is only damage")
+	var server_me := _server_me()
+	var npc := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test", Basis(Vector3.UP, PI))
+	await _steps(4)
+	var body := npc.node as ZzZombieBody
+	DotNpcGore.level = 0
+	var arm := body.limbs.points_of(body.limbs.defs[&"armL"])
+	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
+	shot.point = arm[arm.size() - 1]
+	shot.direction = Vector3.FORWARD
+	shot.tick = _server_game.current_tick()
+	var _landed := _server_game.combat.apply_damage(shot)
+	_check(body.limbs.mask() == 0 and npc.is_alive(), "level 0: the arm stays on")
+	var head := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 1.0, null)
+	head.hit_group = DotHitGroup.HEAD
+	head.point = body.global_position + Vector3(0.0, 1.6, 0.0)
+	head.direction = Vector3.FORWARD
+	head.tick = _server_game.current_tick()
+	var _headed := _server_game.combat.apply_damage(head)
+	_check(body.limbs.mask() == 0 and npc.is_alive(), "level 0: a head shot takes no head and does not kill by it")
+	DotNpcGore.reset()
 	_finished()
 
 
