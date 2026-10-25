@@ -702,6 +702,22 @@ func present(delta: float, listener: Vector3) -> void:
 	_present_lens_holder()
 
 
+## A shot landed at [param point]: the nearest zombie within reach gets a wound mark there (client only).
+func wound_near(point: Vector3) -> void:
+	var best: ZzZombieView = null
+	var best_d := 1.4
+	for key: int in _zombies.keys():
+		var view: ZzZombieView = (_zombies[key] as Dictionary).get("view")
+		if view == null or not is_instance_valid(view) or not view.is_inside_tree():
+			continue
+		var d := (view.global_position + Vector3(0.0, 1.0, 0.0)).distance_to(point)
+		if d < best_d:
+			best_d = d
+			best = view
+	if best != null:
+		best.wound_at(point)
+
+
 func _present_zombies(delta: float, listener: Vector3) -> void:
 	lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
 	for key: int in _zombies.keys():

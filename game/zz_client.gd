@@ -1090,11 +1090,18 @@ func _on_hurt(amount: float, from: Vector3) -> void:
 		hud.hurt_from(from, amount)
 
 
+## The player's blood setting trims what is drawn (dot-npc's DotNpcGore.view_cap): off keeps clean stumps only. What comes off is the server's rule.
+func _apply_gore_pref() -> void:
+	DotNpcGore.view_cap = DotNpcGore.MAX_LEVEL if settings.settings.get_bool(&"gore", true) else DotNpcGore.STUMPS
+
+
 ## A hit the server confirmed: the marker and the number on the body.
 func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
 	if hud != null:
 		hud.confirm_hit(victim, amount, point, killed, headshot)
 	_draw_body_hit(weapons, point)
+	if world_view != null and not killed:
+		world_view.wound_near(point)
 	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
 	if blood != null and camera != null:
 		var _splat := blood.on_body_hit(victim, point, camera.global_position)
@@ -1681,7 +1688,11 @@ func _build_settings() -> void:
 	if world_view != null:
 		world_view.lod.follow(settings.settings)
 
+	_apply_gore_pref()
+
 	settings.settings.changed.connect(func(key: StringName, _value: Variant, _why: StringName) -> void:
+		if key == &"gore":
+			_apply_gore_pref()
 		if key == &"vis_mode" and game != null and game.map != null:
 			game.map.set_vis_mode(_vis_mode())
 			var _mode := platform.set_vis_mode(_vis_mode()))

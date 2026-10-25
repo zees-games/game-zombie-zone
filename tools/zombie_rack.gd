@@ -27,6 +27,7 @@ const COLUMNS := [
 ]
 
 var _cells: Array = []
+var _deferred: Array[Callable] = []
 var _frames := 0
 var _set := "specials"
 var _out := "res://screenshots/specials.png"
@@ -180,6 +181,18 @@ func _gore(root: Node3D) -> void:
 	var ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 	var defs := ZzZombieLimbs.defs_for(&"common", 100.0)
 	var sets := [[], ["head"], ["armL"], ["legR"], ["armL", "armR"], ["legL", "legR"], ["head", "armR", "legL"]]
+	var pick := PackedStringArray()
+	var yaw := 30.0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--pick="):
+			pick = arg.trim_prefix("--pick=").split(",")
+		elif arg.begins_with("--yaw="):
+			yaw = float(arg.trim_prefix("--yaw="))
+	if not pick.is_empty():
+		var chosen := []
+		for i in pick:
+			chosen.append(sets[int(i)])
+		sets = chosen
 	var ground := MeshInstance3D.new()
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(sets.size() * 2.4, 6.0)
@@ -193,17 +206,26 @@ func _gore(root: Node3D) -> void:
 		var view := ZzZombieView.new()
 		root.add_child(view)
 		view.position = Vector3(float(i) * 2.4, 0.0, 0.0)
-		view.rotation.y = deg_to_rad(180.0 - 30.0)
+		view.rotation.y = deg_to_rad(180.0 - yaw)
 		view.build(&"common", 4111 + i)
 		_cells.append([view, ZzZombieBody.Anim.IDLE])
-		for limb: String in sets[i]:
-			view.sever_limb(StringName(limb), defs[limb], Vector3(0.0, 1.0, 2.0))
+		var setup := func() -> void:
+			for limb: String in sets[i]:
+				view.sever_limb(StringName(limb), defs[limb], Vector3(0.0, 1.0, 2.0))
+			if "--wounds" in OS.get_cmdline_user_args():
+				for w in [Vector3(0.06, 1.2, 0.2), Vector3(-0.12, 0.95, 0.2), Vector3(0.1, 0.7, 0.18)]:
+					view.wound_at(view.global_position + view.global_basis * w, 0.1)
+				if "legL" in sets[i] and "legR" in sets[i]:
+					for k in 4:
+						var _p := DotNpcGibs.add_pool(root.get_tree(), view.global_position + view.global_basis * Vector3(0.0, 0.0, -0.5 - 0.7 * float(k)), 0.22 - 0.02 * float(k))
+		_deferred.append(setup)
 	var camera := Camera3D.new()
 	root.add_child(camera)
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	camera.keep_aspect = Camera3D.KEEP_HEIGHT
-	camera.size = 7.0
-	var mid := Vector3(sets.size() * 1.2 - 1.2, 2.2, 0.0)
+	var wide := float(sets.size()) * 2.4
+	camera.size = clampf(wide * 720.0 / 1800.0, 2.6, 7.0)
+	var mid := Vector3(sets.size() * 1.2 - 1.2, 1.0 + camera.size * 0.12, 0.0)
 	camera.look_at_from_position(mid + Vector3(0.0, 2.0, 30.0), mid)
 	get_root().size = Vector2i(1800, 720)
 
@@ -234,6 +256,9 @@ func _horde(root: Node3D) -> void:
 
 func _process(_delta: float) -> bool:
 	_frames += 1
+	if _frames == 3:
+		for call in _deferred:
+			call.call()
 	var now := Time.get_ticks_usec()
 
 	if _last_us > 0 and _frames > 10:

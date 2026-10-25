@@ -230,6 +230,8 @@ var body_id: StringName = &""
 var _model: Node3D = null
 var _anim: AnimationPlayer = null
 var _skeleton: Skeleton3D = null
+var _legs_gone := 0
+var _trail_from := Vector3.INF
 var _mesh: MeshInstance3D = null
 var _bones: Dictionary = {}
 var _shape_bones: Dictionary = {}
@@ -692,6 +694,7 @@ func sever_limb(limb: StringName, d: Dictionary, impulse: Vector3) -> Vector3:
 	if _skeleton == null or _model == null:
 		return Vector3.INF
 
+	_note_limb(limb)
 	return DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, impulse)
 
 
@@ -700,10 +703,31 @@ func stump_limb(limb: StringName, d: Dictionary) -> Vector3:
 	if _skeleton == null or _model == null:
 		return Vector3.INF
 
+	_note_limb(limb)
 	return DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, Vector3.ZERO, true)
 
 
+func _trail(at: Vector3) -> void:
+	if _speed < 0.25 or not is_inside_tree():
+		return
+	if _trail_from == Vector3.INF or at.distance_to(_trail_from) > 0.8:
+		_trail_from = at
+		var _pool := DotNpcGibs.add_pool(get_tree(), at, 0.2)
+
+
+func _note_limb(limb: StringName) -> void:
+	if String(limb).begins_with("leg"):
+		_legs_gone += 1
+
+
+## A wet mark on the body where a shot landed (client only, pooled and capped by DotNpcGore.max_wounds).
+func wound_at(world_point: Vector3, size := 0.09) -> void:
+	if _skeleton != null and kind != &"":
+		var _mark := DotNpcGibs.add_wound(_skeleton, world_point, size)
+
+
 func restore_limbs() -> void:
+	_legs_gone = 0
 	if _skeleton != null:
 		DotNpcGibs.restore(_skeleton, _model)
 
@@ -921,6 +945,11 @@ func present(delta: float, anim: int, flags: int) -> void:
 
 	var overrides: Dictionary = _look.get("clips", {})
 	clip = overrides.get(clip, clip)
+
+	# No legs: it drags itself on its arms and leaves a trail.
+	if _legs_gone >= 2 and anim != ZzZombieBody.Anim.DEAD and (clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"idle"):
+		clip = &"crawl"
+		_trail(at)
 
 	# A new swing starts its clip over, so the swing's frames follow the brain's swing.
 	if striking and _strike_phase < prior and _anim != null and _anim.has_animation(_qualified(clip)):

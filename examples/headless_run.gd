@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 46
+const SECTIONS := 47
 
-const CHECKS := 345
+const CHECKS := 351
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -89,6 +89,7 @@ func _run() -> void:
 	await _test_the_room_wakes()
 	await _test_downs()
 	await _test_ground_strike()
+	await _test_a_legless_zombie_still_attacks()
 	await _test_every_kind_animates()
 	await _test_borrowed_health()
 	await _test_the_shove()
@@ -784,6 +785,35 @@ func _test_ground_strike() -> void:
 		if is_instance_valid(other.node) and other.node.get(&"anim") == ZzZombieBody.Anim.STRIKE_DOWN:
 			seen["down"] = true
 	_check(not seen["down"], "with down_attack off it swings as usual")
+	_finished()
+
+
+## A zombie with no legs is slow, not harmless: it still closes the distance and its blows land, softer for a missing arm.
+func _test_a_legless_zombie_still_attacks() -> void:
+	_section("a legless zombie still crawls toward a survivor and attacks")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	me.place_at(STREET, 0.0)
+	var hurts: Array = []
+	game.player_hurt.connect(func(_who: StringName, amount: float, _from: Vector3) -> void: hurts.append(amount))
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -8.0), &"test", Basis(Vector3.UP, PI))
+	var body := npc.node as ZzZombieBody
+	npc.brain.call(&"force_target", me.player_id)
+	body.limbs.sever(&"legL", Vector3.INF, Vector3.ZERO)
+	body.limbs.sever(&"legR", Vector3.INF, Vector3.ZERO)
+	_check(body.limb_speed_scale() < 0.3 and body.limb_speed_scale() >= 0.2, "both legs gone leave a quarter of its pace", str(body.limb_speed_scale()))
+	_check(ZzZombieView.CLIPS.has(ZzZombieBody.Anim.CRAWL) and ZzZombieView.CLIPS[ZzZombieBody.Anim.CRAWL][0] == &"crawl", "the view has a crawl clip for it")
+	var start := body.global_position.distance_to(me.global_position)
+	await _sim(game, 3.0)
+	var later := body.global_position.distance_to(me.global_position)
+	_check(later < start - 0.3, "it still closes on the survivor", "%.2f -> %.2f" % [start, later])
+	_check(later > start - 8.0 * 0.6, "but at a crawl, not a walk", "%.2f -> %.2f" % [start, later])
+	body.limbs.sever(&"armL", Vector3.INF, Vector3.ZERO)
+	await _sim(game, 25.0)
+	_check(not hurts.is_empty(), "and once there its blows land")
+	if not hurts.is_empty():
+		var full: float = game.config.common_damage * game.config.damage_scale()
+		_check(float(hurts[0]) < full - 0.01, "softer for the arm it lost", "%.2f vs %.2f" % [hurts[0], full])
 	_finished()
 
 

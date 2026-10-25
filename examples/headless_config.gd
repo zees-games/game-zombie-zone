@@ -46,7 +46,7 @@ func _run() -> void:
 	console.set_cvar("zz_waves", "7")
 	_check(config.waves == 7 and binder.source_of("waves") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("waves: 7"), "the diff names the edit")
-	_check(config.gore_level == 2 and config.gore_max_gibs == 24, "gore defaults to flying limbs, 24 gibs")
+	_check(config.gore_level == 2 and config.gore_max_gibs == 24 and config.gore_max_wounds == 48, "gore defaults to flying limbs, 24 gibs, 48 wound marks")
 	console.set_cvar("zz_gore_level", "0")
 	_check(config.gore_level == 0 and keys.has("gore_max_gibs"), "zz_gore_level is a cvar on the config and gore_max_gibs is exposed")
 	var schema_path := "user://zz_config_schema.json"
