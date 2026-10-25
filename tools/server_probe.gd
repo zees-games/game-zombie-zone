@@ -7,6 +7,7 @@ extends Node
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
 ##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--acks] [--native]
+##     [--detail] [--cfg=field=value]
 ## [/codeblock]
 ##
 ## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
@@ -60,6 +61,14 @@ var _far := 0.0
 var _far_coherent := false
 var _far_tiers := 1
 const ACK_LAG := 2
+## --detail: brains timed by kind, players split into simulate and hands, and where the NPCs
+## stand from the nearest survivor, printed as a DETAIL line after RESULT.
+var _detail := false
+var _acc: Dictionary = {}
+var _near_hist: Dictionary = {}
+var _detail_ticks := 0
+## --cfg=field=value (repeatable): a ZzConfig field set before the game starts, e.g. squad_coalesce=true.
+var _cfg: Dictionary = {}
 var _sent_ticks: Dictionary = {}
 var _game: ZzGame
 var _net: DotNetManager
@@ -103,6 +112,12 @@ func _ready() -> void:
 			_far_coherent = true
 		elif arg.begins_with("--far-tiers="):
 			_far_tiers = arg.trim_prefix("--far-tiers=").to_int()
+		elif arg == "--detail":
+			_detail = true
+		elif arg.begins_with("--cfg="):
+			var pair := arg.trim_prefix("--cfg=").split("=", true, 1)
+			if pair.size() == 2:
+				_cfg[pair[0]] = str_to_var(pair[1])
 		elif arg == "--no-fill":
 			_fill = false
 		elif arg.begins_with("--wave="):
@@ -120,6 +135,8 @@ func _run() -> void:
 	config.map_ids = PackedStringArray([String(_map)])
 	config.survival_style = 0
 	config.seed_value = 1
+	for key: String in _cfg:
+		config.set(key, _cfg[key])
 	if _commons > 0:
 		# A fixed crowd whatever the team: the cap is the base alone.
 		config.commons_base = _commons
@@ -202,6 +219,11 @@ func _run() -> void:
 		tick += 1
 		var measuring := up_to_cap_at >= 0
 		_lap = {}
+		if _detail and measuring and _detail_ticks == 0:
+			_acc.clear()
+			_near_hist.clear()
+		if measuring:
+			_detail_ticks += 1
 		_one_tick(tick)
 		if measuring:
 			measured += 1
@@ -267,6 +289,14 @@ func _run() -> void:
 	for k: String in _series:
 		row["phases"][k] = _stats(_series[k])
 	print("RESULT %s" % JSON.stringify(row))
+	if _detail:
+		var per := {}
+		for k: String in _acc:
+			var a: Array = _acc[k]
+			per[k] = {"ms_per_tick": snappedf(float(a[0]) / 1000.0 / float(_detail_ticks), 0.01),
+				"us_each": snappedf(float(a[0]) / float(maxi(int(a[1]), 1)), 0.1),
+				"per_tick": snappedf(float(a[1]) / float(_detail_ticks), 0.1)}
+		print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist}))
 	get_tree().quit(0)
 
 
@@ -288,11 +318,22 @@ func _one_tick(tick: int) -> void:
 	for id: StringName in g.players:
 		var player = g.players[id]
 		if player.is_alive() and not player.watching:
-			player.simulate(g._tick, delta)
-			g._advance_hands(player, delta)
+			if _detail:
+				var t0 := Time.get_ticks_usec()
+				player.simulate(g._tick, delta)
+				var t1 := Time.get_ticks_usec()
+				g._advance_hands(player, delta)
+				_accum("player.simulate", t1 - t0)
+				_accum("player.hands", Time.get_ticks_usec() - t1)
+			else:
+				player.simulate(g._tick, delta)
+				g._advance_hands(player, delta)
 	at = _add("players", at)
+	var wt := Time.get_ticks_usec()
 	g._advance_weapons()
+	wt = _lap_logic("logic.weapons", wt)
 	g._advance_toys(delta)
+	wt = _lap_logic("logic.toys", wt)
 	at = _add("logic", at)
 	var h = g.horde
 	if h != null:
@@ -309,7 +350,10 @@ func _one_tick(tick: int) -> void:
 		sp._ticks += 1
 		sp._perceive()
 		at = _add("senses", at)
-		sp._think(delta)
+		if _detail:
+			_think_detail(sp, delta)
+		else:
+			sp._think(delta)
 		at = _add("brains", at)
 		sp._reclaim()
 		var speed: float = h.zombie_speed_scale * h.wave_speed_scale
@@ -330,21 +374,27 @@ func _one_tick(tick: int) -> void:
 				h._advance_brute()
 				h._advance_panic()
 		at = _add("horde_other", at)
+	var lt := Time.get_ticks_usec()
 	if g.pins != null:
 		g.pins.advance(delta)
+	lt = _lap_logic("logic.pins", lt)
 	if g.hazards != null:
 		g.hazards.tick(delta)
 	if g.boxes != null:
 		g.boxes.tick(delta)
 	if g.loot != null:
 		g.loot.tick(delta)
+	lt = _lap_logic("logic.hazards_boxes_loot", lt)
 	g._advance_bodies(delta)
+	lt = _lap_logic("logic.bodies", lt)
 	if g.combat != null:
 		g.combat.tick(g._tick, delta)
+	lt = _lap_logic("logic.combat", lt)
 	if g.spectate != null:
 		g.spectate.advance(g._tick)
 	if g.sides_are_playable() or g.phase != ZzGame.Phase.IDLE:
 		g.match_node.tick(g._tick)
+	lt = _lap_logic("logic.spectate_match", lt)
 	at = _add("logic", at)
 
 	# The manager's half of net.server_tick, apart: the entities' pull, then the snapshots.
@@ -468,3 +518,43 @@ func _peak_mb() -> int:
 		if line.begins_with("VmHWM:"):
 			return int(line.get_slice(":", 1).strip_edges().get_slice(" ", 0)) / 1024
 	return 0
+
+
+func _lap_logic(key: String, t0: int) -> int:
+	var now := Time.get_ticks_usec()
+	if _detail:
+		_accum(key, now - t0)
+	return now
+
+
+func _accum(key: String, usec: int) -> void:
+	var a: Array = _acc.get_or_add(key, [0, 0])
+	a[0] += usec
+	a[1] += 1
+
+
+## DotNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances.
+func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
+	var sample := sp._ticks % 64 == 0
+	var survivors: Array = []
+	if sample:
+		for p in _game.survivors():
+			if p.is_up():
+				survivors.append(p.global_position)
+	for id in sp._npcs.keys():
+		var found: Variant = sp._npcs.get(id)
+		if not (found is DotNpcInstance):
+			continue
+		var npc: DotNpcInstance = found
+		if not npc.is_alive() or npc.brain == null:
+			continue
+		var t0 := Time.get_ticks_usec()
+		(npc.brain as DotNpcBrain).think(delta)
+		_accum("brain." + String(npc.def.id), Time.get_ticks_usec() - t0)
+		if sample and npc.node is Node3D:
+			var best := INF
+			var at: Vector3 = (npc.node as Node3D).global_position
+			for q: Vector3 in survivors:
+				best = minf(best, at.distance_to(q))
+			var bucket := "<10" if best < 10.0 else "<20" if best < 20.0 else "<40" if best < 40.0 else "<80" if best < 80.0 else ">=80"
+			_near_hist[bucket] = int(_near_hist.get(bucket, 0)) + 1
