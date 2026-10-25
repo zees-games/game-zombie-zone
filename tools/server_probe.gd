@@ -6,7 +6,7 @@ extends Node
 ## [codeblock]
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
-##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--acks]
+##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--acks] [--native]
 ## [/codeblock]
 ##
 ## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
@@ -45,6 +45,8 @@ var _fill := true
 var _relevance := true
 ## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
 var _workers := 0
+## --native: DotNetConfig.native, snapshots built by dot-net's native core.
+var _native := false
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
 ## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
 var _acks := false
@@ -87,6 +89,8 @@ func _ready() -> void:
 			_split = true
 		elif arg == "--acks":
 			_acks = true
+		elif arg == "--native":
+			_native = true
 		elif arg == "--relevance=off":
 			_relevance = false
 		elif arg.begins_with("--workers="):
@@ -144,6 +148,7 @@ func _run() -> void:
 	nc.max_entities_per_snapshot = 192
 	nc.world_extent = ZzGame.NET_WORLD_EXTENT
 	nc.snapshot_workers = _workers
+	nc.native = _native
 	_net.config = nc
 	add_child(_net)
 	var _ok := _net.setup()
@@ -252,7 +257,7 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
@@ -356,7 +361,7 @@ func _one_tick(tick: int) -> void:
 		_net._ticks_since_snapshot = 0
 		_net.history.record(identities, tick)
 		at = _add("net_history", at)
-		if _split and _workers == 0:
+		if _split and _workers == 0 and not _native:
 			_split_snapshots(tick, identities)
 		else:
 			_net._send_snapshots(tick, identities)
