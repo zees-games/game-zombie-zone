@@ -19,7 +19,7 @@ import sys
 import numpy as np
 
 RATE = 44100
-ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "dot-audio", "addons", "dot_audio", "stock", "moods")
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "addons", "dot_audio", "stock", "moods")
 SET = ROOT  # moods.json is read from the shipped set; --dir measures files of the same names elsewhere
 BED_TARGET = -30.0      # tools/make_ambience_set.py BED_LUFS
 SHOT_TARGET = -26.0

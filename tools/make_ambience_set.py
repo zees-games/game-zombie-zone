@@ -24,7 +24,7 @@ MAX_BED = 90.0
 MAX_BOOST_DB = 14.0
 BED_PEAK_DB = -9.0
 RATE = 44100
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "dot-audio", "addons", "dot_audio", "stock", "moods")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "addons", "dot_audio", "stock", "moods")
 SLOW_LEVELLER = "dynaudnorm=f=1500:g=31:p=0.8:m=12:s=8"
 
 # out name -> (source file, options). "cut" = (start, end) seconds of the source.
