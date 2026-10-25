@@ -18,6 +18,7 @@ var _recording := false
 var _profile := false
 var _profiler: Node = null
 var _ticks := 0
+var _load_s := 0.0
 
 
 func _run() -> void:
@@ -32,6 +33,7 @@ func _run() -> void:
 			_profile = true
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
+	_load_s = Time.get_ticks_msec() / 1000.0
 	var local = _client.get("player")
 	for player in game.survivors():
 		player.health.invulnerable = true
@@ -144,5 +146,28 @@ func _report(draws: PackedInt32Array, objects: PackedInt32Array, prims: PackedIn
 		p.call(cols[0], 0.5), p.call(cols[0], 0.99), mean.call(cols[1]), mean.call(cols[4]), mean.call(cols[2]), mean.call(cols[3]), mean.call(gpu), mean.call(cpu),
 		mean.call(as_f.call(draws)), mean.call(as_f.call(objects)), mean.call(as_f.call(prims)) / 1000.0,
 		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))])
+	_print_perf(game, cols[0], mean.call(cols[1]), mean.call(as_f.call(draws)), p)
+
+
+## The line tools/perf_budget.sh compares (dot-game/tools): frame percentiles of the measured window, seconds until
+## a round is running, peak resident memory, GPU name, and the game's own physics, draw and node numbers.
+func _print_perf(game: ZzGame, wall: PackedFloat64Array, phys_ms: float, draws: float, pct: Callable) -> void:
+	var rss_kb := 0
+	var status := FileAccess.open("/proc/self/status", FileAccess.READ)
+	while status != null and not status.eof_reached():
+		var line := status.get_line()
+		if line.begins_with("VmHWM:"):
+			rss_kb = int(line.get_slice(":", 1).strip_edges().get_slice(" ", 0))
+	var worst := 0.0
+	for v in wall:
+		worst = maxf(worst, v)
+	var vp := get_viewport().get_visible_rect().size
+	print("PERF " + JSON.stringify({
+		"map": game.map.doc.get("id", "?"), "zombies": _count, "frames": wall.size(),
+		"p50_ms": pct.call(wall, 0.5), "p95_ms": pct.call(wall, 0.95), "p99_ms": pct.call(wall, 0.99), "stall_ms": worst,
+		"load_s": _load_s, "rss_mb": rss_kb / 1024.0, "phys_ms": phys_ms, "draws": draws,
+		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
+		"gpu": RenderingServer.get_video_adapter_name(), "driver": RenderingServer.get_current_rendering_driver_name(),
+		"resolution": "%dx%d" % [vp.x, vp.y], "godot": Engine.get_version_info().get("string", "")}))
 
 
