@@ -17,8 +17,8 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 20
-const CHECKS := 86
+const SECTIONS := 21
+const CHECKS := 94
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -732,7 +732,7 @@ func _test_unstick_steps() -> void:
 	var start := body.global_position
 
 	for goal: Vector3 in [Vector3(17.5, 0.0, 8.6), Vector3(25.0, 0.0, 8.0)]:
-		var moved := ZzUnstick.relocate(body, goal)
+		var moved := ZzUnstick.relocate(body, goal, true)
 		var went := body.global_position.distance_to(start)
 		_check(moved and went > 1.4 and went < 4.0, "relocate frees the brute even with its goal behind the furniture (%s)" % goal,
 			"moved %s, %.1f m from %s" % [moved, went, start])

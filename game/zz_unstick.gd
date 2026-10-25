@@ -56,7 +56,7 @@ static func nudge_player(player: CharacterBody3D, direction: Vector3, yaw_degree
 
 ## [method relocate] for a survivor, through [method ZzPlayer.place_at] for the reason [method nudge_player] is.
 static func relocate_player(player: CharacterBody3D, goal: Vector3, yaw_degrees: float) -> bool:
-	if not relocate(player, goal):
+	if not relocate(player, goal) and not relocate(player, goal, true):
 		return false
 
 	player.call(&"place_at", player.global_position, yaw_degrees)
@@ -91,11 +91,10 @@ static func walled_off(body: CharacterBody3D, from: Vector3, to: Vector3, throug
 	return false
 
 
-## Puts [param body] on the clear, grounded spot within a few metres that is nearest
-## [param goal]: one closer to it than the body is, else (a big body wedged among furniture, with
-## its goal behind it) the nearest spot that frees it. The last resort after [method nudge]:
-## it only takes a spot the body fits on, not over a drop, and in sight of here through no wall. Returns whether it moved.
-static func relocate(body: CharacterBody3D, goal: Vector3, through_furniture := false) -> bool:
+## Puts [param body] on the clear, grounded spot within a few metres nearest [param goal] when that is
+## closer than the body is; [param wedged] also takes the nearest spot that frees it and lets furniture
+## not count as a wall. The last resort after [method nudge]; never through a wall. Returns whether it moved.
+static func relocate(body: CharacterBody3D, goal: Vector3, wedged := false) -> bool:
 	if body == null:
 		return false
 
@@ -116,7 +115,7 @@ static func relocate(body: CharacterBody3D, goal: Vector3, through_furniture := 
 				if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
 					continue
 
-				if walled_off(body, here, to.origin - Vector3(0.0, lift, 0.0), through_furniture):
+				if walled_off(body, here, to.origin - Vector3(0.0, lift, 0.0), wedged):
 					continue
 
 				var d := to.origin.distance_to(goal)
@@ -134,7 +133,7 @@ static func relocate(body: CharacterBody3D, goal: Vector3, through_furniture := 
 
 	# Nothing nearer the goal: a wedged brute's goal lies behind the furniture that holds it, and
 	# staying put (as this once did, 36 s) is worse than stepping out to where it can turn.
-	if best == Vector3.INF:
+	if best == Vector3.INF and wedged:
 		best = out
 
 	if best == Vector3.INF:
