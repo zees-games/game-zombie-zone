@@ -248,7 +248,7 @@ func setup_seconds() -> float:
 
 ## Whether a zombie reads its squad's sightings when it thinks instead of each sighting calling
 ## the whole horde (DotNpcAiSquads.pull_reports). Read at map load.
-@export var squad_pull_reports: bool = false
+@export var squad_pull_reports: bool = true
 
 ## Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.

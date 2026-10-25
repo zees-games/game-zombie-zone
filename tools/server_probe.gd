@@ -7,7 +7,7 @@ extends Node
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
 ##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--native]
-##     [--detail] [--cfg=field=value]
+##     [--detail] [--cfg=field=value] [--cvar=name=value]
 ## [/codeblock]
 ##
 ## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
@@ -71,6 +71,14 @@ var _near_hist: Dictionary = {}
 var _detail_ticks := 0
 ## --cfg=field=value (repeatable): a ZzConfig field set before the game starts, e.g. squad_coalesce=true.
 var _cfg: Dictionary = {}
+## --cvar=name=value (repeatable): dot-game's DotGameNpcLod cvars (npc_lod, npc_lod_full, npc_sense_quiet ...) on a stand-in console.
+var _cvars: Dictionary = {}
+var _lod: DotGameNpcLod = null
+## Gameplay counters over the window: zombies killed, health zombies lost, health survivors lost, and zombies with a target per tick.
+var _kills := 0
+var _dmg_npc := 0.0
+var _dmg_survivor := 0.0
+var _engaged := 0
 var _sent_ticks: Dictionary = {}
 var _game: ZzGame
 var _net: DotNetManager
@@ -122,6 +130,10 @@ func _ready() -> void:
 			var pair := arg.trim_prefix("--cfg=").split("=", true, 1)
 			if pair.size() == 2:
 				_cfg[pair[0]] = str_to_var(pair[1])
+		elif arg.begins_with("--cvar="):
+			var cv := arg.trim_prefix("--cvar=").split("=", true, 1)
+			if cv.size() == 2:
+				_cvars[cv[0]] = cv[1]
 		elif arg == "--no-fill":
 			_fill = false
 		elif arg.begins_with("--wave="):
@@ -230,6 +242,10 @@ func _run() -> void:
 			_detail_ticks += 1
 		_one_tick(tick)
 		if measuring:
+			for id in _game.horde.spawner._npcs:
+				var inst: DotNpcInstance = _game.horde.spawner._npcs[id]
+				_engaged += 1 if inst.is_alive() and inst.has_target() else 0
+		if measuring:
 			measured += 1
 			for k: String in _lap:
 				(_series.get_or_add(k, []) as Array).append(float(_lap[k]) / 1000.0)
@@ -252,6 +268,12 @@ func _run() -> void:
 				up_to_cap_at = tick
 				_bytes = 0
 				path_graph = _game.horde.spawner.nav
+				_game.horde.spawner.died.connect(func(_n, _b): _kills += 1)
+				_game.combat.damage_applied.connect(func(d: DotDamage) -> void:
+					if _game.horde.is_npc_entity(d.victim):
+						_dmg_npc += d.health_lost
+					else:
+						_dmg_survivor += d.health_lost)
 				searches0 = path_graph.searches
 		if wave_set and _fill and tick % (_rate / 2) == 0:
 			_game.horde.spawn_mob(maxi(cap - _game.horde.commons() - _game.horde.pending_commons(), 0))
@@ -292,6 +314,10 @@ func _run() -> void:
 		"engine_step_ms": _stats(physics_ms), "rss_peak_mb": _peak_mb(), "phases": {}}
 	for k: String in _series:
 		row["phases"][k] = _stats(_series[k])
+	row["gameplay"] = {"kills": _kills, "dmg_to_zombies": snappedf(_dmg_npc, 1.0),
+		"dmg_to_survivors": snappedf(_dmg_survivor, 1.0), "engaged_mean": snappedf(float(_engaged) / float(maxi(measured, 1)), 0.1)}
+	if _lod != null:
+		row["lod"] = _lod.describe()
 	print("RESULT %s" % JSON.stringify(row))
 	if _detail:
 		var per := {}
@@ -354,6 +380,15 @@ func _one_tick(tick: int) -> void:
 		sp._ticks += 1
 		sp.sense_workers = _npc_workers
 		sp.path_workers = _npc_workers
+		if _lod == null and not _cvars.is_empty():
+			var console := DotConsole.new()
+			add_child(console)
+			DotGameNpcLod.ensure_cvars(console)
+			for name: String in _cvars:
+				console.set_cvar(name, _cvars[name])
+			_lod = DotGameNpcLod.attach(self, console, sp)
+		if _lod != null:
+			_lod.follow(delta)
 		sp._perceive()
 		at = _add("senses", at)
 		if _detail:
@@ -556,7 +591,9 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 			continue
 		var t0 := Time.get_ticks_usec()
 		(npc.brain as DotNpcBrain).think(delta)
-		_accum("brain." + String(npc.def.id), Time.get_ticks_usec() - t0)
+		var spent := Time.get_ticks_usec() - t0
+		_accum("brain." + String(npc.def.id), spent)
+		_accum("brain.thought" if int(npc.brain.get(&"_since_thought")) == 0 else "brain.skipped", spent)
 		if sample and npc.node is Node3D:
 			var best := INF
 			var at: Vector3 = (npc.node as Node3D).global_position
