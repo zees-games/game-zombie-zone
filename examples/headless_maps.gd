@@ -57,6 +57,8 @@ var _failures := PackedStringArray()
 
 ## Shipped world maps whose spawner config was checked (three checks each).
 var _spawner_worlds := 0
+## World maps whose spawner checks were skipped because world/ is not linked.
+var _worlds_skipped := 0
 ## Maps whose wire budget cut boxes: each adds the whole-floor check.
 var _nav_extra_maps := 0
 
@@ -86,6 +88,9 @@ func _run() -> void:
 		print("  FAIL  %s" % line)
 
 	var code := 1 if _failed > 0 else 0
+
+	if _worlds_skipped > 0:
+		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
 	var sections := 4 + _maps.size()
 	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
@@ -463,7 +468,11 @@ func _test_map(id: StringName) -> void:
 	_check(lost.is_empty(), "every item lies where it can be picked up", "; ".join(lost.slice(0, 6)))
 
 	# A shipped world map resolves a spawner config and lays at least one weapon site, each over a floor.
-	if str(doc.get("world", "")) != "" and game.spawners != null:
+	if str(doc.get("world", "")) != "" and game.spawners != null and not FileAccess.file_exists(game.map.local_world_prefix() + ".json"):
+		# world/ is never in CI; its sites come from the drawn world, so without it there is nothing to count.
+		_worlds_skipped += 1
+		print("  SKIP  %s: spawner and shelf checks need world/ (not linked), not counted as passed" % doc.get("id", "?"))
+	elif str(doc.get("world", "")) != "" and game.spawners != null:
 		_spawner_worlds += 1
 		game.spawners.start_round(doc)
 		var ours := {}

@@ -19,6 +19,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## mostly boxes or objective gates; the ones that are movers are driven by one button or by
 ## walking up, so the chain (button, delay, relay, volume, lock) is only reachable in a fixture.
 
+const ZzPaths := preload("../game/zz_paths.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
@@ -29,6 +30,8 @@ var _passed := 0
 var _failed := 0
 var _entered := 0
 var _finished := 0
+## Checks of sections that need the drawn worlds, skipped because world/ is not linked (CI).
+var _skipped := 0
 
 
 ## A world made of data, for the chain tests: the same calls a DotMapBspMesh answers.
@@ -83,9 +86,23 @@ func _run() -> void:
 	await _test_no_world()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
-	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed == CHECKS
+	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed + _skipped == CHECKS
+	if _skipped > 0:
+		print("SKIPPED: %d checks need world/ (not linked, as in CI); run dot-bootstrap for the full suite" % _skipped)
 	print("PASS" if ok else "FAIL (expected %d sections and %d checks)" % [SECTIONS, CHECKS])
 	get_tree().quit(0 if ok else 1)
+
+
+## Whether this section is skipped for want of world/ (zombie-zone-maps' drawn worlds, never in CI). Loud and counted,
+## so that a checkout with the worlds still runs every check and a section cannot vanish unnoticed.
+func _skip_without_world(checks: int) -> bool:
+	if DirAccess.dir_exists_absolute(ZzPaths.rebase("res://world")):
+		return false
+
+	_skipped += checks
+	_finished += 1
+	print("  SKIP  %d checks: this section needs world/ (not linked)" % checks)
+	return true
 
 
 func _game(id: StringName, start := false) -> ZzGame:
@@ -128,6 +145,8 @@ func _sim(game: ZzGame, ticks: int) -> void:
 
 func _test_lift() -> void:
 	_entered += 1
+	if _skip_without_world(8):
+		return
 	print("%s: a lift carries a survivor" % LIFT_MAP)
 	ZzMap.bring_global_mechanics = true
 	var game := await _game(LIFT_MAP)
@@ -179,6 +198,8 @@ func _test_lift() -> void:
 
 func _test_real_door() -> void:
 	_entered += 1
+	if _skip_without_world(4):
+		return
 	print("%s: a door blocks, then opens" % LIFT_MAP)
 	var game := await _game(LIFT_MAP)
 	var mech: ZzMechanics = game.map.mechanics
@@ -310,6 +331,8 @@ func _built() -> ZzMechanics:
 ## them, opened by a zombie as by a survivor, and the side crosses the wire.
 func _test_prop_doors() -> void:
 	_entered += 1
+	if _skip_without_world(21):
+		return
 	const DOOR_MAP := &"zm_abandoned_mall"
 	print("%s: its hinged doors swing" % DOOR_MAP)
 	ZzMap.bring_global_mechanics = false
@@ -602,6 +625,8 @@ func _volume_spot(t: Dictionary, lift := 0.1) -> Vector3:
 ## zombies, a fall below the map kills, and the enabled state of a push or gravity volume survives the wire.
 func _test_volumes() -> void:
 	_entered += 1
+	if _skip_without_world(12):
+		return
 	print("%s: hurt, teleport, push and gravity volumes" % VOLUME_MAP)
 	ZzMap.bring_global_mechanics = true
 	var game := await _game(VOLUME_MAP)
@@ -917,6 +942,8 @@ func _test_zz_logic() -> void:
 ## Real maps: zs_lens ships waves, win/lose and beats; zm_4way_tunnel ships point_templates of brushes.
 func _test_real_zz_logic() -> void:
 	_entered += 1
+	if _skip_without_world(10):
+		return
 	print("zs_lens and zm_4way_tunnel: the wave classes and brush templates on real maps")
 	ZzMap.bring_global_mechanics = false
 	var game := await _game(&"zs_lens", true)
@@ -970,6 +997,8 @@ func _test_real_zz_logic() -> void:
 ## zm_blockfort ships its logic: a counter that triggers a relay that shows text, a random-case modifier and template makers.
 func _test_logic_blockfort() -> void:
 	_entered += 1
+	if _skip_without_world(6):
+		return
 	print("zm_blockfort: counter, relay, case, text and template makers on the real map")
 	ZzMap.bring_global_mechanics = false
 	var game := await _game(&"zm_blockfort", true)
@@ -1014,6 +1043,8 @@ func _test_logic_blockfort() -> void:
 ## ze_death_star_escape in a global pack: the compare that switches the push volumes on later, and the push speed set by the map.
 func _test_logic_death_star() -> void:
 	_entered += 1
+	if _skip_without_world(7):
+		return
 	print("%s: the map's links run in a global pack, pushes switch on later and carry their speed" % VOLUME_MAP)
 	ZzMap.bring_global_mechanics = false
 	var game := await _game(VOLUME_MAP, true)
