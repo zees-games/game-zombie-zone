@@ -182,7 +182,8 @@ func hold(id: StringName, switching: bool) -> void:
 func _set_hold_kind() -> void:
 	if person == null:
 		return
-	if holding == &"" or held == null or not held.visible:
+	# The held-gun arms are written over every clip but a gun's, which would flatten a dance or a sit.
+	if holding == &"" or held == null or not held.visible or DotHumanoidActions.is_full_body(person.action):
 		person.set_hold(DotHumanoidFigure.Hold.NONE)
 		return
 	var pose := _pose_of(holding)

@@ -824,6 +824,12 @@ func _settle(actor: Object) -> void:
 	actor.set("is_bot", false)
 	actor.place_at(actor.controller.state.position, actor.controller.state.yaw)
 	await _seconds_of(0.6)
+	# Dropped from above the floor it is still falling: wait for it to land, or the clip ends at once.
+	var waited := 0
+	while waited < 600 and actor.figure.body_node().get("state") != DotPlayerAnimState.IDLE:
+		await get_tree().process_frame
+		waited += 1
+	await _seconds_of(0.2)
 
 
 ## Waits [param seconds], printing the figure's state at the end of it.
