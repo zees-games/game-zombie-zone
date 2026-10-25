@@ -23,7 +23,7 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 14
-const CHECKS := 133
+const CHECKS := 134
 
 var _passed := 0
 var _failed := 0
@@ -644,6 +644,13 @@ func _test_volumes() -> void:
 	await _sim(game, 2 * TICK_RATE)
 	print("    below kill_y %.1f: deaths %s" % [game.map.kill_height(), str(deaths)])
 	_check(not rider.is_alive() and not deaths.is_empty() and deaths.any(func(d: Array) -> bool: return d[0] == &"u2" and d[1] == ZzGame.BY_FELL), "a fall below the map's kill height kills", str(deaths))
+
+	var god := game.add_player(&"u9", "God")
+	deaths.clear()
+	god.health.invulnerable = true
+	god.place_at(Vector3(start.x, game.map.kill_height() - 3.0, start.z), 0.0)
+	await _sim(game, 2 * TICK_RATE)
+	_check(god.is_alive() and deaths.is_empty() and god.feet().y > game.map.kill_height(), "an invulnerable survivor below the kill height is put back, not reported as fallen", "%s %s" % [str(deaths), str(god.feet())])
 
 	var tele := _first_volume(mech, "teleport")
 	var tele_zombie := _first_volume(mech, "teleport", true, -1.0, 1e9, true)

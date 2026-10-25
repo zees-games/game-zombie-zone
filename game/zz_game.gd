@@ -3352,10 +3352,10 @@ func _advance_bodies(delta: float) -> void:
 
 		# Below the map is death, not a down.
 		if player.is_alive() and player.feet().y < map.kill_height():
-			if can_be_harmed(player.player_id):
+			if can_be_harmed(player.player_id) and not player.health.invulnerable:
 				_die(player, &"", BY_FELL)
 			else:
-				# Under the cover nothing may kill it, but it cannot be left falling either.
+				# Invulnerable (an invulnerable box, a tool's stand-in) or under the cover: nothing may kill it, but it cannot be left falling either.
 				var spot := map.spawn("survivors", 0)
 				player.place_at(spot[0], spot[1])
 
