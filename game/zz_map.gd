@@ -1211,7 +1211,7 @@ func load_world() -> DotResult:
 		var stored: DotResult = await DotMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"))
 		DotLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
 		if not stored.ok:
-			DotLog.warn(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
+			DotLog.debug(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
 		if id() != wanted or _drawn == null:
 			return DotResult.success(false)
 
