@@ -6,7 +6,7 @@ extends Node
 ## [codeblock]
 ## tools/server_probe.sh                       # 16 32 64 100 128 at 64 and 33 Hz, one process each
 ## godot --headless --path . res://tools/server_probe.tscn -- --n=64 --rate=64 [--map=zz_stadium]
-##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--native] [--native-interest] [--net=field=value]
+##     [--commons=250] [--seconds=12] [--wave=10] [--relevance=off] [--workers=4] [--npc-workers=4] [--acks] [--no-native] [--no-native-interest] [--net=field=value]
 ##     [--detail] [--cfg=field=value] [--cvar=name=value]
 ## [/codeblock]
 ##
@@ -48,10 +48,10 @@ var _relevance := true
 var _workers := 0
 ## --npc-workers=N: DotNpcSpawner.sense_workers and path_workers (what sv_threads_npc sets on a server).
 var _npc_workers := 0
-## --native: DotNetConfig.native, snapshots built by dot-net's native core.
-var _native := false
+## Native snapshots and native interest are on (the shipped setting to measure); --no-native / --no-native-interest turn them off.
+var _native := true
 ## --native-interest: also DotNetConfig.native_interest. --net=field=value (repeatable): any other DotNetConfig field.
-var _native_interest := false
+var _native_interest := true
 var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
 ## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
@@ -113,6 +113,11 @@ func _ready() -> void:
 			_split = true
 		elif arg == "--acks":
 			_acks = true
+		elif arg == "--no-native":
+			_native = false
+			_native_interest = false
+		elif arg == "--no-native-interest":
+			_native_interest = false
 		elif arg == "--native":
 			_native = true
 		elif arg == "--native-interest":
