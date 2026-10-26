@@ -551,6 +551,22 @@ func _ground_below(at: Vector3, size: Vector3) -> bool:
 	return false
 
 
+## Whether a thin glass pane stands as a doorway: floor-standing, door-sized. Nothing breaks glass here, so one in an opening shuts it for good.
+func is_glass_door(at: Vector3, size: Vector3) -> bool:
+	var width := maxf(size.x, size.z)
+	if size.y < 1.6 or size.y > 2.8 or minf(size.x, size.z) > 0.3 or width < 0.5 or width > 2.6:
+		return false
+	var bottom := at.y - size.y * 0.5
+	var x0 := at.x - size.x * 0.5 - 1.0
+	var x1 := at.x + size.x * 0.5 + 1.0
+	var z0 := at.z - size.z * 0.5 - 1.0
+	var z1 := at.z + size.z * 0.5 + 1.0
+	for fl: Array in (doc.get("nav", {}) as Dictionary).get("floors", []):
+		if float(fl[4]) > bottom - 0.9 and float(fl[4]) < bottom + 0.3 and float(fl[0]) < x1 and float(fl[2]) > x0 and float(fl[1]) < z1 and float(fl[3]) > z0:
+			return true
+	return false
+
+
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
@@ -573,7 +589,8 @@ func _build_boxes() -> void:
 			_add_barricade_box(str(box["barricade"]), box, frame, size, corner)
 			continue
 
-		if bool(box.get("solid", true)) and not ZzMapDoc.is_trim(box):
+		var open_glass := str(box.get("mat", "")).begins_with("glass") and is_glass_door(at, size)
+		if bool(box.get("solid", true)) and not ZzMapDoc.is_trim(box) and not open_glass:
 			var shape := CollisionShape3D.new()
 			var cube := BoxShape3D.new()
 			cube.size = size
@@ -1106,6 +1123,8 @@ func attach_world_collision(world: RefCounted) -> void:
 			for p in shape.points:
 				bounds = bounds.expand(p + origin)
 			if flat.has(model) and bounds.size.y > flat_height:
+				continue
+			if str(h["kind"]) == "glass" and is_glass_door(bounds.get_center(), bounds.size):
 				continue
 			if skips.any(func(r: AABB) -> bool: return r.has_point(bounds.get_center())):
 				continue

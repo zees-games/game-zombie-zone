@@ -2,7 +2,8 @@ extends Node
 ## Finds the places a survivor falls out of a map or gets stuck, without a person: holes in the ground,
 ## capsules dropped from start points and floor samples that end below the floor, outside the walls or
 ## embedded, and spots a capsule cannot move away from.
-##   godot --headless --path . res://tools/fall_probe.tscn -- <map id>|--all [--step=2.0] [--drops=300] [--quiet] [--suggest]
+##   godot --headless --path . res://tools/fall_probe.tscn -- <map id>|--all [--step=2.0] [--drops=300] [--quiet] [--suggest] [--edges]
+## --edges walks a capsule along every edge of the horde's graph and prints the places the physics world blocks one the graph calls walkable (a prop in a doorway).
 ## --suggest prints, per map, the spec `extra_links` that would join each piece of the horde's graph to a neighbouring one.
 ## Exits 1 when any map has a hole, a fall, an embedded start or a trap.
 ## Causes: HOLE_DRAWN (a drawn solid box is over the hole, so its collision is missing), HOLE_NO_HULLS (the
@@ -30,6 +31,7 @@ const LINK_REACH := 3.5
 
 var _game: ZzGame
 var _suggest := false
+var _edges := false
 
 
 static func ids_in_checkout() -> PackedStringArray:
@@ -60,6 +62,8 @@ func _run() -> void:
 			quiet = true
 		elif a == "--suggest":
 			_suggest = true
+		elif a == "--edges":
+			_edges = true
 		elif a == "--all":
 			ids = ids_in_checkout()
 		else:
@@ -71,6 +75,7 @@ func _run() -> void:
 		print("%s: %s" % [id, _line(report)])
 		if bad > 0:
 			failing.append(id)
+		if bad > 0 or _edges or report["doors_blocked"] > 0:
 			if not quiet:
 				for what: String in report["examples"]:
 					print("    ", what)
@@ -79,8 +84,8 @@ func _run() -> void:
 
 
 static func _line(r: Dictionary) -> String:
-	return "%d nav points (%d over void, %d islands, %d route points cut off); %d floor points: %d holes %s (%d uneven); %d drops: %d fell, %d embedded, %d trapped; hulls %d (%d floor points stand on them alone)" % [
-		r["nav_points"], r["nav_void"], r["islands"], r["route_off"], r["points"], r["holes"], r["causes"], r["uneven"], r["dropped"], r["falls"], r["embedded"], r["trapped"], r["hulls"], r["needs_hulls"]]
+	return "%d nav points (%d over void, %d islands, %d route points cut off); %d floor points: %d holes %s (%d uneven); %d drops: %d fell, %d embedded, %d trapped; %d doorways shut; hulls %d (%d floor points stand on them alone)" % [
+		r["nav_points"], r["nav_void"], r["islands"], r["route_off"], r["points"], r["holes"], r["causes"], r["uneven"], r["dropped"], r["falls"], r["embedded"], r["trapped"], r["doors_blocked"], r["hulls"], r["needs_hulls"]]
 
 
 ## Probes one map and returns the counts and a few examples of each fault.
@@ -102,7 +107,7 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 	var map := _game.map
 	var doc := map.doc
 	var report := {"points": 0, "holes": 0, "uneven": 0, "causes": {}, "dropped": 0, "falls": 0, "embedded": 0, "trapped": 0,
-		"needs_hulls": 0, "nav_points": 0, "nav_void": 0, "islands": 0, "route_off": 0, "hulls": map.world_collision.get_child_count() if map.world_collision != null else 0, "examples": PackedStringArray()}
+		"needs_hulls": 0, "nav_points": 0, "nav_void": 0, "islands": 0, "route_off": 0, "doors_blocked": 0, "hulls": map.world_collision.get_child_count() if map.world_collision != null else 0, "examples": PackedStringArray()}
 	var examples: PackedStringArray = report["examples"]
 	var mask: int = _game.physics.collision_mask(&"player")
 	var space := map.get_world_3d().direct_space_state
@@ -190,6 +195,11 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 	report["nav_void"] = nav["void"]
 	report["islands"] = nav["islands"]
 	report["route_off"] = nav["route_off"]
+	var shut := _door_walk(map, space, mask)
+	report["doors_blocked"] = shut.size()
+	for what: String in shut:
+		if examples.size() < 30:
+			examples.append(what)
 	for what: String in nav["examples"]:
 		if examples.size() < 30:
 			examples.append(what)
@@ -328,6 +338,8 @@ func _nav_check(map: Node, space: PhysicsDirectSpaceState3D, mask: int, starts: 
 		if not off.is_empty():
 			examples.append("ROUTE_CUT %d of %d route points are off the start's ground (first %s; last on it: %d at %s)" % [
 				off.size(), route.size(), ",".join(off.slice(0, 6)), last_on, route[last_on] if last_on >= 0 else "none"])
+	if _edges:
+		examples.append_array(_edge_report(graph.data, space, mask))
 	if _suggest and sizes.size() > 1:
 		_print_links(pts, labels, sizes, space, mask)
 	if main >= 0 and sizes.size() > 1:
@@ -368,6 +380,82 @@ func _nav_check(map: Node, space: PhysicsDirectSpaceState3D, mask: int, starts: 
 					hi = hi.max(pts[i])
 			examples.append("ISLAND of %d points from %s to %s" % [sizes[label], lo, hi])
 			shown += 1
+	return out
+
+## The doorways a glass pane would shut (`ZzMap.is_glass_door`: boxes of the document) walked through by a capsule across
+## the pane's thin axis (a stop beyond the pane is a table behind it, not the pane). A line for each one still shut, with what shuts it.
+func _door_walk(map: Node, space: PhysicsDirectSpaceState3D, mask: int) -> PackedStringArray:
+	var out := PackedStringArray()
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.3
+	capsule.height = 1.4
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.collision_mask = mask
+	for box: Dictionary in map.doc.get("boxes", []):
+		var size := ZzMapDoc.v3(box["size"])
+		var at := ZzMapDoc.v3(box["at"])
+		if not str(box.get("mat", "")).begins_with("glass") or not map.is_glass_door(at, size):
+			continue
+		var along := Vector3(1.0, 0.0, 0.0) if size.x < size.z else Vector3(0.0, 0.0, 1.0)
+		var start := Vector3(at.x, at.y - size.y * 0.5 + 0.8, at.z) - along * 1.2
+		query.transform = Transform3D(Basis.IDENTITY, start)
+		if not space.intersect_shape(query, 1).is_empty():
+			continue
+		query.motion = along * 2.4
+		var fractions := space.cast_motion(query)
+		if fractions.size() >= 2 and fractions[0] * 2.4 > 0.85 and fractions[0] * 2.4 < 1.55:
+			query.transform = Transform3D(Basis.IDENTITY, start + along * 2.4 * minf(fractions[1] + 0.02, 1.0))
+			query.motion = Vector3.ZERO
+			var hit := space.intersect_shape(query, 1)
+			out.append("DOORWAY_SHUT at %s by %s" % [at, _describe(hit[0]["collider"], int(hit[0]["shape"])) if not hit.is_empty() else "something"])
+	return out
+
+
+## Edges of [param data] a walking capsule cannot follow, as one line per 3 m cluster with what is in the way.
+func _edge_report(data: Object, space: PhysicsDirectSpaceState3D, mask: int) -> PackedStringArray:
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.3
+	capsule.height = 1.2
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.collision_mask = mask
+	var lift := Vector3(0.0, 0.95, 0.0)
+	var pts: PackedVector3Array = data.points
+	var edges: PackedInt32Array = data.edges
+	var clusters := {}
+	var walked := 0
+	for i in range(0, edges.size() - 1, 2):
+		var a := pts[edges[i]]
+		var b := pts[edges[i + 1]]
+		if a.distance_to(b) > 2.0 or absf(a.y - b.y) > 0.6:
+			continue
+		query.transform = Transform3D(Basis.IDENTITY, a + lift)
+		if not space.intersect_shape(query, 1).is_empty():
+			continue
+		walked += 1
+		query.motion = b - a
+		var fractions := space.cast_motion(query)
+		if fractions.size() < 2 or fractions[0] >= 1.0:
+			continue
+		query.transform = Transform3D(Basis.IDENTITY, a + lift + (b - a) * minf(fractions[1] + 0.02, 1.0))
+		query.motion = Vector3.ZERO
+		var hit := space.intersect_shape(query, 1)
+		var key := Vector3i(floori(a.x / 3.0), floori(a.y / 3.0), floori(a.z / 3.0))
+		var rec: Dictionary = clusters.get(key, {"n": 0, "at": a, "what": ""})
+		rec["n"] += 1
+		if rec["what"] == "" and not hit.is_empty():
+			rec["what"] = _describe(hit[0]["collider"], int(hit[0]["shape"]))
+		clusters[key] = rec
+	var out := PackedStringArray()
+	var total := 0
+	for rec: Dictionary in clusters.values():
+		total += int(rec["n"])
+	out.append("EDGES_BLOCKED %d of %d walked, in %d places" % [total, walked, clusters.size()])
+	var list: Array = clusters.values()
+	list.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return int(x["n"]) > int(y["n"]))
+	for rec: Dictionary in list.slice(0, 12):
+		out.append("EDGE_BLOCKED %d edges near %s by %s" % [rec["n"], rec["at"], rec["what"]])
 	return out
 
 
