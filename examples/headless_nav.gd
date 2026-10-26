@@ -17,8 +17,8 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 21
-const CHECKS := 94
+const SECTIONS := 23
+const CHECKS := 98
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -116,6 +116,15 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
+	if only == "wave":
+		await _test_wave_origin(&"zs_goth_house")
+		await _test_wave_origin(&"zs_ravenstreet")
+		print("%d passed, %d failed" % [_passed, _failed])
+		for line in _failures:
+			print("  FAIL  %s" % line)
+		get_tree().quit(_failed)
+		return
+
 	if only == "mend":
 		await _test_mend_gap()
 		get_tree().quit(0)
@@ -187,6 +196,8 @@ func _run() -> void:
 	await _test_unstick_steps()
 	await _test_lure_crowd()
 	_test_thin_props()
+	await _test_wave_origin(&"zs_goth_house")
+	await _test_wave_origin(&"zs_ravenstreet")
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -520,6 +531,41 @@ func _test_stuck(id: StringName) -> void:
 
 
 # --- Mending round a body -----------------------------------------------------------------------
+
+## A survival wave has somewhere to come from, even on a map all start area (zs_goth_house's
+## hints sit beside the team and its graph is one room): with no origin the wave never came.
+func _test_wave_origin(id: StringName) -> void:
+	_section("%s: a wave has an origin and queues" % id)
+	if not _linked:
+		for i in 2:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray([String(id)])
+		c.survival_warmup_seconds = 300.0
+		c.wanderer_density = 0.0)
+
+	for i in maxi(game.team_size(), TEAM):
+		var p := game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
+		p.is_bot = true
+
+	game.start()
+
+	for i in 64 * 25:
+		game.simulate(TICK)
+
+		if i % 8 == 7:
+			await get_tree().physics_frame
+
+	var horde = game.horde
+	var origin: Vector3 = horde._wave_origin()
+	_check(origin != Vector3.INF, "a wave origin is found", "%d spawn points" % horde.director.spawn_points.size())
+	_check(horde.spawn_wave(8) == 8 and horde.pending_commons() >= 8, "a wave of 8 is queued", "%d pending" % horde.pending_commons())
+	_finished()
+	await _dispose(game)
+
 
 func _test_mend_gap() -> void:
 	_section("a survivor standing in a broken barricade's gap is not walled in by the mend")

@@ -25,6 +25,11 @@ var _goals: StuckMeter
 var _kills := 0
 var _deaths := 0
 var _damage := 0.0
+var _laid := {}
+var _taken := 0
+var _last_laid := -1.0
+var _kills_with_loot := 0
+var _peak_alive := 0
 
 
 func _ready() -> void:
@@ -71,7 +76,7 @@ func _run() -> void:
 		_fail("no map %s" % map_id)
 		return
 	cfg.bots = int(_arg("bots", str(maxi(int(doc.get("survivors", 4)), 1))))
-	_game.zombie_killed.connect(func(_k: StringName, _by: StringName, _h: bool) -> void: _kills += 1)
+	_game.zombie_killed.connect(_on_killed)
 	_game.player_died.connect(func(_id: StringName, _by: StringName, _why: StringName) -> void: _deaths += 1)
 	_game.player_hurt.connect(func(_id: StringName, amount: float, _from: Vector3) -> void: _damage += amount)
 	for i in range(cfg.bots):
@@ -79,6 +84,9 @@ func _run() -> void:
 		player.is_bot = true
 	_game.start()
 	_goals = StuckMeter.new(_game)
+	if _game.loot != null:
+		_game.loot.added.connect(_on_laid)
+		_game.loot.removed.connect(func(_id: int, by: StringName) -> void: _taken += 1 if by != &"" else 0)
 
 	var watch := DotSpawnWatch.new()
 	watch.rules.enabled = true
@@ -89,7 +97,11 @@ func _run() -> void:
 	soak.movers_fn = _movers
 	soak.stats_fn = func() -> Dictionary: return {"kills": _kills, "deaths": _deaths, "damage": _damage}
 	soak.object_count_fn = func() -> int: return int(Performance.get_monitor(Performance.OBJECT_COUNT))
-	soak.step_fn = func(delta: float) -> void: _game.simulate(delta)
+	soak.step_fn = func(delta: float) -> void:
+		_game.simulate(delta)
+		_goals.sample()
+		if _game.horde != null and _game.horde.spawner != null:
+			_peak_alive = maxi(_peak_alive, _game.horde.spawner.all_npcs().size())
 
 	var delta := 1.0 / float(TICK_RATE)
 	while not soak.is_done():
@@ -101,6 +113,12 @@ func _run() -> void:
 	var report := soak.finish()
 	report["map"] = String(map_id)
 	report["bots"] = cfg.bots
+	report["loot_laid"] = _laid
+	report["loot_taken"] = _taken
+	print("SOAKLOOT kills %d (%d with a drop at the body) laid %s taken %d, peak zombies alive %d" % [_kills, _kills_with_loot, _laid, _taken, _peak_alive])
+	print("SOAKSTUCK ", _goals.line())
+	for kind: StringName in StuckMeter.KINDS:
+		print("SOAKCELLS %s %s" % [kind, _goals.worst_cells(kind)])
 	print(DotBotSoak.summary(report))
 	print(DotBotSoak.report_line(report))
 	var path := ProjectSettings.globalize_path("res://.godot/test-logs/soak-%s.json" % map_id)
@@ -109,6 +127,16 @@ func _run() -> void:
 		push_error("could not write %s" % path)
 	await _release_game()
 	get_tree().quit(0 if report["ok"] else 1)
+
+
+func _on_killed(_kind: StringName, _by: StringName, _headshot: bool) -> void:
+	_kills += 1
+	_kills_with_loot += 1 if is_equal_approx(_last_laid, _game.now()) else 0
+
+
+func _on_laid(_id: int, kind: StringName, _item: StringName, _at: Vector3) -> void:
+	_laid[kind] = int(_laid.get(kind, 0)) + 1
+	_last_laid = _game.now()
 
 
 ## Frees the game before quitting: a world still loaded at quit can abort the process.
