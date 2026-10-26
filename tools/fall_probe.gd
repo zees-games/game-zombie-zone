@@ -84,8 +84,8 @@ func _run() -> void:
 
 
 static func _line(r: Dictionary) -> String:
-	return "%d nav points (%d over void, %d islands, %d route points cut off); %d floor points: %d holes %s (%d uneven); %d drops: %d fell, %d embedded, %d trapped; %d doorways shut; hulls %d (%d floor points stand on them alone)" % [
-		r["nav_points"], r["nav_void"], r["islands"], r["route_off"], r["points"], r["holes"], r["causes"], r["uneven"], r["dropped"], r["falls"], r["embedded"], r["trapped"], r["doors_blocked"], r["hulls"], r["needs_hulls"]]
+	return "%d nav points (%d over void, %d islands, %d route points cut off); %d floor points: %d holes %s (%d uneven); %d drops: %d fell (%d pushed out of a wall, not counted), %d embedded, %d trapped; %d doorways shut; hulls %d (%d floor points stand on them alone)" % [
+		r["nav_points"], r["nav_void"], r["islands"], r["route_off"], r["points"], r["holes"], r["causes"], r["uneven"], r["dropped"], r["falls"], r["pushed_out"], r["embedded"], r["trapped"], r["doors_blocked"], r["hulls"], r["needs_hulls"]]
 
 
 ## Probes one map and returns the counts and a few examples of each fault.
@@ -106,7 +106,7 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 		await get_tree().physics_frame
 	var map := _game.map
 	var doc := map.doc
-	var report := {"points": 0, "holes": 0, "uneven": 0, "causes": {}, "dropped": 0, "falls": 0, "embedded": 0, "trapped": 0,
+	var report := {"points": 0, "holes": 0, "uneven": 0, "inside_solid": 0, "pushed_out": 0, "causes": {}, "dropped": 0, "falls": 0, "embedded": 0, "trapped": 0,
 		"needs_hulls": 0, "nav_points": 0, "nav_void": 0, "islands": 0, "route_off": 0, "doors_blocked": 0, "hulls": map.world_collision.get_child_count() if map.world_collision != null else 0, "examples": PackedStringArray()}
 	var examples: PackedStringArray = report["examples"]
 	var mask: int = _game.physics.collision_mask(&"player")
@@ -144,6 +144,8 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 						Vector3(px, y - 1.0, pz), Vector3(px, kill - 5.0, pz), mask)) if hit.is_empty() else hit
 					if not deep.is_empty():
 						report["uneven"] += 1
+					elif _embedded(space, Vector3(px, y, pz), mask) != "":
+						report["inside_solid"] += 1
 					else:
 						var cause := "HOLE_DRAWN" if _under_drawn(drawn, px, pz, y) else ("HOLE_NO_HULLS" if no_hulls else "HOLE_BARE")
 						report["holes"] += 1
@@ -217,6 +219,9 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 		put.append(p)
 	report["dropped"] = bodies.size()
 	await get_tree().physics_frame
+	var shoved: Array[bool] = []
+	for i in bodies.size():
+		shoved.append(false)
 	var skip: Array[bool] = []
 	for i in bodies.size():
 		var inside := _embedded(space, bodies[i].global_position, mask)
@@ -230,16 +235,26 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 	for f in SETTLE_FRAMES:
 		_fall(bodies, Vector3.ZERO)
 		await get_tree().physics_frame
+		if f == 0:
+			# A sample that depenetrates sideways on its first frame started inside a wall's skin; where it lands says nothing about the map.
+			for i in bodies.size():
+				var d := Vector2(bodies[i].global_position.x - put[i].x, bodies[i].global_position.z - put[i].z).length()
+				shoved[i] = d > 0.15 and i >= start_count
 	var region: AABB = map.playable_region().grow(ZzMap.BOUNDARY_MARGIN + 1.0)
 	var settled: Array[Vector3] = []
 	for i in bodies.size():
 		var at := bodies[i].global_position
 		settled.append(at)
 		var outside := region.size != Vector3.ZERO and not (at.x >= region.position.x and at.x <= region.end.x and at.z >= region.position.z and at.z <= region.end.z)
-		if at.y < lowest - FELL or at.y < kill or outside or not at.is_finite():
+		if (at.y < lowest - FELL or at.y < kill or outside or not at.is_finite()) and shoved[i]:
+			report["pushed_out"] += 1
+		elif at.y < lowest - FELL or at.y < kill or outside or not at.is_finite():
 			report["falls"] += 1
 			if examples.size() < 20:
 				examples.append("FELL from %s to %s%s (lowest floor %.1f, kill %.1f)" % [put[i], at, " (outside the walls)" if outside else "", lowest, kill])
+			var under := space.intersect_ray(PhysicsRayQueryParameters3D.create(put[i] + Vector3.UP * RAY_UP, put[i] - Vector3.UP * 1.0, mask))
+			if examples.size() < 20:
+				examples.append("  ray under the drop: %s" % [("%s at y %.2f" % [under["collider"].get_parent().name if under["collider"].get_parent() else under["collider"].name, under["position"].y]) if not under.is_empty() else "nothing"])
 			var kind := "DRAWN" if _under_drawn(drawn, put[i].x, put[i].z, put[i].y) else ("NO_HULLS" if no_hulls else "BARE")
 			causes["FELL_" + kind] = 1 + int(causes.get("FELL_" + kind, 0))
 	var blocked: Array[int] = []
@@ -266,6 +281,15 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 	_game.queue_free()
 	await get_tree().physics_frame
 	return report
+
+
+## Whether ground lies within half a nav cell of [param p]: the graph's grid overhangs a ledge by that much, and nobody stands there.
+static func _ground_near(space: PhysicsDirectSpaceState3D, p: Vector3, mask: int) -> bool:
+	for k in 8:
+		var off := Vector3(cos(TAU * k / 8.0), 0.0, sin(TAU * k / 8.0)) * 0.5
+		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(p + off + Vector3.UP * RAY_UP, p + off - Vector3.UP * FELL, mask)).is_empty():
+			return true
+	return false
 
 
 ## Builds the horde's graph the way the server does. A point with nothing under it within [constant FELL] is a place the
@@ -298,7 +322,7 @@ func _nav_check(map: Node, space: PhysicsDirectSpaceState3D, mask: int, starts: 
 		sizes[labels[i]] = int(sizes.get(labels[i], 0)) + 1
 		var p := pts[i]
 		var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p + Vector3.UP * RAY_UP, p - Vector3.UP * FELL, mask))
-		if hit.is_empty():
+		if hit.is_empty() and not _ground_near(space, p, mask):
 			voids += 1
 			if examples.size() < 8:
 				examples.append("NAV_VOID point at %s" % p)
