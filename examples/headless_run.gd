@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 47
+const SECTIONS := 48
 
-const CHECKS := 359
+const CHECKS := 361
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -110,6 +110,7 @@ func _run() -> void:
 	await _test_objectives()
 	await _test_winning_and_losing()
 	await _test_stand_ins()
+	await _test_stand_ins_take_a_box()
 	await _test_stand_ins_and_the_pass_through_level()
 	await _test_a_crowd_is_cheap()
 	await _test_the_hud()
@@ -2047,6 +2048,33 @@ func _test_stand_ins() -> void:
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
 	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
 	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)
+	_finished()
+
+
+## Three stand-ins and a box on the ground, with nothing else about: each is walked to it, one takes it, and none stands at it pressing a key the game ignores.
+func _test_stand_ins_take_a_box() -> void:
+	_section("stand-ins pick up a box and open it")
+	var game := await _team(3, _quiet, true)
+	var seats := game.survivors()
+	for i in seats.size():
+		seats[i].place_at(STREET + Vector3(float(i) * 1.5 - 1.5, 0.0, 0.0), 0.0)
+	var box := game.loot.add(ZzLoot.BOX, &"medical", STREET + Vector3(0, 0, -3.0))
+	var seen: Array = []
+	game.boxes.opened.connect(func(_id: StringName, _t: StringName, _u: String, _m: String) -> void: seen.append(_t))
+	var longest := 0.0
+	var still := {}
+	var played := 0.0
+	while played < 20.0 and (game.loot.exists(box) or seen.is_empty()):
+		await _sim(game, 0.5)
+		played += 0.5
+		for p in seats:
+			var memory: Dictionary = game.bots._memory(p)
+			var at: Vector3 = still.get(p.player_id, {"at": Vector3.INF, "since": played})["at"]
+			if at == Vector3.INF or at.distance_to(p.feet()) > 0.5:
+				still[p.player_id] = {"at": p.feet(), "since": played}
+			longest = maxf(longest, played - float(still[p.player_id]["since"]) if memory.get("pick", -1) != -1 else 0.0)
+	_check(not game.loot.exists(box) and not seen.is_empty(), "a box lying near them is taken and opened", "%.1f s, opened %d, on the ground %s, carried %s" % [played, seen.size(), str(game.loot.exists(box)), str(seats.map(func(q): return q.carried.size()))])
+	_check(longest <= 8.0, "no stand-in stood at a box it was going for longer than 8 s", "%.1f s" % longest)
 	_finished()
 
 

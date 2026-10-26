@@ -107,6 +107,7 @@ Cvars, each also a key in `config/game.yml` (live from the console or the workbe
 - `zz_nav_threads` (default 2, 0 to 16): worker tasks a graph build uses, off the main thread, so a host keeps drawing and the first build holds READY (no wave starts before the ground exists). 0, and every platform without threads, builds on the main thread in slices.
 - `zz_nav_budget_ms` (default 6, 0.5 to 14): milliseconds a tick a main-thread build may take; only read when `zz_nav_threads` is 0 or there are no threads. A bottom-right "Navigation regenerating" panel shows progress.
 - `zz_bot_open_boxes` (default 1): stand-ins pick up and open the boxes zombies drop; 0 leaves every box to the humans.
+- `zz_bot_repress_use` (default 1): a stand-in going for a box lets go of E every few ticks so a press that missed is made again; 0 holds the key as before, and a box may then stand untouched.
 - `zz_unstick_seconds` (default 4, 0 to 30): every zombie kind frees itself after this long trying to move without getting anywhere (a nudge, then a relocation); 0 turns the watchdog off.
 
 ## The creepy ambience

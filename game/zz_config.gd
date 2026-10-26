@@ -283,6 +283,9 @@ func setup_seconds() -> float:
 ## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
 @export var bot_open_boxes: bool = true
 
+## Whether a stand-in lets go of E every few ticks while going for a box, so a press that missed is made again. Off holds it as before, and a box may stand untouched. `zz_bot_repress_use`.
+@export var bot_repress_use: bool = true
+
 ## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing
 ## ones. The rest hold their posts; with every one walking to a single friend a ram at a dugout
 ## downed all sixteen of the ballpark's team (docs/survival.md). 0: all of them, as an exodus map

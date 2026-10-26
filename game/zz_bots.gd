@@ -1029,8 +1029,9 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	if player.eye_position().distance_to(at) <= game.config.use_reach:
 		_aim(player, command, at + Vector3(0.0, 0.25, 0.0))
 		player.actions |= ZzNetCommand.ACT_USE
-		# A fresh press each time: E on a box is held, on the rest pressed.
-		if loot.kind_of(best) != ZzLoot.BOX and game.current_tick() % 6 >= 3:
+		# A begin needs a fresh press, and a key held since a first press that missed (the view still turning) never gives another. Only a box that takes time to open is held, once begun.
+		var holding: bool = loot.kind_of(best) == ZzLoot.BOX and player.using == &"loot"
+		if not holding and game.current_tick() % 6 >= 3 and (game.config.bot_repress_use or loot.kind_of(best) != ZzLoot.BOX):
 			player.actions &= ~ZzNetCommand.ACT_USE
 	else:
 		_walk_to(player, command, at, memory)
