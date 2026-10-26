@@ -29,8 +29,11 @@ func radius() -> float:
 	return clampf(float(_block().get("radius", 3.5)), 1.0, 30.0)
 
 
+## The block's multiplier, raised by `zz_box_depression_price` per Great Depression box in force.
 func multiplier() -> float:
-	return clampf(float(_block().get("price_multiplier", 1.0)), 0.0, 100.0)
+	var base := clampf(float(_block().get("price_multiplier", 1.0)), 0.0, 100.0)
+	var stacks: int = game.boxes.stacks_of(&"depression") if game.boxes != null else 0
+	return base * pow(game.config.box_depression_price, stacks)
 
 
 func _categories() -> Array:

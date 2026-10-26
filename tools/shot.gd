@@ -490,6 +490,13 @@ func _run() -> void:
 			await _seconds_of(1.0)
 			game.boxes.run([{"do": "give_weapon", "id": "smg"}], {"opener": local, "at": stand, "box": &"upgrade"})
 			await _seconds_of(maxf(_seconds, 1.0))
+		"carry":
+			# Two primaries in one slot, a backpack on, and the weight bar and slot list on the HUD.
+			_clear_view(game, local, stand)
+			game.boxes.run([{"do": "give_weapon", "id": "rifle"}], {"opener": local, "at": stand, "box": &"upgrade"})
+			game.boxes.run([{"do": "give_weapon", "id": "smg"}], {"opener": local, "at": stand, "box": &"upgrade"})
+			var _worn := game.wear_backpack(local, 1)
+			await _seconds_of(maxf(_seconds, 1.5))
 		"defib", "defib_third", "defib_ground":
 			# The defibrillator: in hand (first person, or the figure's view), or lying a step ahead.
 			for other in game.survivors():

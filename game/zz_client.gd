@@ -1273,6 +1273,25 @@ func _on_carry_json(json: String) -> void:
 	if weapons == null or weapons.arsenal == null:
 		return
 	var slots: Dictionary = (state as Dictionary).get("slots", {})
+	var told := {}
+	for key in slots:
+		for id: Variant in slots[key]:
+			told[StringName(str(id))] = true
+	var arsenal: DotWeaponArsenal = weapons.arsenal
+	var dropped := false
+	for slot: int in arsenal.slots():
+		for held in arsenal.weapons_in(slot):
+			dropped = dropped or not told.has(held.id())
+	if dropped:
+		# The server put something down (an over-limit drop, a swap): this end rebuilds to its list.
+		for slot: int in arsenal.slots():
+			while not arsenal.weapons_in(slot).is_empty() and arsenal.take(slot).ok:
+				pass
+		for key in slots:
+			var ids: Array = (slots[key] as Array).duplicate()
+			ids.reverse()
+			for id: Variant in ids:
+				var _back := arsenal.give(StringName(str(id)), false)
 	for key in slots:
 		for id: Variant in slots[key]:
 			if not weapons.arsenal.carries(StringName(str(id))):

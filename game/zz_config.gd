@@ -586,6 +586,9 @@ func setup_seconds() -> float:
 @export var box_instakill_max: float = -1.0
 @export_range(1.0, 100.0, 0.5) var box_instakill_special_scale: float = 4.0
 
+## Great Depression box: every shop price is multiplied by this per box in force; its weight-limit cut is `depression` in `zz_weight_modifiers`.
+@export_range(1.0, 10.0, 0.05) var box_depression_price: float = 1.5
+
 ## A limb's health follows the zombie's actual health (a later wave's, a brute's), and Instakill's
 ## boosted damage does not reach limbs; off restores the old limb rules (zz_limb_follow_health).
 @export var limb_follow_health: bool = true
@@ -598,19 +601,13 @@ func setup_seconds() -> float:
 
 # --- The maps --------------------------------------------------------------
 
-@export_group("Gore")
-
-## How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
-@export_range(0, 3, 1) var gore_level: int = 2
-
-## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
 @export_group("Carry weight")
 
 ## Master switch for `zz_weight_*`: every weapon has a weight, a survivor a carry limit, and slots may hold several weapons.
 @export var weight_enabled: bool = true
 
-## What a survivor with no backpack carries, in weight units (a pistol is about 3, a rifle 8).
-@export_range(0.0, 1000.0, 0.5) var weight_limit: float = 28.0
+## What a survivor with no backpack carries, in weight units (kilograms: a pistol is about 1, a rifle 4).
+@export_range(0.0, 1000.0, 0.5) var weight_limit: float = 14.0
 
 ## Every weapon's weight is multiplied by this, on top of the box modifiers.
 @export_range(0.0, 10.0, 0.05) var weight_multiplier: float = 1.0
@@ -625,14 +622,20 @@ func setup_seconds() -> float:
 @export_range(0.05, 1.0, 0.05) var weight_slow_floor: float = 0.55
 
 ## Capacity a backpack of tier 1, 2, 3... adds, comma separated. Empty: no backpacks.
-@export var weight_backpack_tiers: String = "8,16,28"
+@export var weight_backpack_tiers: String = "4,8,14"
 
 ## Shop price of backpack tier 1, 2, 3...
 @export var weight_backpack_prices: String = "300,600,1000"
 
 ## What an active box effect does to carrying, `effect=weight_factor[/limit_factor[/limit_add]]`, comma separated, once per stack. Any effect name works (hard, angry, a later Great Depression box).
-@export var weight_modifiers: String = "hard=1.15,angry=1.1/0.9"
+@export var weight_modifiers: String = "hard=1.15,angry=1.1/0.9,depression=1/0.75"
 
+@export_group("Gore")
+
+## How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
+@export_range(0, 3, 1) var gore_level: int = 2
+
+## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
 @export_range(0, 200, 1) var gore_max_gibs: int = 24
 
 ## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
@@ -834,7 +837,7 @@ const CFG_FILES := {
 	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
 	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
 	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors",
-	"Carry weight": "survivors", "Gore": "world", "The maps": "world", "Netcode": "world",
+	"Carry weight": "carry", "Gore": "world", "The maps": "world", "Netcode": "world",
 }
 
 

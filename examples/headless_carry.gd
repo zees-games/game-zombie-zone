@@ -11,8 +11,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Carry weight: off by default, the limit and a refused pickup, backpacks, several weapons per slot and cycling,
 ## box modifiers, the slow and drop rules, and the wire. Counts sections AND checks, because a script error aborts a section silently.
 
-const SECTIONS := 5
-const CHECKS := 32
+const SECTIONS := 6
+const CHECKS := 36
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -39,6 +39,7 @@ func _run() -> void:
 	await _test_cycle()
 	await _test_modifiers()
 	await _test_wire()
+	await _test_depression()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -93,19 +94,19 @@ func _test_off() -> void:
 
 func _test_limit() -> void:
 	_section("a limit refuses a heavy pickup with a message; a backpack lifts it")
-	var game := await _solo({"weight_enabled": true, "weight_limit": 20.0, "weight_slot_capacity": 2})
+	var game := await _solo({"weight_enabled": true, "weight_limit": 9.0, "weight_slot_capacity": 2})
 	var p := game.survivors()[0]
 	var arsenal := p.weapons.arsenal
 	var heavies := ZzWeapons.ids_of(&"heavy")
 	var weight := game.carry.carry.weight_of(arsenal.catalogue.get_def(heavies[0]))
 	_check(arsenal.catalogue.get_def(heavies[0]).weight > 0.0 and weight > 0.0, "every def has a weight (tier default)", "%.1f" % weight)
-	_check(is_equal_approx(arsenal.capacity(), 20.0), "capacity is the limit", "%.1f" % arsenal.capacity())
+	_check(is_equal_approx(arsenal.capacity(), 9.0), "capacity is the limit", "%.1f" % arsenal.capacity())
 	_check(_hand(game, heavies[0]), "one heavy fits under the limit")
 	var before := arsenal.carried_weight()
 	_check(not _hand(game, heavies[1]) and game.arm_failure.begins_with("Too heavy"), "a second is refused with a clear message", game.arm_failure)
 	_check(is_equal_approx(arsenal.carried_weight(), before), "a refusal changes nothing")
 	var took := game.wear_backpack(p, 3)
-	_check(took and arsenal.capacity() > 40.0, "backpack 3 raises the limit", "%.1f" % arsenal.capacity())
+	_check(took and arsenal.capacity() > 20.0, "backpack 3 raises the limit", "%.1f" % arsenal.capacity())
 	_check(not game.wear_backpack(p, 1), "a smaller pack is no upgrade")
 	_check(_hand(game, heavies[1]), "and the second heavy now fits")
 	_finished()
@@ -144,7 +145,7 @@ func _test_cycle() -> void:
 
 func _test_modifiers() -> void:
 	_section("box modifiers scale weight and limit; over the limit slows or drops")
-	var game := await _solo({"weight_enabled": true, "weight_limit": 40.0, "weight_slot_capacity": 2,
+	var game := await _solo({"weight_enabled": true, "weight_limit": 20.0, "weight_slot_capacity": 2,
 		"weight_modifiers": "hard=2/1/0,light=1/1/10"})
 	var p := game.survivors()[0]
 	var arsenal := p.weapons.arsenal
@@ -186,7 +187,23 @@ func _test_wire() -> void:
 	var parsed := ZzCarry.parse_modifiers("hard=1.15,angry=1.1/0.9/-2,junk")
 	_check(parsed.size() == 2 and parsed["angry"] == [1.1, 0.9, -2.0] and parsed["hard"] == [1.15, 1.0, 0.0], "modifier specs parse")
 	var cfg := ZzConfig.new()
-	_check(cfg.weight_backpack_tiers == "8,16,28" and ZzCarry.parse_floats(cfg.weight_backpack_tiers).size() == 3, "backpack tiers are a list in config")
+	_check(cfg.weight_backpack_tiers == "4,8,14" and ZzCarry.parse_floats(cfg.weight_backpack_tiers).size() == 3, "backpack tiers are a list in config")
+	_finished()
+
+
+func _test_depression() -> void:
+	_section("the Great Depression box cuts the limit and raises the shop's prices, per stack")
+	var game := await _solo({"weight_enabled": true, "weight_limit": 20.0})
+	var arsenal := game.survivors()[0].weapons.arsenal
+	var price: float = game.shop.multiplier()
+	var _fx := game.boxes.activate(&"depression", &"depression", {})
+	await _sim(game, 0.2)
+	_check(game.boxes.stacks_of(&"depression") == 1, "the box is in force")
+	_check(is_equal_approx(arsenal.capacity(), 15.0), "the limit is cut to three quarters", "%.1f" % arsenal.capacity())
+	_check(is_equal_approx(game.shop.multiplier(), price * game.config.box_depression_price), "every price is multiplied by zz_box_depression_price")
+	var _fx2 := game.boxes.activate(&"depression", &"depression", {})
+	await _sim(game, 0.2)
+	_check(is_equal_approx(game.shop.multiplier(), price * pow(game.config.box_depression_price, 2.0)), "and again for a second box")
 	_finished()
 
 

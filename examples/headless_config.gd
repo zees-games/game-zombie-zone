@@ -107,7 +107,7 @@ func _run() -> void:
 	for k in keys:
 		if not listed.has(k):
 			missing.append(k)
-	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
+	_check(missing.is_empty() and binder.profile_sets().size() == 5, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
 	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "start_points", "value": 90})
 	_check(res.ok and config.start_points == 90, "a workbench edit reaches the live config", "" if res.ok else res.error.message)
 	var files: Dictionary = wb.exporter.call("collect")
@@ -179,7 +179,7 @@ func _layers() -> void:
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.
 func _templates(binder: DotGameConfigBinder) -> void:
 	var files := binder.template_files()
-	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
+	_check(files.size() == 5, "five shipped cfg files", str(files.size()))
 	var stale := PackedStringArray()
 	for path: String in files:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:

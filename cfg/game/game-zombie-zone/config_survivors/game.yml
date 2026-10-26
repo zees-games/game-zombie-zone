@@ -134,29 +134,11 @@
 # box_instakill_max: -1.0
 #  [1.0..100.0]
 # box_instakill_special_scale: 4.0
+# Great Depression box: every shop price is multiplied by this per box in force; its weight-limit cut is `dep... [1.0..10.0]
+# box_depression_price: 1.5
 # A limb's health follows the zombie's actual health (a later wave's, a brute's), and Instakill's boosted dam...
 # limb_follow_health: true
 # Boxes lying about at once; past it, the oldest goes. [1..200]
 # max_boxes: 16
 # Whether boxes exist at all.
 # boxes_enabled: true
-
-# --- Carry weight
-# Master switch for `zz_weight_*`: every weapon has a weight, a survivor a carry limit, and slots may hold se...
-# weight_enabled: true
-# What a survivor with no backpack carries, in weight units (a pistol is about 3, a rifle 8). [0.0..1000.0]
-# weight_limit: 28.0
-# Every weapon's weight is multiplied by this, on top of the box modifiers. [0.0..10.0]
-# weight_multiplier: 1.0
-# Weapons one slot holds; pressing the slot key again cycles through them. [1..8]
-# weight_slot_capacity: 2
-# Over the limit (a limit that fell, a box that made weapons heavier): `slow` slows the survivor down, `drop`...
-# weight_over_limit: "slow"
-# The slowest an overloaded survivor goes, as a share of normal speed. [0.05..1.0]
-# weight_slow_floor: 0.55
-# Capacity a backpack of tier 1, 2, 3... adds, comma separated. Empty: no backpacks.
-# weight_backpack_tiers: "8,16,28"
-# Shop price of backpack tier 1, 2, 3...
-# weight_backpack_prices: "300,600,1000"
-# What an active box effect does to carrying, `effect=weight_factor[/limit_factor[/limit_add]]`, comma separa...
-# weight_modifiers: "hard=1.15,angry=1.1/0.9"

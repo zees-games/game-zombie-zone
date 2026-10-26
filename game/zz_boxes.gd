@@ -66,7 +66,7 @@ const ACTIONS: Array[String] = [
 
 ## The named boxes' handlers: effect name -> script (see zz_box_effect.gd). A later box is one line
 ## here, one small file, and a type in boxes.json.
-const HANDLERS := {"instakill": ZzBoxInstakill, "hard": ZzBoxEffect, "angry": ZzBoxEffect, "move_speed": ZzBoxSpeed, "crawl_speed": ZzBoxSpeed}
+const HANDLERS := {"instakill": ZzBoxInstakill, "hard": ZzBoxEffect, "angry": ZzBoxEffect, "depression": ZzBoxEffect, "move_speed": ZzBoxSpeed, "crawl_speed": ZzBoxSpeed}
 
 const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
 const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]

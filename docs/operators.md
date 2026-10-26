@@ -178,19 +178,20 @@ The same keys are in the server file as `physics_crates`, `crate_mass` and so on
 
 ## Carry weight
 
-On in Zombie Zone (`zz_weight_enabled 1`; the addon itself is off for any other game); the rules are REPLICATED and live in `survivors.yml` under `weight`.
+On in Zombie Zone (`zz_weight_enabled 1`; the addon itself is off for any other game); the rules are REPLICATED and live in `config_carry` (its own workbench set).
 
 | Cvar | Default | Effect |
 | --- | --- | --- |
 | `zz_weight_enabled` | 1 | Master switch. Off: nothing is weighed, one weapon per slot. |
-| `zz_weight_limit` | 28 | What a survivor with no backpack may carry. |
+| `zz_weight_limit` | 14 | What a survivor with no backpack may carry. |
 | `zz_weight_multiplier` | 1 | Every weapon weighs this much more (heavier gear for the whole server). |
 | `zz_weight_slot_capacity` | 2 | Weapons one slot holds; the slot key pressed again cycles them. |
 | `zz_weight_over_limit` | slow | `slow`: over the limit is slower, down to `zz_weight_slow_floor`; `drop`: the heaviest spare weapons are dropped. |
 | `zz_weight_slow_floor` | 0.55 | The slowest a heavy load goes, as a share of a run. |
-| `zz_weight_backpack_tiers` | `8,16,28` | Extra capacity of backpack 1, 2, 3. |
+| `zz_weight_backpack_tiers` | `4,8,14` | Extra capacity of backpack 1, 2, 3. |
 | `zz_weight_backpack_prices` | `300,600,1000` | The trader's price for each (0 or missing: not sold). A `backpack` loot kind lays them on the map. |
-| `zz_weight_modifiers` | `hard=1.15,angry=1.1/0.9` | A box effect's factor per stack: `name=weight` or `name=weight/limit/add`. |
+| `zz_weight_modifiers` | `hard=1.15,angry=1.1/0.9,depression=1/0.75` | A box effect's factor per stack: `name=weight` or `name=weight/limit/add`. |
+| `zz_box_depression_price` | 1.5 | Great Depression box: shop prices times this per box in force (its limit cut is `depression` above). |
 
 A weapon's own weight is `weight:` in its profile (workbench: the weapon's Weight field).
 

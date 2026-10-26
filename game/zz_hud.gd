@@ -340,10 +340,11 @@ func _build() -> void:
 	_weight.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_weight.offset_left = -330.0
 	_weight.offset_right = -20.0
-	_weight.offset_top = -214.0
+	_weight.offset_top = -240.0
 	_weight.offset_bottom = -140.0
 	_weight.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_weight.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_weight.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_weight_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 310.0, 8.0)
 	_weight_fill = _rect(Color(0.55, 0.8, 0.4), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 0.0, 8.0)
 
@@ -852,7 +853,7 @@ func _draw_weight() -> void:
 			lines.append("%s: %s" % [key, names[0]])
 	var pack: String = " | pack %d" % int(_weight_state.get("tier", 0)) if int(_weight_state.get("max", 0)) > 0 else ""
 	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
-	_weight.text = "%s\nweight %.1f / %.1f%s%s" % ["   ".join(lines), carried, limit, pack, slow]
+	_weight.text = "%s\nweight %.1f / %.1f%s%s" % ["\n".join(lines), carried, limit, pack, slow]
 	_weight.add_theme_color_override("font_color", colour)
 
 

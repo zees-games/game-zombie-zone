@@ -53,9 +53,9 @@ const WADING := &"zz_wading"
 ## Carrying more than the limit allows (`zz_weight_over_limit slow`): the scale is the carry rule's, set by [method set_weight_scale].
 const WEIGHT := &"zz_weight"
 
-## Knocked flying, toward one of seven compass points (index 0 is -Z, then clockwise); the eighth slot of the motor's 32 went to [constant WEIGHT].
+## Knocked flying, toward one of eight compass points (index 0 is -Z, then clockwise).
 const KNOCK_PREFIX := "zz_knock_"
-const KNOCK_DIRECTIONS := 7
+const KNOCK_DIRECTIONS := 8
 
 ## How hard a knock throws, sideways and up, in m/s.
 const KNOCK_SPEED := 9.0

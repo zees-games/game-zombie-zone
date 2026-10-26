@@ -6,8 +6,8 @@ extends RefCounted
 ## per slot like the server, because the weights it shows come from the server's CARRY event.
 
 const MODIFIER_PREFIX := "fx_"
-## Weight by tier when no yml names the weapon.
-const TIER_WEIGHT := {&"sidearm": 3.0, &"primary": 8.0, &"heavy": 14.0, &"melee": 2.0, &"thrown": 1.0}
+## Weight by tier (kilograms, the scale of the packs' ymls) when no yml names the weapon.
+const TIER_WEIGHT := {&"sidearm": 1.0, &"primary": 4.0, &"heavy": 7.0, &"melee": 1.5, &"thrown": 0.4}
 
 var carry := DotWeaponCarry.new()
 
