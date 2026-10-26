@@ -23,7 +23,7 @@ const CHECKS := 43
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 29
+const REAL_CHECKS := 31
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
@@ -327,6 +327,15 @@ func _real_packs() -> void:
 	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id))), "every medieval weapons are in the pool")
 	_check(MODERN_IDS.all(func(id: String) -> bool: return ZzWeapons.tier_of(StringName(id)) != &""), "each modern weapon has a tier")
 	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return ZzWeapons.tier_of(StringName(id)) != &""), "each medieval weapon has a tier")
+
+	# The trader's card and the hands draw ZeeWeaponArtTable's model for the id: the pack's own glb, one per weapon (never a zee stand-in).
+	var models := {}
+	for id: String in MODERN_IDS:
+		var art := ZeeWeaponArtTable.get_art(StringName(id))
+		models[art.model_path if art != null else "none:" + id] = true
+	_check(models.size() == MODERN_IDS.size(), "each modern weapon's shop and hand model is its own", "%d distinct of %d" % [models.size(), MODERN_IDS.size()])
+	_check(models.keys().all(func(path: String) -> bool: return path.begins_with("res://addons/zz_modern_weapons/assets/") and ResourceLoader.exists(path)),
+		"every modern weapon's model is the pack's own and loads", str(models.keys().filter(func(path: String) -> bool: return not ResourceLoader.exists(path))))
 	_check(ZzWeapons.tier_of(&"zz_vss") == &"primary", "the Vintorez is a primary", str(ZzWeapons.tier_of(&"zz_vss")))
 	_check(ZzWeapons.tier_of(&"war_axe") == &"melee" and ZzWeapons.tier_of(&"double_axe") == &"melee", "both new axes are melee")
 	_check(ZzWeapons.exists(&"pistol"), "the built-in weapons are still there")

@@ -98,6 +98,9 @@ static func floor_plane(map: Object) -> float:
 	if lowest == INF:
 		return -INF
 	lowest = minf(lowest, _mechanics_low(map))
+	# Water is a place the map meant: a swimmer's bed lies below every deck, and is not the void.
+	for pool: AABB in (map.get("water_boxes") as Array):
+		lowest = minf(lowest, pool.position.y)
 	return maxf(lowest - FALL_DEPTH, float(map.call(&"kill_height")) + 1.0)
 
 
