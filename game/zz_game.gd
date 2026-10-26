@@ -877,7 +877,7 @@ func _map_ui(data: Dictionary) -> void:
 
 ## Whether a map's game_ui has the survivor's controls: their weapon is held while it does.
 func ui_holds(player: ZzPlayer) -> bool:
-	return ui_holders.values().has(player.player_id)
+	return not ui_holders.is_empty() and ui_holders.values().has(player.player_id)
 
 
 func _feed_map_uis() -> void:
