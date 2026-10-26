@@ -1875,6 +1875,8 @@ func _draw(player: ZzPlayer, weapon_id: StringName) -> void:
 	if player.weapons == null:
 		return
 
+	weapon_id = ZzWeapons.resolve(weapon_id)
+
 	var def := player.weapons.arsenal.catalogue.get_def(weapon_id)
 
 	if def != null:
@@ -3155,7 +3157,7 @@ func _go_down(player: ZzPlayer, by: StringName, why: StringName) -> void:
 
 	# The sidearm comes out: a downed survivor can still shoot, with what is in their hand.
 	if player.weapons != null and player.weapons.arsenal != null:
-		var sidearm := player.weapons.arsenal.catalogue.get_def(StringName(config.start_weapons[0]))
+		var sidearm := player.weapons.arsenal.catalogue.get_def(ZzWeapons.resolve(StringName(config.start_weapons[0])))
 		if sidearm != null and player.weapons.arsenal.carries(sidearm.id):
 			var _drawn := player.weapons.arsenal.select(sidearm.slot, _tick)
 			player.wanted_slot = sidearm.slot
@@ -3462,6 +3464,7 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 ## Hands [param player] a weapon, building their rig the first time.
 func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
+	weapon_id = ZzWeapons.resolve(weapon_id)
 	if player.weapons == null:
 		var rig := ZeeWeaponRig.new()
 		rig.name = "Weapons"

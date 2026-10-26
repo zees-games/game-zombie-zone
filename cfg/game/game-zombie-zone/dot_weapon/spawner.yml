@@ -63,7 +63,7 @@ pools:
       tags_none: [melee]
       weight: 1
       weights:
-        pistol: 0.5
+        zz_pistol: 0.5
     entries:
       - id: medkit
         kind: medkit
@@ -161,8 +161,14 @@ game:
     # disabled:
     #   - armour
     # Per item, a price (shotgun: 300) or nested keys price and enabled (enabled: false removes it).
-    # items:
-    #   shotgun: 300
+    # Dearer or cheaper than the tier's price (sidearm 50, primary 250, heavy 600, thrown 75).
+    items:
+      zz_revolver: 150
+      zz_mp5: 220
+      zz_spas: 320
+      zz_dmr: 450
+      zz_lmg: 900
+      zz_m79: 750
     ammo:
       magazine_share: 0.08   # a magazine costs this share of the gun's price (at least 5)
       refill_share: 0.2      # a refill to the cap costs this share (at least 10)

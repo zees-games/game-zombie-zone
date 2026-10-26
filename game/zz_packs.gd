@@ -44,6 +44,8 @@ const DEFAULTS := {
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
+		# On brings zee-dot-weapons' own blasters and tools back into every pool, the shop and the stand-ins' kits.
+		"legacy": false,
 		# Weapon ids kept out of the pool.
 		"exclude": [],
 		# id -> draw weight in boxes, loot and caches (default 1, 0 never drawn; still given by name).

@@ -525,7 +525,7 @@ func _do_rescue(a: Dictionary, ctx: Dictionary) -> void:
 ## A weapon: `id`, or a random one of `tier` (`sidearm`, `primary`, `heavy`, `melee`, `thrown`, `any`).
 func _do_give_weapon(a: Dictionary, ctx: Dictionary) -> void:
 	for p in _who(a, ctx):
-		var id := StringName(str(a.get("id", "")))
+		var id := ZzWeapons.resolve(StringName(str(a.get("id", ""))))
 		if id == &"" or not ZzWeapons.exists(id):
 			id = ZzWeapons.random_of(StringName(str(a.get("tier", "primary"))), _rng, &"box")
 		if game.arm(p, id):

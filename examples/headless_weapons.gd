@@ -268,7 +268,7 @@ func _test_spawner() -> void:
 	var game = _client.game
 	var me := _client.player
 	game.config.trader_enabled = 0
-	var doc := {"id": "spawner_probe", "spawners": [{"id": "wall", "at": [0, 0, 0], "pool": "wall_guns", "filter": {"ids": ["shotgun"]}, "respawn": 20, "max": 1}]}
+	var doc := {"id": "spawner_probe", "spawners": [{"id": "wall", "at": [0, 0, 0], "pool": "wall_guns", "filter": {"ids": ["zz_shotgun"]}, "respawn": 20, "max": 1}]}
 	game.spawners.start_round(doc)
 	game.spawners.tick()
 	var lid: int = game.spawners.loot_ids()[0] if not game.spawners.loot_ids().is_empty() else -1
@@ -280,7 +280,7 @@ func _test_spawner() -> void:
 	_check(game.spawners.spawner.seconds_until(&"wall") > 10.0, "the respawn timer runs", str(game.spawners.spawner.seconds_until(&"wall")))
 	game.spawners.spawner.tick(game.now() + 25.0)
 	_check(game.spawners.spawner.alive() == 1 and game.loot.count_of(ZzLoot.WEAPON) >= 1, "after the timer the next one lies there")
-	var shop := {"id": "spawner_probe", "spawners": [{"id": "buy", "at": [0, 0, 0], "item": "shotgun", "respawn": 0, "data": {"price": 300}}]}
+	var shop := {"id": "spawner_probe", "spawners": [{"id": "buy", "at": [0, 0, 0], "item": "zz_shotgun", "respawn": 0, "data": {"price": 300}}]}
 	game.spawners.start_round(shop)
 	game.spawners.tick()
 	var buy: int = game.spawners.loot_ids()[0] if not game.spawners.loot_ids().is_empty() else -1
@@ -337,12 +337,12 @@ func _test_spawner() -> void:
 	_check(game.spawners.spawner.alive() == 0 and game.spawners.spawner.seconds_until(&"am") > 0.0, "and its site respawns it")
 	_check(game.spawners._restock.size() >= 2, "an empty roll reschedules the trader's slot", str(game.spawners._restock.size()))
 	_check(game.spawners._clean_price(NAN) > 100000 and game.spawners._clean_price(INF) > 100000 and game.spawners._clean_price(1e30) > 100000 and game.spawners._clean_price(-5) == 0 and game.spawners._clean_price(75) == 75, "a nan, infinite or huge price is unaffordable, never free")
-	var cheap: int = game.loot.add(ZzLoot.WEAPON, &"shotgun", Vector3.ZERO, -1.0, 300)
+	var cheap: int = game.loot.add(ZzLoot.WEAPON, &"zz_shotgun", Vector3.ZERO, -1.0, 300)
 	game.spawners._price_of[cheap] = 300
 	me.points = 10
 	game.loot.remove(cheap, me.player_id)
 	_check(me.points == 0, "a charge never takes the points below zero", str(me.points))
-	var wire := ZzEvents.read_loot(DotNetReader.new(ZzEvents.write_loot(7, &"weapon", &"shotgun", Vector3.ZERO, 250)))
+	var wire := ZzEvents.read_loot(DotNetReader.new(ZzEvents.write_loot(7, &"weapon", &"zz_shotgun", Vector3.ZERO, 250)))
 	_check(int(wire["price"]) == 250 and bool(wire["ok"]), "the loot event carries the price to the client")
 	_finished()
 

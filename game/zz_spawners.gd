@@ -49,7 +49,7 @@ func _init(p_game: Object) -> void:
 
 ## Reads the config files; call once the weapon packs are installed, since pools draw from their tags.
 func load_config() -> void:
-	spawner.config.defs = ZzWeapons.all_defs()
+	spawner.config.defs = ZzWeapons.offered_defs()
 	spawner.config.weigher = ZzWeapons.channel_weight
 	var _read := spawner.config.load_files()
 

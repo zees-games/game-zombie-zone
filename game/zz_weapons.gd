@@ -12,6 +12,21 @@ const TIERS: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"
 
 const ZzPackList := preload("zz_packs.gd")
 
+## zee-dot-weapons' own catalogue, the toy-looking blasters and tools the game shipped with. They stay in
+## the rigs' catalogue (an old save, `arm`, a console command still name them) but are offered nowhere
+## (boxes, loot, caches, spawners, shop, stand-ins) unless `weapons.legacy` is on in packs.yml.
+## Maps to the modern pack's weapon that takes the old one's place when an old id is named by data.
+const LEGACY := {
+	&"knife": &"zz_knife", &"shiv": &"zz_knife", &"hatchet": &"zz_knife", &"mallet": &"zz_knife",
+	&"pickaxe": &"zz_knife", &"spade": &"zz_knife",
+	&"pistol": &"zz_pistol", &"revolver": &"zz_revolver", &"machine_pistol": &"zz_smg", &"derringer": &"zz_pistol",
+	&"smg": &"zz_smg", &"carbine": &"zz_m4", &"rifle": &"zz_m4", &"bullpup": &"zz_m4",
+	&"battle_rifle": &"zz_dmr", &"burst_rifle": &"zz_m4", &"shotgun": &"zz_shotgun", &"drum_shotgun": &"zz_spas",
+	&"marksman": &"zz_dmr", &"sniper": &"zz_sniper", &"minigun": &"zz_lmg", &"launcher": &"zz_m79",
+	&"beamer": &"zz_vss", &"charge_rifle": &"zz_vss", &"frag": &"zz_frag", &"sticky": &"zz_frag",
+}
+const MODERN_PACK := "zz_modern_weapons"
+
 static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
 
@@ -50,6 +65,41 @@ static func _add(def: DotWeaponDef) -> void:
 	_by_id[def.id] = def
 
 
+## Whether [param id] may be handed out by a pool: a legacy blaster only with `weapons.legacy` on,
+## or when the modern pack is not installed (a checkout without it still has to play).
+static func offered(id: StringName) -> bool:
+	if not LEGACY.has(id):
+		return true
+
+	return bool(ZzPackList.cfg("weapons.legacy", false)) or not ZzPackList.providers.has(MODERN_PACK)
+
+
+## The weapon an id from data (a box row, a map's pickup, a shop item) stands for: a legacy id becomes
+## its modern successor while legacy is off, anything else is returned as it came.
+static func resolve(id: StringName) -> StringName:
+	if LEGACY.has(id) and not offered(id) and exists(LEGACY[id]):
+		return LEGACY[id]
+
+	# A checkout without the modern pack: its ids fall back to the blasters they replace.
+	if not exists(id) and LEGACY.values().has(id):
+		for old: StringName in LEGACY:
+			if LEGACY[old] == id and exists(old):
+				return old
+
+	return id
+
+
+## [method all_defs] without the legacy blasters when they are not offered.
+static func offered_defs() -> Array[DotWeaponDef]:
+	var out: Array[DotWeaponDef] = []
+
+	for def in all_defs():
+		if offered(def.id):
+			out.append(def)
+
+	return out
+
+
 static func exists(id: StringName) -> bool:
 	var _all := all_defs()
 	return _by_id.has(id)
@@ -66,7 +116,7 @@ static func ids_of(tier: StringName) -> Array[StringName]:
 	var out: Array[StringName] = []
 
 	for def in all_defs():
-		if def.tags.has(tier) and def.id != &"fists":
+		if def.tags.has(tier) and def.id != &"fists" and offered(def.id):
 			out.append(def.id)
 
 	return out
@@ -90,7 +140,7 @@ static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: Str
 		total += float(weights.get(String(id), 1.0))
 
 	if pool.is_empty():
-		return &"pistol"
+		return &"zz_pistol" if exists(&"zz_pistol") else &"pistol"
 
 	var at := rng.randf() * total
 
@@ -111,7 +161,7 @@ static func channel_weight(channel: StringName, id: StringName, weight: float) -
 		return weight
 
 	var barred: Array = ZzPackList.cfg("weapons.not_in.%s" % channel, []) if channel != &"" else []
-	if barred.has(String(id)):
+	if barred.has(String(id)) or not offered(id):
 		return 0.0
 
 	var weights: Dictionary = ZzPackList.cfg("weapons.weights", {})

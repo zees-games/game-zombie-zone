@@ -25,7 +25,7 @@
 # Seconds before a dead survivor is rescued: back in, beside whoever is furthest along, with half health and ... [0.0..600.0]
 # rescue_seconds: 75.0
 # What everybody starts a map holding, by weapon id. The first is drawn.
-# start_weapons: ["pistol", "knife"]
+# start_weapons: ["zz_pistol", "zz_knife"]   # with weapons.legacy on in packs.yml: ["pistol", "knife"]
 # How many medkits and pills each survivor starts a map with. [0..1]
 # start_medkits: 1
 #  [0..1]

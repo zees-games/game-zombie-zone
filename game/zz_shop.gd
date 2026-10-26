@@ -52,7 +52,7 @@ func items() -> Array:
 	var mag_share := float(ammo.get("magazine_share", 0.08))
 	var refill_share := float(ammo.get("refill_share", 0.2))
 
-	for def in ZzWeapons.all_defs():
+	for def in ZzWeapons.offered_defs():
 		if def.id == &"fists":
 			continue
 		var tier := ZzWeapons.tier_of(def.id)

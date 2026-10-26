@@ -354,7 +354,7 @@ func setup_seconds() -> float:
 @export_range(0.0, 600.0, 1.0) var stuck_rescue_seconds: float = 12.0
 
 ## What everybody starts a map holding, by weapon id. The first is drawn.
-@export var start_weapons: PackedStringArray = PackedStringArray(["pistol", "knife"])
+@export var start_weapons: PackedStringArray = PackedStringArray(["zz_pistol", "zz_knife"])
 
 ## How many medkits and pills each survivor starts a map with.
 @export_range(0, 1, 1) var start_medkits: int = 1

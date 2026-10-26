@@ -2,6 +2,7 @@
 # addon with a spawn_provider.gd). ALL .yml files in this directory are read, in name order, a
 # later file winning; keep a server's changes in its own file (e.g. 90-server.yml).
 weapons:
+  legacy: false      # true brings zee-dot-weapons' original blasters and tools (pistol, rifle, launcher, ...) back into every pool, the shop and the kits; the modern pack is the default set
   enabled: true      # installed weapons join boxes, loot, the buy pool and the stand-ins' kits
   exclude: []        # weapon ids to keep out of the pool
   # weights:         # id: draw weight in boxes, loot and caches (default 1; 0 is never drawn there, still given by name)

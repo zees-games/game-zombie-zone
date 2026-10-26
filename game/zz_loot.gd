@@ -89,6 +89,8 @@ func shown(kind: StringName, item: StringName) -> StringName:
 func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0, price: int = 0) -> int:
 	var id := _next_id
 	_next_id += 1
+	if kind == WEAPON or kind == THROWABLE:
+		item = ZzWeapons.resolve(item)
 	# A drop never lands inside another one: two crates drawn through each other cannot be told apart or picked.
 	if lifetime > 0.0:
 		at = _clear_spot(at)

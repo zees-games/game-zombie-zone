@@ -23,8 +23,8 @@ const CHECKS := 43
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 26
-const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss"]
+const REAL_CHECKS := 27
+const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
 var _passed := 0
@@ -330,6 +330,8 @@ func _real_packs() -> void:
 	_check(ZzWeapons.tier_of(&"zz_vss") == &"primary", "the Vintorez is a primary", str(ZzWeapons.tier_of(&"zz_vss")))
 	_check(ZzWeapons.tier_of(&"war_axe") == &"melee" and ZzWeapons.tier_of(&"double_axe") == &"melee", "both new axes are melee")
 	_check(ZzWeapons.exists(&"pistol"), "the built-in weapons are still there")
+	_check(ZzWeapons.resolve(&"pistol") == &"zz_pistol" and not ZzWeapons.offered(&"pistol") and ZzWeapons.offered(&"zz_pistol"),
+		"a legacy blaster resolves to its modern successor and is not offered")
 	_check(ZzPacks.monsters.size() == 6 and ZzPacks.specials().size() == 5 and ZzPacks.bosses().size() == 1,
 		"six monsters: five specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
