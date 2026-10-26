@@ -7,7 +7,8 @@ const ZzLampBudget := preload("zz_lamp_budget.gd")
 const ZzFixtures := preload("zz_fixtures.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzMechanics := preload("zz_mechanics.gd")
-const WATER_SHADER := preload("zz_water.gdshader")
+## Loaded, not preloaded: a client whose dot-map predates it still parses this file and draws a plain sheet.
+const WATER_SHADER_PATH := "res://addons/dot_map/surfaces/liquid.gdshader"
 
 ## A map document, built: the building, the furniture, the lights and the sky.
 ##
@@ -349,7 +350,7 @@ func _build_water_volumes() -> void:
 		water_boxes.append(AABB(ZzMapDoc.v3(pool["at"]) - size * 0.5, size))
 
 
-## Each volume's surface: one sheet at the top face, with the water shader (see zz_water.gdshader),
+## Each volume's surface: one sheet at the top face, with dot-map's liquid shader,
 ## which draws the ripples, the sheen and the lip. The volume has no walls: Source's water is a
 ## surface too, and a swimmer sees the pool's own sides through it.
 func _build_water_surfaces() -> void:
@@ -359,16 +360,24 @@ func _build_water_surfaces() -> void:
 		var box := water_boxes[i]
 		var plane := PlaneMesh.new()
 		plane.size = Vector2(box.size.x, box.size.z)
-		var material := ShaderMaterial.new()
-		material.shader = WATER_SHADER
 		var entry: Dictionary = waters[i]
-
-		if entry.has("tint"):
-			var tint := ZzMapDoc.colour(entry["tint"])
-			material.set_shader_parameter("tint", tint)
-			material.set_shader_parameter("deep_tint", tint.darkened(0.65))
-
-		material.set_shader_parameter("extent", Vector4(box.position.x, box.position.z, box.end.x, box.end.z))
+		var tint := ZzMapDoc.colour(entry["tint"]) if entry.has("tint") else Color(0.10, 0.34, 0.42)
+		var material: Material
+		if ResourceLoader.exists(WATER_SHADER_PATH):
+			var liquid := ShaderMaterial.new()
+			liquid.shader = load(WATER_SHADER_PATH)
+			if entry.has("tint"):
+				liquid.set_shader_parameter("tint", tint)
+				liquid.set_shader_parameter("deep_tint", tint.darkened(0.65))
+			liquid.set_shader_parameter("extent", Vector4(box.position.x, box.position.z, box.end.x, box.end.z))
+			material = liquid
+		else:
+			var plain := StandardMaterial3D.new()
+			plain.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			plain.cull_mode = BaseMaterial3D.CULL_DISABLED
+			plain.albedo_color = Color(tint, 0.6)
+			plain.roughness = 0.1
+			material = plain
 		var sheet := MeshInstance3D.new()
 		sheet.name = "Water%d" % i
 		sheet.mesh = plane
@@ -451,6 +460,12 @@ func playable_region() -> AABB:
 	for obj: Dictionary in doc.get("objectives", []):
 		if obj.has("at"):
 			points.append(obj["at"])
+	# The importer keeps only water with a bed in reach, so a pool the horde's floors miss is still ground.
+	for w: Dictionary in doc.get("water", []):
+		var at := ZzMapDoc.v3(w["at"])
+		var half := ZzMapDoc.v3(w["size"]) * 0.5
+		points.append([at.x - half.x, at.y - half.y, at.z - half.z])
+		points.append([at.x + half.x, at.y + half.y, at.z + half.z])
 
 	for pt: Array in points:
 		var v := ZzMapDoc.v3(pt)
@@ -1273,6 +1288,10 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 			child.queue_free()
 
 	lap = _lap(stages, "unbake", lap)
+	# A global pack draws its own water faces with the same shader; a sheet as well is a second layer.
+	if global_pack and (world.get("surfaces") as Array).any(func(rec: Dictionary) -> bool: return rec.get("water", false)):
+		for sheet in _water_nodes:
+			sheet.visible = false
 	var node: Node3D = world.call(&"build_node", material_for)
 	node.name = "World"
 	_drawn.add_child(node)

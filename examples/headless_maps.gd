@@ -26,7 +26,7 @@ const ZzPaths := preload("../game/zz_paths.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
-const CHECKS_PER_MAP := 17
+const CHECKS_PER_MAP := 18
 const BAKE_CHECKS := 7
 const WORLD_CHECKS := 4
 const LAMP_CHECKS := 8
@@ -420,6 +420,12 @@ func _test_map(id: StringName) -> void:
 			if space.intersect_ray(ray).is_empty():
 				open_sides.append(str(dir))
 	_check(open_sides.is_empty(), "the playable ground is walled in on every side", "open: %s" % [open_sides])
+	# zm_4way_tunnel's wall once crossed its lower pool, which the horde's floors never reach.
+	var walled_off: Array = []
+	for pool: AABB in game.map.water_boxes:
+		if not region.grow(0.01).encloses(pool):
+			walled_off.append(str(pool))
+	_check(walled_off.is_empty(), "every pool is inside the walls", "outside: %s" % [walled_off])
 
 	var seats := ((doc.get("spawns", {}) as Dictionary).get("survivors", []) as Array).size()
 	var bad_spawns: Array = []

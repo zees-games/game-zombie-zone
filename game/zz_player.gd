@@ -374,7 +374,8 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 	swim.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())
 	submerged = water_level == WaterLevel.EYES
-	var wading := water_level == WaterLevel.FEET and state.mode != swim.mode_id
+	# Waist-deep water too shallow to float in is waded too (DotFpsSwimMode.has_room_to_float).
+	var wading := water_level != WaterLevel.NONE and state.mode != swim.mode_id
 	var has := controller.motor.has_modifier(state, ZzController.WADING)
 
 	if wading and not has:
