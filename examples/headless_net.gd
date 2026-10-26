@@ -167,10 +167,10 @@ func _test_the_codec() -> void:
 	_check(bool(round_info["ok"]) and not bool(round_info["won"]) and str(round_info["why"]) == "everybody is down",
 		"ROUND carries the result and the sentence")
 
-	var clock := ZzEvents.read_clock(_r(ZzEvents.write_clock(3, 2, 40.25, 12.5, 60.0, 4, true, 0, 1, 20.0)))
+	var clock := ZzEvents.read_clock(_r(ZzEvents.write_clock(3, 2, 40.25, 12.5, 60.0, 4, true, 0, 1, 20.0, 17.5)))
 	_check(bool(clock["ok"]) and int(clock["round"]) == 3 and absf(float(clock["elapsed"]) - 40.25) < 0.1
 		and absf(float(clock["held"]) - 12.5) < 0.1 and int(clock["alive"]) == 4 and int(clock["objective"]) == 0
-		and int(clock["objective_state"]) == 1, "CLOCK", str(clock))
+		and int(clock["objective_state"]) == 1 and absf(float(clock["grace_left"]) - 17.5) < 0.2, "CLOCK", str(clock))
 
 	var npc := ZzEvents.read_npc(_r(ZzEvents.write_npc(77, ZzNpcs.STRANGLER, 513, Vector3(3.5, 0.0, -12.25))))
 	_check(bool(npc["ok"]) and int(npc["net_id"]) == 77 and npc["kind"] == ZzNpcs.STRANGLER and int(npc["variant"]) == 513
@@ -1337,6 +1337,7 @@ func _make_game(server: bool, parent: Node) -> ZzGame:
 	config.minimum_players = 0
 	config.keep_progress = false
 	config.start_grace_seconds = 0.5
+	config.escape_grace_seconds = 0.0
 	config.wanderer_density = 0.0
 	config.sleepers_enabled = false
 	config.specials_base = 0
