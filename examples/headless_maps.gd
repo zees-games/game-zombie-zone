@@ -366,8 +366,16 @@ func _test_worlds() -> void:
 		var host := Node3D.new()
 		extras.call(&"_attach_world_extras", world, host)
 		var wanted_props := 0
+		# A library model draws when the pack's model store resolves (the game's .stores link, present only
+		# while a tool such as solid_props.sh holds it) and otherwise becomes a proxy, so count both worlds.
+		var licence: Dictionary = manifest.get("licence", {})
+		var store_root := prefix.get_base_dir().path_join(str(licence.get("model_store", "model-library"))).simplify_path()
+		var in_store := {}
+		for row: Dictionary in licence.get("model_stand_ins", []):
+			if row.has("store_file") and FileAccess.file_exists(store_root.path_join(str(row["store_file"]))):
+				in_store[str(row.get("stand_in", ""))] = true
 		for rec: Dictionary in manifest.get("props", []):
-			if rec.has("box"):
+			if rec.has("box") or in_store.has(str(rec.get("stand_in", ""))):
 				wanted_props += 1
 			elif (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"find_resource", str(rec.get("stand_in", "")),
 					PackedStringArray(["res://addons/dot_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
