@@ -205,6 +205,11 @@ func _census() -> void:
 			var hk := "in_" + String(holder).rstrip("0123456789_")
 			c[hk] = int(c.get(hk, 0)) + 1
 			c[hk + "_surf"] = int(c.get(hk + "_surf", 0)) + surfaces
+			var tris := _triangles(m.mesh)
+			c[hk + "_tris"] = int(c.get(hk + "_tris", 0)) + tris
+			c["tris_total"] = int(c.get("tris_total", 0)) + tris
+			if m.visibility_range_end > 0.0:
+				c["tris_ranged"] = int(c.get("tris_ranged", 0)) + tris
 			if m.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
 				c[hk + "_shadow"] = int(c.get(hk + "_shadow", 0)) + 1
 			c["mesh_surfaces"] = int(c.get("mesh_surfaces", 0)) + surfaces
@@ -222,6 +227,28 @@ func _census() -> void:
 		elif n is GPUParticles3D or n is CPUParticles3D or n is Sprite3D or n is Decal or n is AnimatedSprite3D or n is Label3D or n is GeometryInstance3D:
 			c[n.get_class()] = int(c.get(n.get_class(), 0)) + 1
 	print("CENSUS ", c)
+	var tops: Array = c.keys().filter(func(k): return String(k).ends_with("_tris"))
+	tops.sort_custom(func(a, b): return int(c[a]) > int(c[b]))
+	for k in tops.slice(0, 12):
+		print("TRIS %-40s %d" % [k, c[k]])
+	print("TRIS total %d ranged %d" % [int(c.get("tris_total", 0)), int(c.get("tris_ranged", 0))])
+
+
+var _tri_cache := {}
+
+
+func _triangles(mesh: Mesh) -> int:
+	if mesh == null:
+		return 0
+	if _tri_cache.has(mesh):
+		return _tri_cache[mesh]
+	var n := 0
+	for i in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(i)
+		var idx = arrays[Mesh.ARRAY_INDEX]
+		n += (idx.size() if idx != null else (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()) / 3
+	_tri_cache[mesh] = n
+	return n
 
 
 func _physics_process(_delta: float) -> void:

@@ -1528,6 +1528,12 @@ func set_shadow_cost(proxy: bool, range_m: float, translucent: bool) -> void:
 		mesh.call(&"set_shadow_translucent", translucent)
 
 
+## Sets dot-map's LOD size for library models (before the world is built); the `prop_lod_min_tris` cvar.
+func set_model_lod(min_tris: int, max_tris: int) -> void:
+	if can_draw_world():
+		(load(MESH_SCRIPT) as GDScript).call(&"set_model_lod", min_tris, max_tris)
+
+
 ## Turns off the sun shadow of every prop under [param props] whose longest side is under [member prop_shadow_min].
 func _trim_prop_shadows(props: Node3D) -> void:
 	if prop_shadow_min <= 0.0:

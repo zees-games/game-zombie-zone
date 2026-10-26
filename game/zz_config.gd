@@ -688,6 +688,15 @@ func setup_seconds() -> float:
 ## is a draw call a player never reads. `--zz-prop-shadow-min=`.
 @export var prop_shadow_min: float = 1.2
 
+## Triangles a library model's mesh must have before a client simplifies it into LOD levels (0: never; a scanned tree is over a million, and a street of them was the frame). Read when a world is built. `--zz-prop-lod-min-tris=`.
+@export var prop_lod_min_tris: int = 20000
+
+## Most triangles a library model's mesh keeps at full detail on a client (0: its own): a scanned tree of 1.6 million is cut to about this before its LODs are made. Read when a world is built. `--zz-prop-max-tris=`.
+@export var prop_max_tris: int = 150000
+
+## Pixels of error a mesh may show before the engine picks a finer LOD, on a client: higher is coarser and cheaper (1 is the engine's own). `--zz-mesh-lod-threshold=`.
+@export_range(0.0, 16.0) var mesh_lod_threshold: float = 1.0
+
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 
