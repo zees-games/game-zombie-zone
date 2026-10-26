@@ -5,6 +5,14 @@ weapons:
   legacy: false      # true brings zee-dot-weapons' original blasters and tools (pistol, rifle, launcher, ...) back into every pool, the shop and the kits; the modern pack is the default set
   enabled: true      # installed weapons join boxes, loot, the buy pool and the stand-ins' kits
   exclude: []        # weapon ids to keep out of the pool
+  min_wave:          # first survival wave that lays the weapon out (heavy and drum-fed guns come late); exodus maps are not gated
+    zz_deagle: 2
+    zz_scar: 3
+    zz_aa12: 4
+    zz_lmg: 5
+    zz_m79: 5
+    zz_rpg: 7
+  # rating:          # id: a stand-in's idea of a gun's worth, over damage a second worked out from its stats
   # weights:         # id: draw weight in boxes, loot and caches (default 1; 0 is never drawn there, still given by name)
   #   zz_sniper: 0.3
   # tiers:           # id: sidearm | primary | heavy | melee | thrown, over what the pack tags

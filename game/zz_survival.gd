@@ -116,6 +116,7 @@ func stop() -> void:
 			waves.stage_changed.disconnect(_on_stage)
 		waves.stop()
 
+	ZzWeapons.wave = 0
 	_set_twist(&"")
 
 
@@ -167,6 +168,7 @@ func _release(horde) -> void:
 	# And a wave may have only part of the cap up at once, growing to all of it by the last, on
 	# a curve: slow through the middle waves (where holds were lost), a wall at the end.
 	horde.wave_index = waves.index
+	ZzWeapons.wave = waves.index
 	var ramp := clampf(float(waves.index - 1) / maxf(float(waves.count - 1), 1.0), 0.0, 1.0)
 	var share := lerpf(clampf(float(game.config.wave_alive_share_by_map.get(str(game.map_doc.get("id", "")), game.config.wave_alive_share)), 0.1, 1.0), 1.0, ramp * ramp)
 	horde.wave_room = int(float(game.config.commons_cap(_team())) * share)

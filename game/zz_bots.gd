@@ -49,6 +49,11 @@ const BOT_NAMES := ["Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable",
 
 ## How far a bot sees a zombie, and how close a crowd has to be to be shoved.
 const SIGHT := 32.0
+## A stand-in swaps a gun in the same slot for one rated this many times higher.
+const UPGRADE_RATIO := 1.35
+## Closer than this a launcher is not fired: the blast reaches its owner (the rocket's 7.5 m splash falls off).
+const BLAST_SAFE := 9.0
+const LAUNCHER_BONUS := 10000.0
 
 ## How near the line of fire a friend's middle may be before a stand-in holds its fire: a
 ## body's half-width and a little more for a shotgun's spread.
@@ -214,6 +219,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 	# 3. Threats.
 	if danger != null:
 		_aim_at(player, command, danger)
+		_choose_slot(player, danger)
 		var crowd := _crowd_within(player, SHOVE_RANGE)
 
 		if crowd >= 2 or (danger.def.id == ZzNpcs.COMMON and danger.position().distance_to(player.feet()) < 1.3):
@@ -594,6 +600,9 @@ func _crowd_within(player, reach: float) -> int:
 func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 	var aim: DotBotAim = memory["aim"]
 	if aim.target_id != npc.instance_id:
+		return false
+	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
+	if held != null and ZzWeapons.explosive(held.id) and npc.position().distance_to(player.feet()) < BLAST_SAFE:
 		return false
 	var at: Vector3 = memory["target_at"] if memory.get("target_at", Vector3.INF) != Vector3.INF else _aim_point(npc)
 	if not aim.trigger(game.now(), player.eye_position().distance_to(at)):
@@ -1097,7 +1106,51 @@ func _wants_weapon(player, id: StringName) -> bool:
 	if def == null:
 		return false
 
-	return not player.weapons.arsenal.has_slot(def.slot)
+	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+
+	if not arsenal.has_slot(def.slot):
+		return true
+
+	# Same slot: only a clearly better gun, and never a launcher over a gun that can be fired at close range.
+	return not ZzWeapons.explosive(id) and ZzWeapons.rating(id) > ZzWeapons.rating(arsenal.slot_at(def.slot).def.id) * UPGRADE_RATIO
+
+
+## Which carried gun to hold against [param danger]: the best-rated that has rounds, a launcher only against a special
+## or a brute that is far enough off not to catch its owner in the blast. Changes only for a clear gain, so a stand-in does not hop.
+func _choose_slot(player, danger: DotNpcInstance) -> void:
+	if player.weapons == null or player.weapons.arsenal == null or player.weapons.arsenal.is_switching() or player.weapons.arsenal.is_reloading():
+		return
+
+	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var gap := danger.position().distance_to(player.feet())
+	var big := danger.def.id != ZzNpcs.COMMON
+	var held: DotWeaponSlot = arsenal.current()
+	var best := -1
+	var best_score := 0.0
+
+	for slot_no: int in arsenal.slots():
+		var slot := arsenal.slot_at(slot_no)
+		var def := slot.def
+
+		if def.tags.has(&"melee") or def.tags.has(&"thrown") or not _loaded(arsenal, slot):
+			continue
+
+		if ZzWeapons.explosive(def.id) and (gap < BLAST_SAFE or not big):
+			continue
+
+		# One rocket is worth a long reload only against something big: a launcher in reach is the pick, whatever its rate says.
+		var score := ZzWeapons.rating(def.id) * (UPGRADE_RATIO if slot == held else 1.0) + (LAUNCHER_BONUS if ZzWeapons.explosive(def.id) else 0.0)
+
+		if score > best_score:
+			best = slot_no
+			best_score = score
+
+	if best >= 0 and best != arsenal.current_slot():
+		player.wanted_slot = best
+
+
+func _loaded(arsenal: DotWeaponArsenal, slot: DotWeaponSlot) -> bool:
+	return slot.magazine > 0 or slot.def.infinite_reserve or slot.def.ammo_type == &"" or arsenal.ammo().has(slot.def.ammo_type, 1)
 
 
 func _low_on_ammo(player) -> bool:

@@ -50,6 +50,10 @@ const DEFAULTS := {
 		"exclude": [],
 		# id -> draw weight in boxes, loot and caches (default 1, 0 never drawn; still given by name).
 		"weights": {},
+		# id -> first survival wave that lays the weapon out (boxes, caches, spawners, crates, wall-buys); the trader is priced instead.
+		"min_wave": {},
+		# id -> a stand-in's rating (damage a second, worked out from the weapon when absent); the better gun is taken and drawn.
+		"rating": {},
 		# id -> tier (sidearm, primary, heavy, melee, thrown), over what the pack tags.
 		"tiers": {},
 		# channel (box, loot, cache, spawner, wall, crate, trader) -> ids kept out of that channel only.
@@ -395,6 +399,22 @@ static func bosses(wave: int = 0) -> Array[Monster]:
 
 static func _from_wave(m: Monster, wave: int) -> bool:
 	return wave <= 0 or wave >= int((cfg("monsters.min_wave", {}) as Dictionary).get(String(m.id), 0))
+
+
+## The credit line every installed pack asks to be shown (`credits_line()` on its provider), one per pack.
+static func credit_lines() -> PackedStringArray:
+	var out := PackedStringArray()
+
+	for dir_name: String in providers:
+		var provider: Object = providers[dir_name]
+
+		if provider != null and provider.has_method(&"credits_line"):
+			var line := str(provider.call(&"credits_line"))
+
+			if line != "":
+				out.append(line)
+
+	return out
 
 
 static func is_pack_kind(kind: StringName) -> bool:

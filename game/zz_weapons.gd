@@ -27,6 +27,9 @@ const LEGACY := {
 }
 const MODERN_PACK := "zz_modern_weapons"
 
+## The survival wave in play (0 outside a hold); `weapons.min_wave` holds a heavy weapon back until then.
+static var wave: int = 0
+
 static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
 static var _zed_ids: Dictionary = {}
@@ -149,7 +152,7 @@ static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: Str
 	var total := 0.0
 
 	for id in ids:
-		if barred.has(String(id)) or float(weights.get(String(id), 1.0)) <= 0.0:
+		if barred.has(String(id)) or float(weights.get(String(id), 1.0)) <= 0.0 or not from_wave(id):
 			continue
 
 		pool.append(id)
@@ -177,11 +180,38 @@ static func channel_weight(channel: StringName, id: StringName, weight: float) -
 		return weight
 
 	var barred: Array = ZzPackList.cfg("weapons.not_in.%s" % channel, []) if channel != &"" else []
-	if barred.has(String(id)) or not offered(id):
+	if barred.has(String(id)) or not offered(id) or not from_wave(id):
 		return 0.0
 
 	var weights: Dictionary = ZzPackList.cfg("weapons.weights", {})
 	return weight * float(weights.get(String(id), 1.0))
+
+
+## Whether the wave in play is late enough for [param id] to be laid out (`weapons.min_wave`; always, outside a hold).
+## The trader is not gated: its price is.
+static func from_wave(id: StringName) -> bool:
+	return wave <= 0 or wave >= int((ZzPackList.cfg("weapons.min_wave", {}) as Dictionary).get(String(id), 0))
+
+
+## How hard [param id] hits per second, for a stand-in choosing between two guns: `weapons.rating.<id>` over a figure
+## worked out from the def (pellets times damage, a quarter of the blast, over the time between uses).
+static func rating(id: StringName) -> float:
+	var set: Dictionary = ZzPackList.cfg("weapons.rating", {})
+	if set.has(String(id)):
+		return float(set[String(id)])
+
+	var def := def_of(id)
+	if def == null or def.tuning == null or not "damage" in def.tuning:
+		return 0.0
+
+	var per_use: float = float(def.tuning.damage) * maxf(float(def.tuning.pellets), 1.0) + float(def.tuning.splash_damage) * 0.25
+	return per_use / maxf(float(def.use_interval_ticks) / maxf(float(def.authored_tick_rate), 1.0), 0.05)
+
+
+## Whether [param id] hurts whoever fires it when the target is near.
+static func explosive(id: StringName) -> bool:
+	var def := def_of(id)
+	return def != null and def.tags.has(&"explosive") and not def.tags.has(&"thrown")
 
 
 static func _any() -> Array[StringName]:
