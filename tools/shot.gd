@@ -53,7 +53,8 @@ var _day := -1.0
 
 ## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A dot-cloud client reads packs published
 ## into <dir> (<id>/<version>/manifest.json), trusting that key, and the map's world is fetched as <id>@<version>
-## (its shared art slice follows as a dependency) instead of being read from the checkout.
+## (its shared art slice follows as a dependency) instead of being read from the checkout. A <dir> that is a URL
+## (`https://dotgames.org/content`) fetches from that origin, over the network, which is what a player's client does.
 var _world_key := ""
 
 
@@ -69,7 +70,10 @@ func _cloud_store(spec: String) -> void:
 	cloud.name = "Cloud"
 	cloud.config = config
 	cloud.config_file = ""
-	cloud.local_search_dirs = PackedStringArray([parts[0]])
+	if parts[0].begins_with("http"):
+		cloud.http_base_urls = PackedStringArray([parts[0]])
+	else:
+		cloud.local_search_dirs = PackedStringArray([parts[0]])
 	cloud.allow_netchan_fallback = false
 	add_child(cloud)
 	ZzMap.local_worlds = false
