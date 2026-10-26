@@ -148,6 +148,13 @@ With the shadows off after the change the GPU time stays at 14 ms, so what is le
 | and `--workers=2` | 50.01 | 8.70 | 4.43 | 8.24 | 7.91 | 7.83 | 96027 |
 | and `--workers=4` | 49.33 | 8.68 | 4.40 | 8.20 | 7.89 | 7.03 | 95661 |
 
+Then (zz-tick-cost, `tickcut`): `DotNpcAiSquad.pull` walks the log rows since the member's last think when that is fewer than the enemies (one pass in log order, no dictionary walk and no sort), the same deliveries by a selftest section that checks both paths against a brute-force reading at 100 enemies. Laps put the pull at 8.6 µs a call and 1.2 ms a tick (was 1.3): what is left is `DotNpcAiMemory.informed` per delivered report, real news each time, so a cap or a shared memory would change what zombies know and kills; a batched `_squad_report_rows` call measured no faster and was dropped. The attack move (`steer_with_spacing`: path advance, crowd-grid separation, `steer_toward`, progress watch) and `_listen` (already early-outs when no sound is new) are a dozen small calls each with no single term to cut, so 3.1 and 0.35 ms stand; cutting them further wants the crowd stepped natively. Same probe, kills 78 and damage 4058 identical:
+
+| run | total | brains | senses | players | bots |
+| --- | --- | --- | --- | --- | --- |
+| before (this session) | 56.63 | 8.56 | 4.42 | 8.02 | 7.80 |
+| pull by log row | 55.67 | 8.44 | 4.39 | 7.98 | 7.71 |
+
 Still three times the budget: the players' motor (80 µs a survivor), the brains' per-zombie script (zz decide 4.5 ms, of it the attack move 3.1) and the stand-ins, which a server of humans does not pay.
 
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
