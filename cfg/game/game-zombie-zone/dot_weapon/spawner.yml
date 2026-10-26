@@ -169,6 +169,15 @@ game:
       zz_dmr: 450
       zz_lmg: 900
       zz_m79: 750
+      zz_glock: 90
+      zz_deagle: 260
+      zz_p90: 340
+      zz_bren: 300
+      zz_ak: 380
+      zz_scar: 520
+      zz_aa12: 560
+      zz_rpg: 1100
+      zz_machete: 70
     ammo:
       magazine_share: 0.08   # a magazine costs this share of the gun's price (at least 5)
       refill_share: 0.2      # a refill to the cap costs this share (at least 10)
