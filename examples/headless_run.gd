@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 47
 
-const CHECKS := 354
+const CHECKS := 355
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -822,6 +822,7 @@ func _test_every_kind_animates() -> void:
 	var kinds: Array = ZzZombieView.LOOKS.keys()
 	var missing: Array = []
 	var flat: Array = []
+	var dark: Array = []
 	var root := Node3D.new()
 	add_child(root)
 
@@ -829,6 +830,13 @@ func _test_every_kind_animates() -> void:
 		var view := ZzZombieView.new()
 		root.add_child(view)
 		view.build(kind, 5)
+		# Night play test: charcoal specials drew as black cones and the spitter's body glow as a flat
+		# green silhouette. Every body keeps a self-light share and none glows over its whole skin.
+		var mat := view._material as ShaderMaterial
+		var glow := mat.get_shader_parameter(&"glow") as Vector3 if mat != null and mat.get_shader_parameter(&"glow") != null else Vector3.ZERO
+		var lift: Variant = mat.get_shader_parameter(&"lift") if mat != null else null
+		if lift == null or float(lift) < 0.15 or maxf(glow.x, maxf(glow.y, glow.z)) > 0.1:
+			dark.append("%s lift=%s glow=%s" % [kind, lift, glow])
 		var player := view.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		var overrides: Dictionary = ZzZombieView.look_for(kind, 5).get("clips", {})
 
@@ -856,6 +864,7 @@ func _test_every_kind_animates() -> void:
 				flat.append("%s/%d" % [kind, anim])
 
 	_check(kinds.size() == 12, "all twelve kinds are looked at", "%d" % kinds.size())
+	_check(dark.is_empty(), "every kind's body keeps a self-light and none glows over its whole skin", str(dark))
 	_check(missing.is_empty(), "every state of every kind resolves to a clip the kit has", str(missing))
 	_check(flat.is_empty(), "the pin, leap, reach, reel and ground strike each pose the arms", str(flat))
 	root.queue_free()

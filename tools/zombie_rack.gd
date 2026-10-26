@@ -74,6 +74,14 @@ func _initialize() -> void:
 	sun.light_energy = 1.1
 	root.add_child(sun)
 
+	# A night map's light (a dim blue fill and a low moon), the look no daylit sheet shows.
+	if "--night" in OS.get_cmdline_user_args():
+		env.environment.background_color = Color(0.03, 0.04, 0.08)
+		env.environment.ambient_light_color = Color(0.35, 0.4, 0.6)
+		env.environment.ambient_light_energy = 0.3
+		sun.light_color = Color(0.6, 0.7, 1.0)
+		sun.light_energy = 0.35
+
 	var rows: Array = []
 
 	for column: Array in COLUMNS:
@@ -88,6 +96,9 @@ func _initialize() -> void:
 		return
 	elif _set == "deaths":
 		_deaths(root)
+		return
+	elif _set == "ragdolls":
+		_ragdolls(root)
 		return
 	elif _set == "gore":
 		_gore(root)
@@ -175,12 +186,66 @@ func _deaths(root: Node3D) -> void:
 	get_root().size = Vector2i(1500, int(1500.0 * tall / wide))
 
 
+## Every kind dropped as a skeletal ragdoll the way `ZzWorldView` does it, a common first: a body whose bones
+## are scaled for its shape must still fall as itself.
+func _ragdolls(root: Node3D) -> void:
+	var kinds: Array = [&"common"] + SPECIALS
+	if not _kinds.is_empty():
+		kinds = kinds.filter(func(k: StringName) -> bool: return _kinds.has(String(k)))
+	var ground := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	shape.shape = WorldBoundaryShape3D.new()
+	ground.add_child(shape)
+	root.add_child(ground)
+	var floor_mesh := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(kinds.size() * 2.4, 6.0)
+	floor_mesh.mesh = plane
+	floor_mesh.position = Vector3(kinds.size() * 1.2 - 1.2, 0.0, 0.0)
+	root.add_child(floor_mesh)
+	var yard := DotPlayerRagdolls.new()
+	root.add_child(yard)
+	for i in kinds.size():
+		var view := ZzZombieView.new()
+		root.add_child(view)
+		view.position = Vector3(float(i) * 2.4, 0.0, 0.0)
+		view.rotation.y = deg_to_rad(150.0)
+		view.build(kinds[i], 4111 + i)
+		_cells.append([view, ZzZombieBody.Anim.IDLE])
+		_deferred.append(func() -> void:
+			var limbs: PackedStringArray = []
+			for arg in OS.get_cmdline_user_args():
+				if arg.begins_with("--sever="):
+					limbs = arg.trim_prefix("--sever=").split(",", false)
+			var defs := preload("../npcs/zz_zombie_limbs.gd").defs_for(kinds[i], 100.0)
+			for limb: String in limbs:
+				view.sever_limb(StringName(limb), defs[limb], Vector3(0.0, 1.0, 2.0))
+			var death := DotPlayerDeath.new()
+			death.reaction = &"limp"
+			death.direction = Vector3(0.0, 0.0, -1.0)
+			death.damage = 40.0
+			yard.spawn(view, death)
+			view.visible = false)
+	var camera := Camera3D.new()
+	root.add_child(camera)
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.size = maxf(4.0, float(kinds.size()) * 2.4 / 1.78)
+	var mid := Vector3(kinds.size() * 1.2 - 1.2, 1.0, 0.0)
+	camera.look_at_from_position(mid + Vector3(0.0, 1.0, 30.0), mid)
+	get_root().size = Vector2i(2400, 600)
+
+
 ## Dismemberment: a common with no limb, then one each, then several, side by side, standing and walking.
 ## `--level=N` sets DotNpcGore.level first.
 func _gore(root: Node3D) -> void:
 	var ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
-	var defs := ZzZombieLimbs.defs_for(&"common", 100.0)
-	var sets := [[], ["head"], ["armL"], ["legR"], ["armL", "armR"], ["legL", "legR"], ["head", "armR", "legL"]]
+	var kind := &"common"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--kind="):
+			kind = StringName(arg.trim_prefix("--kind="))
+	var defs := ZzZombieLimbs.defs_for(kind, 100.0)
+	var sets := [[], ["head"], ["armL"], ["legR"], ["armL", "armR"], ["legL", "legR"], ["head", "armR", "legL"], ["armL", "armR", "legL", "legR"]]
 	var pick := PackedStringArray()
 	var yaw := 30.0
 	for arg in OS.get_cmdline_user_args():
@@ -207,7 +272,7 @@ func _gore(root: Node3D) -> void:
 		root.add_child(view)
 		view.position = Vector3(float(i) * 2.4, 0.0, 0.0)
 		view.rotation.y = deg_to_rad(180.0 - yaw)
-		view.build(&"common", 4111 + i)
+		view.build(kind, 4111 + i)
 		_cells.append([view, ZzZombieBody.Anim.IDLE])
 		var setup := func() -> void:
 			for limb: String in sets[i]:

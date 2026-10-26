@@ -76,3 +76,7 @@ The first body that is ours rather than the kit's: `art-src/zombie_worker.py` ta
 ## Marks on the specials' skin
 
 `mark` in a kind's `LOOKS` entry is a bruise or sore colour the palette shader paints where the vertex noise is high in green and low in red (the blood's complement, so the two never overlap). `zz_zombie_detail 0` draws the plain colour. It is one smoothstep pair per fragment and no extra draw call. Contact sheets of the audit (2026-10-25) are under `~/npc-shots/` on the dev VM.
+
+## Dark bodies at night
+
+Lit by a night map's moon alone, the specials' charcoal skins (ram, leaper, brute) drew as black cones with only claws showing, and the spitter's whole-body `glow` drew it as a flat green silhouette. The shader now emits `BODY_LIFT` of the body's own colour, and a kind's `glow` reaches the body at `GLOW_BODY` (the throat is its own mesh). `zombie_rack.gd --night` renders the sheet by a night's light; `--set=ragdolls [--sever=head,legL] [--kinds=...]` drops each kind as the world view does.

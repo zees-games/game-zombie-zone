@@ -175,6 +175,11 @@ const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"cra
 ## vertex-colour noise, then the kind's glow. Written for the compatibility renderer: no
 ## per-instance uniforms (a material per look instead), no arrays with hints.
 const SWAPS := 6
+## How much of a kind's `glow` the whole body gives off (the throat is its own mesh): at full
+## strength the spitter was a flat green silhouette with no face. And the share of its own
+## colour every zombie emits, which keeps a dark body readable in the dark.
+const GLOW_BODY := 0.25
+const BODY_LIFT := 0.22
 const SHADER := """
 shader_type spatial;
 render_mode cull_back, specular_disabled;
@@ -192,6 +197,7 @@ uniform vec3 glow = vec3(0.0);
 uniform vec3 mark_colour : source_color = vec3(0.0);
 uniform float mark_amount = 0.0;
 uniform float flash = 0.0;
+uniform float lift = 0.0;
 
 void fragment() {
 	// Sampled exactly as a StandardMaterial3D samples its albedo (source_color), so a zombie is
@@ -222,7 +228,9 @@ void fragment() {
 	c = mix(c, mark_colour, mark * mark_amount);
 	ALBEDO = c;
 	ROUGHNESS = mix(0.9, 0.3, blood);
-	EMISSION = glow + vec3(flash * 0.35, flash * 0.05, flash * 0.03);
+	// A little self-light so a dark skin on a night map keeps its legs, head and face: lit by
+	// the moon alone the specials' charcoal bodies drew as black cones.
+	EMISSION = c * lift + glow + vec3(flash * 0.35, flash * 0.05, flash * 0.03);
 }
 """
 
@@ -605,7 +613,8 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	material.set_shader_parameter(&"blood_cut", float(look.get("blood", 0.6)))
 	material.set_shader_parameter(&"dirt", float(look.get("dirt", 0.5)))
 	var g := glow.srgb_to_linear()
-	material.set_shader_parameter(&"glow", Vector3(g.r, g.g, g.b))
+	material.set_shader_parameter(&"glow", Vector3(g.r, g.g, g.b) * GLOW_BODY)
+	material.set_shader_parameter(&"lift", BODY_LIFT)
 	material.set_shader_parameter(&"mark_colour", Color(mark.r, mark.g, mark.b))
 	material.set_shader_parameter(&"mark_amount", 0.95 if mark != Color.BLACK else 0.0)
 	_materials[key] = material
