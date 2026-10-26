@@ -22,8 +22,8 @@
     "phys_ms": 2.0,
     "draws": 150.0
   },
-  "recorded": "2026-10-25T12:47:24-0400",
-  "commit": "c6486f60a68486955f0a2ba6c80df783faf4b6d0",
+  "recorded": "2026-10-25T23:38:21-0400",
+  "commit": "8d1a01977b8add2823a6d5e24bdcabc7de544910",
   "maps": {
     "zm_abandoned_mall": {
       "p50_ms": 68.778,
@@ -44,6 +44,16 @@
       "rss_mb": 1484.672,
       "phys_ms": 31.329,
       "draws": 182.022
+    },
+    "zz_high_school@120": {
+      "p50_ms": 65.239,
+      "p95_ms": 78.525,
+      "p99_ms": 89.842,
+      "stall_ms": 125.02,
+      "load_s": 13.176,
+      "rss_mb": 1966.695,
+      "phys_ms": 26.598,
+      "draws": 881.038
     }
   }
 }
