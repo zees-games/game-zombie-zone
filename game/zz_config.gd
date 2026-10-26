@@ -823,6 +823,9 @@ func validate() -> DotResult:
 		return DotResult.fail(DotError.CODE_INVALID,
 			"downed_crawl_speed is %.2f; it is 0 (stay put) to 6 metres per second." % downed_crawl_speed)
 
+	if weight_over_limit != "slow" and weight_over_limit != "drop":
+		return DotResult.fail(DotError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)
+
 	return DotResult.success(null)
 
 
@@ -838,9 +841,6 @@ const CFG_FILES := {
 ## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
 static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
 	var b := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
-	if weight_over_limit != "slow" and weight_over_limit != "drop":
-		return DotResult.fail(DotError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)
-
 	b.grouped = true
 	b.group_files = CFG_FILES
 	return b

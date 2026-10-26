@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 388
+const CHECKS := 391
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1681,6 +1681,26 @@ func _test_throwables() -> void:
 	_check(not ZzWeapons.exists(&"pistol") and not ZzWeapons.exists(&"frag"), "zee's own blasters are not carried")
 
 	var ahead := STREET + Vector3(0.0, 0.0, -8.0)
+
+	# Fire and noise are hazards a pack's tags (molotov, pipe_bomb) or a box ask for; no installed weapon throws them now.
+	var fires_before := game.hazards.areas.size()
+	var _molotov := game.hazards.launch(ZzHazards.MOLOTOV, me.eye_position(), (ahead - me.eye_position()) * 0.6 + Vector3.UP * 4.0, me.entity_id, 8.0)
+	await _sim(game, 2.0)
+	var fire := false
+	for a: Dictionary in game.hazards.areas.values():
+		fire = fire or (a["kind"] == ZzHazards.FIRE and (a["at"] as Vector3).distance_to(ahead) < 6.0)
+	_check(game.hazards.areas.size() > fires_before and fire, "a molotov starts a fire where it lands")
+
+	var crowd: Array[DotNpcInstance] = []
+	for i in 4:
+		crowd.append(game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-3.0 + i * 2.0, 0.0, -22.0), &"test"))
+	var _pipe := game.hazards.launch(ZzHazards.PIPE, me.eye_position(), (ahead - me.eye_position()) * 0.6 + Vector3.UP * 4.0, me.entity_id, 300.0)
+	await _sim(game, 3.0)
+	var drawn := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive() and n.position().distance_to(ahead) < 9.0).size()
+	_check(drawn >= 2, "a pipe bomb draws the commons to it", "%d of 4 within 9 m" % drawn)
+	await _sim(game, 5.0)
+	var left := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive()).size()
+	_check(left < 4, "and goes off among them", "%d of 4 standing" % left)
 
 	var frag := game.horde.spawner.spawn(ZzNpcs.COMMON, ahead, &"test")
 	(frag.brain as Object).set(&"idle_kind", 0)
