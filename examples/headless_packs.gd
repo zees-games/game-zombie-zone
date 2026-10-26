@@ -18,7 +18,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addons/zombie_zone"
 const SECTIONS := 5
-const CHECKS := 43
+const CHECKS := 44
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -364,13 +364,7 @@ func _real_packs() -> void:
 	found = ZzPacks.scan()
 	ZzWeapons.use_packs()
 	_check(is_equal_approx(_damage_of(&"zz_m4"), 77.0), "a modern weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"zz_m4"))
-	# Known pack bug (zz-medieval-weapons): its weapon_defs() builds from ZzMedievalConfig.defaults()
-	# and never reads load_all(), so a yml cannot retune a medieval weapon. Not counted, so the
-	# suite stays green; it turns into a check when the pack is fixed.
-	if not is_equal_approx(_damage_of(&"dagger"), 41.0):
-		print("  KNOWN GAP  medieval weapon_defs ignores cfg/addons/zz_medieval_weapons/*.yml (dagger %.1f, wanted 41)" % _damage_of(&"dagger"))
-	else:
-		print("  note  medieval cfg yml now applies: make this a check")
+	_check(is_equal_approx(_damage_of(&"dagger"), 41.0), "a medieval weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"dagger"))
 	_check_game_tier()
 	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
 	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
