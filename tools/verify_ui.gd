@@ -13,6 +13,7 @@ var _out := "res://screenshots/verify"
 var _client: Node = null
 var _failed := 0
 var _passed := 0
+var _map := "zz_lot"
 
 
 func _ready() -> void:
@@ -21,9 +22,17 @@ func _ready() -> void:
 			_check = arg.trim_prefix("--check=")
 		elif arg.begins_with("--out="):
 			_out = arg.trim_prefix("--out=")
+		elif arg.begins_with("--map="):
+			_map = arg.trim_prefix("--map=")
 
+	# An unpinned run draws a random world, which costs gigabytes to build twice.
+	DirAccess.make_dir_recursive_absolute("user://cfg")
+	var pin := FileAccess.open("user://cfg/verify-ui.json", FileAccess.WRITE)
+	pin.store_string(JSON.stringify({"map_ids": [_map]}))
+	pin.close()
 	_client = ZzClient.new()
 	_client.name = "Client"
+	_client.config_file = "user://cfg/verify-ui.json"
 	_client.set("force_offline", true)
 	_client.set("standalone_content", false)
 	_client.set("offline_bots", 3)
