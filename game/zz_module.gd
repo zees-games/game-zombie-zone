@@ -6,6 +6,7 @@ const ZzServices := preload("zz_services.gd")
 
 const ZzBots := preload("zz_bots.gd")
 const ZzGame := preload("zz_game.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzAvatars := preload("zz_avatars.gd")
 const ZzVote := preload("zz_vote.gd")
@@ -525,6 +526,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_zombie_climb", 1.0 if config.zombie_climb else 0.0,
 		"Zombies climb the jump ups as well (a held tower is no longer safe); 0 off",
 		func(value: float) -> void: config.zombie_climb = value > 0.5)
+	_tunable("zz_zombie_detail", 1.0,
+		"Bruises and sores on the specials' skin (client look only); 0 draws the plain colour",
+		func(value: float) -> void: ZzZombieView.detail = value > 0.5)
 	_tunable("zz_zombie_spread", 1.0 if config.zombie_spread else 0.0,
 		"Send each zombie through the least used choke on its way, not all down one route; 0 off",
 		func(value: float) -> void: config.zombie_spread = value > 0.5)

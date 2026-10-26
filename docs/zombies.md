@@ -72,3 +72,7 @@ Not measured: a real browser on a real GPU, where the numbers that matter are di
 ## The worker (2026-10-20)
 
 The first body that is ours rather than the kit's: `art-src/zombie_worker.py` takes `zombie_basic.glb`, models a hard hat, hi-vis vest with reflective bands, backpack, tool belt and knee pads, weights each piece whole to one bone, bakes the kit's colours, the gear's paint, dirt and ambient occlusion into one atlas (`atlas_worker.png`) on a fresh UV layout and exports one mesh with the kit's clips. About 9.4k triangles. It is a sixth common variant (`COMMON_BODIES`); `WEARS` is empty because the colours are baked, so the per-zombie skin and clothes swaps do not touch it. The kit body is low-poly with rings of vertices about 0.15 apart at the waist, so the generator fits gear to the skin by `band_fit` over a wide window rather than by exact rings. Render sheets: `reports/models/2026-10-20/`.
+
+## Marks on the specials' skin
+
+`mark` in a kind's `LOOKS` entry is a bruise or sore colour the palette shader paints where the vertex noise is high in green and low in red (the blood's complement, so the two never overlap). `zz_zombie_detail 0` draws the plain colour. It is one smoothstep pair per fragment and no extra draw call. Contact sheets of the audit (2026-10-25) are under `~/npc-shots/` on the dev VM.
