@@ -24,6 +24,8 @@ const PILLS := &"pills"
 const THROWABLE := &"throwable"
 const BOX := &"box"
 const DEFIB := &"defib"
+## The item is the tier ("1", "2"...); a bigger pack than the one worn raises the carry limit.
+const BACKPACK := &"backpack"
 
 ## How close to the line of sight a thing must be to be the one looked at, in metres.
 const AIM_SLACK := 0.55
@@ -228,6 +230,8 @@ func use(id: int, player) -> void:
 				if e["kind"] == WEAPON:
 					game._draw(player, item)
 				remove(id, player.player_id)
+			elif game.arm_failure != "":
+				game.refused.emit(player.player_id, game.arm_failure)
 		AMMO:
 			# A map's own pile stays for the next person; one a spawner laid or a shop prices is used up,
 			# so it is charged and its site respawns it.
@@ -253,6 +257,10 @@ func use(id: int, player) -> void:
 				game.refused.emit(player.player_id, "You already have a defibrillator.")
 				return
 			player.defibs = game.config.defib_charges
+			remove(id, player.player_id)
+		BACKPACK:
+			if not game.wear_backpack(player, int(String(item))):
+				return
 			remove(id, player.player_id)
 		BOX:
 			if game.config.box_carry > 0:

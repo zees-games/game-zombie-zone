@@ -279,6 +279,14 @@ func add_loot(id: int, kind: StringName, item: StringName, at: Vector3, box_colo
 			bottle.position.y = 0.08
 			bottle.material_override = _material(Color(0.95, 0.6, 0.15))
 			node.add_child(bottle)
+		&"backpack":
+			var tier := clampf(float(String(item).to_int()), 1.0, 3.0)
+			var pack := _box(Vector3(0.34 + 0.06 * tier, 0.42 + 0.06 * tier, 0.2 + 0.04 * tier), Color(0.28, 0.33 - 0.04 * tier, 0.2))
+			pack.position.y = 0.25
+			node.add_child(pack)
+			var flap := _box(Vector3(0.3 + 0.06 * tier, 0.08, 0.24 + 0.04 * tier), Color(0.2, 0.22, 0.14))
+			flap.position.y = 0.5 + 0.06 * tier
+			node.add_child(flap)
 		&"box":
 			var crate := _box(Vector3(0.55, 0.45, 0.55), box_colour)
 			crate.name = "Crate"
@@ -308,6 +316,8 @@ static func _label(kind: StringName, item: StringName) -> String:
 			return "take the pills"
 		&"defib":
 			return "take the defibrillator"
+		&"backpack":
+			return "wear backpack %s" % String(item)
 		&"box":
 			return "take the box" if item == &"unknown" else "take the %s box" % String(item).replace("_", " ")
 	return "pick up"

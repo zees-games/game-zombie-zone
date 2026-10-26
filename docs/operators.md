@@ -173,3 +173,22 @@ Ammo piles and boxes lying on the ground are rigid bodies on the server (dot-pro
 | `zz_crate_sync_hz` | 10 | Times a second the moved crates' places go out. |
 
 The same keys are in the server file as `physics_crates`, `crate_mass` and so on.
+
+## Carry weight
+
+On in Zombie Zone (`zz_weight_enabled 1`; the addon itself is off for any other game); the rules are REPLICATED and live in `survivors.yml` under `weight`.
+
+| Cvar | Default | Effect |
+| --- | --- | --- |
+| `zz_weight_enabled` | 1 | Master switch. Off: nothing is weighed, one weapon per slot. |
+| `zz_weight_limit` | 28 | What a survivor with no backpack may carry. |
+| `zz_weight_multiplier` | 1 | Every weapon weighs this much more (heavier gear for the whole server). |
+| `zz_weight_slot_capacity` | 2 | Weapons one slot holds; the slot key pressed again cycles them. |
+| `zz_weight_over_limit` | slow | `slow`: over the limit is slower, down to `zz_weight_slow_floor`; `drop`: the heaviest spare weapons are dropped. |
+| `zz_weight_slow_floor` | 0.55 | The slowest a heavy load goes, as a share of a run. |
+| `zz_weight_backpack_tiers` | `8,16,28` | Extra capacity of backpack 1, 2, 3. |
+| `zz_weight_backpack_prices` | `300,600,1000` | The trader's price for each (0 or missing: not sold). A `backpack` loot kind lays them on the map. |
+| `zz_weight_modifiers` | `hard=1.15,angry=1.1/0.9` | A box effect's factor per stack: `name=weight` or `name=weight/limit/add`. |
+
+A weapon's own weight is `weight:` in its profile (workbench: the weapon's Weight field).
+

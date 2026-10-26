@@ -598,6 +598,35 @@ func setup_seconds() -> float:
 @export_range(0, 3, 1) var gore_level: int = 2
 
 ## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
+@export_group("Carry weight")
+
+## Master switch for `zz_weight_*`: every weapon has a weight, a survivor a carry limit, and slots may hold several weapons.
+@export var weight_enabled: bool = true
+
+## What a survivor with no backpack carries, in weight units (a pistol is about 3, a rifle 8).
+@export_range(0.0, 1000.0, 0.5) var weight_limit: float = 28.0
+
+## Every weapon's weight is multiplied by this, on top of the box modifiers.
+@export_range(0.0, 10.0, 0.05) var weight_multiplier: float = 1.0
+
+## Weapons one slot holds; pressing the slot key again cycles through them.
+@export_range(1, 8, 1) var weight_slot_capacity: int = 2
+
+## Over the limit (a limit that fell, a box that made weapons heavier): `slow` slows the survivor down, `drop` makes them drop the heaviest spare weapon.
+@export_enum("slow", "drop") var weight_over_limit: String = "slow"
+
+## The slowest an overloaded survivor goes, as a share of normal speed.
+@export_range(0.05, 1.0, 0.05) var weight_slow_floor: float = 0.55
+
+## Capacity a backpack of tier 1, 2, 3... adds, comma separated. Empty: no backpacks.
+@export var weight_backpack_tiers: String = "8,16,28"
+
+## Shop price of backpack tier 1, 2, 3...
+@export var weight_backpack_prices: String = "300,600,1000"
+
+## What an active box effect does to carrying, `effect=weight_factor[/limit_factor[/limit_add]]`, comma separated, once per stack. Any effect name works (hard, angry, a later Great Depression box).
+@export var weight_modifiers: String = "hard=1.15,angry=1.1/0.9"
+
 @export_range(0, 200, 1) var gore_max_gibs: int = 24
 
 ## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
@@ -791,13 +820,16 @@ const CFG_FILES := {
 	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
 	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
 	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors",
-	"Gore": "world", "The maps": "world", "Netcode": "world",
+	"Carry weight": "survivors", "Gore": "world", "The maps": "world", "Netcode": "world",
 }
 
 
 ## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
 static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
 	var b := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
+	if weight_over_limit != "slow" and weight_over_limit != "drop":
+		return DotResult.fail(DotError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)
+
 	b.grouped = true
 	b.group_files = CFG_FILES
 	return b

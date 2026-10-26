@@ -121,6 +121,8 @@ enum Kind {
 	MAP_FX,
 	## Physics crates that moved: for each, the loot id, the place and the turn.
 	LOOT_MOVED,
+	## What this one player carries: weight, limit, backpack, speed scale and the weapons by slot (JSON). To its owner only.
+	CARRY,
 }
 
 ## What a MAP_FX says.
@@ -1156,6 +1158,19 @@ static func read_say(r: DotNetReader) -> Dictionary:
 
 
 const SHOP_BYTES := 32768
+const CARRY_BYTES := 2048
+
+
+static func write_carry(json: String) -> PackedByteArray:
+	var w := _w()
+	w.write_bytes(json.to_utf8_buffer().slice(0, CARRY_BYTES))
+	return w.to_bytes()
+
+
+static func read_carry(r: DotNetReader) -> Dictionary:
+	var raw := r.read_bytes(CARRY_BYTES)
+	return {"json": raw.get_string_from_utf8(), "ok": r.ok()}
+
 
 
 static func write_shop(json: String) -> PackedByteArray:

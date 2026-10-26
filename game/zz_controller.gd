@@ -50,9 +50,12 @@ const CRAWL_BOOST_SCALE := 1.8
 ## again whenever that changes ([method set_wade_scale]), on every end, or a replay reads the old.
 const WADING := &"zz_wading"
 
-## Knocked flying, toward one of eight compass points (index 0 is -Z, then clockwise).
+## Carrying more than the limit allows (`zz_weight_over_limit slow`): the scale is the carry rule's, set by [method set_weight_scale].
+const WEIGHT := &"zz_weight"
+
+## Knocked flying, toward one of seven compass points (index 0 is -Z, then clockwise); the eighth slot of the motor's 32 went to [constant WEIGHT].
 const KNOCK_PREFIX := "zz_knock_"
-const KNOCK_DIRECTIONS := 8
+const KNOCK_DIRECTIONS := 7
 
 ## How hard a knock throws, sideways and up, in m/s.
 const KNOCK_SPEED := 9.0
@@ -78,6 +81,7 @@ func _register_extensions() -> void:
 
 	set_crawl_speed(0.0)
 	set_wade_scale(0.8)
+	set_weight_scale(1.0)
 
 	var limp := DotFpsModifier.make(LIMP)
 	limp.max_speed_scale = 0.78
@@ -161,6 +165,17 @@ func set_wade_scale(scale: float) -> void:
 	wading.max_speed_scale = clampf(scale, 0.05, 1.0)
 	wading.jump_scale = 0.9
 	var _w := motor.register_modifier(wading)
+
+
+## Registers WEIGHT at [param scale] of a run again (same reason as [method set_wade_scale]) and switches it on below 1.
+func set_weight_scale(scale: float) -> void:
+	var weight := DotFpsModifier.make(WEIGHT)
+	weight.max_speed_scale = clampf(scale, 0.05, 1.0)
+	var _w := motor.register_modifier(weight)
+	if scale < 0.999:
+		var _on := add_modifier(WEIGHT)
+	else:
+		var _off := remove_modifier(WEIGHT)
 
 
 ## The knock modifier that throws somebody along [param direction] (horizontal).

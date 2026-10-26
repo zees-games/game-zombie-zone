@@ -121,6 +121,11 @@ var box_order: Array[StringName] = []
 var box_titles: Dictionary = {}
 var box_colours: Dictionary = {}
 var _carry: Label = null
+## The weight readout (bar and slot contents), fed by [method set_carry]; hidden when the rule is off.
+var _weight: Label = null
+var _weight_back: ColorRect = null
+var _weight_fill: ColorRect = null
+var _weight_state: Dictionary = {"on": false}
 var _use_back: ColorRect = null
 var _use_fill: ColorRect = null
 var _use_label: Label = null
@@ -330,6 +335,18 @@ func _build() -> void:
 	_use_label.offset_bottom = 112.0
 	_use_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
+	_weight = _label(15)
+	_weight.name = "Weight"
+	_weight.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_weight.offset_left = -330.0
+	_weight.offset_right = -20.0
+	_weight.offset_top = -214.0
+	_weight.offset_bottom = -140.0
+	_weight.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_weight.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	_weight_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 310.0, 8.0)
+	_weight_fill = _rect(Color(0.55, 0.8, 0.4), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 0.0, 8.0)
+
 	_held = _label(28)
 	_held.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_held.offset_left = -500.0
@@ -491,6 +508,7 @@ func _process(delta: float) -> void:
 	_draw_health()
 	_draw_team()
 	_draw_weapon()
+	_draw_weight()
 	_draw_use()
 	_draw_carry()
 	_draw_effects()
@@ -796,6 +814,46 @@ func team_lines() -> PackedStringArray:
 			out.append("%s|%s|%.2f" % [(row["name"] as Label).text, (row["state"] as Label).text,
 				(fill.size.x / TEAM_BAR_WIDTH) if fill.visible else 0.0])
 	return out
+
+
+## What the player carries (the CARRY event's document, or [method ZzCarry.state_json] offline).
+func set_carry(state: Dictionary) -> void:
+	_weight_state = state
+
+
+func _draw_weight() -> void:
+	if _weight == null:
+		return
+	var on := bool(_weight_state.get("on", false)) and player.is_alive()
+	_weight.visible = on
+	_weight_back.visible = on
+	_weight_fill.visible = on
+	if not on:
+		return
+	var carried := float(_weight_state.get("w", 0.0))
+	var limit := maxf(float(_weight_state.get("l", 1.0)), 0.1)
+	var share := carried / limit
+	var over := share > 1.0
+	var colour := Color(1.0, 0.35, 0.3) if over else (AMBER if share > 0.8 else Color(0.55, 0.8, 0.4))
+	_set_width(_weight_fill, 310.0 * minf(share, 1.0))
+	_weight_fill.color = colour
+	var lines := PackedStringArray()
+	var slots: Dictionary = _weight_state.get("slots", {})
+	var keys := slots.keys()
+	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return int(a) < int(b))
+	for key in keys:
+		var names := PackedStringArray()
+		for id: Variant in slots[key]:
+			names.append(ZzWeapons.title_of(StringName(str(id))))
+		if names.size() > 1:
+			var rest := names.slice(1)
+			lines.append("%s: [%s] %s" % [key, names[0], " ".join(rest)])
+		else:
+			lines.append("%s: %s" % [key, names[0]])
+	var pack: String = " | pack %d" % int(_weight_state.get("tier", 0)) if int(_weight_state.get("max", 0)) > 0 else ""
+	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
+	_weight.text = "%s\nweight %.1f / %.1f%s%s" % ["   ".join(lines), carried, limit, pack, slow]
+	_weight.add_theme_color_override("font_color", colour)
 
 
 func _draw_weapon() -> void:

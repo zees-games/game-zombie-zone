@@ -90,6 +90,8 @@ signal armed_received(player_id: int, weapon_id: StringName)
 
 signal notice_received(text: String)
 signal shop_received(json: String)
+## Client side: what this client carries (JSON from [method ZzCarry.state_json]).
+signal carry_received(json: String)
 
 ## Client side: the server moved this client's own camera. [param mode] is
 ## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
@@ -376,6 +378,11 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
 				notice(peer_id, text))
+		game.carry_changed.connect(func(id: StringName) -> void:
+			var peer_id := peer_for_player(session_of(id))
+			var who: ZzPlayer = game.players.get(id)
+			if peer_id > 0 and who != null:
+				_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(who))))
 		game.shop_changed.connect(func() -> void:
 			if game.shop != null:
 				_broadcast(ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json())))
@@ -1134,6 +1141,9 @@ func _admit(peer_id: int) -> void:
 	_tell(peer_id, ZzEvents.Kind.PHASE, ZzEvents.write_phase(game.phase))
 	if game.shop != null:
 		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
+	for owner_session: int in _peer_of_player:
+		if int(_peer_of_player[owner_session]) == peer_id and game.players.has(player_key(owner_session)):
+			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(game.players[player_key(owner_session)])))
 	_tell(peer_id, ZzEvents.Kind.CLOCK, _clock_body())
 
 	if _nav_sent >= 0:
@@ -1665,6 +1675,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var shop := ZzEvents.read_shop(reader)
 			if bool(shop["ok"]):
 				shop_received.emit(str(shop["json"]))
+		ZzEvents.Kind.CARRY:
+			var carried := ZzEvents.read_carry(reader)
+			if bool(carried["ok"]):
+				carry_received.emit(str(carried["json"]))
 		ZzEvents.Kind.AMMO:
 			ammo_received.emit()
 		ZzEvents.Kind.SPLAT:

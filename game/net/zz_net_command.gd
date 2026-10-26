@@ -40,7 +40,9 @@ const ACT_BOX := 16
 const ACT_AIM := 32
 ## Held for a few ticks by a client that wants the light switched; the server toggles on the rising edge.
 const ACT_FLASHLIGHT := 64
-const ACT_BITS := 7
+## Held for a few ticks by a client that pressed its slot key again; the server cycles the slot on the rising edge.
+const ACT_CYCLE := 128
+const ACT_BITS := 8
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

@@ -276,6 +276,7 @@ func _team(count: int, bots: bool) -> ZzGame:
 		await _dispose(old)
 
 	var config := ZzConfig.new()
+	config.weight_enabled = false  # the carry limit has its own suite (headless_carry)
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
 	config.minimum_players = 0

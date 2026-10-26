@@ -1,6 +1,7 @@
 extends Node3D
 
 const ZzBoxes := preload("zz_boxes.gd")
+const ZzCarry := preload("zz_carry.gd")
 const ZzBots := preload("zz_bots.gd")
 const ZzCatalogue := preload("zz_catalogue.gd")
 const ZzConfig := preload("zz_config.gd")
@@ -149,6 +150,8 @@ signal refused(player_id: StringName, why: String)
 signal told(player_id: StringName, text: String)
 ## The trader opened, closed, moved or changed its list: clients are sent it again.
 signal shop_changed()
+## A player's weights, weapons by slot or backpack changed (the owner is told).
+signal carry_changed(player_id: StringName)
 signal achievement_earned(player_id: StringName, title: String, points: int)
 signal player_armed(player_id: StringName, weapon_id: StringName)
 
@@ -253,6 +256,9 @@ var shop = null
 ## The map's weapon and supply spawners (zz_spawners.gd), server only.
 var spawners: ZzSpawners = null
 var boxes: ZzBoxes = null
+
+## The carry rules, shared by every player's arsenal (a client's copy only stows, see [ZzCarry]).
+var carry := ZzCarry.new()
 var bots: ZzBots = null
 
 ## player id -> [ZzPlayer].
@@ -2545,6 +2551,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	var pressed := held & ~player.previous_actions
 	player.previous_actions = held
 
+	if (pressed & ZzNetCommand.ACT_CYCLE) != 0 and player.weapons != null and not player.is_held():
+		var _cycled := player.weapons.arsenal.cycle_slot(_tick)
+
 	var shove_pressed := player.shove_held and not player.previous_shove
 	player.previous_shove = player.shove_held
 
@@ -3496,9 +3505,14 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 # --- Weapons ------------------------------------------------------------------------------------
 
+## Why the last [method arm] refused ("" when it was not the weight); the caller says it to the player.
+var arm_failure: String = ""
+
+
 ## Hands [param player] a weapon, building their rig the first time.
 func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 	weapon_id = ZzWeapons.resolve(weapon_id)
+	arm_failure = ""
 	if player.weapons == null:
 		var rig := ZeeWeaponRig.new()
 		rig.name = "Weapons"
@@ -3518,12 +3532,62 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 			return false
 
 		player.weapons = rig
+		_wire_carry(player)
 
-	if not player.weapons.give(weapon_id).ok:
+	var given := player.weapons.give(weapon_id)
+	if not given.ok:
+		arm_failure = given.error.message if given.error.code == DotError.CODE_QUOTA else ""
 		return false
 
 	player_armed.emit(player.player_id, weapon_id)
 	return true
+
+
+## Hangs the shared carry rules on [param player]'s arsenal and weighs its catalogue.
+func _wire_carry(player: ZzPlayer) -> void:
+	var arsenal := player.weapons.arsenal
+	carry.tune_catalogue(arsenal.catalogue)
+	arsenal.carry = carry.carry
+	player.carry_dirty = true
+	arsenal.carried_changed.connect(func() -> void: player.carry_dirty = true)
+
+
+## Wears backpack [param tier] if it is bigger than the one worn; says why not.
+func wear_backpack(player: ZzPlayer, tier: int) -> bool:
+	if player.weapons == null or not carry.carry.enabled:
+		refused.emit(player.player_id, "You have no use for a backpack.")
+		return false
+	if not player.weapons.arsenal.equip_backpack(tier):
+		refused.emit(player.player_id, "You already wear a bigger pack.")
+		return false
+	told.emit(player.player_id, "Backpack: you can carry %.0f." % player.weapons.arsenal.capacity())
+	return true
+
+
+## Follows the rules each tick, then each player's weight: drops what is over the limit (DROP mode), sets the
+## speed scale (SLOW mode) and tells the owner when anything moved.
+func _carry_update() -> void:
+	var rules_moved := carry.sync(config, boxes)
+
+	for id: StringName in players:
+		var player: ZzPlayer = players[id]
+		if player.weapons == null or player.weapons.arsenal == null:
+			continue
+		var arsenal := player.weapons.arsenal
+
+		if rules_moved or player.carry_dirty:
+			player.carry_dirty = false
+			if carry.carry.enabled and carry.carry.over_limit == DotWeaponCarry.OverLimit.DROP:
+				for dropped in arsenal.enforce_limit():
+					told.emit(id, "Too heavy: you dropped %s." % ZzWeapons.title_of(dropped))
+					if loot != null:
+						var _laid := loot.add(ZzLoot.WEAPON, dropped, player.global_position, 120.0)
+			var scale := arsenal.speed_scale()
+			if not is_equal_approx(scale, player.carry_scale):
+				player.carry_scale = scale
+				if player.controller != null:
+					player.controller.set_weight_scale(scale)
+			carry_changed.emit(id)
 
 
 func _disarm(player: ZzPlayer) -> void:
@@ -3540,6 +3604,8 @@ func _disarm(player: ZzPlayer) -> void:
 func _advance_weapons() -> void:
 	if combat == null:
 		return
+
+	_carry_update()
 
 	for id: StringName in players:
 		var player: ZzPlayer = players[id]

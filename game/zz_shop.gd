@@ -76,6 +76,15 @@ func items() -> Array:
 	out.append({"id": "heal", "name": "Patch up", "cat": "supplies", "price": _price(supplies.get("heal", 100)), "desc": "Back to full health."})
 	out.append({"id": "armour", "name": "Armour", "cat": "supplies", "price": _price(supplies.get("armour", 200)), "desc": "+%d armour." % int(supplies.get("armour_amount", 50))})
 
+	if game.carry.carry.enabled:
+		var tier := 1
+		while tier <= game.carry.carry.max_backpack_tier():
+			var price: int = game.carry.backpack_price(tier)
+			if price > 0:
+				out.append({"id": "backpack:%d" % tier, "name": "Backpack %d" % tier, "cat": "supplies", "price": price,
+					"desc": "Carry up to %.0f." % (game.carry.carry.base_limit + game.carry.carry.backpack_bonus(tier))})
+			tier += 1
+
 	if game.boxes != null:
 		for type_id: Variant in boxes:
 			if game.boxes.types.has(StringName(str(type_id))):
@@ -197,6 +206,11 @@ func _give(player, item_id: String, found: Dictionary) -> String:
 	if item_id == "refill_all":
 		var added: int = 0 if arsenal == null else int(game.loot.give_ammo(player, 1.0))
 		return "" if added > 0 else "Your ammunition is full."
+	if item_id.begins_with("backpack:"):
+		var worn: int = arsenal.backpack_tier if arsenal != null else 0
+		if arsenal == null or not game.carry.carry.enabled or not arsenal.equip_backpack(int(item_id.substr(9))):
+			return "You already wear a bigger pack." if worn > 0 else "You have no use for a backpack."
+		return ""
 	if item_id.begins_with("box:"):
 		if game.boxes == null or not game.boxes.carry(player, StringName(item_id.substr(4))):
 			return "Your hands are full."
@@ -219,7 +233,7 @@ func _give(player, item_id: String, found: Dictionary) -> String:
 			return "" if arsenal.add_ammo(def.ammo_type, 1) > 0 else "You cannot carry more."
 		return "You already carry it."
 	if not game.arm(player, weapon):
-		return "You cannot carry that."
+		return game.arm_failure if game.arm_failure != "" else "You cannot carry that."
 	if str(found.get("cat", "")) == "weapons":
 		game._draw(player, weapon)
 	return ""

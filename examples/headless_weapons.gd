@@ -239,6 +239,8 @@ func _test_box_guns_are_drawn() -> void:
 	var me := _client.player
 	var game := _client.game
 	var settle := 12
+	# Every gun of every tier is handed over in turn; the carry limit has its own suite (headless_carry).
+	game.config.weight_enabled = false
 
 	for tier in [&"sidearm", &"primary", &"heavy"]:
 		var bad := PackedStringArray()

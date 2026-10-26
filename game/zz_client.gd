@@ -4,6 +4,7 @@ const ZzEvents := preload("net/zz_events.gd")
 const ZzAudio := preload("zz_audio.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzBots := preload("zz_bots.gd")
+const ZzCarry := preload("zz_carry.gd")
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzBoxHands := preload("zz_box_hands.gd")
 const ZzDefibHands := preload("zz_defib_hands.gd")
@@ -60,6 +61,10 @@ var player: ZzPlayer = null
 var flash: DotFlashlight = null
 var flash_crowd: DotFlashlightCrowd = null
 var _flash_ticks := 0
+## Ticks left to hold ACT_CYCLE after the slot key was pressed twice.
+var _cycle_ticks := 0
+## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
+var _mirror := ZzCarry.new()
 var _flash_msec := -100000
 
 ## Keeps the screen covered, and the local body and the input still, until the map, the
@@ -257,6 +262,8 @@ func _draw_world() -> void:
 		game.map.set_light_floor(float(game.config.get(&"light_floor")))
 		game.map.set_shadow_cost(bool(game.config.get(&"shadow_proxy")), float(game.config.get(&"shadow_range")), bool(game.config.get(&"shadow_translucent")))
 		game.map.set_sun_shadow_splits(int(game.config.get(&"sun_shadow_splits")))
+		game.map.set_model_lod(int(game.config.get(&"prop_lod_min_tris")), int(game.config.get(&"prop_max_tris")))
+		get_viewport().mesh_lod_threshold = maxf(float(game.config.get(&"mesh_lod_threshold")), 0.0)
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")
@@ -553,6 +560,7 @@ func _build_netcode() -> DotResult:
 			var _splat := blood.splat_at(point, normal))
 	bridge.notice_received.connect(_on_notice)
 	bridge.shop_received.connect(_on_shop_json)
+	bridge.carry_received.connect(_on_carry_json)
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
 		_on_zombie(kind, true)
 		world_view.add_zombie(net_id, kind, variant, body))
@@ -672,6 +680,9 @@ func _hear_the_world() -> void:
 			_on_notice(text))
 	if game.shop != null:
 		game.shop_changed.connect(func() -> void: _on_shop_json(game.shop.state_json()))
+	game.carry_changed.connect(func(id: StringName) -> void:
+		if id == &"local" and hud != null and game.players.has(id):
+			hud.set_carry(JSON.parse_string(game.carry.state_json(game.players[id])) as Dictionary))
 	game.refused.connect(func(id: StringName, why: String) -> void:
 		if id == &"local":
 			_on_notice(why)
@@ -1232,6 +1243,9 @@ func _arm_locally(weapon_id: StringName) -> void:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
 	player.view_rig = weapons
+	_mirror.mirror = true
+	var _moved := _mirror.sync(game.config)
+	weapons.arsenal.carry = _mirror.carry
 
 	if not weapons.give(weapon_id).ok:
 		return
@@ -1244,6 +1258,25 @@ func _arm_locally(weapon_id: StringName) -> void:
 
 	if audio != null:
 		var _ding := audio.play(ZzAudio.PICKUP)
+
+
+## The server's word on what is carried: the HUD shows it, and a weapon this end never heard of is given.
+func _on_carry_json(json: String) -> void:
+	var state: Variant = JSON.parse_string(json)
+	if not state is Dictionary:
+		return
+	if hud != null:
+		hud.set_carry(state)
+	var _moved := _mirror.sync(game.config)
+	if player != null and player.controller != null:
+		player.controller.set_weight_scale(float((state as Dictionary).get("scale", 1.0)))
+	if weapons == null or weapons.arsenal == null:
+		return
+	var slots: Dictionary = (state as Dictionary).get("slots", {})
+	for key in slots:
+		for id: Variant in slots[key]:
+			if not weapons.arsenal.carries(StringName(str(id))):
+				var _given := weapons.arsenal.give(StringName(str(id)))
 
 
 func _strip_locally() -> void:
@@ -1848,6 +1881,9 @@ func _actions() -> int:
 	if _flash_ticks > 0:
 		_flash_ticks -= 1
 		out |= ZzNetCommand.ACT_FLASHLIGHT
+	if _cycle_ticks > 0:
+		_cycle_ticks -= 1
+		out |= ZzNetCommand.ACT_CYCLE
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -2540,6 +2576,9 @@ func _key_event(event: InputEvent) -> bool:
 
 	for i in range(ZzBindings.SLOTS.size()):
 		if event.is_action_pressed(ZzBindings.SLOTS[i]):
+			if _slot == i + 1 and weapons != null and weapons.arsenal != null and weapons.arsenal.weapons_in(_slot).size() > 1:
+				_cycle_ticks = 3
+				var _cycled := weapons.arsenal.cycle_slot(game.round_number * 100000 + Engine.get_physics_frames())
 			_slot = i + 1
 			return true
 
