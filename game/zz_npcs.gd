@@ -45,7 +45,7 @@ const CHANNEL := "zz.npcs"
 ## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 2
+const NAV_CACHE_VERSION := 3
 const NAV_COVER_RANGE := 1.2
 
 const COMMON := &"common"
@@ -568,6 +568,8 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	var builder := DotNpcNavBuilder.new()
 	builder.spacing = float(nav_doc.get("spacing", 1.0))
 	builder.point_radius = builder.spacing * 1.25
+	builder.neighbour_reach = 1.6
+	builder.obstacle_under_feet = float(nav_doc.get("under_feet", -1.0))
 	builder.clearance = float(nav_doc.get("clearance", 0.35))
 	builder.generate_cover = true
 	builder.cover_range = NAV_COVER_RANGE
@@ -594,6 +596,10 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 			continue
 
 		if box.has("nav") and not bool(box["nav"]):
+			continue
+
+		# Sky never collides (ZzMap), and its slab can sit just under a cellar floor, where the clearance would swallow the cellar's points.
+		if str(box.get("kind", "")) == "sky":
 			continue
 
 		var bounds := _box_bounds(box)

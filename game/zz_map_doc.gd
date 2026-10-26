@@ -481,6 +481,8 @@ static func validate(source: Dictionary) -> DotResult:
 	if nav_in is Dictionary:
 		nav["spacing"] = clampf(float((nav_in as Dictionary).get("spacing", 1.0)), 0.5, 4.0)
 		nav["clearance"] = clampf(float((nav_in as Dictionary).get("clearance", 0.35)), 0.1, 1.5)
+		if (nav_in as Dictionary).has("under_feet"):
+			nav["under_feet"] = clampf(float((nav_in as Dictionary)["under_feet"]), 0.0, 1.5)
 		for raw: Variant in (nav_in as Dictionary).get("floors", []):
 			var f := _floats(raw, 5)
 			if f[2] <= f[0] or f[3] <= f[1]:
