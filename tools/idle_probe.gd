@@ -144,9 +144,29 @@ func _run() -> void:
 			print("IDLE %s t=%.0f still=%.0fs at=%s goal=%s pick=%s carried=%s using=%s pts=%d zombies20=%d hold=%s path=%d" % [
 				id, t, still, here.snapped(Vector3.ONE * 0.1), memory["goal"], memory.get("pick"), player.carried, player.using,
 				player.points, near_zombies, game.bots._hold_of(player).snapped(Vector3.ONE * 0.1), (memory["path"] as PackedVector3Array).size()])
+			if (memory["path"] as PackedVector3Array).is_empty() and memory["goal"] != Vector3.INF:
+				print("  EMPTY ", _why_empty(game, here, memory["goal"]))
 
 	print("PROBE %s team=%d seconds=%.0f idle_bot_seconds=%.0f" % [_map, team, t, idle_total])
 	get_tree().quit(0)
+
+
+## Why a stand-in's path to [param goal] is empty: how far each end is from a graph point, and
+## which search (the stand-ins' filter, none, partial) still finds a way.
+func _why_empty(game, here: Vector3, goal: Vector3) -> String:
+	var nav = game.horde.spawner.nav
+	var kept = nav.filter
+	var out := PackedStringArray()
+	for end: Vector3 in [here, goal]:
+		var near: int = nav.data.nearest_point(end, 6.0)
+		out.append("end %s nearest=%s" % [end.snapped(Vector3.ONE * 0.1), "none" if near < 0 else "%s d=%.2f" % [nav.data.points[near].snapped(Vector3.ONE * 0.1), nav.data.points[near].distance_to(end)]])
+	nav.filter = nav.bot_filter
+	out.append("bot=%d" % nav.find_smooth_path(here, goal, 2.5, true, 16).size())
+	out.append("bot_full=%d" % nav.find_path(here, goal, 2.5, false).size())
+	nav.filter = null
+	out.append("none=%d" % nav.find_path(here, goal, 2.5, false).size())
+	nav.filter = kept
+	return " | ".join(out)
 
 
 func _print_trace(game, t: float) -> void:

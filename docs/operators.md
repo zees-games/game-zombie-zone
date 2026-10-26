@@ -169,6 +169,8 @@ Ammo piles and boxes lying on the ground are rigid bodies on the server (dot-pro
 | `zz_crate_blast` | 1 | Multiplier on the speed an explosion gives a crate. 0 leaves them unmoved. |
 | `zz_crate_max_active` | 16 | Most crates simulating at once; the longest untouched are put to sleep first. |
 | `zz_crate_max_bodies` | 128 | Most crate bodies in the world; loot beyond it lies static. |
+| `zz_crate_fall_limit` | 15 | Metres below where it last rested at which a crate counts as fallen out of the map (a drop over a pit). 0 waits for the map's kill height. |
+| `zz_crate_lost` | rest | `rest` puts a lost crate back where it last rested (gone if it never rested), `remove` takes it away. Either way its loot entry is dropped or moved, so bots stop chasing it. |
 | `zz_crate_sleep_seconds` | 2 | Seconds at rest before a crate sleeps. |
 | `zz_crate_sync_hz` | 10 | Times a second the moved crates' places go out. |
 

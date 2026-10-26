@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 389
+const CHECKS := 391
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -890,6 +890,29 @@ func _test_crates() -> void:
 		peak = maxi(peak, game.crates.active())
 		await get_tree().physics_frame
 	_check(peak <= 2 and game.crates.count() >= 7, "no more than crate_max_active crates simulate at once", "peak %d" % peak)
+
+	# A crate that falls out of the map is put back where it last rested (zz_crate_lost 0) or removed with its loot entry (1).
+	game.config.crate_sleep_seconds = 2.0
+	game.config.crate_max_active = 16
+	var lost_spot := STREET + Vector3(0.0, 0.0, 12.0)
+	var lost_id := game.loot.add(ZzLoot.AMMO, &"", lost_spot)
+	await get_tree().physics_frame
+	for _i in range(60):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	var lost_rest: Vector3 = game.loot.position_of(lost_id)
+	var lost_body: RigidBody3D = game.crates.toy_of(lost_id).body
+	var dropped := Transform3D(lost_body.global_basis, lost_body.global_position + Vector3(0.0, -40.0, 0.0))
+	PhysicsServer3D.body_set_state(lost_body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, dropped)
+	lost_body.global_transform = dropped
+	game.crates.tick(TICK)
+	_check(game.loot.exists(lost_id) and (game.loot.position_of(lost_id) as Vector3).distance_to(lost_rest) < 0.3, "a crate that fell 40 m is put back where it last rested", "rest %s now %s" % [str(lost_rest), str(game.loot.position_of(lost_id))])
+	game.config.crate_lost = 1
+	PhysicsServer3D.body_set_state(lost_body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, dropped)
+	lost_body.global_transform = dropped
+	game.crates.tick(TICK)
+	_check(not game.loot.exists(lost_id) and game.crates.toy_of(lost_id) == null, "and with zz_crate_lost 1 it is removed with its loot entry, so no stand-in goes after it")
+	game.config.crate_lost = 0
 
 	game.config.physics_crates = false
 	var off_spot := STREET + Vector3(0.0, 0.0, -8.0)

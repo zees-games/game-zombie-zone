@@ -987,7 +987,8 @@ func _can_walk_to(player, at: Vector3) -> bool:
 	var kept = nav.filter
 	if nav.has_method(&"relabel"):
 		nav.filter = nav.bot_filter
-	var path: PackedVector3Array = nav.find_smooth_path(player.feet(), at, 2.5, true, 2)
+	# Not partial: a way to the nearest point of another piece of the graph is a path that ends short of the item, and a stand-in that took it stood there until the idle watchdog.
+	var path: PackedVector3Array = nav.find_smooth_path(player.feet(), at, 2.5, false, 2)
 	nav.filter = kept
 	return not path.is_empty()
 
@@ -1068,6 +1069,14 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			return false
 
 	var at: Vector3 = loot.position_of(best)
+
+	# A crate pushed or dropped onto another level since it was judged: judge again.
+	if best == kept and at.distance_to(memory.get("pick_judged_at", at)) > 1.0 and not _can_walk_to(player, at):
+		_give_up_pick(memory, loot, best)
+		return false
+
+	if best != kept or at.distance_to(memory.get("pick_judged_at", at)) > 1.0:
+		memory["pick_judged_at"] = at
 
 	var eye: Vector3 = player.eye_position()
 	var in_reach: bool = eye.distance_to(at) <= game.config.use_reach

@@ -561,6 +561,12 @@ func setup_seconds() -> float:
 ## Most crate bodies in the world; loot laid beyond it lies static, as with `zz_physics_crates 0`.
 @export_range(1, 2048, 1) var crate_max_bodies: int = 128
 
+## A crate this far below where it last rested has fallen out of the map (a drop over a pit) and is recovered (0: only the map's kill height counts).
+@export_range(0.0, 200.0, 1.0) var crate_fall_limit: float = 15.0
+
+## What becomes of a lost crate: back to where it last rested (never rested: gone), or just gone.
+@export_enum("rest", "remove") var crate_lost: int = 0
+
 ## Seconds primary fire is held to open a carried box (server file key `box_deploy_seconds`,
 ## cvar `zz_box_deploy_seconds`, 0.5 to 15), and the radius (metres) the survivor may drift in
 ## meanwhile before it is cancelled. 1 s is quick enough to open one mid-fight; it was 3.5, which

@@ -80,6 +80,7 @@ func _ensure() -> bool:
 	_box.rules = DotPropToyRules.new()
 	_box.gravity = game.config.gravity
 	_box.kill_y = game.map.kill_height()
+	var _l := _box.lost.connect(_on_lost)
 	var physics = game.physics
 	if physics != null:
 		_box.loose_layer = physics.layer_mask(&"toy")
@@ -101,6 +102,8 @@ func _apply_rules() -> void:
 	_box.rules.max_awake = clampi(cfg.crate_max_active, 1, 256)
 	_box.rules.push_scale = cfg.crate_push
 	_box.sleep_after = cfg.crate_sleep_seconds
+	_box.fall_limit = cfg.crate_fall_limit
+	_box.lost_mode = DotPropToyBox.LostMode.REMOVE if cfg.crate_lost == 1 else DotPropToyBox.LostMode.LAST_REST
 
 
 func _on_added(id: int, kind: StringName, _item: StringName, at: Vector3) -> void:
@@ -115,6 +118,18 @@ func _on_added(id: int, kind: StringName, _item: StringName, at: Vector3) -> voi
 	if toy != null:
 		_toys[id] = toy
 		_sent[id] = true
+
+
+## A crate fell out of the map. One that never rested has no place to go back to, so it is
+## removed with its loot entry; the others are put back by the box and their entry follows.
+func _on_lost(toy: DotPropToy) -> void:
+	var id := id_of(toy)
+	if id < 0:
+		return
+	var back := _box.lost_mode == DotPropToyBox.LostMode.LAST_REST and _box.has_rested(toy)
+	DotLog.debug(CHANNEL, "a crate fell out of the map", {"id": id, "recovered": back})
+	if not back:
+		game.loot.remove(id)
 
 
 func _on_removed(id: int, _by: StringName) -> void:
