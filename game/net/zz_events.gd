@@ -382,7 +382,8 @@ static func read_armed(r: DotNetReader) -> Dictionary:
 ## and goal (0 for none), who is left, the objective in play and its state.
 static func write_clock(
 	round_number: int, phase: int, elapsed: float, held: float, goal: float,
-	alive: int, playable: bool, objective: int, objective_state: int, objective_ends: float
+	alive: int, playable: bool, objective: int, objective_state: int, objective_ends: float,
+	grace_left: float = 0.0
 ) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(round_number)
@@ -395,6 +396,7 @@ static func write_clock(
 	w.write_uint(clampi(objective + 1, 0, 31), 5)
 	w.write_uint(clampi(objective_state, 0, 3), 2)
 	w.write_float_range(clampf(objective_ends, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_float_range(clampf(grace_left, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
 	return w.to_bytes()
 
 
@@ -409,10 +411,11 @@ static func read_clock(r: DotNetReader) -> Dictionary:
 	var objective := r.read_uint(5) - 1
 	var objective_state := r.read_uint(2)
 	var objective_ends := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	var grace_left := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
 	return {
 		"round": round_number, "phase": phase, "elapsed": elapsed, "held": held, "goal": goal,
 		"alive": alive, "playable": playable, "objective": objective,
-		"objective_state": objective_state, "objective_ends": objective_ends, "ok": r.ok(),
+		"objective_state": objective_state, "objective_ends": objective_ends, "grace_left": grace_left, "ok": r.ok(),
 	}
 
 

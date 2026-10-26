@@ -312,6 +312,11 @@ var survival: ZzSurvival = null
 ## What a client was told of the hold, the shape of [method ZzSurvival.state]; empty for none.
 var remote_survival: Dictionary = {}
 
+## The start grace: no zombies for the first seconds of a map (`zz_escape_grace_seconds`). The server's; a client reads [member remote_grace_left].
+var grace := DotNpcDirectorGrace.new()
+## Seconds of grace a client was told are left (0 when none, or the HUD countdown is off).
+var remote_grace_left: float = 0.0
+
 ## Every barricade of the map in play: id -> {health, max, intact, label}. Both ends keep it:
 ## the server decides, a client is told (BARRICADE) and draws it.
 var barricades: Dictionary = {}
@@ -1591,6 +1596,7 @@ func _on_round_started(number: int) -> void:
 	if progress != null:
 		progress.on_round_began()
 
+	grace.clear()
 	_set_phase(Phase.READY)
 	round_began.emit(number, map.id())
 
@@ -1606,6 +1612,7 @@ func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 
 	_set_phase(Phase.IDLE)
 	_stop_survival()
+	grace.clear()
 
 	if horde != null:
 		horde.stop_pacing()
@@ -1917,6 +1924,9 @@ func _advance_phase(delta: float) -> void:
 		phase_elapsed = 0.0
 		return
 
+	if grace.is_active() and phase == Phase.PLAY:
+		grace.tick(delta)
+
 	match phase:
 		Phase.READY:
 			if _anybody_left_start() or phase_elapsed >= config.start_grace_seconds:
@@ -1925,7 +1935,7 @@ func _advance_phase(delta: float) -> void:
 				_check_round()
 		Phase.PLAY:
 			# A survival map's hold starts with its first objective, when it has one.
-			if is_survival() and authoritative and (objective_states.is_empty() or objective_states[0] == &"done"):
+			if is_survival() and authoritative and not grace.is_active() and (objective_states.is_empty() or objective_states[0] == &"done"):
 				if survival == null:
 					_start_survival()
 				if survival != null:
@@ -1952,6 +1962,16 @@ func _anybody_left_start() -> bool:
 func _begin_play() -> void:
 	_set_phase(Phase.PLAY)
 
+	var grace_seconds := grace_seconds_for_map()
+	if authoritative and grace_seconds > 0.0 and grace.begin(grace_seconds):
+		if not grace.ended.is_connected(_on_grace_ended):
+			grace.ended.connect(_on_grace_ended)
+		notice.emit("Zombies arrive in %s. Trade and get ready." % _clock(grace_seconds))
+		shop_changed.emit()
+		if not is_survival():
+			notice.emit("Make for the shelter.")
+		return
+
 	# A survival map's horde is the hold's (it starts on the next tick); an exodus map's is the
 	# director's, from now.
 	if horde != null and not is_survival():
@@ -1959,6 +1979,32 @@ func _begin_play() -> void:
 
 	if not is_survival():
 		notice.emit("Make for the shelter.")
+
+
+## Seconds of start grace this map gets: 0 when the cvars leave it out (`zz_grace_maps`, `zz_escape_grace_seconds`).
+func grace_seconds_for_map() -> float:
+	match config.grace_maps:
+		0:
+			return 0.0
+		1:
+			return config.escape_grace_seconds if not is_survival() else 0.0
+	return config.escape_grace_seconds
+
+
+## Seconds the HUD counts down to the zombies; 0 when no grace runs or `zz_grace_hud` is 0.
+func grace_left_for_hud() -> float:
+	if authoritative:
+		return grace.left if grace.is_active() and config.grace_hud == 1 else 0.0
+	return remote_grace_left
+
+
+func _on_grace_ended(_skipped: bool) -> void:
+	if not authoritative:
+		return
+	notice.emit("The zombies are coming!")
+	shop_changed.emit()
+	if horde != null and not is_survival():
+		horde.start_pacing(false)
 
 
 ## Server: the hold begins. Its schedule's first stage sets the horde going.
@@ -2075,6 +2121,7 @@ func _decide(won: bool, why: String) -> void:
 	_won = won
 	_why = why
 
+	grace.clear()
 	if horde != null:
 		horde.stop_pacing()
 

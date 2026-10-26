@@ -56,6 +56,23 @@ A trader stands where the map's `traders:` say (the document or `game: traders:`
 | `menu`, `radius` | | E near the trader opens the menu (weapons, grenades, ammo per gun and refill, supplies, deployable boxes), listed with price, owned/full state and stats |
 | `price_multiplier`, `categories`, `disabled`, `items`, `ammo`, `supplies`, `boxes`, `prices` | | prices and the list; `items: {shotgun: 300}` or `{shotgun: {enabled: false}}` per item |
 
+### When the trader sells, and the start grace
+
+The trader is closed while the horde is on (default `available: waves`: the setup period, the grace and a survival map's breathers). A survivor who presses E at a closed trader is told `zz_trader_closed_message`; a menu open when the round turns closes with the same sentence. Every cvar below is also a `config/game.yml` key (`cfg/game/game-zombie-zone/config/game.yml`, the server's copy of it under `cfg/server/`) and a live, savable row in the workbench; none needs a restart (the grace length is read when a map starts). `zz_grace_hud` and `zz_trader_closed_message` are replicated.
+
+| Cvar | Default | Meaning |
+| --- | --- | --- |
+| `zz_trader_setup` | -1 (yes) | sells before a map starts and between maps; 1 yes, 0 no, -1 default |
+| `zz_trader_grace` | -1 (yes) | sells during the start grace |
+| `zz_trader_breather` | -1 (from `zz_trader_when`) | sells in a survival map's breathers |
+| `zz_trader_round` | -1 (from `zz_trader_when`, no unless 2) | sells while the horde is on: the "during the round" switch |
+| `zz_trader_closed_message` | `Trader closed: round in progress` | the sentence; empty is silent |
+| `zz_escape_grace_seconds` | 30 | seconds after a map starts with no zombie spawned, woken or targeting anyone; 0 off |
+| `zz_grace_maps` | 1 | 0 no map, 1 escape (exodus) maps only, 2 every map (a survival hold then begins after the grace) |
+| `zz_grace_hud` | 1 | 1 shows "Zombies arrive in 0:23"; the end is always announced |
+
+The grace is dot-npc-ai-director's `DotNpcDirectorGrace`, set as `director.grace`; another game uses it the same way. The default of 30 s is long enough to buy and spread out and short enough that the horde is not a pause in the map.
+
 The price of a weapon is its tier's (`prices:`); a melee weapon is not sold unless `items` gives it a price. The ground shelf and the menu share the window, the stock pool (`trader_stock`) and the points.
 
 ## Configuration, the workbench and passing through teammates

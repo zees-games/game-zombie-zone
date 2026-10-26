@@ -1553,6 +1553,7 @@ func _bind_config(world: ZzGame) -> void:
 	for cvar_name: String in HAND_FIELDS:
 		if console.has_name(cvar_name):
 			hand[HAND_FIELDS[cvar_name]] = cvar_name
+	binder.replicate_keys = PackedStringArray(["trader_closed_message", "grace_hud"])
 	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(n: String) -> bool:
 		return console.has_name(n) or hand.has(n.trim_prefix("zz_")))
 	binder.bind_commands(add_command)

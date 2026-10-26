@@ -831,7 +831,7 @@ func _clock_body() -> PackedByteArray:
 	return ZzEvents.write_clock(
 		game.round_number, game.phase, game.phase_elapsed, game.survival_elapsed,
 		game.survival_goal, game.alive_on(ZzGame.SURVIVORS), game.sides_are_playable(),
-		index, state, ends
+		index, state, ends, game.grace.left if game.grace.is_active() and game.config.grace_hud == 1 else 0.0
 	)
 
 
@@ -2276,6 +2276,7 @@ func _apply_clock(reader: DotNetReader) -> void:
 	game.survival_elapsed = float(clock["held"])
 	game.survival_goal = float(clock["goal"])
 	game.remote_alive = int(clock["alive"])
+	game.remote_grace_left = float(clock["grace_left"])
 	game.remote_playable = bool(clock["playable"])
 	game.remote_seconds_left = maxf(game.survival_goal - game.survival_elapsed, 0.0) if game.survival_goal > 0.0 else -1.0
 

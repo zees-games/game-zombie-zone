@@ -17,8 +17,9 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 11
-const CHECKS := 59
+const ZzHud := preload("../game/zz_hud.gd")
+const SECTIONS := 12
+const CHECKS := 75
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -52,6 +53,7 @@ func _run() -> void:
 		_test_spawner()
 		_test_trader()
 		_test_shop()
+		_test_trader_phases_and_grace()
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -385,6 +387,7 @@ func _test_shop() -> void:
 	var game = _client.game
 	var me := _client.player
 	var cfg = game.config
+	game.grace.clear()
 	cfg.trader_enabled = -1
 	cfg.trader_when = -1
 	game._set_phase(game.Phase.READY)
@@ -436,11 +439,96 @@ func _test_shop() -> void:
 	_finished()
 
 
+func _test_trader_phases_and_grace() -> void:
+	_section("the trader per phase, and the start grace: no zombies until it ends")
+	var game = _client.game
+	var cfg = game.config
+	var sp = game.spawners
+	var me := _client.player
+	cfg.trader_enabled = -1
+	cfg.trader_when = -1
+	cfg.trader_setup = -1
+	cfg.trader_grace = -1
+	cfg.trader_breather = -1
+	cfg.trader_round = -1
+	cfg.grace_maps = 2
+	cfg.escape_grace_seconds = 5.0
+	game.grace.clear()
+	game._set_phase(game.Phase.READY)
+	sp.start_round({"id": "grace_probe", "traders": [{"id": "own", "at": [0, 0, 8], "slots": 2}]})
+	sp.tick()
+	_check(sp.trader_window() == &"setup" and sp.trader_open(), "before the map starts the trader is open")
+
+	game.horde.stop_pacing()
+	game._begin_play()
+	sp.tick()
+	_check(game.grace.is_active() and sp.trader_window() == &"grace" and sp.trader_open(), "in the grace it is open")
+	_check(not game.horde.pacing and game.horde.spawner.all_npcs().is_empty(), "and no zombie exists or is paced")
+	_check(game.grace_left_for_hud() > 4.0 and ZzHud.grace_line(23.0) == "Zombies arrive in 0:23", "the HUD counts down", ZzHud.grace_line(23.0))
+	cfg.grace_hud = 0
+	_check(game.grace_left_for_hud() == 0.0, "zz_grace_hud 0 hides the countdown")
+	cfg.grace_hud = 1
+
+	for i in 4:
+		game._advance_phase(1.0)
+	game.horde.tick(0.1)
+	var targeted := false
+	for sid: StringName in game.horde._survivors:
+		targeted = targeted or bool(game.horde._survivors[sid]["alive"])
+	_check(game.grace.is_active() and not game.horde.pacing and game.horde.spawner.all_npcs().is_empty() and not targeted, "four seconds in, still none, and nobody is a target")
+	cfg.trader_grace = 0
+	sp.tick()
+	_check(not sp.trader_open() and sp.closed_message() == "Trader closed: round in progress", "zz_trader_grace 0 closes it, with the sentence")
+	cfg.trader_grace = -1
+
+	game._advance_phase(1.5)
+	sp.tick()
+	_check(not game.grace.is_active() and game.horde.pacing, "the grace ends and the pacing starts")
+	var spawned := 0
+	for i in 600:
+		game.horde.tick(0.1)
+	spawned = game.horde.spawner.all_npcs().size()
+	_check(spawned > 0 or game.horde.director.spawn_points.is_empty(), "and zombies spawn after it", "%d" % spawned)
+	_check(sp.trader_window() == &"round" and not sp.trader_open(), "then the trader closes for the round")
+	me.points = 10000
+	me.place_at(sp.trader_sites()[0], 0.0)
+	_check(not game.shop.buy(me, "armour"), "and sells nothing")
+	cfg.trader_round = 1
+	sp.tick()
+	_check(sp.trader_open(), "zz_trader_during_round: zz_trader_round 1 keeps it open")
+	cfg.trader_round = -1
+	cfg.trader_setup = 0
+	game._set_phase(game.Phase.READY)
+	sp.tick()
+	_check(not sp.trader_open(), "zz_trader_setup 0 closes it before the start")
+	cfg.trader_setup = -1
+
+	cfg.grace_maps = 0
+	game.grace.clear()
+	game._set_phase(game.Phase.READY)
+	game._begin_play()
+	_check(not game.grace.is_active() and game.horde.pacing, "zz_grace_maps 0: no grace, the horde runs at once")
+	cfg.grace_maps = 1
+	_check(game.grace_seconds_for_map() == (0.0 if game.is_survival() else 5.0), "zz_grace_maps 1: escape maps only")
+	cfg.grace_maps = 1
+	cfg.escape_grace_seconds = 30.0
+	_check(game.grace_seconds_for_map() == (0.0 if game.is_survival() else 30.0), "the shipped grace is 30 s")
+
+	game.horde.stop_pacing()
+	game.grace.clear()
+	cfg.grace_maps = 1
+	cfg.escape_grace_seconds = 30.0
+	game._set_phase(game.Phase.READY)
+	sp.start_round({"id": "spawner_probe"})
+	_finished()
+
+
 func _test_trader() -> void:
 	_section("the startup trader: present in the setup period, per config after it, starting points, a purchase")
 	var game = _client.game
 	var me := _client.player
 	var cfg = game.config
+	game.grace.clear()
 	cfg.trader_enabled = -1
 	cfg.trader_when = -1
 	cfg.trader_despawn = -1

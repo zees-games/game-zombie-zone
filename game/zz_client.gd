@@ -2017,8 +2017,8 @@ func _on_shop_json(json: String) -> void:
 
 
 ## Whether the local survivor stands within reach of an open trader.
-func _near_trader() -> bool:
-	if player == null or not player.can_act() or not bool(shop_state.get("menu", false)) or not bool(shop_state.get("open", false)):
+func _near_trader(only_open := true) -> bool:
+	if player == null or not player.can_act() or not bool(shop_state.get("menu", false)) or (only_open and not bool(shop_state.get("open", false))):
 		return false
 	var feet := player.feet()
 	for at: Variant in shop_state.get("at", []):
@@ -2039,7 +2039,7 @@ func open_shop() -> void:
 	_firing = false
 	_aiming = false
 	_suspend_input(true)
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	platform.hold_pointer(&"shop")
 	_chat_shown(false)
 	_shop_menu.open(shop_state.get("items", []), player.points, _shop_item_state)
 
@@ -2056,7 +2056,7 @@ func close_shop() -> void:
 	_shop_menu.close()
 	_chat_shown(true)
 	_suspend_input(false)
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	platform.release_pointer(&"shop")
 
 
 ## Closes the menu when its trader goes or its customer leaves; keeps its balance and states current while it is up.
@@ -2064,6 +2064,8 @@ func _follow_shop_menu() -> void:
 	if not is_shop_open():
 		return
 	if not _near_trader():
+		if not bool(shop_state.get("open", false)) and str(shop_state.get("closed_message", "")) != "":
+			game.notice.emit(str(shop_state["closed_message"]))
 		close_shop()
 		return
 	_shop_menu.refresh(shop_state.get("items", []), player.points)
@@ -2393,6 +2395,10 @@ func _key_event(event: InputEvent) -> bool:
 		if pressed and _near_trader() and _prompt() == "":
 			open_shop()
 			return true
+		if pressed and not _near_trader() and _near_trader(false) and _prompt() == "":
+			var why := str(shop_state.get("closed_message", ""))
+			if why != "":
+				game.notice.emit(why)
 		_using = pressed
 		return true
 

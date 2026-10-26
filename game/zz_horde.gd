@@ -249,6 +249,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	director.rules = _rules()
 	director.population = [ZzNpcs.COMMON]
 	director.enabled = false
+	director.grace = game.grace if game != null else null
 	add_child(director)
 
 	game.combat.entity_killed.connect(_on_entity_killed)
@@ -826,7 +827,7 @@ func _rebuild_candidates() -> void:
 		var state: DotFpsState = player.controller.state
 		# A seat behind its loading cover is not a target: not chased, not spawned at, not counted
 		# in the crowd's size (dot-game's "still loading"); it is still alive for the round.
-		var alive: bool = player.is_alive() and not player.watching and game.can_be_harmed(id)
+		var alive: bool = player.is_alive() and not player.watching and game.can_be_harmed(id) and not game.grace.is_active()
 
 		_survivors[id] = {
 			"position": state.position,

@@ -122,10 +122,10 @@ func _describe(def: DotWeaponDef, tier: StringName) -> String:
 func state_json() -> String:
 	var at: Array = []
 	if game.spawners != null:
-		for pos: Vector3 in game.spawners.trader_positions():
+		for pos: Vector3 in game.spawners.trader_sites():
 			at.append([snappedf(pos.x, 0.01), snappedf(pos.y, 0.01), snappedf(pos.z, 0.01)])
 	return JSON.stringify({"menu": menu_enabled(), "open": game.spawners != null and game.spawners.trader_open(),
-		"radius": radius(), "at": at, "items": items() if menu_enabled() else []})
+		"radius": radius(), "at": at, "closed_message": game.spawners.closed_message() if game.spawners != null else "", "items": items() if menu_enabled() else []})
 
 
 ## Whether [param player] stands within reach of an open trader.

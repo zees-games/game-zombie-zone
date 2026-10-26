@@ -551,9 +551,18 @@ func _draw_top() -> void:
 	elif not game.is_survival() and game.phase == ZzGame.Phase.PLAY and sub == "":
 		sub = "Make for the shelter"
 
+	var grace_left := game.grace_left_for_hud()
+	if grace_left > 0.0:
+		sub = grace_line(grace_left)
+
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
 	strip.show_clock(clock, clock_low, under if clock != "" else "")
+
+
+## The line under the title while the start grace runs; static so a suite reads it without a screen.
+static func grace_line(seconds: float) -> String:
+	return "Zombies arrive in %s" % DotScoreStrip.clock_text(ceilf(seconds))
 
 
 ## What the top says between a decided map and the next: `[title, clock, under the clock]`.

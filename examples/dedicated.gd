@@ -182,6 +182,7 @@ func _test_the_module_loads() -> void:
 	config.exodus_team = 0
 	config.end_hold_seconds = 0.5
 	config.start_grace_seconds = 2.0
+	config.escape_grace_seconds = 0.0
 	config.map_ids = PackedStringArray(["zz_practice"])
 
 	game = ZzGame.new()

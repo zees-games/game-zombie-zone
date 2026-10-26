@@ -161,6 +161,19 @@ func setup_seconds() -> float:
 @export_range(-1, 2) var trader_when: int = -1
 ## `zz_trader_despawn`: 1 the shelf is gone when closed, 0 it stays standing and refuses to sell.
 @export_range(-1, 1) var trader_despawn: int = -1
+## Per phase, whether the trader sells (1 yes, 0 no, -1 derives it from `zz_trader_when`): `zz_trader_setup` before a map starts and between maps, `zz_trader_grace` in the grace after it starts, `zz_trader_breather` in a survival map's breathers, `zz_trader_round` while the horde is on.
+@export_range(-1, 1) var trader_setup: int = -1
+@export_range(-1, 1) var trader_grace: int = -1
+@export_range(-1, 1) var trader_breather: int = -1
+@export_range(-1, 1) var trader_round: int = -1
+## `zz_trader_closed_message`: what a survivor is told on E at a closed trader; empty is silent.
+@export var trader_closed_message: String = "Trader closed: round in progress"
+## `zz_grace_maps`: which maps get the start grace, 0 none, 1 escape (exodus) maps only, 2 every map.
+@export_range(0, 2) var grace_maps: int = 1
+## `zz_escape_grace_seconds`: seconds after a map starts with no zombies (none spawn, none are woken, none target anyone). 0 is off. Set before the map starts.
+@export_range(0.0, 600.0, 1.0) var escape_grace_seconds: float = 30.0
+## `zz_grace_hud`: 1 shows "Zombies arrive in 0:23" on the HUD.
+@export_range(0, 1) var grace_hud: int = 1
 ## `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode).
 @export_range(-1, 1000000) var start_points: int = -1
 

@@ -21,6 +21,7 @@ func _boot_world() -> void:
 	config.minimum_players = 0
 	config.exodus_team = 0
 	config.start_grace_seconds = 0.0
+	config.escape_grace_seconds = 0.0
 	config.wanderer_density = 0.0
 	config.director_enabled = false
 	config.map_ids = PackedStringArray([map_id])

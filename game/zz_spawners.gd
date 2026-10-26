@@ -253,6 +253,13 @@ func grant_start_points_to(player, start: int = -1) -> void:
 
 
 ## True while the trader may sell: the setup period (before the horde runs), and by `available` a survival map's breathers or always.
+func trader_sites() -> Array:
+	var out: Array = []
+	for id: StringName in _traders:
+		out.append(_traders[id]["at"])
+	return out
+
+
 func trader_positions() -> Array:
 	var out: Array = []
 	if _present:
@@ -265,18 +272,38 @@ func trader_open() -> bool:
 	return _open
 
 
-func _window_open() -> bool:
+## Which window a map is in, for `zz_trader_<window>`: setup (not started, or between maps), grace, breather (a survival map's rest between waves) or round.
+func trader_window() -> StringName:
 	if game.phase != game.Phase.PLAY:
-		return true
-	match trader_when():
-		WHEN_ALWAYS:
+		return &"setup"
+	if game.grace.is_active():
+		return &"grace"
+	var run = game.survival
+	if game.is_survival() and (run == null or run.waves == null or run.waves.stage != DotNpcDirectorWaves.Stage.HORDE):
+		return &"breather"
+	return &"round"
+
+
+## Whether the trader sells in [param window]: its own cvar when set, else what `zz_trader_when` / the file's `available` says.
+func trader_allowed_in(window: StringName) -> bool:
+	var forced: int = int(game.config.get("trader_" + String(window)))
+	if forced >= 0:
+		return forced == 1
+	match window:
+		&"setup", &"grace":
 			return true
-		WHEN_WAVES:
-			var run = game.survival
-			if not game.is_survival():
-				return false
-			return run == null or run.waves == null or run.waves.stage != DotNpcDirectorWaves.Stage.HORDE
-	return false
+		&"breather":
+			return trader_when() >= WHEN_WAVES
+	return trader_when() == WHEN_ALWAYS
+
+
+func _window_open() -> bool:
+	return trader_allowed_in(trader_window())
+
+
+## The sentence for a survivor who presses use at a closed trader; "" is silence.
+func closed_message() -> String:
+	return str(game.config.trader_closed_message)
 
 
 func _follow_window() -> void:

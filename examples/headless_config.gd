@@ -7,7 +7,7 @@ extends Node
 ## [/codeblock]
 
 const ZzConfig := preload("../game/zz_config.gd")
-const CHECKS := 20
+const CHECKS := 29
 
 var _passed := 0
 var _failed := 0
@@ -39,6 +39,11 @@ func _run() -> void:
 		keys.append(e["key"])
 	for k in ["waves", "wave_size", "respawn_base_seconds", "box_drop_common", "defib_range", "down_attack", "start_points", "difficulty"]:
 		_check(keys.has(k), "%s is exposed" % k)
+
+	for k in ["trader_setup", "trader_grace", "trader_breather", "trader_round", "trader_closed_message", "grace_maps", "escape_grace_seconds", "grace_hud"]:
+		_check(keys.has(k), "%s is exposed (a zz_%s cvar, a game.yml key, a workbench row)" % [k, k])
+	_check(config.escape_grace_seconds == 30.0 and config.grace_maps == 1 and config.grace_hud == 1 and config.trader_round == -1
+		and config.trader_closed_message == "Trader closed: round in progress", "the grace and trader window defaults")
 
 	var console := DotConsole.new()
 	add_child(console)

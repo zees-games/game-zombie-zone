@@ -112,6 +112,7 @@ func _game(id: StringName, start := false) -> ZzGame:
 	config.minimum_players = 0
 	config.keep_progress = false
 	config.start_grace_seconds = 600.0
+	config.escape_grace_seconds = 0.0
 	config.map_ids = PackedStringArray([String(id)])
 
 	var game := ZzGame.new()
