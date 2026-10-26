@@ -1431,6 +1431,11 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 		sounds.free()
 
 	var drawn_props: Node3D = world.call(&"build_props")
+	# The document's solid boxes collide whether or not the library models came; draw the ones nothing else shows.
+	if world.has_method(&"draw_unseen_boxes"):
+		var unseen: Node3D = world.call(&"draw_unseen_boxes", doc.get("solid_props", []))
+		if unseen != null:
+			drawn_props.add_child(unseen)
 	if drawn_props.get_child_count() > 0:
 		node.add_child(drawn_props)
 	else:

@@ -373,10 +373,17 @@ func _test_worlds() -> void:
 					PackedStringArray(["res://addons/dot_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
 				wanted_props += 1
 		var props_node := host.get_node_or_null("Props")
-		var drawn_props := props_node.get_child_count() if props_node != null else 0
+		# Low-detail boxes for library models this checkout lacks (dot-map's proxies) are counted apart.
+		var drawn_props := 0
+		var proxies := 0
+		for c in (props_node.get_children() if props_node != null else []):
+			if c.has_meta(&"dot_map_proxy") or c.name == &"UnseenProps":
+				proxies += 1
+			else:
+				drawn_props += 1
 		var bodies := host.find_children("*", "CollisionObject3D", true, false).size()
 		_check(drawn_props == wanted_props and bodies == 0, "%s: its sounds and props attach" % id,
-			"%d props drawn of %d, %d bodies" % [drawn_props, wanted_props, bodies])
+			"%d props drawn of %d, %d proxies, %d bodies" % [drawn_props, wanted_props, proxies, bodies])
 		host.free()
 		extras.free()
 
