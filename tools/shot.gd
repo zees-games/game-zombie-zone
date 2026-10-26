@@ -28,6 +28,8 @@ var _pin := &""
 var _sever: PackedStringArray = PackedStringArray()
 var _pin_me := false
 var _box := &""
+## --hard=N: N Hard Box stacks running, so the mutants are drawn faded.
+var _hard := 0
 ## --aim=DEG: every stand-in but you holds this view pitch (up positive), so a frame from the
 ## side shows the figures' spines and gun arms following it (`"aim"` in ZzPlayer's set_motion).
 var _aim := INF
@@ -116,6 +118,8 @@ func _ready() -> void:
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
 		elif arg.begins_with("--aim="):
 			_aim = arg.trim_prefix("--aim=").to_float()
+		elif arg.begins_with("--hard="):
+			_hard = arg.trim_prefix("--hard=").to_int()
 		elif arg.begins_with("--box="):
 			_box = StringName(arg.trim_prefix("--box="))
 		elif arg == "--workshop":
@@ -327,6 +331,9 @@ func _run() -> void:
 			if body != null and body.get(&"limbs") != null:
 				for limb in _sever:
 					body.limbs.sever(StringName(limb), body.global_position + Vector3(0.0, 1.2, 0.0), Vector3(0.0, 2.0, 1.0))
+
+	for _stack in _hard:
+		game.boxes.run([{"do": "effect", "name": "hard"}], {"opener": local, "at": stand, "box": &"hard"})
 
 	if _box != &"" and game.boxes != null:
 		var _dropped := game.boxes.drop(_box, stand + Vector3(0.0, 0.0, -2.2))

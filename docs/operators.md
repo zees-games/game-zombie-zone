@@ -143,3 +143,14 @@ Commons chase slowly by default. A common's chase speed starts at `zz_common_spe
 | `zz_angry_runner_fraction` | 0.3 | share of commons that run while an Angry Box lasts (0 to 1) |
 
 The two boxes are types in `boxes/boxes.json` (`hard`, `angry`; effects of the same names), so an owner can drop them, change their drop weights or duration, or add more stacks by editing that file.
+
+## Mutants fade as Hard Box stacks rise
+
+Mutants (every zombie kind but a common) are drawn more transparent for each Hard Box stack on: alpha is `1 - stacks * zz_mutant_fade_per_stack`, never below `zz_mutant_min_alpha`, so a mutant is never fully invisible. It is drawing only: health, hit boxes, damage and senses are unchanged, and the shadow stays solid. Every part fades together (body, worn parts, stumps and flying limbs), and the stack count changing mid-life redraws at once. The four cvars are replicated, so clients follow them; changing one takes effect on the next frame.
+
+| Cvar | Default | Meaning |
+| --- | --- | --- |
+| `zz_mutant_fade` | 1 | 0 restores the old solid look for every zombie |
+| `zz_mutant_min_alpha` | 0.25 | the most transparent a zombie gets (0.05 to 1) |
+| `zz_mutant_fade_per_stack` | 0.1 | alpha lost per Hard Box stack (0 to 0.5) |
+| `zz_common_fade` | 0 | 1 fades commons the same way (they are many, so each one costs its own material copy while faded) |

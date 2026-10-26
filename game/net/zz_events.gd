@@ -629,7 +629,7 @@ static func write_effects(summary: Array) -> PackedByteArray:
 	var rows: Array = []
 
 	for e: Dictionary in summary:
-		rows.append([str(e["title"]), int(e["stacks"]), snappedf(float(e["seconds"]), 0.1), str(e["who"]), snappedf(float(e["scale"]), 0.01)])
+		rows.append([str(e["title"]), int(e["stacks"]), snappedf(float(e["seconds"]), 0.1), str(e["who"]), snappedf(float(e["scale"]), 0.01), str(e.get("id", ""))])
 
 	w.write_string(JSON.stringify(rows), EFFECTS_BYTES)
 	return w.to_bytes()
@@ -643,7 +643,7 @@ static func read_effects(r: DotNetReader) -> Dictionary:
 	if parsed is Array:
 		for row: Variant in parsed:
 			if row is Array and (row as Array).size() >= 5:
-				rows.append({"title": str(row[0]), "stacks": int(row[1]), "seconds": float(row[2]), "who": str(row[3]), "scale": float(row[4])})
+				rows.append({"title": str(row[0]), "stacks": int(row[1]), "seconds": float(row[2]), "who": str(row[3]), "scale": float(row[4]), "id": str(row[5]) if (row as Array).size() > 5 else ""})
 
 	return {"effects": rows, "ok": r.ok()}
 

@@ -447,6 +447,14 @@ func setup_seconds() -> float:
 @export_range(0.5, 15.0, 0.1) var common_speed_base: float = 2.2
 @export_range(0.0, 5.0, 0.05) var common_speed_per_hard_stack: float = 0.8
 @export_range(0.5, 15.0, 0.1) var common_speed_max: float = 6.3
+
+## `zz_mutant_fade*`: mutants (every kind but a common) draw more transparent as Hard Box stacks
+## rise, `mutant_fade_per_stack` of alpha per stack, never below `mutant_min_alpha`. Drawing only;
+## 0 on `mutant_fade` restores the solid look. `common_fade` 1 fades commons the same way.
+@export_range(0, 1) var mutant_fade: int = 1
+@export_range(0.05, 1.0, 0.01) var mutant_min_alpha: float = 0.25
+@export_range(0.0, 0.5, 0.01) var mutant_fade_per_stack: float = 0.1
+@export_range(0, 1) var common_fade: int = 0
 @export_range(0.0, 1.0, 0.05) var angry_runner_fraction: float = 0.3
 @export_range(0.0, 100.0, 0.5) var common_damage: float = 2.0
 

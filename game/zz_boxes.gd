@@ -1110,7 +1110,7 @@ func effects_summary() -> Array:
 		var key := "%s|%s" % [e["what"], e["who"]]
 
 		if not grouped.has(key):
-			grouped[key] = {"title": e["title"], "stacks": 0, "seconds": 0.0, "who": _who_name(StringName(str(e["who"]))), "scale": 1.0}
+			grouped[key] = {"id": String(e["what"]), "title": e["title"], "stacks": 0, "seconds": 0.0, "who": _who_name(StringName(str(e["who"]))), "scale": 1.0}
 
 		var g: Dictionary = grouped[key]
 		g["stacks"] = int(g["stacks"]) + int(e.get("stacks", 1))

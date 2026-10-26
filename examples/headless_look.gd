@@ -2,6 +2,9 @@ extends Node
 
 const ZzBlood := preload("../game/zz_blood.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzFade := preload("../game/zz_fade.gd")
+const ZzConfig := preload("../game/zz_config.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 ## Blood behind a hit body (zz_blood.gd over dot-fx's DotFxDecals) and which end of a hold's
 ## day a map's own light becomes (ZzMapDoc.take_derived_light).
@@ -10,7 +13,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 ## godot --headless --path . res://examples/headless_look.tscn
 ## [/codeblock]
 
-const CHECKS := 15
+const CHECKS := 28
 
 var _passed := 0
 var _failed := 0
@@ -26,6 +29,7 @@ func _run() -> void:
 	print("game-zombie-zone: blood and the hold's day")
 	await _blood()
 	_light()
+	_fade()
 	print("")
 	print("%d passed, %d failed" % [_passed, _failed])
 	for line in _failures:
@@ -106,6 +110,57 @@ func _light() -> void:
 	var exodus := {"mode": ZzMapDoc.EXODUS, "environment": ZzMapDoc.IMPORTER_ENV.duplicate(true)}
 	ZzMapDoc.take_derived_light(exodus, day)
 	_check(exodus["environment"] == day and not exodus.has("day_environment"), "an exodus map takes the derived day as its light")
+
+
+func _fade() -> void:
+	var c := ZzConfig.new()
+	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 0), 1.0), "no Hard Box stack: a mutant is solid")
+	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 3), 1.0 - 3.0 * c.mutant_fade_per_stack), "three stacks: alpha is 1 - 3 * step")
+	_check(is_equal_approx(ZzFade.alpha(c, &"brute", 40), c.mutant_min_alpha), "any number of stacks stops at the minimum alpha")
+	c.mutant_min_alpha = 0.0
+	_check(ZzFade.alpha(c, &"ram", 99) >= ZzFade.FLOOR, "a minimum of 0 still leaves the mutant visible")
+	c.mutant_min_alpha = 0.25
+	_check(is_equal_approx(ZzFade.alpha(c, &"common", 5), 1.0), "commons are untouched by default")
+	c.common_fade = 1
+	_check(ZzFade.alpha(c, &"common", 5) < 1.0, "zz_common_fade 1 fades commons too")
+	c.mutant_fade = 0
+	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 8), 1.0) and is_equal_approx(ZzFade.alpha(c, &"common", 8), 1.0), "zz_mutant_fade 0 gives 1.0 for everyone")
+
+	var a := ZzZombieView.new()
+	var b := ZzZombieView.new()
+	add_child(a)
+	add_child(b)
+	a.build(&"spitter", 0)
+	b.build(&"spitter", 0)
+	var meshes_a := a.find_children("*", "MeshInstance3D", true, false)
+	var solid: Material = (meshes_a[0] as MeshInstance3D).material_override
+	_check(meshes_a.size() >= 2 and solid == (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override,
+		"two spitters share one look before any fade (%d parts)" % meshes_a.size())
+	a.set_fade(0.5)
+	var every := true
+	for node: Node in a.find_children("*", "MeshInstance3D", true, false):
+		var m := node as MeshInstance3D
+		var mat := m.material_override
+		var half := false
+		if mat is ShaderMaterial:
+			half = is_equal_approx(float((mat as ShaderMaterial).get_shader_parameter(&"fade")), 0.5)
+		elif mat is BaseMaterial3D:
+			half = is_equal_approx((mat as BaseMaterial3D).albedo_color.a, 0.5)
+		every = every and half
+	_check(every, "every part of the body, its worn parts included, is drawn at 0.5")
+	var other: Material = (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override
+	_check(other == solid and (solid as ShaderMaterial).get_shader_parameter(&"fade") == null, "the shared look was not written")
+	b.set_fade(0.8)
+	var first := (a.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override as ShaderMaterial
+	var second := (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override as ShaderMaterial
+	_check(is_equal_approx(float(first.get_shader_parameter(&"fade")), 0.5) and is_equal_approx(float(second.get_shader_parameter(&"fade")), 0.8),
+		"two zombies of one kind keep independent alpha")
+	a.set_fade(0.3)
+	_check(is_equal_approx(float(first.get_shader_parameter(&"fade")), 0.3), "a stack change mid-life updates the same zombie")
+	a.set_fade(1.0)
+	_check((a.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override == solid, "back to solid: the shared look returns")
+	a.queue_free()
+	b.queue_free()
 
 
 func _check(ok: bool, what: String) -> void:

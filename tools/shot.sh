@@ -14,6 +14,7 @@
 #   tools/shot.sh --view=action --action=emote:dance --seconds=0.5   # a stand-in playing an avatar action (pose:sit)
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
+#   tools/shot.sh --view=survivor --spawn=ram:2 --hard=5          # five Hard Box stacks: mutants drawn faded
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=crawl                                       # down, crawling, the speed boxes in the strip (crawl_third: the figure)
 #   tools/shot.sh --view=killcam --seconds=3                         # the last stand replayed (--seconds=9: the podium)
@@ -43,7 +44,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cloud-store=*|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

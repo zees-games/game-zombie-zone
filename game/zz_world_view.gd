@@ -9,6 +9,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
+const ZzFade := preload("zz_fade.gd")
 
 ## Everything a client draws in the world that is not a survivor or a wall: the zombies and their
 ## bodies, what lies on the ground, pools of acid and fire, things thrown, explosions, and a
@@ -35,6 +36,10 @@ const BLAST_SECONDS := 0.6
 const GRAVITY := 18.0
 
 var audio: ZzAudio = null
+## The config the fade cvars live in, and the Hard Box stacks last heard of; a change of either redraws.
+var fade_config: Object = null
+var hard_stacks := 0
+var _fade_seen := ""
 
 ## key -> {body, view, last_anim, next_moan, voice_handle}
 var _zombies: Dictionary = {}
@@ -128,6 +133,7 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	var _limbs := ZzZombieLimbs.attach(body, kind, variant)
 	ZzZombieLimbs.bind_view(body, view)
 
+	view.set_fade(_alpha_of(kind))
 	var entry := {"body": body, "view": view, "kind": kind, "last_anim": -1,
 		"next_moan": _rng.randf_range(1.0, 9.0), "voice": 0}
 	_zombies[key] = entry
@@ -690,7 +696,44 @@ func unpin(victim: Node3D) -> void:
 
 # --- The frame ---------------------------------------------------------------------
 
+## The effects the HUD lists; the Hard Box's stacks are what fade the zombies.
+func set_effects(rows: Array) -> void:
+	var stacks := 0
+
+	for row: Variant in rows:
+		if row is Dictionary and str((row as Dictionary).get("id", "")) == "hard":
+			stacks += int((row as Dictionary).get("stacks", 0))
+
+	hard_stacks = stacks
+
+
+func _alpha_of(kind: StringName) -> float:
+	return ZzFade.alpha(fade_config, kind, hard_stacks) if fade_config != null else 1.0
+
+
+## Redraws every zombie when a stack or a cvar moved, so a change mid-life shows at once.
+func _refresh_fade() -> void:
+	if fade_config == null:
+		return
+
+	var sig := "%d|%s|%s|%s|%s" % [hard_stacks, fade_config.get(&"mutant_fade"), fade_config.get(&"mutant_min_alpha"),
+		fade_config.get(&"mutant_fade_per_stack"), fade_config.get(&"common_fade")]
+
+	if sig == _fade_seen:
+		return
+
+	_fade_seen = sig
+
+	for key: Variant in _zombies:
+		var entry: Dictionary = _zombies[key]
+		var view: ZzZombieView = entry["view"]
+
+		if is_instance_valid(view):
+			view.set_fade(_alpha_of(entry["kind"]))
+
+
 func present(delta: float, listener: Vector3) -> void:
+	_refresh_fade()
 	_present_zombies(delta, listener)
 	_present_corpses(delta)
 	_present_loot(delta)

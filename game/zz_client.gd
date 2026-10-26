@@ -305,6 +305,7 @@ func _build_world_view() -> void:
 	world_view.audio = audio
 	world_view.ragdoll_mask = game.ground_mask()
 	world_view.ragdoll_rules = game.ragdoll_rules
+	world_view.fade_config = game.config
 	game.add_child(world_view)
 	blood = ZzBlood.new()
 	blood.mask = game.world_mask()
@@ -523,6 +524,8 @@ func _build_netcode() -> DotResult:
 	bridge.bile_received.connect(_on_bile)
 	bridge.objective_received.connect(_on_objective)
 	bridge.effects_received.connect(func(rows: Array) -> void:
+		if world_view != null:
+			world_view.set_effects(rows)
 		if hud != null:
 			hud.set_effects(rows))
 	bridge.hurt_received.connect(_on_hurt)
@@ -711,6 +714,8 @@ func _hear_the_world() -> void:
 		game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
 			_on_box(_session(id), type_id, title, message))
 		game.boxes.effects_changed.connect(func() -> void:
+			if world_view != null:
+				world_view.set_effects(game.boxes.effects_summary())
 			if hud != null:
 				hud.set_effects(game.boxes.effects_summary()))
 
@@ -1360,10 +1365,26 @@ static func follow_roster(source: Object, config: ZzConfig) -> bool:
 	var held := String(source.call(&"replicated_cvar", "zz_team_roster", ""))
 	if held != "":
 		config.team_roster = held.strip_edges() == "1"
+	for name: String in FADE_CVARS:
+		var fade_held := String(source.call(&"replicated_cvar", name, ""))
+		if fade_held != "":
+			_set_fade_cvar(config, name, fade_held)
 	source.connect(&"replicated_cvar_changed", func(cvar_name: String, value: String) -> void:
 		if cvar_name == "zz_team_roster":
-			config.team_roster = value.strip_edges() == "1")
+			config.team_roster = value.strip_edges() == "1"
+		elif FADE_CVARS.has(cvar_name):
+			_set_fade_cvar(config, cvar_name, value))
 	return true
+
+
+const FADE_CVARS: Array[String] = ["zz_mutant_fade", "zz_mutant_min_alpha", "zz_mutant_fade_per_stack", "zz_common_fade"]
+
+
+static func _set_fade_cvar(config: ZzConfig, cvar_name: String, value: String) -> void:
+	var text := value.strip_edges()
+
+	if text.is_valid_float():
+		config.set(StringName(cvar_name.trim_prefix("zz_")), text.to_int() if cvar_name.ends_with("_fade") else text.to_float())
 
 
 ## The key an action is on, as the player has it bound.
