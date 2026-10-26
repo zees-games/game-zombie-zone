@@ -45,7 +45,7 @@
 # Seed every random choice is drawn from.
 # seed_value: 20261010
 # Whether zed-dot-weapons (real-world guns, launchers, a flamethrower, molotovs, pipe bombs and bile jars) is...
-# second_weapon_pack: true
+# second_weapon_pack: false
 
 # --- Netcode
 # Metres within which a survivor is sent a common's and a special's updates (live). A client hides a mirror t... [40.0..1000.0]

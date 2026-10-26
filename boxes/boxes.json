@@ -145,7 +145,7 @@
      "actions": [
       {
        "do": "give_weapon",
-       "id": "launcher"
+       "id": "zz_m79"
       }
      ]
     },
@@ -779,7 +779,7 @@
      "actions": [
       {
        "do": "give_weapon",
-       "id": "sniper"
+       "id": "zz_sniper"
       }
      ]
     }
@@ -832,13 +832,13 @@
     },
     {
      "id": "minigun",
-     "title": "Minigun",
+     "title": "Machine gun",
      "weight": 2,
-     "message": "{name} has a minigun. Stand behind them.",
+     "message": "{name} has a machine gun. Stand behind them.",
      "actions": [
       {
        "do": "give_weapon",
-       "id": "minigun"
+       "id": "zz_lmg"
       }
      ]
     },

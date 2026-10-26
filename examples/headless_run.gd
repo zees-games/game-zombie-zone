@@ -1672,7 +1672,9 @@ func _test_loot() -> void:
 ## Until `_throw` existed every grenade and rocket in the game cost ammunition and did nothing.
 func _test_both_packs() -> void:
 	_section("both weapon packs, and what they throw")
-	var game := await _team(1, _quiet)
+	var game := await _team(1, func(c: ZzConfig) -> void:
+		_quiet.call(c)
+		c.second_weapon_pack = true)
 	var me := game.survivors()[0]
 	me.health.invulnerable = true
 	me.place_at(STREET, 0.0)

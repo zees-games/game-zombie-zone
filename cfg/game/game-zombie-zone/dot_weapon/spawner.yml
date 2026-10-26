@@ -178,6 +178,11 @@ game:
       zz_aa12: 560
       zz_rpg: 1100
       zz_machete: 70
+      zz_bat: 40
+      zz_crowbar: 60
+      zz_axe: 110
+      zz_sledge: 180
+      zz_hunting: 400
     ammo:
       magazine_share: 0.08   # a magazine costs this share of the gun's price (at least 5)
       refill_share: 0.2      # a refill to the cap costs this share (at least 10)
