@@ -165,6 +165,9 @@ var _survivors: Dictionary = {}
 var _doc: Dictionary = {}
 ## The server-only `hulls/<id>.nav.json` of a map whose boxes the wire budget cut ([method ZzMap.read_nav_extra]).
 var _nav_extra: Dictionary = {}
+
+var _usable_posts: Array = []
+var _usable_posts_for: DotNpcNavData = null
 var _populated: bool = true
 var _time: float = 0.0
 
@@ -382,10 +385,15 @@ func _mark_narrow() -> void:
 			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"))
 
 
+## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
+func usable_posts() -> Array:
+	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
+
+
 func _plan_notes() -> void:
 	var posts := PackedVector3Array()
 
-	for p: Array in _doc.get("posts", []):
+	for p: Array in usable_posts():
 		posts.append(ZzMapDoc.v3(p))
 
 	_mark_narrow()
@@ -506,6 +514,8 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 		return applied
 
 	_adopt_links()
+	_usable_posts = ZzNpcs.reachable_posts(nav, _doc)
+	_usable_posts_for = nav
 
 	var _from_nav := director.set_spawn_points_from_nav(nav, 6.0, DotNpcNavFilter.walking_only())
 	_add_hinted_spawns()
@@ -1481,7 +1491,29 @@ func _wave_origin() -> Vector3:
 
 		return p
 
-	return _spawn_point(15.0, 90.0, false)
+	var far := _spawn_point(15.0, 90.0, false)
+	return far if far != Vector3.INF else _last_resort_origin()
+
+
+## A small map holds nothing 15 m from its team that is out of sight (a house that is all start
+## area), and a wave with no origin never comes: the farthest ground that reaches somebody does,
+## seen or not.
+func _last_resort_origin() -> Vector3:
+	var nodes := _survivor_nodes()
+	var best := Vector3.INF
+	var best_gap := 2.0
+
+	for p: Vector3 in spawner.nav.data.points:
+		var gap := INF
+
+		for id in survivor_ids():
+			gap = minf(gap, p.distance_to(survivor_position(id)))
+
+		if gap > best_gap and _reaches_somebody(p, nodes):
+			best = p
+			best_gap = gap
+
+	return best
 
 
 ## The map's own commons (its wanderers) still alive are sent at the team, spread round it. A

@@ -45,8 +45,14 @@ const CHANNEL := "zz.npcs"
 ## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 3
+const NAV_CACHE_VERSION := 4
+
+## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
+const NAV_BRIDGE_GAP := 2.5
 const NAV_COVER_RANGE := 1.2
+
+## How far from a post the graph's nearest point may be for a stand-in to path to it.
+const POST_SNAP := 2.5
 
 const COMMON := &"common"
 const LEAPER := &"leaper"
@@ -505,7 +511,12 @@ static func with_nav_extra(doc: Dictionary, extra: Dictionary) -> Dictionary:
 
 	var out := doc.duplicate()
 	var boxes: Array = (doc.get("boxes", []) as Array).duplicate()
-	boxes.append_array(extra.get("boxes", []))
+
+	for box: Dictionary in extra.get("boxes", []):
+		# attach_world_collision takes only solid, clip and glass hulls: a nodraw brush of the whole map holds no body.
+		if str(box.get("kind", "")) != "nodraw":
+			boxes.append(box)
+
 	out["boxes"] = boxes
 	var nav: Dictionary = (doc.get("nav", {}) as Dictionary).duplicate()
 	nav["floors"] = _joined(nav.get("floors", []), extra.get("floors", []), 4)
@@ -531,6 +542,32 @@ static func _row_key(row: Array, keys: int) -> String:
 	for i in keys:
 		parts.append(str(roundi(float(row[i]) * 100.0)))
 	return ",".join(parts)
+
+
+## The map's posts whose nearest point is joined to the first survivor spawn's on [param nav]; every post when none
+## is (a map whose graph has no spawn point is not judged).
+static func reachable_posts(nav: DotNpcNavData, doc: Dictionary) -> Array:
+	var posts: Array = doc.get("posts", [])
+	var spawns: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
+
+	if spawns.is_empty() or posts.is_empty():
+		return posts
+
+	var graph := DotNpcNavGraph.new(nav)
+	var home := nav.nearest_point(ZzMapDoc.v3(spawns[0]["at"]), POST_SNAP)
+
+	if home < 0:
+		return posts
+
+	var kept: Array = []
+
+	for p: Variant in posts:
+		var point := nav.nearest_point(ZzMapDoc.v3(p), POST_SNAP)
+
+		if point >= 0 and graph.connected(home, point):
+			kept.append(p)
+
+	return kept if not kept.is_empty() else posts
 
 
 ## The posts and the points of the ground joined to the first survivor spawn on [param nav].
@@ -570,6 +607,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	builder.point_radius = builder.spacing * 1.25
 	builder.neighbour_reach = 1.6
 	builder.obstacle_under_feet = float(nav_doc.get("under_feet", -1.0))
+	builder.bridge_gap = float(nav_doc.get("bridge", NAV_BRIDGE_GAP))
 	builder.clearance = float(nav_doc.get("clearance", 0.35))
 	builder.generate_cover = true
 	builder.cover_range = NAV_COVER_RANGE

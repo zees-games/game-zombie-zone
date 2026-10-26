@@ -81,7 +81,7 @@ const MAX_LIGHTS := 1024
 const MAX_WATER := 24
 ## Solid-prop boxes a document may hold (the largest converted map has 1068). Past what fits the wire they stay on the
 ## server and the client builds them from its world pack ([method wire_form]).
-const MAX_SOLID_PROPS := 4000
+const MAX_SOLID_PROPS := 12000
 const MAX_SPAWNS := 64
 const MAX_ITEMS := 400
 const MAX_OBJECTIVES := 16
@@ -483,6 +483,8 @@ static func validate(source: Dictionary) -> DotResult:
 		nav["clearance"] = clampf(float((nav_in as Dictionary).get("clearance", 0.35)), 0.1, 1.5)
 		if (nav_in as Dictionary).has("under_feet"):
 			nav["under_feet"] = clampf(float((nav_in as Dictionary)["under_feet"]), 0.0, 1.5)
+		if (nav_in as Dictionary).has("bridge"):
+			nav["bridge"] = clampf(float((nav_in as Dictionary)["bridge"]), 0.0, 6.0)
 		for raw: Variant in (nav_in as Dictionary).get("floors", []):
 			var f := _floats(raw, 5)
 			if f[2] <= f[0] or f[3] <= f[1]:

@@ -316,7 +316,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 ## sorted by id, so it does not change while it plays), a ring round the post when there are
 ## more stand-ins than posts. The spawns when the map has no posts.
 func _post_of(player) -> Vector3:
-	var posts: Array = game.map_doc.get("posts", [])
+	var posts: Array = game.horde.usable_posts() if game.horde != null else game.map_doc.get("posts", [])
 
 	if posts.is_empty():
 		var spot: Array = game.map.spawn("survivors", _seat(player))

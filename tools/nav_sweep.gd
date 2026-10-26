@@ -8,6 +8,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const TICK := 1.0 / 64.0
 ## What a stand-in's path start and goal snap to (idle_probe's `_why_empty`).
@@ -15,6 +16,9 @@ const SNAP := 2.5
 
 ## --points: also lists every point of the maps named, marked "+" when the first spawn reaches it, then its piece number.
 var _points := false
+
+## --between=ax,ay,az,bx,by,bz: names the obstacle boxes that stop the builder joining two points.
+var _between := PackedFloat64Array()
 
 
 func _ready() -> void:
@@ -28,6 +32,8 @@ func _run() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
 			ids.append(arg.substr(6))
+		elif arg.begins_with("--between="):
+			_between = PackedFloat64Array(Array(arg.substr(10).split(",")).map(func(v: String) -> float: return v.to_float()))
 		elif arg == "--points":
 			_points = true
 		elif arg == "--all":
@@ -44,6 +50,9 @@ func _run() -> void:
 		if game == null:
 			print("%-28s no graph" % id)
 			continue
+
+		if _between.size() == 6:
+			_explain(game)
 
 		var line := _report(game)
 		bad_maps += 1 if line.contains("nopoint") or line.contains("island") else 0
@@ -94,6 +103,38 @@ func _built(id: String) -> Node:
 		return null
 
 	return game
+
+
+## Which obstacle boxes (grown by the clearance) hold the samples between two points.
+func _explain(game: Node) -> void:
+	var horde = game.horde
+	var props_size := func(id: StringName) -> Vector3:
+		return game.props_catalogue.size_of(id) if game.props_catalogue.has(id) else Vector3.ZERO
+
+	var blockers: Array[AABB] = []
+
+	if game.map != null and game.map.mechanics != null:
+		blockers = game.map.mechanics.rest_blockers()
+
+	var job := ZzNpcs.nav_job(ZzNpcs.with_nav_extra(horde._doc, horde._nav_extra), props_size, horde.open_gates, blockers, false, false)
+	var builder: DotNpcNavBuilder = job.make_builder.call([], {})
+	var a := Vector3(_between[0], _between[1], _between[2])
+	var b := Vector3(_between[3], _between[4], _between[5])
+	var hit := {}
+
+	for k in 21:
+		var p := a.lerp(b, k / 20.0)
+
+		for i in builder._obstacles.size():
+			var box: AABB = builder._obstacles[i]
+
+			if box.end.y >= p.y - builder._under_feet() and box.grow(builder.clearance).has_point(p):
+				hit[i] = "sample %d at %s box %s" % [k, p.snapped(Vector3.ONE * 0.01), box]
+
+	print("between: %d obstacles hold a sample" % hit.size())
+
+	for i: int in hit:
+		print("  ", hit[i])
 
 
 func _report(game: Node) -> String:
