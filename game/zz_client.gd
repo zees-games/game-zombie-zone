@@ -243,6 +243,9 @@ func _draw_world() -> void:
 	var _mode := platform.set_vis_mode(game.map.vis_mode)
 	game.map.cull_fn = platform.attach_visibility
 	game.map.use_lightmaps = bool(game.config.get(&"lightmaps")) if game.config != null else true
+	if game.config != null:
+		game.map.prop_shadow_min = float(game.config.get(&"prop_shadow_min"))
+		game.map.set_sun_shadow_splits(int(game.config.get(&"sun_shadow_splits")))
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")

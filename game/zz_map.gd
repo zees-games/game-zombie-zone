@@ -208,6 +208,10 @@ var _lamps: Array[Light3D] = []
 var _lamp_budget := ZzLampBudget.new()
 ## The most lamps lit at once (the nearest to the camera); a map may have many more, all in its bake.
 @export var realtime_lamps := 128
+## Cascades of the sun's shadow (1, 2 or 4), set by the client from `sun_shadow_splits`.
+var sun_shadow_splits := 4
+## Props shorter than this cast no sun shadow (0: all do); set by the client from `prop_shadow_min`.
+var prop_shadow_min := 0.0
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
 
@@ -1457,10 +1461,31 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 			drawn_props.add_child(unseen)
 	if drawn_props.get_child_count() > 0:
 		node.add_child(drawn_props)
+		_trim_prop_shadows(drawn_props)
 	else:
 		drawn_props.free()
 
 	_attach_fx(world, node)
+
+
+## Turns off the sun shadow of every prop under [param props] whose longest side is under [member prop_shadow_min].
+func _trim_prop_shadows(props: Node3D) -> void:
+	if prop_shadow_min <= 0.0:
+		return
+	for g in props.find_children("*", "GeometryInstance3D", true, false):
+		var geometry := g as GeometryInstance3D
+		var size := (geometry.global_transform * geometry.get_aabb()).size
+		if geometry.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON and maxf(size.x, maxf(size.y, size.z)) < prop_shadow_min:
+			geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
+## Sets the sun's cascades: each is another draw of every caster in it.
+func set_sun_shadow_splits(splits: int) -> void:
+	sun_shadow_splits = splits
+	if _sun == null:
+		return
+	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if splits <= 1 \
+		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if splits == 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 
 
 ## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's DotMapFx), capped per map.
@@ -1600,6 +1625,8 @@ func _build_environment() -> void:
 		_fill = _aim_fill(lighting, env_doc, _sun)
 		_sun.shadow_blur = 1.5
 		_sun.directional_shadow_max_distance = 60.0
+		# Rebuilt when a converted map's own light is taken, so the setting is applied here too.
+		set_sun_shadow_splits(sun_shadow_splits)
 		# The rig never draws a sun under 0.35, a floor for daylight worlds; a night map's
 		# moon there lit every street like an overcast afternoon. The map's own strength, on
 		# the rig's curve, without the floor.

@@ -574,6 +574,14 @@ func setup_seconds() -> float:
 ## lit materials and the document's lamps. `--zz-lightmaps=`.
 @export var lightmaps: bool = true
 
+## Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the old look) is
+## about twice the draws of 2 on a converted map. `--zz-sun-shadow-splits=`.
+@export_range(1, 4) var sun_shadow_splits: int = 2
+
+## Props whose longest side is under this many metres cast no sun shadow on a client (0: all do, as before). A can's shadow
+## is a draw call a player never reads. `--zz-prop-shadow-min=`.
+@export var prop_shadow_min: float = 1.2
+
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 

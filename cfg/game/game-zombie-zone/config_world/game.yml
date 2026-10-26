@@ -22,6 +22,10 @@
 # vis_mode: ""
 # Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the lit ma...
 # lightmaps: true
+# Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the old look) is about twice the draws of 2 on a converted map. `--zz-sun-shadow-splits=`.
+# sun_shadow_splits: 2
+# Props whose longest side is under this many metres cast no sun shadow on a client (0: all do, as before). A can's shadow is a draw call a player never reads. `--zz-prop-shadow-min=`.
+# prop_shadow_min: 1.2
 # Seed every random choice is drawn from.
 # seed_value: 20261010
 # Whether zed-dot-weapons (real-world guns, launchers, a flamethrower, molotovs, pipe bombs and bile jars) is...
