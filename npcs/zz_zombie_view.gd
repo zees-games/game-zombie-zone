@@ -1239,7 +1239,9 @@ func _pose_ground_strike() -> void:
 	var hips: int = _bones.get(&"Hips", -1)
 
 	if hips >= 0:
-		_skeleton.set_bone_pose_position(hips, _skeleton.get_bone_pose_position(hips) + Vector3(0.0, -0.32 * float(_look["height"]) / 1.75, 0.0))
+		# From the rest origin, not the current pose: no clip writes the hips' position, so adding
+		# to it sank the body 0.3 per frame until only the feet were left.
+		_skeleton.set_bone_pose_position(hips, _skeleton.get_bone_rest(hips).origin + Vector3(0.0, -0.32 * float(_look["height"]) / 1.75, 0.0))
 
 	_pitch(&"Abdomen", 0.5 + 0.5 * hit)
 	_pitch(&"Torso", 0.4 + 0.4 * hit)

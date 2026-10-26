@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 388
+const CHECKS := 389
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1028,6 +1028,7 @@ func _test_every_kind_animates() -> void:
 	var kinds: Array = ZzZombieView.LOOKS.keys()
 	var missing: Array = []
 	var flat: Array = []
+	var sunk: Array = []
 	var dark: Array = []
 	var bodies: Array = []
 	var counted := 0
@@ -1072,6 +1073,20 @@ func _test_every_kind_animates() -> void:
 			if player == null or not player.has_animation("zz/" + String(clip)):
 				missing.append("%s/%d" % [kind, anim])
 
+		# A pose written every frame must not build on its own last frame: held 120 times, the
+		# ground strike sank every body through the floor, leaving feet.
+		var hips: int = view._bones.get(&"Hips", -1)
+
+		if hips >= 0:
+			view._pose(ZzZombieBody.Anim.STRIKE_DOWN)
+			var settled: float = view._skeleton.get_bone_pose_position(hips).y
+
+			for _i in 120:
+				view._pose(ZzZombieBody.Anim.STRIKE_DOWN)
+
+			if absf(view._skeleton.get_bone_pose_position(hips).y - settled) > 0.001:
+				sunk.append("%s %.2f -> %.2f" % [kind, settled, view._skeleton.get_bone_pose_position(hips).y])
+
 		var arm: int = view._bones.get(&"UpperArm.L", -1)
 
 		if arm < 0:
@@ -1093,6 +1108,7 @@ func _test_every_kind_animates() -> void:
 	_check(dark.is_empty(), "every kind's body keeps a self-light and none glows over its whole skin", str(dark))
 	_check(missing.is_empty(), "every state of every kind resolves to a clip the kit has", str(missing))
 	_check(flat.is_empty(), "the pin, leap, reach, reel and ground strike each pose the arms", str(flat))
+	_check(sunk.is_empty(), "a held ground strike does not sink the body frame after frame", str(sunk))
 	root.queue_free()
 	_finished()
 
