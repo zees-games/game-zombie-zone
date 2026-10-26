@@ -100,3 +100,6 @@ Thumbs.db
 /addons/dot_peer_to_peer
 /addons/dot_player_class
 /addons/dot_server_query
+
+# Godot writes an .import beside each golden when a test run loads it; goldens are read as raw images.
+/tests/golden/*.import

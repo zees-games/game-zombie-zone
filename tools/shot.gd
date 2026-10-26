@@ -353,7 +353,7 @@ func _run() -> void:
 			else:
 				_free_camera().look_at_from_position(_at, _look)
 		"crates":
-			# A ring of ammo piles and boxes, then a blast in the middle; --seconds after it, seen from the side.
+			# A ring of ammo piles and boxes, a blast in the middle, and frames before it and 0.35 s and --seconds after.
 			_clear_view(game, local, stand)
 			var middle := stand + Vector3(0.0, 0.0, -5.0)
 			for n in 8:
@@ -361,9 +361,14 @@ func _run() -> void:
 				var spot := middle + Vector3(cos(a), 0.0, sin(a)) * 1.6
 				var _id := game.loot.add(ZzLoot.AMMO if n % 2 == 0 else ZzLoot.BOX, &"", game.ray_hit(spot + Vector3.UP, spot + Vector3.DOWN * 4.0), 600.0)
 			await _seconds_of(1.0)
-			_free_camera().look_at_from_position(middle + Vector3(5.5, 3.0, 4.5), middle + Vector3(0.0, 1.0, 0.0))
+			# Low and close: a crate is 0.3 m, and from the side a launch shows as crates leaving the ring.
+			_free_camera().look_at_from_position(middle + Vector3(3.6, 0.9, -2.4), middle + Vector3(0.0, 0.3, 0.0))
+			await _save_extra("_before")
 			game.explode(middle + Vector3(0.0, 0.3, 0.0), 6.0, 50.0, -1, &"grenade", 0.0)
-			await _seconds_of(_seconds)
+			await _save_extra("_t0")
+			await _seconds_of(0.35)
+			await _save_extra("_t035")
+			await _seconds_of(maxf(_seconds - 0.35, 0.65))
 		"third":
 			_client.call("toggle_view")
 			await _seconds_of(_seconds)

@@ -23,6 +23,7 @@
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope
 #   tools/shot.sh --view=room --zz-map-ids=zm_4way_tunnel --fire=break_roof_spawn:ForceSpawn --at=...   # a maker's copies
+#   tools/shot.sh --view=crates --seconds=1.2                         # a ring of crates, frames before the blast and 0, 0.35 s and --seconds after
 #   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
 #   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png
 #
@@ -52,6 +53,9 @@ done
 # A contact sheet is of the gun in hand: the stand-ins an exodus map seats beside the camera put
 # their own rifles in the corner of every hip frame (the yellow and blue shape bottom-left).
 [ "$view" = "weapons" ] && config+=("--zz-exodus-team=1")
+
+# The crates view wants flat open ground; the default map choice can land on a converted wall.
+if [ "$view" = "crates" ] && [[ " ${config[*]} " != *" --zz-map-ids="* ]]; then config+=("--zz-map-ids=zz_lot"); fi
 
 name="$view"
 for e in "${extra[@]}"; do
