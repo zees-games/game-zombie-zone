@@ -79,7 +79,9 @@ const MAX_TOYS := 96
 const MAX_LIGHTS := 1024
 
 const MAX_WATER := 24
-const MAX_SOLID_PROPS := 600
+## Solid-prop boxes a document may hold (the largest converted map has 1068). Past what fits the wire they stay on the
+## server and the client builds them from its world pack ([method wire_form]).
+const MAX_SOLID_PROPS := 4000
 const MAX_SPAWNS := 64
 const MAX_ITEMS := 400
 const MAX_OBJECTIVES := 16
@@ -415,6 +417,8 @@ static func validate(source: Dictionary) -> DotResult:
 
 	if not solid_props.is_empty():
 		doc["solid_props"] = solid_props
+	elif int(source.get("solid_props_total", 0)) > 0:
+		doc["solid_props_total"] = int(source["solid_props_total"])
 
 	var spawns: Variant = source.get("spawns", {})
 	if not (spawns is Dictionary):
@@ -748,17 +752,29 @@ static func _prop(raw: Variant) -> Dictionary:
 static func wire_form(doc: Dictionary) -> Dictionary:
 	var all: Array = doc.get("lights", [])
 	var keep := int(doc.get("wire_lamps", 0))
+	var props: Array = doc.get("solid_props", [])
+	var out := doc
+	var cut_lamps := keep > 0 and all.size() > keep
 
-	if keep <= 0 or all.size() <= keep:
-		return doc
+	if cut_lamps:
+		out = doc.duplicate()
+		out["lights_total"] = all.size()
+		out["lights_digest"] = JSON.stringify(all, "", true).sha256_text().substr(0, 16)
+		out["lights"] = all.slice(0, keep)
 
-	var out := doc.duplicate()
-	out["lights_total"] = all.size()
-	out["lights_digest"] = JSON.stringify(all, "", true).sha256_text().substr(0, 16)
+	# Solid props go first when the document will not fit: a client draws its world pack, whose manifest
+	# gives the same boxes ([method ZzMap.attach_world_props]); the server keeps the document it read.
+	if not props.is_empty() and _deflated_size(out) > WIRE_LIMIT - WIRE_HEADROOM:
+		if not cut_lamps:
+			out = doc.duplicate()
+		out.erase("solid_props")
+		out["solid_props_total"] = props.size()
+
+	if not cut_lamps:
+		return out
 
 	# Lamps are the one part of a document that can shrink: a map that fits a browser's message only
 	# by a few hundred bytes is one a longer name or an extra lamp pushes over, and then no web client gets it.
-	out["lights"] = all.slice(0, keep)
 
 	while keep > 0 and _deflated_size(out) > WIRE_LIMIT - WIRE_HEADROOM:
 		keep /= 2

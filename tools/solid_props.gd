@@ -47,6 +47,10 @@ func _initialize() -> void:
 				boxes.append([snappedf(o.x, 0.001), snappedf(o.y, 0.001), snappedf(o.z, 0.001),
 					snappedf(size.x, 0.001), snappedf(size.y, 0.001), snappedf(size.z, 0.001), snappedf(yaw, 0.01)])
 			body.free()
+		var clear := _clear_of_spawns(doc as Dictionary, boxes)
+		if clear.size() < boxes.size():
+			print(id, ": ", boxes.size() - clear.size(), " solid props left out: they stand where a spawn does")
+		boxes = clear
 		var kept := _keep_connected(doc as Dictionary, boxes)
 		if kept.size() < boxes.size():
 			print(id, ": ", boxes.size() - kept.size(), " solid props left out: they seal the horde's ground")
@@ -68,6 +72,30 @@ static func _places(doc: Dictionary) -> Array[Vector3]:
 	for o: Dictionary in doc.get("objectives", []):
 		var at: Array = o["at"]
 		out.append(Vector3(float(at[0]), float(at[1]), float(at[2])))
+	return out
+
+
+## [param boxes] without those a standing person at a spawn would be inside: a stand-in's box that overlaps where the author put people is the stand-in's error, never a wall.
+static func _clear_of_spawns(doc: Dictionary, boxes: Array) -> Array:
+	var spawns: Dictionary = doc.get("spawns", {})
+	var at: Array[Vector3] = []
+	for key: String in spawns:
+		for s: Variant in spawns[key]:
+			if s is Dictionary and (s as Dictionary).has("at"):
+				var a: Array = (s as Dictionary)["at"]
+				at.append(Vector3(float(a[0]), float(a[1]), float(a[2])))
+	var out := []
+	for box: Array in boxes:
+		var xf := Transform3D(Basis(Vector3.UP, deg_to_rad(float(box[6]))), Vector3(box[0], box[1], box[2]))
+		var half := Vector3(box[3], box[4], box[5]) * 0.5
+		var hit := false
+		for p in at:
+			var local := xf.affine_inverse() * (p + Vector3(0.0, 0.9, 0.0))
+			if absf(local.x) < half.x + 0.3 and absf(local.z) < half.z + 0.3 and absf(local.y) < half.y + 0.8:
+				hit = true
+				break
+		if not hit:
+			out.append(box)
 	return out
 
 

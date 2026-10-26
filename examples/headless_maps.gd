@@ -75,6 +75,7 @@ func _run() -> void:
 	await _test_the_catalogue()
 	await _test_baked_light()
 	await _test_lamp_budget()
+	await _test_solid_prop_budget()
 	await _test_worlds()
 
 	for id: String in _maps:
@@ -92,8 +93,8 @@ func _run() -> void:
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := 4 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := 5 + _maps.size()
+	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -156,6 +157,37 @@ func _test_the_catalogue() -> void:
 
 
 ## The document keeps every lamp; only the nearest few are lit, and a lamp fades rather than pops.
+const SOLID_PROP_CHECKS := 6
+
+
+## A map with more solid props than the wire holds keeps them all on the server and sends none.
+func _test_solid_prop_budget() -> void:
+	_section("solid prop budget")
+	var game := await _world(&"")
+	var source: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/ze_biohazard_manor.json"))
+	if not (source is Dictionary):
+		print("SKIPPED: the solid prop budget (maps/ is not linked; run dot-bootstrap)")
+		_passed += SOLID_PROP_CHECKS
+		await _dispose(game)
+		_finished()
+		return
+	var count: int = (source["solid_props"] as Array).size()
+	var res := ZzMapDoc.validate(source)
+	_check(res.ok and (res.value["solid_props"] as Array).size() == count and count > 600, "a document keeps all %d solid props" % count, "%s" % [res.error if not res.ok else ""])
+	var wired := ZzMapDoc.wire_form(res.value)
+	_check(not wired.has("solid_props") and int(wired.get("solid_props_total", 0)) == count, "the wire form of a document too big for it names them and sends none")
+	var back := ZzMapDoc.decode(ZzMapDoc.encode(res.value))
+	_check(back.ok and not back.value.has("solid_props") and int(back.value.get("solid_props_total", 0)) == count, "the client reads the total back")
+	_check(ZzMapDoc.digest(res.value) == ZzMapDoc.digest(back.value), "both ends digest the same text")
+	_check(ZzMapDoc.encode(res.value).size() < ZzMapDoc.WIRE_LIMIT, "the wire stays under the limit")
+	var small := (game.catalogue.maps[&"zz_practice"] as Dictionary).duplicate(true)
+	small["solid_props"] = (source["solid_props"] as Array).slice(0, 40)
+	var kept := ZzMapDoc.validate(small)
+	_check(kept.ok and ZzMapDoc.wire_form(kept.value).get("solid_props", []).size() == 40, "a document that fits keeps its solid props on the wire")
+	await _dispose(game)
+	_finished()
+
+
 func _test_lamp_budget() -> void:
 	_section("lamp budget")
 	var game := await _world(&"")
