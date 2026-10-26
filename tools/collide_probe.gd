@@ -2,7 +2,7 @@ extends Node
 ## Compares the drawn world with what the server collides with (dot-core's DotCollisionSweep): drawn floor and walls with no
 ## collision, and collision with nothing drawn. fall_probe asks what a capsule does on the collision alone; this asks whether the
 ## collision is where the picture says it is.
-##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400]
+##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400] [--examples=6]
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -20,18 +20,21 @@ func _run() -> void:
 	var ids := PackedStringArray()
 	var step := 2.0
 	var stands := 400
+	var examples := 6
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--step="):
 			step = float(a.substr(7))
 		elif a.begins_with("--stands="):
 			stands = int(a.substr(9))
+		elif a.begins_with("--examples="):
+			examples = int(a.substr(11))
 		elif a == "--all":
 			ids = FallProbe.ids_in_checkout()
 		else:
 			ids.append_array(a.split(","))
 	var rows: Array[String] = []
 	for id in ids:
-		var sweep: DotCollisionSweep = await probe(StringName(id), step, stands)
+		var sweep: DotCollisionSweep = await probe(StringName(id), step, stands, examples)
 		if sweep == null:
 			print("%s: no drawn world" % id)
 			continue
@@ -46,7 +49,7 @@ func _run() -> void:
 	get_tree().quit()
 
 
-func probe(id: StringName, step: float, stands: int) -> DotCollisionSweep:
+func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollisionSweep:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -65,12 +68,14 @@ func probe(id: StringName, step: float, stands: int) -> DotCollisionSweep:
 	var prefix := map.local_world_prefix()
 	var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	if not read.ok:
+		print("%s: %s (%s)" % [id, read.error.message, prefix])
 		game.queue_free()
 		await get_tree().physics_frame
 		return null
 	var world: RefCounted = read.value
 	var space := map.get_world_3d().direct_space_state
 	var sweep := DotCollisionSweep.new(space, game.physics.collision_mask(&"player"))
+	sweep.examples_per_kind = examples
 	for rec: Dictionary in world.get("surfaces"):
 		if int(rec["model"]) != 0 or rec.get("sky3d", false):
 			continue
@@ -91,6 +96,15 @@ func probe(id: StringName, step: float, stands: int) -> DotCollisionSweep:
 		for i in idx.size():
 			faces[i] = verts[idx[i]]
 		sweep.add_faces(tag, faces)
+	# A solid prop collides as a box and is drawn as its stand-in, so the stand-ins (and the boxes the client draws where a model is missing) count as drawn.
+	var props: Node3D = world.call(&"build_props")
+	print("%s: %d prop models missing, %d drawn as boxes of their bounds" % [id, world.get("missing_models"), world.get("missing_proxied")])
+	var unseen: Node3D = world.call(&"draw_unseen_boxes", map.doc.get("solid_props", []))
+	if unseen != null:
+		props.add_child(unseen)
+	add_child(props)
+	sweep.add_node(&"prop", props)
+	props.free()
 	var floors: Array = (map.doc.get("nav", {}) as Dictionary).get("floors", [])
 	sweep.play = func(p: Vector3) -> bool:
 		for fl: Array in floors:
