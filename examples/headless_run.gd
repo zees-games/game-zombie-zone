@@ -2194,8 +2194,8 @@ func _test_water() -> void:
 		"every setting is a cvar, the ones a client predicts replicated", str(added.size()))
 	_check(not game.water_rules.set_cvar("zz_water_swim_speed", "fast") and game.water_rules.set_cvar("zz_water_swim_speed", "99")
 		and game.water_rules.swim_speed <= 12.0, "junk is refused and a huge speed clamped")
-	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= 32,
-		"the wading modifier fits the motor's 32", str(me.controller.motor.modifier_defs.size()))
+	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= DotFpsNetSync.MODIFIER_BITS,
+		"the wading modifier fits the motor's modifier bits", str(me.controller.motor.modifier_defs.size()))
 	_finished()
 
 
