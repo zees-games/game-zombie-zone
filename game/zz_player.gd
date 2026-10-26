@@ -162,6 +162,10 @@ var wanted_slot: int = 0
 ## shove button. Server side; a press is the difference between the two.
 var actions: int = 0
 var previous_actions: int = 0
+
+## Set when the arsenal changed, so the game re-weighs it next tick; the speed scale last applied.
+var carry_dirty: bool = false
+var carry_scale: float = 1.0
 var shove_held: bool = false
 var previous_shove: bool = false
 
@@ -403,7 +407,7 @@ func breathe(delta: float, rules: ZzWaterRules) -> float:
 ## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
 ## the two must agree.
 static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+	var t := DotFpsTunables.with_profile("legacy")
 	t.max_speed = p_config.run_speed if p_config != null else 6.2
 	t.gravity = p_config.gravity if p_config != null else 20.0
 	t.jump_height = p_config.jump_height if p_config != null else 1.1
