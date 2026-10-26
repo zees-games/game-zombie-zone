@@ -16,7 +16,7 @@ const ZzNetLink := preload("../game/net/zz_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 13
-const CHECKS := 97
+const CHECKS := 98
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -188,6 +188,7 @@ func _test_the_module_loads() -> void:
 	game = ZzGame.new()
 	game.name = "World"
 	game.config = config
+	game.config_binder = ZzConfig.make_binder(config)
 	game.tick_rate = Engine.physics_ticks_per_second
 	add_child(game)
 	await get_tree().process_frame
@@ -202,6 +203,10 @@ func _test_the_module_loads() -> void:
 	var module := _module()
 	_check(module != null and module.get("net") != null and module.get("bridge") != null,
 		"with its netcode and the game's bridge")
+	var wb: DotGameWorkbench = module.get("workbench") if module != null else null
+	var amb: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "ambience", "id": DotGameWorkbench.CVAR_SET_ID, "key": "zz_ambient_volume", "value": 0.2}) if wb != null and wb.api != null else null
+	_check(amb != null and amb.ok and is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.2), "the zz_ambient* cvars are a workbench set and an edit moves the cvar", "" if amb == null or amb.ok else amb.error.message)
+	var _restore := server.console.set_cvar("zz_ambient_volume", "0.5")
 
 	var net: DotNetManager = module.get("net") if module != null else null
 	_check(net != null and net.config.tick_rate == TICK_RATE, "the netcode runs at the configured rate")

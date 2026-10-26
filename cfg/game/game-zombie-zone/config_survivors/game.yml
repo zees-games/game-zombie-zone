@@ -24,8 +24,12 @@
 # revive_range: 1.9
 # Seconds before a dead survivor is rescued: back in, beside whoever is furthest along, with half health and ... [0.0..600.0]
 # rescue_seconds: 75.0
+# Whether a survivor below the map's floor plane is put back on the last ground they stood on (`zz_fall_rescu...
+# fall_rescue: true
+# Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off). [0.0..600.0]
+# stuck_rescue_seconds: 12.0
 # What everybody starts a map holding, by weapon id. The first is drawn.
-# start_weapons: ["zz_pistol", "zz_knife"]   # with weapons.legacy on in packs.yml: ["pistol", "knife"]
+# start_weapons: ["zz_pistol", "zz_knife"]
 # How many medkits and pills each survivor starts a map with. [0..1]
 # start_medkits: 1
 #  [0..1]
@@ -96,6 +100,25 @@
 # box_lifetime: 150.0
 # How many boxes a survivor carries (E picks one up into the hands; primary fire held opens it). 0: no carryi... [0..6]
 # box_carry: 1
+# Ammo piles and boxes on the ground are rigid bodies: pushed along by survivors and zombies, shot, thrown by...
+# physics_crates: true
+# Which loot kinds are crates, comma separated (ammo, box, medkit, pills, weapon, throwable, defib).
+# crate_kinds: "ammo,box"
+# A crate's mass in kilograms, against a walking survivor's push (`crate_push` scales it) and a blast. [0.25..200.0]
+# crate_mass: 8.0
+# How hard a walk pushes a crate, against the walker's speed (0: nothing pushes one), and whether zombies pus... [0.0..4.0]
+# crate_push: 1.0
+# crate_zombie_push: true
+# How hard a blast throws a crate, against a barrel's blast speed (0: blasts leave crates alone). [0.0..8.0]
+# crate_blast: 1.0
+# The most crates simulating at once; the longest untouched sleep first. A crate at rest for `crate_sleep_sec... [1..256]
+# crate_max_active: 16
+#  [0.0..30.0]
+# crate_sleep_seconds: 2.0
+# Times a second the moved crates' places go to clients. [1.0..30.0]
+# crate_sync_hz: 10.0
+# Most crate bodies in the world; loot laid beyond it lies static, as with `zz_physics_crates 0`. [1..2048]
+# crate_max_bodies: 128
 # Seconds primary fire is held to open a carried box (server file key `box_deploy_seconds`, cvar `zz_box_depl... [0.5..15.0]
 # box_deploy_seconds: 1.0
 #  [0.2..6.0]
@@ -107,6 +130,8 @@
 # box_instakill_max: -1.0
 #  [1.0..100.0]
 # box_instakill_special_scale: 4.0
+# A limb's health follows the zombie's actual health (a later wave's, a brute's), and Instakill's boosted dam...
+# limb_follow_health: true
 # Boxes lying about at once; past it, the oldest goes. [1..200]
 # max_boxes: 16
 # Whether boxes exist at all.

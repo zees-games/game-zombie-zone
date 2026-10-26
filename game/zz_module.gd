@@ -1,5 +1,7 @@
 extends DotGameModule
 
+## The workbench kind of the ambience cvar set.
+const AMBIENT_KIND := "ambience"
 const ZzMapConfig := preload("zz_map_config.gd")
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzServices := preload("zz_services.gd")
@@ -1640,7 +1642,11 @@ func _start_workbench(world: ZzGame) -> void:
 	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
 		return admin_permit.is_valid() and actor is String and bool(admin_permit.call(actor, flag))
 	if world.config_binder != null:
-		workbench.add_set(world.config_binder.profile_set(), "Game settings")
+		for set: DotProfileSet in world.config_binder.profile_sets():
+			workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var ambient_set := DotGameWorkbench.cvar_set(console, world.ambient_rules.cvar_types(), AMBIENT_KIND)
+	if ambient_set != null:
+		workbench.add_set(ambient_set, "Ambience (zz_ambient*)")
 	add_child(workbench)
 	var started := workbench.start(rt)
 	if not started.ok:
@@ -1648,3 +1654,5 @@ func _start_workbench(world: ZzGame) -> void:
 		return
 	if world.config_binder != null:
 		world.config_binder.attach(rt)
+	if ambient_set != null:
+		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)

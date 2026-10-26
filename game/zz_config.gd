@@ -771,16 +771,33 @@ func validate() -> DotResult:
 	return DotResult.success(null)
 
 
-## The survival style's name, as the cvar and the HUD say it.
+## `@export_group` -> the cfg file it lives in: `cfg/game/game-zombie-zone/config_<file>/game.yml`.
+const CFG_FILES := {
+	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
+	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
+	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors",
+	"Gore": "world", "The maps": "world", "Netcode": "world",
+}
+
+
+## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
+static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
+	var b := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
+	b.grouped = true
+	b.group_files = CFG_FILES
+	return b
+
+
 ## The layered load through [DotGameConfigBinder] (JSON, cfg/ yml, env, argv; strict on a server). The value is the binder.
 static func boot(config: DotConfig, json_path: String) -> DotResult:
-	var binder := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
+	var binder := make_binder(config, json_path)
 	var loaded := binder.load_layers()
 	if not loaded.ok:
 		return loaded
 	return DotResult.success(binder)
 
 
+## The survival style's name, as the cvar and the HUD say it.
 func survival_style_name() -> String:
 	return ["waves", "nights", "clock"][clampi(survival_style, 0, 2)]
 

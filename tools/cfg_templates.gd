@@ -6,7 +6,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 
 
 func _init() -> void:
-	var binder := DotGameConfigBinder.create(ZzConfig.new(), "game-zombie-zone", "zz", "user://cfg/zombiezone.json")
+	var binder := ZzConfig.make_binder(ZzConfig.new())
 	var files := binder.template_files()
 	for path: String in files:
 		var res := DotPaths.write_text("res://" + path, files[path])

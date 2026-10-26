@@ -7,7 +7,9 @@ extends Node
 ## [/codeblock]
 
 const ZzConfig := preload("../game/zz_config.gd")
-const CHECKS := 29
+const ROOT := "user://zz_cfgtest"
+const GAME := "game-zombie-zone"
+const CHECKS := 38
 
 var _passed := 0
 var _failed := 0
@@ -28,9 +30,12 @@ func _check(ok: bool, what: String, _detail := "") -> void:
 
 
 func _run() -> void:
+	if OS.get_cmdline_user_args().has("--probe"):
+		_probe()
+		return
 	print("game-zombie-zone: config binder")
 	var config := ZzConfig.new()
-	var binder := DotGameConfigBinder.create(config, "game-zombie-zone", "zz")
+	var binder := ZzConfig.make_binder(config)
 	binder.strict = true
 	_check(binder.load_layers().ok, "defaults load")
 	_check(binder.diff().is_empty(), "no diff at the code defaults")
@@ -61,37 +66,52 @@ func _run() -> void:
 	var bad := FileAccess.open("user://zz_config_bad.json", FileAccess.WRITE)
 	bad.store_string('{"no_such_field": 1}')
 	bad.close()
-	var strict := DotGameConfigBinder.create(ZzConfig.new(), "game-zombie-zone", "zz", "user://zz_config_bad.json")
+	var strict := ZzConfig.make_binder(ZzConfig.new(), "user://zz_config_bad.json")
 	strict.strict = true
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
 	DirAccess.remove_absolute("user://zz_config_bad.json")
 
-	var shipped := "res://cfg/game/game-zombie-zone/config/game.yml"
-	DirAccess.make_dir_recursive_absolute("res://cfg/game/game-zombie-zone/config")
+	var shipped := "res://cfg/game/%s/config_round/game.yml" % GAME
+	var kept := FileAccess.get_file_as_string(shipped)
+	DirAccess.make_dir_recursive_absolute(shipped.get_base_dir())
 	var yml := FileAccess.open(shipped, FileAccess.WRITE)
-	yml.store_string("start_points: 75\ndown_attack: false\n")
+	yml.store_string("start_points: 75\nwaves: 6\n")
 	yml.close()
 	var loaded := ZzConfig.new()
-	var from_yml := DotGameConfigBinder.create(loaded, "game-zombie-zone", "zz")
+	var from_yml := ZzConfig.make_binder(loaded)
 	from_yml.strict = true
 	var got := from_yml.load_layers()
-	_check(got.ok and loaded.start_points == 75 and not loaded.down_attack and from_yml.source_of("start_points") != "default",
-		"an exported cfg/game/<game>/config/game.yml loads back as defaults", "" if got.ok else got.error.message)
-	DirAccess.remove_absolute(shipped)
-	DirAccess.remove_absolute("res://cfg/game/game-zombie-zone/config")
+	_check(got.ok and loaded.start_points == 75 and loaded.waves == 6 and from_yml.source_of("start_points") != "default",
+		"an exported cfg/game/<game>/config_round/game.yml loads back as defaults", "" if got.ok else got.error.message)
+	yml = FileAccess.open(shipped, FileAccess.WRITE)
+	yml.store_string(kept)
+	yml.close()
+
+	_layers()
+	_templates(binder)
 
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
 	wb.config = {"enabled": false}
-	wb.add_set(binder.profile_set(), "Game settings")
+	for pset: DotProfileSet in binder.profile_sets():
+		wb.add_set(pset, pset.rel_path)
 	add_child(wb)
 	_check(wb.start().ok, "the workbench starts")
 	binder.attach(wb.api.runtime)
-	var set: DotProfileSet = binder.profile_set()
-	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": set.rel_path, "id": binder.profile_id, "key": "start_points", "value": 90})
-	_check(res.ok and config.start_points == 90, "a workbench edit reaches the live config")
+	var listed := PackedStringArray()
+	for kind: String in wb.api.kinds():
+		var lg: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
+		if lg.ok:
+			listed.append_array(PackedStringArray((lg.value as Dictionary).get("values", {}).keys()))
+	var missing := PackedStringArray()
+	for k in keys:
+		if not listed.has(k):
+			missing.append(k)
+	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
+	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "start_points", "value": 90})
+	_check(res.ok and config.start_points == 90, "a workbench edit reaches the live config", "" if res.ok else res.error.message)
 	var files: Dictionary = wb.exporter.call("collect")
-	var text: String = files.get("cfg/game/game-zombie-zone/config/game.yml", "")
+	var text: String = files.get("cfg/game/%s/config_round/game.yml" % GAME, "")
 	_check(text.contains("start_points: 90"), "the export holds the edit in the cfg layout")
 
 	wb.free()
@@ -105,3 +125,63 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+func _write_root(rel: String, text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(ROOT.path_join(rel).get_base_dir())
+	var f := FileAccess.open(ROOT.path_join(rel), FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+## Child process: loads the layers strictly over the test root and prints what the live config holds.
+func _probe() -> void:
+	var config := ZzConfig.new()
+	var binder := ZzConfig.make_binder(config)
+	binder.strict = true
+	binder.roots = PackedStringArray([ProjectSettings.globalize_path(ROOT)])
+	var loaded := binder.load_layers()
+	var console := DotConsole.new()
+	add_child(console)
+	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	print("PROBE ok=%s waves=%s waves_src=%s commons=%s commons_src=%s cvar=%s gibs=%s gibs_src=%s pts=%s pts_src=%s" % [
+		loaded.ok, config.waves, binder.source_of("waves"), config.commons_base, binder.source_of("commons_base"),
+		console.find_cvar("zz_commons_base").get_string(), config.gore_max_gibs, binder.source_of("gore_max_gibs"),
+		config.start_points, binder.source_of("start_points")])
+	get_tree().quit(0)
+
+
+func _child() -> String:
+	var out: Array = []
+	OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
+		"res://examples/headless_config.tscn", "--", "--probe", "--zz-gore-max-gibs=12", "--zz-start-points=120"], out, true)
+	return "".join(PackedStringArray(out))
+
+
+## A value set in a cfg file, the environment and argv each reaches the live config, and later layers win.
+func _layers() -> void:
+	_write_root("game/%s/config_round/game.yml" % GAME, "waves: 4\n")
+	_write_root("game/%s/config_horde/game.yml" % GAME, "commons_base: 30\n")
+	OS.set_environment("ZZ_COMMONS_BASE", "33")
+	var text := _child()
+	_check(text.contains("PROBE ok=true"), "the layers load strictly in a fresh process", text.right(300))
+	_check(text.contains("waves=4") and text.contains("waves_src=yml"), "a cfg file reaches the live config")
+	_check(text.contains("commons=33") and text.contains("commons_src=env") and text.contains("cvar=33"), "the environment beats the file and reaches the cvar")
+	_check(text.contains("gibs=12") and text.contains("gibs_src=argv"), "argv alone reaches the config")
+	_check(text.contains("pts=120") and text.contains("pts_src=argv"), "a second argv flag reaches it too")
+	OS.unset_environment("ZZ_COMMONS_BASE")
+	_write_root("game/%s/config_round/game.yml" % GAME, "commons_base: 30\n")
+	_check(_child().contains("PROBE ok=false"), "strict: a key in the wrong file is refused")
+	for f in ["config_round", "config_horde"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(ROOT.path_join("game/%s/%s/game.yml" % [GAME, f])))
+
+
+## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.
+func _templates(binder: DotGameConfigBinder) -> void:
+	var files := binder.template_files()
+	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
+	var stale := PackedStringArray()
+	for path: String in files:
+		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
+			stale.append(path)
+	_check(stale.is_empty(), "the shipped files match the config (run tools/cfg_templates.gd)", ",".join(stale))

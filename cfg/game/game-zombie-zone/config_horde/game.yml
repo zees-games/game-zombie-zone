@@ -52,6 +52,10 @@
 # bot_hold_overrun: 6
 # Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot...
 # bot_open_boxes: true
+# Whether a stand-in lets go of E every few ticks while going for a box, so a press that missed is made again...
+# bot_repress_use: true
+# Seconds a stand-in that wants an item or a place may stay put, not firing or using anything, before it give... [0.0..120.0]
+# bot_idle_seconds: 12.0
 # How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing ones. The rest ... [0..16]
 # bot_helpers: 2
 # Metres within which any stand-in answers a pinned or downed friend on a survival map, however many already ... [0.0..40.0]
@@ -80,6 +84,24 @@
 # common_run_speed: 6.3
 #  [0.2..5.0]
 # common_walk_speed: 1.1
+# How fast a common chases (`zz_common_speed_*`). Scaling on: it starts at `common_speed_base`, gains `common...
+# common_speed_scaling: true
+#  [0.5..15.0]
+# common_speed_base: 2.2
+#  [0.0..5.0]
+# common_speed_per_hard_stack: 0.8
+#  [0.5..15.0]
+# common_speed_max: 6.3
+# `zz_mutant_fade*`: mutants (every kind but a common) draw more transparent as Hard Box stacks rise, `mutant... [0..1]
+# mutant_fade: 1
+#  [0.05..1.0]
+# mutant_min_alpha: 0.25
+#  [0.0..0.5]
+# mutant_fade_per_stack: 0.1
+#  [0..1]
+# common_fade: 0
+#  [0.0..1.0]
+# angry_runner_fraction: 0.3
 #  [0.0..100.0]
 # common_damage: 2.0
 # Seconds between a common's swings. [0.2..5.0]
