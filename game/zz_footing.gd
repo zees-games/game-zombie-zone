@@ -76,9 +76,9 @@ func forget(player_id: StringName) -> void:
 	_seen.erase(player_id)
 
 
-## Under the floor plane. The walls (ZzMap._build_boundary) keep a body in; a nav region is not a wall, so it is not tested here.
+## Under the floor plane but above the kill height: below that the map's own death applies, and a net that caught it first made the kill height dead letter. The walls (ZzMap._build_boundary) keep a body in; a nav region is not a wall, so it is not tested here.
 static func out_of_map(map: Object, feet: Vector3) -> bool:
-	return feet.y < floor_plane(map)
+	return feet.y < floor_plane(map) and feet.y >= float(map.call(&"kill_height"))
 
 
 ## The lowest ground the document names, less [constant FALL_DEPTH]; INF-safe when it names none.
@@ -90,6 +90,11 @@ static func floor_plane(map: Object) -> float:
 	for side: String in (doc.get("spawns", {}) as Dictionary):
 		for entry: Dictionary in doc["spawns"][side]:
 			lowest = minf(lowest, float((entry["at"] as Array)[1]))
+	# A lift's plate rests below the floors it serves.
+	var mech: Object = map.get("mechanics")
+	if mech != null:
+		for i in int(mech.call(&"mover_count")):
+			lowest = minf(lowest, ((mech.call(&"mover", i) as Dictionary)["zone"] as AABB).position.y)
 	if lowest == INF:
 		return -INF
 	return maxf(lowest - FALL_DEPTH, float(map.call(&"kill_height")) + 1.0)
