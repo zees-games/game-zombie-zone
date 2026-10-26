@@ -154,3 +154,22 @@ Mutants (every zombie kind but a common) are drawn more transparent for each Har
 | `zz_mutant_min_alpha` | 0.25 | the most transparent a zombie gets (0.05 to 1) |
 | `zz_mutant_fade_per_stack` | 0.1 | alpha lost per Hard Box stack (0 to 0.5) |
 | `zz_common_fade` | 0 | 1 fades commons the same way (they are many, so each one costs its own material copy while faded) |
+
+## Physics crates
+
+Ammo piles and boxes lying on the ground are rigid bodies on the server (dot-props' `crate` toy, driven by `game/zz_crates.gd`): survivors and zombies shove them along the floor, an explosion throws them away from the blast, and a bullet knocks them. Pickup, use and buying read where the crate lies now, so they work on a moved crate, for bots too. Clients get the moved crates' places in one batched event at `zz_crate_sync_hz` and ease toward them. Crates come to rest and sleep, so a quiet map costs nothing.
+
+| Cvar | Default | Effect |
+| --- | --- | --- |
+| `zz_physics_crates` | 1 | Master switch. 0 keeps every pile and box exactly where it was laid, as before. |
+| `zz_crate_kinds` | `ammo,box` | Which loot kinds become crates. |
+| `zz_crate_mass` | 8 | Kilograms; heavier crates are harder to push. |
+| `zz_crate_push` | 1 | Multiplier on the shove from a walking survivor or zombie. 0 stops pushing. |
+| `zz_crate_zombie_push` | on | Whether zombies shove crates at all (on or off). |
+| `zz_crate_blast` | 1 | Multiplier on the speed an explosion gives a crate. 0 leaves them unmoved. |
+| `zz_crate_max_active` | 16 | Most crates simulating at once; the longest untouched are put to sleep first. |
+| `zz_crate_max_bodies` | 128 | Most crate bodies in the world; loot beyond it lies static. |
+| `zz_crate_sleep_seconds` | 2 | Seconds at rest before a crate sleeps. |
+| `zz_crate_sync_hz` | 10 | Times a second the moved crates' places go out. |
+
+The same keys are in the server file as `physics_crates`, `crate_mass` and so on.

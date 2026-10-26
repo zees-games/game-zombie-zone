@@ -25,7 +25,7 @@ game/
   zz_npcs.gd         the zombie catalogue (twelve kinds), and the nav graph a map's document gives
   zz_npc_profiles.gd the twelve kinds as dot-npc profiles (cfg/game/game-zombie-zone/npc/<id>.yml, written by tools/export_npc_profiles.gd from the code table; a key overrides only when it differs from the shipped value, so cvars and difficulty still reach an unedited kind; `health` is unscaled, a brute's is its base; the sleeper's cost stays in code)
   zz_horde.gd        the horde: spawner, director, senses, squads, sounds; mobs, specials, brutes, sleepers, waves
-  zz_turrets.gd (the Turret Box's sentries: placement, targeting and ammo are dot-combat's `DotSentry`, the box rule and tuning are here) zz_pins.gd zz_hazards.gd zz_loot.gd zz_boxes.gd zz_box_effect.gd zz_box_instakill.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
+  zz_turrets.gd (the Turret Box's sentries: placement, targeting and ammo are dot-combat's `DotSentry`, the box rule and tuning are here) zz_pins.gd zz_hazards.gd zz_loot.gd zz_crates.gd zz_boxes.gd zz_box_effect.gd zz_box_instakill.gd zz_weapons.gd   being held; acid, fire, throws; loot; boxes; tiers
   zz_shop.gd zz_shop_menu.gd zz_shop_icons.gd   the trader: stock and sale (server), the menu (client)
   zz_nav_job.gd      the horde's graph as a resumable job (thread or slices) and its disk cache
   zz_survival.gd     a survival map held: dot-npc-ai-director's DotNpcDirectorWaves, the breather, twists, caches

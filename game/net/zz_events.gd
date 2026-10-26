@@ -119,6 +119,8 @@ enum Kind {
 	COPY,
 	## A map's logic told its ears something: a sound fade or spin, or a beat (`MapFx`).
 	MAP_FX,
+	## Physics crates that moved: for each, the loot id, the place and the turn.
+	LOOT_MOVED,
 }
 
 ## What a MAP_FX says.
@@ -594,6 +596,33 @@ static func read_loot(r: DotNetReader) -> Dictionary:
 	var at := _read_pos(r)
 	var price := r.read_varint()
 	return {"id": id, "kind": StringName(kind), "item": StringName(item), "at": at, "price": price, "ok": r.ok()}
+
+
+## The most crates one LOOT_MOVED carries (the cap on awake crates is 256).
+const MOVED_MAX := 256
+
+
+static func write_loot_moved(batch: Array) -> PackedByteArray:
+	var w := _w()
+	var n := mini(batch.size(), MOVED_MAX)
+	w.write_varint(n)
+	for i in n:
+		var row: Array = batch[i]
+		w.write_varint(int(row[0]))
+		_pos(w, row[1])
+		w.write_quaternion(row[2], 9)
+	return w.to_bytes()
+
+
+static func read_loot_moved(r: DotNetReader) -> Dictionary:
+	var n := mini(r.read_varint(), MOVED_MAX)
+	var rows: Array = []
+	for i in n:
+		var id := r.read_varint()
+		var at := _read_pos(r)
+		var turn := r.read_quaternion(9)
+		rows.append([id, at, turn])
+	return {"rows": rows, "ok": r.ok()}
 
 
 static func write_loot_gone(id: int, by: int) -> PackedByteArray:

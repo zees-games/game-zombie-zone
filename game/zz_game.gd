@@ -9,6 +9,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
+const ZzCrates := preload("zz_crates.gd")
 const ZzDrops := preload("zz_drops.gd")
 const ZzMapObjects := preload("zz_map_objects.gd")
 const ZzSpawners := preload("zz_spawners.gd")
@@ -236,6 +237,9 @@ var hazards: ZzHazards = null
 ## Server only. The sentry turrets a box deployed.
 var turrets: ZzTurrets = null
 var loot: ZzLoot = null
+
+## Ammo piles and boxes as rigid bodies (server only; null on a client).
+var crates: ZzCrates = null
 ## What a dead zombie leaves (ammunition, health); server only.
 var drops: ZzDrops = null
 ## What a map's breakables leave when they break (`spawn_object`), whitelisted and capped.
@@ -404,6 +408,8 @@ func _ready() -> void:
 		# A pipe bomb, a propane tank, a molotov's burst: the map's toys thrown from it.
 		var _toys := exploded.connect(_on_exploded_near_toys)
 		loot = ZzLoot.new(self)
+		crates = ZzCrates.new(self)
+		var _cm := crates.moved_many.connect(func(batch: Array) -> void: loot.moved_many.emit(batch))
 		spawners = ZzSpawners.new(self)
 		spawners.load_config()
 		shop = ZzShop.new(self)
@@ -3697,6 +3703,8 @@ func _step(delta: float) -> void:
 
 	if authoritative:
 		_advance_toys(delta)
+		if crates != null:
+			crates.tick(delta)
 		if horde != null:
 			_tick_horde(delta)
 		if pins != null:
@@ -3754,14 +3762,19 @@ func _advance_toys(delta: float) -> void:
 ## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
 ## a barrel is never cover between a survivor and a zombie. Server side.
 func _shoot_toys(shot: DotShot) -> void:
-	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
+	if not authoritative or map == null:
 		return
 	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
 	for raw: Variant in directions:
-		var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
+		if crates != null:
+			var _crate := crates.shoot(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage)
+		if map.toys != null and map.toys.count() > 0:
+			var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
 
 
 func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
+	if authoritative and crates != null:
+		var _flung := crates.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
 	if authoritative and map != null and map.toys != null:
 		var _thrown := map.toys.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
 

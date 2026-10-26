@@ -533,6 +533,34 @@ func setup_seconds() -> float:
 ## opens a box on the ground as it did before boxes could be carried.
 @export_range(0, 6, 1) var box_carry: int = 1
 
+# --- Physics crates (zz_crates.gd) -----------------------------------------
+
+## Ammo piles and boxes on the ground are rigid bodies: pushed along by survivors and zombies, shot, thrown by blasts (cvar `zz_physics_crates`). 0 keeps them where the map or the drop put them.
+@export var physics_crates: bool = true
+
+## Which loot kinds are crates, comma separated (ammo, box, medkit, pills, weapon, throwable, defib).
+@export var crate_kinds: String = "ammo,box"
+
+## A crate's mass in kilograms, against a walking survivor's push (`crate_push` scales it) and a blast.
+@export_range(0.25, 200.0, 0.25) var crate_mass: float = 8.0
+
+## How hard a walk pushes a crate, against the walker's speed (0: nothing pushes one), and whether zombies push too.
+@export_range(0.0, 4.0, 0.05) var crate_push: float = 1.0
+@export var crate_zombie_push: bool = true
+
+## How hard a blast throws a crate, against a barrel's blast speed (0: blasts leave crates alone).
+@export_range(0.0, 8.0, 0.05) var crate_blast: float = 1.0
+
+## The most crates simulating at once; the longest untouched sleep first. A crate at rest for `crate_sleep_seconds` sleeps (0: the engine's own timer).
+@export_range(1, 256, 1) var crate_max_active: int = 16
+@export_range(0.0, 30.0, 0.1) var crate_sleep_seconds: float = 2.0
+
+## Times a second the moved crates' places go to clients.
+@export_range(1.0, 30.0, 1.0) var crate_sync_hz: float = 10.0
+
+## Most crate bodies in the world; loot laid beyond it lies static, as with `zz_physics_crates 0`.
+@export_range(1, 2048, 1) var crate_max_bodies: int = 128
+
 ## Seconds primary fire is held to open a carried box (server file key `box_deploy_seconds`,
 ## cvar `zz_box_deploy_seconds`, 0.5 to 15), and the radius (metres) the survivor may drift in
 ## meanwhile before it is cancelled. 1 s is quick enough to open one mid-fight; it was 3.5, which

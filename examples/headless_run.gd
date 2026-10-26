@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 50
+const SECTIONS := 51
 
-const CHECKS := 371
+const CHECKS := 382
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -86,6 +86,7 @@ func _run() -> void:
 	await _test_zombie_loot()
 	await _test_zombie_drops()
 	await _test_toys()
+	await _test_crates()
 	await _test_the_room_wakes()
 	await _test_downs()
 	await _test_ground_strike()
@@ -633,6 +634,7 @@ func _test_zombie_drops() -> void:
 		told.append(kind))
 	var drops: Object = game.drops
 	_check(drops != null and bool(drops.config["enabled"]), "the shipped drops are on")
+	game.config.physics_crates = false
 	game.config.max_boxes = 100000
 	drops.config["max_lying"] = 100000
 	drops.config["despawn_seconds"] = 0.0
@@ -702,7 +704,20 @@ func _test_zombie_drops() -> void:
 		for b in range(a + 1, pile.size()):
 			var pb: Vector3 = game.loot.position_of(pile[b])
 			closest = minf(closest, Vector2(pa.x - pb.x, pa.z - pb.z).length())
-	_check(closest >= ZzLoot.SPACING - 0.01, "nine drops on one spot lie apart (ammo and boxes alike)", "closest %.2f" % closest)
+	var why: Array = []
+	for ring in range(1, 4):
+		for step in 8:
+			var ang := TAU * float(step) / 8.0 + float(ring) * 0.4
+			var sp: Vector3 = STREET + Vector3(cos(ang), 0.0, sin(ang)) * ZzLoot.SPACING * float(ring)
+			var wall: bool = game.ray_hit(STREET + Vector3(0, 0.5, 0), sp + Vector3(0, 0.5, 0)) != Vector3.INF
+			var fl: bool = game.ray_hit(sp + Vector3(0, 1, 0), sp + Vector3(0, -2, 0)) == Vector3.INF
+			var occ := 0
+			for o: Dictionary in game.loot.entries.values():
+				var th: Vector3 = o["at"]
+				if Vector2(th.x - sp.x, th.z - sp.z).length() < ZzLoot.SPACING:
+					occ += 1
+			why.append("%d%d%s%s%d" % [ring, step, "W" if wall else "-", "F" if fl else "-", occ])
+	_check(closest >= ZzLoot.SPACING - 0.01, "nine drops on one spot lie apart (ammo and boxes alike)", "closest %.2f, floating %d, layer %d mask %d, %s %s" % [closest, floating, game.crates.toy_of(pile[0]).body.collision_layer if game.crates.toy_of(pile[0]) != null else -1, game.world_mask(), str(why), str(pile.map(func(i: int) -> Vector3: return game.loot.position_of(i)))])
 	_check(floating == 0, "every spread drop lies on the floor", "%d off it" % floating)
 	_finished()
 
@@ -772,6 +787,121 @@ func _test_toys() -> void:
 	var fresh := game.map.toys
 	_check(fresh != box and fresh.count() == 4 and fresh.toy(0).body.global_position.distance_to(b0) < 0.05,
 		"a new map builds every toy home again")
+	_finished()
+
+
+## Ammo piles and boxes as rigid bodies (dot-props' crate toy, ZzCrates): pushed, thrown away from
+## a blast, shot, still usable where they came to rest, held static by the master cvar, capped.
+func _test_crates() -> void:
+	_section("ammo piles and boxes are physics crates")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	var spot := STREET + Vector3(8.0, 0.0, 0.0)
+	var id := game.loot.add(ZzLoot.AMMO, &"", spot)
+	await get_tree().physics_frame
+	_check(game.crates.toy_of(id) != null, "an ammo pile becomes a crate", str(game.crates.describe()))
+	for _i in range(30):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	var rest: Vector3 = game.loot.position_of(id)
+	_check(rest.distance_to(spot) < 0.15 and absf(rest.y - spot.y) < 0.2, "it settles on the floor where it was laid", "%s" % str(rest))
+
+	var moved_batches: Array = []
+	game.crates.moved_many.connect(func(batch: Array) -> void: moved_batches.append(batch))
+	me.place_at(rest + Vector3(-0.6, -0.12, 0.0), -90.0)
+	for _i in range(14):
+		me.controller.state.velocity = Vector3(5.0, 0.0, 0.0)
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	for _i in range(30):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	var pushed: Vector3 = game.loot.position_of(id)
+	_check(pushed.x > rest.x + 0.3, "a survivor walking into a crate pushes it along", "%.2f m, me %s vel %s crate %s alive %s" % [pushed.x - rest.x, str(me.controller.state.position), str(me.controller.state.velocity), str(game.crates.toy_of(id).body.global_position), str(me.is_alive())])
+	_check(not moved_batches.is_empty() and ((moved_batches.back() as Array)[0] as Array)[0] == id, "the move goes out as a batch, the loot entry already following", "%d batches" % moved_batches.size())
+
+	var told_ammo := [0]
+	game.ammo_given.connect(func(_pid: StringName) -> void: told_ammo[0] += 1)
+	me.place_at(pushed + Vector3(-1.0, -0.12, 0.0), -90.0)
+	me.controller.state.velocity = Vector3.ZERO
+	var seen := game.loot.looked_at(me.eye_position(), (pushed + Vector3(0.0, 0.2, 0.0) - me.eye_position()).normalized(), 3.0)
+	game.loot.use(id, me)
+	_check(seen == id and told_ammo[0] == 1, "the moved crate is still looked at and used", "looked at %d, used %d" % [seen, told_ammo[0]])
+
+	# Thrown in open air (a wall beside a crate on the street would hide the direction).
+	me.place_at(spot + Vector3(0.0, 0.0, -9.0), 0.0)
+	game.loot.remove(id)
+	id = game.loot.add(ZzLoot.AMMO, &"", spot)
+	var flier: RigidBody3D = game.crates.toy_of(id).body
+	flier.global_position += Vector3(0.0, 6.0, 0.0)
+	flier.linear_velocity = Vector3.ZERO
+	var before: Vector3 = flier.global_position
+	game.exploded.emit(before + Vector3(-1.5, -0.2, 0.0), 4.0, &"pipe_bomb")
+	for _i in range(4):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	var thrown: Vector3 = flier.global_position - before
+	_check(thrown.x > 0.3 and absf(thrown.x) > absf(thrown.z) * 3.0, "a blast throws it away from the blast", "(%.2f, %.2f) v %s" % [thrown.x, thrown.z, str(flier.linear_velocity)])
+
+	game.loot.remove(id)
+	id = game.loot.add(ZzLoot.AMMO, &"", spot)
+	for _i in range(40):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	var here: Vector3 = game.loot.position_of(id)
+	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	shot.origin = here + Vector3(0.0, 0.2, -2.0)
+	shot.direction = Vector3(0.0, 0.0, 1.0)
+	shot.damage = 40.0
+	shot.max_range = 40.0
+	game._shoot_toys(shot)
+	var probe: int = game.crates.shoot(shot.origin + Vector3(0, 0, 0.5), Vector3(0, 0, 1), 10.0, 0.0)
+	for _i in range(30):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	_check((game.loot.position_of(id) as Vector3).z > here.z + 0.1, "a shot crate reacts", "%.2f m, here %s now %s direct %d" % [(game.loot.position_of(id) as Vector3).z - here.z, str(here), str(game.loot.position_of(id)), probe])
+
+	game.loot.remove(id)
+	id = game.loot.add(ZzLoot.AMMO, &"", spot)
+	await get_tree().physics_frame
+	var still: Vector3 = game.loot.position_of(id)
+	game.config.crate_sleep_seconds = 0.5
+	for _i in range(160):
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	_check(not game.crates.toy_of(id).awake() and (game.loot.position_of(id) as Vector3).distance_to(still) < 1.5, "a crate at rest goes to sleep", "awake %s v %s w %s" % [str(game.crates.toy_of(id).awake()), str(game.crates.toy_of(id).body.linear_velocity), str(game.crates.toy_of(id).body.angular_velocity)])
+
+	var wire := ZzEvents.read_loot_moved(DotNetReader.new(ZzEvents.write_loot_moved([[7, Vector3(12.5, 0.2, -3.0), Quaternion(Vector3.UP, 0.7)]])))
+	var row: Array = (wire["rows"] as Array)[0] if not (wire["rows"] as Array).is_empty() else []
+	_check(bool(wire["ok"]) and row.size() == 3 and row[0] == 7 and (row[1] as Vector3).distance_to(Vector3(12.5, 0.2, -3.0)) < 0.1 and (row[2] as Quaternion).angle_to(Quaternion(Vector3.UP, 0.7)) < 0.05,
+		"LOOT_MOVED round-trips an id, a place and a turn")
+
+	game.config.crate_max_active = 2
+	game.config.crate_sleep_seconds = 0.0
+	var pile := STREET + Vector3(-8.0, 0.0, 0.0)
+	for i in 6:
+		var _crate := game.loot.add(ZzLoot.BOX, &"", pile + Vector3(float(i) * 0.7, 0.0, 0.0))
+	await get_tree().physics_frame
+	game.exploded.emit(pile + Vector3(1.0, 0.0, -1.0), 6.0, &"pipe_bomb")
+	var peak := 0
+	for _i in range(20):
+		game.crates.tick(TICK)
+		peak = maxi(peak, game.crates.active())
+		await get_tree().physics_frame
+	_check(peak <= 2 and game.crates.count() >= 7, "no more than crate_max_active crates simulate at once", "peak %d" % peak)
+
+	game.config.physics_crates = false
+	var off_spot := STREET + Vector3(0.0, 0.0, -8.0)
+	var off_id := game.loot.add(ZzLoot.AMMO, &"", off_spot)
+	await get_tree().physics_frame
+	me.place_at(off_spot + Vector3(-0.6, -0.12, 0.0), -90.0)
+	for _i in range(14):
+		me.controller.state.velocity = Vector3(5.0, 0.0, 0.0)
+		game.crates.tick(TICK)
+		await get_tree().physics_frame
+	_check(game.crates.toy_of(off_id) == null and (game.loot.position_of(off_id) as Vector3).distance_to(off_spot) < 0.001, "zz_physics_crates 0 leaves a pile where it lies")
+	game.config.physics_crates = true
+	game.loot.remove(off_id)
 	_finished()
 
 

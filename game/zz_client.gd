@@ -545,6 +545,7 @@ func _build_netcode() -> DotResult:
 		world_view.add_loot(id, kind, item, at, _box_colours.get(item, Color(0.8, 0.6, 0.25))))
 	bridge.loot_priced.connect(world_view.set_loot_price)
 	bridge.loot_removed.connect(func(id: int, _by: int) -> void: world_view.remove_loot(id))
+	bridge.loot_moved.connect(world_view.move_loot_many)
 	bridge.hazard_added.connect(world_view.add_hazard)
 	bridge.hazard_removed.connect(world_view.remove_hazard)
 	bridge.turret_added.connect(world_view.add_turret)
@@ -709,6 +710,7 @@ func _hear_the_world() -> void:
 			world_view.add_loot(id, kind, seen, at, _box_colours.get(seen, Color(0.8, 0.6, 0.25)))
 			world_view.set_loot_price(id, game.loot.price_of(id)))
 		game.loot.removed.connect(func(id: int, _by: StringName) -> void: world_view.remove_loot(id))
+		game.loot.moved_many.connect(world_view.move_loot_many)
 
 	if game.boxes != null:
 		game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:

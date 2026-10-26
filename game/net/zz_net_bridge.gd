@@ -115,6 +115,7 @@ signal loot_added(id: int, kind: StringName, item: StringName, at: Vector3)
 ## After loot_added, for an entry the shop sells.
 signal loot_priced(id: int, price: int)
 signal loot_removed(id: int, by: int)
+signal loot_moved(rows: Array)
 signal hazard_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float)
 signal hazard_removed(id: int)
 signal turret_added(id: int, at: Vector3, yaw: float, seconds: float)
@@ -408,6 +409,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at, game.loot.price_of(id))))
 			game.loot.removed.connect(func(id: int, by: StringName) -> void:
 				_broadcast(ZzEvents.Kind.LOOT_GONE, ZzEvents.write_loot_gone(id, _session_or_zero(by))))
+			game.loot.moved_many.connect(func(batch: Array) -> void:
+				_broadcast(ZzEvents.Kind.LOOT_MOVED, ZzEvents.write_loot_moved(batch)))
 
 		if game.boxes != null:
 			game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
@@ -1555,6 +1558,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				loot_added.emit(int(loot["id"]), loot["kind"], loot["item"], loot["at"])
 				if int(loot["price"]) > 0:
 					loot_priced.emit(int(loot["id"]), int(loot["price"]))
+		ZzEvents.Kind.LOOT_MOVED:
+			var moved := ZzEvents.read_loot_moved(reader)
+			if bool(moved["ok"]):
+				loot_moved.emit(moved["rows"])
 		ZzEvents.Kind.LOOT_GONE:
 			var taken := ZzEvents.read_loot_gone(reader)
 			if bool(taken["ok"]):

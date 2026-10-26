@@ -31,6 +31,9 @@ const AIM_SLACK := 0.55
 signal added(id: int, kind: StringName, item: StringName, at: Vector3)
 signal removed(id: int, by: StringName)
 
+## Physics crates moved: `[id, at, rotation]` each (see [ZzCrates]); entries[id].at has followed already.
+signal moved_many(batch: Array)
+
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
 

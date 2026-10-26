@@ -334,6 +334,23 @@ func set_loot_price(id: int, price: int) -> void:
 		node.add_child(tag)
 
 
+## Crates that moved on the server: `[id, at, rotation]` each. The pose is eased to in
+## [method _present_loot], so ten updates a second are not ten steps; a bobbing box rests instead.
+func move_loot_many(rows: Array) -> void:
+	for row: Array in rows:
+		var node: Node3D = _loot.get(int(row[0]))
+		if node == null or not is_instance_valid(node):
+			continue
+		node.set_meta(&"aim_at", row[1])
+		node.set_meta(&"aim_turn", row[2])
+		if node.has_meta(&"bob"):
+			node.remove_meta(&"bob")
+			var crate := node.get_node_or_null(^"Crate") as Node3D
+			if crate != null:
+				crate.position.y = 0.225
+				crate.rotation.y = 0.0
+
+
 func remove_loot(id: int) -> void:
 	var node: Node3D = _loot.get(id)
 	_loot.erase(id)
@@ -849,6 +866,10 @@ func _present_loot(delta: float) -> void:
 
 	for id: int in _loot:
 		var node: Node3D = _loot[id]
+		if node.has_meta(&"aim_at"):
+			var k := clampf(delta * 14.0, 0.0, 1.0)
+			node.global_position = node.global_position.lerp(node.get_meta(&"aim_at"), k)
+			node.quaternion = node.quaternion.slerp(node.get_meta(&"aim_turn"), k)
 		if node.has_meta(&"bob"):
 			var crate := node.get_node_or_null(^"Crate") as Node3D
 			if crate != null:
