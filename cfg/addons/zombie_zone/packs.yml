@@ -7,14 +7,41 @@ weapons:
   exclude: []        # weapon ids to keep out of the pool
   min_wave:          # first survival wave that lays the weapon out (heavy and drum-fed guns come late); exodus maps are not gated
     zz_deagle: 2
+    zz_p90: 2
+    zz_hunting: 3
     zz_scar: 3
+    zz_dmr: 4
     zz_aa12: 4
+    zz_bren: 4
+    zz_vss: 4
+    zz_sniper: 5
     zz_lmg: 5
     zz_m79: 5
+    zz_frag: 5
     zz_rpg: 7
   # rating:          # id: a stand-in's idea of a gun's worth, over damage a second worked out from its stats
-  # weights:         # id: draw weight in boxes, loot and caches (default 1; 0 is never drawn there, still given by name)
-  #   zz_sniper: 0.3
+  weights:           # id: draw weight in boxes, loot and caches (default 1; 0 is never drawn there, still given by name)
+    zz_bat: 2.0
+    zz_crowbar: 2.0
+    zz_machete: 1.5
+    zz_knife: 1.5
+    zz_axe: 1.2
+    zz_sledge: 0.7
+    zz_pistol: 2.0
+    zz_glock: 2.0
+    zz_revolver: 1.2
+    zz_shotgun: 1.2
+    zz_hunting: 0.8
+    zz_deagle: 0.6
+    zz_dmr: 0.5
+    zz_vss: 0.4
+    zz_sniper: 0.3
+    zz_bren: 0.5
+    zz_aa12: 0.5
+    zz_lmg: 0.4
+    zz_frag: 0.5
+    zz_m79: 0.3
+    zz_rpg: 0.2
   # tiers:           # id: sidearm | primary | heavy | melee | thrown, over what the pack tags
   #   zz_vss: heavy
   # not_in:          # channel -> ids kept out of that channel only. Channels: box, loot, cache (the drops),
