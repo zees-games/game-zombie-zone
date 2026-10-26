@@ -13,7 +13,7 @@ const CHANNEL := "zz.spawners"
 const GAME_ID := "game-zombie-zone"
 
 ## Spawner kinds that are loot kinds already; anything else is laid as a weapon.
-const KINDS: Array[StringName] = [ZzLoot.WEAPON, ZzLoot.AMMO, ZzLoot.MEDKIT, ZzLoot.PILLS, ZzLoot.THROWABLE, ZzLoot.BOX, ZzLoot.DEFIB]
+const KINDS: Array[StringName] = [ZzLoot.WEAPON, ZzLoot.AMMO, ZzLoot.MEDKIT, ZzLoot.PILLS, ZzLoot.THROWABLE, ZzLoot.BOX, ZzLoot.DEFIB, ZzLoot.BACKPACK]
 
 var game = null
 var spawner := DotWeaponSpawner.new()
@@ -363,16 +363,22 @@ func lays(loot_id: int) -> bool:
 	return _inst_of.has(loot_id)
 
 
-## False, with the reason sent to [param player], when they cannot pay for [param loot_id]. The charge is taken when the entry is used up.
-func may_use(loot_id: int, player) -> bool:
+## Why [param player] cannot use [param loot_id] now ("" when they can): a shelf while the trader is closed, a price they cannot pay. Asks only, so a stand-in can judge before it walks over.
+func refusal(loot_id: int, player) -> String:
 	if _shelf.has(loot_id) and not _open:
-		game.refused.emit(player.player_id, "The trader is closed.")
-		return false
+		return "The trader is closed."
 	var price := price_of(loot_id)
 	if price > 0 and player.points < price:
-		game.refused.emit(player.player_id, "That costs %d points." % price)
-		return false
-	return true
+		return "That costs %d points." % price
+	return ""
+
+
+## False, with the reason sent to [param player], when they cannot use [param loot_id] (closed, or cannot pay). The charge is taken when the entry is used up.
+func may_use(loot_id: int, player) -> bool:
+	var why := refusal(loot_id, player)
+	if why != "":
+		game.refused.emit(player.player_id, why)
+	return why == ""
 
 
 ## The game's loot entry went (used or removed): the buyer pays, and the spawner starts the item's timer (a trader's slot restocks instead).

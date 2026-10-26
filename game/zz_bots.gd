@@ -1027,6 +1027,10 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		if int(e.get("price", 0)) > player.points:
 			continue
 
+		# A shelf while the trader is closed refuses the press for good: standing at it is all that is left.
+		if game.spawners != null and game.spawners.refusal(id, player) != "":
+			continue
+
 		var wanted := false
 
 		match e["kind"]:

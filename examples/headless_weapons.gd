@@ -19,7 +19,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const ZzHud := preload("../game/zz_hud.gd")
 const SECTIONS := 12
-const CHECKS := 75
+const CHECKS := 76
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -309,6 +309,15 @@ func _test_spawner() -> void:
 		if game.loot.price_of(id) > 0:
 			shelf.append(id)
 	_check(shelf.size() == 3, "a trader shelves three priced entries", str(shelf.size()))
+	# A stand-in with the points does not walk to a shelf the trader has closed: the press is refused for good.
+	me.points = 1000
+	me.place_at(game.loot.position_of(shelf[0]), 0.0)
+	var wants_open: bool = game.bots._pick_up(me, DotFpsCommand.new(), {"pick": -1})
+	game.spawners.set("_open", false)
+	var memory := {"pick": -1}
+	var wants_closed: bool = game.bots._pick_up(me, DotFpsCommand.new(), memory)
+	game.spawners.set("_open", true)
+	_check(wants_open and not wants_closed and int(memory["pick"]) == -1, "a stand-in goes for a shelf item while the trader is open and not while it is closed", "open %s, closed %s" % [wants_open, wants_closed])
 	var bought: int = shelf[0]
 	var price: int = game.loot.price_of(bought)
 	me.points = 1000

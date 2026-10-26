@@ -111,7 +111,7 @@ Cvars, each also a key in `config/game.yml` (live from the console or the workbe
 - `zz_nav_budget_ms` (default 6, 0.5 to 14): milliseconds a tick a main-thread build may take; only read when `zz_nav_threads` is 0 or there are no threads. A bottom-right "Navigation regenerating" panel shows progress.
 - `zz_bot_open_boxes` (default 1): stand-ins pick up and open the boxes zombies drop; 0 leaves every box to the humans.
 - `zz_bot_repress_use` (default 1): a stand-in going for a box lets go of E every few ticks so a press that missed is made again; 0 holds the key as before, and a box may then stand untouched.
-- `zz_bot_idle_seconds` (default 12, 0 off): a stand-in that wants an item or a place and has neither moved nor fired nor used anything for this long gives that goal up for 30 s (or, with none, is put at its post), logged at INFO on `zz.bots`. An item within reach but behind a wall or rail is no longer stood at pressing E: after 3 s it is given up.
+- `zz_bot_idle_seconds` (default 12, 0 off): a stand-in that wants an item or a place and has neither moved nor fired nor used anything for this long gives that goal up for 30 s (or, with none, is put at its post), logged at INFO on `zz.bots`. An item within reach but behind a wall or rail is no longer stood at pressing E: after 3 s it is given up. A stand-in no longer goes for a shelf item while the trader is closed (the press is refused for good), and `idle_probe --trace=<id>` prints one stand-in's pick, reach and command each second.
 - `zz_unstick_seconds` (default 4, 0 to 30): every zombie kind frees itself after this long trying to move without getting anywhere (a nudge, then a relocation); 0 turns the watchdog off.
 
 ## The creepy ambience

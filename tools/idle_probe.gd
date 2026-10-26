@@ -17,6 +17,8 @@ var _sets: Dictionary = {}
 var _drop := 0.0
 var _rng := RandomNumberGenerator.new()
 var _drop_seed := 1
+## --trace=u102: prints that stand-in's goal, pick, reach and last command every second.
+var _trace := ""
 
 
 func _ready() -> void:
@@ -31,6 +33,8 @@ func _ready() -> void:
 			_idle = arg.trim_prefix("--idle=").to_float()
 		elif arg.begins_with("--drop="):
 			_drop = arg.trim_prefix("--drop=").to_float()
+		elif arg.begins_with("--trace="):
+			_trace = arg.trim_prefix("--trace=")
 		elif arg.begins_with("--set="):
 			var pair := arg.trim_prefix("--set=").split("=")
 			_sets[pair[0]] = pair[1]
@@ -98,6 +102,9 @@ func _run() -> void:
 
 		next = t + 1.0
 
+		if _trace != "":
+			_print_trace(game, t)
+
 		for player in game.survivors():
 			if not player.is_bot or not player.is_alive():
 				continue
@@ -140,3 +147,23 @@ func _run() -> void:
 
 	print("PROBE %s team=%d seconds=%.0f idle_bot_seconds=%.0f" % [_map, team, t, idle_total])
 	get_tree().quit(0)
+
+
+func _print_trace(game, t: float) -> void:
+	for player in game.survivors():
+		if String(player.player_id) != _trace:
+			continue
+
+		var memory: Dictionary = game.bots._memory(player)
+		var pick := int(memory.get("pick", -1))
+		var spot := Vector3.INF
+		var kind := &""
+
+		if pick >= 0 and game.loot.entries.has(pick):
+			spot = game.loot.position_of(pick)
+			kind = game.loot.kind_of(pick)
+
+		var last = memory.get("last_command")
+		print("TRACE t=%.0f at=%s pick=%d kind=%s spot=%s eye_gap=%.2f using=%s carried=%s actions=%d move=%s pts=%d" % [t, player.feet().snapped(Vector3.ONE * 0.1), pick, kind,
+			spot.snapped(Vector3.ONE * 0.1), player.eye_position().distance_to(spot) if spot != Vector3.INF else -1.0, player.using, player.carried, player.actions,
+			(last as DotFpsCommand).move.snapped(Vector2.ONE * 0.1) if last != null else Vector2.ZERO, player.points])
