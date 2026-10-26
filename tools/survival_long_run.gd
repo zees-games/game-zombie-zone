@@ -283,7 +283,9 @@ func _profiled_step() -> void:
 		var player = g.players[id]
 		if player.is_alive() and not player.watching:
 			player.simulate(g._tick, delta)
+			at = _part("p.simulate", at)
 			g._advance_hands(player, delta)
+			at = _part("p.hands", at)
 	at = _part("players", at)
 	g._advance_weapons()
 	at = _part("weapons", at)
@@ -293,12 +295,15 @@ func _profiled_step() -> void:
 		g.pins.advance(delta)
 	if g.hazards != null:
 		g.hazards.tick(delta)
+	at = _part("w.pins_hazards", at)
 	if g.boxes != null:
 		g.boxes.tick(delta)
+	at = _part("w.boxes", at)
 	if g.loot != null:
 		g.loot.tick(delta)
+	at = _part("w.loot", at)
 	g._advance_bodies(delta)
-	at = _part("world", at)
+	at = _part("w.bodies", at)
 	if g.combat != null:
 		g.combat.tick(g._tick, delta)
 	if g.spectate != null:

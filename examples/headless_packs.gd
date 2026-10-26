@@ -83,7 +83,7 @@ func _none_installed() -> void:
 	print("nothing installed")
 	_clean()
 	var found := ZzPacks.scan("res://examples/fixtures/none")
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(found == 0 and ZzPacks.monsters.is_empty() and ZzPacks.weapon_rows.is_empty(), "an empty scan finds nothing")
 	var cfg_dir := ProjectSettings.globalize_path("user://zz_mounted_pack")
 	DirAccess.make_dir_recursive_absolute(cfg_dir.path_join("cfg"))
@@ -153,7 +153,7 @@ func _installed() -> void:
 	print("installed (defaults)")
 	_clean()
 	var found := ZzPacks.scan(FIXTURE)
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(found == 1, "one provider is loaded by path", "%d" % found)
 	_check(ZzPacks.weapon_rows.size() == 1, "the weapon with a definition is listed, the one without is refused", "%d" % ZzPacks.weapon_rows.size())
 	_check(ZzWeapons.exists(&"fx_rifle"), "the pack weapon is in the pool")
@@ -185,20 +185,20 @@ func _tuned() -> void:
 	_clean()
 	_write("10-base.yml", "monsters:\n  boss: [fx_ghoul]\nweapons:\n  exclude: [fx_rifle]\n")
 	_f = ZzPacks.scan(FIXTURE)
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(ZzPacks.specials().is_empty() and ZzPacks.bosses().size() == 2, "the boss list moves a special into the bosses", "%d bosses" % ZzPacks.bosses().size())
 	_check(not ZzWeapons.exists(&"fx_rifle") and ZzPacks.weapon_rows.is_empty(), "weapons.exclude keeps a weapon out of the pool")
 
 	_clean()
 	_write("10-base.yml", "weapons:\n  enabled: false\nmonsters:\n  enabled: false\n")
 	_f = ZzPacks.scan(FIXTURE)
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(ZzPacks.monsters.is_empty() and not ZzWeapons.exists(&"fx_rifle"), "both switches off leave the game as it was")
 	_clean()
 
 	_write("10-base.yml", "weapons:\n  tiers:\n    fx_rifle: heavy\n  not_in:\n    box: [fx_rifle]\nmonsters:\n  min_wave:\n    fx_ghoul: 4\n")
 	_f = ZzPacks.scan(FIXTURE)
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	_check(ZzWeapons.tier_of(&"fx_rifle") == &"heavy", "weapons.tiers moves a pack weapon to another tier", String(ZzWeapons.tier_of(&"fx_rifle")))
@@ -217,7 +217,7 @@ func _tuned() -> void:
 	_clean()
 	_write("10-base.yml", "weapons:\n  weights:\n    fx_rifle: 0\n")
 	_f = ZzPacks.scan(FIXTURE)
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	var got := 0
 
 	for _i in 200:
@@ -303,7 +303,7 @@ func _check_game_tier() -> void:
 	f.store_string("extra:\n  damage: 61.0\n")
 	f.close()
 	ZzPacks.scan()
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(is_equal_approx(_damage_of(&"zz_vss"), 61.0), "a game-tier profile overrides a pack weapon", "%.1f" % _damage_of(&"zz_vss"))
 	DirAccess.remove_absolute("%s/vss.yml" % dir)
 
@@ -315,7 +315,7 @@ func _real_packs() -> void:
 	_clean_real()
 	ZzPacks.root = "res://addons"
 	var found := ZzPacks.scan()
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(found == 3, "three providers are loaded from addons/", "%d" % found)
 	_check(ZzPacks.weapon_rows.size() == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
 
@@ -338,12 +338,10 @@ func _real_packs() -> void:
 		"every modern weapon's model is the pack's own and loads", str(models.keys().filter(func(path: String) -> bool: return not ResourceLoader.exists(path))))
 	_check(ZzWeapons.tier_of(&"zz_vss") == &"primary", "the Vintorez is a primary", str(ZzWeapons.tier_of(&"zz_vss")))
 	_check(ZzWeapons.tier_of(&"war_axe") == &"melee" and ZzWeapons.tier_of(&"double_axe") == &"melee", "both new axes are melee")
-	_check(ZzWeapons.exists(&"pistol"), "the built-in weapons are still there")
+	_check(not ZzWeapons.exists(&"pistol") and ZzWeapons.exists(&"fists"), "zee's blasters are out of the catalogue, its fists stay")
 	_check(ZzWeapons.resolve(&"pistol") == &"zz_pistol" and not ZzWeapons.offered(&"pistol") and ZzWeapons.offered(&"zz_pistol"),
 		"a legacy blaster resolves to its modern successor and is not offered")
-	_check(ZzWeapons.exists(&"pump_shotgun") and not ZzWeapons.offered(&"pump_shotgun") and not ZzWeapons.offered(&"molotov")
-		and not ZzWeapons.offered(&"dagger") and not ZzWeapons.offered(&"war_axe"),
-		"zed guns and medieval weapons are not offered by default")
+	_check(not ZzWeapons.offered(&"dagger") and not ZzWeapons.offered(&"war_axe"), "medieval weapons are not offered by default")
 	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return not ZzWeapons.ids_of(ZzWeapons.tier_of(StringName(id))).has(StringName(id))),
 		"no pool draws a medieval weapon by default")
 	_check(ZzPacks.monsters.size() == 6 and ZzPacks.specials().size() == 5 and ZzPacks.bosses().size() == 1,
@@ -364,7 +362,7 @@ func _real_packs() -> void:
 	_write_real("zz_historical_monsters", "90-test.yml", "tiger:\n  claw:\n    damage: 33.0\n")
 	_write("90-test.yml", "monsters:\n  weights:\n    zhm_bear: 0\n")
 	found = ZzPacks.scan()
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 	_check(is_equal_approx(_damage_of(&"zz_m4"), 77.0), "a modern weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"zz_m4"))
 	# Known pack bug (zz-medieval-weapons): its weapon_defs() builds from ZzMedievalConfig.defaults()
 	# and never reads load_all(), so a yml cannot retune a medieval weapon. Not counted, so the
@@ -381,7 +379,7 @@ func _real_packs() -> void:
 	_clean_real()
 	_clean()
 	found = ZzPacks.scan()
-	ZzWeapons.use_packs(true)
+	ZzWeapons.use_packs()
 
 	# A real game spawns each monster once, and arms a survivor with a weapon from each pack.
 	var config := ZzConfig.new()

@@ -32,22 +32,12 @@ static var wave: int = 0
 
 static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
-static var _zed_ids: Dictionary = {}
 
 
-## Puts the packs the server carries on zee's catalogue: zee-dot-weapons always, and
-## zed-dot-weapons (the second pack) when [param second] is on. Called by the world before
-## any rig is built, because a rig reads its catalogue once.
-##
-## [b]A second pack is one line here[/b] because zee builds every rig's catalogue, every world
-## model's art and every report from its own tables, and `ZedWeaponPack.install()` adds to
-## those (zee's `add_source`). Nothing else in the game names a pack.
-static func use_packs(second: bool) -> void:
-	if second:
-		ZedWeaponPack.install()
-	else:
-		ZedWeaponPack.uninstall()
-
+## Leaves zee-dot-weapons' blasters out of the catalogue (only its fists stay, the arsenal's floor): every other weapon
+## comes from an installed pack. Called by the world before any rig is built, because a rig reads its catalogue once.
+static func use_packs() -> void:
+	ZeeWeaponPack.keep_only([&"fists"])
 	_defs.clear()
 	_by_id.clear()
 
@@ -78,7 +68,7 @@ static func offered(id: StringName) -> bool:
 	return bool(ZzPackList.cfg("weapons.legacy", false)) or not ZzPackList.providers.has(MODERN_PACK)
 
 
-## Zee's blasters, zed-dot-weapons' guns and every non-modern provider's weapons (the medieval pack).
+## Zee's old ids and every non-modern provider's weapons (the medieval pack).
 static func _is_older(id: StringName) -> bool:
 	if LEGACY.has(id):
 		return true
@@ -86,11 +76,7 @@ static func _is_older(id: StringName) -> bool:
 	if ZzPackList.pack_of.has(String(id)):
 		return ZzPackList.pack_of[String(id)] != MODERN_PACK
 
-	if _zed_ids.is_empty() and ZedWeaponPack.installed():
-		for def in ZedWeaponPack.weapons({}, false):
-			_zed_ids[def.id] = true
-
-	return _zed_ids.has(id)
+	return false
 
 
 ## The weapon an id from data (a box row, a map's pickup, a shop item) stands for: a legacy id becomes

@@ -700,10 +700,6 @@ func setup_seconds() -> float:
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 
-## Whether zed-dot-weapons (real-world guns, launchers, a flamethrower, molotovs, pipe bombs
-## and bile jars) is carried beside zee-dot-weapons. Read when a world is built.
-@export var second_weapon_pack: bool = false
-
 # --- Netcode ----------------------------------------------------------------
 
 @export_group("Netcode")

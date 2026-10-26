@@ -81,7 +81,7 @@ Anybody pinned needs a friend: shoot what holds them or shove it off. Every spec
 
 **Friendly fire is on**, at a tenth of the damage on normal and much more on expert. Stand-ins fill the team when there are not enough people (four, or the team the map is built for), and they shoot, revive, heal, mend and pick things up, and they do not shoot through you.
 
-**Modern weapons.** The game hands out [zz-modern-weapons](https://github.com/zees-games/zz-modern-weapons) (twenty-eight guns, blades and a grenade, each with a real CC0 or CC-BY model credited in its CREDITS.md); the maps, boxes, shop and stand-ins draw from it alone. The older toy blasters of zee-dot-weapons stay in the catalogue for old saves and `arm` but are offered nowhere, and zed-dot-weapons (real-world guns, a flamethrower, molotovs) is carried only when `second_weapon_pack` is turned on.
+**Modern weapons.** The game hands out [zz-modern-weapons](https://github.com/zees-games/zz-modern-weapons) (twenty-eight guns, blades and a grenade, each with a real CC0 or CC-BY model credited in its CREDITS.md); the maps, boxes, shop and stand-ins draw from it alone. zee-dot-weapons carries only its fists here (`ZeeWeaponPack.keep_only`); its toy blasters are not in the catalogue and an old id in data resolves to its modern successor.
 
 There are ten maps: the **practice street** built into the game, and from [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps) the three-map **Blackout** exodus (Corner Shop, The Depot, The Pier) and six survival maps: **Westbrook High** (a school at night, twenty-one boarded doors and windows, for twelve), **Riverside Galleria** (a shopping mall with sixteen shops, a food court and eight ways in, for fourteen), **Harbor Park** (a ballpark under its floodlights: the concourse is theirs, the field is yours while the tunnels hold, for sixteen), **Relief Camp** (tents and trucks behind a plywood wall in the woods, for ten), **Parking Lot** and **Chapel Yard**. At the end of an exodus series or a survival map the players vote for what is next, and **M** opens the map list.
 
@@ -217,7 +217,6 @@ The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuot
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
-The second weapon pack (off by default) is a config setting rather than a cvar, because a weapon rig reads its weapons once: `--zz-second-weapon-pack true` on the command line (or `second_weapon_pack` in the config file) carries zed-dot-weapons beside zee-dot-weapons.
 
 ```
 zz_spectate_camera 0           // who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody

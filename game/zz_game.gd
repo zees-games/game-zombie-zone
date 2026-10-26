@@ -384,7 +384,7 @@ func _ready() -> void:
 	_round_seed = config.seed_value
 	# Optional packs first: a rig reads its catalogue once, and zee's sources are what it reads.
 	var _packs := ZzPacks.scan()
-	ZzWeapons.use_packs(config.second_weapon_pack)
+	ZzWeapons.use_packs()
 
 	_build_physics()
 	pass_rules.humans_pass = config.humans_pass_barricades

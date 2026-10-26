@@ -27,7 +27,7 @@ var _worlds: Array[ZzGame] = []
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
-	load("res://game/zz_packs.gd").root = "res://examples/fixtures/none"
+	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
 

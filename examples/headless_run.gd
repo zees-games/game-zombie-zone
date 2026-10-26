@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 391
+const CHECKS := 388
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -64,9 +64,9 @@ var _worlds: Array[ZzGame] = []
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
-	# Optional packs linked into addons/ add weapons to the loot pool, which shifts what the
-	# stand-ins pick up: this suite's thresholds are for the built-in game (headless_packs covers packs).
-	load("res://game/zz_packs.gd").root = "res://examples/fixtures/none"
+	# The installed packs are the game's weapons (zee carries only fists), so this suite scans addons/; the stand-ins' thresholds
+	# hold with them (headless_packs covers pack rules).
+	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
 
@@ -103,7 +103,7 @@ func _run() -> void:
 	_test_what_zombies_look_like()
 	await _test_hazards()
 	await _test_loot()
-	await _test_both_packs()
+	await _test_throwables()
 	await _test_every_box_outcome()
 	await _test_effects_stack()
 	await _test_turret_box()
@@ -295,8 +295,8 @@ func _test_world_builds() -> void:
 	var armed := true
 	for player in game.survivors():
 		all_in_start = all_in_start and game.map.in_area("start", player.feet())
-		armed = armed and player.weapons != null and player.weapons.arsenal.carries(&"pistol") \
-			and player.weapons.arsenal.current_def().id == &"pistol"
+		armed = armed and player.weapons != null and player.weapons.arsenal.carries(&"zz_pistol") \
+			and player.weapons.arsenal.current_def().id == &"zz_pistol"
 	_check(all_in_start, "everybody starts in the start room")
 	_check(armed, "holding the sidearm")
 	_check(game.survivors()[0].medkits == 1 and game.survivors()[0].health.health == 100.0, "with a medkit and full health")
@@ -1637,7 +1637,7 @@ func _test_loot() -> void:
 	_section("what lies on the ground")
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
-	var shotgun := game.loot.add(ZzLoot.WEAPON, &"shotgun", STREET + Vector3(0, 0, -1.5))
+	var shotgun := game.loot.add(ZzLoot.WEAPON, &"zz_shotgun", STREET + Vector3(0, 0, -1.5))
 	me.place_at(STREET, 0.0)
 	_aim(me, STREET + Vector3(0, 0.25, -1.5))
 	me.actions = ZzNetCommand.ACT_USE
@@ -1645,12 +1645,12 @@ func _test_loot() -> void:
 	me.actions = 0
 	# Long enough for the pistol to go away and the shotgun to come out.
 	await _sim(game, 1.0)
-	_check(not game.loot.exists(shotgun) and me.weapons.arsenal.carries(&"shotgun") and me.weapons.current_def().id == &"shotgun",
+	_check(not game.loot.exists(shotgun) and me.weapons.arsenal.carries(&"zz_shotgun") and me.weapons.current_def().id == &"zz_shotgun",
 		"a gun looked at and E'd is picked up and drawn", "%s, holding %s" % [
 			"taken" if not game.loot.exists(shotgun) else "still there", str(me.weapons.current_def().id)])
 
 	var pile := game.loot.add(ZzLoot.AMMO, &"", STREET + Vector3(0, 0, -1.5))
-	var pool := ZzWeapons.def_of(&"shotgun").ammo_type
+	var pool := ZzWeapons.def_of(&"zz_shotgun").ammo_type
 	var _spent := me.weapons.arsenal.ammo().take(pool, 1000)
 	await _sim(game, 0.05)
 	me.actions = ZzNetCommand.ACT_USE
@@ -1668,48 +1668,29 @@ func _test_loot() -> void:
 	_finished()
 
 
-## Both weapon packs are carried, and everything a weapon puts into the world does something.
+## Everything a weapon puts into the world does something.
 ## Until `_throw` existed every grenade and rocket in the game cost ammunition and did nothing.
-func _test_both_packs() -> void:
-	_section("both weapon packs, and what they throw")
-	var game := await _team(1, func(c: ZzConfig) -> void:
-		_quiet.call(c)
-		c.second_weapon_pack = true)
+func _test_throwables() -> void:
+	_section("what weapons throw")
+	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.health.invulnerable = true
 	me.place_at(STREET, 0.0)
-	_check(ZzWeapons.exists(&"pistol") and ZzWeapons.exists(&"pump_shotgun") and ZzWeapons.ids_of(&"thrown").has(&"molotov")
-		and ZzWeapons.ids_of(&"thrown").has(&"frag"), "zee's weapons and the second pack's are both handed out")
+	_check(ZzWeapons.exists(&"fists") and ZzWeapons.exists(&"zz_pistol") and ZzWeapons.ids_of(&"thrown").has(&"zz_frag"),
+		"the modern pack's weapons are handed out")
+	_check(not ZzWeapons.exists(&"pistol") and not ZzWeapons.exists(&"frag"), "zee's own blasters are not carried")
 
 	var ahead := STREET + Vector3(0.0, 0.0, -8.0)
-	var fires_before := game.hazards.areas.size()
-	game._throw(me, _spawn(&"molotov", me, ahead))
-	await _sim(game, 1.5)
-	var fire := false
-	for a: Dictionary in game.hazards.areas.values():
-		fire = fire or (a["kind"] == ZzHazards.FIRE and (a["at"] as Vector3).distance_to(ahead) < 4.0)
-	_check(game.hazards.areas.size() > fires_before and fire, "a molotov starts a fire where it lands")
-
-	var crowd: Array[DotNpcInstance] = []
-	for i in 4:
-		crowd.append(game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-3.0 + i * 2.0, 0.0, -22.0), &"test"))
-	game._throw(me, _spawn(&"pipe_bomb", me, ahead))
-	await _sim(game, 3.0)
-	var drawn := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive() and n.position().distance_to(ahead) < 9.0).size()
-	_check(drawn >= 2, "a pipe bomb draws the commons to it", "%d of 4 within 9 m" % drawn)
-	await _sim(game, 5.0)
-	var left := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive()).size()
-	_check(left < 4, "and goes off among them", "%d of 4 standing" % left)
 
 	var frag := game.horde.spawner.spawn(ZzNpcs.COMMON, ahead, &"test")
 	(frag.brain as Object).set(&"idle_kind", 0)
-	var thrown := _spawn(&"frag", me, ahead)
+	var thrown := _spawn(&"zz_frag", me, ahead)
 	thrown.fuse_ticks = TICK_RATE * 2
 	thrown.splash_radius = 5.0
 	thrown.splash_damage = 200.0
 	game._throw(me, thrown)
 	await _sim(game, 3.0)
-	_check(not frag.is_alive(), "zee's frag goes off on its fuse")
+	_check(not frag.is_alive(), "a frag goes off on its fuse")
 
 	var target := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -12.0), &"test")
 	await _sim(game, 0.1)
@@ -1720,18 +1701,6 @@ func _test_both_packs() -> void:
 	game._throw(me, rocket)
 	await _sim(game, 1.0)
 	_check(not target.is_alive(), "a rocket goes off on the zombie it meets")
-
-	var burner := game.horde.spawner.spawn(ZzNpcs.BRUTE, STREET + Vector3(0.0, 0.0, -5.0), &"test")
-	await _sim(game, 0.1)
-	var flame := DotShot.make(&"flamethrower", me.entity_id, game.current_tick(), 0)
-	flame.origin = me.eye_position()
-	flame.direction = (burner.position() + Vector3(0, 1.2, 0) - flame.origin).normalized()
-	flame.damage = 5.0
-	flame.damage_type = game.combat.damage_type(&"strike")
-	flame.max_range = 9.0
-	flame.scatter()
-	var _burnt := game.combat.resolve_shot(flame)
-	_check(game.hazards._burning.has(burner.instance_id), "the flamethrower sets what it hits alight")
 	_finished()
 
 
@@ -2319,7 +2288,7 @@ func _test_stand_ins() -> void:
 	_check(kills > 0, "they shoot what comes at them", "%d kills%s" % [kills, over])
 	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f%s" % [furthest, over])
 	# The practice street's spawners put a gun back after it is taken, so the shelf is never emptier than "3 free"; what shows pickup is a primary in a stand-in's hands that nobody started with.
-	var primary_slot: int = ZzWeapons.def_of(&"shotgun").slot
+	var primary_slot: int = ZzWeapons.def_of(&"zz_shotgun").slot
 	var armed := 0
 	for player in game.survivors():
 		armed += 1 if player.weapons != null and player.weapons.arsenal != null and player.weapons.arsenal.has_slot(primary_slot) else 0

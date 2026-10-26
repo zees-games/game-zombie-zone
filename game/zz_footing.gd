@@ -81,8 +81,19 @@ static func out_of_map(map: Object, feet: Vector3) -> bool:
 	return feet.y < floor_plane(map) and feet.y >= float(map.call(&"kill_height"))
 
 
-## The lowest ground the document names, less [constant FALL_DEPTH]; INF-safe when it names none.
+## The lowest ground the document names, less [constant FALL_DEPTH]; INF-safe when it names none. Cached on the map, because it is asked per survivor per tick and walks every nav floor and spawn.
 static func floor_plane(map: Object) -> float:
+	var mech: Object = map.get("mechanics")
+	var key := [(map.get("water_boxes") as Array).size(), int(mech.call(&"mover_count")) if mech != null else -1]
+	if map.has_meta(&"zz_floor_plane") and (map.get_meta(&"zz_floor_plane_key") as Array) == key:
+		return float(map.get_meta(&"zz_floor_plane"))
+	var plane := _floor_plane(map)
+	map.set_meta(&"zz_floor_plane", plane)
+	map.set_meta(&"zz_floor_plane_key", key)
+	return plane
+
+
+static func _floor_plane(map: Object) -> float:
 	var doc: Dictionary = map.get("doc")
 	var lowest := INF
 	for fl: Array in (doc.get("nav", {}) as Dictionary).get("floors", []):

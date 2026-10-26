@@ -83,8 +83,9 @@ func _run() -> void:
 ## list and the check are the addon's; `tools/sync-art.sh` in zee-dot-weapons copies what it names.
 func _test_the_weapon_art_is_vendored() -> void:
 	_section("Every model the weapon art table names is vendored in this game")
+	ZzWeapons.use_packs()
 	var count := ZeeWeaponArtTable.model_paths().size()
-	_check(count > 20, "the table names models (%d)" % count)
+	_check(count == 0, "zee's art table names no blaster models once its weapons are dropped (%d)" % count)
 	var models := ZeeWeaponArtTable.validate_models()
 	_check(models.ok, "no weapon model is missing", "" if models.ok else models.error.message)
 	_finished()

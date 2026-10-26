@@ -113,9 +113,44 @@ func _memory(player) -> Dictionary:
 	return _state[player.player_id]
 
 
+## The survivors, and which are pinned or down, read once per [method drive]: every stand-in asks, so
+## at a hundred of them the list was rebuilt and walked ten thousand times a tick. Null outside a drive.
+var _roster: Array = []
+var _pinned: Array = []
+var _downed: Array = []
+var _roster_live := false
+## The caches that have loot on them this drive, or null when not worked out yet.
+var _stocked_caches: Variant = null
+
+
+func _team() -> Array:
+	return _roster if _roster_live else game.survivors()
+
+
+func _take_roster() -> void:
+	_roster = game.survivors()
+	_pinned = []
+	_downed = []
+	_stocked_caches = null
+
+	for other in _roster:
+		if other.is_pinned() and other.is_alive():
+			_pinned.append(other)
+		if other.is_down() and not other.is_pinned():
+			_downed.append(other)
+
+	_roster_live = true
+
+
 ## One tick of every stand-in's decisions, as commands on their controllers.
 func drive(_delta: float) -> void:
-	for player in game.survivors():
+	_take_roster()
+	_drive_each()
+	_roster_live = false
+
+
+func _drive_each() -> void:
+	for player in _roster:
 		if not player.is_bot or not player.is_alive() or player.watching:
 			continue
 
@@ -322,7 +357,7 @@ func _seat(player) -> int:
 
 	var ids: Array = []
 
-	for other in game.survivors():
+	for other in _team():
 		if other.is_bot:
 			ids.append(String(other.player_id))
 
@@ -448,18 +483,10 @@ func _restock(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	var best := Vector3.INF
 	var best_gap := 70.0
 
-	for raw: Array in game.map_doc.get("caches", []):
-		var at := ZzMapDoc.v3(raw)
-		var stocked := false
-
-		for id: int in game.loot.entries:
-			if (game.loot.position_of(id) as Vector3).distance_to(at) < 1.6:
-				stocked = true
-				break
-
+	for at: Vector3 in _caches_with_loot():
 		var gap := at.distance_to(player.feet())
 
-		if stocked and gap < best_gap:
+		if gap < best_gap:
 			best = at
 			best_gap = gap
 
@@ -468,6 +495,27 @@ func _restock(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 
 	_walk_to(player, command, best, memory)
 	return true
+
+
+## Cache positions with something on them: once per drive, not once per stand-in that wants one.
+func _caches_with_loot() -> Array:
+	if _roster_live and _stocked_caches != null:
+		return _stocked_caches
+
+	var found: Array = []
+
+	for raw: Array in game.map_doc.get("caches", []):
+		var at := ZzMapDoc.v3(raw)
+
+		for id: int in game.loot.entries:
+			if (game.loot.position_of(id) as Vector3).distance_to(at) < 1.6:
+				found.append(at)
+				break
+
+	if _roster_live:
+		_stocked_caches = found
+
+	return found
 
 
 ## The slots a primary or heavy gun goes in, worked out once: asked every tick by every
@@ -640,7 +688,7 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 	var reach := eye.distance_to(at)
 	var cone := tan(deg_to_rad(FRIEND_CONE_DEGREES))
 
-	for other in game.survivors():
+	for other in _team():
 		if other == player or not other.is_alive() or other.watching:
 			continue
 
@@ -721,7 +769,7 @@ func _answers(player, friend) -> bool:
 
 	var closer := 0
 
-	for other in game.survivors():
+	for other in _team():
 		if other == friend or other == player or other.is_down() or other.is_pinned() or not other.is_alive():
 			continue
 		if other.feet().distance_to(at) < mine:
@@ -730,10 +778,18 @@ func _answers(player, friend) -> bool:
 	return closer < game.config.bot_helpers
 
 
+func _pinned_now() -> Array:
+	return _pinned if _roster_live else _team()
+
+
+func _downed_now() -> Array:
+	return _downed if _roster_live else _team()
+
+
 func _pinned_friend(player):
 	var best = null
 
-	for other in game.survivors():
+	for other in _pinned_now():
 		if other != player and other.is_pinned() and other.is_alive():
 			if best == null or other.feet().distance_to(player.feet()) < best.feet().distance_to(player.feet()):
 				best = other
@@ -744,7 +800,7 @@ func _pinned_friend(player):
 func _downed_friend(player):
 	var best = null
 
-	for other in game.survivors():
+	for other in _downed_now():
 		if other != player and other.is_down() and not other.is_pinned():
 			if other.feet().distance_to(player.feet()) > 40.0:
 				continue
@@ -893,14 +949,14 @@ func _leader(player):
 	var best_flow := -INF
 	var humans := false
 
-	for other in game.survivors():
+	for other in _team():
 		if other.is_up() and not other.is_bot and not other.watching:
 			humans = true
 			break
 
 	var flow = game.horde.director.flow if game.horde != null and game.horde.director != null else null
 
-	for other in game.survivors():
+	for other in _team():
 		if not other.is_up() or other.watching or (humans and other.is_bot):
 			continue
 
