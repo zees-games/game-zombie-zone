@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 47
 
-const CHECKS := 351
+const CHECKS := 354
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2266,6 +2266,7 @@ func _test_the_client_platform() -> void:
 	tab.pressed = false
 	var _b: bool = client.settings.menu.handle_event(tab)
 	_check(board != null and not board.is_open(), "and letting go puts it away")
+	await _check_trader_menu_holds_pointer(client, platform)
 	var wheel := InputEventMouseButton.new()
 	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	wheel.pressed = true
@@ -2594,6 +2595,25 @@ func _test_the_first_play_test() -> void:
 
 ## A pack naming dot-ui's glance pieces does not parse on a shell whose dot-ui predates them,
 ## so the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+## The trader menu is the one modal this game frees the mouse for; it must hold the pointer through DotGameClient.
+func _check_trader_menu_holds_pointer(client: ZzClient, platform: DotGameClient) -> void:
+	var feet: Vector3 = client.player.feet() if client.player != null else Vector3.ZERO
+	client.shop_state = {"menu": true, "open": true, "radius": 3.5, "at": [[feet.x, feet.y, feet.z]], "items": []}
+	client.open_shop()
+	_check(client.is_shop_open() and platform.is_input_blocked(), "the trader menu opens and holds the pointer, blocking input")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	get_viewport().push_input(click)
+	platform._on_menu_state(false)
+	platform.notification(MainLoop.NOTIFICATION_APPLICATION_FOCUS_IN)
+	await get_tree().process_frame
+	_check(client.is_shop_open() and platform.is_input_blocked() and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE,
+		"a click outside, another menu closing and a focus event leave the pointer free while the trader menu is up")
+	client.close_shop()
+	_check(not client.is_shop_open() and not platform.is_input_blocked(), "closing the trader menu releases the hold")
+
+
 func _check_requires() -> void:
 	var asks := DotAddonApi.derive()
 	_check(
