@@ -97,7 +97,26 @@ static func floor_plane(map: Object) -> float:
 			lowest = minf(lowest, ((mech.call(&"mover", i) as Dictionary)["zone"] as AABB).position.y)
 	if lowest == INF:
 		return -INF
+	lowest = minf(lowest, _mechanics_low(map))
 	return maxf(lowest - FALL_DEPTH, float(map.call(&"kill_height")) + 1.0)
+
+
+## The lowest point of a lift, door or volume: a shaft or an acid pit is a place the map meant, below its lowest floor.
+static func _mechanics_low(map: Object) -> float:
+	if map.has_meta(&"zz_mech_low"):
+		return float(map.get_meta(&"zz_mech_low"))
+	var mech: Object = map.get("mechanics")
+	if mech == null:
+		return INF
+	var low := INF
+	for i in int(mech.call(&"mover_count")):
+		var zone: Variant = (mech.call(&"mover", i) as Dictionary).get("zone")
+		if zone is AABB:
+			low = minf(low, (zone as AABB).position.y)
+	for t: Dictionary in mech.call(&"volume_toggles"):
+		low = minf(low, ((t["vol"] as Object).call(&"bounds") as AABB).position.y)
+	map.set_meta(&"zz_mech_low", low)
+	return low
 
 
 func _put_back(game: Node, player: Object, rec: Dictionary, why: String, feet: Vector3) -> bool:

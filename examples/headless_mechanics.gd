@@ -663,6 +663,8 @@ func _test_volumes() -> void:
 	print("    lethal hurt entity %d: alive %s, deaths %s" % [int(lethal["entity"]), str(victim.is_alive()), str(deaths)])
 	_check(not victim.is_alive() and why == ZzGame.BY_HAZARD, "a lethal hurt volume kills a survivor as a hazard death", str(deaths))
 
+	# The footing net (default on) puts a faller back before the kill height; with it off the kill height is the net.
+	game.config.fall_rescue = false
 	rider = game.add_player(&"u2", "Faller")
 	deaths.clear()
 	var start := rider.feet()
@@ -678,6 +680,7 @@ func _test_volumes() -> void:
 	await _sim(game, 2 * TICK_RATE)
 	_check(god.is_alive() and deaths.is_empty() and god.feet().y > game.map.kill_height(), "an invulnerable survivor below the kill height is put back, not reported as fallen", "%s %s" % [str(deaths), str(god.feet())])
 
+	game.config.fall_rescue = true
 	var tele := _first_volume(mech, "teleport")
 	var tele_zombie := _first_volume(mech, "teleport", true, -1.0, 1e9, true)
 	var walker := game.add_player(&"u3", "Walker")
