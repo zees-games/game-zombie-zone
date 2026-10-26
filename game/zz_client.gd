@@ -48,6 +48,8 @@ const CHASE_UP := 0.6
 
 @export var config_file: String = "user://cfg/zombiezone.json"
 @export var force_offline: bool = false
+## Off for tests and tools: the offline gate otherwise waits on the content download.
+@export var standalone_content: bool = true
 
 ## How many stand-ins an offline map gets beside you.
 @export_range(0, 12, 1) var offline_bots: int = 3
@@ -156,6 +158,7 @@ func _ready() -> void:
 	platform = DotGameClient.new()
 	platform.name = "Platform"
 	platform.force_offline = force_offline
+	platform.use_standalone_content = standalone_content
 	platform.spawned_fn = func() -> bool:
 		return player != null and camera != null and camera.is_inside_tree()
 	platform.scoreboard_action = ZzBindings.SCOREBOARD

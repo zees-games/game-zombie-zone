@@ -136,6 +136,7 @@ func _ready() -> void:
 	_client = ZzClient.new()
 	_client.name = "Client"
 	_client.set("force_offline", true)
+	_client.set("standalone_content", false)
 	_client.set("offline_bots", 3)
 	add_child(_client)
 	if _world_key != "":

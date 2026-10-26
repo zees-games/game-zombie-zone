@@ -28,6 +28,7 @@ func _ready() -> void:
 	_client = ZzClient.new()
 	_client.name = "Client"
 	_client.set("force_offline", true)
+	_client.set("standalone_content", false)
 	add_child(_client)
 	_run.call_deferred()
 

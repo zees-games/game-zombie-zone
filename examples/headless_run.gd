@@ -2539,8 +2539,14 @@ func _test_the_map_menu() -> void:
 func _test_the_client_platform() -> void:
 	_section("the client: the cover lifts, Tab holds the board through the menu, the wheel is a row")
 	var client := ZzClient.new()
-	client.config_file = "user://cfg/headless-none.json"
+	# A random drawn world here costs gigabytes to build twice; nothing in this section reads the map.
+	DirAccess.make_dir_recursive_absolute("user://cfg")
+	var pin := FileAccess.open("user://cfg/headless-run-client.json", FileAccess.WRITE)
+	pin.store_string(JSON.stringify({"map_ids": ["zz_lot"]}))
+	pin.close()
+	client.config_file = "user://cfg/headless-run-client.json"
 	client.force_offline = true
+	client.standalone_content = false
 	client.offline_bots = 0
 	add_child(client)
 	var platform: DotGameClient = client.platform

@@ -108,6 +108,7 @@ func _test_armed() -> bool:
 	_client = ZzClient.new()
 	_client.config_file = CONFIG_FILE
 	_client.force_offline = true
+	_client.standalone_content = false
 	_client.offline_bots = 0
 	add_child(_client)
 
