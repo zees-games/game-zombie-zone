@@ -44,7 +44,7 @@ const DEFAULTS := {
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
-		# On brings zee-dot-weapons' own blasters and tools back into every pool, the shop and the stand-ins' kits.
+		# On brings zee-dot-weapons' own blasters and tools, zed-dot-weapons and every other pack's weapons back into every pool, the shop and the stand-ins' kits.
 		"legacy": false,
 		# Weapon ids kept out of the pool.
 		"exclude": [],
@@ -86,6 +86,8 @@ static var root: String = "res://addons"
 static var config: Dictionary = DEFAULTS.duplicate(true)
 static var providers: Dictionary = {}
 static var weapon_rows: Array[Dictionary] = []
+## Weapon id -> the pack directory that defined it.
+static var pack_of: Dictionary = {}
 static var monsters: Array[Monster] = []
 static var _sources: Array[StringName] = []
 static var _notes: PackedStringArray = PackedStringArray()
@@ -135,6 +137,7 @@ static func clear() -> void:
 	_sources.clear()
 	providers.clear()
 	weapon_rows.clear()
+	pack_of.clear()
 	monsters.clear()
 	_notes = PackedStringArray()
 
@@ -203,6 +206,7 @@ static func _take(pack: String, provider: Object) -> void:
 		if def is DotWeaponDef and not excluded.has(String(def.id)):
 			kept.append(def)
 			weapon_ids.append(String(def.id))
+			pack_of[String(def.id)] = pack
 
 	if not kept.is_empty():
 		# Through _tiered, never the provider's own: zee calls the source on every rig it builds and

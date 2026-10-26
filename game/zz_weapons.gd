@@ -29,6 +29,7 @@ const MODERN_PACK := "zz_modern_weapons"
 
 static var _defs: Array[DotWeaponDef] = []
 static var _by_id: Dictionary = {}
+static var _zed_ids: Dictionary = {}
 
 
 ## Puts the packs the server carries on zee's catalogue: zee-dot-weapons always, and
@@ -65,13 +66,28 @@ static func _add(def: DotWeaponDef) -> void:
 	_by_id[def.id] = def
 
 
-## Whether [param id] may be handed out by a pool: a legacy blaster only with `weapons.legacy` on,
+## Whether [param id] may be handed out by a pool: a legacy blaster, zed gun or other pack's weapon only with `weapons.legacy` on,
 ## or when the modern pack is not installed (a checkout without it still has to play).
 static func offered(id: StringName) -> bool:
-	if not LEGACY.has(id):
+	if not _is_older(id):
 		return true
 
 	return bool(ZzPackList.cfg("weapons.legacy", false)) or not ZzPackList.providers.has(MODERN_PACK)
+
+
+## Zee's blasters, zed-dot-weapons' guns and every non-modern provider's weapons (the medieval pack).
+static func _is_older(id: StringName) -> bool:
+	if LEGACY.has(id):
+		return true
+
+	if ZzPackList.pack_of.has(String(id)):
+		return ZzPackList.pack_of[String(id)] != MODERN_PACK
+
+	if _zed_ids.is_empty() and ZedWeaponPack.installed():
+		for def in ZedWeaponPack.weapons({}, false):
+			_zed_ids[def.id] = true
+
+	return _zed_ids.has(id)
 
 
 ## The weapon an id from data (a box row, a map's pickup, a shop item) stands for: a legacy id becomes
