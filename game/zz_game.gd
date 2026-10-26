@@ -5,6 +5,7 @@ const ZzBots := preload("zz_bots.gd")
 const ZzCatalogue := preload("zz_catalogue.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
+const ZzFlashlight := preload("zz_flashlight.gd")
 const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
@@ -177,6 +178,9 @@ signal survival_changed()
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by whoever loaded the config.
 var config_binder: DotGameConfigBinder = null
+## The flashlight's config and binder, made on first use so a suite that builds a game by hand still has one.
+var flashlight_config: DotFlashlightConfig = null
+var flashlight_binder: DotGameConfigBinder = null
 
 ## The runtime layer the workbench edits through (the config set and dot-team's noblock kind); made on demand.
 var profile_runtime: DotProfileRuntime = null
@@ -1828,6 +1832,8 @@ func build_map(doc: Dictionary) -> DotResult:
 	if spectate != null:
 		spectate.set_overviews(map.overview(), map.overview())
 
+	for p: ZzPlayer in players.values():
+		p.flashlight_ready = false
 	world_rebuilt.emit()
 	return built
 
@@ -2553,6 +2559,7 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		return
 
 	_box_in_hands(player, pressed)
+	_flashlight_hands(player, pressed)
 
 	if shove_pressed:
 		_shove(player)
@@ -2638,6 +2645,27 @@ func _begin_use(player: ZzPlayer) -> void:
 func _fire_held(player: ZzPlayer) -> bool:
 	var pending := player.controller.current_command if player.controller != null else null
 	return pending != null and pending.is_pressed(ZzNetCommand.BUTTON_FIRE)
+
+
+## The flashlight config, made on first use.
+func flashlight_conf() -> DotFlashlightConfig:
+	if flashlight_config == null:
+		flashlight_config = ZzFlashlight.make_config()
+		flashlight_binder = ZzFlashlight.make_binder(flashlight_config)
+		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
+	return flashlight_config
+
+
+## A new map sets the light by the map; the switch toggles it for a living survivor, battery or not.
+func _flashlight_hands(player: ZzPlayer, pressed: int) -> void:
+	var cfg := flashlight_conf()
+	if not player.flashlight_ready:
+		player.flashlight_ready = true
+		var map_id := str(map_doc.get("id", ""))
+		player.flashlight = cfg.enabled and ZzFlashlight.starts_on(cfg, map_id, map_doc)
+	if (pressed & ZzNetCommand.ACT_FLASHLIGHT) != 0 and cfg.enabled \
+			and DotFlashlightRules.allowed_on(cfg, str(map_doc.get("id", ""))):
+		player.flashlight = not player.flashlight
 
 
 ## A carried box comes into the hands when picked up and goes back in the pack when the survivor

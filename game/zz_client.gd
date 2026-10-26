@@ -56,6 +56,11 @@ const CHASE_UP := 0.6
 
 var game: ZzGame = null
 var player: ZzPlayer = null
+## The flashlight on the eye and the other survivors' beams (dot-flashlight); the server owns on/off.
+var flash: DotFlashlight = null
+var flash_crowd: DotFlashlightCrowd = null
+var _flash_ticks := 0
+var _flash_msec := -100000
 
 ## Keeps the screen covered, and the local body and the input still, until the map, the
 ## player and the camera are all in. The platform's; see [DotGameClient].
@@ -439,11 +444,17 @@ func _add_noblock_and_workbench() -> void:
 	if game.config_binder != null:
 		for set: DotProfileSet in game.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := game.flashlight_conf()
+	if game.flashlight_binder != null:
+		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start(rt)
 	DotLog.result(CHANNEL, "the workbench", started)
 	if started.ok and game.config_binder != null:
 		game.config_binder.attach(rt)
+	if started.ok and game.flashlight_binder != null:
+		game.flashlight_binder.attach(rt)
 	platform.add_workbench(wb)
 
 
@@ -862,6 +873,8 @@ func _on_phase(phase: int) -> void:
 
 
 func _on_map(map_id: StringName) -> void:
+	if flash != null:
+		flash.allowed = DotFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
 	reset_slowmo()
 	_end_active = false
 	_end_weight = 0.0
@@ -1785,6 +1798,44 @@ func _pointer_ours() -> bool:
 	return pointer_forced or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
+## The light on the eye follows the server's state (but not for 0.4 s after our own switch, which is shown at once), and everyone else's beams follow theirs.
+func _present_flashlights() -> void:
+	var cfg := game.flashlight_conf()
+
+	if flash == null or not is_instance_valid(flash):
+		flash = DotFlashlight.new()
+		flash.name = "Flashlight"
+		flash.config = cfg
+		flash.handle_input = false
+		flash.authoritative = false
+		flash.allowed = DotFlashlightRules.allowed_on(cfg, str(game.map_doc.get("id", "")))
+		flash.switch_requested.connect(func(_want: bool) -> void:
+			_flash_ticks = 3
+			_flash_msec = Time.get_ticks_msec())
+		camera.add_child(flash)
+
+	if flash.get_parent() != camera:
+		flash.reparent(camera, false)
+
+	if Time.get_ticks_msec() - _flash_msec > 400:
+		flash.apply_state({"on": player.flashlight and player.is_alive()})
+
+	if flash_crowd == null:
+		flash_crowd = DotFlashlightCrowd.new()
+		flash_crowd.name = "Flashlights"
+		flash_crowd.config = cfg
+		add_child(flash_crowd)
+
+	flash_crowd.set_viewer(camera.global_position)
+
+	for key: Variant in game.players:
+		var other: ZzPlayer = game.players[key]
+		flash_crowd.set_lit(key, other != player and other.flashlight and other.is_alive())
+		flash_crowd.place(key, other.eye_position(), other.aim_direction())
+
+	flash_crowd.retain(game.players.keys())
+
+
 ## The hands' bits for this tick, from the held keys.
 func _actions() -> int:
 	var out := 0
@@ -1794,6 +1845,9 @@ func _actions() -> int:
 		out |= ZzNetCommand.ACT_HEAL
 	if _pills:
 		out |= ZzNetCommand.ACT_PILLS
+	if _flash_ticks > 0:
+		_flash_ticks -= 1
+		out |= ZzNetCommand.ACT_FLASHLIGHT
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -1881,6 +1935,8 @@ func _process(delta: float) -> void:
 
 	if camera == null or player == null:
 		return
+
+	_present_flashlights()
 
 	if world_view != null:
 		world_view.present(delta, camera.global_position)
@@ -2470,6 +2526,11 @@ func _key_event(event: InputEvent) -> bool:
 			spectate_step(0)
 		else:
 			toggle_view()
+		return true
+
+	if event.is_action_pressed(ZzBindings.FLASHLIGHT):
+		if flash != null:
+			var _asked := flash.toggle()
 		return true
 
 	if event.is_action_pressed(ZzBindings.SHOVE):

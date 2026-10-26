@@ -103,3 +103,4 @@ Thumbs.db
 
 # Godot writes an .import beside each golden when a test run loads it; goldens are read as raw images.
 /tests/golden/*.import
+/addons/dot_flashlight

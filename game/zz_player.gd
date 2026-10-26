@@ -168,6 +168,9 @@ var previous_shove: bool = false
 ## An administrator's `blind` and `beacon`, as dot-moderation's tools set them.
 var blinded: bool = false
 var beacon: bool = false
+## The flashlight is on (server-owned, replicated); `flashlight_ready` is cleared on a new map so the next tick sets its start state.
+var flashlight: bool = false
+var flashlight_ready: bool = false
 var beacon_marker: DotFxBeacon = null
 
 ## Whether the end-of-map logic has them inside the end area right now.

@@ -38,7 +38,9 @@ const ACT_DEPLOY := 8
 const ACT_BOX := 16
 ## Aim down the sights, held (right mouse); it becomes the weapon command's ads button.
 const ACT_AIM := 32
-const ACT_BITS := 6
+## Held for a few ticks by a client that wants the light switched; the server toggles on the rising edge.
+const ACT_FLASHLIGHT := 64
+const ACT_BITS := 7
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

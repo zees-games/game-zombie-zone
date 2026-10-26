@@ -1573,6 +1573,10 @@ var workbench: DotGameWorkbench = null
 
 ## Every [ZzConfig] field as a `zz_<field>` cvar, a cfg/ yml key and a workbench set. A hand-written cvar keeps its own code; a workbench or yml edit is pushed through it.
 func _bind_config(world: ZzGame) -> void:
+	var _fl := world.flashlight_conf()
+	if world.flashlight_binder != null:
+		var _flash_cvars := world.flashlight_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(n: String) -> bool: return console.has_name(n))
+		world.flashlight_binder.bind_commands(add_command)
 	var binder := world.config_binder
 	if binder == null:
 		return
@@ -1644,6 +1648,9 @@ func _start_workbench(world: ZzGame) -> void:
 	if world.config_binder != null:
 		for set: DotProfileSet in world.config_binder.profile_sets():
 			workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	if world.flashlight_binder != null:
+		for set: DotProfileSet in world.flashlight_binder.profile_sets():
+			workbench.add_set(set, "Flashlight")
 	var ambient_set := DotGameWorkbench.cvar_set(console, world.ambient_rules.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (zz_ambient*)")
@@ -1654,5 +1661,7 @@ func _start_workbench(world: ZzGame) -> void:
 		return
 	if world.config_binder != null:
 		world.config_binder.attach(rt)
+	if world.flashlight_binder != null:
+		world.flashlight_binder.attach(rt)
 	if ambient_set != null:
 		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)

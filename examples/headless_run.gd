@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 51
+const SECTIONS := 52
 
-const CHECKS := 382
+const CHECKS := 388
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -125,6 +125,7 @@ func _run() -> void:
 	await _test_solid_props()
 	await _test_solid_props_from_document()
 	await _test_common_speed()
+	await _test_the_flashlight()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1220,6 +1221,41 @@ func _test_the_shove() -> void:
 	await _sim(game, 0.1)
 	me.shove_held = false
 	_check(friend.is_pinned() and friend.pin_kind == &"carry", "but nothing shoves a ram off anybody")
+	_finished()
+
+
+func _test_the_flashlight() -> void:
+	_section("the flashlight")
+	var game := await _team(1, _quiet)
+	var me := game.survivors()[0]
+	var cfg := game.flashlight_conf()
+	_check(cfg.key == "T" and game.flashlight_binder != null, "the key is T, since F is the shove", cfg.key)
+
+	cfg.default_state = DotFlashlightConfig.START_ON
+	me.flashlight_ready = false
+	await _sim(game, 0.1)
+	_check(me.flashlight, "a map that starts lit lights the survivor")
+	cfg.default_state = DotFlashlightConfig.START_OFF
+	me.flashlight_ready = false
+	await _sim(game, 0.1)
+	_check(not me.flashlight, "and one that starts dark does not")
+
+	me.actions = ZzNetCommand.ACT_FLASHLIGHT
+	await _sim(game, 0.4)
+	_check(me.flashlight, "the switch turns it on, once however long it is held")
+	me.actions = 0
+	await _sim(game, 0.1)
+	me.actions = ZzNetCommand.ACT_FLASHLIGHT
+	await _sim(game, 0.1)
+	me.actions = 0
+	_check(not me.flashlight, "and the next press turns it off")
+
+	cfg.allowed_maps = PackedStringArray(["no_such_map"])
+	me.actions = ZzNetCommand.ACT_FLASHLIGHT
+	await _sim(game, 0.2)
+	me.actions = 0
+	_check(not me.flashlight, "a map outside allowed_maps has no light")
+	cfg.allowed_maps = PackedStringArray()
 	_finished()
 
 
