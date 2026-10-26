@@ -250,6 +250,7 @@ func _draw_world() -> void:
 		game.map.prop_shadow_min = float(game.config.get(&"prop_shadow_min"))
 		game.map.sun_floor = float(game.config.get(&"sun_floor"))
 		game.map.set_light_floor(float(game.config.get(&"light_floor")))
+		game.map.set_shadow_cost(bool(game.config.get(&"shadow_proxy")), float(game.config.get(&"shadow_range")), bool(game.config.get(&"shadow_translucent")))
 		game.map.set_sun_shadow_splits(int(game.config.get(&"sun_shadow_splits")))
 	var _drawn: DotResult = await game.map.load_world()
 	if gate != null and ticket == _world_ticket:

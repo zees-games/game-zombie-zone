@@ -636,6 +636,15 @@ func setup_seconds() -> float:
 ## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
 @export_range(0.0, 2.0) var sun_floor: float = 0.6
 
+## Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every material's surfaces. `--zz-shadow-proxy=`.
+@export var shadow_proxy: bool = true
+
+## Metres beyond which a chunk's shadow proxy is not drawn into the sun's cascades (0: all are). `--zz-shadow-range=`.
+@export_range(0.0, 1000.0, 1.0, "or_greater") var shadow_range: float = 0.0
+
+## Whether foliage and glass cards cast a sun shadow (costly: their alpha is tested in the shadow pass). Needs `shadow_proxy`. `--zz-shadow-translucent=`.
+@export var shadow_translucent: bool = false
+
 ## Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the old look) is
 ## about twice the draws of 2 on a converted map. `--zz-sun-shadow-splits=`.
 @export_range(1, 4) var sun_shadow_splits: int = 2

@@ -22,6 +22,16 @@
 # vis_mode: ""
 # Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the lit ma...
 # lightmaps: true
+# The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author li... [0.0..2.0]
+# light_floor: 0.6
+# The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves ... [0.0..2.0]
+# sun_floor: 0.6
+# Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every mat...
+# shadow_proxy: true
+# Metres beyond which a chunk's shadow proxy is not drawn into the sun's cascades (0: all are). `--zz-shadow-... [0.0..]
+# shadow_range: 0.0
+# Whether foliage and glass cards cast a sun shadow (costly: their alpha is tested in the shadow pass). Needs...
+# shadow_translucent: false
 # Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the... [1..4]
 # sun_shadow_splits: 2
 # Props whose longest side is under this many metres cast no sun shadow on a client (0: all do, as before). A...

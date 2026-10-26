@@ -1520,6 +1520,14 @@ func set_light_floor(value: float) -> void:
 		(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
 
 
+## Sets dot-map's world shadow cost (before the world is built); the `shadow_proxy`, `shadow_range` and `shadow_translucent` cvars.
+func set_shadow_cost(proxy: bool, range_m: float, translucent: bool) -> void:
+	if can_draw_world():
+		var mesh := load(MESH_SCRIPT) as GDScript
+		mesh.call(&"set_shadow_cost", proxy, range_m)
+		mesh.call(&"set_shadow_translucent", translucent)
+
+
 ## Turns off the sun shadow of every prop under [param props] whose longest side is under [member prop_shadow_min].
 func _trim_prop_shadows(props: Node3D) -> void:
 	if prop_shadow_min <= 0.0:

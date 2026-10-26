@@ -27,7 +27,7 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 
 const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
 const CHECKS_PER_MAP := 18
-const BAKE_CHECKS := 7
+const BAKE_CHECKS := 9
 const WORLD_CHECKS := 4
 const LAMP_CHECKS := 8
 
@@ -359,6 +359,19 @@ func _test_baked_light() -> void:
 			if not line.strip_edges().begins_with("#") and (line.contains("DotLightBake") or line.contains("DotLightmapSheet")):
 				named.append("%s: %s" % [f, line.strip_edges()])
 	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 dot-lighting class", "%s" % [named])
+	var cfg := ZzConfig.new()
+	_check(cfg.shadow_proxy and is_zero_approx(cfg.shadow_range) and not cfg.shadow_translucent,
+		"the shadow cvars default to proxy on, range 0 (all), translucent off")
+	var shadows_set := true
+	if ZzMap.can_draw_world():
+		var mesh := load(ZzMap.MESH_SCRIPT) as GDScript
+		var shadow_map := ZzMap.new()
+		shadow_map.set_shadow_cost(false, 40.0, true)
+		shadows_set = not bool(mesh.get(&"shadow_proxy")) and is_equal_approx(float(mesh.get(&"shadow_range")), 40.0) and bool(mesh.get(&"shadow_translucent"))
+		shadow_map.set_shadow_cost(true, 0.0, false)
+		shadow_map.free()
+		shadows_set = shadows_set and bool(mesh.get(&"shadow_proxy")) and not bool(mesh.get(&"shadow_translucent"))
+	_check(shadows_set, "set_shadow_cost reaches dot-map's proxy, range and translucent switches and restores them")
 	await _dispose(game)
 	_finished()
 
