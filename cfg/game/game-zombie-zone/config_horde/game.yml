@@ -1,0 +1,132 @@
+# game-zombie-zone: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-zombie-zone/config_horde/game.yml. Layers: defaults < this < env < argv.
+
+# --- Difficulty
+# 0 easy, 1 normal, 2 advanced, 3 expert. Scales what a zombie's hit does, how much a special can take, and f...
+# difficulty: 1
+# What a teammate's bullet does to you, as a fraction of what it would do to a zombie, before difficulty. The... [0.0..1.0]
+# friendly_fire: 0.1
+# What a teammate's bullet does to you: 0 nothing, 1 the share above (friendly fire), 2 the same but a NEW pl...
+# friendly_fire_mode: 2
+# Playtime under which a player is new, in minutes (lifetime where progress is kept, this session where it is... [0.0..100000.0]
+# rookie_minutes: 120.0
+# The window, in seconds, that team damage is added up over. [5.0..3600.0]
+# team_damage_window: 60.0
+# Team damage dealt within the window that starts a voteban against the player, through dot-vote's API. 0 nev... [0.0..100000.0]
+# team_damage_vote: 150.0
+# Team damage within the window that bans the player outright, for team_damage_ban_minutes. 0 never. A hard c... [0.0..100000.0]
+# team_damage_ban: 400.0
+#  [1.0..100000.0]
+# team_damage_ban_minutes: 30.0
+# Whether humans walk through a barricade (and so can go outside) without breaking it: the zombies are still ...
+# humans_pass_barricades: true
+# The team an exodus map is filled to with stand-ins, at least (a survival map says its own). An exodus is a ... [0..24]
+# exodus_team: 8
+# Whether a built navigation graph is kept in `user://nav_cache` and loaded next time, keyed by the map's con...
+# nav_cache: true
+# Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes... [0..16]
+# nav_threads: 2
+# Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`. [0.5..14.0]
+# nav_budget_ms: 6.0
+# Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its bake, and the bots...
+# nav_notes: true
+# Seconds a zombie may try to move without getting anywhere before it is freed; 0 turns it off. `zz_unstick_s... [0.0..30.0]
+# unstick_seconds: 4.0
+# The longest drop, in metres, a zombie takes off a ledge. `zz_nav_drop`. [1.0..10.0]
+# nav_drop_max: 4.0
+# Whether the zombies step down ledges the annotations found (a balcony is a way in, never a way up). `zz_zom...
+# zombie_drops: true
+# Whether a zombie climbs the jump ups too, which lets it up a ledge a survivor holds. Off, so a tower is def...
+# zombie_climb: false
+# Whether each zombie is sent through one of the chokes on the way, the least used, so a horde arrives by eve...
+# zombie_spread: true
+# Whether a zombie reads its squad's sightings when it thinks instead of each sighting calling the whole hord...
+# squad_pull_reports: true
+# Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its nearest survivo... [0.25..4.0]
+# think_range: 1.0
+# A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time, rather than once... [0..8]
+# horde_frame_ticks: 4
+# Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in place of a post a...
+# bot_hold_chokes: true
+# Zombies within four and a half metres of a choke that make it overrun: the stand-ins holding it fall back a... [2..40]
+# bot_hold_overrun: 6
+# Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot...
+# bot_open_boxes: true
+# How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing ones. The rest ... [0..16]
+# bot_helpers: 2
+# Metres within which any stand-in answers a pinned or downed friend on a survival map, however many already ... [0.0..40.0]
+# bot_helper_radius: 8.0
+
+# --- The horde
+# Common infected alive at once, for one survivor and for each more. [0..400]
+# commons_base: 24
+#  [0..50]
+# commons_per_survivor: 6
+# Most commons alive at once whatever the survivor count; 0 leaves commons_cap uncapped. [0..2000]
+# commons_max: 0
+# Commons standing about a map at its start, per hundred square metres of walkable floor. [0.0..10.0]
+# wanderer_density: 0.55
+# Seconds between mobs, from and to. A mob is a crowd that knows where you are. [10.0..900.0]
+# mob_interval_min: 90.0
+#  [10.0..900.0]
+# mob_interval_max: 180.0
+# Commons in a mob, and how many more for each survivor. [1..200]
+# mob_size: 14
+#  [0..40]
+# mob_size_per_survivor: 3
+# A common's health, speed running and walking, and what its hit does on normal. [1.0..1000.0]
+# common_health: 50.0
+#  [1.0..15.0]
+# common_run_speed: 6.3
+#  [0.2..5.0]
+# common_walk_speed: 1.1
+#  [0.0..100.0]
+# common_damage: 2.0
+# Seconds between a common's swings. [0.2..5.0]
+# common_attack_interval: 0.9
+# Whether zombies kneel and strike a downed survivor, and the damage that blow does compared to a standing hit.
+# down_attack: true
+#  [0.0..10.0]
+# down_attack_damage: 1.5
+# Commons that may be on one survivor at once; the rest wait their turn round them. [1..20]
+# attackers_per_survivor: 6
+# How far gunfire carries to a common, in metres. [0.0..200.0]
+# gunfire_radius: 30.0
+# Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
+# director_enabled: true
+
+# --- The specials
+# Special infected alive at once, for one survivor and one more for each this many survivors. [0..32]
+# specials_base: 2
+#  [1.0..32.0]
+# survivors_per_special: 3.0
+# Seconds between a special dying and the next of any kind, from and to. [1.0..300.0]
+# special_interval_min: 18.0
+#  [1.0..300.0]
+# special_interval_max: 40.0
+# Which specials may spawn, by id. Empty means all of them.
+# special_kinds: []
+# Commons a screamer's scream sends at whoever it saw (before survival's growth). [0..100]
+# screamer_mob: 10
+# Seconds between one screamer's screams. [4.0..120.0]
+# screamer_cooldown: 20.0
+# What a crawler's hold on an ankle does a second, on normal. [0.0..50.0]
+# crawler_grab_dps: 6.0
+# The share of a hit on a riot zombie's shield that gets through (0 none, 1 all of it). [0.0..1.0]
+# riot_shield: 0.1
+# Seconds between brutes, from and to, on a campaign map. 0 never. [0.0..3600.0]
+# brute_interval_min: 300.0
+#  [0.0..3600.0]
+# brute_interval_max: 480.0
+# A brute's health for one survivor, and how much more for each further survivor. [100.0..50000.0]
+# brute_health: 3000.0
+#  [0.0..20000.0]
+# brute_health_per_survivor: 900.0
+# Whether the crying sleepers a map places are there at all.
+# sleepers_enabled: true
+
+# --- Bots
+# How many survivors the server keeps in the game by adding stand-ins. [0..24]
+# minimum_players: 4
+# Whether a map that says how big a team it is built for (its `survivors`) raises that number to it: a high s...
+# team_from_map: true

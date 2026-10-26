@@ -1,0 +1,127 @@
+# game-zombie-zone: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-zombie-zone/config_round/game.yml. Layers: defaults < this < env < argv.
+
+# --- The HUD
+# The top-left list of team-mates with their health bars. Off by default: the Tab board carries each survivor...
+# team_roster: false
+
+# --- The round
+# Seconds between maps. [0.0..60.0]
+# intermission_seconds: 10.0
+# Seconds of the map's final killcam, added to the intermission (`mp_killcam_time`); 0 is off, the shipped de... [0.0..30.0]
+# killcam_seconds: 0.0
+# Seconds of warmup before the first round. 0 starts immediately. [0.0..300.0]
+# warmup_seconds: 10.0
+# Seconds the start area holds the director off, unless somebody leaves it first. [0.0..600.0]
+# start_grace_seconds: 60.0
+# Seconds every survivor still standing must be inside the end area for the map to be won. [0.0..30.0]
+# end_hold_seconds: 3.0
+# What happens after a map is lost: 0 play it again, 1 move on.
+# map_on_loss: 0
+# How many times a lost map is played again before the server moves on regardless. [0..20]
+# retries: 2
+# Seconds a survival map is held for in the `clock` style, when the map does not say. 0: as long as you can. [0.0..7200.0]
+# survive_seconds: 480.0
+
+# --- Survival
+# How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]):  waves    a breather, then wave a...
+# survival_style: 0
+# Waves to clear, or nights to live through. [1..50]
+# waves: 10
+#  [1..20]
+# nights: 5
+# Seconds of setup before a survival map's first wave or night (buy, position, load out): no zombie exists un... [0.0..300.0]
+# prestart_seconds: 30.0
+# Overrides the prestart when 0 or more (zz_survival_warmup); -1 follows prestart_seconds. [-1.0..300.0]
+# survival_warmup_seconds: -1.0
+# Whether the dead come back as each breather begins (zz_respawn_on_wave_end).
+# respawn_on_wave_end: true
+# Timed respawn (zz_timed_respawn), off by default: a dead survivor returns after ZzRespawn.delay seconds, re...
+# timed_respawn: false
+#  [0.0..600.0]
+# respawn_base_seconds: 30.0
+#  [0.0..600.0]
+# respawn_min_seconds: 8.0
+#  [0.0..600.0]
+# respawn_max_seconds: 90.0
+# Delay multiplier with the whole team up, and with nearly everybody down. [0.0..10.0]
+# respawn_healthy_scale: 0.5
+#  [0.0..10.0]
+# respawn_scarce_scale: 2.0
+# Seconds added per wave after the first. [0.0..120.0]
+# respawn_per_wave_seconds: 2.0
+# Fraction of the delay added per difficulty step above normal (taken off below it). [0.0..1.0]
+# respawn_difficulty_step: 0.0
+# Seconds the returned survivor cannot be hurt. [0.0..30.0]
+# respawn_protect_seconds: 3.0
+# Seconds of breather between waves: the downed are up, the dead are back, the caches restock, and the barric... [0.0..300.0]
+# breather_seconds: 30.0
+# Seconds of day between nights, and of a night. [10.0..900.0]
+# day_seconds: 60.0
+#  [10.0..1800.0]
+# night_seconds: 150.0
+# The first wave's commons for one survivor, and how many more for each further survivor. [1..400]
+# wave_size: 16
+#  [0..50]
+# wave_size_per_survivor: 4
+# How much bigger each wave (or harder each night) is than the first, as a share of it, and the square term t... [0.0..2.0]
+# wave_growth: 0.22
+#  [0.0..0.5]
+# wave_growth_accel: 0.018
+# Specials a wave brings: one from the second wave plus this many for each wave past the first, for every sur... [0.0..5.0]
+# wave_specials_growth: 0.6
+#  [1.0..32.0]
+# survivors_per_wave_special: 6.0
+# A wave down to this share of the team in stragglers (never fewer than three) ends 30 s after its last relea... [0.0..2.0]
+# wave_straggler_share: 0.5
+# The share of the commons cap a wave may have up at once in its first wave, growing to the whole cap by the ... [0.1..1.0]
+# wave_alive_share: 0.4
+# Health everybody standing gets back in a breather. [0.0..100.0]
+# breather_heal: 30.0
+# Every this many waves a brute comes with the wave (and two with the last). 0 never. [0..50]
+# brute_every_waves: 5
+# Whether waves from the third on draw a twist (sprinters, a swarm, heavies, hunters).
+# wave_twists: true
+# A barricade's strength, when the map does not say, and what one zombie's bashing takes off it a second (a b... [10.0..10000.0]
+# barricade_health: 500.0
+#  [0.0..200.0]
+# barricade_bash: 6.0
+# What one repair (holding E on a barricade) puts back, and how long it takes. [1.0..2000.0]
+# barricade_repair: 120.0
+#  [0.2..10.0]
+# barricade_repair_seconds: 2.0
+
+# --- Trader
+# Operator overrides of the `game: shop:` block of `dot_weapon/spawner.yml` (docs/operators.md); -1 leaves th... [-1..1]
+# trader_enabled: -1
+# `zz_trader_when`: 0 the setup period only, 1 setup and a survival map's breathers, 2 always. [-1..2]
+# trader_when: -1
+# `zz_trader_despawn`: 1 the shelf is gone when closed, 0 it stays standing and refuses to sell. [-1..1]
+# trader_despawn: -1
+# Per phase, whether the trader sells (1 yes, 0 no, -1 derives it from `zz_trader_when`): `zz_trader_setup` b... [-1..1]
+# trader_setup: -1
+#  [-1..1]
+# trader_grace: -1
+#  [-1..1]
+# trader_breather: -1
+#  [-1..1]
+# trader_round: -1
+# `zz_trader_closed_message`: what a survivor is told on E at a closed trader; empty is silent.
+# trader_closed_message: "Trader closed: round in progress"
+# `zz_grace_maps`: which maps get the start grace, 0 none, 1 escape (exodus) maps only, 2 every map. [0..2]
+# grace_maps: 1
+# `zz_escape_grace_seconds`: seconds after a map starts with no zombies (none spawn, none are woken, none tar... [0.0..600.0]
+# escape_grace_seconds: 30.0
+# `zz_grace_hud`: 1 shows "Zombies arrive in 0:23" on the HUD. [0..1]
+# grace_hud: 1
+# `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode). [-1..1000000]
+# start_points: -1
+
+# --- Watching
+# Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
+# spectate_camera: 0
+
+# --- Progress
+# keep_progress: true
+# progress_directory: ""
+# report_progress: false

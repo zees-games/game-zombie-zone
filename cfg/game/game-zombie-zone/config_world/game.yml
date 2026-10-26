@@ -1,0 +1,42 @@
+# game-zombie-zone: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-zombie-zone/config_world/game.yml. Layers: defaults < this < env < argv.
+
+# --- Gore
+# How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, ... [0..3]
+# gore_level: 2
+# The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_ma... [0..200]
+# gore_max_gibs: 24
+# Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; ... [0..400]
+# gore_max_wounds: 48
+
+# --- The maps
+# Which maps this server may play, by id. Empty means every one it has.
+# map_ids: []
+# Whether the next map is drawn at random (seeded) rather than taken in order; a campaign map's `next` always...
+# shuffle_maps: false
+# The file that says which maps this server ROTATES: `cfg/maps.yml` (dot-map's `DotMapRotationFile`: named ro...
+# map_rotation_file: "cfg/maps.yml"
+# Where map documents are read from, relative to this game's root.
+# map_directory: "maps"
+# How the client culls a world: off, pvs, occluders or both (dot-map's DotMapVisibility). Empty leaves it to ...
+# vis_mode: ""
+# Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the lit ma...
+# lightmaps: true
+# Seed every random choice is drawn from.
+# seed_value: 20261010
+# Whether zed-dot-weapons (real-world guns, launchers, a flamethrower, molotovs, pipe bombs and bile jars) is...
+# second_weapon_pack: true
+
+# --- Netcode
+# Metres within which a survivor is sent a common's and a special's updates (live). A client hides a mirror t... [40.0..1000.0]
+# net_common_radius: 80.0
+#  [40.0..1000.0]
+# net_special_radius: 260.0
+# Anything past net_far_distance metres from a survivor (players included, never their own) is sent every Nth... [1..16]
+# net_far_every: 1
+#  [0.0..1000.0]
+# net_far_distance: 40.0
+# Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once for all of t...
+# net_far_coherent: false
+# Bands past net_far_distance, each twice as far and sent half as often (1 is one band). [1..4]
+# net_far_tiers: 1

@@ -1,0 +1,113 @@
+# game-zombie-zone: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/game-zombie-zone/config_survivors/game.yml. Layers: defaults < this < env < argv.
+
+# --- The survivors
+#  [1.0..400.0]
+# max_health: 100.0
+# Below this health a survivor limps: slower (by `ZzController.LIMP`, which both ends register identically, s... [0.0..100.0]
+# limp_health: 40.0
+# Temporary health (pills, a revive) drains this much a second. [0.0..10.0]
+# temp_decay_per_second: 0.27
+# Downs a survivor survives before the next one kills: the third time is death. [0..10]
+# max_incaps: 2
+# A downed survivor's pool, and how fast it bleeds away a second. [10.0..2000.0]
+# downed_health: 300.0
+# Metres per second a downed survivor crawls at (`zz_down_crawl_speed`, also the file key `downed_crawl_speed... [0.0..6.0]
+# downed_crawl_speed: 1.4
+#  [0.0..100.0]
+# downed_bleed_per_second: 3.0
+# Seconds of holding E to pick somebody up, and the temporary health they get up with. [0.5..30.0]
+# revive_seconds: 5.0
+#  [1.0..100.0]
+# revive_health: 30.0
+# Metres a reviver may be from the downed. [0.5..5.0]
+# revive_range: 1.9
+# Seconds before a dead survivor is rescued: back in, beside whoever is furthest along, with half health and ... [0.0..600.0]
+# rescue_seconds: 75.0
+# What everybody starts a map holding, by weapon id. The first is drawn.
+# start_weapons: ["pistol", "knife"]
+# How many medkits and pills each survivor starts a map with. [0..1]
+# start_medkits: 1
+#  [0..1]
+# start_pills: 0
+#  [1.0..20.0]
+# run_speed: 6.2
+#  [0.1..1.0]
+# walk_speed_scale: 0.45
+#  [0.1..5.0]
+# jump_height: 1.1
+#  [1.0..60.0]
+# gravity: 20.0
+#  [0.0..200.0]
+# air_accelerate: 12.0
+
+# --- Items
+# A medkit heals this share of what is missing, after this long holding it. [0.1..1.0]
+# medkit_heal_fraction: 0.8
+#  [0.5..20.0]
+# medkit_seconds: 4.5
+# Temporary health a bottle of pills gives. [1.0..100.0]
+# pills_health: 50.0
+# The defibrillator: held E at a dead teammate's body shocks them back (a downed one is picked up by hand as ... [0..1]
+# start_defibs: 0
+# Seconds E is held at the body, and the metres from it. [0.5..30.0]
+# defib_charge_seconds: 4.0
+#  [0.5..5.0]
+# defib_range: 2.0
+# Share of maximum health the revived come back with, and seconds they cannot be hurt. [0.05..1.0]
+# defib_revive_fraction: 0.4
+#  [0.0..15.0]
+# defib_invulnerable_seconds: 2.0
+# Revives one item holds, and seconds after a shock before the next try. [1..7]
+# defib_charges: 1
+#  [0.0..120.0]
+# defib_cooldown_seconds: 8.0
+# Seconds after death beyond which the body is past saving (0: never). [0.0..600.0]
+# defib_max_body_age: 60.0
+# Metres the user may drift while charging before it is interrupted. [0.1..3.0]
+# defib_move_tolerance: 0.6
+# Metres from the eye an item may be picked up or a box opened. [0.5..5.0]
+# use_reach: 2.2
+
+# --- The shove
+# Seconds between shoves, and how much each shove in a row adds to it after the fourth. [0.1..5.0]
+# shove_cooldown: 0.7
+#  [0.0..2.0]
+# shove_fatigue: 0.35
+# Reach and half-angle of a shove. [0.5..5.0]
+# shove_range: 2.0
+#  [10.0..90.0]
+# shove_half_angle: 55.0
+# Damage a shove does to a common, which is nothing much: it is for room, not for killing. [0.0..100.0]
+# shove_damage: 5.0
+
+# --- Boxes
+# Where the boxes and what they do are read from, relative to this game's root.
+# box_file: "boxes/boxes.json"
+# Chance a common drops a box when it dies, and a special, and a brute. A common was 1.2% (one in eighty), so... [0.0..1.0]
+# box_drop_common: 0.04
+#  [0.0..1.0]
+# box_drop_special: 0.3
+#  [0.0..1.0]
+# box_drop_brute: 1.0
+# Seconds of holding E to open a box lying on the ground when nobody can carry one (box_carry 0), and how lon... [0.0..10.0]
+# box_open_seconds: 0.8
+#  [5.0..1200.0]
+# box_lifetime: 150.0
+# How many boxes a survivor carries (E picks one up into the hands; primary fire held opens it). 0: no carryi... [0..6]
+# box_carry: 1
+# Seconds primary fire is held to open a carried box (server file key `box_deploy_seconds`, cvar `zz_box_depl... [0.5..15.0]
+# box_deploy_seconds: 1.0
+#  [0.2..6.0]
+# box_deploy_radius: 1.2
+# Whether a box on the ground and in the slot says what type it is. Off (the default): every box looks the sa...
+# box_labels: false
+# Instakill, the first named box: the duration it lasts (seconds, uniform between; a negative minimum or maxi...
+# box_instakill_min: -1.0
+# box_instakill_max: -1.0
+#  [1.0..100.0]
+# box_instakill_special_scale: 4.0
+# Boxes lying about at once; past it, the oldest goes. [1..200]
+# max_boxes: 16
+# Whether boxes exist at all.
+# boxes_enabled: true
