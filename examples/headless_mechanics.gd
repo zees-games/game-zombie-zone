@@ -20,11 +20,12 @@ const ZzPlayer := preload("../game/zz_player.gd")
 ## walking up, so the chain (button, delay, relay, volume, lock) is only reachable in a fixture.
 
 const ZzPaths := preload("../game/zz_paths.gd")
+const ZzFooting := preload("../game/zz_footing.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 14
-const CHECKS := 134
+const SECTIONS := 15
+const CHECKS := 141
 
 var _passed := 0
 var _failed := 0
@@ -84,6 +85,7 @@ func _run() -> void:
 	await _test_trail_targets()
 	await _test_map_events()
 	await _test_no_world()
+	await _test_footing_rescue()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
 	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed + _skipped == CHECKS
@@ -1223,6 +1225,59 @@ func _test_map_events() -> void:
 	for e: Dictionary in game.loot.entries.values():
 		lying += 1 if e["until"] > 0.0 else 0
 	_check(lying <= ZzMapObjects.MAX_LYING, "pieces lying at once are capped", str(lying))
+	game.queue_free()
+	_finished += 1
+
+
+## The footing net on a real round: a survivor under the floor plane, and one pressing into a wall, are put back on ground they stood on.
+func _test_footing_rescue() -> void:
+	_entered += 1
+	print("zz_practice: the footing net puts a survivor back")
+	var game := await _game(&"zz_practice")
+	game.config.stuck_rescue_seconds = 1.5
+	var deaths: Array = []
+	game.player_died.connect(func(id: StringName, _by: StringName, why: StringName) -> void: deaths.append([id, why]))
+	var walker := game.add_player(&"u1", "Walker")
+	game.next_map_id = &"zz_practice"
+	game.start()
+	await _sim(game, 8)
+	var home: Vector3 = game.map.spawn("survivors", 1)[0]
+	var plane := ZzFooting.floor_plane(game.map)
+	walker.place_at(home, 0.0)
+	await _sim(game, 3 * TICK_RATE)
+	_check(walker.is_alive() and game.footing.rescued == 0, "standing on the ground is not rescued", "%d rescued" % game.footing.rescued)
+
+	var spot := walker.feet()
+	walker.place_at(Vector3(spot.x, plane - 2.0, spot.z), 0.0)
+	await _sim(game, TICK_RATE)
+	_check(game.footing.rescued == 1, "a survivor under the floor plane is rescued", "%d rescued" % game.footing.rescued)
+	_check(walker.is_alive() and walker.feet().y > plane and deaths.is_empty(), "and lives, above the plane", "%s %s" % [str(walker.feet()), str(deaths)])
+	_check(walker.feet().distance_to(spot) < 1.0, "on the ground they last stood on", "%.2f m from it" % walker.feet().distance_to(spot))
+
+	var wall := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(8.0, 6.0, 0.5)
+	wall.shape = box
+	wall.transform.origin = Vector3(spot.x, spot.y + 3.0, spot.z - 3.0)
+	game.map.get("_solid").add_child(wall)
+	walker.place_at(spot, 0.0)
+	var forward := DotFpsCommand.new()
+	forward.move = Vector2(0.0, 1.0)
+	walker.controller.apply_command(forward)
+	for i in 4 * TICK_RATE:
+		walker.controller.current_command = forward
+		game.simulate(TICK)
+		if game.footing.rescued == 2:
+			break
+		if i % 8 == 7:
+			await get_tree().physics_frame
+	_check(game.footing.rescued == 2, "a survivor pressing into a wall is rescued once stuck", "%d rescued" % game.footing.rescued)
+	_check(walker.is_alive() and walker.feet().distance_to(spot) < 1.0, "and put back on ground they stood on", "%.2f m from it" % walker.feet().distance_to(spot))
+	game.config.fall_rescue = false
+	var count: int = game.footing.rescued
+	walker.place_at(Vector3(spot.x, plane - 0.5, spot.z), 0.0)
+	game.simulate(TICK)
+	_check(game.footing.rescued == count, "with zz_fall_rescue off the net lets a fall alone", "%d rescued" % game.footing.rescued)
 	game.queue_free()
 	_finished += 1
 

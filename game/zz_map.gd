@@ -533,6 +533,24 @@ func _collides_hidden(box: Dictionary, bottom: float, sky_floor: float) -> bool:
 	return bottom < sky_floor
 
 
+## Whether the document names ground (a nav floor or a spawn) under [param size] at [param at] deeper than a slab's thickening: a cellar.
+func _ground_below(at: Vector3, size: Vector3) -> bool:
+	var floor_y := at.y + size.y * 0.5 - GROUND_DEPTH
+	var x0 := at.x - size.x * 0.5
+	var x1 := at.x + size.x * 0.5
+	var z0 := at.z - size.z * 0.5
+	var z1 := at.z + size.z * 0.5
+	for fl: Array in (doc.get("nav", {}) as Dictionary).get("floors", []):
+		if float(fl[4]) < floor_y and float(fl[0]) < x1 and float(fl[2]) > x0 and float(fl[1]) < z1 and float(fl[3]) > z0:
+			return true
+	for side: String in (doc.get("spawns", {}) as Dictionary):
+		for entry: Dictionary in doc["spawns"][side]:
+			var p: Array = entry["at"]
+			if float(p[1]) < floor_y and float(p[0]) > x0 and float(p[0]) < x1 and float(p[2]) > z0 and float(p[2]) < z1:
+				return true
+	return false
+
+
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
@@ -566,7 +584,7 @@ func _build_boxes() -> void:
 			# it is: a body pushed into a 0.2 m slab past its middle was pushed out of the
 			# bottom, and nothing is under the ground (zz-mall-floor-falls-1).
 			var top := at.y + size.y * 0.5
-			if absf(top) < 0.05 and size.y <= 0.5:
+			if absf(top) < 0.05 and size.y <= 0.5 and not _ground_below(at, size):
 				cube.size.y = size.y + GROUND_DEPTH
 				shape.transform.origin.y -= GROUND_DEPTH * 0.5
 			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
