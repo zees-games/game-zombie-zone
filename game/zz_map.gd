@@ -79,6 +79,9 @@ const BOUNDARY_MARGIN := 8.0
 const BOUNDARY_THICKNESS := 4.0
 const BOUNDARY_HEIGHT := 60.0
 
+## How far [method clear_spot] looks for room round a start point that is inside something.
+const SPAWN_SEARCH := 3.0
+
 ## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
 ## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
 const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
@@ -130,6 +133,7 @@ var world_collision: StaticBody3D = null
 var world_clip: StaticBody3D = null
 ## A box per solid prop of the drawn world (prop_dynamic and prop_physics the source makes solid), on the prop layer.
 var world_props: StaticBody3D = null
+
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
 ## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
@@ -1974,7 +1978,40 @@ func spawn(side: String, seat: int) -> Array:
 		var angle := float(lap) * 2.39996
 		at += Vector3(cos(angle), 0.0, sin(angle)) * (1.1 * ceilf(float(lap) / 6.0))
 
-	return [at, float(base.get("yaw", 0.0))]
+	return [clear_spot(at), float(base.get("yaw", 0.0))]
+
+
+## [param at] if a standing survivor fits there, else the nearest spot within [constant SPAWN_SEARCH] metres where one does and
+## the ground is under it: a converted map's start point can land inside a prop. Unchanged before the map is in a world.
+func clear_spot(at: Vector3) -> Vector3:
+	if physics == null or not is_inside_tree():
+		return at
+	var space := get_world_3d().direct_space_state
+	var mask := physics.collision_mask(&"player")
+	if _fits(space, mask, at):
+		return at
+	var reach := 0.5
+	while reach <= SPAWN_SEARCH:
+		for k in 12:
+			var spot := at + Vector3(cos(TAU * k / 12.0), 0.0, sin(TAU * k / 12.0)) * reach
+			if _fits(space, mask, spot):
+				return spot
+		reach += 0.5
+	return at
+
+
+func _fits(space: PhysicsDirectSpaceState3D, mask: int, feet: Vector3) -> bool:
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = 0.36
+	capsule.height = 1.7
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.collision_mask = mask
+	query.transform = Transform3D(Basis.IDENTITY, feet + Vector3(0.0, 0.95, 0.0))
+	if not space.intersect_shape(query, 1).is_empty():
+		return false
+	var down := PhysicsRayQueryParameters3D.create(feet + Vector3(0.0, 0.5, 0.0), feet + Vector3(0.0, -0.6, 0.0), mask)
+	return not space.intersect_ray(down).is_empty()
 
 
 ## Whether a start point is on: the map's `info_player_*` entity says so live, else the document's `disabled`. Found by name (the document keeps 64 characters of it); where several share a name, the one nearest the entry, else by standing within 0.75 m of it.

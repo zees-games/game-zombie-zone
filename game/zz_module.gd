@@ -558,6 +558,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_rescue_seconds", config.rescue_seconds,
 		"Seconds before a dead survivor is rescued beside the team (0 never)",
 		func(value: float) -> void: config.rescue_seconds = clampf(value, 0.0, 600.0))
+	_tunable("zz_fall_rescue", 1.0 if config.fall_rescue else 0.0,
+		"1: a survivor below the map's floor or outside its walls is put back on the last ground they stood on; 0: they die at the kill height",
+		func(value: float) -> void: config.fall_rescue = value != 0.0)
+	_tunable("zz_stuck_rescue_seconds", config.stuck_rescue_seconds,
+		"Seconds a survivor pushes on the world without moving before they are put back on the last ground (0 off)",
+		func(value: float) -> void: config.stuck_rescue_seconds = clampf(value, 0.0, 600.0))
 	_tunable("zz_start_grace", config.start_grace_seconds,
 		"Seconds the start area holds the horde off unless somebody leaves it",
 		func(value: float) -> void: config.start_grace_seconds = clampf(value, 0.0, 600.0))

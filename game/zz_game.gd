@@ -26,6 +26,7 @@ const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzCrawlRules := preload("zz_crawl_rules.gd")
 const ZzWaterRules := preload("zz_water_rules.gd")
+const ZzFooting := preload("zz_footing.gd")
 const ZzPassRules := preload("zz_pass_rules.gd")
 const ZzAmbientRules := preload("zz_ambient_rules.gd")
 const ZzEndCameraRules := preload("zz_end_camera_rules.gd")
@@ -258,6 +259,9 @@ var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 ## `zz_pass_barricades`: whether survivors walk through barricades. Bound by the module
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var pass_rules: ZzPassRules = ZzPassRules.new()
+
+## The net under the survivors: put back on the ground after a fall or a long stuck (`zz_fall_rescue`, `zz_stuck_rescue_seconds`).
+var footing: ZzFooting = ZzFooting.new()
 
 ## `zz_down_crawl_speed`: how fast a downed survivor crawls (0: not at all). Bound by the module
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
@@ -3396,6 +3400,9 @@ func _advance_bodies(delta: float) -> void:
 					var _returned := rescue(player)
 			elif config.rescue_seconds > 0.0 and player.died_at >= 0.0 and now_s - player.died_at >= config.rescue_seconds:
 				var _back := rescue(player)
+
+		if player.is_alive() and map != null and footing.advance(self, player, delta):
+			continue
 
 		# Below the map is death, not a down.
 		if player.is_alive() and player.feet().y < map.kill_height():

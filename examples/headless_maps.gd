@@ -77,6 +77,7 @@ func _run() -> void:
 	await _test_lamp_budget()
 	await _test_solid_prop_budget()
 	await _test_worlds()
+	await _test_footing()
 
 	for id: String in _maps:
 		await _test_map(StringName(id))
@@ -93,8 +94,8 @@ func _run() -> void:
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := 5 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := 6 + _maps.size()
+	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -157,6 +158,27 @@ func _test_the_catalogue() -> void:
 
 
 ## The document keeps every lamp; only the nearest few are lit, and a lamp fades rather than pops.
+const FOOTING_CHECKS := 4
+const ZzFooting := preload("res://game/zz_footing.gd")
+
+
+## The fall and stuck net (ZzFooting): what counts as out of the map, and that a fallen survivor is put back.
+func _test_footing() -> void:
+	_section("footing")
+	var id: StringName = StringName(_maps[0]) if not _maps.is_empty() else &""
+	var game := await _world(id)
+	var map: ZzMap = game.map
+	var plane := ZzFooting.floor_plane(map)
+	var at: Vector3 = map.spawn("survivors", 0)[0]
+	_check(plane < at.y and plane >= map.kill_height(), "the floor plane is under the spawn and over the kill height", "%.1f" % plane)
+	_check(not ZzFooting.out_of_map(map, at), "a spawn is in the map")
+	_check(ZzFooting.out_of_map(map, Vector3(at.x, plane - 1.0, at.z)), "under the floor plane is out of the map")
+	var net := ZzFooting.new()
+	_check(net.rescued == 0 and net.has_method("forget"), "a fresh net has rescued nobody")
+	await _dispose(game)
+	_finished()
+
+
 const SOLID_PROP_CHECKS := 6
 
 

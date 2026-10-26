@@ -346,6 +346,13 @@ func setup_seconds() -> float:
 ## half health and a sidearm. 0 never: the dead watch until the map ends.
 @export_range(0.0, 600.0, 5.0) var rescue_seconds: float = 75.0
 
+## Whether a survivor below the map's floor plane is put back on the last ground they stood on
+## (`zz_fall_rescue`); off, they die at the kill height.
+@export var fall_rescue: bool = true
+
+## Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off).
+@export_range(0.0, 600.0, 1.0) var stuck_rescue_seconds: float = 12.0
+
 ## What everybody starts a map holding, by weapon id. The first is drawn.
 @export var start_weapons: PackedStringArray = PackedStringArray(["pistol", "knife"])
 
