@@ -129,3 +129,5 @@ A survival map fades between its night (the converter's placeholder) and a day. 
 ## Putting it live
 
 The client shell needs dot-ui API level 4. Tag zee-dot-weapons (`add_source`) and zed, dot-npc (native search, `warm()`, `go_rough`), dot-npc-ai (the shared surround, rough corners), dot-npc-ai-director (API level 2, `DotNpcDirectorWaves`), dot-player-char (API level 3, the skeletal ragdolls) and anything else changed; add `content/zombiezone/` and a client example to dot-server-deploy and rebuild the shell; then the game, and the maps pack after it (its Blackout maps say `exodus`, which an older game refuses).
+
+**Dark maps keep a visibility floor** from dot-map: `zz_light_floor` (default 0.6, 0 disables) is the lowest light an unlit-looking surface and a survivor receive, and `zz_sun_floor` (default 0.6, 0 disables) the lowest sun energy; author lightmaps above the floor are untouched. No flashlight or night-vision exists in the family yet.

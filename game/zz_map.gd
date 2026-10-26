@@ -216,6 +216,8 @@ var _lamp_budget := ZzLampBudget.new()
 var sun_shadow_splits := 4
 ## Props shorter than this cast no sun shadow (0: all do); set by the client from `prop_shadow_min`.
 var prop_shadow_min := 0.0
+## The sun's least energy on a lightmapped world; set by the client from `sun_floor`.
+var sun_floor := 0.0
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
 
@@ -1347,7 +1349,10 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	lap = _lap(stages, "props", lap)
 	_light_from_world(world)
 	if lit and _environment != null:
-		(load(LIT_SCRIPT) as GDScript).call(&"attach", self, world, _environment.environment, _lamps.duplicate(), true)
+		var lit_node: Node = (load(LIT_SCRIPT) as GDScript).call(&"attach", self, world, _environment.environment, _lamps.duplicate(), true)
+		if lit_node != null and sun_floor > 0.0:
+			lit_node.set(&"sun", _sun)
+			lit_node.set(&"min_sun_energy", sun_floor)
 		_lamps.clear()
 	lap = _lap(stages, "light_lit", lap)
 	_dress_panorama_sky(world)
@@ -1507,6 +1512,12 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 		drawn_props.free()
 
 	_attach_fx(world, node)
+
+
+## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.
+func set_light_floor(value: float) -> void:
+	if can_draw_world():
+		(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
 
 
 ## Turns off the sun shadow of every prop under [param props] whose longest side is under [member prop_shadow_min].

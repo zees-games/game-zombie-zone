@@ -630,6 +630,12 @@ func setup_seconds() -> float:
 ## lit materials and the document's lamps. `--zz-lightmaps=`.
 @export var lightmaps: bool = true
 
+## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (dot-map's `DotMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
+@export_range(0.0, 2.0) var light_floor: float = 0.6
+
+## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
+@export_range(0.0, 2.0) var sun_floor: float = 0.6
+
 ## Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the old look) is
 ## about twice the draws of 2 on a converted map. `--zz-sun-shadow-splits=`.
 @export_range(1, 4) var sun_shadow_splits: int = 2
