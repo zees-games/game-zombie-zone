@@ -141,6 +141,7 @@ func drive(_delta: float) -> void:
 		if game.phase != game.Phase.IDLE:
 			_decide(player, command)
 			_pulse_trigger(player, command)
+			_watch_idle(player, command, memory)
 
 		memory["last_command"] = command
 		player.controller.apply_command(command)
@@ -954,6 +955,33 @@ func _objective(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 const PICK_UP_REACH := 7.0
 const PICK_UP_GIVE_UP := 15.0
 
+## Seconds a stand-in tries to get a clear line to an item that is within reach but behind something.
+const PICK_BLOCKED_GIVE_UP := 3.0
+
+
+## Lets go of item [param id] for 30 s, and of its neighbours (a shelf behind boards holds several goods: giving up one gives up the rest too, or each costs a full give-up in turn).
+func _give_up_pick(memory: Dictionary, loot, id: int) -> void:
+	memory["pick"] = -1
+	memory.erase("pick_blocked")
+	memory["pick_ignore"] = id if loot.entries.has(id) else -1
+	memory["pick_ignore_until"] = game.now() + 30.0
+	memory["pick_ignore_at"] = (loot.entries[id]["at"] as Vector3) if loot.entries.has(id) else Vector3.INF
+
+
+## Whether the graph has a way from [param player] to [param at]; true when there is no graph to ask.
+func _can_walk_to(player, at: Vector3) -> bool:
+	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
+
+	if nav == null or not nav.is_ready():
+		return true
+
+	var kept = nav.filter
+	if nav.has_method(&"relabel"):
+		nav.filter = nav.bot_filter
+	var path: PackedVector3Array = nav.find_smooth_path(player.feet(), at, 2.5, true, 2)
+	nav.filter = kept
+	return not path.is_empty()
+
 
 ## Picks up what it needs within a few metres: a medkit without one, pills, ammo when low, a box.
 func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
@@ -970,11 +998,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	# one 7 m away can lead off the other way, and re-judging by straight distance each tick
 	# made the stand-in alternate between it and its post, standing still.
 	if kept >= 0 and (not loot.entries.has(kept) or game.now() > float(memory.get("pick_until", 0.0))):
-		memory["pick"] = -1
-		memory["pick_ignore"] = kept if loot.entries.has(kept) else -1
-		memory["pick_ignore_until"] = game.now() + 30.0
-		# A shelf behind boards holds several goods: giving up one gives up its neighbours too, or each costs a full give-up in turn.
-		memory["pick_ignore_at"] = (loot.entries[kept]["at"] as Vector3) if loot.entries.has(kept) else Vector3.INF
+		_give_up_pick(memory, loot, kept)
 		kept = -1
 
 	for id: int in loot.entries:
@@ -1022,11 +1046,34 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 
 	if best != kept:
 		memory["pick"] = best
+		memory.erase("pick_blocked")
 		memory["pick_until"] = game.now() + PICK_UP_GIVE_UP
+
+		# Nowhere to walk to it (a rail, a ledge, another level): leave it be at once, not after fifteen seconds of pushing at the nearest point.
+		if not _can_walk_to(player, loot.position_of(best)):
+			_give_up_pick(memory, loot, best)
+			return false
 
 	var at: Vector3 = loot.position_of(best)
 
-	if player.eye_position().distance_to(at) <= game.config.use_reach:
+	var eye: Vector3 = player.eye_position()
+	var in_reach: bool = eye.distance_to(at) <= game.config.use_reach
+
+	# In reach through a wall or a rail is not in reach: the game's use needs a clear line, and a stand-in that stopped here pressed E at it for good. The clock keeps running while it hops about, and stops only when the line is seen clear.
+	if in_reach:
+		if game.clear_between(eye, at + Vector3(0.0, 0.35, 0.0)):
+			memory.erase("pick_blocked")
+		else:
+			var since: float = memory.get("pick_blocked", game.now())
+			memory["pick_blocked"] = since
+
+			if game.now() - since > PICK_BLOCKED_GIVE_UP:
+				_give_up_pick(memory, loot, best)
+				return false
+
+			in_reach = false
+
+	if in_reach:
 		_aim(player, command, at + Vector3(0.0, 0.25, 0.0))
 		player.actions |= ZzNetCommand.ACT_USE
 		# A begin needs a fresh press, and a key held since a first press that missed (the view still turning) never gives another. Only a box that takes time to open is held, once begun.
@@ -1135,3 +1182,36 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 
 			if ZzUnstick.relocate_player(player, aim, command.yaw):
 				memory["relocations"] = int(memory.get("relocations", 0)) + 1
+
+
+## Seconds a stand-in may want something (an item, a place) and not move or act before it is given another goal (`zz_bot_idle_seconds`).
+func _watch_idle(player, command: DotFpsCommand, memory: Dictionary) -> void:
+	var limit: float = game.config.bot_idle_seconds
+	var here: Vector3 = player.feet()
+	var anchor: Vector3 = memory.get("idle_at", Vector3.INF)
+	var acting: bool = command.is_pressed(ZzNetCommand.BUTTON_FIRE) or player.using != &"" or player.shove_held \
+		or not player.is_up() or player.is_pinned() or not player.carried.is_empty()
+	var wants: bool = int(memory.get("pick", -1)) >= 0 or command.move.length() > 0.3
+
+	if limit <= 0.0 or acting or not wants or anchor == Vector3.INF or here.distance_to(anchor) > STUCK_RADIUS:
+		memory["idle_at"] = here
+		memory["idle_since"] = game.now()
+		return
+
+	if game.now() - float(memory["idle_since"]) < limit:
+		return
+
+	memory["idle_since"] = game.now()
+	memory["idle_fixes"] = int(memory.get("idle_fixes", 0)) + 1
+	memory["path"] = PackedVector3Array()
+	var pick := int(memory.get("pick", -1))
+	var how := "new goal"
+
+	if pick >= 0 and game.loot != null:
+		_give_up_pick(memory, game.loot, pick)
+	elif ZzUnstick.relocate_player(player, _hold_of(player), command.yaw):
+		how = "relocated"
+
+	DotLog.info(CHANNEL, "a stand-in stood still wanting to move; given another goal", {
+		"player": String(player.player_id), "at": str(here.snappedf(0.1)), "pick": pick, "how": how, "seconds": limit,
+	})

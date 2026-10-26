@@ -509,6 +509,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_bot_repress_use", 1.0 if config.bot_repress_use else 0.0,
 		"Stand-ins release E every few ticks while going for a box so a missed press is repeated; 0 holds it",
 		func(value: float) -> void: config.bot_repress_use = value > 0.5)
+	_tunable("zz_bot_idle_seconds", config.bot_idle_seconds,
+		"Seconds a stand-in that wants to move or take something may stand still before it gets another goal; 0 off",
+		func(value: float) -> void: config.bot_idle_seconds = clampf(value, 0.0, 120.0))
 	_tunable("zz_nav_cache", 1.0 if config.nav_cache else 0.0,
 		"Keep each built navigation graph on disk and load it next time; 0 builds every time",
 		func(value: float) -> void: config.nav_cache = value > 0.5)

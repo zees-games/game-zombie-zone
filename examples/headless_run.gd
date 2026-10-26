@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 48
+const SECTIONS := 49
 
-const CHECKS := 361
+const CHECKS := 362
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -111,6 +111,7 @@ func _run() -> void:
 	await _test_winning_and_losing()
 	await _test_stand_ins()
 	await _test_stand_ins_take_a_box()
+	await _test_stand_in_and_a_box_behind_a_wall()
 	await _test_stand_ins_and_the_pass_through_level()
 	await _test_a_crowd_is_cheap()
 	await _test_the_hud()
@@ -2075,6 +2076,34 @@ func _test_stand_ins_take_a_box() -> void:
 			longest = maxf(longest, played - float(still[p.player_id]["since"]) if memory.get("pick", -1) != -1 else 0.0)
 	_check(not game.loot.exists(box) and not seen.is_empty(), "a box lying near them is taken and opened", "%.1f s, opened %d, on the ground %s, carried %s" % [played, seen.size(), str(game.loot.exists(box)), str(seats.map(func(q): return q.carried.size()))])
 	_check(longest <= 8.0, "no stand-in stood at a box it was going for longer than 8 s", "%.1f s" % longest)
+	_finished()
+
+
+## A box within arm's reach but behind a wall, the way a stand-in stood at one on a lava map for good: it must give the box up (3 s) rather than keep it for the full 15, and with the watchdog off still let go at the old time.
+func _test_stand_in_and_a_box_behind_a_wall() -> void:
+	_section("a stand-in lets go of a box it cannot see")
+	var game := await _team(1, _quiet, true)
+	var p: ZzPlayer = game.survivors()[0]
+	p.place_at(STREET + Vector3(0.0, 0.0, 0.6), 0.0)
+	var wall := StaticBody3D.new()
+	wall.collision_layer = game.world_mask()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(40.0, 4.0, 0.3)
+	shape.shape = box
+	wall.add_child(shape)
+	game.add_child(wall)
+	wall.global_position = STREET + Vector3(0.0, 2.0, 0.0)
+	var id := game.loot.add(ZzLoot.BOX, &"medical", STREET + Vector3(0, 0, -0.6))
+	var gave_up := -1.0
+	var played := 0.0
+	while played < 9.0:
+		await _sim(game, 0.5)
+		played += 0.5
+		if gave_up < 0.0 and int(game.bots._memory(p).get("pick", -1)) != id:
+			gave_up = played
+	_check(gave_up >= 0.0, "the stand-in no longer holds a box it cannot see after 9 s", "gave up at %.1f s" % gave_up)
+	wall.queue_free()
 	_finished()
 
 
