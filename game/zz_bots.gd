@@ -514,11 +514,13 @@ func _threat(player) -> DotNpcInstance:
 		return held
 
 	var eye: Vector3 = player.eye_position()
-	var scored: Array = []
+	var near: Array = game.horde.zombies_near(player.feet(), SIGHT)
+	# Sorted as one packed key (millimetres above, the index below) rather than with a lambda,
+	# which was a script call per comparison: six thousand a frame at wave 7.
+	var keys := PackedInt64Array()
 
-	for npc in game.horde.zombies_near(player.feet(), SIGHT):
-		if not npc.is_alive():
-			continue
+	for i in near.size():
+		var npc: DotNpcInstance = near[i]
 
 		# The sleeper is left alone unless she is up.
 		if npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting":
@@ -529,15 +531,15 @@ func _threat(player) -> DotNpcInstance:
 		if ZzNpcs.is_special(npc.def.id):
 			score -= 12.0
 
-		scored.append([score, npc])
+		keys.append((int((score + 64.0) * 1000.0) << 12) | i)
 
-	scored.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+	keys.sort()
 	var best: DotNpcInstance = null
 
 	# The ten it would rather shoot, at most: past those, a crowd behind a wall is a crowd
 	# behind a wall.
-	for n in mini(scored.size(), 10):
-		var npc: DotNpcInstance = scored[n][1]
+	for n in mini(keys.size(), 10):
+		var npc: DotNpcInstance = near[keys[n] & 0xFFF]
 		if _sees(player, _aim_point(npc)) or _sees(player, _head_point(npc)):
 			best = npc
 			break
@@ -799,6 +801,10 @@ func _move_world(_player, command: DotFpsCommand, direction: Vector3) -> void:
 	command.move = Vector2(flat.dot(right), flat.dot(forward)).limit_length(1.0)
 
 
+## Path points a stand-in smooths per repath (the spawner's `smooth_horizon` for the zombies).
+const SMOOTH_HORIZON := 16
+
+
 func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
@@ -811,7 +817,9 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 		var kept = nav.filter
 		if nav.has_method(&"relabel"):
 			nav.filter = nav.bot_filter
-		path = nav.find_smooth_path(here, goal, 2.5, true)
+		# Smoothed only at its head, like the zombies': it repaths every second, so the rest of a
+		# forty-point path was smoothed and thrown away.
+		path = nav.find_smooth_path(here, goal, 2.5, true, SMOOTH_HORIZON)
 		nav.filter = kept
 		memory["path"] = path
 		memory["path_at"] = game.now()

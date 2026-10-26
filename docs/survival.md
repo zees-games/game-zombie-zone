@@ -109,6 +109,22 @@ Measured `--from=10 --profile`, seed 1, before (all four repos stashed, VM load 
 
 What is left is the tick: about 120 µs of script per zombie per tick on this CPU (thinking 70, of which the path step is 55 µs a call, the body's sweep 55 µs, senses 17), so 56 zombies in reach are 7 ms of the 10 ms tick, and the solo player and stand-ins most of the rest. 60 fps needs that tick near 4 ms; 100 needs it near 2 ms and a render near 7, which is the crowd stepped in native code, not more distance tiers. The physics engine's own `move_and_slide` costs 40% less under Jolt in a 56-capsule measurement; the game still runs GodotPhysics3D. Under Xvfb the laptop's render is about 6 ms more than its GPU time (15.6 against 7.7 with no zombies), so a frame on a desktop is faster than these numbers.
 
+**Wave 7 with 120 zombies, solo (zz-perf-client, 2026-10-25).** Reported on a desktop at about 40 fps with physics 11 to 14 ms over 1.2 steps and render 3.8 ms: the tick, not the drawing. Same bench on the laptop box, `--zz-map-ids=zz_high_school --zombies=120 --measure=20` (about 74 alive), two runs each:
+
+| zz_high_school, 120 zombies | fps | frame ms (p99) | physics ms (steps) | `_physics_process` ms | render ms |
+| --- | --- | --- | --- | --- | --- |
+| before | 13.4, 13.7 | 74.7, 72.9 (112, 95) | 34.8, 32.7 (4.5, 4.4) | 23.7, 22.5 | 31.7, 32.1 |
+| after | 15.5, 15.8 | 64.7, 63.3 (95, 95) | 27.3, 26.7 (3.9, 3.8) | 20.9, 19.4 | 29.3, 28.7 |
+
+The tick by part (`--profile`, ms a tick): stand-ins 1.92 → 1.37, the survivor 1.77 → 1.61, weapons 0.91 → 0.52, brains 3.89 → 3.68, bodies 1.41 → 1.27, senses about 1.5 and the grid 0.4 unchanged; about 12.4 → 11.1. What changed:
+
+- **Smoothing remembers a leg** (dot-npc's `memo_legs`): a crowd chasing one survivor smooths the same legs again and again, and `can_walk_straight` was most of it. The stand-ins smooth only their path's first 16 points (`ZzBots.SMOOTH_HORIZON`).
+- **A stand-in's threat scan** sorts packed integer keys instead of a lambda over dictionaries, and the crowd grid answers a 32 m question by walking its entries rather than a thousand cells.
+- **A squad delivers each enemy's newest report** without walking the whole log since the member last asked.
+- **A severed limb's cut is cached per body mesh and bone** (dot-npc's `DotNpcGibs`): every sever was two script skinning passes, about 8 ms; the same cut again is 0.3 ms, with the same triangles.
+
+90 fps is not reachable on this box: the render alone is 28 to 31 ms under Xvfb, and the tick is still about 11 ms with the cost spread over every part of a zombie's thought (sensing and listening 1.2 ms, deciding 1.7, the rest under 0.3 each). It needs the crowd stepped in native code, behind a cvar and off by default, and a cheaper zombie render. `tools/perf_budget.sh` now has the case `zz_high_school@120`.
+
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
 
 `tools/survival_long_run.tscn` plays a whole hold on one map with its full team of stand-ins, headless, and prints a row per wave: seconds, sent, most alive, downs and deaths (and what downed them), barricades broken, the team up at its end, the tick's mean and worst, and a `RESULT` JSON line. `--from=K` starts at wave K (barricades whole, nobody hurt, the caches at K's tier), `--profile` splits the tick by part, `--watch=S --detail` says where the wave's zombies are and why. A school's ten waves are about 35 minutes of play and longer than that on a shared VM, so the runs were split: from wave 1 as far as nine minutes go, and from 4, 7, 9 and 10, several seeds, eight at a time.
