@@ -653,6 +653,9 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.box_instakill_max = value)
 	_tunable("zz_box_instakill_special_scale", config.box_instakill_special_scale, "Instakill: what a special takes per hit, as a multiple",
 		func(value: float) -> void: config.box_instakill_special_scale = clampf(value, 1.0, 100.0))
+	_tunable("zz_limb_follow_health", float(config.limb_follow_health),
+		"1: a limb holds as much as the zombie's real health and Instakill's boost skips limbs; 0: the old rule (later waves and Instakill strip limbs)",
+		func(value: float) -> void: config.limb_follow_health = value > 0.5)
 	_tunable("zz_gravity", config.gravity, "Metres per second squared, for everything",
 		func(value: float) -> void: config.gravity = value)
 	_tunable("zz_spectate_camera", float(config.spectate_camera),

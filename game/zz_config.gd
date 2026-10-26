@@ -521,6 +521,10 @@ func setup_seconds() -> float:
 @export var box_instakill_max: float = -1.0
 @export_range(1.0, 100.0, 0.5) var box_instakill_special_scale: float = 4.0
 
+## A limb's health follows the zombie's actual health (a later wave's, a brute's), and Instakill's
+## boosted damage does not reach limbs; off restores the old limb rules (zz_limb_follow_health).
+@export var limb_follow_health: bool = true
+
 ## Boxes lying about at once; past it, the oldest goes.
 @export_range(1, 200, 1) var max_boxes: int = 16
 

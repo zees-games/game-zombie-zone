@@ -2031,7 +2031,7 @@ func limb_hit(damage: DotDamage) -> void:
 		return
 
 	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
-	var _took := limbs.hit_limb(limb, damage.point, damage.amount, impulse)
+	var _took := limbs.hit_limb(limb, damage.point, limb_damage(npc, damage), impulse)
 
 	if not limbs.is_lethal():
 		return
@@ -2048,6 +2048,25 @@ func limb_hit(damage: DotDamage) -> void:
 	_in_limb_hit = true
 	var _applied = game.combat.apply_damage(kill)
 	_in_limb_hit = false
+
+
+## What a hit does to a limb. Limbs are sized from the kind's base health, so a later wave's or a
+## brute's real health, and Instakill's boosted damage, would strip them in a hit or two.
+func limb_damage(npc: DotNpcInstance, damage: DotDamage) -> float:
+	if not game.config.limb_follow_health:
+		return damage.amount
+
+	var amount := damage.amount
+
+	if game.boxes != null and game.boxes.is_active(&"instakill"):
+		amount = minf(amount, damage.base_amount) if damage.base_amount > 0.0 else amount
+
+	var health := npc.node.get_node_or_null(^"Health") as DotHealth
+
+	if health != null and health.max_health > 0.0 and npc.def.max_health > 0.0:
+		amount *= npc.def.max_health / health.max_health
+
+	return amount
 
 
 func _forget_combat(npc: DotNpcInstance) -> void:

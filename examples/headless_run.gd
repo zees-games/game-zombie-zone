@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 47
 
-const CHECKS := 355
+const CHECKS := 359
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -823,6 +823,8 @@ func _test_every_kind_animates() -> void:
 	var missing: Array = []
 	var flat: Array = []
 	var dark: Array = []
+	var bodies: Array = []
+	var counted := 0
 	var root := Node3D.new()
 	add_child(root)
 
@@ -837,6 +839,23 @@ func _test_every_kind_animates() -> void:
 		var lift: Variant = mat.get_shader_parameter(&"lift") if mat != null else null
 		if lift == null or float(lift) < 0.15 or maxf(glow.x, maxf(glow.y, glow.z)) > 0.1:
 			dark.append("%s lift=%s glow=%s" % [kind, lift, glow])
+		# Wave-2 play test: specials drew as legless, headless cones. Every kind spawns with a
+		# drawn, non-empty mesh whose size is a person's, not a sliver or a speck.
+		var tris := 0
+		var box := AABB()
+		var shown := view._mesh != null and view._mesh.is_visible_in_tree() and view._mesh.mesh != null
+
+		if shown:
+			for surface in view._mesh.mesh.get_surface_count():
+				var idx: Variant = view._mesh.mesh.surface_get_arrays(surface)[Mesh.ARRAY_INDEX]
+				tris += (idx as PackedInt32Array).size() / 3 if idx is PackedInt32Array else 0
+
+			box = view._model.transform * view._mesh.get_aabb()
+
+		if not shown or tris < 400 or box.size.y < 0.6 or box.size.y > 5.0 or box.size.x < 0.2:
+			bodies.append("%s tris=%d box=%s" % [kind, tris, box.size])
+
+		counted += 1
 		var player := view.find_child("AnimationPlayer", true, false) as AnimationPlayer
 		var overrides: Dictionary = ZzZombieView.look_for(kind, 5).get("clips", {})
 
@@ -864,6 +883,7 @@ func _test_every_kind_animates() -> void:
 				flat.append("%s/%d" % [kind, anim])
 
 	_check(kinds.size() == 12, "all twelve kinds are looked at", "%d" % kinds.size())
+	_check(counted == kinds.size() and bodies.is_empty(), "every kind spawns with a drawn mesh of a plausible size", "%d of %d: %s" % [counted, kinds.size(), str(bodies)])
 	_check(dark.is_empty(), "every kind's body keeps a self-light and none glows over its whole skin", str(dark))
 	_check(missing.is_empty(), "every state of every kind resolves to a clip the kit has", str(missing))
 	_check(flat.is_empty(), "the pin, leap, reach, reel and ground strike each pose the arms", str(flat))
@@ -1680,6 +1700,16 @@ func _test_box_framework() -> void:
 	var spit := game.horde.spawner.spawn(ZzNpcs.SPITTER, STREET + Vector3(0, 0, -6), &"test")
 	_check(is_equal_approx(game.boxes.zombie_damage(ZzNpcs.SPITTER, spit.def.max_health, 10.0), 10.0 * game.config.box_instakill_special_scale)
 		and game.boxes.zombie_damage(ZzNpcs.COMMON, 50.0, 1.0) > 50.0, "a special takes the configured multiple, a common everything")
+	var boosted := DotDamage.make(0, 0, 160.0, null)
+	boosted.base_amount = 40.0
+	var spit_health := spit.node.get_node(^"Health") as DotHealth
+	var rated := spit.def.max_health / spit_health.max_health
+	_check(is_equal_approx(game.horde.limb_damage(spit, boosted), 40.0 * rated), "Instakill's boost does not reach a special's limbs")
+	game.config.limb_follow_health = false
+	_check(is_equal_approx(game.horde.limb_damage(spit, boosted), 160.0), "zz_limb_follow_health 0 restores the old limb rule")
+	game.config.limb_follow_health = true
+	spit_health.max_health *= 4.0
+	_check(is_equal_approx(game.horde.limb_damage(spit, boosted), 40.0 * rated / 4.0), "a later wave's health makes a special's limbs hold as much")
 	await _sim(game, 2.4)
 	_check(not game.boxes.is_active(&"instakill") and is_equal_approx(game.boxes.zombie_damage(ZzNpcs.COMMON, 50.0, 1.0), 1.0),
 		"and it wears off when the time is up")
