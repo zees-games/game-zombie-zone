@@ -855,6 +855,24 @@ func _rebuild_candidates() -> void:
 		))
 
 
+## Hard Box stacks now on, which the commons' chase speed climbs with.
+func hard_stacks() -> int:
+	return game.boxes.stacks_of(&"hard") if game != null and game.boxes != null else 0
+
+
+## Whether a common with this [param roll] (0 to 1, fixed per zombie) runs now: an Angry Box is on.
+func is_runner(roll: float) -> bool:
+	if game == null or game.boxes == null or not game.boxes.is_active(&"angry"):
+		return false
+
+	return roll < config.angry_runner_fraction
+
+
+## A common's chase speed in m/s under the speed cvars; the brain asks every tick.
+func common_chase_speed(roll: float) -> float:
+	return ZzNpcs.common_chase_speed(config, hard_stacks(), is_runner(roll))
+
+
 func _survivor_count() -> int:
 	var n := 0
 

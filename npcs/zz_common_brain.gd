@@ -50,6 +50,9 @@ var home: Vector3 = Vector3.ZERO
 
 ## This one's own speed, ring and reactions, off its seed.
 var pace: float = 1.0
+
+## Fixed per zombie, so the same ones run for as long as an Angry Box does.
+var runner_roll: float = 0.0
 var ring: float = 2.6
 
 var _alert_for: float = 0.5
@@ -82,6 +85,7 @@ func _build() -> void:
 		idle_kind = Idle.FEED
 
 	pace = lerpf(0.88, 1.12, DotNpcAiNode.deterministic_unit(seed_id, 4127))
+	runner_roll = DotNpcAiNode.deterministic_unit(seed_id, 4153)
 	ring = lerpf(RING_MIN, RING_MAX, DotNpcAiNode.deterministic_unit(seed_id, 4133))
 	_alert_for = lerpf(ALERT_MIN, ALERT_MAX, DotNpcAiNode.deterministic_unit(seed_id, 4139))
 	home = npc.position() if npc != null else Vector3.ZERO
@@ -211,7 +215,7 @@ func _decide(_delta: float) -> void:
 				var gap := flat_distance(npc.position(), lure)
 
 				if gap > ring:
-					go_to(lure, npc.def.move_speed * pace, 1.0)
+					go_to(lure, _chase_speed() * pace, 1.0)
 					b.anim = ZzZombieBody.Anim.RUN
 					_unstick(b, lure)
 				else:
@@ -233,6 +237,12 @@ func _begin_alert(who: StringName, where: Vector3, extra: float) -> void:
 		h.call(&"spread_alert", npc, who, where if where != Vector3.INF else npc.position())
 
 
+## The horde owns the rule (Hard Box stacks, Angry runners); without one the def's run speed stands.
+func _chase_speed() -> float:
+	var h := horde()
+	return float(h.call(&"common_chase_speed", runner_roll)) if h != null else npc.def.move_speed
+
+
 ## One tick of the fight. False when there is nobody to fight.
 func _chase(b: ZzZombieBody) -> bool:
 	var target := quarry()
@@ -245,7 +255,7 @@ func _chase(b: ZzZombieBody) -> bool:
 	if at == Vector3.INF:
 		return false
 
-	var speed := npc.def.move_speed * pace
+	var speed := _chase_speed() * pace
 
 	if b.has_flag(ZzZombieBody.FLAG_BURNING):
 		speed *= 1.2

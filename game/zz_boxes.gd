@@ -1,5 +1,6 @@
 extends RefCounted
 
+const ZzBoxEffect := preload("zz_box_effect.gd")
 const ZzBoxInstakill := preload("zz_box_instakill.gd")
 const ZzBoxSpeed := preload("zz_box_speed.gd")
 const ZzController := preload("zz_controller.gd")
@@ -65,7 +66,7 @@ const ACTIONS: Array[String] = [
 
 ## The named boxes' handlers: effect name -> script (see zz_box_effect.gd). A later box is one line
 ## here, one small file, and a type in boxes.json.
-const HANDLERS := {"instakill": ZzBoxInstakill, "move_speed": ZzBoxSpeed, "crawl_speed": ZzBoxSpeed}
+const HANDLERS := {"instakill": ZzBoxInstakill, "hard": ZzBoxEffect, "angry": ZzBoxEffect, "move_speed": ZzBoxSpeed, "crawl_speed": ZzBoxSpeed}
 
 const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
 const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]
@@ -1045,6 +1046,11 @@ func zombie_damage(kind: StringName, max_health: float, amount: float) -> float:
 ## Whether the named effect is on (for [param who], or the whole game by default).
 func is_active(effect_name: StringName, who: StringName = &"") -> bool:
 	return not _find(String(effect_name), who).is_empty()
+
+
+## Stack count of the game-wide effect [param effect_name], 0 when it is off.
+func stacks_of(effect_name: StringName) -> int:
+	return int(_find(String(effect_name), &"").get("stacks", 0))
 
 
 ## Pushes the game-wide effects into the horde.

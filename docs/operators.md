@@ -126,3 +126,17 @@ Each map plays a quiet mood: beds under the level and sparse one-shots (creaks, 
 | `zz_ambient_dir` | empty | a directory with your own `moods.json` and sounds (format: dot-audio `docs/ambience.md`); its moods replace the built-in ones of the same name. Local to the machine that plays |
 
 A map's mood comes from an `"ambient"` field in its document, else the hand-made maps' table, else the sound names of a converted map, else `outdoor_night`. Players have Creepy ambience, Ambience volume and Distant sounds in the Audio page.
+
+## How fast commons chase: Hard and Angry boxes
+
+Commons chase slowly by default. A common's chase speed starts at `zz_common_speed_base`, gains `zz_common_speed_per_hard_stack` for each stack of the Hard Box (game-wide, stacking, up to 8, lasting 2 to 4 minutes and surviving a survival wave) and stops at `zz_common_speed_max`. The Angry Box (game-wide, does not stack, 1 to 2 minutes) makes a share of the commons run at the old full speed (`zz_common_run_speed` in the config file); which commons run is fixed per zombie, so the same ones run for as long as the box lasts. Specials are not touched. The rule is the server's and zombies are never predicted, so nothing is replicated: clients only see the zombies move, and the stack count already shows in the effects strip.
+
+| Cvar | Default | Meaning |
+| --- | --- | --- |
+| `zz_common_speed_scaling` | 1 | 0 restores the old behaviour: every common chases at the run speed, whatever the boxes say |
+| `zz_common_speed_base` | 2.2 | chase speed in m/s with no Hard Box stack (0.5 to 15) |
+| `zz_common_speed_per_hard_stack` | 0.8 | m/s gained per Hard Box stack (0 to 5) |
+| `zz_common_speed_max` | 6.3 | the cap in m/s (0.5 to 15) |
+| `zz_angry_runner_fraction` | 0.3 | share of commons that run while an Angry Box lasts (0 to 1) |
+
+The two boxes are types in `boxes/boxes.json` (`hard`, `angry`; effects of the same names), so an owner can drop them, change their drop weights or duration, or add more stacks by editing that file.

@@ -982,6 +982,7 @@ func _world(configure: Callable = Callable()) -> ZzGame:
 	config.minimum_players = 0
 	config.keep_progress = false
 	config.start_grace_seconds = 1.0
+	config.common_speed_scaling = false  # timed against the old running pace
 	config.escape_grace_seconds = 0.0
 
 	if configure.is_valid():

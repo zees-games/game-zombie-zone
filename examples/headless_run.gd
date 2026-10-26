@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 49
+const SECTIONS := 50
 
-const CHECKS := 362
+const CHECKS := 371
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -123,6 +123,7 @@ func _run() -> void:
 	await _test_water()
 	await _test_solid_props()
 	await _test_solid_props_from_document()
+	await _test_common_speed()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -313,6 +314,78 @@ func _test_start_area() -> void:
 	game.survivors()[0].place_at(STREET, 0.0)
 	await _sim(game, 0.5)
 	_check(game.phase == ZzGame.Phase.PLAY and game.horde.pacing, "one step outside and it starts")
+	_finished()
+
+
+func _test_common_speed() -> void:
+	_section("commons walk slowly, Hard Box stacks speed them up, Angry runs some")
+	var game := await _team(1, func(cfg: ZzConfig) -> void:
+		_quiet(cfg)
+		cfg.common_speed_scaling = true)
+	var me := game.survivors()[0]
+	var c := game.config
+	var horde: Object = game.horde
+	_check(c.common_speed_scaling and c.common_speed_base < c.common_run_speed * 0.5,
+		"by default a common's base chase speed is well under the old run", "%.1f" % c.common_speed_base)
+	_check(is_equal_approx(horde.common_chase_speed(0.99), c.common_speed_base), "with no Hard Box a common chases at the base speed")
+
+	var ctx := {"opener": me, "at": STREET, "box": &"hard"}
+	game.boxes.run([{"do": "effect", "name": "hard"}], ctx)
+	var one: float = horde.common_chase_speed(0.99)
+	game.boxes.run([{"do": "effect", "name": "hard"}], ctx)
+	var two: float = horde.common_chase_speed(0.99)
+	_check(horde.hard_stacks() == 2 and one > c.common_speed_base and two > one,
+		"each Hard Box stack raises the speed", "%.2f %.2f %.2f" % [c.common_speed_base, one, two])
+	for _i in 12:
+		game.boxes.run([{"do": "effect", "name": "hard"}], ctx)
+
+	_check(is_equal_approx(horde.common_chase_speed(0.99), c.common_speed_max) and horde.common_chase_speed(0.99) <= c.common_speed_max,
+		"the speed stops at the cap however many stacks", str(horde.hard_stacks()))
+
+	game.boxes.reset()
+	_check(horde.hard_stacks() == 0 and not horde.is_runner(0.0), "no stacks and no runners once the boxes are gone")
+
+	var angry := {"opener": me, "at": STREET, "box": &"angry"}
+	game.boxes.run([{"do": "effect", "name": "angry"}], angry)
+	var runners := 0
+	var total := 400
+
+	for i in total:
+		var roll := (float(i) + 0.5) / float(total)
+
+		if horde.is_runner(roll):
+			runners += 1
+			if not is_equal_approx(horde.common_chase_speed(roll), c.common_run_speed):
+				runners = -9999
+
+	_check(absf(float(runners) / float(total) - c.angry_runner_fraction) < 0.02,
+		"an Angry Box makes the configured share of commons run", "%d of %d" % [runners, total])
+	var spawned := 0
+
+	for _i in 60:
+		var z = horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(float(_i % 6) - 3.0, 0, -6.0 - float(_i / 6)), &"test")
+
+		if z == null:
+			continue
+
+		if horde.is_runner(float(z.brain.get(&"runner_roll"))):
+			spawned += 1
+
+	_check(spawned > 3 and spawned < 35, "real spawned commons carry a fixed roll, so about the share run", "%d of 60" % spawned)
+
+	c.common_speed_scaling = false
+	_check(is_equal_approx(horde.common_chase_speed(0.99), c.common_run_speed) and is_equal_approx(horde.common_chase_speed(0.0), c.common_run_speed),
+		"zz_common_speed_scaling 0 restores the old speed for every common")
+	c.common_speed_scaling = true
+	game.boxes.reset()
+
+	var npc = horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -8), &"test", Basis(Vector3.UP, PI))
+	me.place_at(STREET, 0.0)
+	await _sim(game, 0.3)
+	var start: Vector3 = npc.position()
+	await _sim(game, 1.5)
+	var moved: float = start.distance_to(npc.position())
+	_check(moved < c.common_speed_base * 1.5 * 1.15 + 0.5, "a spawned common really covers ground at the slow speed", "%.1f m in 1.5 s" % moved)
 	_finished()
 
 
@@ -2744,6 +2817,8 @@ func _world(configure: Callable = Callable()) -> ZzGame:
 	config.start_grace_seconds = 1.0
 	config.escape_grace_seconds = 0.0
 	config.sleepers_enabled = true
+	# The other sections time arrivals at the old running pace; the speed section turns it back on.
+	config.common_speed_scaling = false
 
 	if configure.is_valid():
 		configure.call(config)

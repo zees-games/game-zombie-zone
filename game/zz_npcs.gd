@@ -197,6 +197,15 @@ static func _eyes(def: DotNpcDef) -> DotNpcDef:
 	return def
 
 
+## A common's chase speed in m/s: the slow base plus [param hard_stacks] steps, capped; a runner (or
+## scaling off) keeps the old full run speed.
+static func common_chase_speed(c: ZzConfig, hard_stacks: int, runner: bool) -> float:
+	if not c.common_speed_scaling or runner:
+		return c.common_run_speed
+
+	return minf(c.common_speed_base + c.common_speed_per_hard_stack * float(maxi(hard_stacks, 0)), c.common_speed_max)
+
+
 ## The crowd.
 ##
 ## [b]Short sight and good ears while it idles, which is what makes sneaking past one a thing a

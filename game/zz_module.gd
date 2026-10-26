@@ -651,6 +651,16 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.defib_max_body_age = clampf(value, 0.0, 600.0))
 	_tunable("zz_defib_move_tolerance", config.defib_move_tolerance, "Metres the user may drift while charging before it is interrupted (0.1 to 3)",
 		func(value: float) -> void: config.defib_move_tolerance = clampf(value, 0.1, 3.0))
+	_tunable("zz_common_speed_scaling", 1.0 if config.common_speed_scaling else 0.0, "Commons chase slowly and speed up with Hard Box stacks (1), or all run at zz_common_run_speed as before (0)",
+		func(value: float) -> void: config.common_speed_scaling = value > 0.5)
+	_tunable("zz_common_speed_base", config.common_speed_base, "A common's chase speed in m/s with no Hard Box stack (0.5 to 15)",
+		func(value: float) -> void: config.common_speed_base = clampf(value, 0.5, 15.0))
+	_tunable("zz_common_speed_per_hard_stack", config.common_speed_per_hard_stack, "m/s a common gains per Hard Box stack (0 to 5)",
+		func(value: float) -> void: config.common_speed_per_hard_stack = clampf(value, 0.0, 5.0))
+	_tunable("zz_common_speed_max", config.common_speed_max, "The fastest a scaled common gets, in m/s (0.5 to 15)",
+		func(value: float) -> void: config.common_speed_max = clampf(value, 0.5, 15.0))
+	_tunable("zz_angry_runner_fraction", config.angry_runner_fraction, "Share of commons that run at full speed while an Angry Box lasts (0 to 1)",
+		func(value: float) -> void: config.angry_runner_fraction = clampf(value, 0.0, 1.0))
 	_tunable("zz_box_labels", 1.0 if config.box_labels else 0.0, "Whether a box says its type before it is opened (default 0: the contents are a surprise, and the type is never sent)",
 		func(value: float) -> void: config.box_labels = value > 0.5)
 	_tunable("zz_box_instakill_min", config.box_instakill_min, "Instakill lasts at least this many seconds (negative: the box file's)",

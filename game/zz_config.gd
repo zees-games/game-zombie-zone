@@ -431,6 +431,16 @@ func setup_seconds() -> float:
 @export_range(1.0, 1000.0, 1.0) var common_health: float = 50.0
 @export_range(1.0, 15.0, 0.1) var common_run_speed: float = 6.3
 @export_range(0.2, 5.0, 0.1) var common_walk_speed: float = 1.1
+
+## How fast a common chases (`zz_common_speed_*`). Scaling on: it starts at `common_speed_base`,
+## gains `common_speed_per_hard_stack` per Hard Box stack and stops at `common_speed_max`;
+## `angry_runner_fraction` of the crowd runs at `common_run_speed` while an Angry Box lasts.
+## Scaling off (`zz_common_speed_scaling 0`) is the old behaviour: every common runs.
+@export var common_speed_scaling: bool = true
+@export_range(0.5, 15.0, 0.1) var common_speed_base: float = 2.2
+@export_range(0.0, 5.0, 0.05) var common_speed_per_hard_stack: float = 0.8
+@export_range(0.5, 15.0, 0.1) var common_speed_max: float = 6.3
+@export_range(0.0, 1.0, 0.05) var angry_runner_fraction: float = 0.3
 @export_range(0.0, 100.0, 0.5) var common_damage: float = 2.0
 
 ## Seconds between a common's swings.

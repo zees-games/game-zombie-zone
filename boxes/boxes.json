@@ -1359,6 +1359,78 @@
    ]
   },
   {
+   "id": "hard",
+   "title": "Hard Box",
+   "colour": "#c0392b",
+   "polarity": "negative",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": true,
+   "max_stacks": 8,
+   "survives_round": true,
+   "duration": {
+    "mode": "seconds",
+    "min": 120,
+    "max": 240
+   },
+   "drop": {
+    "common": 1,
+    "special": 2,
+    "brute": 2,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "hard",
+     "title": "Harder!",
+     "weight": 1,
+     "message": "{name} opened it: the infected get faster, and again for every one opened.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "hard"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "angry",
+   "title": "Angry Box",
+   "colour": "#e67e22",
+   "polarity": "negative",
+   "impact": "game",
+   "radius": 0.0,
+   "stacks": false,
+   "max_stacks": 1,
+   "survives_round": true,
+   "duration": {
+    "mode": "seconds",
+    "min": 60,
+    "max": 120
+   },
+   "drop": {
+    "common": 1,
+    "special": 2,
+    "brute": 2,
+    "map": 1
+   },
+   "outcomes": [
+    {
+     "id": "angry",
+     "title": "Angry!",
+     "weight": 1,
+     "message": "{name} opened it: some of the infected run at you.",
+     "actions": [
+      {
+       "do": "effect",
+       "name": "angry"
+      }
+     ]
+    }
+   ]
+  },
+  {
    "id": "swift",
    "title": "Swift Box",
    "colour": "#3fd0e0",
