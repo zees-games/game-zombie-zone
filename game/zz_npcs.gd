@@ -203,7 +203,19 @@ static func common_chase_speed(c: ZzConfig, hard_stacks: int, runner: bool) -> f
 	if not c.common_speed_scaling or runner:
 		return c.common_run_speed
 
-	return minf(c.common_speed_base + c.common_speed_per_hard_stack * float(maxi(hard_stacks, 0)), c.common_speed_max)
+	return DotStackScale.ramp(c.common_speed_base, c.common_speed_per_hard_stack, c.common_speed_max, hard_stacks)
+
+
+## How see-through a zombie is drawn at the Hard Box stacks now on (`zz_mutant_fade*`, `zz_common_fade`).
+## [param c] is a ZzConfig; commons stay solid unless `zz_common_fade` is on.
+static func fade_alpha(c: Object, kind: StringName, stacks: int) -> float:
+	if int(c.get(&"mutant_fade")) != 1:
+		return 1.0
+
+	if kind == &"common" and int(c.get(&"common_fade")) != 1:
+		return 1.0
+
+	return DotStackScale.fade_alpha(stacks, float(c.get(&"mutant_fade_per_stack")), float(c.get(&"mutant_min_alpha")))
 
 
 ## The crowd.

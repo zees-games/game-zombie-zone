@@ -5,11 +5,11 @@ const ZzBoxes := preload("zz_boxes.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzDefibModel := preload("zz_defib_model.gd")
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzNpcs := preload("zz_npcs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
-const ZzFade := preload("zz_fade.gd")
 
 ## Everything a client draws in the world that is not a survivor or a wall: the zombies and their
 ## bodies, what lies on the ground, pools of acid and fire, things thrown, explosions, and a
@@ -725,7 +725,7 @@ func set_effects(rows: Array) -> void:
 
 
 func _alpha_of(kind: StringName) -> float:
-	return ZzFade.alpha(fade_config, kind, hard_stacks) if fade_config != null else 1.0
+	return ZzNpcs.fade_alpha(fade_config, kind, hard_stacks) if fade_config != null else 1.0
 
 
 ## Redraws every zombie when a stack or a cvar moved, so a change mid-life shows at once.

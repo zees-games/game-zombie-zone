@@ -1,8 +1,8 @@
 extends Node
 
+const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzBlood := preload("../game/zz_blood.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const ZzFade := preload("../game/zz_fade.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
@@ -114,17 +114,17 @@ func _light() -> void:
 
 func _fade() -> void:
 	var c := ZzConfig.new()
-	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 0), 1.0), "no Hard Box stack: a mutant is solid")
-	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 3), 1.0 - 3.0 * c.mutant_fade_per_stack), "three stacks: alpha is 1 - 3 * step")
-	_check(is_equal_approx(ZzFade.alpha(c, &"brute", 40), c.mutant_min_alpha), "any number of stacks stops at the minimum alpha")
+	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"spitter", 0), 1.0), "no Hard Box stack: a mutant is solid")
+	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"spitter", 3), 1.0 - 3.0 * c.mutant_fade_per_stack), "three stacks: alpha is 1 - 3 * step")
+	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"brute", 40), c.mutant_min_alpha), "any number of stacks stops at the minimum alpha")
 	c.mutant_min_alpha = 0.0
-	_check(ZzFade.alpha(c, &"ram", 99) >= ZzFade.FLOOR, "a minimum of 0 still leaves the mutant visible")
+	_check(ZzNpcs.fade_alpha(c, &"ram", 99) >= DotStackScale.ALPHA_FLOOR, "a minimum of 0 still leaves the mutant visible")
 	c.mutant_min_alpha = 0.25
-	_check(is_equal_approx(ZzFade.alpha(c, &"common", 5), 1.0), "commons are untouched by default")
+	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"common", 5), 1.0), "commons are untouched by default")
 	c.common_fade = 1
-	_check(ZzFade.alpha(c, &"common", 5) < 1.0, "zz_common_fade 1 fades commons too")
+	_check(ZzNpcs.fade_alpha(c, &"common", 5) < 1.0, "zz_common_fade 1 fades commons too")
 	c.mutant_fade = 0
-	_check(is_equal_approx(ZzFade.alpha(c, &"spitter", 8), 1.0) and is_equal_approx(ZzFade.alpha(c, &"common", 8), 1.0), "zz_mutant_fade 0 gives 1.0 for everyone")
+	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"spitter", 8), 1.0) and is_equal_approx(ZzNpcs.fade_alpha(c, &"common", 8), 1.0), "zz_mutant_fade 0 gives 1.0 for everyone")
 
 	var a := ZzZombieView.new()
 	var b := ZzZombieView.new()
