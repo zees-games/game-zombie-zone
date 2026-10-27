@@ -485,13 +485,16 @@ func _add_noblock_and_workbench() -> void:
 		for set: DotProfileSet in game.flashlight_binder.profile_sets():
 			wb.add_set(set, "Flashlight")
 	wb.add_set(game.bot_persona_set(), "Bot personas (add, edit, delete)")
+	wb.add_set(game.box_profile_set(), "Boxes (odds, effects, colours, sounds)")
 	add_child(wb)
 	var started := wb.start(rt)
 	DotLog.result(CHANNEL, "the workbench", started)
 	if started.ok:
 		rt.profile_changed.connect(func(kind: String, _id: String, _rev: int) -> void:
 			if kind == DotBotPersona.KIND:
-				game.reload_personas())
+				game.reload_personas()
+			elif kind == DotBoxProfiles.KIND:
+				game.reload_boxes())
 	if link == null:
 		if started.ok and game.config_binder != null:
 			game.config_binder.attach(rt)
@@ -1130,6 +1133,10 @@ func _on_box(session_id: int, type_id: StringName, title: String, message: Strin
 			var _opened := audio.at(ZzAudio.BOX_OPEN, who.global_position) if session_id != _watch_id else 0
 		if session_id == _watch_id:
 			var _mine := audio.play(ZzAudio.BOX_OPEN)
+
+	# Solo, the simulation fires the box's events itself; connected, the server's open reaches here.
+	if link != null and game.boxes != null:
+		var _reward := game.boxes.sounds.fire(type_id, &"reward", who.global_position if who != null else Vector3.ZERO)
 
 	var box_title := str(type_id).capitalize()
 
@@ -1812,6 +1819,8 @@ func _build_audio() -> void:
 		remove_child(audio)
 		audio.queue_free()
 		audio = null
+	elif game.boxes != null:
+		audio.add_recipes(game.boxes.use_audio(audio.manager))
 
 
 func _build_settings() -> void:
@@ -2154,7 +2163,9 @@ func carried_colour(who: ZzPlayer) -> Color:
 ## dead or watching.
 func _aim_allowed() -> bool:
 	return _pointer_ours() and not third_person and not is_spectating() \
-		and player != null and player.is_alive() and not player.is_down() and not player.is_held()
+		and player != null and player.is_alive() and not player.is_down() and not player.is_held() \
+		and not (player.controller != null and player.controller.state.sprinting \
+			and player.controller.tunables != null and player.controller.tunables.sprint_blocks_aim)
 
 
 ## What the command says about the sights: the view model's own state, so a toggle in the rules
@@ -2171,7 +2182,12 @@ func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
 		hands.aim_input(_aiming and _aim_allowed())
-	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
+	var zoom := hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0
+	camera.fov = base_fov * zoom
+	if _sampler != null:
+		_sampler.look_scale = zoom
+	if player != null and player.sampler != null:
+		player.sampler.look_scale = zoom
 	if hud != null:
 		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 		if weapons != null and weapons.arsenal != null:
