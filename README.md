@@ -271,5 +271,7 @@ The defibrillator is [Defibrillator (Low Poly)](https://sketchfab.com/3d-models/
 
 The Mutant is [Buff Mutant 2.0](https://sketchfab.com/3d-models/buff-mutant-20-8933f1f4a728486e8bcbe09714b842be) by Zeldrix ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), modified: re-rigged, re-weighted and split into gun, pack and body parts by `art-src/mutant.py`.
 
+The oil monster is [Scary, Lovcraftian, Toothy, Oil-monster](https://sketchfab.com/3d-models/scary-lovcraftian-toothy-oil-monster-7b89564025b94fceb3153668f538f8f5) by lealeelu ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), modified: the baked fluid simulation's floor splash cut away, the lace of oil decimated, its collider sphere made the solid core with a mouth cut in it, and rigged with test clips by `art-src/oil_monster.py`. Its teeth are [Tooth and spike collection](https://blendswap.com/blend/12455) by mStuff (CC0).
+
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.
