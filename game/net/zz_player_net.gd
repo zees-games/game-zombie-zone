@@ -44,6 +44,9 @@ var net_crouch: float = 0.0
 var net_flags: int = 0
 var net_modifiers: int = 0
 
+## Owner-only packed stamina (DotFpsNetSync.pack_stamina), so a predicting client's rewind restores it.
+var net_stamina: int = 0
+
 ## Hit points, and the one field with a hard cap on the wire.
 ##
 ## [b]Sent against 0..1000 rather than against the player's own maximum.[/b] A server that
@@ -154,6 +157,9 @@ func _register_net_vars() -> void:
 
 		if spec["property"] == &"net_crouch":
 			declaration.range_of(0.0, 1.0)
+
+	for spec in DotFpsNetSync.stamina_specs():
+		var _stamina := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
 	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(14)
 	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(12)

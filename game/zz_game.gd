@@ -281,6 +281,9 @@ var footing: ZzFooting = ZzFooting.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
+## Sprint and stamina (`sv_sprint*`, `sv_stamina*`, REPLICATED): the server's numbers over the config's, copied onto every player's tunables on both ends.
+var sprint_rules := DotFpsSprintRules.new()
+
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults. One per game, not
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
@@ -396,6 +399,9 @@ func _ready() -> void:
 	_build_physics()
 	pass_rules.humans_pass = config.humans_pass_barricades
 	crawl_rules.speed = config.downed_crawl_speed
+	sprint_rules.apply_from(ZzPlayer.tunables_for(config))
+	if not sprint_rules.changed.is_connected(_on_sprint_rules_changed):
+		sprint_rules.changed.connect(_on_sprint_rules_changed)
 	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
 		crawl_rules.changed.connect(_on_crawl_rules_changed)
 	if not water_rules.changed.is_connected(_push_water):
@@ -536,6 +542,12 @@ func _apply_body_mask(player: ZzPlayer) -> void:
 func _on_crawl_rules_changed() -> void:
 	for id in players:
 		(players[id] as ZzPlayer).controller.set_crawl_speed(crawl_rules.speed)
+
+
+## The sprint and stamina numbers on every player's tunables, on this end.
+func _on_sprint_rules_changed() -> void:
+	for id in players:
+		sprint_rules.apply_to((players[id] as ZzPlayer).controller.tunables)
 
 
 ## The water survivors move through: the map's volumes, or none when `zz_water` is off.
@@ -1334,6 +1346,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		_apply_body_mask(player)
 
 	player.controller.set_crawl_speed(crawl_rules.speed)
+	sprint_rules.apply_to(player.controller.tunables)
 	player.set_water(_water_boxes(), water_rules)
 
 	var opened := entities.open(DotEntity.KIND_PLAYER, player, &"", player_id, now())

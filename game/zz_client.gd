@@ -209,6 +209,8 @@ func _ready() -> void:
 
 	_sampler = DotFpsSampler.new(ZzPlayer.tunables_for(config))
 	ZzPlayer.register_actions(_sampler)
+	game.sprint_rules.apply_to(_sampler.tunables)
+	game.sprint_rules.changed.connect(func() -> void: game.sprint_rules.apply_to(_sampler.tunables))
 
 	_build_hud()
 	_build_chat()
@@ -492,6 +494,7 @@ func _build_netcode() -> DotResult:
 				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
 		var _recoil := game.recoil_rules.follow_cvars(link)
+		var _sprint := game.sprint_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)

@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 391
+const CHECKS := 392
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2055,6 +2055,14 @@ func _test_crawling_and_speed_boxes() -> void:
 		and game.crawl_rules.set_cvar("99") and is_equal_approx(game.crawl_rules.speed, ZzCrawlRules.MAX_SPEED),
 		"junk is refused and a huge value is clamped")
 	game.crawl_rules.set_cvar("1.4")
+
+	var drain_was := me.controller.tunables.stamina_drain
+	var _drain := game.sprint_rules.set_cvar("sv_stamina_drain", "1.5")
+	var _noaim := game.sprint_rules.set_cvar("sv_sprint_noaim", "0")
+	_check(is_equal_approx(me.controller.tunables.stamina_drain, 1.5) and not me.controller.tunables.sprint_blocks_aim,
+		"sv_stamina_drain and sv_sprint_noaim reach a live player's tunables", "was %.2f" % drain_was)
+	var _back := game.sprint_rules.set_cvar("sv_stamina_drain", str(drain_was))
+	var _on := game.sprint_rules.set_cvar("sv_sprint_noaim", "1")
 
 	# The boxes: in the file, four ways of being faster.
 	var file := ZzBoxes.new(null)

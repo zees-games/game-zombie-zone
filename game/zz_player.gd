@@ -456,6 +456,8 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 	t.stamina_exhaust_delay = p_config.stamina_exhaust_delay
 	t.sprint_load_speed = p_config.sprint_load_speed
 	t.sprint_load_drain = p_config.sprint_load_drain
+	t.sprint_blocks_aim = p_config.sprint_blocks_aim
+	t.sprint_toggle = p_config.sprint_toggle
 
 
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.

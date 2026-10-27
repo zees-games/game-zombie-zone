@@ -374,6 +374,10 @@ func setup_seconds() -> float:
 ## How strongly the carried share of the weight limit cuts the sprint bonus and raises the drain; 0 off.
 @export_range(0.0, 2.0, 0.01) var sprint_load_speed: float = 1.0
 @export_range(0.0, 4.0, 0.01) var sprint_load_drain: float = 1.0
+## Whether sprinting stops aiming down sights and reloading.
+@export var sprint_blocks_aim: bool = true
+## Whether Shift toggles sprint instead of being held.
+@export var sprint_toggle: bool = false
 @export_range(0.1, 5.0, 0.05) var jump_height: float = 1.1
 @export_range(1.0, 60.0, 0.5) var gravity: float = 20.0
 @export_range(0.0, 200.0, 1.0) var air_accelerate: float = 12.0

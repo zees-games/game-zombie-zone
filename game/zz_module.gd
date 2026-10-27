@@ -291,6 +291,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# Sprint and stamina: a client predicts its own run under the same numbers.
+	var _sprint := world.sprint_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# Per-weapon recoil: the server's bullet offset and every client's view kick read the same numbers.
 	var _recoil := world.recoil_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
