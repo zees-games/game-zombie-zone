@@ -1,0 +1,25 @@
+title: "Angry Box"
+colour: "#e67e22"
+polarity: "negative"
+impact: "game"
+radius: 0
+stacks: false
+max_stacks: 1
+survives_round: true
+duration:
+  mode: "seconds"
+  min: 60
+  max: 120
+drop:
+  common: 1
+  special: 2
+  brute: 2
+  map: 1
+outcomes:
+  - id: "angry"
+    title: "Angry!"
+    weight: 1
+    message: "{name} opened it: some of the infected run at you."
+    actions:
+      - do: "effect"
+        name: "angry"

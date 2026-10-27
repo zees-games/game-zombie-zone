@@ -1,0 +1,95 @@
+title: "Med Box"
+colour: "#3fd06a"
+polarity: "positive"
+impact: "self"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 5
+  special: 4
+  brute: 3
+  map: 5
+outcomes:
+  - id: "full_heal"
+    title: "Field surgery"
+    weight: 5
+    message: "{name} is patched up."
+    actions:
+      - do: "heal"
+        fraction: 1
+  - id: "team_heal"
+    title: "First aid for all"
+    weight: 4
+    message: "Everybody gets some health back."
+    actions:
+      - do: "heal"
+        who: "team"
+        fraction: 0.5
+  - id: "revive_all"
+    title: "Get up!"
+    weight: 4
+    message: "Everybody who was down is back on their feet."
+    actions:
+      - do: "revive"
+      - do: "temp_health"
+        who: "team"
+        amount: 20
+  - id: "rescue"
+    title: "Back from the dead"
+    weight: 2
+    message: "The dead come back."
+    actions:
+      - do: "rescue"
+  - id: "medkits"
+    title: "Medkits"
+    weight: 4
+    message: "A medkit for everyone."
+    actions:
+      - do: "give_item"
+        who: "team"
+        item: "medkit"
+  - id: "pills"
+    title: "Pills"
+    weight: 5
+    message: "Pills for everyone."
+    actions:
+      - do: "give_item"
+        who: "team"
+        item: "pills"
+  - id: "aura"
+    title: "Healing aura"
+    weight: 4
+    message: "Stand close: the air itself heals."
+    actions:
+      - do: "heal_zone"
+        radius: 6
+        seconds: 20
+        rate: 4
+  - id: "adrenaline"
+    title: "Adrenaline"
+    weight: 4
+    message: "{name} is fast and borrowed-healthy."
+    actions:
+      - do: "haste"
+      - do: "temp_health"
+        amount: 40
+  - id: "poison"
+    title: "Poisoned"
+    weight: 2
+    message: "It was not medicine."
+    actions:
+      - do: "hurt"
+        who: "team"
+        amount: 15
+  - id: "placebo"
+    title: "Placebo"
+    weight: 2
+    message: "{name} feels better. Nothing actually happened."
+    actions:
+      - do: "temp_health"
+        amount: 5

@@ -1,0 +1,24 @@
+title: "Instakill Box"
+colour: "#f2d21b"
+polarity: "positive"
+impact: "game"
+radius: 0
+stacks: false
+max_stacks: 1
+duration:
+  mode: "seconds"
+  min: 30
+  max: 60
+drop:
+  common: 1
+  special: 3
+  brute: 3
+  map: 1
+outcomes:
+  - id: "instakill"
+    title: "Instakill!"
+    weight: 1
+    message: "{name} opened it: every zombie falls in one hit and the specials take far more."
+    actions:
+      - do: "effect"
+        name: "instakill"

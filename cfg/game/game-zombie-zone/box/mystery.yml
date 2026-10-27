@@ -1,0 +1,127 @@
+title: "Mystery Box"
+colour: "#f2c94c"
+polarity: "mixed"
+impact: "self"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 4
+  special: 4
+  brute: 4
+  map: 3
+outcomes:
+  - id: "moon"
+    title: "Low gravity"
+    weight: 4
+    message: "Everybody floats for half a minute."
+    actions:
+      - do: "low_gravity"
+        who: "team"
+  - id: "speed"
+    title: "Speed"
+    weight: 4
+    message: "Everybody is fast for twenty seconds."
+    actions:
+      - do: "haste"
+        who: "team"
+  - id: "heavy"
+    title: "Lead boots"
+    weight: 3
+    message: "Everybody is slow for fifteen seconds."
+    actions:
+      - do: "heavy"
+        who: "team"
+  - id: "ahead"
+    title: "Shortcut"
+    weight: 3
+    message: "{name} was thrown ahead."
+    actions:
+      - do: "teleport"
+        to: "ahead"
+  - id: "lost"
+    title: "Lost"
+    weight: 2
+    message: "{name} is somewhere else entirely."
+    actions:
+      - do: "teleport"
+        to: "random"
+  - id: "swap"
+    title: "Switcheroo"
+    weight: 3
+    message: "{name} traded places with somebody."
+    actions:
+      - do: "swap"
+  - id: "god"
+    title: "Untouchable"
+    weight: 3
+    message: "Nothing can hurt {name} for ten seconds."
+    actions:
+      - do: "invulnerable"
+        seconds: 10
+  - id: "flash"
+    title: "Flashbang"
+    weight: 3
+    message: "{name} can't see."
+    actions:
+      - do: "blind"
+        seconds: 3
+  - id: "knock"
+    title: "Spring-loaded"
+    weight: 3
+    message: "{name} went flying."
+    actions:
+      - do: "knock"
+  - id: "more"
+    title: "More boxes"
+    weight: 3
+    message: "Three more boxes fell out."
+    actions:
+      - do: "drop_boxes"
+        count: 3
+  - id: "gamble"
+    title: "Double or nothing"
+    weight: 3
+    message: "Two random things happen."
+    actions:
+      - do: "random"
+        pick: 2
+        choices:
+          - _list:
+              - do: "give_weapon"
+                tier: "heavy"
+          - _list:
+              - do: "mob"
+                scale: 1
+          - _list:
+              - do: "heal"
+                who: "team"
+                fraction: 0.5
+          - _list:
+              - do: "special"
+                count: 2
+          - _list:
+              - do: "airstrike"
+                target: "zombies"
+                count: 5
+                damage: 200
+          - _list:
+              - do: "bile"
+                seconds: 10
+          - _list:
+              - do: "give_item"
+                who: "team"
+                item: "pills"
+          - _list:
+              - do: "brute"
+  - id: "nothing"
+    title: "Nothing"
+    weight: 3
+    message: "Absolutely nothing happened. Suspicious."
+    actions:
+      - do: "message"
+        text: "{name}'s box did nothing. For now."

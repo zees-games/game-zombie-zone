@@ -287,6 +287,14 @@ static func _real_files(event: StringName) -> PackedStringArray:
 	return out
 
 
+## Bakes [param recipes] (id to DotAudioSynth.Voice) into the bank beside the game's own, for sounds added after setup.
+func add_recipes(recipes: Dictionary) -> void:
+	var godot_sink := manager.sink as DotAudioSinkGodot if manager != null else null
+
+	if godot_sink != null:
+		godot_sink.bank.merge(DotAudioSynth.bank(manager.catalogue, recipes), true)
+
+
 ## The synthesised stand-ins, for every id with no file.
 static func sound_recipes() -> Dictionary:
 	return {

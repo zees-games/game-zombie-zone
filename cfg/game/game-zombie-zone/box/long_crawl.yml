@@ -1,0 +1,27 @@
+title: "Long Crawl Box"
+colour: "#b85aa8"
+polarity: "positive"
+impact: "game"
+radius: 0
+stacks: false
+max_stacks: 1
+survives_round: false
+duration:
+  mode: "round"
+  min: 0
+  max: 0
+drop:
+  common: 1
+  special: 2
+  brute: 3
+  map: 1
+params:
+  modifier: "crawl"
+outcomes:
+  - id: "long_crawl"
+    title: "Long crawl!"
+    weight: 1
+    message: "{name} opened it: the downed crawl much faster until the round is over."
+    actions:
+      - do: "effect"
+        name: "crawl_speed"

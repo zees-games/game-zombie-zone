@@ -1,0 +1,90 @@
+title: "Arsenal Box"
+colour: "#3b8ff0"
+polarity: "positive"
+impact: "self"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 5
+  special: 5
+  brute: 3
+  map: 5
+outcomes:
+  - id: "primary"
+    title: "Upgrade"
+    weight: 6
+    message: "{name} found a better gun."
+    actions:
+      - do: "give_weapon"
+        tier: "primary"
+  - id: "heavy"
+    title: "Heavy weapon"
+    weight: 3
+    message: "{name} found something heavy."
+    actions:
+      - do: "give_weapon"
+        tier: "heavy"
+  - id: "minigun"
+    title: "Machine gun"
+    weight: 2
+    message: "{name} has a machine gun. Stand behind them."
+    actions:
+      - do: "give_weapon"
+        id: "zz_lmg"
+  - id: "ammo_all"
+    title: "Ammo drop"
+    weight: 5
+    message: "Ammunition for everyone."
+    actions:
+      - do: "give_ammo"
+        who: "team"
+  - id: "melee"
+    title: "Something sharp"
+    weight: 3
+    message: "{name} found a melee weapon."
+    actions:
+      - do: "give_weapon"
+        tier: "melee"
+  - id: "boost"
+    title: "Hollow points"
+    weight: 4
+    message: "{name}'s shots hit twice as hard for a minute."
+    actions:
+      - do: "damage_boost"
+        scale: 2
+        seconds: 60
+  - id: "team_boost"
+    title: "Hollow points for all"
+    weight: 3
+    message: "Everybody hits harder for thirty seconds."
+    actions:
+      - do: "damage_boost"
+        who: "team"
+        scale: 1.5
+        seconds: 30
+  - id: "shuffle"
+    title: "Weapon roulette"
+    weight: 3
+    message: "Everybody's guns are swapped for something random."
+    actions:
+      - do: "shuffle_weapons"
+  - id: "throwables"
+    title: "Throw things"
+    weight: 4
+    message: "Something to throw for everyone."
+    actions:
+      - do: "give_weapon"
+        who: "team"
+        tier: "thrown"
+  - id: "empty"
+    title: "Empty crate"
+    weight: 2
+    message: "Just packing peanuts."
+    actions:
+      - do: "message"
+        text: "{name}'s arsenal box was empty."

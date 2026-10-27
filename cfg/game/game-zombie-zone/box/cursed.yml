@@ -1,0 +1,83 @@
+title: "Cursed Box"
+colour: "#2a2a32"
+polarity: "negative"
+impact: "self"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 1
+  special: 2
+  brute: 4
+  map: 1
+outcomes:
+  - id: "doom"
+    title: "Doom"
+    weight: 3
+    message: "Bile, a horde, and a brute. Good luck."
+    actions:
+      - do: "bile"
+        seconds: 15
+      - do: "mob"
+        scale: 1.5
+      - do: "brute"
+  - id: "drain"
+    title: "Drained"
+    weight: 3
+    message: "Everybody loses health."
+    actions:
+      - do: "hurt"
+        who: "team"
+        amount: 25
+  - id: "hunted"
+    title: "Hunted"
+    weight: 3
+    message: "{name} is covered in bile, and the specials are coming too."
+    actions:
+      - do: "bile"
+        seconds: 15
+      - do: "special"
+        count: 2
+  - id: "blessing"
+    title: "Blessing in disguise"
+    weight: 3
+    message: "Heal, ammo, and a heavy weapon."
+    actions:
+      - do: "heal"
+        who: "team"
+        fraction: 1
+      - do: "give_ammo"
+        who: "team"
+      - do: "give_weapon"
+        tier: "heavy"
+  - id: "nightmare"
+    title: "Nightmare"
+    weight: 2
+    message: "Everything is harder for three minutes."
+    actions:
+      - do: "pace"
+        what: "mob_rate"
+        scale: 1.5
+        seconds: 180
+      - do: "pace"
+        what: "special_health"
+        scale: 1.5
+        seconds: 180
+      - do: "pace"
+        what: "zombie_speed"
+        scale: 1.15
+        seconds: 180
+  - id: "sacrifice"
+    title: "Sacrifice"
+    weight: 2
+    message: "{name} goes down. Everybody else is healed."
+    actions:
+      - do: "hurt"
+        amount: 500
+      - do: "heal"
+        who: "others"
+        fraction: 1

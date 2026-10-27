@@ -1,0 +1,96 @@
+title: "Horde Box"
+colour: "#9b4fe0"
+polarity: "negative"
+impact: "game"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 3
+  special: 3
+  brute: 1
+  map: 1
+outcomes:
+  - id: "mob_now"
+    title: "Here they come"
+    weight: 5
+    message: "A horde is on its way."
+    actions:
+      - do: "mob"
+        scale: 1.5
+  - id: "double_mob"
+    title: "Here they ALL come"
+    weight: 2
+    message: "Two hordes."
+    actions:
+      - do: "mob"
+        scale: 1.5
+      - do: "mob"
+        scale: 1.5
+  - id: "frenzy"
+    title: "Horde frenzy"
+    weight: 5
+    message: "Hordes come twice as often for two minutes."
+    actions:
+      - do: "pace"
+        what: "mob_rate"
+        scale: 2
+        seconds: 120
+  - id: "bigger"
+    title: "Bigger hordes"
+    weight: 4
+    message: "Every horde is half again as big for three minutes."
+    actions:
+      - do: "pace"
+        what: "mob_size"
+        scale: 1.5
+        seconds: 180
+  - id: "fast"
+    title: "Fast zombies"
+    weight: 3
+    message: "The zombies are faster for a minute."
+    actions:
+      - do: "pace"
+        what: "zombie_speed"
+        scale: 1.3
+        seconds: 60
+  - id: "bile_opener"
+    title: "Covered in it"
+    weight: 4
+    message: "{name} is covered in bile. Everything is coming for them."
+    actions:
+      - do: "bile"
+        seconds: 15
+  - id: "panic"
+    title: "Alarm"
+    weight: 3
+    message: "An alarm. Hold on for thirty seconds."
+    actions:
+      - do: "panic"
+        seconds: 30
+  - id: "calm"
+    title: "Eye of the storm"
+    weight: 3
+    message: "The zombies freeze for ten seconds."
+    actions:
+      - do: "freeze_zombies"
+        seconds: 10
+  - id: "slow"
+    title: "Molasses"
+    weight: 3
+    message: "The zombies are slow for a minute."
+    actions:
+      - do: "pace"
+        what: "zombie_speed"
+        scale: 0.6
+        seconds: 60
+  - id: "cleanse"
+    title: "Calm"
+    weight: 2
+    message: "Every effect on the horde is gone."
+    actions:
+      - do: "clear_effects"

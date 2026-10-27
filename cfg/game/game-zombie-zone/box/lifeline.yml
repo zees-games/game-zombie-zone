@@ -1,0 +1,27 @@
+title: "Lifeline Box"
+colour: "#e07fd0"
+polarity: "positive"
+impact: "game"
+radius: 0
+stacks: false
+max_stacks: 1
+survives_round: true
+duration:
+  mode: "seconds"
+  min: 30
+  max: 60
+drop:
+  common: 2
+  special: 3
+  brute: 2
+  map: 2
+params:
+  modifier: "crawl"
+outcomes:
+  - id: "lifeline"
+    title: "Lifeline!"
+    weight: 1
+    message: "{name} opened it: anybody who goes down crawls much faster for a while."
+    actions:
+      - do: "effect"
+        name: "crawl_speed"

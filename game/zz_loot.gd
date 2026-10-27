@@ -209,7 +209,8 @@ func looked_at(eye: Vector3, aim: Vector3, reach: float) -> int:
 func use_seconds(id: int) -> float:
 	# Carried, a box is picked up in a moment; it is the deploy that takes the time.
 	if kind_of(id) == BOX and game.config.box_carry <= 0:
-		return game.config.box_open_seconds
+		var own := float(((game.boxes.types if game.boxes != null else {}).get((entries[id] as Dictionary)["item"], {}) as Dictionary).get("open_seconds", 0.0))
+		return own if own > 0.0 else game.config.box_open_seconds
 
 	return 0.0
 

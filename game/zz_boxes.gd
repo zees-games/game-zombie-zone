@@ -1,6 +1,7 @@
 extends RefCounted
 
 const ZzBoxEffect := preload("zz_box_effect.gd")
+const ZzBoxProfiles := preload("zz_box_profiles.gd")
 const ZzBoxInstakill := preload("zz_box_instakill.gd")
 const ZzBoxSpeed := preload("zz_box_speed.gd")
 const ZzController := preload("zz_controller.gd")
@@ -98,6 +99,11 @@ var _next_effect: int = 1
 
 var _rng := RandomNumberGenerator.new()
 
+## Per-event sounds from each type's `sounds` profile key (spawn, approach, open, reward, deny, effect_end); signals fire on any end, sound only with an audio manager.
+var sounds := DotBoxSounds.new()
+var _open_box: StringName = &""
+var _open_at := Vector3.ZERO
+
 
 func _init(p_game: Object) -> void:
 	game = p_game
@@ -140,51 +146,14 @@ func load_text(text: String) -> DotResult:
 	var ids: Array[StringName] = []
 
 	for raw: Variant in doc.get("boxes", []):
-		if not (raw is Dictionary):
-			return DotResult.fail(DotError.CODE_INVALID, "A box is not an object.")
+		var read := read_box(raw, out)
 
-		var box := raw as Dictionary
-		var id := StringName(str(box.get("id", "")))
+		if not read.ok:
+			return read
 
-		if id == &"" or out.has(id):
-			return DotResult.fail(DotError.CODE_INVALID, "A box has no id, or a second one with the same id.", String(id))
-
-		var outcomes: Array = []
-
-		for o: Variant in box.get("outcomes", []):
-			if not (o is Dictionary):
-				return DotResult.fail(DotError.CODE_INVALID, "An outcome of %s is not an object." % id)
-
-			var checked := _check_actions((o as Dictionary).get("actions", []), "%s/%s" % [id, str((o as Dictionary).get("id", "?"))])
-
-			if not checked.ok:
-				return checked
-
-			outcomes.append({
-				"id": str((o as Dictionary).get("id", "outcome")),
-				"title": str((o as Dictionary).get("title", "")),
-				"weight": maxf(float((o as Dictionary).get("weight", 1.0)), 0.0),
-				"message": str((o as Dictionary).get("message", "")),
-				"actions": (o as Dictionary).get("actions", []),
-			})
-
-		if outcomes.is_empty():
-			return DotResult.fail(DotError.CODE_INVALID, "Box %s has no outcomes." % id)
-
-		var schema := _read_schema(box, id)
-
-		if not schema.ok:
-			return schema
-
-		out[id] = {
-			"id": id,
-			"title": str(box.get("title", String(id).capitalize())),
-			"colour": str(box.get("colour", "#d0a040")),
-			"drop": box.get("drop", {}),
-			"outcomes": outcomes,
-		}
-		out[id].merge(schema.value)
-		ids.append(id)
+		var entry: Dictionary = read.value
+		out[entry["id"]] = entry
+		ids.append(entry["id"])
 
 	if out.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "The box file has no boxes.")
@@ -192,6 +161,107 @@ func load_text(text: String) -> DotResult:
 	types = out
 	order = ids
 	return DotResult.success(types.size())
+
+
+## Reads and checks one box document ([param taken] holds the boxes read so far, for a repeated id). The value is the type.
+func read_box(raw: Variant, taken: Dictionary = {}) -> DotResult:
+	if not (raw is Dictionary):
+		return DotResult.fail(DotError.CODE_INVALID, "A box is not an object.")
+
+	var box := raw as Dictionary
+	var id := StringName(str(box.get("id", "")))
+
+	if id == &"" or taken.has(id):
+		return DotResult.fail(DotError.CODE_INVALID, "A box has no id, or a second one with the same id.", String(id))
+
+	var outcomes: Array = []
+
+	for o: Variant in box.get("outcomes", []):
+		if not (o is Dictionary):
+			return DotResult.fail(DotError.CODE_INVALID, "An outcome of %s is not an object." % id)
+
+		var checked := _check_actions((o as Dictionary).get("actions", []), "%s/%s" % [id, str((o as Dictionary).get("id", "?"))])
+
+		if not checked.ok:
+			return checked
+
+		outcomes.append({
+			"id": str((o as Dictionary).get("id", "outcome")),
+			"title": str((o as Dictionary).get("title", "")),
+			"weight": maxf(float((o as Dictionary).get("weight", 1.0)), 0.0),
+			"message": str((o as Dictionary).get("message", "")),
+			"actions": (o as Dictionary).get("actions", []),
+		})
+
+	if outcomes.is_empty():
+		return DotResult.fail(DotError.CODE_INVALID, "Box %s has no outcomes." % id)
+
+	var schema := _read_schema(box, id)
+
+	if not schema.ok:
+		return schema
+
+	var entry := {
+		"id": id,
+		"title": str(box.get("title", String(id).capitalize())),
+		"colour": str(box.get("colour", "#d0a040")),
+		"drop": box.get("drop", {}),
+		"outcomes": outcomes,
+		"enabled": bool(box.get("enabled", true)),
+		"open_seconds": maxf(float(box.get("open_seconds", 0.0)), 0.0),
+		"lifetime": maxf(float(box.get("lifetime", 0.0)), 0.0),
+		"sounds": box.get("sounds", {}),
+	}
+	entry.merge(schema.value)
+	return DotResult.success(entry)
+
+
+## Plays through [param manager] (a client's); installs the stock sounds and every type's slots. Returns the synth recipes for the bank.
+func use_audio(manager: DotAudioManager) -> Dictionary:
+	sounds.manager = manager
+	var recipes := sounds.install(manager.catalogue)
+
+	for id in order:
+		recipes.merge(_sounds_for(id))
+
+	return recipes
+
+
+func _sounds_for(id: StringName) -> Dictionary:
+	var raw: Variant = (types.get(id, {}) as Dictionary).get("sounds", {})
+	return sounds.set_slots(id, raw if raw is Dictionary else {})
+
+
+## Lays the `box` profiles (cfg/game/<game>/box, the server's layer, live edits) over the types read from the file: a profile of a known
+## id replaces that type, one of a new id adds a type. A profile that does not read is logged and the file's type stays.
+func overlay_profiles(set: DotProfileSet) -> int:
+	var applied := 0
+
+	for pid in set.list_ids():
+		var res := DotBoxProfiles.load_box(set, pid)
+
+		if not res.ok:
+			DotLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": res.error.message, "detail": res.error.detail})
+			continue
+
+		var doc: Dictionary = ZzBoxProfiles.doc_of(res.value)
+		doc["id"] = pid
+		var read := read_box(doc)
+
+		if not read.ok:
+			DotLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": read.error.message})
+			continue
+
+		var id := StringName(pid)
+
+		if not types.has(id):
+			order.append(id)
+
+		types[id] = read.value
+		applied += 1
+		_sounds_for(id)
+
+	return applied
 
 
 ## The schema half of a box: polarity, impact, radius, stacks, max_stacks, duration, survives_round
@@ -295,7 +365,10 @@ func drop(type_id: StringName, at: Vector3) -> int:
 		loot.remove(loot.oldest(ZzLoot.BOX))
 
 	var ground: Vector3 = game.ray_hit(at + Vector3(0.0, 1.0, 0.0), at + Vector3(0.0, -4.0, 0.0))
-	return loot.add(ZzLoot.BOX, type_id, ground if ground != Vector3.INF else at, game.config.box_lifetime)
+	var lifetime := float((types[type_id] as Dictionary).get("lifetime", 0.0))
+	var where: Vector3 = ground if ground != Vector3.INF else at
+	var _h := sounds.fire(type_id, &"spawn", where)
+	return loot.add(ZzLoot.BOX, type_id, where, lifetime if lifetime > 0.0 else game.config.box_lifetime)
 
 
 ## A type drawn by its drop weight for [param source] (`common`, `special`, `brute`, `map`).
@@ -321,7 +394,7 @@ func random_type(source: StringName, rng: RandomNumberGenerator) -> StringName:
 func _drop_weight(id: StringName, source: StringName) -> float:
 	var box: Dictionary = types[id]
 
-	if not _has_use(box):
+	if not _has_use(box) or not bool(box.get("enabled", true)):
 		return 0.0
 
 	return float((box["drop"] as Dictionary).get(String(source), 1.0))
@@ -400,10 +473,17 @@ func open(type_id: StringName, player, at: Vector3) -> void:
 
 	var outcome := _pick(box["outcomes"])
 	var ctx := {"opener": player, "at": at, "box": type_id}
+	var _h := sounds.fire(type_id, &"open", at)
+	_open_box = type_id
+	_open_at = at
 	run(outcome["actions"], ctx)
+	_open_box = &""
 
 	if ctx.get("refused", false):
+		var _d := sounds.fire(type_id, &"deny", at)
 		return
+
+	var _r := sounds.fire(type_id, &"reward", at)
 
 	var message := str(outcome["message"]).replace("{name}", player.display_name)
 	opened.emit(player.player_id, type_id, str(outcome["title"]), message)
@@ -957,7 +1037,7 @@ func _start_one(handler: Object, effect_name: StringName, box: Dictionary, box_i
 		"who": String(who), "box": String(box_id), "stacks": 1, "max_stacks": int(box.get("max_stacks", 1)),
 		"impact": str(box.get("impact", "game")), "polarity": str(box.get("polarity", "mixed")),
 		"radius": float(box.get("radius", 0.0)), "survives_round": bool(box.get("survives_round", false)),
-		"params": box.get("params", {}), "data": {}, "handler": handler, "started": now,
+		"params": box.get("params", {}), "data": {}, "handler": handler, "started": now, "at": _open_at,
 	}
 	_next_effect += 1
 
@@ -981,7 +1061,8 @@ func _find(what: String, who: StringName) -> Dictionary:
 
 func _add_effect(what: String, scale: float, seconds: float, title: String, who: StringName) -> void:
 	effects.append({"what": what, "scale": scale, "until": game.now() + seconds, "title": title, "who": String(who),
-		"impact": "game" if who == &"" else "self", "stacks": 1, "survives_round": false})
+		"impact": "game" if who == &"" else "self", "stacks": 1, "survives_round": false, "box_id": String(_open_box), "at": _open_at, "id": _next_effect})
+	_next_effect += 1
 	_apply()
 	effects_changed.emit()
 
@@ -995,6 +1076,7 @@ func reset() -> void:
 		p.carried.clear()
 
 	_end(effects.duplicate())
+	sounds.reset()
 
 
 ## The round (a survival wave, or a whole map) is over: every effect that changes the game ends,
@@ -1024,6 +1106,11 @@ func _end(gone: Array) -> void:
 	for e in gone:
 		if e.has("handler"):
 			(e["handler"] as Object).on_end(self, e)
+
+		var from := StringName(str(e.get("box", e.get("box_id", ""))))
+
+		if from != &"" and types.has(from):
+			var _ended := sounds.effect_end(from, e.get("id", e.get("what", "")), e.get("at", Vector3.ZERO))
 
 		if e["what"] == "invulnerable":
 			var p = game.player_by_id(StringName(str(e["who"])))

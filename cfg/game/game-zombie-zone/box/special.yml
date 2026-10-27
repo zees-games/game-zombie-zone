@@ -1,0 +1,87 @@
+title: "Special Box"
+colour: "#b0202a"
+polarity: "negative"
+impact: "game"
+radius: 0
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 2
+  special: 4
+  brute: 2
+  map: 1
+outcomes:
+  - id: "three"
+    title: "Ambush"
+    weight: 5
+    message: "Three specials, right now."
+    actions:
+      - do: "special"
+        count: 3
+  - id: "harder"
+    title: "Hardened specials"
+    weight: 4
+    message: "Specials take half again as much for three minutes."
+    actions:
+      - do: "pace"
+        what: "special_health"
+        scale: 1.5
+        seconds: 180
+  - id: "swarm"
+    title: "Specials swarm"
+    weight: 4
+    message: "Specials come twice as often for two minutes."
+    actions:
+      - do: "pace"
+        what: "special_rate"
+        scale: 2
+        seconds: 120
+  - id: "brute"
+    title: "BRUTE"
+    weight: 2
+    message: "Something huge is coming."
+    actions:
+      - do: "brute"
+  - id: "leapers"
+    title: "Leapers"
+    weight: 3
+    message: "Two leapers."
+    actions:
+      - do: "special"
+        kind: "leaper"
+        count: 2
+  - id: "riders"
+    title: "Riders"
+    weight: 3
+    message: "Two riders."
+    actions:
+      - do: "special"
+        kind: "rider"
+        count: 2
+  - id: "strangler_pair"
+    title: "Tongues"
+    weight: 3
+    message: "Two stranglers."
+    actions:
+      - do: "special"
+        kind: "strangler"
+        count: 2
+  - id: "cull"
+    title: "Cull"
+    weight: 3
+    message: "Every special nearby drops dead."
+    actions:
+      - do: "kill_zombies"
+        radius: 60
+        kinds: "specials"
+  - id: "trophy"
+    title: "Hunter's trophy"
+    weight: 3
+    message: "{name} gets a sniper rifle."
+    actions:
+      - do: "give_weapon"
+        id: "zz_sniper"

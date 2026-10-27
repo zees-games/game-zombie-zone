@@ -4,6 +4,8 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzNpcProfiles := preload("../game/zz_npc_profiles.gd")
+const ZzBoxes := preload("../game/zz_boxes.gd")
+const ZzBoxProfiles := preload("../game/zz_box_profiles.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
@@ -17,8 +19,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
-const SECTIONS := 5
-const CHECKS := 44
+const SECTIONS := 6
+const CHECKS := 51
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -46,6 +48,7 @@ func _run() -> void:
 	_tuned()
 	await _in_a_game()
 	_npc_profiles()
+	_box_profiles()
 
 	if _real_packs_linked():
 		_sections += 1
@@ -93,6 +96,72 @@ func _none_installed() -> void:
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
 	_check(cat.size() == 14, "the catalogue is the fourteen built-in kinds", "%d" % cat.size())
 	_check(ZzPacks.specials().is_empty() and ZzPacks.bosses().is_empty(), "no pack specials or bosses")
+	_finished += 1
+
+
+## Deep equality where 4 and 4.0 are the same number (json reads floats, yml gives ints).
+func _same(a: Variant, b: Variant) -> bool:
+	if a is Dictionary and b is Dictionary:
+		if (a as Dictionary).size() != (b as Dictionary).size():
+			return false
+		for k in a:
+			if not (b as Dictionary).has(k) or not _same(a[k], b[k]):
+				return false
+		return true
+	if a is Array and b is Array:
+		if (a as Array).size() != (b as Array).size():
+			return false
+		for i in (a as Array).size():
+			if not _same(a[i], b[i]):
+				return false
+		return true
+	if (a is int or a is float) and (b is int or b is float):
+		return is_equal_approx(float(a), float(b))
+	return a == b
+
+
+func _box_profiles() -> void:
+	_entered += 1
+	print("box profiles (cfg/game/game-zombie-zone/box)")
+	var text := FileAccess.get_file_as_string("res://boxes/boxes.json")
+	var floor_boxes := ZzBoxes.new(null)
+	_check(floor_boxes.load_text(text).ok and floor_boxes.types.size() == 17, "boxes.json is the floor: seventeen types")
+	var doc: Dictionary = JSON.parse_string(text)
+	var stale := 0
+	for box: Dictionary in doc["boxes"]:
+		if FileAccess.get_file_as_string("%s/%s.yml" % [ZzBoxProfiles.DIR, box["id"]]) != ZzBoxProfiles.yaml_of(box):
+			stale += 1
+	_check(stale == 0 and DirAccess.get_files_at(ZzBoxProfiles.DIR).size() == 17, "the shipped files are what tools/export_box_profiles.gd writes", "%d stale" % stale)
+	var shipped := ZzBoxes.new(null)
+	var _l := shipped.load_text(text)
+	var applied := shipped.overlay_profiles(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg"])))
+	var same := 0
+	for id in floor_boxes.order:
+		var a: Dictionary = floor_boxes.types[id]
+		var b: Dictionary = shipped.types.get(id, {})
+		if _same(b, a):
+			same += 1
+	_check(applied == 17 and same == 17, "with the shipped files every type reads as its json", "%d applied, %d same" % [applied, same])
+	var base := "user://zz_box_cfg/server/game/game-zombie-zone/box"
+	DirAccess.make_dir_recursive_absolute(base)
+	var f := FileAccess.open(base + "/explosive.yml", FileAccess.WRITE)
+	f.store_string("title: \"Big Bang\"\ndrop:\n  common: 9\nopen_seconds: 2.5\nsounds:\n  effect_end:\n    volume: 2\n")
+	f.close()
+	var served := ZzBoxes.new(null)
+	var _l2 := served.load_text(text)
+	var _n := served.overlay_profiles(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg", "user://zz_box_cfg"])))
+	var ex: Dictionary = served.types[&"explosive"]
+	_check(ex["title"] == "Big Bang" and ex["drop"]["common"] == 9 and ex["open_seconds"] == 2.5, "a per-server file overrides the shipped type")
+	_check(_same(ex["outcomes"], floor_boxes.types[&"explosive"]["outcomes"]) and served.types[&"medical"]["title"] == shipped.types[&"medical"]["title"], "and only that key and that type")
+	_check(served.sounds.slot_of(&"explosive", &"effect_end")["volume"] == 2.0 and served.sounds.slot_of(&"medical", &"effect_end")["volume"] == 1.0, "its sound slot reaches the sounds, others stay stock")
+	var f2 := FileAccess.open(base + "/explosive.yml", FileAccess.WRITE)
+	f2.store_string("polarity: nasty\n")
+	f2.close()
+	var bad := ZzBoxes.new(null)
+	var _l3 := bad.load_text(text)
+	var _n3 := bad.overlay_profiles(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg", "user://zz_box_cfg"])))
+	_check(bad.types[&"explosive"]["title"] == "Explosive Box", "a bad server file is refused and the shipped type stays")
+	DirAccess.remove_absolute(base + "/explosive.yml")
 	_finished += 1
 
 

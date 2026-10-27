@@ -1,0 +1,25 @@
+title: "Great Depression Box"
+colour: "#5d6d7e"
+polarity: "negative"
+impact: "game"
+radius: 0
+stacks: true
+max_stacks: 4
+survives_round: true
+duration:
+  mode: "seconds"
+  min: 120
+  max: 240
+drop:
+  common: 1
+  special: 2
+  brute: 2
+  map: 1
+outcomes:
+  - id: "depression"
+    title: "Great Depression!"
+    weight: 1
+    message: "{name} opened it: the trader's prices climb and everyone can carry less, and again for every one opened."
+    actions:
+      - do: "effect"
+        name: "depression"

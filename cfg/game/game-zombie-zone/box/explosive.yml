@@ -1,0 +1,124 @@
+title: "Explosive Box"
+colour: "#e2482b"
+polarity: "negative"
+impact: "radius"
+radius: 6
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 4
+  special: 5
+  brute: 2
+  map: 3
+outcomes:
+  - id: "airstrike_nearest"
+    title: "Airstrike!"
+    weight: 5
+    message: "{name} called in an airstrike. On the people standing next to them."
+    actions:
+      - do: "airstrike"
+        target: "nearest"
+        count: 3
+        damage: 70
+        delay: 1.6
+  - id: "airstrike_zombies"
+    title: "Carpet bombing"
+    weight: 5
+    message: "Shells rain on the horde."
+    actions:
+      - do: "airstrike"
+        target: "zombies"
+        count: 6
+        damage: 200
+        delay: 1
+  - id: "airstrike_team"
+    title: "Danger close"
+    weight: 2
+    message: "Incoming on everybody. Move!"
+    actions:
+      - do: "airstrike"
+        target: "team"
+        count: 4
+        damage: 50
+        delay: 2
+  - id: "blast_here"
+    title: "Booby-trapped"
+    weight: 4
+    message: "It was rigged. {name} is having a bad day."
+    actions:
+      - do: "explode"
+        radius: 5
+        damage: 120
+        survivor_scale: 0.35
+  - id: "clear_room"
+    title: "Shockwave"
+    weight: 5
+    message: "Everything nearby is flattened."
+    actions:
+      - do: "kill_zombies"
+        radius: 18
+        kinds: "commons"
+      - do: "explode"
+        radius: 8
+        damage: 300
+        survivor_scale: 0
+  - id: "pipes"
+    title: "Party favours"
+    weight: 5
+    message: "Three charges, beeping. The crowd loves them."
+    actions:
+      - do: "lure"
+        seconds: 6
+        damage: 400
+      - do: "lure"
+        seconds: 6
+        damage: 400
+      - do: "lure"
+        seconds: 6
+        damage: 400
+  - id: "grenades"
+    title: "Grenade crate"
+    weight: 5
+    message: "Grenades for everyone."
+    actions:
+      - do: "give_weapon"
+        who: "team"
+        tier: "thrown"
+  - id: "launcher"
+    title: "Bring the big gun"
+    weight: 3
+    message: "{name} found a launcher."
+    actions:
+      - do: "give_weapon"
+        id: "zz_m79"
+  - id: "chain"
+    title: "Chain reaction"
+    weight: 2
+    message: "Explosions everywhere at once."
+    actions:
+      - do: "explode"
+        at: "random_near"
+        radius: 5
+        damage: 150
+        survivor_scale: 0.2
+      - do: "explode"
+        at: "random_near"
+        radius: 5
+        damage: 150
+        survivor_scale: 0.2
+      - do: "explode"
+        at: "random_near"
+        radius: 5
+        damage: 150
+        survivor_scale: 0.2
+  - id: "dud"
+    title: "Dud"
+    weight: 3
+    message: "It was empty. Just a smell of powder."
+    actions:
+      - do: "message"
+        text: "{name}'s box was a dud."

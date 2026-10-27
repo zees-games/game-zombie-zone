@@ -1,0 +1,93 @@
+title: "Incendiary Box"
+colour: "#ff8a1f"
+polarity: "negative"
+impact: "radius"
+radius: 5
+stacks: true
+max_stacks: 99
+duration:
+  mode: "instant"
+  min: 0
+  max: 0
+drop:
+  common: 4
+  special: 4
+  brute: 2
+  map: 3
+outcomes:
+  - id: "ring"
+    title: "Ring of fire"
+    weight: 5
+    message: "Fire all round {name}."
+    actions:
+      - do: "fire"
+        radius: 6
+        seconds: 12
+        damage: 6
+  - id: "ignite_all"
+    title: "Torch the street"
+    weight: 5
+    message: "Every zombie nearby goes up in flames."
+    actions:
+      - do: "ignite_zombies"
+        radius: 30
+        seconds: 8
+  - id: "self_burn"
+    title: "Well, that was hot"
+    weight: 3
+    message: "{name} is on fire."
+    actions:
+      - do: "burn"
+        seconds: 3
+        dps: 6
+  - id: "molotov_rain"
+    title: "Molotov rain"
+    weight: 4
+    message: "Bottles from the sky."
+    actions:
+      - do: "molotov_rain"
+        count: 8
+        radius: 16
+        damage: 8
+  - id: "napalm"
+    title: "Napalm"
+    weight: 2
+    message: "Fire everywhere. Everywhere."
+    actions:
+      - do: "molotov_rain"
+        count: 16
+        radius: 26
+        damage: 10
+      - do: "ignite_zombies"
+        radius: 40
+        seconds: 10
+  - id: "flamer"
+    title: "Burning rounds"
+    weight: 4
+    message: "{name}'s gun hits twice as hard for a minute."
+    actions:
+      - do: "damage_boost"
+        scale: 2
+        seconds: 60
+  - id: "team_rounds"
+    title: "Incendiary ammo for all"
+    weight: 3
+    message: "Everybody's shots hit harder for half a minute."
+    actions:
+      - do: "damage_boost"
+        who: "team"
+        scale: 1.5
+        seconds: 30
+  - id: "brute_bait"
+    title: "Smoke signal"
+    weight: 2
+    message: "Something big saw the smoke."
+    actions:
+      - do: "brute"
+  - id: "fizz"
+    title: "Fizzle"
+    weight: 3
+    message: "It sparked and went out."
+    actions:
+      - do: "message"
+        text: "{name}'s box fizzled."
