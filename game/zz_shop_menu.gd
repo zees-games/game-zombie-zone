@@ -307,7 +307,7 @@ func _card(it: Dictionary) -> Button:
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.texture = _picture_of(it)
-	ZzWeaponIcons.filter(picture, ZzWeaponIcons.texture(StringName(str(it.get("w", "")))) != null)
+	ZzWeaponIcons.shared.filter(picture, ZzWeaponIcons.shared.texture(StringName(str(it.get("w", "")))) != null)
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	inside.add_child(picture)
 
@@ -348,7 +348,7 @@ func _picture_of(it: Dictionary) -> Texture2D:
 	var weapon := str(it.get("w", ""))
 	if weapon == "":
 		return null
-	var sprite := ZzWeaponIcons.texture(StringName(weapon))
+	var sprite := ZzWeaponIcons.shared.texture(StringName(weapon))
 	return sprite if sprite != null else _icons.icon_for(StringName(weapon))
 
 
@@ -388,7 +388,7 @@ func _select(id: String) -> void:
 	var why: String = str(state_fn.call(it)) if state_fn.is_valid() else ""
 	var price := int(it.get("price", 0))
 	_picture.texture = _picture_of(it)
-	ZzWeaponIcons.filter(_picture, ZzWeaponIcons.texture(StringName(str(it.get("w", "")))) != null)
+	ZzWeaponIcons.shared.filter(_picture, ZzWeaponIcons.shared.texture(StringName(str(it.get("w", "")))) != null)
 	_title.text = str(it.get("name", id))
 	_kind.text = str(CATEGORY_TITLES.get(str(it.get("cat", "")), "")).to_upper()
 	_body.text = str(it.get("desc", ""))

@@ -939,10 +939,10 @@ func _draw_weapon() -> void:
 
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)
-	var sprite := ZzWeaponIcons.texture(slot.def.id)
+	var sprite := ZzWeaponIcons.shared.texture(slot.def.id)
 	_weapon_icon.texture = sprite
 	_weapon_icon.visible = sprite != null
-	ZzWeaponIcons.filter(_weapon_icon, true)
+	ZzWeaponIcons.shared.filter(_weapon_icon, true)
 
 	if slot.def.magazine > 0:
 		var reserve := rig.arsenal.ammo().count(slot.def.ammo_type) if slot.def.ammo_type != &"" else 0
