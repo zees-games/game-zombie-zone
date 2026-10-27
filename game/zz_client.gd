@@ -334,10 +334,6 @@ func _build_world_view() -> void:
 	render_quality.name = "RenderQuality"
 	add_child(render_quality)
 	render_quality.load_layers()
-	var render_quality := DotFxRenderQuality.new()
-	render_quality.name = "RenderQuality"
-	add_child(render_quality)
-	render_quality.load_layers()
 	_warm_zombies()
 
 
