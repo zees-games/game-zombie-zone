@@ -56,13 +56,15 @@ var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
 ## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
 var _acks := false
+## --no-snapshot-auto: keep SNAPSHOT_RATE; by default dot-game's net_snapshot_auto tiers it by --n as a real server does.
+var _snapshot_auto := true
 ## --split: the inline snapshot path run here instead of the manager's, lapped as
 ## si_relevant, si_thin, si_scores, si_prioritise, si_budget and snap_build (_send_to_peer) per peer.
 var _split := false
 ## Snapshots built, for the prep/join/apply means of a native or pooled run.
 var _snaps := 0
-## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot.
-var _far_every := 1
+## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot (unset: the config's net_far_*).
+var _far_every := 0
 var _far := 0.0
 ## --far-coherent, --far-tiers=T: DotNetInterest.far_coherent and far_tiers.
 var _far_coherent := false
@@ -200,6 +202,8 @@ func _run() -> void:
 	nc.snapshot_workers = _workers
 	nc.native = _native
 	nc.native_interest = _native_interest
+	if _snapshot_auto:
+		var _line := DotGameNetcode.adapt_snapshot_rate(nc, _n)
 	for field: String in _net_fields:
 		nc.set(field, type_convert(_net_fields[field], typeof(nc.get(field))))
 	_net.config = nc
@@ -214,10 +218,12 @@ func _run() -> void:
 		return
 	if not _relevance:
 		_net.interest = DotNetInterestAll.new()
-	_net.interest.far_every = _far_every
-	_net.interest.far_distance = _far
-	_net.interest.far_coherent = _far_coherent
-	_net.interest.far_tiers = _far_tiers
+	# Only what was asked for: otherwise the game's own net_far_* settings stand, as on a server.
+	if _far_every > 0:
+		_net.interest.far_every = _far_every
+		_net.interest.far_distance = _far
+		_net.interest.far_coherent = _far_coherent
+		_net.interest.far_tiers = _far_tiers
 	_bridge.open_link(self)
 	_net.messages.seal()
 	_bridge.link.loopback = func(method: StringName, peer_id: int, payload: PackedByteArray) -> void:
@@ -259,6 +265,7 @@ func _run() -> void:
 		if _detail and measuring and _detail_ticks == 0:
 			_acc.clear()
 			_near_hist.clear()
+			Engine.set_meta(&"_prof", {})
 		if measuring:
 			_detail_ticks += 1
 		_one_tick(tick)
@@ -326,7 +333,7 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"acks": _acks, "relevance": _relevance, "far_every": _far_every, "far": _far, "far_coherent": _far_coherent, "far_tiers": _far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"snapshot_rate": _net.config.snapshot_rate, "staggered": _net.config.stagger_snapshots, "acks": _acks, "relevance": _relevance, "far_every": _net.interest.far_every, "far": _net.interest.far_distance, "far_coherent": _net.interest.far_coherent, "far_tiers": _net.interest.far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"snapshot_ms": _snapshot_split(),
@@ -348,7 +355,12 @@ func _run() -> void:
 			per[k] = {"ms_per_tick": snappedf(float(a[0]) / 1000.0 / float(_detail_ticks), 0.01),
 				"us_each": snappedf(float(a[0]) / float(maxi(int(a[1]), 1)), 0.1),
 				"per_tick": snappedf(float(a[1]) / float(_detail_ticks), 0.1)}
-		print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist}))
+		# Laps a temporarily instrumented script added to Engine meta "_prof" (usec), as ms per tick.
+		var prof := {}
+		var laps: Dictionary = Engine.get_meta(&"_prof", {})
+		for k: String in laps:
+			prof[k] = snappedf(float(laps[k]) / 1000.0 / float(_detail_ticks), 0.01)
+		print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist, "prof": prof}))
 	get_tree().quit(0)
 
 
@@ -372,7 +384,19 @@ func _one_tick(tick: int) -> void:
 		if player.is_alive() and not player.watching:
 			if _detail:
 				var t0 := Time.get_ticks_usec()
-				player.simulate(g._tick, delta)
+				var body: Object = player.controller.body if player.controller != null else null
+				var q0: int = int(body.get(&"query_count")) if body != null else 0
+				if player.sampler == null:
+					player.step_controller(g._tick, delta)
+					var tm := Time.get_ticks_usec()
+					_accum("player.motor", tm - t0)
+					player.global_position = player.controller.state.position
+					_accum("player.place", Time.get_ticks_usec() - tm)
+				else:
+					player.simulate(g._tick, delta)
+				if body != null:
+					_accum("player.queries", 0)
+					(_acc["player.queries"] as Array)[0] += int(body.get(&"query_count")) - q0
 				var t1 := Time.get_ticks_usec()
 				g._advance_hands(player, delta)
 				_accum("player.simulate", t1 - t0)
@@ -469,15 +493,22 @@ func _one_tick(tick: int) -> void:
 			for behaviour in identity.behaviours:
 				behaviour._net_simulate(tick, step)
 	at = _add("net_pull", at)
-	_net._ticks_since_snapshot += 1
-	if _net._ticks_since_snapshot >= _net.config.ticks_per_snapshot():
-		_net._ticks_since_snapshot = 0
+	var period := _net.config.ticks_per_snapshot()
+	if _net.config.stagger_snapshots and period > 1:
+		# DotNetManager.server_tick's staggered path: a share of the peers every tick.
 		_net.history.record(identities, tick)
 		at = _add("net_history", at)
-		if _split and _workers == 0 and not _native:
-			_split_snapshots(tick, identities)
-		else:
-			_net._send_snapshots(tick, identities)
+		_net._send_snapshots(tick, identities, posmod(tick, period), period)
+	else:
+		_net._ticks_since_snapshot += 1
+		if _net._ticks_since_snapshot >= period:
+			_net._ticks_since_snapshot = 0
+			_net.history.record(identities, tick)
+			at = _add("net_history", at)
+			if _split and _workers == 0 and not _native:
+				_split_snapshots(tick, identities)
+			else:
+				_net._send_snapshots(tick, identities)
 	if tick % ZzNetBridge.CLOCK_EVERY == 0:
 		_bridge._broadcast(ZzEvents.Kind.CLOCK, _bridge._clock_body())
 	at = _add("net_snapshot", at)
