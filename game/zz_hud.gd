@@ -133,7 +133,7 @@ var _use_fill: ColorRect = null
 var _use_label: Label = null
 var _held: Label = null
 var _crosshair: Control = null
-## The player's `cl_crosshair_*` cvars (dot-ui API 10); null on an older shell, which keeps the dot.## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
+## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
 var aim_fraction: float = 0.0
