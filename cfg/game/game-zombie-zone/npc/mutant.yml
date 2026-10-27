@@ -1,0 +1,45 @@
+name: Mutant
+category: zombie
+faction: infected
+weight: heavy
+cost: 6
+health: 900.0
+speed: 2.4
+sight: 60.0
+sight_angle: 120.0
+hearing: 25.0
+los: true
+eye: 2.16
+extra:
+  damage: 14.0
+  reach: 1.9
+  attack_interval: 1.4
+  zap_range: 24.0
+  zap_damage: 4.0
+  zap_interval: 2.5
+  prop_chance: 0.5
+  prop_range: 14.0
+  prop_mass: 40.0
+  pull_speed: 14.0
+  hold_time: 1.0
+  throw_speed: 22.0
+  throw_range: 30.0
+  throw_damage: 8.0
+  throw_interval: 4.0
+  fuel: 14.0
+  fuel_regen: 1.4
+  fly_speed: 8.0
+  cruise_height: 7.0
+  fly_from: 14.0
+  fly_time: 9.0
+  angry_health: 0.4
+  charge_time: 1.4
+  charge_height: 12.0
+  dive_speed: 26.0
+  slam_radius: 7.0
+  slam_damage: 30.0
+  slam_recover: 3.0
+  dive_cooldown: 8.0
+  body: mutant
+  radius: 0.55
+  height: 2.4
