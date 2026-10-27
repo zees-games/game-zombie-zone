@@ -378,6 +378,7 @@ func _adopt_links() -> void:
 	if not graph.rebuild(nav).ok:
 		return
 
+	graph.steep = config.nav_steep if config.nav_steep > 0.0 else INF
 	spawner.nav = graph
 
 	if notes.is_ready():
@@ -388,14 +389,14 @@ func _adopt_links() -> void:
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
 func _mark_narrow() -> void:
 	if spawner.nav.has_method(&"mark_narrow"):
+		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
+		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
+		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
 		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
 			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), radius, fit)
 
 
 ## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
-		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
-		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
-		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
 func usable_posts() -> Array:
 	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
 
@@ -1024,9 +1025,6 @@ func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 	return out
 
 
-## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
-## there and not along the walk it had.
-func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 ## Hostile zombies alive that count as "infected left": everything but a sleeper still sitting. Cached for a second.
 func infected_left() -> int:
 	if _time - _left_at < 1.0:
@@ -1070,6 +1068,11 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or b.anchored or npc.owner_id == &"map" or _sitting_sleeper(npc):
+		return
+
+	# A lure draws it away from the survivors on purpose.
+	if npc.brain != null and npc.brain.get(&"state") == &"lure":
+		stuck.forget(npc.instance_id)
 		return
 
 	var nearest := INF
@@ -1139,6 +1142,9 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 		"to": str(spot.snappedf(0.1)), "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 
 
+## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
+## there and not along the walk it had.
+func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or not is_instance_valid(b) or b.anchored:

@@ -344,7 +344,9 @@ Three changes: props from 0.3 m are cut from the graph (was 0.5: a 0.41 m pallet
 | ze_death_star_escape | 0.0% | 0.0% | 17.9% | 0.5% | 42 | 4 |
 | ze_nuke_beta | 50.1% | 50.0% | 4.7% | 10.6% | 20 | 42 |
 
-The other ten maps are at or under 13% for both kinds before and after. Open: the atix stand-ins walk into a window sill the importer linked across (zombie-zone-maps `import_bsp.py`, `nav_emulate`), the nuke stand-in on a sill doorway, and zm_antarctic_hospital (unshipped, imported to a scratch directory only) stands commons at 27% against a window counter with a pillar over it.
+The other ten maps are at or under 13% for both kinds before and after. Open: the atix stand-ins walk into a window sill the importer linked across (zombie-zone-maps `import_bsp.py`), the nuke stand-in on a sill doorway, and zm_antarctic_hospital (unshipped, imported to a scratch directory only) stands commons at 27% against a window counter with a pillar over it.
+
+Reach after the steep-edge rule, floor-piercing link cut and stuck rescue (`special_reach --all`, 30 maps, 148 origins): commons path 132, reached 136 (was 88 of 119, 74%; now 92%), brute path 137, reached 116. `zm_roy_the_ship` commons 2 of 5 reached (was 0): its drop links were read upward (`zz_nav_steep`, default 1.2 m, walks them downhill only). The importer (`zombie-zone-maps/tools/import_bsp.py`, `cut_blocked`) now cuts doc links that pierce a floor slab, as `ZzNpcs._link_through_floor` does at load; ze_nuke_beta and ze_boat_escape are left uncut, because the cut disconnects their routes. Open: `zs_krusty_krab_large` (a drop lands in a pit at 3.9, -15.8, 6.5 with no nav points), `zs_slugde` (no links, 4 components, 5 of 8 wave hints in one island), `zm_roy_highway` and `zs_lens` (island hints; 42 posts need the unwired ladders). Ladders are not exempt from `zz_nav_steep` yet.
 
 ## Sprint and stamina
 

@@ -428,6 +428,8 @@ func _test_a_wedged_zombie() -> void:
 	game.add_child(wall)
 	var wall_z := STREET.z - 5.0
 	wall.global_position = Vector3(0.0, 2.0, wall_z)
+	# The horde's rescue would relocate it past the wall; this checks the per-kind watchdog alone.
+	game.config.stuck_rescue = false
 	game.config.unstick_seconds = 0.0
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, Vector3(0.0, 0.05, wall_z - 3.0), &"test", Basis(Vector3.UP, PI))
 	npc.brain.call(&"force_target", me.player_id)

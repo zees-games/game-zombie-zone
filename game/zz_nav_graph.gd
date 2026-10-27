@@ -29,6 +29,11 @@ var allow_climb: bool = false:
 			_native.clear()
 			_patched.clear()
 
+## A plain edge that rises more than this is a drop seen from above: the importer's links join two levels with one undirected
+## edge, and a zombie cannot step back up a 2 m drop (the ship's, where commons stood under it pressing at a wall). Down only,
+## up only with [member allow_climb].
+var steep: float = 1.2
+
 ## from index -> PackedInt32Array of the points one drop leads down to.
 var _down: Dictionary = {}
 
@@ -46,6 +51,9 @@ var _relaxed_for: Dictionary = {}
 ## True while the native search's graph is being built: its plain edges are bidirectional, so the
 ## one-way links must not be in them (they are connected after, one way).
 var _building: bool = false
+
+## Set with [member _building] when the native graph is for a kind that obeys the steep rule.
+var _steep_cut: bool = false
 
 ## Drops in this graph, for suites and describe.
 var drop_count: int = 0
@@ -239,6 +247,12 @@ func is_link(a: int, b: int) -> bool:
 func neighbours(index: int) -> PackedInt32Array:
 	var base := super(index)
 
+	if filter == bot_filter and not _building:
+		return base
+
+	if _steep_cut or not _building:
+		base = _without_steep(index, base, _steep_cut)
+
 	if _building or not _linked.has(index) or filter == bot_filter:
 		return base
 
@@ -256,17 +270,48 @@ func neighbours(index: int) -> PackedInt32Array:
 	return out
 
 
+## [param base] without the edges from [param index] a zombie cannot take: up a rise over [member steep] (all steep ones
+## when [param both], which the native build uses so it can connect the steep ones one way after).
+func _without_steep(index: int, base: PackedInt32Array, both: bool) -> PackedInt32Array:
+	var here := data.points[index].y
+	var out := PackedInt32Array()
+	var cut := false
+
+	for to in base:
+		var rise := data.points[to].y - here
+
+		if (both and absf(rise) > steep) or (rise > steep and not allow_climb):
+			cut = true
+			continue
+
+		out.append(to)
+
+	return out if cut else base
+
+
 ## The native search's graph: [method super]'s (the plain edges), which has no link in it, plus
 ## the links as one-way segments.
 func _native_for(with: DotNpcNavFilter) -> AStar3D:
 	_building = true
+	_steep_cut = with != bot_filter
 	var astar: AStar3D = super(with)
 	_building = false
+	_steep_cut = false
 
-	if with == bot_filter or not has_links() or _patched.has(astar.get_instance_id()):
+	if with == bot_filter or _patched.has(astar.get_instance_id()):
 		return astar
 
 	_patched[astar.get_instance_id()] = true
+
+	# The steep plain edges, downhill (and uphill with allow_climb), one way each.
+	for i in data.points.size():
+		var here := data.points[i].y
+
+		for to in super.neighbours(i):
+			var rise := data.points[to].y - here
+
+			if rise < -steep or (rise > steep and allow_climb):
+				astar.connect_points(i, to, false)
 
 	for from: int in _down:
 		for to in _down[from] as PackedInt32Array:

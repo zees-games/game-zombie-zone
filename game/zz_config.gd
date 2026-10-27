@@ -307,6 +307,9 @@ func setup_seconds() -> float:
 ## Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 never. `zz_stuck_remove_after`.
 @export_range(0, 10, 1) var stuck_remove_after: int = 2
 
+## A graph edge that rises more than this many metres is taken down only (a drop seen from below is a wall). 0 off. `zz_nav_steep`.
+@export_range(0.0, 20.0, 0.1) var nav_steep: float = 1.2
+
 ## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
 @export var bot_open_boxes: bool = true
 

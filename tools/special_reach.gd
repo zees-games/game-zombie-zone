@@ -23,6 +23,8 @@ var _static_only := false
 var _ai := false
 ## Keep the barricades: a zombie held at one is stopped by design, and 30 s will not bash a door through.
 var _held := false
+## `--steep=N`: ZzConfig.nav_steep for the run (0 is the old undirected links).
+var _steep := 1.2
 ## Print the first origin's walk every two seconds (position, path, wish).
 var _trace := false
 ## `--edges=x,y,z`: the graph points around that place and whether a ray between neighbours meets something.
@@ -51,6 +53,8 @@ func _run() -> void:
 			_origins = int(arg.substr(10))
 		elif arg.begins_with("--seconds="):
 			_seconds = float(arg.substr(10))
+		elif arg.begins_with("--steep="):
+			_steep = float(arg.substr(8))
 		elif arg == "--ai":
 			_ai = true
 		elif arg.begins_with("--kinds="):
@@ -254,6 +258,19 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 			var b = npc.brain.body()
 			var p = npc.brain.get(&"path")
 			print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
+			if b.velocity.length() < 0.5:
+				if p != null:
+					print("      next %s from floor %s" % [str(Array(p.points).slice(0, 4).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))), b.is_on_floor()])
+
+				var hit := KinematicCollision3D.new()
+				var ahead: Vector3 = b.wish.normalized() * 0.4
+
+				if b.test_move(b.global_transform, ahead, hit):
+					var col := hit.get_collider() as Node
+					print("      blocked by %s; ahead hits %s at %s normal %s" % [_blockers(npc), "?" if col == null else "%s/%s" % [col.get_parent().name if col.get_parent() else "", col.name], hit.get_position().snapped(Vector3.ONE * 0.05), hit.get_normal().snapped(Vector3.ONE * 0.1)])
+				else:
+					print("      blocked by %s; ahead clear" % _blockers(npc))
+
 			if p != null and tick % 512 == 256:
 				print("      ahead %s" % str(Array(p.points).slice(0, 6).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))))
 
@@ -352,6 +369,7 @@ func _built(id: String) -> Node:
 	config.minimum_players = 0
 	config.keep_progress = false
 	config.nav_cache = false
+	config.nav_steep = _steep
 	config.wanderer_density = 0.0
 	var game := ZzGame.new()
 	game.config = config
