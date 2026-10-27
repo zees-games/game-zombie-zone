@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 53
 
-const CHECKS := 406
+const CHECKS := 407
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -856,6 +856,13 @@ func _test_supports() -> void:
 	game._roll_into_survivors(0.1)
 	_check(is_equal_approx(float(zhp.call()), h_hit), "with roll_damage_zombies off the zombie is left alone", "%.1f" % float(zhp.call()))
 	game.config.roll_damage_zombies = true
+	barrel.body.linear_velocity = Vector3(8.0, 0.0, 0.0)
+	var fast_gate: bool = game._toy_moving_fast()
+	barrel.body.linear_velocity = Vector3.ZERO
+	for other: Variant in game.map.toys.toys:
+		if is_instance_valid(other) and other.body != null:
+			other.body.linear_velocity = Vector3.ZERO
+	_check(fast_gate and not game._toy_moving_fast(), "the rolling scan runs only while a toy is fast (no victim list at rest)", "fast=%s" % fast_gate)
 	var client := ZzMap.new()
 	client.physics = game.physics
 	client.authoritative = false

@@ -4,6 +4,7 @@ const ZzBoxes := preload("zz_boxes.gd")
 const ZzCarry := preload("zz_carry.gd")
 const ZzBots := preload("zz_bots.gd")
 const ZzBotProfiles := preload("zz_bot_profiles.gd")
+const ZzBoxProfiles := preload("zz_box_profiles.gd")
 const ZzCatalogue := preload("zz_catalogue.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
@@ -290,6 +291,27 @@ func personas() -> DotBotPersonaPool:
 	return _personas
 
 
+var _box_set: DotProfileSet = null
+
+
+## The `box` profile set (every type's odds, effect, colour and sounds), for the workbench and [method reload_boxes].
+func box_profile_set() -> DotProfileSet:
+	if _box_set == null:
+		_box_set = ZzBoxProfiles.make_set()
+	return _box_set
+
+
+## A box profile was edited: read the file's types and every profile again, keeping the audio.
+func reload_boxes() -> void:
+	if boxes == null:
+		return
+	var manager := boxes.sounds.manager
+	var _n := boxes.load_file(config.box_file)
+	var _applied := boxes.overlay_profiles(box_profile_set())
+	if manager != null:
+		var _recipes := boxes.use_audio(manager)
+
+
 ## A persona was added, edited or deleted: read them again, and let every stand-in draw anew.
 func reload_personas() -> void:
 	if _personas == null:
@@ -481,6 +503,7 @@ func _ready() -> void:
 		drops.load_config()
 		boxes = ZzBoxes.new(self)
 		var _loaded_boxes := boxes.load_file(config.box_file)
+		var _box_profiles := boxes.overlay_profiles(box_profile_set())
 		bots = ZzBots.new(self)
 		_build_horde()
 		catalogue = ZzCatalogue.new()
@@ -3957,6 +3980,11 @@ func _advance_toys(delta: float) -> void:
 
 ## A loose barrel going fast hurts the survivor it runs into (once per cooldown), as the original supports' barrels did.
 func _roll_into_survivors(delta: float) -> void:
+	if not _toy_moving_fast():
+		# Still advances the cooldown clocks; no victim list for 100 players and 250 zombies a tick.
+		var _none := rolling.scan(map.toys, [], delta)
+		var _none_z := rolling_zombies.scan(map.toys, [], delta)
+		return
 	var victims: Array = []
 	for id: StringName in players:
 		var player: ZzPlayer = players[id]
@@ -3974,6 +4002,15 @@ func _roll_into_survivors(delta: float) -> void:
 		player_hurt.emit(player.player_id, float(hit["damage"]), player.feet())
 	if config.roll_damage_zombies:
 		_roll_into_zombies(delta)
+
+
+## Whether any rolling kind of toy is past the speed that hurts; false is the usual tick.
+func _toy_moving_fast() -> bool:
+	var floor_speed := minf(rolling.min_speed, rolling_zombies.min_speed)
+	for toy: DotPropToy in map.toys.toys:
+		if is_instance_valid(toy) and toy.body != null and toy.body.linear_velocity.length_squared() >= floor_speed * floor_speed:
+			return true
+	return false
 
 
 ## The same barrel hurts the zombies it runs into (commons and specials alike), through the zombie damage path with no
