@@ -19,7 +19,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const ZzHud := preload("../game/zz_hud.gd")
 const SECTIONS := 12
-const CHECKS := 78
+const CHECKS := 80
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -98,6 +98,9 @@ func _test_the_weapon_art_is_vendored() -> void:
 		var s := ZeeWeaponSound.stream(sound)
 		stock_streams = stock_streams and s is AudioStreamOggVorbis and s.resource_path.begins_with(DotWeaponSound.DIR)
 	_check(stock_streams, "weapon shots, dry, equip and reloads play the stock recordings, not the synth fallback")
+	var problems := DotWeaponSound.check_stock()
+	_check(problems.is_empty(), "every weapon class resolves a non-silent, unclipped voice", ", ".join(problems))
+	_check(DotWeaponSound.pick_tail(&"rifle", true) != null and DotWeaponSound.pick_tail(&"rifle", false) == null, "indoors a shot gets a tail, outdoors none")
 	_finished()
 
 
