@@ -362,6 +362,18 @@ func setup_seconds() -> float:
 
 @export_range(1.0, 20.0, 0.1) var run_speed: float = 6.2
 @export_range(0.1, 1.0, 0.01) var walk_speed_scale: float = 0.45
+
+## Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_stamina*` in dot-player-controller.
+@export var sprint_enabled: bool = true
+@export_range(1.0, 2.0, 0.01) var sprint_speed_scale: float = 1.22
+@export var stamina_enabled: bool = true
+@export_range(0.0, 10.0, 0.01) var stamina_drain: float = 0.2
+@export_range(0.0, 10.0, 0.01) var stamina_recover: float = 0.15
+@export_range(0.0, 1.0, 0.01) var stamina_resume_at: float = 0.3
+@export_range(0.0, 3.5, 0.05) var stamina_exhaust_delay: float = 1.5
+## How strongly the carried share of the weight limit cuts the sprint bonus and raises the drain; 0 off.
+@export_range(0.0, 2.0, 0.01) var sprint_load_speed: float = 1.0
+@export_range(0.0, 4.0, 0.01) var sprint_load_drain: float = 1.0
 @export_range(0.1, 5.0, 0.05) var jump_height: float = 1.1
 @export_range(1.0, 60.0, 0.5) var gravity: float = 20.0
 @export_range(0.0, 200.0, 1.0) var air_accelerate: float = 12.0

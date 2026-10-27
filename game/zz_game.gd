@@ -3587,6 +3587,10 @@ func _carry_update() -> void:
 					told.emit(id, "Too heavy: you dropped %s." % ZzWeapons.title_of(dropped))
 					if loot != null:
 						var _laid := loot.add(ZzLoot.WEAPON, dropped, player.global_position, 120.0)
+			if player.controller != null and player.controller.motor != null:
+				player.controller.motor.load_fraction = (
+					arsenal.carried_weight() / maxf(arsenal.capacity(), 0.1) if carry.carry.enabled else 0.0
+				)
 			var scale := arsenal.speed_scale()
 			if not is_equal_approx(scale, player.carry_scale):
 				player.carry_scale = scale

@@ -422,7 +422,7 @@ static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
 	t.auto_hop = false
 	t.walk_speed_scale = p_config.walk_speed_scale if p_config != null else 0.45
 	t.can_walk = true
-	t.can_sprint = false
+	apply_sprint(t, p_config)
 	t.can_crouch = true
 	t.crouch_speed_scale = 0.45
 	t.accelerate = 10.0
@@ -440,7 +440,23 @@ static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
 	return t
 
 
-## The movement actions, and the slow walk on shift.
+## Copies the sprint and stamina numbers of [param p_config] onto [param t] (also on a live cvar change).
+static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
+	if p_config == null:
+		t.can_sprint = false
+		return
+	t.can_sprint = p_config.sprint_enabled
+	t.sprint_speed_scale = p_config.sprint_speed_scale
+	t.stamina_enabled = p_config.stamina_enabled
+	t.stamina_drain = p_config.stamina_drain
+	t.stamina_recover = p_config.stamina_recover
+	t.stamina_resume_at = p_config.stamina_resume_at
+	t.stamina_exhaust_delay = p_config.stamina_exhaust_delay
+	t.sprint_load_speed = p_config.sprint_load_speed
+	t.sprint_load_drain = p_config.sprint_load_drain
+
+
+## The movement actions. Shift is sprint; the slow walk stays on Alt.
 static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 	var _added := DotFpsSampler.register_default_actions(p_sampler)
 	var crouch := &"dot_fps_crouch"
@@ -459,11 +475,7 @@ static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 	for event in InputMap.action_get_events(walk):
 		var key := event as InputEventKey
 		if key != null and key.physical_keycode == KEY_SHIFT:
-			return
-
-	var shift := InputEventKey.new()
-	shift.physical_keycode = KEY_SHIFT
-	InputMap.action_add_event(walk, shift)
+			InputMap.action_erase_event(walk, event)
 
 
 static func _has_key(action: StringName, keycode: Key) -> bool:

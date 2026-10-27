@@ -102,6 +102,8 @@ var ammo: DotAmmoCounter = null
 var strip: DotScoreStrip = null
 ## The medkit and pills, each with its key.
 var kits: DotKeyHints = null
+var stamina_bar: DotStatBar = null
+var _stamina_pct: float = 100.0
 ## Four ticks round the crosshair on a hit the server confirmed.
 var hit_marker: DotHitMarker = null
 ## The confirmed hits' numbers, on the bodies they landed on.
@@ -247,6 +249,24 @@ func _build() -> void:
 	vitals.offset_bottom = -PLATE_BOTTOM
 	_root.add_child(vitals)
 
+	# Stamina, a thin bar right over the health plate; only drawn once it is below full.
+	stamina_bar = DotStatBar.new()
+	stamina_bar.name = "Stamina"
+	stamina_bar.max_value = 100.0
+	stamina_bar.show_text = false
+	stamina_bar.bar_height = 6.0
+	stamina_bar.fill_colour = Color(0.95, 0.8, 0.3)
+	stamina_bar.low_colour = Color(0.9, 0.35, 0.25)
+	stamina_bar.low_fraction = 0.15
+	stamina_bar.ease_sec = 0.1
+	stamina_bar.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	stamina_bar.offset_left = 24.0
+	stamina_bar.offset_right = 24.0 + 300.0
+	stamina_bar.offset_top = -PLATE_BOTTOM - 64.0
+	stamina_bar.offset_bottom = -PLATE_BOTTOM - 58.0
+	stamina_bar.visible = false
+	var _bound := stamina_bar.bind(func() -> Variant: return _stamina_pct)
+	_root.add_child(stamina_bar)
 
 	kits = DotKeyHints.new()
 	kits.name = "Kits"
@@ -503,6 +523,7 @@ func _process(delta: float) -> void:
 	_nav_meter.show_percent(game.nav_percent())
 	_draw_top()
 	_draw_health()
+	_draw_stamina()
 	_draw_team()
 	_draw_weapon()
 	_draw_weight()
@@ -816,6 +837,19 @@ func team_lines() -> PackedStringArray:
 ## What the player carries (the CARRY event's document, or [method ZzCarry.state_json] offline).
 func set_carry(state: Dictionary) -> void:
 	_weight_state = state
+
+
+func _draw_stamina() -> void:
+	var s: DotFpsState = player.controller.state if player.controller != null else null
+	var tunables: DotFpsTunables = player.controller.tunables if player.controller != null else null
+	var shown := s != null and tunables != null and tunables.stamina_enabled and tunables.can_sprint \
+		and player.is_alive() and (s.stamina < 0.999 or s.sprinting)
+	stamina_bar.visible = shown
+	if not shown:
+		return
+	stamina_bar.fill_colour = Color(0.9, 0.35, 0.25) if s.stamina_exhausted else Color(0.95, 0.8, 0.3)
+	_stamina_pct = s.stamina * 100.0
+	stamina_bar.refresh()
 
 
 func _draw_weight() -> void:

@@ -38,6 +38,23 @@
 # run_speed: 6.2
 #  [0.1..1.0]
 # walk_speed_scale: 0.45
+# Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_st...
+# sprint_enabled: true
+#  [1.0..2.0]
+# sprint_speed_scale: 1.22
+# stamina_enabled: true
+#  [0.0..10.0]
+# stamina_drain: 0.2
+#  [0.0..10.0]
+# stamina_recover: 0.15
+#  [0.0..1.0]
+# stamina_resume_at: 0.3
+#  [0.0..3.5]
+# stamina_exhaust_delay: 1.5
+# How strongly the carried share of the weight limit cuts the sprint bonus and raises the drain; 0 off. [0.0..2.0]
+# sprint_load_speed: 1.0
+#  [0.0..4.0]
+# sprint_load_drain: 1.0
 #  [0.1..5.0]
 # jump_height: 1.1
 #  [1.0..60.0]

@@ -1272,6 +1272,9 @@ func _on_carry_json(json: String) -> void:
 	var _moved := _mirror.sync(game.config)
 	if player != null and player.controller != null:
 		player.controller.set_weight_scale(float((state as Dictionary).get("scale", 1.0)))
+		if player.controller.motor != null:
+			var limit := maxf(float((state as Dictionary).get("l", 1.0)), 0.1)
+			player.controller.motor.load_fraction = float((state as Dictionary).get("w", 0.0)) / limit if bool((state as Dictionary).get("on", false)) else 0.0
 	if weapons == null or weapons.arsenal == null:
 		return
 	var slots: Dictionary = (state as Dictionary).get("slots", {})
