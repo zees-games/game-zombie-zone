@@ -106,19 +106,11 @@ static func scan(from: String = "") -> int:
 
 	var found := 0
 
-	if not DirAccess.dir_exists_absolute(base):
-		return 0
-
-	for dir_name in DirAccess.get_directories_at(base):
+	for dir_name in ZeePackScan.provider_dirs(base, PROVIDER_FILE):
 		var path := "%s/%s/%s" % [base, dir_name, PROVIDER_FILE]
+		var script := ZeePackScan.load_provider(CHANNEL, dir_name, path)
 
-		if not ResourceLoader.exists(path) and not FileAccess.file_exists(path):
-			continue
-
-		var script := load(path) as GDScript
-
-		if script == null or not script.can_instantiate():
-			DotLog.warn(CHANNEL, "a pack's provider does not load", {"pack": dir_name, "path": path})
+		if script == null:
 			continue
 
 		_set_pack_game("%s/%s/" % [base, dir_name])
@@ -201,20 +193,16 @@ static func _take(pack: String, provider: Object) -> void:
 	if provider.has_method(&"weapon_defs") and bool(cfg("weapons.enabled", true)):
 		defs = provider.call(&"weapon_defs", ZeeWeaponDamage.table())
 
-	var excluded: Array = cfg("weapons.exclude", [])
 	var source := StringName(SOURCE_PREFIX + pack)
-	var kept: Array[DotWeaponDef] = []
+	var kept := ZeePackScan.kept(defs, cfg("weapons.exclude", []))
 
-	for def: Variant in defs:
-		if def is DotWeaponDef and not excluded.has(String(def.id)):
-			kept.append(def)
-			weapon_ids.append(String(def.id))
-			pack_of[String(def.id)] = pack
+	for def in kept:
+		weapon_ids.append(String(def.id))
+		pack_of[String(def.id)] = pack
 
 	if not kept.is_empty():
-		# Through _tiered, never the provider's own: zee calls the source on every rig it builds and
-		# a pack's definitions come back fresh each time, so the tier has to be given each time.
-		ZeePackSource.register(source, provider.get_script(), Callable(load("res://game/zz_packs.gd"), &"_tiered").bind(provider.get_script()))
+		var tiers: Dictionary = cfg("weapons.tiers", {})
+		ZeePackSource.register(source, provider.get_script(), Callable(ZeePackRoles, &"tiered").bind(provider.get_script(), TIERS_ALL, tiers))
 		_sources.append(source)
 
 	var seen := 0
@@ -247,33 +235,6 @@ static func _take(pack: String, provider: Object) -> void:
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row)
-
-
-## A pack weapon's definitions with a tier. The game draws boxes, loot and stand-in kits by tier
-## (ZzWeapons.TIERS) and a weapon with none is in the pool and never handed out: the medieval
-## pack's bow and crossbow are tagged `ranged`, not `primary`, so they were silently unreachable.
-## A ranged weapon with no tier joins `primary`, a melee one `melee`. Static and public to the
-## engine only because a source Callable must be a static method, never a lambda.
-static func _tiered(types: Dictionary, provider_script: Script) -> Array[DotWeaponDef]:
-	var defs: Array[DotWeaponDef] = provider_script.call(&"weapon_defs", types)
-	var tiers: Dictionary = cfg("weapons.tiers", {})
-
-	for def in defs:
-		var has_tier := false
-
-		if tiers.has(String(def.id)) and TIERS_ALL.has(StringName(str(tiers[String(def.id)]))):
-			for tier: StringName in TIERS_ALL:
-				def.tags.erase(tier)
-
-			def.tags.append(StringName(str(tiers[String(def.id)])))
-
-		for tier: StringName in [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]:
-			has_tier = has_tier or def.tags.has(tier)
-
-		if not has_tier:
-			def.tags.append(&"melee" if def.tags.has(&"melee") else &"primary")
-
-	return defs
 
 
 static func _add_monster(pack: String, row: Dictionary) -> void:
