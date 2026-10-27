@@ -274,6 +274,7 @@ func build(p_doc: Dictionary) -> DotResult:
 		_build_objective_props()
 		_build_lights()
 		_build_environment()
+		_keep_fog_variant_warm()
 		if use_bakes:
 			_attach_bake()
 
@@ -349,6 +350,16 @@ func clear() -> void:
 	_night_light = {}
 	_day_light = {}
 	_daylight = 0.0
+
+
+## Fog on is a different shader variant in the Compatibility renderer, so a pool's first underwater frame recompiled every material. A map with water keeps fog on at zero density from the start and pays that once, behind the load.
+func _keep_fog_variant_warm() -> void:
+	if water_boxes.is_empty() or _environment == null or _environment.environment == null:
+		return
+	var env := _environment.environment
+	if not env.fog_enabled:
+		env.fog_density = 0.0
+		env.fog_enabled = true
 
 
 ## The document's water as boxes (`at` is the centre, the top face is the surface).
