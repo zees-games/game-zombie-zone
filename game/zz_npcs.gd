@@ -468,6 +468,8 @@ const LINK_TEST_HEIGHTS := [0.4, 0.9]
 const LINK_TEST_TRIM := 0.15
 ## A link that rises more than this is a drop or a climb, and is tested against the floors it crosses.
 const LINK_STEEP := 1.2
+## Horizontal run inside a floor slab below which a level-changing link only nicks the slab's edge.
+const LINK_CLIP_MIN := 0.3
 ## How far (m) and how far off in height a graph point may stand from the foot or head of a ladder and still be its end.
 const LADDER_REACH := 6.5
 const LADDER_HEIGHT := 1.5
@@ -807,7 +809,17 @@ static func _link_through_floor(from: Vector3, to: Vector3, slabs: Array[AABB]) 
 	var b := to - dir * LINK_TEST_TRIM
 
 	for bounds in slabs:
-		if bounds.intersects_segment(a, b):
+		var enter: Variant = bounds.intersects_segment(a, b)
+		var leave: Variant = bounds.intersects_segment(b, a)
+
+		if enter == null or leave == null:
+			continue
+
+		# A ceiling is crossed through its underside for more than a nick of its edge; a drop that clips a ledge is not one.
+		var p: Vector3 = enter
+		var q: Vector3 = leave
+
+		if minf(p.y, q.y) <= bounds.position.y + 0.02 and (Vector2(p.x - q.x, p.z - q.z).length() >= LINK_CLIP_MIN or Vector2(to.x - from.x, to.z - from.z).length() < LINK_CLIP_MIN):
 			return true
 
 	return false

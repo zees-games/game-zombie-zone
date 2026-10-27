@@ -80,8 +80,15 @@ func _run() -> void:
 	await _test_worlds()
 	await _test_footing()
 
+	var only := ""
+
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--map="):
+			only = arg.substr(6)
+
 	for id: String in _maps:
-		await _test_map(StringName(id))
+		if only.is_empty() or only == id:
+			await _test_map(StringName(id))
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
