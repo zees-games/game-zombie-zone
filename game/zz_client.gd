@@ -18,6 +18,7 @@ const ZzConfig := preload("zz_config.gd")
 const ZzGame := preload("zz_game.gd")
 const ZzHud := preload("zz_hud.gd")
 const ZzKillcam := preload("zz_killcam.gd")
+const ZzShopIcons := preload("zz_shop_icons.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.gd")
@@ -117,6 +118,9 @@ var third_person: bool = false
 var _offline: bool = true
 ## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
 var _killcam_sec: float = -1.0
+
+## Weapon pictures for the killcam banner, drawn from the weapon models on first ask.
+var _killcam_icons: ZzShopIcons = null
 var _map_ending: bool = false
 var _end_point := Vector3.ZERO
 var _end_left := 0.0
@@ -715,7 +719,8 @@ func _hear_the_world() -> void:
 	game.round_began.connect(func(n: int, _map: StringName) -> void: _on_round(n, true, false))
 	game.round_over.connect(func(n: int, won: bool, why: String) -> void: _on_round(n, false, won, why))
 	game.player_died.connect(func(id: StringName, by: StringName, why: StringName) -> void:
-		_on_death(_session(id), _session_of_killer(by), why, _kind_of_killer(by)))
+		_on_death(_session(id), _session_of_killer(by), why, _kind_of_killer(by),
+			game.players[id].death_weapon if game.players.has(id) else &""))
 	game.player_downed.connect(func(id: StringName, by: StringName, why: StringName) -> void:
 		_on_down(_session(id), _session_of_killer(by), why, _kind_of_killer(by)))
 	game.player_revived.connect(func(id: StringName, by: StringName) -> void:
@@ -994,12 +999,12 @@ func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 		chat.say_locally(why, Color(0.98, 0.86, 0.40))
 
 
-func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName) -> void:
+func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName, weapon_id: StringName = &"") -> void:
 	var who := _player_of(session_id)
 	var mine := session_id == _watch_id
 
 	if killcam != null and who != null:
-		killcam.note_moment(who.player_id, "fell to %s" % ("a " + String(by_kind) if by_kind != &"" else "the horde"), "THE LAST STAND")
+		killcam.note_moment(who.player_id, "fell to %s" % ("a " + String(by_kind) if by_kind != &"" else "the horde"), "THE LAST STAND", weapon_id)
 
 	if audio != null and mine:
 		var _heard := audio.play(ZzAudio.YOU_ARE_DEAD)
@@ -1685,6 +1690,9 @@ func _build_killcam() -> void:
 			world_view.set_replaying(on)
 	killcam.feet_fn = func(p: ZzPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
 	killcam.colour_fn = func(_p: ZzPlayer) -> Color: return game.side_colour(ZzGame.SURVIVORS)
+	_killcam_icons = ZzShopIcons.new()
+	add_child(_killcam_icons)
+	killcam.weapon_icon_fn = func(id: String) -> Texture2D: return _killcam_icons.icon_for(StringName(id))
 	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_map())
 	add_child(killcam)

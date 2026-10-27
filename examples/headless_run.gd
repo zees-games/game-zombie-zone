@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 53
 
-const CHECKS := 407
+const CHECKS := 409
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1616,6 +1616,10 @@ func _test_how_survivors_fall() -> void:
 	_check(bool(died["ok"]) and carried != null and carried.reaction == &"face_plant" and carried.roll_seed == 1234
 		and died["by_kind"] == &"common" and bool(bare["ok"]) and not bare.has("death"),
 		"a DEATH carries the fall the server picked, and one without a fall still reads")
+	var armed_death := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"", fall, &"rifle")))
+	var carried_again: DotPlayerDeath = armed_death.get("death")
+	_check(armed_death["weapon_id"] == &"rifle" and carried_again != null and carried_again.roll_seed == 1234 and bare["weapon_id"] == &"",
+		"a DEATH carries the weapon that landed it (the killcam's icon), before the fall")
 
 	var catalogue: DotAudioCatalogue = (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue")
 	var listed := not DotPlayerDeathSounds.rows().is_empty()
@@ -3119,6 +3123,15 @@ func _check_killcam_time() -> void:
 	var held: Dictionary = recorder.buffer.sample(tick[0])["b"]
 	_check(held.has("~zombies") and (held["~zombies"] as Array).size() == 1, "a killcam frame records the zombies near the survivors", str(held.keys()))
 	recorder.free()
+
+	var iconed: Node = load("res://game/zz_killcam.gd").new()
+	iconed.weapon_icon_fn = func(id: String) -> Texture2D: return PlaceholderTexture2D.new() if id == "rifle" else null
+	add_child(iconed)
+	iconed.note_moment(&"p1", "fell to the horde", "THE LAST STAND", &"rifle")
+	var noted: Dictionary = iconed.buffer.last_event(&"moment")
+	_check(noted["data"]["weapon_id"] == "rifle" and iconed.killcam.icon_provider.call("rifle") != null and iconed.killcam.icon_provider.call("axe") == null,
+		"a killcam moment keeps the weapon id and the banner's icon provider asks the game's icons")
+	iconed.queue_free()
 
 
 func _world(configure: Callable = Callable()) -> ZzGame:

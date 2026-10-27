@@ -362,13 +362,15 @@ static func read_team(r: DotNetReader) -> Dictionary:
 ## A death or a down: who, by whom (a session, or 0), by what (a zombie kind, or empty), why.
 ## [param death] is how the body falls (dot-player-char's [DotPlayerDeath], the server's pick),
 ## last and optional, so every client draws the same fall and an older one reads the rest.
+## [param weapon_id] is what landed the hit (empty for a claw), for the killcam's icon.
 static func write_death(player_id: int, by: int, why: StringName, by_kind: StringName = &"",
-		death: DotPlayerDeath = null) -> PackedByteArray:
+		death: DotPlayerDeath = null, weapon_id: StringName = &"") -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
 	w.write_varint(by)
 	w.write_string(String(why), ID_BYTES)
 	w.write_string(String(by_kind), ID_BYTES)
+	w.write_string(String(weapon_id), ID_BYTES)
 	if death != null:
 		death.write_to(w)
 	return w.to_bytes()
@@ -379,7 +381,9 @@ static func read_death(r: DotNetReader) -> Dictionary:
 	var by := r.read_varint()
 	var why := r.read_string(ID_BYTES)
 	var by_kind := r.read_string(ID_BYTES)
-	var out := {"player_id": player_id, "by": by, "why": StringName(why), "by_kind": StringName(by_kind)}
+	var weapon_id := r.read_string(ID_BYTES)
+	var out := {"player_id": player_id, "by": by, "why": StringName(why), "by_kind": StringName(by_kind),
+		"weapon_id": StringName(weapon_id)}
 	# A byte or more left is the fall; less is the padding to the last byte.
 	if r.bits_remaining() >= 8:
 		out["death"] = DotPlayerDeath.read_from(r)

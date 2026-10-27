@@ -2,6 +2,7 @@ extends Node3D
 
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzCarry := preload("zz_carry.gd")
+const ZzClasses := preload("zz_classes.gd")
 const ZzBots := preload("zz_bots.gd")
 const ZzBotProfiles := preload("zz_bot_profiles.gd")
 const ZzBoxProfiles := preload("zz_box_profiles.gd")
@@ -1495,6 +1496,7 @@ func remove_player(player_id: StringName) -> void:
 
 	if combat != null and is_instance_valid(combat) and player.entity_id != 0:
 		combat.forget(player.entity_id)
+		DotGameClassImmunity.clear(combat, player.entity_id)
 		var _closed := entities.close(player.entity_id, DotEntityTable.REASON_OWNER_LEFT)
 
 	if match_node != null:
@@ -1972,6 +1974,9 @@ func _place_everybody() -> void:
 ## What a survivor holds at the start of a map ([param fresh]) or after a rescue.
 func _equip(player: ZzPlayer, fresh: bool) -> void:
 	_disarm(player)
+
+	if combat != null and player.entity_id != 0:
+		var _immune := ZzClasses.apply_immunity(combat, player.entity_id)
 
 	var kit := config.start_weapons if fresh else PackedStringArray([config.start_weapons[0]])
 
@@ -3429,6 +3434,7 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 
 	# How the body falls, picked once, here, and carried on DEATH to every client.
 	player.death = decide_death(player, damage)
+	player.death_weapon = damage.weapon_id if damage != null else &""
 
 	player_died.emit(player.player_id, by, why)
 	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})

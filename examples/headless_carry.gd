@@ -12,8 +12,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Carry weight: off by default, the limit and a refused pickup, backpacks, several weapons per slot and cycling,
 ## box modifiers, the slow and drop rules, and the wire. Counts sections AND checks, because a script error aborts a section silently.
 
-const SECTIONS := 7
-const CHECKS := 46
+const SECTIONS := 8
+const CHECKS := 50
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -42,6 +42,7 @@ func _run() -> void:
 	await _test_wire()
 	await _test_depression()
 	await _test_class_profile()
+	await _test_class_immunity()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -362,6 +363,43 @@ func _test_class_profile() -> void:
 
 	_class_file("speed: 99\n")
 	_check(is_equal_approx(ZzPlayer.tunables_for(plain).max_speed, plain.run_speed), "an unsafe value is refused and the config speed stands")
+
+	ZzClasses.set_roots(PackedStringArray())
+	var _gone := DotPaths.remove_tree(CLASS_DIR)
+	_finished()
+
+
+func _fall_hit(game: ZzGame, p: ZzPlayer) -> float:
+	var before := p.health.health
+	var hit := DotDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"fall"))
+	hit.tick = game.current_tick()
+	var _applied := game.combat.apply_damage(hit)
+	var lost := before - p.health.health
+	p.health.health = before
+	return lost
+
+
+func _test_class_immunity() -> void:
+	_section("an `immune: [fall]` class takes no fall damage, and a respawn as another class keeps nothing")
+	var _clean := DotPaths.remove_tree(CLASS_DIR)
+	ZzClasses.set_roots(PackedStringArray([CLASS_DIR]))
+	var game := await _solo({})
+	var p := game.survivors()[0]
+	_check(_fall_hit(game, p) > 0.0, "no profile: a fall hurts")
+
+	_class_file("immune: [fall]\n")
+	game.place_one(p)
+	_check(is_zero_approx(_fall_hit(game, p)), "an immune: [fall] class takes no fall damage")
+	var hit := DotDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"bite"))
+	hit.tick = game.current_tick()
+	var before := p.health.health
+	var _bitten := game.combat.apply_damage(hit)
+	_check(p.health.health < before, "and is still bitten")
+	p.health.health = before
+
+	_class_file("speed: 1.0\n")
+	game.place_one(p)
+	_check(_fall_hit(game, p) > 0.0, "a respawn under a class without it clears the immunity")
 
 	ZzClasses.set_roots(PackedStringArray())
 	var _gone := DotPaths.remove_tree(CLASS_DIR)

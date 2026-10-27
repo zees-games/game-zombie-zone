@@ -191,6 +191,9 @@ var figure: ZzFigure = null
 ## carried on DEATH and set here before anybody hears of it. Null before a first death.
 var death: DotPlayerDeath = null
 
+## The weapon that landed the killing hit (empty for a claw or a fall), for the killcam's icon.
+var death_weapon: StringName = &""
+
 ## Remote weapon state, for drawing a gun in a watched survivor's hand. See mg-deathrun.
 var mirrored: bool = false
 var dealt: Array[StringName] = []

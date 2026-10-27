@@ -55,3 +55,9 @@ static func _def_host() -> Object:
 ## The carry limit for a survivor: the class's, else [param fallback].
 static func carry_limit(fallback: float) -> float:
 	return DotPlayerClassApply.carry_limit(survivor(), fallback)
+
+
+## Writes the survivor class's `immune_to` onto [param combat] for [param entity]; no profile clears it.
+## Called at every spawn, so a respawn never keeps what the last life had.
+static func apply_immunity(combat: Object, entity: int) -> int:
+	return DotGameClassImmunity.apply(combat, survivor(), entity)

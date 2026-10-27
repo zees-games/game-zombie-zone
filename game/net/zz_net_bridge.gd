@@ -83,7 +83,7 @@ signal round_changed(number: int, began: bool, won: bool, why: String)
 signal phase_received(phase: int)
 
 ## Somebody died, and what did it: a session, or a zombie kind.
-signal death_received(player_id: int, by: int, why: StringName, by_kind: StringName)
+signal death_received(player_id: int, by: int, why: StringName, by_kind: StringName, weapon_id: StringName)
 
 ## Somebody was handed, or picked up, a weapon. The HUD names it.
 signal armed_received(player_id: int, weapon_id: StringName)
@@ -793,7 +793,7 @@ func _on_player_died(player_id: StringName, by: StringName, why: StringName) -> 
 	var who: ZzPlayer = game.players.get(player_id) if game != null else null
 	_broadcast(ZzEvents.Kind.DEATH, ZzEvents.write_death(
 		session_of(player_id), _session_or_zero(by), why, _kind_or_empty(by),
-		who.death if who != null else null
+		who.death if who != null else null, who.death_weapon if who != null else &""
 	))
 
 
@@ -1520,7 +1520,7 @@ func _on_event(message: DotNetMessage) -> void:
 				if fell != null and death.has("death"):
 					fell.death = death["death"]
 				death_received.emit(
-					int(death["player_id"]), int(death["by"]), death["why"], death["by_kind"]
+					int(death["player_id"]), int(death["by"]), death["why"], death["by_kind"], death["weapon_id"]
 				)
 		ZzEvents.Kind.ARMED:
 			var armed := ZzEvents.read_armed(reader)

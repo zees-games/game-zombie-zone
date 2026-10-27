@@ -39,6 +39,9 @@ var replaying_fn: Callable = Callable()
 ## `func(p: ZzPlayer) -> Color`: the colour of the player's side.
 var colour_fn: Callable = func(_p: Node) -> Color: return Color.WHITE
 
+## Weapon id -> Texture2D or null: the picture beside the weapon's name in the banner.
+var weapon_icon_fn: Callable = Callable()
+
 ## The killcam's length in seconds; 0 disables.
 var seconds_fn: Callable = func() -> float: return 7.0
 
@@ -64,6 +67,8 @@ func _ready() -> void:
 	killcam = DotKillcam.new()
 	killcam.name = "Killcam"
 	killcam.skip_actions = SKIP_ACTIONS
+	killcam.icon_provider = func(id: String) -> Texture2D:
+		return weapon_icon_fn.call(id) if weapon_icon_fn.is_valid() else null
 	add_child(killcam)
 	killcam.started.connect(_on_started)
 	killcam.frame_drawn.connect(_apply)
@@ -89,8 +94,9 @@ func frame() -> void:
 
 ## A moment worth replaying: [param subject] is whose eyes the replay is behind, [param what]
 ## the banner's words ("overrun by the horde"), [param title] its heading.
-func note_moment(subject: StringName, what: String, title: String = "THE LAST MOMENT") -> void:
-	buffer.note_event(now_fn.call(), &"moment", {"subject": String(subject), "what": what, "title": title})
+func note_moment(subject: StringName, what: String, title: String = "THE LAST MOMENT", weapon_id: StringName = &"") -> void:
+	buffer.note_event(now_fn.call(), &"moment", {
+		"subject": String(subject), "what": what, "title": title, "weapon_id": String(weapon_id)})
 
 
 ## A new map: the last one's frames and moments must never be replayed into it.
@@ -114,6 +120,7 @@ func map_ended() -> bool:
 		"killer": String(subject.get(&"display_name")),
 		"victim": "",
 		"weapon": String(moment["data"].get("what", "")),
+		"weapon_id": String(moment["data"].get("weapon_id", "")),
 		"hint": "Jump to skip",
 	})
 	if not played.ok:
