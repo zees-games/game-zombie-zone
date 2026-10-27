@@ -35,7 +35,7 @@ func _run() -> void:
 	var rules := ZzAmbientRules.new()
 	var fired := [0]
 	rules.changed.connect(func() -> void: fired[0] += 1)
-	_check(rules.is_on() and rules.volume == 0.5 and rules.frequency == 1.0 and rules.mood == "", "rules default to on, quiet and free")
+	_check(rules.is_on() and rules.volume == 0.25 and rules.frequency == 0.5 and rules.mood == "", "rules default to on, quiet and free")
 	_check(rules.set_cvar("zz_ambient_volume", "0.3") and is_equal_approx(rules.volume, 0.3), "a level cvar sets the level")
 	_check(rules.set_cvar("zz_ambient_volume", "9") and rules.volume == 1.0, "and is clamped")
 	_check(rules.set_cvar("zz_ambient_frequency", "2") and rules.frequency == 2.0, "the one-shot rate sets")
@@ -164,13 +164,13 @@ func _run() -> void:
 	_check(audio.ambient.effective_mood() == &"swamp+industrial", "an extra set joins the mood's one-shots", str(audio.ambient.effective_mood()))
 	var base_shots := audio.ambient.mood_def(&"swamp").oneshots.size()
 	_check(audio.ambient.mood_def(&"swamp+industrial").oneshots.size() == base_shots + audio.ambient.mood_def(&"industrial").oneshots.size(), "and the beds are the base's")
-	_check(is_equal_approx(audio.ambient.config.frequency, 2.0 * 1.0), "the map's frequency scales the setting", str(audio.ambient.config.frequency))
+	_check(is_equal_approx(audio.ambient.config.frequency, 2.0 * ZzAmbientRules.new().frequency), "the map's frequency scales the setting", str(audio.ambient.config.frequency))
 	audio.ambient.set_indoors(true)
 	audio.ambient.advance(0.1)
 	_check(audio.ambient.effective_mood() == &"cave_tunnel+industrial", "under a roof the document's indoor mood plays, with the extra", str(audio.ambient.effective_mood()))
 	audio.ambient.set_indoors(false)
 	audio.on_map_doc(&"zz_new_map", {"ambient": "swamp"})
-	_check(audio.indoor_mood_for_map() == &"indoor_hall" and audio.ambient.config.frequency == 1.0, "a bare mood gets the default room tone and no scales")
+	_check(audio.indoor_mood_for_map() == &"indoor_hall" and is_equal_approx(audio.ambient.config.frequency, ZzAmbientRules.new().frequency), "a bare mood gets the default room tone and no scales")
 	src["ambient"] = {"mood": "swamp", "volume": 99, "frequency": -3, "indoor": "Bad Id", "junk": 1}
 	var v2 := ZzMapDoc.validate(src)
 	var kept: Variant = (v2.value as Dictionary).get("ambient") if v2.ok else null
