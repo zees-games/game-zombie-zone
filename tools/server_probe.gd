@@ -36,6 +36,8 @@ var _map := &"zz_stadium"
 var _n := 16
 var _rate := 64
 var _commons := 0
+## --mutants=N: N mutants (jetpack, two gravity guns) released once the horde is at its cap.
+var _mutants := 0
 var _seconds := 12.0
 var _wave := 10
 ## Seconds of play allowed to get the horde up before the window opens, and whether the probe tops
@@ -107,6 +109,8 @@ func _ready() -> void:
 			_rate = arg.trim_prefix("--rate=").to_int()
 		elif arg.begins_with("--commons="):
 			_commons = arg.trim_prefix("--commons=").to_int()
+		elif arg.begins_with("--mutants="):
+			_mutants = arg.trim_prefix("--mutants=").to_int()
 		elif arg.begins_with("--seconds="):
 			_seconds = arg.trim_prefix("--seconds=").to_float()
 		elif arg.begins_with("--lead="):
@@ -303,6 +307,9 @@ func _run() -> void:
 					else:
 						_dmg_survivor += d.health_lost)
 				searches0 = path_graph.searches
+
+				for _m in _mutants:
+					_game.horde.spawn_special(&"mutant")
 		if wave_set and _fill and tick % (_rate / 2) == 0:
 			_game.horde.spawn_mob(maxi(cap - _game.horde.commons() - _game.horde.pending_commons(), 0))
 		if tick % (_rate * 20) == 0:

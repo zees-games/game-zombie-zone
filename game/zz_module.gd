@@ -1705,6 +1705,7 @@ func _start_workbench(world: ZzGame) -> void:
 	add_child(workbench)
 	var started := workbench.start(rt)
 	if not started.ok:
+	workbench.add_set(world.box_profile_set(), "Boxes (odds, effects, colours, sounds)")
 		log_warn("the workbench", {"why": started.error.message})
 		return
 	# Off until the owner sets sv_workbench_remote 1; then flagged admins edit from a client.
@@ -1716,6 +1717,8 @@ func _start_workbench(world: ZzGame) -> void:
 		world.flashlight_binder.attach(rt)
 	rt.profile_changed.connect(func(kind: String, _id: String, _rev: int) -> void:
 		if kind == DotBotPersona.KIND:
-			world.reload_personas())
+			world.reload_personas()
+		elif kind == DotBoxProfiles.KIND:
+			world.reload_boxes())
 	if ambient_set != null:
 		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)
