@@ -75,22 +75,68 @@ var areas: Dictionary = {}
 ## id -> {kind, at, velocity, owner, amount, since, fuse}
 var flying: Dictionary = {}
 
-## Survivor id -> seconds stood in acid without leaving, for the ramp.
-var _in_acid: Dictionary = {}
-
 ## Zombie instance id -> burning until.
 var _burning: Dictionary = {}
 
 var _next_id: int = 1
 
+## Ground hazards that hurt by standing in them (acid; the oil monster's goo): dot-effects' pool.
+var pool := DotHazardPool.new()
+
+## Hazard kind -> its [DotHazardProfile]; a kind not here is simulated by this file.
+var profiles: Dictionary = {ACID: DotHazardProfile.acid()}
+
 
 func _init(p_game: Object) -> void:
 	game = p_game
+	pool.id_source = _take_id
+	pool.occupants = _occupants
+	pool.damage_sink = _pay
+	pool.victim_key = _victim_key
+	pool.added.connect(_on_pool_added)
+	pool.ended.connect(_on_pool_ended)
+
+
+## Method callables, not lambdas: a lambda capturing self would make this RefCounted and its pool a cycle.
+func _occupants(at: Vector3, radius: float, reach: float) -> Array:
+	return game.survivors_within(at, radius, reach)
+
+
+func _pay(player: Object, amount: float, owner: int, kind: StringName) -> void:
+	game.hazard_damage(player, amount, owner, kind)
+
+
+func _victim_key(player: Object) -> Variant:
+	return player.player_id
+
+
+func _on_pool_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> void:
+	var a: Dictionary = pool.areas[id]
+	areas[id] = {"kind": kind, "at": at, "radius": radius, "until": a["until"], "since": a["since"],
+		"amount": a["amount"], "owner": a["owner"]}
+	area_added.emit(id, kind, at, radius, seconds)
+
+
+func _on_pool_ended(id: int) -> void:
+	if areas.erase(id):
+		area_ended.emit(id)
+
+
+func _take_id() -> int:
+	_next_id += 1
+	return _next_id - 1
+
+
+## Sets profile keys for a hazard kind from a dot-profile's values or a cvar dump.
+func configure(kind: StringName, values: Dictionary) -> void:
+	profiles[kind] = DotHazardProfile.from_values(values, profiles.get(kind, DotHazardProfile.new()))
 
 
 func add(kind: StringName, at: Vector3, radius: float, seconds: float, amount: float, owner: int = 0) -> int:
-	var id := _next_id
-	_next_id += 1
+	if profiles.has(kind):
+		return pool.add(profiles[kind], at, game.now(), owner, amount, radius, seconds)
+
+	var id := _take_id()
 	areas[id] = {"kind": kind, "at": at, "radius": radius, "until": game.now() + seconds,
 		"since": game.now(), "amount": amount, "owner": owner}
 	area_added.emit(id, kind, at, radius, seconds)
@@ -138,6 +184,7 @@ func strike(at: Vector3, delay: float, amount: float, owner: int = 0) -> int:
 
 
 func tick(delta: float) -> void:
+	pool.tick(game.now(), delta)
 	_advance_flying(delta)
 	_advance_areas(delta)
 	_advance_burning(delta)
@@ -234,10 +281,12 @@ func _land(id: int, p: Dictionary, at: Vector3) -> void:
 
 func _advance_areas(delta: float) -> void:
 	var now: float = game.now()
-	var in_acid_now := {}
 
 	for id: int in areas.keys():
 		var a: Dictionary = areas[id]
+
+		if profiles.has(a["kind"]):
+			continue
 
 		if float(a["until"]) <= now:
 			areas.erase(id)
@@ -249,13 +298,6 @@ func _advance_areas(delta: float) -> void:
 		var radius: float = float(a["radius"]) * clampf((now - float(a["since"])) / 1.0, 0.2, 1.0)
 
 		match a["kind"]:
-			ACID:
-				for player in game.survivors_within(at, radius, 1.2):
-					var stood: float = float(_in_acid.get(player.player_id, 0.0)) + delta
-					in_acid_now[player.player_id] = stood
-					# Two a second at first, the full amount after two seconds of standing in it.
-					var rate := lerpf(2.0, float(a["amount"]) * 4.0, clampf(stood / 2.0, 0.0, 1.0))
-					game.hazard_damage(player, rate * delta, int(a["owner"]), ACID)
 			FIRE:
 				for player in game.survivors_within(at, radius, 1.0):
 					game.hazard_damage(player, float(a["amount"]) * delta, int(a["owner"]), FIRE)
@@ -267,7 +309,6 @@ func _advance_areas(delta: float) -> void:
 				for player in game.survivors_within(at, radius, 1.0):
 					var _healed: float = player.heal_real(float(a["amount"]) * delta)
 
-	_in_acid = in_acid_now
 
 
 func _advance_burning(delta: float) -> void:
@@ -303,12 +344,13 @@ func ignite(npc: DotNpcInstance, seconds: float = AFTERBURN) -> void:
 
 
 func clear() -> void:
+	pool.clear()
+
 	for id: int in areas.keys():
 		area_ended.emit(id)
 
 	areas.clear()
 	flying.clear()
-	_in_acid.clear()
 	_burning.clear()
 
 
