@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -29,8 +29,6 @@ const REAL_CHECKS := 32
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79", "zz_ak", "zz_scar", "zz_bren", "zz_glock", "zz_deagle", "zz_p90", "zz_aa12", "zz_rpg", "zz_machete", "zz_bat", "zz_crowbar", "zz_axe", "zz_sledge", "zz_hunting"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
-var _passed := 0
-var _failed := 0
 var _entered := 0
 var _finished := 0
 var _sections := SECTIONS
@@ -60,10 +58,7 @@ func _run() -> void:
 	_clean()
 	ZzPacks.clear()
 	ZzPacks.root = "res://addons"
-	print("\n%d sections (%d finished), %d passed, %d failed" % [_entered, _finished, _passed, _failed])
-	var ok := _failed == 0 and _entered == _sections and _finished == _sections and _passed + _failed == _checks
-	print("PASS" if ok else "FAIL (expected %d sections and %d checks)" % [_sections, _checks])
-	get_tree().quit(0 if ok else 1)
+	_report_sections(_entered, _finished, _sections, _checks)
 
 
 func _write(name: String, body: String) -> void:
@@ -484,13 +479,3 @@ func _real_packs() -> void:
 	_check(game.arm(player, &"zz_m4") and game.arm(player, &"dagger"), "a survivor can be armed from each weapon pack")
 	game.queue_free()
 	_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	print("  FAIL  %s%s" % [what, "" if detail == "" else "  (%s)" % detail])

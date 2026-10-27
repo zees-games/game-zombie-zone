@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzBlood := preload("../game/zz_blood.gd")
@@ -15,9 +15,6 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
 const CHECKS := 28
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 
 
 func _ready() -> void:
@@ -30,15 +27,7 @@ func _run() -> void:
 	await _blood()
 	_light()
 	_fade()
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report(CHECKS)
 
 
 func _blood() -> void:
@@ -161,13 +150,3 @@ func _fade() -> void:
 	_check((a.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override == solid, "back to solid: the shared look returns")
 	a.queue_free()
 	b.queue_free()
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		_failures.append(what)
-		print("  FAIL  %s" % what)

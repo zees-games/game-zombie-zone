@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -19,8 +19,6 @@ const PLAY_SECONDS := 30.0
 const SECTIONS := 2
 const CHECKS := 8
 
-var _passed := 0
-var _failed := 0
 var _entered := 0
 var _finished := 0
 var _worlds: Array[ZzGame] = []
@@ -39,10 +37,7 @@ func _run() -> void:
 		remove_child(old)
 		old.free()
 
-	print("\n%d sections (%d finished), %d passed, %d failed" % [_entered, _finished, _passed, _failed])
-	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed == CHECKS
-	print("PASS" if ok else "FAIL (expected %d sections and %d checks)" % [SECTIONS, CHECKS])
-	get_tree().quit(0 if ok else 1)
+	_report_sections(_entered, _finished, SECTIONS, CHECKS)
 
 
 func _test_start(id: StringName) -> void:
@@ -116,13 +111,3 @@ func _sim(game: ZzGame, seconds: float) -> void:
 			await get_tree().physics_frame
 
 	await get_tree().physics_frame
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	print("  FAIL  %s%s" % [what, "" if detail == "" else "  (%s)" % detail])

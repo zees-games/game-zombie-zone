@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 ## The creepy ambience in zz: cvars, the shipped sound set, the map to mood choice and the settings.
 ##
@@ -11,22 +11,9 @@ const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const CHECKS := 71
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
-
-
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
-
-
-func _check(ok: bool, what: String, _detail := "") -> void:
-	if ok:
-		_passed += 1
-	else:
-		_failed += 1
-		_failures.append(what)
 
 
 func _run() -> void:
@@ -236,12 +223,4 @@ func _run() -> void:
 	_check(audio.cue(&"nobody", &"idle") == ZzAudio.MOAN, "an unknown kind falls back to the first-generation sound")
 
 	audio.free()
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report(CHECKS)
