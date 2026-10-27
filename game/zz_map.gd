@@ -1488,6 +1488,8 @@ func _light_from_world(world: RefCounted) -> void:
 ## sets none (the document's own sun and sky stay: a second sun lit everything twice), ambient
 ## sounds and prop stand-ins, drawn only. Each is nothing for a world without it.
 func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
+	var lap := Time.get_ticks_msec()
+	var stages := {}
 	var env_node: Node3D = world.call(&"build_environment", 8, false)
 	if env_node != null:
 		var probes := env_node.get_node_or_null("Probes")
@@ -1503,6 +1505,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 			target.fog_density = we.environment.fog_density
 		env_node.free()
 
+	lap = _lap(stages, "environment", lap)
 	var sounds: Node3D = world.call(&"build_sounds")
 	if sounds.get_child_count() > 0:
 		node.add_child(sounds)
@@ -1512,6 +1515,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	else:
 		sounds.free()
 
+	lap = _lap(stages, "sounds", lap)
 	var drawn_props: Node3D = world.call(&"build_props")
 	# The document's solid boxes collide whether or not the library models came; draw the ones nothing else shows.
 	if world.has_method(&"draw_unseen_boxes"):
@@ -1524,7 +1528,10 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	else:
 		drawn_props.free()
 
+	lap = _lap(stages, "props", lap)
 	_attach_fx(world, node)
+	_lap(stages, "fx", lap)
+	DotLog.info(CHANNEL, "world extras stages", {"ms": stages})
 
 
 ## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.

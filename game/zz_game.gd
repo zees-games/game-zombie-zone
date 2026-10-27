@@ -1870,6 +1870,7 @@ func _lay_out_map() -> void:
 ## Builds [param doc] as the map. What the server does between maps, and what a client does
 ## when it is sent one.
 func build_map(doc: Dictionary) -> DotResult:
+	var started := Time.get_ticks_msec()
 	world_clearing.emit()
 
 	for id: StringName in players:
@@ -1906,6 +1907,7 @@ func build_map(doc: Dictionary) -> DotResult:
 	for p: ZzPlayer in players.values():
 		p.flashlight_ready = false
 	world_rebuilt.emit()
+	DotLog.info(CHANNEL, "map built", {"id": str(doc.get("id", "?")), "ms": Time.get_ticks_msec() - started})
 	return built
 
 

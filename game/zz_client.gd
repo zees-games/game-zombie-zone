@@ -170,7 +170,10 @@ func _ready() -> void:
 	# after this node is in the tree. The platform puts the loading cover up, held until the
 	# player exists and the camera is current, and finds the link.
 	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
-	if not OS.get_cmdline_user_args().any(func(a: String) -> bool: return a.begins_with("--map_load_threads=")):
+	var own_threads := false
+	for a in OS.get_cmdline_user_args():
+		own_threads = own_threads or a.begins_with("--map_load_threads=")
+	if not own_threads:
 		MapThreads.client_value = -1
 		var _on := MapThreads.apply(-1)
 	platform = DotGameClient.new()
