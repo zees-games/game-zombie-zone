@@ -719,7 +719,7 @@ func _hear_the_world() -> void:
 			world_view.remove_zombie(npc.instance_id, not npc.alive and npc.health <= 0.0))
 		game.horde.mob_started.connect(func(_size: int) -> void:
 			if audio != null:
-				var _horde := audio.play(ZzAudio.HORDE))
+				var _horde := audio.play(ZzAudio.REAL_HORDE))
 
 	if game.pins != null:
 		game.pins.pinned.connect(func(victim: StringName, kind: StringName, _attacker: int) -> void:
@@ -1154,6 +1154,13 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 		var _splat := blood.on_body_hit(victim, point, camera.global_position)
 
 
+	if audio != null and world_view != null:
+		var kind := world_view.kind_of(victim)
+		if kind != &"":
+			if killed:
+				audio.gore_at(point, headshot)
+			else:
+				var _h := audio.cue_at(kind, &"hurt", point, 0.8)
 ## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
 ## body the client's presentation ray never meets (a zombie is drawn as a figure and hit through the server's hitboxes). The rig's effects skip a second drawing
 ## of a hit the ray already drew. Through `has_method`: an older shell's zee has no

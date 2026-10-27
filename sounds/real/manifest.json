@@ -1,0 +1,606 @@
+{
+ "moan": [
+  {
+   "file": "moan_1",
+   "source": "darsycho"
+  },
+  {
+   "file": "moan_2",
+   "source": "darsycho"
+  },
+  {
+   "file": "moan_3",
+   "source": "darsycho"
+  },
+  {
+   "file": "moan_4",
+   "source": "darsycho"
+  },
+  {
+   "file": "moan_5",
+   "source": "darsycho"
+  },
+  {
+   "file": "moan_6",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_7",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_8",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_9",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_10",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_11",
+   "source": "artisticdude"
+  },
+  {
+   "file": "moan_12",
+   "source": "saturn91"
+  },
+  {
+   "file": "moan_13",
+   "source": "saturn91"
+  },
+  {
+   "file": "moan_14",
+   "source": "saturn91"
+  },
+  {
+   "file": "moan_15",
+   "source": "saturn91"
+  },
+  {
+   "file": "moan_16",
+   "source": "ownathan"
+  }
+ ],
+ "rage": [
+  {
+   "file": "rage_1",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_2",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_3",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_4",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_5",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_6",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_7",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_8",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_9",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_10",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "rage_11",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "rage_12",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "rage_13",
+   "source": "arrigd"
+  }
+ ],
+ "claw": [
+  {
+   "file": "claw_1",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "claw_2",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "claw_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "claw_4",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "claw_5",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "claw_6",
+   "source": "ogrebane"
+  },
+  {
+   "file": "claw_7",
+   "source": "ogrebane"
+  },
+  {
+   "file": "claw_8",
+   "source": "ogrebane"
+  }
+ ],
+ "die": [
+  {
+   "file": "die_1",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "die_2",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "die_3",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "die_4",
+   "source": "arcadeparty"
+  },
+  {
+   "file": "die_5",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "die_6",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "die_7",
+   "source": "jollygreenz"
+  }
+ ],
+ "hurt": [
+  {
+   "file": "hurt_1",
+   "source": "vinrax"
+  },
+  {
+   "file": "hurt_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "hurt_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "hurt_4",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "hurt_5",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "hurt_6",
+   "source": "rubberduck-1"
+  }
+ ],
+ "leaper": [
+  {
+   "file": "leaper_1",
+   "source": "starninjas"
+  },
+  {
+   "file": "leaper_2",
+   "source": "starninjas"
+  },
+  {
+   "file": "leaper_3",
+   "source": "starninjas"
+  },
+  {
+   "file": "leaper_4",
+   "source": "starninjas"
+  },
+  {
+   "file": "leaper_5",
+   "source": "starninjas"
+  }
+ ],
+ "strangler": [
+  {
+   "file": "strangler_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "strangler_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "strangler_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "strangler_4",
+   "source": "ogrebane"
+  },
+  {
+   "file": "strangler_5",
+   "source": "ogrebane"
+  }
+ ],
+ "bloater": [
+  {
+   "file": "bloater_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "bloater_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "bloater_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "bloater_4",
+   "source": "rubberduck-1"
+  }
+ ],
+ "ram": [
+  {
+   "file": "ram_1",
+   "source": "starninjas"
+  },
+  {
+   "file": "ram_2",
+   "source": "starninjas"
+  },
+  {
+   "file": "ram_3",
+   "source": "starninjas"
+  },
+  {
+   "file": "ram_4",
+   "source": "starninjas"
+  },
+  {
+   "file": "ram_5",
+   "source": "starninjas"
+  }
+ ],
+ "spitter": [
+  {
+   "file": "spitter_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "spitter_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "spitter_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "spitter_4",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "spitter_5",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "spitter_6",
+   "source": "rubberduck-2"
+  },
+  {
+   "file": "spitter_7",
+   "source": "rubberduck-2"
+  }
+ ],
+ "rider": [
+  {
+   "file": "rider_1",
+   "source": "starninjas"
+  },
+  {
+   "file": "rider_2",
+   "source": "starninjas"
+  },
+  {
+   "file": "rider_3",
+   "source": "starninjas"
+  },
+  {
+   "file": "rider_4",
+   "source": "starninjas"
+  },
+  {
+   "file": "rider_5",
+   "source": "starninjas"
+  },
+  {
+   "file": "rider_6",
+   "source": "starninjas"
+  }
+ ],
+ "brute": [
+  {
+   "file": "brute_1",
+   "source": "trazzz123"
+  },
+  {
+   "file": "brute_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "brute_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "brute_4",
+   "source": "rubberduck-1"
+  }
+ ],
+ "screamer": [
+  {
+   "file": "screamer_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "screamer_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "screamer_3",
+   "source": "arrigd"
+  },
+  {
+   "file": "screamer_4",
+   "source": "ogrebane"
+  }
+ ],
+ "crawler": [
+  {
+   "file": "crawler_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "crawler_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "crawler_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "crawler_4",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "crawler_5",
+   "source": "rubberduck-1"
+  }
+ ],
+ "riot": [
+  {
+   "file": "riot_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "riot_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "riot_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "riot_4",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "riot_5",
+   "source": "rubberduck-1"
+  }
+ ],
+ "mutant": [
+  {
+   "file": "mutant_1",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "mutant_2",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "mutant_3",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "mutant_4",
+   "source": "rubberduck-1"
+  },
+  {
+   "file": "mutant_5",
+   "source": "ogrebane"
+  },
+  {
+   "file": "mutant_6",
+   "source": "ogrebane"
+  },
+  {
+   "file": "mutant_7",
+   "source": "ogrebane"
+  },
+  {
+   "file": "mutant_8",
+   "source": "ogrebane"
+  }
+ ],
+ "mutant_zap": [
+  {
+   "file": "mutant_zap_1",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_zap_2",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_zap_3",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_zap_4",
+   "source": "kenney-digital"
+  }
+ ],
+ "mutant_grab": [
+  {
+   "file": "mutant_grab_1",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_grab_2",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_grab_3",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_grab_4",
+   "source": "kenney-digital"
+  }
+ ],
+ "mutant_throw": [
+  {
+   "file": "mutant_throw_1",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_throw_2",
+   "source": "kenney-digital"
+  },
+  {
+   "file": "mutant_throw_3",
+   "source": "ezduzziteh"
+  }
+ ],
+ "gore_bone": [
+  {
+   "file": "gore_bone_1",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_2",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_3",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_4",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_5",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_6",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_7",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_8",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_9",
+   "source": "zanelittle"
+  },
+  {
+   "file": "gore_bone_10",
+   "source": "zanelittle"
+  }
+ ],
+ "gore_rip": [
+  {
+   "file": "gore_rip_1",
+   "source": "eldritch-grim"
+  }
+ ],
+ "gore_splat": [
+  {
+   "file": "gore_splat_1",
+   "source": "independent.nu"
+  },
+  {
+   "file": "gore_splat_2",
+   "source": "independent.nu"
+  }
+ ],
+ "horde": [
+  {
+   "file": "horde_1",
+   "source": "perrybassin"
+  },
+  {
+   "file": "horde_2",
+   "source": "garyq"
+  },
+  {
+   "file": "horde_3",
+   "source": "garyq"
+  },
+  {
+   "file": "horde_4",
+   "source": "garyq"
+  }
+ ],
+ "mutant_jet": [
+  {
+   "file": "mutant_jet_1",
+   "source": "jacksonacademyashmore"
+  },
+  {
+   "file": "mutant_jet_2",
+   "source": "velcronator"
+  },
+  {
+   "file": "mutant_jet_3",
+   "source": "mostyxs"
+  }
+ ]
+}

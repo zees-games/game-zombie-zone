@@ -8,6 +8,8 @@ extends RefCounted
 ## reaches a kind whose file was never edited; a value equal to the schema default counts as unstated. `health` is the unscaled number (the special
 ## health scale multiplies it); a brute's is its base, before the per-survivor share.
 
+const ZzCues := preload("zz_cues.gd")
+
 const CHANNEL := "zz.npc_profiles"
 const GAME := "game-zombie-zone"
 const DIR := "res://cfg/game/game-zombie-zone/npc"
@@ -48,6 +50,9 @@ static func overlay(def: DotNpcDef, base: DotNpcDef, c: RefCounted, base_config:
 	_set_if(p, "hearing", base.hearing_range, func(v: Variant) -> void: def.hearing_range = float(v))
 	_set_if(p, "los", base.require_line_of_sight, func(v: Variant) -> void: def.require_line_of_sight = bool(v))
 	for key: String in p.extra:
+		# Cues are ZzAudio's, read from the profile; they are not the body's numbers.
+		if key.begins_with("cue_"):
+			continue
 		if not base.meta.has(key) or _differs(p.extra[key], base.meta[key]):
 			def.meta[key] = p.extra[key]
 	# The eye follows the body's height unless the file states one.
@@ -78,6 +83,10 @@ static func yaml_of(def: DotNpcDef, c: RefCounted) -> String:
 	for key: String in def.meta:
 		var v: Variant = def.meta[key]
 		lines.append("  %s: %s" % [key, _num(v) if typeof(v) in [TYPE_FLOAT, TYPE_INT] else str(v)])
+	var cues: Dictionary = ZzCues.of(def.id)
+	for key: String in ZzCues.KEYS:
+		if cues.has(key):
+			lines.append("  cue_%s: %s" % [key, cues[key]])
 	return "\n".join(lines) + "\n"
 
 

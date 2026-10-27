@@ -9,7 +9,7 @@ extends Node
 const ZzAudio := preload("../game/zz_audio.gd")
 const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const CHECKS := 65
+const CHECKS := 71
 
 var _passed := 0
 var _failed := 0
@@ -217,6 +217,23 @@ func _run() -> void:
 				unlisted.append(dir + "/" + f)
 	_check(unlisted.is_empty(), "every shipped ambience file is credited: %s" % ", ".join(unlisted))
 	_check(FileAccess.file_exists("res://docs/ambience-audit.md"), "the loudness audit table is kept")
+
+	var absent: Array[String] = []
+	for event: StringName in ZzAudio.REAL_COUNTS:
+		for path in ZzAudio._real_files(event):
+			if not FileAccess.file_exists(path) and not FileAccess.file_exists(path + ".import"):
+				absent.append(path)
+	_check(absent.is_empty(), "every recorded variant exists: %s" % ", ".join(absent))
+	var real_credits := FileAccess.get_file_as_string("res://sounds/real/CREDITS.md")
+	var uncredited_real: Array[String] = []
+	for f in DirAccess.get_files_at("res://sounds/real"):
+		if f.ends_with(".ogg") and not real_credits.contains("`%s`" % f.get_basename()):
+			uncredited_real.append(f)
+	_check(uncredited_real.is_empty(), "every recorded file is credited: %s" % ", ".join(uncredited_real))
+	_check(audio.cue(&"common", &"idle") == &"real_moan" and audio.cue(&"brute", &"voice") == &"real_brute", "the profiles' cues name the recorded sets")
+	_check(audio.cue(&"mutant", &"jet") == &"real_mutant_jet", "the Mutant's jet cue resolves")
+	_check(audio.cue(&"sleeper", &"voice") == &"sleeper", "the sleeper keeps her looping cry")
+	_check(audio.cue(&"nobody", &"idle") == ZzAudio.MOAN, "an unknown kind falls back to the first-generation sound")
 
 	audio.free()
 	print("")

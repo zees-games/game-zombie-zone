@@ -147,6 +147,12 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 			entry["voice"] = handle
 
 
+## The kind of the zombie drawn under [param key], or empty.
+func kind_of(key: int) -> StringName:
+	var entry: Variant = _zombies.get(key)
+	return (entry as Dictionary)["kind"] if entry != null else &""
+
+
 ## A zombie gone: a body to drop for a moment if it was killed.
 func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	var entry: Variant = _zombies.get(key)
@@ -172,7 +178,7 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 		return
 
 	if audio != null and old_body != null and is_instance_valid(old_body):
-		var _died := audio.at(ZzAudio.ZOMBIE_DIE, old_body.global_position)
+		var _died := audio.cue_at((entry as Dictionary)["kind"], &"die", old_body.global_position)
 
 	# A skeletal ragdoll when there is room for one: copied from the view where it stands, so
 	# the view and the server's body go now.
@@ -839,9 +845,9 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 			match anim:
 				ZzZombieBody.Anim.RAGE:
 					var kind: StringName = entry["kind"]
-					var _s := audio.at(ZzAudio.SCREAM, at) if kind == &"common" else audio.special_voice(kind, at)
+					var _s := audio.cue_at(&"common", &"rage", at) if kind == &"common" else audio.special_voice(kind, at)
 				ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.PIN:
-					var _c := audio.at(ZzAudio.CLAW, at)
+					var _c := audio.cue_at(entry["kind"], &"attack", at)
 				ZzZombieBody.Anim.LEAP, ZzZombieBody.Anim.CHARGE, ZzZombieBody.Anim.VOMIT, \
 						ZzZombieBody.Anim.SPIT, ZzZombieBody.Anim.TONGUE, ZzZombieBody.Anim.THROW, \
 						ZzZombieBody.Anim.SCREAM, ZzZombieBody.Anim.GRAB:
@@ -853,7 +859,7 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 			entry["next_moan"] = _rng.randf_range(4.0, 14.0)
 
 			if entry["kind"] == &"common":
-				var _m := audio.at(ZzAudio.MOAN, at, 0.8)
+				var _m := audio.cue_at(&"common", &"idle", at, 0.8)
 
 
 func _present_corpses(delta: float) -> void:

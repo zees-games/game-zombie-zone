@@ -25,3 +25,7 @@ extra:
   body: strangler
   radius: 0.32
   height: 2.0
+  cue_attack: real_claw
+  cue_die: real_die
+  cue_hurt: real_hurt
+  cue_voice: real_strangler

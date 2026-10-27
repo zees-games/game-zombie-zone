@@ -20,3 +20,8 @@ extra:
   body: common
   radius: 0.32
   height: 1.75
+  cue_idle: real_moan
+  cue_rage: real_rage
+  cue_attack: real_claw
+  cue_die: real_die
+  cue_hurt: real_hurt

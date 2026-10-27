@@ -1,6 +1,8 @@
 extends Node
 
 const ZzPaths := preload("zz_paths.gd")
+const ZzCues := preload("zz_cues.gd")
+const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 
 ## What this game makes a noise about, and the noise, on the client.
 ##
@@ -68,6 +70,18 @@ const WEAPON_LAUNCH := &"weapon_launch"
 const WEAPON_BEAM := &"weapon_beam"
 const WEAPON_THROW := &"weapon_throw"
 
+# The recorded sets (sounds/real, CREDITS.md there): a variant count per event, from tools/build_real_sounds.py.
+const REAL_COUNTS := {
+	&"moan": 16, &"rage": 13, &"claw": 8, &"die": 7, &"hurt": 6, &"leaper": 5, &"strangler": 5, &"bloater": 4,
+	&"ram": 5, &"spitter": 7, &"rider": 6, &"brute": 4, &"screamer": 4, &"crawler": 5, &"riot": 5, &"mutant": 8,
+	&"mutant_zap": 4, &"mutant_grab": 4, &"mutant_throw": 3, &"mutant_jet": 3, &"gore_bone": 10, &"gore_rip": 1,
+	&"gore_splat": 2, &"horde": 4,
+}
+const GORE_BONE := &"real_gore_bone"
+const GORE_SPLAT := &"real_gore_splat"
+const GORE_RIP := &"real_gore_rip"
+const REAL_HORDE := &"real_horde"
+
 # Music.
 const MUSIC_HORDE := &"music_horde"
 const MUSIC_BRUTE := &"music_brute"
@@ -80,6 +94,9 @@ const SPECIAL_VOICES := {
 }
 
 var manager: DotAudioManager = null
+
+## kind -> {key -> cue id}, read from the profiles on first use.
+var _cues: Dictionary = {}
 
 ## Everybody's footsteps by what they stand on (dot-audio's stock: Kenney, CC0).
 var steps: DotAudioFootsteps = null
@@ -172,6 +189,8 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	cry.looping = true
 	c.add(cry)
 
+	_add_real(c)
+
 	var boom := _placed(EXPLOSION, 160.0, 18.0, 3, 95, 0.9, 1.05, "explosion_1")
 	boom.variants = PackedStringArray([_file("explosion_1"), _file("explosion_2")])
 	c.add(boom)
@@ -225,6 +244,47 @@ static func sound_catalogue() -> DotAudioCatalogue:
 		toy.cooldown_ms = int(row["cooldown_ms"])
 		c.add(toy)
 	return c
+
+
+## `real_<event>` for every recorded set: all its files as variants, the first-generation file as the path.
+static func _add_real(c: DotAudioCatalogue) -> void:
+	# event: [fallback file, max distance, unit size, concurrent, priority, pitch min, pitch max]
+	var rows := {
+		&"moan": ["moan_1", 30.0, 4.0, 5, 30, 0.85, 1.12], &"rage": ["fastzombie1", 45.0, 6.0, 4, 60, 0.9, 1.15],
+		&"claw": ["punch_2", 20.0, 4.0, 4, 50, 0.92, 1.08], &"die": ["zombienoise2", 25.0, 4.0, 4, 40, 0.88, 1.1],
+		&"hurt": ["zombienoise1", 22.0, 4.0, 4, 45, 0.9, 1.12],
+		&"leaper": ["leaper_screech", 60.0, 8.0, 2, 85, 0.92, 1.08], &"strangler": ["strangler_cough", 50.0, 7.0, 2, 80, 0.92, 1.08],
+		&"bloater": ["slime_1", 40.0, 6.0, 2, 80, 0.9, 1.1], &"ram": ["ram_bellow", 60.0, 8.0, 2, 85, 0.85, 1.0],
+		&"spitter": ["slime_2", 45.0, 6.0, 2, 80, 0.95, 1.15], &"rider": ["rider_laugh", 45.0, 6.0, 2, 80, 0.92, 1.08],
+		&"brute": ["brute_roar", 120.0, 14.0, 1, 95, 0.85, 1.0], &"screamer": ["screamer_shriek", 90.0, 10.0, 1, 90, 0.92, 1.05],
+		&"crawler": ["crawler_gurgle", 22.0, 3.0, 2, 75, 0.9, 1.1], &"riot": ["riot_clank", 45.0, 6.0, 2, 80, 0.9, 1.05],
+		&"mutant": ["brute_roar", 120.0, 14.0, 1, 95, 0.8, 0.95],
+		&"mutant_zap": ["explosion_1", 70.0, 8.0, 2, 80, 0.9, 1.1], &"mutant_grab": ["woosh", 40.0, 6.0, 2, 70, 0.9, 1.1],
+		&"mutant_throw": ["woosh", 50.0, 8.0, 2, 80, 0.85, 1.0],
+		&"gore_bone": ["punch_heavy", 35.0, 5.0, 3, 65, 0.9, 1.1], &"gore_rip": ["slime_1", 30.0, 5.0, 2, 60, 0.9, 1.1],
+		&"gore_splat": ["slime_2", 35.0, 5.0, 3, 60, 0.9, 1.1],
+	}
+	for event: StringName in rows:
+		var r: Array = rows[event]
+		var def := _placed(StringName("real_" + String(event)), r[1], r[2], r[3], r[4], r[5], r[6], r[0])
+		def.variants = _real_files(event)
+		def.cooldown_ms = 90 if event in [&"die", &"hurt", &"gore_bone", &"gore_splat"] else 0
+		c.add(def)
+	var jet := _placed(&"real_mutant_jet", 60.0, 8.0, 1, 70, 1.0, 1.0, "brute_roar")
+	jet.variants = _real_files(&"mutant_jet")
+	jet.looping = true
+	c.add(jet)
+	# The horde bed is flat, like the first generation's.
+	var horde := _flat(REAL_HORDE, &"SFX", 1, 90, "horde_distant")
+	horde.variants = _real_files(&"horde")
+	c.add(horde)
+
+
+static func _real_files(event: StringName) -> PackedStringArray:
+	var out := PackedStringArray()
+	for i in int(REAL_COUNTS[event]):
+		out.append(_file("real/%s_%d" % [event, i + 1]))
+	return out
 
 
 ## The synthesised stand-ins, for every id with no file.
@@ -474,8 +534,56 @@ func on_weapon(where: Vector3, kind: int) -> bool:
 
 
 func special_voice(kind: StringName, where: Vector3) -> int:
-	var id: StringName = SPECIAL_VOICES.get(kind, &"")
+	var id := cue(kind, &"voice")
 	return at(id, where) if id != &"" else 0
+
+
+## The kind's cue for [param key] (`idle`, `rage`, `attack`, `die`, `hurt`, `voice`, ...): its profile's
+## `cue_<key>`, else the shipped list; an id the catalogue lacks gives the first-generation sound.
+func cue(kind: StringName, key: StringName) -> StringName:
+	if not _cues.has(kind):
+		_cues[kind] = _read_cues(kind)
+	var id := StringName(str((_cues[kind] as Dictionary).get(String(key), "")))
+	if id != &"" and manager != null and manager.catalogue != null and manager.catalogue.has(id):
+		return id
+	return _legacy(kind, key)
+
+
+func cue_at(kind: StringName, key: StringName, where: Vector3, volume: float = 1.0) -> int:
+	var id := cue(kind, key)
+	return at(id, where, volume) if id != &"" else 0
+
+
+## Gore of a confirmed kill: a skull cracks, anything else comes apart wet.
+func gore_at(where: Vector3, headshot: bool) -> void:
+	var _g := at(GORE_BONE if headshot else GORE_SPLAT, where, 0.9)
+
+
+func _read_cues(kind: StringName) -> Dictionary:
+	var out: Dictionary = ZzCues.of(kind).duplicate()
+	var set := ZzNpcProfiles.make_set()
+	if set.has_id(String(kind)):
+		var res := set.load_profile(String(kind))
+		if res.ok:
+			for key: String in ZzCues.KEYS:
+				if (res.value as DotProfile).extra.has("cue_" + key):
+					out[key] = (res.value as DotProfile).extra["cue_" + key]
+	return out
+
+
+static func _legacy(kind: StringName, key: StringName) -> StringName:
+	match key:
+		&"idle":
+			return MOAN
+		&"rage":
+			return SCREAM
+		&"attack":
+			return CLAW
+		&"die":
+			return ZOMBIE_DIE
+		&"voice":
+			return SPECIAL_VOICES.get(kind, &"")
+	return &""
 
 
 func music(id: StringName) -> void:

@@ -20,3 +20,6 @@ extra:
   body: sleeper
   radius: 0.3
   height: 1.6
+  cue_die: real_die
+  cue_hurt: real_hurt
+  cue_voice: sleeper

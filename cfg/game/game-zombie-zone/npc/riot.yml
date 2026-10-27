@@ -18,3 +18,7 @@ extra:
   body: riot
   radius: 0.36
   height: 1.85
+  cue_attack: real_claw
+  cue_die: real_die
+  cue_hurt: real_hurt
+  cue_voice: real_riot
