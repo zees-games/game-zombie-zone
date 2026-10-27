@@ -594,6 +594,9 @@ func setup_seconds() -> float:
 ## opens a box on the ground as it did before boxes could be carried.
 @export_range(0, 6, 1) var box_carry: int = 1
 
+## Whether a fast-rolling barrel, crate or tyre also hurts zombies (cvar `zz_roll_damage_zombies`); survivors are always hurt.
+@export var roll_damage_zombies: bool = true
+
 # --- Physics crates (zz_crates.gd) -----------------------------------------
 
 ## Ammo piles and boxes on the ground are rigid bodies: pushed along by survivors and zombies, shot, thrown by blasts (cvar `zz_physics_crates`). 0 keeps them where the map or the drop put them.

@@ -356,6 +356,8 @@ var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
 ## The harm a barrel does by rolling into a survivor (dot-props); server only.
 var rolling := DotPropRolling.new()
+## The zombies' own scan: a separate cooldown clock from the survivors'.
+var rolling_zombies := DotPropRolling.new()
 
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
@@ -3970,6 +3972,33 @@ func _roll_into_survivors(delta: float) -> void:
 		damage.context = {"why": BY_HAZARD}
 		var _applied := combat.apply_damage(damage)
 		player_hurt.emit(player.player_id, float(hit["damage"]), player.feet())
+	if config.roll_damage_zombies:
+		_roll_into_zombies(delta)
+
+
+## The same barrel hurts the zombies it runs into (commons and specials alike), through the zombie damage path with no
+## attacker, so nobody is credited. A second scan keeps its own cooldown clock, so a barrel resting on a zombie is one hit per cooldown.
+func _roll_into_zombies(delta: float) -> void:
+	if horde == null or horde.spawner == null:
+		return
+	var victims: Array = []
+	var by_id := {}
+	for npc: DotNpcInstance in horde.spawner.all_npcs():
+		var entity := horde.entity_id_for(npc)
+		if not npc.is_alive() or entity == 0:
+			continue
+		by_id[entity] = npc
+		victims.append({"id": entity, "position": npc.position(), "radius": 0.4, "height": 1.8})
+	for hit: Dictionary in rolling_zombies.scan(map.toys, victims, delta):
+		var npc: DotNpcInstance = by_id.get(hit["victim"])
+		if npc == null:
+			continue
+		var damage := DotDamage.make(0, int(hit["victim"]), float(hit["damage"]), combat.damage_type(&"strike"))
+		damage.point = npc.position()
+		damage.direction = hit["direction"]
+		damage.tick = _tick
+		damage.weapon_id = &"barrel"
+		var _applied := combat.apply_damage(damage)
 
 
 ## A survivor's shot against the toys: the first one on its ray, nearer than a wall, is pushed

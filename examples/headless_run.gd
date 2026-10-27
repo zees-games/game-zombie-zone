@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 53
 
-const CHECKS := 402
+const CHECKS := 406
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -834,6 +834,28 @@ func _test_supports() -> void:
 	barrel.body.linear_velocity = Vector3(0.5, 0.0, 0.0)
 	var none := game.rolling.scan(game.map.toys, [{"id": &"third", "position": barrel.body.global_position}], 2.0)
 	_check(none.is_empty(), "a barrel that is merely nudged hurts nobody", str(slow.size()))
+	var feet := barrel.body.global_position - Vector3(0.0, 0.2, 0.0)
+	var zed := game.horde.spawner.spawn(ZzNpcs.COMMON, feet, &"test")
+	var hp0: float = zed.health
+	var zhp := func() -> float: return zed.health
+	zed.node.global_position = feet
+	barrel.body.linear_velocity = Vector3(0.5, 0.0, 0.0)
+	game._roll_into_zombies(0.1)
+	var h_nudge: float = zhp.call()
+	_check(h_nudge == hp0, "a nudged barrel does not hurt a zombie", "%.1f -> %.1f" % [hp0, h_nudge])
+	barrel.body.linear_velocity = Vector3(8.0, 0.0, 0.0)
+	game._roll_into_zombies(0.1)
+	var h_hit: float = zhp.call()
+	_check(h_hit < hp0, "a barrel rolling at speed hurts a zombie", "%.1f -> %.1f" % [hp0, h_hit])
+	barrel.body.linear_velocity = Vector3(8.0, 0.0, 0.0)
+	game._roll_into_zombies(0.1)
+	_check(is_equal_approx(float(zhp.call()), h_hit), "the same barrel hits the same zombie once per cooldown", "%.1f" % float(zhp.call()))
+	game.config.roll_damage_zombies = false
+	game.rolling_zombies.reset()
+	barrel.body.linear_velocity = Vector3(8.0, 0.0, 0.0)
+	game._roll_into_survivors(0.1)
+	_check(is_equal_approx(float(zhp.call()), h_hit), "with roll_damage_zombies off the zombie is left alone", "%.1f" % float(zhp.call()))
+	game.config.roll_damage_zombies = true
 	var client := ZzMap.new()
 	client.physics = game.physics
 	client.authoritative = false
