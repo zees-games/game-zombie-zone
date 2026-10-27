@@ -225,6 +225,11 @@ var _client_ticked_for: int = -1
 
 ## The map the clients were last sent, so a late joiner is sent the same bytes.
 var _map_body: PackedByteArray = PackedByteArray()
+## The map as MAP_PART bodies when it is too big for one message, else empty.
+var _map_parts: Array[PackedByteArray] = []
+var _map_seq: int = 0
+## A client's map arriving in pieces: {seq, count, pieces: {index: bytes}}.
+var _incoming_map: Dictionary = {}
 
 ## Zombies this server replicates (instance id -> [ZzNpcNet]), and that a client draws
 ## (net id -> [ZzNpcNet]).
@@ -739,15 +744,17 @@ func _on_world_rebuilt() -> void:
 
 	var encoded := ZzMapDoc.encode(game.map.doc)
 
-	if encoded.size() > ZzMapDoc.WIRE_LIMIT:
-		# Sent anyway: a client on a native transport will take it, and the line says why a
-		# browser does not. A WebSocket message past its outbound buffer is never delivered.
-		DotLog.warn(CHANNEL, "a map is larger than a browser can be sent in one message", {
-			"map": String(game.map.id()), "bytes": encoded.size(), "limit": ZzMapDoc.WIRE_LIMIT,
-		})
+	_map_seq += 1
+	_map_parts = ZzEvents.write_map_parts(encoded, _map_seq)
+	_map_body = PackedByteArray() if not _map_parts.is_empty() else ZzEvents.write_map(encoded)
 
-	_map_body = ZzEvents.write_map(encoded)
-	_broadcast(ZzEvents.Kind.MAP, _map_body)
+	if _map_parts.is_empty():
+		_broadcast(ZzEvents.Kind.MAP, _map_body)
+	else:
+		DotLog.debug(CHANNEL, "a map is sent in pieces", {"map": String(game.map.id()), "bytes": encoded.size(), "pieces": _map_parts.size()})
+		for part in _map_parts:
+			_broadcast(ZzEvents.Kind.MAP_PART, part)
+
 	_register_toys()
 
 
@@ -1129,6 +1136,8 @@ func _admit(peer_id: int) -> void:
 	# The map, before anything that stands on it.
 	if not _map_body.is_empty():
 		_tell(peer_id, ZzEvents.Kind.MAP, _map_body)
+	for part in _map_parts:
+		_tell(peer_id, ZzEvents.Kind.MAP_PART, part)
 
 	# The map's toys by net id in toy order, which the joiner's own copies are paired with.
 	if not _toys_body.is_empty():
@@ -1422,6 +1431,8 @@ func _on_event(message: DotNetMessage) -> void:
 			_apply_hello(reader)
 		ZzEvents.Kind.MAP:
 			_apply_map(reader)
+		ZzEvents.Kind.MAP_PART:
+			_apply_map_part(reader)
 		ZzEvents.Kind.TOYS:
 			var told := ZzEvents.read_toys(reader)
 			if bool(told["ok"]):
@@ -2168,13 +2179,41 @@ func toy_count() -> int:
 	return n
 
 
+func _apply_map_part(reader: DotNetReader) -> void:
+	var part := ZzEvents.read_map_part(reader)
+
+	if not bool(part["ok"]):
+		return
+
+	if _incoming_map.is_empty() or int(_incoming_map["seq"]) != int(part["seq"]):
+		_incoming_map = {"seq": int(part["seq"]), "count": int(part["count"]), "pieces": {}}
+
+	(_incoming_map["pieces"] as Dictionary)[int(part["index"])] = part["piece"]
+
+	if (_incoming_map["pieces"] as Dictionary).size() < int(_incoming_map["count"]):
+		return
+
+	var whole := PackedByteArray()
+	for i in int(_incoming_map["count"]):
+		whole.append_array((_incoming_map["pieces"] as Dictionary).get(i, PackedByteArray()))
+	_incoming_map = {}
+	_build_told_map(whole)
+
+
 func _apply_map(reader: DotNetReader) -> void:
 	var told := ZzEvents.read_map(reader)
 
 	if not bool(told["ok"]) or game == null:
 		return
 
-	var decoded := ZzMapDoc.decode(told["encoded"])
+	_build_told_map(told["encoded"])
+
+
+func _build_told_map(encoded: PackedByteArray) -> void:
+	if game == null:
+		return
+
+	var decoded := ZzMapDoc.decode(encoded)
 
 	if not decoded.ok:
 		DotLog.warn(CHANNEL, "the server sent a map this build cannot build", {

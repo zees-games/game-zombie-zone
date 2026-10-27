@@ -2,7 +2,7 @@ extends Node
 ## Compares the drawn world with what the server collides with (dot-core's DotCollisionSweep): drawn floor and walls with no
 ## collision, and collision with nothing drawn. fall_probe asks what a capsule does on the collision alone; this asks whether the
 ## collision is where the picture says it is.
-##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400] [--examples=6]
+##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400] [--examples=6] [--max-invisible=N]
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -21,6 +21,7 @@ func _run() -> void:
 	var step := 2.0
 	var stands := 400
 	var examples := 6
+	var max_invisible := -1
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--step="):
 			step = float(a.substr(7))
@@ -28,6 +29,8 @@ func _run() -> void:
 			stands = int(a.substr(9))
 		elif a.begins_with("--examples="):
 			examples = int(a.substr(11))
+		elif a.begins_with("--max-invisible="):
+			max_invisible = int(a.substr(16))
 		elif a == "--all":
 			ids = FallProbe.ids_in_checkout()
 		else:
@@ -50,6 +53,10 @@ func _run() -> void:
 				authored += sweep.count(kind, label)
 		var line := "%s: floor %d wall %d buried %d invisible %d (authored clip %d) [samples %d floor, %d wall, %d rays]" % [id, sweep.count("floor_missing"), sweep.count("wall_missing"), sweep.count("wall_buried"), sweep.count("invisible_floor") + sweep.count("invisible_wall") - authored, authored, sweep.floor_samples, sweep.wall_samples, sweep.probe_rays]
 		print(line)
+		var invisible := sweep.count("invisible_floor") + sweep.count("invisible_wall") - authored
+		if max_invisible >= 0 and invisible > max_invisible:
+			printerr("%s: %d invisible hits, more than --max-invisible=%d" % [id, invisible, max_invisible])
+			failed = true
 		for l in sweep.describe_lines().slice(1):
 			print("   ", l)
 	get_tree().quit(1 if failed else 0)
@@ -111,6 +118,13 @@ func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollis
 	add_child(props)
 	sweep.add_node(&"prop", props)
 	props.free()
+	# A mover's collision stands where its drawn model does (a door, a lift), so those meshes count as drawn too.
+	var moving: Node3D = world.call(&"build_node")
+	for child in moving.get_children():
+		if int(child.get_meta(&"model", 0)) != 0:
+			sweep.add_node(&"mover", child)
+	add_child(moving)
+	moving.free()
 	var floors: Array = (map.doc.get("nav", {}) as Dictionary).get("floors", [])
 	sweep.play = func(p: Vector3) -> bool:
 		for fl: Array in floors:

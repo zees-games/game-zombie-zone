@@ -123,6 +123,8 @@ enum Kind {
 	LOOT_MOVED,
 	## What this one player carries: weight, limit, backpack, speed scale and the weapons by slot (JSON). To its owner only.
 	CARRY,
+	## One piece of a map document too big for one message: which map, which piece of how many.
+	MAP_PART,
 }
 
 ## What a MAP_FX says.
@@ -157,6 +159,11 @@ const TEXT_BYTES := 256
 
 ## The largest map a reader accepts: [ZzMapDoc.WIRE_LIMIT] and its header.
 const MAP_BYTES := 65536 + 16
+
+## A map larger than this is sent as MAP_PART pieces of this size (a browser's outbound buffer is 64 KiB).
+const MAP_PART_BYTES := 32768
+## The most pieces a reader accepts for one map: a hostile server cannot make a client hold more than 64 MiB.
+const MAP_PARTS_MAX := 2048
 
 ## The most an avatar document may take in a JOIN.
 const AVATAR_BYTES := 1024
@@ -260,6 +267,31 @@ static func write_map(encoded: PackedByteArray) -> PackedByteArray:
 static func read_map(r: DotNetReader) -> Dictionary:
 	var encoded := r.read_bytes(MAP_BYTES)
 	return {"encoded": encoded, "ok": r.ok() and not encoded.is_empty()}
+
+
+## The pieces of an encoded map, each a MAP_PART body; [] when it fits one MAP message.
+static func write_map_parts(encoded: PackedByteArray, seq: int) -> Array[PackedByteArray]:
+	var out: Array[PackedByteArray] = []
+	if encoded.size() <= MAP_PART_BYTES:
+		return out
+	var count := (encoded.size() + MAP_PART_BYTES - 1) / MAP_PART_BYTES
+	for i in count:
+		var w := _w()
+		w.write_varint(seq)
+		w.write_varint(i)
+		w.write_varint(count)
+		w.write_bytes(encoded.slice(i * MAP_PART_BYTES, mini((i + 1) * MAP_PART_BYTES, encoded.size())))
+		out.append(w.to_bytes())
+	return out
+
+
+static func read_map_part(r: DotNetReader) -> Dictionary:
+	var seq := r.read_varint()
+	var index := r.read_varint()
+	var count := r.read_varint()
+	var piece := r.read_bytes(MAP_PART_BYTES)
+	return {"seq": seq, "index": index, "count": count, "piece": piece,
+		"ok": r.ok() and count > 0 and count <= MAP_PARTS_MAX and index < count and not piece.is_empty()}
 
 
 # --- Players ---------------------------------------------------------------

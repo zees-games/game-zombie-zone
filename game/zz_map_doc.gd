@@ -61,35 +61,33 @@ const KIND := "zombiezone_map"
 ## The words a hidden box's `kind` may take.
 const HIDDEN_KINDS: PackedStringArray = ["clip", "nodraw", "sky"]
 
-## The largest a document may be on the wire, compressed. A WebSocket's outbound buffer is
-## sixty-four kilobytes and a message past it is never sent (mg-look-at-me's finding), so a map
-## must fit with room for the header.
-const WIRE_LIMIT := 60000
-## Kept free under the limit so a small edit to a map does not tip it over.
-const WIRE_HEADROOM := 500
+## The most a document may be on the wire, deflated: a safety bound against a hostile server, not a budget. A map bigger than
+## one message goes as MAP_PART pieces ([constant ZzEvents.MAP_PART_BYTES]), so a browser's 64 KiB outbound buffer no longer sizes a map.
+const WIRE_LIMIT := 32 * 1024 * 1024
+## The most a reader inflates (a corrupt header would otherwise allocate whatever it says).
+const WIRE_INFLATED_MAX := 256 * 1024 * 1024
 
 ## A map's drawn world is the pack `zz_world_<id>` (zombie-zone-maps' tools/build_worlds.py).
 const WORLD_PREFIX := "zz_world_"
 
-const MAX_BOXES := 6000
-const MAX_PROPS := 2000
+const MAX_BOXES := 400000
+const MAX_PROPS := 20000
 const MAX_TOYS := 96
 ## Every lamp of the source is kept (the bake uses all of them); the game lights only the nearest few
 ## at once ([constant ZzMap.REALTIME_LAMPS]), so this bounds the document, not the frame.
-const MAX_LIGHTS := 1024
+const MAX_LIGHTS := 16384
 
-const MAX_WATER := 24
-## Solid-prop boxes a document may hold (the largest converted map has 1068). Past what fits the wire they stay on the
-## server and the client builds them from its world pack ([method wire_form]).
-const MAX_SOLID_PROPS := 12000
-const MAX_SPAWNS := 64
-const MAX_ITEMS := 400
+const MAX_WATER := 256
+## Solid-prop boxes a document may hold (a safety bound; the largest converted map has a few thousand).
+const MAX_SOLID_PROPS := 200000
+const MAX_SPAWNS := 256
+const MAX_ITEMS := 4000
 const MAX_OBJECTIVES := 16
-const MAX_ROUTE := 256
-const MAX_NAV_FLOORS := 800
-const MAX_NAV_LINKS := 600
-const MAX_SLEEPERS := 16
-const MAX_AREAS := 8
+const MAX_ROUTE := 2048
+const MAX_NAV_FLOORS := 50000
+const MAX_NAV_LINKS := 50000
+const MAX_SLEEPERS := 256
+const MAX_AREAS := 64
 
 ## The two ways a map is played. Exodus was called "campaign" until the first play test asked
 ## for a name of its own; a document that still says "campaign" is read as exodus.
@@ -751,44 +749,18 @@ static func _prop(raw: Variant) -> Dictionary:
 	return out
 
 
-## The document as the wire carries it: a map with `wire_lamps` sends only that many of its lamps, the total
-## and a digest of all. Applying it twice changes nothing, so both ends digest the same text.
+## The document as the wire carries it: a map with `wire_lamps` (the bake's fingerprint) also carries a digest of its lamps.
+## Applying it twice changes nothing, so both ends digest the same text.
 static func wire_form(doc: Dictionary) -> Dictionary:
 	var all: Array = doc.get("lights", [])
 	var keep := int(doc.get("wire_lamps", 0))
-	var props: Array = doc.get("solid_props", [])
 	var out := doc
-	var cut_lamps := keep > 0 and all.size() > keep
 
-	if cut_lamps:
+	if keep > 0 and all.size() > keep:
 		out = doc.duplicate()
-		out["lights_total"] = all.size()
 		out["lights_digest"] = JSON.stringify(all, "", true).sha256_text().substr(0, 16)
-		out["lights"] = all.slice(0, keep)
-
-	# Solid props go first when the document will not fit: a client draws its world pack, whose manifest
-	# gives the same boxes ([method ZzMap.attach_world_props]); the server keeps the document it read.
-	if not props.is_empty() and _deflated_size(out) > WIRE_LIMIT - WIRE_HEADROOM:
-		if not cut_lamps:
-			out = doc.duplicate()
-		out.erase("solid_props")
-		out["solid_props_total"] = props.size()
-
-	if not cut_lamps:
-		return out
-
-	# Lamps are the one part of a document that can shrink: a map that fits a browser's message only
-	# by a few hundred bytes is one a longer name or an extra lamp pushes over, and then no web client gets it.
-
-	while keep > 0 and _deflated_size(out) > WIRE_LIMIT - WIRE_HEADROOM:
-		keep /= 2
-		out["lights"] = all.slice(0, keep)
 
 	return out
-
-
-static func _deflated_size(doc: Dictionary) -> int:
-	return JSON.stringify(doc, "", false).to_utf8_buffer().compress(FileAccess.COMPRESSION_DEFLATE).size()
 
 
 ## What a bake of the lamps is checked against: the lamps themselves, or for a map with `wire_lamps` a digest
@@ -824,7 +796,7 @@ static func decode(bytes: PackedByteArray) -> DotResult:
 		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire is not the length it says.")
 
 	# A size this large is a corrupt header; decompressing it would allocate whatever it says.
-	if size <= 0 or size > WIRE_LIMIT * 40:
+	if size <= 0 or size > WIRE_INFLATED_MAX:
 		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire says it is %d bytes." % size)
 
 	var raw := bytes.slice(8).decompress(size, FileAccess.COMPRESSION_DEFLATE)
