@@ -28,6 +28,7 @@ const ZzWorldView := preload("zz_world_view.gd")
 const ZzShopMenu := preload("zz_shop_menu.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
 ## offline, or against a server.
@@ -1849,6 +1850,9 @@ func _build_settings() -> void:
 func _bind_crosshair_console() -> void:
 	if console != null and hud != null:
 		var _bound := game.combat_feel.bind_console(console, hud.crosshair())
+		var sources: Array = console.sources()
+		if not sources.is_empty() and sources[0] is DotConsoleLocal:
+			ZzWeaponIcons.bind_console(sources[0])
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.

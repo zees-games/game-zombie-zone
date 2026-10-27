@@ -5,6 +5,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 const ZzNavMeter := preload("zz_nav_meter.gd")
 
 ## What a survivor needs on screen, and nothing that would make a dark street less dark.
@@ -98,6 +99,8 @@ var _top_sub: Label = null
 var vitals: DotVitals = null
 ## What is in hand and how much is in it.
 var ammo: DotAmmoCounter = null
+## The carried weapon's sprite above the counter (`cl_weapon_icons`); hidden when the weapon has none.
+var _weapon_icon: TextureRect = null
 ## The held gun's fire modes, above the ammunition.
 var fire_mode: DotFireModeIndicator = null
 ## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
@@ -307,6 +310,18 @@ func _build() -> void:
 	ammo.offset_top = -100.0
 	ammo.offset_bottom = -24.0
 	_root.add_child(ammo)
+
+	_weapon_icon = TextureRect.new()
+	_weapon_icon.name = "WeaponIcon"
+	_weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	_weapon_icon.offset_left = -310.0
+	_weapon_icon.offset_right = -150.0
+	_weapon_icon.offset_top = -96.0
+	_weapon_icon.offset_bottom = -28.0
+	_weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_weapon_icon)
 
 	fire_mode = DotFireModeIndicator.new()
 	fire_mode.name = "FireMode"
@@ -913,6 +928,7 @@ func _draw_weapon() -> void:
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
 		fire_mode.clear()
+		_weapon_icon.visible = false
 		return
 
 	var names := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
@@ -923,6 +939,10 @@ func _draw_weapon() -> void:
 
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)
+	var sprite := ZzWeaponIcons.texture(slot.def.id)
+	_weapon_icon.texture = sprite
+	_weapon_icon.visible = sprite != null
+	ZzWeaponIcons.filter(_weapon_icon, true)
 
 	if slot.def.magazine > 0:
 		var reserve := rig.arsenal.ammo().count(slot.def.ammo_type) if slot.def.ammo_type != &"" else 0
