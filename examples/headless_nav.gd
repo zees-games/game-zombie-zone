@@ -17,8 +17,9 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-const SECTIONS := 23
-const CHECKS := 98
+## Without the per-map wave-origin sections (one section, two checks each).
+const SECTIONS := 21
+const CHECKS := 94
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -117,8 +118,7 @@ func _run() -> void:
 		return
 
 	if only == "wave":
-		await _test_wave_origin(&"zs_goth_house")
-		await _test_wave_origin(&"zs_ravenstreet")
+		await _test_wave_origins()
 		print("%d passed, %d failed" % [_passed, _failed])
 		for line in _failures:
 			print("  FAIL  %s" % line)
@@ -196,8 +196,7 @@ func _run() -> void:
 	await _test_unstick_steps()
 	await _test_lure_crowd()
 	_test_thin_props()
-	await _test_wave_origin(&"zs_goth_house")
-	await _test_wave_origin(&"zs_ravenstreet")
+	await _test_wave_origins()
 
 	print("")
 	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
@@ -208,12 +207,12 @@ func _run() -> void:
 
 	var code := 1 if _failed > 0 else 0
 
-	if _sections_entered != _sections_finished or _sections_entered != SECTIONS:
+	if _sections_entered != _sections_finished or _sections_entered != SECTIONS + _wave_maps():
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, SECTIONS])
 		code = 1
 
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, CHECKS])
+	if _passed + _failed != CHECKS + 2 * _wave_maps():
+		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, CHECKS + 2 * _wave_maps()])
 		code = 1
 
 	for game in _worlds.duplicate():
@@ -531,6 +530,33 @@ func _test_stuck(id: StringName) -> void:
 
 
 # --- Mending round a body -----------------------------------------------------------------------
+
+## Every survival map the game has, by its document's file name (the id).
+func _survival_maps() -> Array[StringName]:
+	var out: Array[StringName] = []
+	var dir := ProjectSettings.globalize_path("res://maps")
+
+	for file in DirAccess.get_files_at(dir):
+		if not file.ends_with(".json"):
+			continue
+
+		var doc = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join(file)))
+
+		if doc is Dictionary and str(doc.get("mode", "")) == "survival":
+			out.append(StringName(file.get_basename()))
+
+	out.sort()
+	return out
+
+
+func _wave_maps() -> int:
+	return _survival_maps().size()
+
+
+func _test_wave_origins() -> void:
+	for id in _survival_maps():
+		await _test_wave_origin(id)
+
 
 ## A survival wave has somewhere to come from, even on a map all start area (zs_goth_house's
 ## hints sit beside the team and its graph is one room): with no origin the wave never came.

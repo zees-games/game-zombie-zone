@@ -30,6 +30,7 @@ var _taken := 0
 var _last_laid := -1.0
 var _kills_with_loot := 0
 var _peak_alive := 0
+var _spawn_failed := false
 
 
 func _ready() -> void:
@@ -119,6 +120,12 @@ func _run() -> void:
 	print("SOAKSTUCK ", _goals.line())
 	for kind: StringName in StuckMeter.KINDS:
 		print("SOAKCELLS %s %s" % [kind, _goals.worst_cells(kind)])
+	# Waves were due (a survival map past its first wave's time) yet no zombie was ever alive.
+	var waves_due: bool = str(doc.get("mode", "")) == "survival" and cfg.minutes * 60.0 > _game.config.survival_warmup_seconds + 30.0
+	_spawn_failed = waves_due and _peak_alive == 0 and _kills == 0
+	if _spawn_failed:
+		report["ok"] = false
+		print("SOAKFAIL spawn: waves expected on %s but no zombie was ever alive (peak 0, kills 0)" % map_id)
 	print(DotBotSoak.summary(report))
 	print(DotBotSoak.report_line(report))
 	var path := ProjectSettings.globalize_path("res://.godot/test-logs/soak-%s.json" % map_id)
