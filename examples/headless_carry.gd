@@ -6,13 +6,14 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzCarry := preload("../game/zz_carry.gd")
+const ZzClasses := preload("../game/zz_classes.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## Carry weight: off by default, the limit and a refused pickup, backpacks, several weapons per slot and cycling,
 ## box modifiers, the slow and drop rules, and the wire. Counts sections AND checks, because a script error aborts a section silently.
 
-const SECTIONS := 6
-const CHECKS := 36
+const SECTIONS := 7
+const CHECKS := 44
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -40,6 +41,7 @@ func _run() -> void:
 	await _test_modifiers()
 	await _test_wire()
 	await _test_depression()
+	await _test_class_profile()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -317,3 +319,43 @@ func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> 
 	game.start()
 	await _sim(game, 0.25)
 	return game
+
+
+const CLASS_DIR := "user://carry_class_cfg"
+
+
+func _class_file(text: String) -> void:
+	var path := CLASS_DIR.path_join("server/game/game-zombie-zone/class/survivor.yml")
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+	ZzClasses.forget()
+
+
+func _test_class_profile() -> void:
+	_section("the survivor class profile sets speed, sprint, stamina and carry; an edit lands on the next spawn")
+	var _clean := DotPaths.remove_tree(CLASS_DIR)
+	ZzClasses.set_roots(PackedStringArray([CLASS_DIR]))
+	var plain := ZzConfig.new()
+	var base := ZzPlayer.tunables_for(plain)
+	_check(is_equal_approx(base.max_speed, plain.run_speed), "no server file: the config speed stands", "%.2f" % base.max_speed)
+	_check(is_equal_approx(ZzClasses.carry_limit(14.0), 14.0), "and so does the carry limit")
+
+	_class_file("speed: 1.5\nsprint_speed_scale: 1.4\nstamina_drain: 0.6\ncarry_limit: 20\n")
+	var t := ZzPlayer.tunables_for(plain)
+	_check(is_equal_approx(t.max_speed, plain.run_speed * 1.5), "a profile edit scales the run speed", "%.2f" % t.max_speed)
+	_check(is_equal_approx(t.sprint_speed_scale, 1.4) and is_equal_approx(t.stamina_drain, 0.6), "and sets the sprint multiplier and stamina drain")
+	_check(is_equal_approx(t.walk_speed_scale, plain.walk_speed_scale), "a number the profile leaves out keeps the config's")
+
+	var game := await _solo({"weight_enabled": true, "weight_limit": 9.0})
+	var p := game.survivors()[0]
+	_check(is_equal_approx(p.weapons.arsenal.capacity(), 20.0), "the carry capacity is the class's", "%.1f" % p.weapons.arsenal.capacity())
+	_check(is_equal_approx(p.controller.tunables.max_speed, plain.run_speed * 1.5), "a spawned survivor moves at the class speed", "%.2f" % p.controller.tunables.max_speed)
+
+	_class_file("speed: 99\n")
+	_check(is_equal_approx(ZzPlayer.tunables_for(plain).max_speed, plain.run_speed), "an unsafe value is refused and the config speed stands")
+
+	ZzClasses.set_roots(PackedStringArray())
+	var _gone := DotPaths.remove_tree(CLASS_DIR)
+	_finished()

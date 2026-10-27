@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzClasses := preload("zz_classes.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzWaterRules := preload("zz_water_rules.gd")
@@ -437,6 +438,7 @@ static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
 	t.stand_height = BODY_HEIGHT
 	t.crouch_height = BODY_CROUCH
 	t.step_height = BODY_STEP
+	var _classed := DotPlayerClassApply.to_movement(ZzClasses.survivor(), t)
 	return t
 
 

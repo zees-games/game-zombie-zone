@@ -5,6 +5,8 @@ extends RefCounted
 ## The server's carry refuses and drops; a client's ([member mirror]) only stows several weapons
 ## per slot like the server, because the weights it shows come from the server's CARRY event.
 
+const ZzClasses := preload("zz_classes.gd")
+
 const MODIFIER_PREFIX := "fx_"
 ## Weight by tier (kilograms, the scale of the packs' ymls) when no yml names the weapon.
 const TIER_WEIGHT := {&"sidearm": 1.0, &"primary": 4.0, &"heavy": 7.0, &"melee": 1.5, &"thrown": 0.4}
@@ -22,7 +24,7 @@ var _prices := PackedInt32Array()
 func sync(config: Object, boxes: Object = null) -> bool:
 	var specs := parse_modifiers(String(config.get(&"weight_modifiers")))
 	var parts: PackedStringArray = [
-		str(config.get(&"weight_enabled")), str(config.get(&"weight_limit")), str(config.get(&"weight_multiplier")),
+		str(config.get(&"weight_enabled")), str(ZzClasses.carry_limit(float(config.get(&"weight_limit")))), str(config.get(&"weight_multiplier")),
 		str(config.get(&"weight_slot_capacity")), String(config.get(&"weight_over_limit")), str(config.get(&"weight_slow_floor")),
 		String(config.get(&"weight_backpack_tiers")), String(config.get(&"weight_backpack_prices")),
 	]
@@ -36,7 +38,7 @@ func sync(config: Object, boxes: Object = null) -> bool:
 	_signature = sig
 
 	carry.enabled = bool(config.get(&"weight_enabled")) and not mirror
-	carry.base_limit = float(config.get(&"weight_limit"))
+	carry.base_limit = ZzClasses.carry_limit(float(config.get(&"weight_limit")))
 	carry.multiplier = float(config.get(&"weight_multiplier"))
 	carry.slot_capacity = int(config.get(&"weight_slot_capacity")) if bool(config.get(&"weight_enabled")) else 1
 	carry.over_limit = DotWeaponCarry.OverLimit.DROP if String(config.get(&"weight_over_limit")) == "drop" else DotWeaponCarry.OverLimit.SLOW
