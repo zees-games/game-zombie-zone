@@ -55,6 +55,10 @@
 # sprint_load_speed: 1.0
 #  [0.0..4.0]
 # sprint_load_drain: 1.0
+# Whether sprinting stops aiming down sights and reloading.
+# sprint_blocks_aim: true
+# Whether Shift toggles sprint instead of being held.
+# sprint_toggle: false
 #  [0.1..5.0]
 # jump_height: 1.1
 #  [1.0..60.0]
