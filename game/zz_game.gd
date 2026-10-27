@@ -288,6 +288,9 @@ var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 ## Movement-dependent weapon spread (`sv_spread*`, REPLICATED, on here). Every arsenal reads it, so the shot and the crosshair agree.
 var spread_rules: DotWeaponSpreadRules = _spread_rules_on()
 
+## Per-weapon recoil patterns (`sv_recoil*`, REPLICATED, on here): the server's bullet offset and the client's view kick share them.
+var recoil_rules: DotWeaponRecoilRules = _recoil_rules_on()
+
 
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
 ## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
@@ -3536,6 +3539,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 			return false
 
 		player.weapons = rig
+		rig.arsenal.recoil_rules = recoil_rules
 		rig.arsenal.spread_rules = spread_rules
 		_wire_carry(player)
 
@@ -3999,6 +4003,12 @@ func describe_lines() -> PackedStringArray:
 	if map != null:
 		lines.append_array(map.describe_lines())
 
+
+
+static func _recoil_rules_on() -> DotWeaponRecoilRules:
+	var rules := DotWeaponRecoilRules.new()
+	rules.enabled = true
+	return rules
 	return lines
 
 

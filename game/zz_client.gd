@@ -333,6 +333,10 @@ func _build_world_view() -> void:
 	render_quality.name = "RenderQuality"
 	add_child(render_quality)
 	render_quality.load_layers()
+	var render_quality := DotFxRenderQuality.new()
+	render_quality.name = "RenderQuality"
+	add_child(render_quality)
+	render_quality.load_layers()
 	_warm_zombies()
 
 
@@ -487,6 +491,7 @@ func _build_netcode() -> DotResult:
 			if link.has_signal(&"replicated_cvar_changed"):
 				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
+		var _recoil := game.recoil_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
@@ -1248,6 +1253,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
 	player.view_rig = weapons
+	weapons.arsenal.recoil_rules = game.recoil_rules
 	_mirror.mirror = true
 	var _moved := _mirror.sync(game.config)
 	weapons.arsenal.carry = _mirror.carry

@@ -291,6 +291,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# Per-weapon recoil: the server's bullet offset and every client's view kick read the same numbers.
+	var _recoil := world.recoil_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 
 	# Water: how survivors wade, swim and drown, and how the horde wades (see ZzWaterRules). The
 	# movement ones are REPLICATED, because a client predicts its own swim.
