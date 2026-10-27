@@ -238,6 +238,10 @@ func _game_load() -> DotResult:
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
+	# sv_falldamage, _threshold, _scale: dot-combat's, on by default in this game. Server-side
+	# only, so no REPLICATED: the damage is the server's and arrives as health.
+	var _fall := world.fall_rules.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
+
 	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
 	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
 		"Seconds the killcam of a map's last moment plays, added to the intermission (0 for none)",

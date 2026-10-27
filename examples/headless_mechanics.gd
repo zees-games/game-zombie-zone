@@ -24,8 +24,8 @@ const ZzFooting := preload("../game/zz_footing.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 16
-const CHECKS := 144
+const SECTIONS := 17
+const CHECKS := 148
 
 var _passed := 0
 var _failed := 0
@@ -87,6 +87,7 @@ func _run() -> void:
 	await _test_no_world()
 	await _test_footing_rescue()
 	await _test_ladders()
+	await _test_fall_damage()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
 	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed + _skipped == CHECKS
@@ -1321,6 +1322,29 @@ func _test_ladders() -> void:
 				break
 		_check(boxes.size() > 0 and gained > 1.5, "%s: a survivor climbs a ladder" % id, "%d ladder boxes, climbed %.1f m of a %.1f m one" % [boxes.size(), gained, best.size.y])
 		game.queue_free()
+	_finished += 1
+
+
+## sv_falldamage: a hard landing costs health through dot-combat, a short drop and the cvar off cost none.
+func _test_fall_damage() -> void:
+	_entered += 1
+	print("fall damage")
+	var game := await _game(&"zz_practice", true)
+	var me := game.add_player(&"u1", "Faller")
+	await _sim(game, 8)
+	var floor_at := me.feet()
+	_check(game.fall_rules.enabled, "on by default in this game")
+	var hurt := {}
+	for case in [["high", 14.0, true], ["short", 0.6, true], ["off", 14.0, false]]:
+		game.fall_rules.enabled = case[2]
+		me.health.health = me.health.max_health
+		me.place_at(floor_at + Vector3(0.0, case[1], 0.0), 0.0)
+		await _sim(game, TICK_RATE * 2)
+		hurt[case[0]] = me.health.max_health - me.health.health
+	_check(hurt["high"] > 0.0, "a drop from 14 m hurts", "lost %.1f" % hurt["high"])
+	_check(hurt["short"] == 0.0, "a short drop does not", "lost %.1f" % hurt["short"])
+	_check(hurt["off"] == 0.0, "cvar off: a 14 m drop does not hurt", "lost %.1f" % hurt["off"])
+	game.queue_free()
 	_finished += 1
 
 

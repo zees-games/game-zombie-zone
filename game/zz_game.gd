@@ -308,6 +308,10 @@ var players: Dictionary = {}
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
+## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
+## server applies it through [member combat], a client never does.
+var fall_rules: DotFallDamageRules = _make_fall_rules()
+
 ## `zz_pass_barricades`: whether survivors walk through barricades. Bound by the module
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var pass_rules: ZzPassRules = ZzPassRules.new()
@@ -1344,6 +1348,12 @@ func _build_horde() -> void:
 
 # --- Players --------------------------------------------------------------------------------
 
+static func _make_fall_rules() -> DotFallDamageRules:
+	var rules := DotFallDamageRules.new()
+	rules.enabled = true
+	return rules
+
+
 func add_player(player_id: StringName, display_name: String, _wanted_side: int = 0,
 		samples_input: bool = false) -> ZzPlayer:
 	if players.has(player_id):
@@ -1385,6 +1395,18 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 	if combat != null:
 		combat.register_health(player.entity_id, health)
 		player.build_hitboxes(combat)
+
+	if combat != null and player.controller != null:
+		var fall := DotFallDamage.new()
+		fall.name = "FallDamage"
+		fall.rules = fall_rules
+		fall.victim = player.entity_id
+		fall.controller = DotNodeRef.of_path(player.controller.get_path())
+		fall.controller.mode = DotNodeRef.Mode.ABSOLUTE
+		fall.combat = DotNodeRef.of_path(combat.get_path())
+		fall.combat.mode = DotNodeRef.Mode.ABSOLUTE
+		fall.in_water = func() -> bool: return player.water_level != ZzPlayer.WaterLevel.NONE
+		player.add_child(fall)
 
 	health.died.connect(func(damage: DotDamage) -> void: _on_health_zero(player, damage))
 	health.damaged.connect(func(damage: DotDamage) -> void: _on_player_damaged(player, damage))
