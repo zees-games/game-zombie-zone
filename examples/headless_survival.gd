@@ -12,6 +12,7 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzRespawn := preload("../game/zz_respawn.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## Survival maps, held: the three styles a server picks (`zz_survival`), the breather, a wipe,
 ## the barricades, the team a map is built for, and then every big survival map played for a
@@ -24,8 +25,8 @@ const ZzRespawn := preload("../game/zz_respawn.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 15
-const CHECKS := 92
+const SECTIONS := 17
+const CHECKS := 106
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -75,6 +76,8 @@ func _run() -> void:
 	_test_the_wire()
 	_test_the_hud()
 	await _test_map_rows()
+	await _test_personas()
+	await _test_stuck_rescue()
 
 	for id: String in BIG_MAPS:
 		await _test_big_map(StringName(id))
@@ -591,10 +594,11 @@ func _test_big_map(id: StringName) -> void:
 		if player.is_up():
 			standing += 1
 			var post: Vector3 = game.bots._hold_of(player)
-			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather:
+			var on_job: bool = String(game.bots.describe_personas().get(String(player.player_id), {}).get("behaviour", "")) != ""
+			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather or on_job:
 				at_post += 1
 	_check(standing >= int(ceil(team * 0.7)) and at_post >= int(ceil(standing * 0.5)),
-		"most of the team is standing, most of them near their posts", "%d of %d up, %d near their post" % [standing, team, at_post])
+		"most of the team is standing, most near their posts or out on a persona job", "%d of %d up, %d near their post" % [standing, team, at_post])
 
 	var mean := float(spent) / float(maxi(ticks, 1)) / 1000.0
 	print("    %s: %d ticks, %.2f ms mean, %.1f ms worst, %d zombies at the end, %d nav points" % [
@@ -602,6 +606,127 @@ func _test_big_map(id: StringName) -> void:
 	_check(mean < 1000.0 / float(TICK_RATE), "a tick fits in a 64 Hz server's budget", "%.2f ms mean, %.1f worst" % [mean, float(worst) / 1000.0])
 	await _dispose(game)
 	_finished()
+
+
+## Stand-ins never idle while infected remain, and the persona set takes an add and a delete.
+func _test_personas() -> void:
+	_section("bot personas: no idling with infected alive, and profiles added and deleted")
+	var game := await _hold(func(c: ZzConfig) -> void:
+		c.survival_style = 0
+		c.waves = 2
+		c.survival_warmup_seconds = 1.0
+		c.wave_size = 8
+		c.wave_size_per_survivor = 0
+		c.brute_every_waves = 0, 4)
+	var bots: Array[ZzPlayer] = []
+	for bot in game.survivors():
+		bot.is_bot = true
+		bots.append(bot)
+	await _sim(game, 3.0)
+	var left: int = game.horde.infected_left()
+	_check(left > 0, "a wave is on", "%d infected" % left)
+
+	var acted := 0
+	var picked := {}
+	var all_assigned := true
+	for bot in bots:
+		var memory: Dictionary = game.bots._memory(bot)
+		all_assigned = all_assigned and memory.get("persona") is DotBotPersona
+		if game.bots.persona_act(bot, DotFpsCommand.new(), memory):
+			acted += 1
+			picked[String(memory.get("behave", &""))] = true
+	_check(all_assigned, "every stand-in is given a persona from the server's pool")
+	_check(acted == bots.size(), "each acts on a behaviour while infected remain", "%d of %d" % [acted, bots.size()])
+	_check(not picked.is_empty() and picked.keys().all(func(k: String) -> bool: return DotBotPersona.BEHAVIOURS.has(StringName(k))),
+		"and it is one of hunt, loot, hold, support, scout", str(picked.keys()))
+
+	var before: Vector3 = bots[0].feet()
+	await _sim(game, 6.0)
+	var gap: float = bots[0].feet().distance_to(before)
+	_check(gap > 0.5, "they walk rather than stand", "%.1f m" % gap)
+
+	var base := "user://zz_personas_selftest"
+	var runtime := DotProfileRuntime.new()
+	var set: DotProfileSet = game.bot_persona_set()
+	runtime.add_set(set)
+	runtime.save_root = base
+	runtime.permit = func(_actor: Variant, _flag: String) -> bool: return true
+	var ids_before := set.list_ids().size()
+	var added := runtime.handle_request("admin", DotProfileRuntime.make_request("add", DotBotPersona.KIND, "sentry", "", {"weight": 3.0}))
+	game.reload_personas()
+	_check(added.ok and set.has_id("sentry") and set.list_ids().size() == ids_before + 1, "a persona is added through the runtime")
+	_check(game.personas().weight_of(_persona(game, "sentry")) > 0.0, "and the server's pool draws on it after a reload")
+	var removed := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "sentry"))
+	game.reload_personas()
+	_check(removed.ok and not set.has_id("sentry") and _persona(game, "sentry") == null, "and deleted, it leaves the set and the pool")
+	var shipped := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "scout"))
+	game.reload_personas()
+	_check(shipped.ok and _persona(game, "scout") == null and _persona(game, "hunter") != null, "a shipped persona can be deleted and the rest stay")
+	game.config.bot_personas = "hunter:1"
+	_check(game.personas().candidates().size() == 1 and game.personas().candidates()[0].id == &"hunter", "the server's override pins the pool", str(game.personas().describe()))
+	_rm_dir(base)
+	_finished()
+
+
+func _persona(game: ZzGame, id: String) -> DotBotPersona:
+	for p in game.personas().personas:
+		if p.id == StringName(id):
+			return p
+	return null
+
+
+func _rm_dir(dir: String) -> void:
+	if not DirAccess.dir_exists_absolute(dir):
+		return
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(f))
+	for d in DirAccess.get_directories_at(dir):
+		_rm_dir(dir.path_join(d))
+	DirAccess.remove_absolute(dir)
+
+
+## An infected that makes no progress toward the survivors is repathed, then put near them.
+func _test_stuck_rescue() -> void:
+	_section("stuck infected: no progress means a repath, then a relocation near the survivors")
+	var game := await _hold(func(c: ZzConfig) -> void:
+		c.survival_style = 0
+		c.waves = 2
+		c.survival_warmup_seconds = 1.0
+		c.wave_size = 8
+		c.wave_size_per_survivor = 0
+		c.stuck_repath_seconds = 5.0
+		c.stuck_relocate_seconds = 12.0
+		c.stuck_low_count = 0
+		c.brute_every_waves = 0, 1)
+	await _sim(game, 3.0)
+	var npc: DotNpcInstance = null
+	for n in game.horde.spawner.npcs_of(game.horde.WAVE):
+		if n.is_alive() and n.node is ZzZombieBody:
+			npc = n
+			break
+	_check(npc != null, "a wave zombie to hold still")
+	if npc == null:
+		for i in 3:
+			_check(false, "skipped: no zombie")
+		_finished()
+		return
+	var body := npc.node as ZzZombieBody
+	body.global_position = STREET + Vector3(0.0, 0.0, 30.0)
+	game.horde.stuck.clear()
+	game.horde._rescue_if_stuck(npc)
+	game.horde._time += 6.0
+	game.horde._rescue_if_stuck(npc)
+	_check(game.horde.stuck.repaths == 1 and game.horde.stuck.relocations == 0, "five seconds without progress repaths it", str(game.horde.stuck.describe()))
+	var from := npc.position()
+	game.horde._time += 8.0
+	game.horde._rescue_if_stuck(npc)
+	_check(game.horde.stuck.relocations == 1 and npc.position().distance_to(from) > 1.0, "twelve without progress relocates it", "%.1f m" % npc.position().distance_to(from))
+	var near := INF
+	for id in game.horde.survivor_ids():
+		near = minf(near, npc.position().distance_to(game.horde.survivor_position(id)))
+	_check(near < from.distance_to(STREET) + 0.1 or near < 60.0, "to somewhere near the survivors", "%.1f m" % near)
+	_finished()
+
 
 
 # --- Helpers -------------------------------------------------------------------------------------

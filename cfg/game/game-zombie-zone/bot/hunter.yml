@@ -1,0 +1,8 @@
+name: Hunter
+weight: 2
+hunt: 8
+loot: 1
+hold: 1
+support: 1
+scout: 2
+difficulty: hard

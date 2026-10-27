@@ -1665,6 +1665,7 @@ func _start_workbench(world: ZzGame) -> void:
 	if world.flashlight_binder != null:
 		for set: DotProfileSet in world.flashlight_binder.profile_sets():
 			workbench.add_set(set, "Flashlight")
+	workbench.add_set(world.bot_persona_set(), "Bot personas (add, edit, delete)")
 	var ambient_set := DotGameWorkbench.cvar_set(console, world.ambient_rules.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (zz_ambient*)")
@@ -1677,5 +1678,8 @@ func _start_workbench(world: ZzGame) -> void:
 		world.config_binder.attach(rt)
 	if world.flashlight_binder != null:
 		world.flashlight_binder.attach(rt)
+	rt.profile_changed.connect(func(kind: String, _id: String, _rev: int) -> void:
+		if kind == DotBotPersona.KIND:
+			world.reload_personas())
 	if ambient_set != null:
 		var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, rt, console)

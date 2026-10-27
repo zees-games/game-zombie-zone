@@ -3,6 +3,7 @@ extends Node3D
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzCarry := preload("zz_carry.gd")
 const ZzBots := preload("zz_bots.gd")
+const ZzBotProfiles := preload("zz_bot_profiles.gd")
 const ZzCatalogue := preload("zz_catalogue.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
@@ -260,6 +261,43 @@ var boxes: ZzBoxes = null
 ## The carry rules, shared by every player's arsenal (a client's copy only stows, see [ZzCarry]).
 var carry := ZzCarry.new()
 var bots: ZzBots = null
+
+var _persona_set: DotProfileSet = null
+var _personas: DotBotPersonaPool = null
+var _personas_text := ""
+
+
+## The `bot` profile set (the stand-ins' characters), for the workbench and [method personas].
+func bot_persona_set() -> DotProfileSet:
+	if _persona_set == null:
+		_persona_set = ZzBotProfiles.make_set()
+	return _persona_set
+
+
+## The pool a stand-in's character is drawn from: every enabled persona profile by its weight, or the
+## server's `zz_bot_personas` list.
+func personas() -> DotBotPersonaPool:
+	if _personas == null:
+		_personas = DotBotPersonaPool.new()
+		var _n := _personas.load_from(bot_persona_set())
+		_personas_text = ""
+	if config != null and config.bot_personas != _personas_text:
+		_personas_text = config.bot_personas
+		_personas.set_override(_personas_text)
+		_personas.reset_assignments()
+	return _personas
+
+
+## A persona was added, edited or deleted: read them again, and let every stand-in draw anew.
+func reload_personas() -> void:
+	if _personas == null:
+		return
+	var n := _personas.load_from(bot_persona_set())
+	_personas.reset_assignments()
+	if bots != null:
+		bots.redraw_personas()
+	DotLog.info("zz.bots", "bot personas reloaded", {"personas": n})
+
 
 ## player id -> [ZzPlayer].
 var players: Dictionary = {}

@@ -822,6 +822,9 @@ func tick(delta: float, ticks: int = 1) -> void:
 			b.speed_scale = speed * b.limb_speed_scale() * (game.water_pace_at(b.global_position) if game != null else 1.0)
 			b.tick(step, ticks)
 
+			if config.stuck_rescue and stuck.due(npc.instance_id, _time):
+				_rescue_if_stuck(npc)
+
 	squads.prune()
 	_release_pending()
 
@@ -1086,6 +1089,7 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 	stuck.repath_after = config.stuck_repath_seconds
 	stuck.relocate_after = config.stuck_relocate_seconds
 	stuck.low_count = config.stuck_low_count
+	stuck.remove_after_relocations = config.stuck_remove_after
 	var action := stuck.observe(npc.instance_id, nearest, _time, infected_left())
 
 	if action == DotNpcStuckRescue.NONE:
@@ -1102,6 +1106,18 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
 			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+		return
+
+	if action == DotNpcStuckRescue.REMOVE:
+		DotLog.warn(CHANNEL, "stuck infected removed after relocations changed nothing", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
+			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+
+		# The wave owes it again, as for one that fell out of the map.
+		if npc.owner_id == WAVE:
+			refused_wave += 1
+
+		stuck.forget(npc.instance_id)
+		var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
 		return
 
 	var spot := _spawn_point(14.0, 45.0, false)

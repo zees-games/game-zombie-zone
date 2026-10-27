@@ -1,0 +1,7 @@
+name: Medic
+weight: 1.5
+hunt: 2
+loot: 1
+hold: 2
+support: 8
+scout: 1

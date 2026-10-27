@@ -304,6 +304,9 @@ func setup_seconds() -> float:
 ## At or under this many infected left, those waits shrink to a third. 0 off. `zz_stuck_low_count`.
 @export_range(0, 100, 1) var stuck_low_count: int = 8
 
+## Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 never. `zz_stuck_remove_after`.
+@export_range(0, 10, 1) var stuck_remove_after: int = 2
+
 ## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
 @export var bot_open_boxes: bool = true
 

@@ -462,9 +462,14 @@ func _add_noblock_and_workbench() -> void:
 	if game.flashlight_binder != null:
 		for set: DotProfileSet in game.flashlight_binder.profile_sets():
 			wb.add_set(set, "Flashlight")
+	wb.add_set(game.bot_persona_set(), "Bot personas (add, edit, delete)")
 	add_child(wb)
 	var started := wb.start(rt)
 	DotLog.result(CHANNEL, "the workbench", started)
+	if started.ok:
+		rt.profile_changed.connect(func(kind: String, _id: String, _rev: int) -> void:
+			if kind == DotBotPersona.KIND:
+				game.reload_personas())
 	if started.ok and game.config_binder != null:
 		game.config_binder.attach(rt)
 	if started.ok and game.flashlight_binder != null:

@@ -96,6 +96,9 @@ func _init(p_game: Object) -> void:
 func forget(id: StringName) -> void:
 	_state.erase(id)
 
+	if game != null and game.has_method(&"personas"):
+		game.personas().release(id)
+
 
 ## A stand-in's aim draws from its own stream, seeded from its id, never from the object.
 static func _seed_of(player) -> int:
@@ -109,8 +112,41 @@ func _memory(player) -> Dictionary:
 			"aim": DotBotAim.new(_seed_of(player), DotBotSettings.of(game)), "now": NAN,
 			"target_at": Vector3.INF, "stuck_at": Vector3.INF, "stuck_time": 0.0, "use_until": -1.0,
 		}
+		_apply_persona(player.player_id, _state[player.player_id])
 
 	return _state[player.player_id]
+
+
+## Draws this stand-in's character from the server's pool, and gives it that character's aim when the persona states one.
+func _apply_persona(id: StringName, memory: Dictionary) -> void:
+	var persona: DotBotPersona = game.personas().assign(id, _rng)
+	memory["persona"] = persona
+	memory.erase("behave")
+	var own := persona.profile_over(DotBotSettings.of(game).profile)
+	var settings := DotBotSettings.of(game)
+
+	if own != null:
+		settings = DotBotSettings.new()
+		settings.profile = own
+
+	memory["aim"] = DotBotAim.new(hash(String(id)), settings)
+
+
+## A persona was added, edited or deleted: every stand-in draws again.
+func redraw_personas() -> void:
+	for id: StringName in _state:
+		_apply_persona(id, _state[id])
+
+
+## id -> {persona, behaviour} of every stand-in that has one, for suites and probes.
+func describe_personas() -> Dictionary:
+	var out := {}
+
+	for id: StringName in _state:
+		var m: Dictionary = _state[id]
+		out[String(id)] = {"persona": String((m["persona"] as DotBotPersona).id) if m.has("persona") else "", "behaviour": String(m.get("behave", &""))}
+
+	return out
 
 
 ## The survivors, and which are pinned or down, read once per [method drive]: every stand-in asks, so
@@ -299,15 +335,189 @@ func _decide(player, command: DotFpsCommand) -> void:
 	if game.is_survival():
 		if _mend(player, command, memory) or _restock(player, command, memory):
 			return
-		if not _objective(player, command, memory):
+		if not _objective(player, command, memory) and not persona_act(player, command, memory):
 			_hold_post(player, command, memory)
 		return
 
 	# 5. The team, or the objective.
-	if _objective(player, command, memory):
+	if _objective(player, command, memory) or persona_act(player, command, memory):
 		return
 
 	_follow(player, command, memory)
+
+
+# --- Acting by persona -----------------------------------------------------------------------
+
+## Seconds a picked behaviour lasts before the next is drawn from the persona's mix.
+const BEHAVE_MIN := 10.0
+const BEHAVE_MAX := 22.0
+
+## How far a looting stand-in looks for something it wants, metres.
+const LOOT_REACH := 90.0
+
+
+## With infected left and nothing in sight, acts by the persona's mix: hunt the rest, loot, hold a choke, support a
+## teammate, scout. Never stands: a pick with nothing to do hands on to the next, and scouting always has somewhere
+## to go. False only when no infected remain (the breather's mending and holding take over) or there is no map to walk.
+func persona_act(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	if game.horde == null or game.horde.infected_left() <= 0:
+		return false
+
+	var persona: DotBotPersona = memory["persona"]
+	var now: float = game.now()
+	var behave: StringName = memory.get("behave", &"")
+
+	if behave == &"" or now >= float(memory.get("behave_until", 0.0)):
+		behave = persona.pick(_rng.randf(), behave)
+		memory["behave"] = behave
+		memory["behave_until"] = now + _rng.randf_range(BEHAVE_MIN, BEHAVE_MAX)
+		memory.erase("scout_goal")
+		DotLog.debug(CHANNEL, "a stand-in picked a behaviour", {"player": String(player.player_id), "persona": String(persona.id),
+			"behaviour": String(behave), "infected_left": game.horde.infected_left()})
+
+	if _behave(behave, player, command, memory):
+		return true
+
+	# Its pick has nothing to do now: the others in order of weight, then the two that nearly always can.
+	var rest: Array = DotBotPersona.BEHAVIOURS.duplicate()
+	rest.erase(behave)
+	rest.sort_custom(func(a: StringName, b: StringName) -> bool: return float(persona.mix.get(a, 0.0)) > float(persona.mix.get(b, 0.0)))
+
+	for other: StringName in rest:
+		if _behave(other, player, command, memory):
+			memory["behave_shown"] = other
+			return true
+
+	return false
+
+
+func _behave(behaviour: StringName, player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	match behaviour:
+		DotBotPersona.HUNT:
+			return _hunt(player, command, memory)
+		DotBotPersona.LOOT:
+			return _loot(player, command, memory)
+		DotBotPersona.HOLD:
+			return _hold_choke(player, command, memory)
+		DotBotPersona.SUPPORT:
+			return _support(player, command, memory)
+		_:
+			return _scout(player, command, memory)
+
+
+## Walks at the nearest live zombie, the horde's own list, so five stragglers somewhere on the map are found.
+func _hunt(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	var npc: DotNpcInstance = memory.get("hunt_target")
+
+	if npc == null or not is_instance_valid(npc.node) or not npc.is_alive() or game.now() >= float(memory.get("hunt_until", 0.0)):
+		npc = game.horde.nearest_zombie(player.feet())
+		memory["hunt_target"] = npc
+		memory["hunt_until"] = game.now() + 1.5
+
+	if npc == null:
+		return false
+
+	_walk_to(player, command, npc.position(), memory)
+	return true
+
+
+## Anything it wants within [constant LOOT_REACH], else a stocked cache it is not already standing at.
+func _loot(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	if _pick_up(player, command, memory, LOOT_REACH):
+		return true
+
+	var best := Vector3.INF
+	var best_gap := INF
+
+	for at: Vector3 in _caches_with_loot():
+		var gap := at.distance_to(player.feet())
+
+		if gap > 4.0 and gap < best_gap:
+			best = at
+			best_gap = gap
+
+	if best == Vector3.INF:
+		return false
+
+	_walk_to(player, command, best, memory)
+	return true
+
+
+## Stands behind the choke on the horde's route, unless few infected are left: then nobody camps.
+func _hold_choke(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	if game.horde.infected_left() <= game.config.stuck_low_count:
+		return false
+
+	var post := _hold_of(player)
+
+	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > 2.0:
+		_walk_to(player, command, post, memory)
+
+	return true
+
+
+## Goes to the weakest teammate it is not already beside (a downed one is answered earlier in the decision).
+func _support(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	var best = null
+	var best_health := INF
+
+	for other in _team():
+		if other == player or not other.is_up() or other.watching:
+			continue
+
+		var h: float = other.health_fraction() + other.feet().distance_to(player.feet()) * 0.002
+
+		if h < best_health:
+			best = other
+			best_health = h
+
+	if best == null or best.feet().distance_to(player.feet()) <= FOLLOW_NEAR:
+		return false
+
+	_walk_to(player, command, best.feet(), memory)
+	return true
+
+
+## Walks the map's posts (or its spawns) one after another: always somewhere to go.
+func _scout(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	var goal: Vector3 = memory.get("scout_goal", Vector3.INF)
+	var here: Vector3 = player.feet()
+
+	if goal == Vector3.INF or Vector2(goal.x - here.x, goal.z - here.z).length() < 3.0:
+		goal = _scout_goal(here)
+		memory["scout_goal"] = goal
+
+	if goal == Vector3.INF:
+		return false
+
+	_walk_to(player, command, goal, memory)
+	return true
+
+
+func _scout_goal(here: Vector3) -> Vector3:
+	var places: Array[Vector3] = []
+
+	for p in game.horde.usable_posts() if game.horde != null else game.map_doc.get("posts", []):
+		places.append(ZzMapDoc.v3(p))
+
+	for p in game.map_doc.get("caches", []):
+		places.append(ZzMapDoc.v3(p))
+
+	var spawns: Array = (game.map_doc.get("spawns", {}) as Dictionary).get("survivors", [])
+
+	for sp: Dictionary in spawns:
+		places.append(ZzMapDoc.v3(sp["at"]))
+
+	var far: Array[Vector3] = []
+
+	for p in places:
+		if Vector2(p.x - here.x, p.z - here.z).length() > 12.0:
+			far.append(p)
+
+	if far.is_empty():
+		return Vector3.INF
+
+	return far[_rng.randi_range(0, far.size() - 1)]
 
 
 # --- Holding a survival map ------------------------------------------------------------------
@@ -522,6 +732,10 @@ func _caches_with_loot() -> Array:
 ## stand-in, the weapon tables are too long to walk each time.
 var _primary_slots: Array = []
 
+## Auto up close, burst mid range, semi far; assign `_fire_modes.rule` to change it.
+var _fire_modes := DotBotFireMode.new()
+const MODE_NAMES := {DotWeaponDef.Fire.AUTO: "auto", DotWeaponDef.Fire.SEMI: "semi", DotWeaponDef.Fire.BURST: "burst"}
+
 
 func _has_primary(player) -> bool:
 	if _primary_slots.is_empty():
@@ -544,8 +758,18 @@ func _pulse_trigger(player, command: DotFpsCommand) -> void:
 		return
 
 	var def: DotWeaponDef = player.weapons.current_def()
+	var threat: Variant = _memory(player).get("threat")
+	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	if def != null and threat is DotNpcInstance and def.allowed_fire_modes().size() > 1 and not arsenal.is_switching():
+		var names := PackedStringArray()
+		for m in def.allowed_fire_modes():
+			names.append(MODE_NAMES[m])
+		var want := _fire_modes.pick(player.feet().distance_to((threat as DotNpcInstance).position()), names)
+		if want != "":
+			var _set := arsenal.set_fire_mode(DotWeaponDef.fire_mode_named(want))
 
-	if def != null and def.fire_mode != DotWeaponDef.Fire.AUTO and (game.current_tick() % 6) >= 3:
+	var mode := arsenal.fire_mode()
+	if def != null and mode != DotWeaponDef.Fire.AUTO and (game.current_tick() % 6) >= 3:
 		command.set_button(ZzNetCommand.BUTTON_FIRE, false)
 
 
@@ -1050,14 +1274,14 @@ func _can_walk_to(player, at: Vector3) -> bool:
 
 
 ## Picks up what it needs within a few metres: a medkit without one, pills, ammo when low, a box.
-func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float = PICK_UP_REACH) -> bool:
 	var loot = game.loot
 
 	if loot == null:
 		return false
 
 	var best := -1
-	var best_gap := PICK_UP_REACH
+	var best_gap := reach
 	var kept := int(memory.get("pick", -1))
 
 	# An item taken on is kept until it is had, gone or PICK_UP_GIVE_UP seconds old: the path to
@@ -1117,7 +1341,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	if best != kept:
 		memory["pick"] = best
 		memory.erase("pick_blocked")
-		memory["pick_until"] = game.now() + PICK_UP_GIVE_UP
+		memory["pick_until"] = game.now() + PICK_UP_GIVE_UP + maxf(reach - PICK_UP_REACH, 0.0) / 3.0
 
 		# Nowhere to walk to it (a rail, a ledge, another level): leave it be at once, not after fifteen seconds of pushing at the nearest point.
 		if not _can_walk_to(player, loot.position_of(best)):
