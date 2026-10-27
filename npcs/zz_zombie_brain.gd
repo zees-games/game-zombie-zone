@@ -60,6 +60,8 @@ var _owed_delta: float = 0.0
 var _since_thought: int = 0
 var _nearest: float = 0.0
 var _nearest_at: float = -INF
+## Ticks the next thought spans, decided after each thought (and 1 on a stagger), not every tick.
+var _every: int = 1
 
 ## Whether its last thought ended tearing at a barricade: one at the boards thinks every other
 ## tick, because all it decides there is to keep tearing.
@@ -309,6 +311,7 @@ func cancel_swing() -> void:
 ## blast, a shotgun at point blank.
 func stagger(direction: Vector3, seconds: float, strength: float = 4.0) -> void:
 	stagger_until = maxf(stagger_until, now() + seconds)
+	_every = 1
 	cancel_swing()
 	var b := body()
 
@@ -341,23 +344,24 @@ func lure_to(at: Vector3) -> void:
 # --- The tick --------------------------------------------------------------------------------
 
 func _npc_think(delta: float) -> void:
-	# [b]A horde far off thinks less often, and nothing can tell.[/b] A zombie forty metres away
-	# that re-plans its run every fourth tick instead of every tick is the same zombie on every
-	# screen: its body moves every tick on the wish it last had, and it is told everything it
-	# missed as one longer step. Measured on the school with twelve stand-ins and ninety
-	# commons: thinking was ten of the sixteen milliseconds a tick took, against a 64 Hz
-	# server's 15.6.
-	var every := _think_every()
+	# A horde far off thinks less often (_think_every); its body still moves every tick on the
+	# last wish, and the skipped time is handed over as one longer step.
 	_since_thought += 1
 	_owed_delta += delta
 
-	if _since_thought < every:
+	if _since_thought < _every:
 		return
 
 	delta = _owed_delta
 	_owed_delta = 0.0
 	_since_thought = 0
-	super(delta)
+	_think_now(delta)
+	# Decided once per thought rather than every tick: a swing or the boards only start in one.
+	_every = _think_every()
+
+
+func _think_now(delta: float) -> void:
+	super._npc_think(delta)
 
 	if npc == null or not npc.is_alive() or body() == null:
 		return
