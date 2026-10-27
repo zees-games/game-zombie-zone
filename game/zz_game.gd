@@ -288,7 +288,6 @@ var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 ## Movement-dependent spread, recoil patterns, sprint and stamina (`sv_spread*`, `sv_recoil*`, `sv_sprint*`, `sv_stamina*`, REPLICATED, on here) and the `cl_crosshair_*` cvars: dot-game's opt-in.
 var combat_feel: DotGameCombatFeel = DotGameCombatFeel.new(true)
 
-
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
 ## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
 var water_rules: ZzWaterRules = ZzWaterRules.new()
@@ -4000,4 +3999,5 @@ func describe_lines() -> PackedStringArray:
 
 	if map != null:
 		lines.append_array(map.describe_lines())
+
 	return lines

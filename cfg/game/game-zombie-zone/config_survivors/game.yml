@@ -35,13 +35,13 @@
 #  [0..1]
 # start_pills: 0
 #  [1.0..20.0]
-# run_speed: 6.2
+# run_speed: 4.3
 #  [0.1..1.0]
 # walk_speed_scale: 0.45
 # Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_st...
 # sprint_enabled: true
 #  [1.0..2.0]
-# sprint_speed_scale: 1.22
+# sprint_speed_scale: 1.45
 # stamina_enabled: true
 #  [0.0..10.0]
 # stamina_drain: 0.2

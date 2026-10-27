@@ -263,6 +263,15 @@ func setup_seconds() -> float:
 ## the whole horde (DotNpcAiSquads.pull_reports). Read at map load.
 @export var squad_pull_reports: bool = true
 
+## Seconds between a zombie's reads of its squad's sightings (the log keeps them, so this only delays news). 0 reads on every think.
+@export_range(0.0, 2.0, 0.05) var squad_pull_interval: float = 0.15
+
+## How far a zombie's goal may move, as a share of the distance to it, before its route is searched again.
+@export_range(0.0, 1.0, 0.05) var repath_drift_ratio: float = 0.25
+
+## Seconds per metre to its goal added to a zombie's forced re-search (1.5 s): 0.1 makes one 30 m off re-plan every 3 s.
+@export_range(0.0, 0.5, 0.01) var repath_interval_per_m: float = 0.1
+
 ## Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
 @export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
@@ -330,7 +339,7 @@ func setup_seconds() -> float:
 @export_range(10.0, 2000.0, 10.0) var downed_health: float = 300.0
 
 ## Metres per second a downed survivor crawls at (`zz_down_crawl_speed`, also the file key
-## `downed_crawl_speed`). 0 keeps them where they fell, as downs were before crawling. A run is
+## `downed_crawl_speed`). 0 keeps them where they fell, as downs were before crawling. A run was
 ## 6.2, so the default is a fifth of it: enough to reach a friend, never to escape the horde.
 @export_range(0.0, 6.0, 0.1) var downed_crawl_speed: float = 1.4
 @export_range(0.0, 100.0, 0.1) var downed_bleed_per_second: float = 3.0
@@ -360,12 +369,12 @@ func setup_seconds() -> float:
 @export_range(0, 1, 1) var start_medkits: int = 1
 @export_range(0, 1, 1) var start_pills: int = 0
 
-@export_range(1.0, 20.0, 0.1) var run_speed: float = 6.2
+@export_range(1.0, 20.0, 0.1) var run_speed: float = 4.3
 @export_range(0.1, 1.0, 0.01) var walk_speed_scale: float = 0.45
 
 ## Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_stamina*` in dot-player-controller.
 @export var sprint_enabled: bool = true
-@export_range(1.0, 2.0, 0.01) var sprint_speed_scale: float = 1.22
+@export_range(1.0, 2.0, 0.01) var sprint_speed_scale: float = 1.45
 @export var stamina_enabled: bool = true
 @export_range(0.0, 10.0, 0.01) var stamina_drain: float = 0.2
 @export_range(0.0, 10.0, 0.01) var stamina_recover: float = 0.15
@@ -516,6 +525,10 @@ func setup_seconds() -> float:
 
 ## The share of a hit on a riot zombie's shield that gets through (0 none, 1 all of it).
 @export_range(0.0, 1.0, 0.01) var riot_shield: float = 0.1
+
+## The chance a special roll may pick the mutant at all (rare), and the first wave it can appear on.
+@export_range(0.0, 1.0, 0.01) var mutant_chance: float = 0.12
+@export_range(0, 100, 1) var mutant_min_wave: int = 3
 
 ## Seconds between brutes, from and to, on a campaign map. 0 never.
 @export_range(0.0, 3600.0, 10.0) var brute_interval_min: float = 300.0

@@ -13,9 +13,10 @@ const BASE := &"zombie"
 ## The limbs of [param kind]: the base set with the kind's own keys over it. A limb's `share` of
 ## [param max_health] becomes its `health` (0 leaves `health` as written, or 100).
 static func defs_for(kind: StringName, max_health: float) -> Dictionary:
-	var base := DotNpcLimbs.defs_from_config(BASE)
+	# A kind with a body of its own lists every limb and takes none of the zombie's.
+	var base := DotNpcLimbs.defs_from_config(BASE) if kind != &"mutant" else {}
 
-	if base.is_empty():
+	if base.is_empty() and kind != &"mutant":
 		return {}
 
 	var defs := base.duplicate(true)

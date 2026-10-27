@@ -19,15 +19,15 @@ config/features=PackedStringArray("4.7")
 
 driver/enable_input=true
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/dot_lighting/plugin.cfg")
+
 [importer_defaults]
 
 texture={
 "detect_3d/compress_to": 0
 }
-
-[editor_plugins]
-
-enabled=PackedStringArray("res://addons/dot_lighting/plugin.cfg")
 
 [rendering]
 

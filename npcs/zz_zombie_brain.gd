@@ -88,6 +88,11 @@ const BODY_STRIDE_FROM := 30.0
 func _npc_ready() -> void:
 	super()
 	state_since = context.now if context != null else 0.0
+	var h := horde()
+	var config: Variant = h.get(&"config") if h != null else null
+
+	if config != null:
+		squad_pull_interval = float(config.squad_pull_interval)
 
 
 ## The horde this zombie belongs to. Duck-typed: see `zz_horde.gd`.

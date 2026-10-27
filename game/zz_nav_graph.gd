@@ -40,6 +40,9 @@ var _linked: Dictionary = {}
 
 var _patched: Dictionary = {}
 
+## filter -> the same without NARROW ([method _relaxed]).
+var _relaxed_for: Dictionary = {}
+
 ## True while the native search's graph is being built: its plain edges are bidirectional, so the
 ## one-way links must not be in them (they are connected after, one way).
 var _building: bool = false
@@ -78,6 +81,77 @@ func can_walk_straight(a: Vector3, b: Vector3, corridor: float = -1.0) -> bool:
 
 ## The flag on a point a brute's body does not fit at; the brute's definition excludes it.
 const NARROW := 1 << 12
+
+
+## A brute's search that found nothing without the NARROW points is asked again with them: a brute that cannot path stands
+## where it is, and a map whose only ways in are doors and furniture gaps would never be reached by one (a relocate and the
+## unstick watch free it from a tight spot, nothing frees it from a path it does not have).
+func find_path(from: Vector3, to: Vector3, snap_radius: float = -1.0, allow_partial: bool = false) -> PackedVector3Array:
+	var out := super(from, to, snap_radius, allow_partial)
+
+	if (not out.is_empty() and not last_partial) or filter == null or (filter.exclude_flags & NARROW) == 0:
+		return out
+
+	var first_partial := last_partial
+	var kept := filter
+	filter = _relaxed(kept)
+	var again := super(from, to, snap_radius, allow_partial)
+	filter = kept
+
+	# A partial answer without the exclusion is better than none, not better than a whole one with it.
+	if again.is_empty() or (not out.is_empty() and last_partial):
+		last_partial = first_partial
+		return out
+
+	return again
+
+
+## [method find_path]'s batch with the same second chance.
+func find_paths(queries: Array, workers: int) -> void:
+	super(queries, workers)
+	var again: Array = []
+
+	for q: DotNpcNavGraph.PathQuery in queries:
+		if q.points.is_empty() and q.filter != null and (q.filter.exclude_flags & NARROW) != 0:
+			var retry := DotNpcNavGraph.PathQuery.new()
+			retry.from = q.from
+			retry.to = q.to
+			retry.filter = _relaxed(q.filter)
+			retry.snap_radius = q.snap_radius
+			retry.allow_partial = q.allow_partial
+			retry.smooth = q.smooth
+			retry.horizon = q.horizon
+			again.append(retry)
+			again.append(q)
+
+	if again.is_empty():
+		return
+
+	var retries: Array = []
+
+	for i in range(0, again.size(), 2):
+		retries.append(again[i])
+
+	super(retries, workers)
+
+	for i in range(0, again.size(), 2):
+		var q: DotNpcNavGraph.PathQuery = again[i + 1]
+		q.points = (again[i] as DotNpcNavGraph.PathQuery).points
+		q.partial = (again[i] as DotNpcNavGraph.PathQuery).partial
+
+
+## [param base] without the NARROW exclusion, kept per base so the native search keeps one graph for it.
+func _relaxed(base: DotNpcNavFilter) -> DotNpcNavFilter:
+	if _relaxed_for.has(base):
+		return _relaxed_for[base]
+
+	var out := DotNpcNavFilter.new()
+	out.area_costs = base.area_costs.duplicate()
+	out.include_flags = base.include_flags
+	out.exclude_flags = base.exclude_flags & ~NARROW
+	out.avoid_cost = base.avoid_cost
+	_relaxed_for[base] = out
+	return out
 
 
 ## Flags every point where a body of [param radius] would overlap [param mask] (furniture packed

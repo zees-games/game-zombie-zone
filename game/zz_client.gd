@@ -488,10 +488,10 @@ func _build_netcode() -> DotResult:
 			if link.has_signal(&"replicated_cvar_changed"):
 				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
-		game.combat_feel.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
+		game.combat_feel.follow_cvars(link)
 		var _wading := game.water_rules.follow_cvars(link)
 		var _ambient := game.ambient_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
@@ -1554,6 +1554,7 @@ func _prepare_board(snap: Dictionary) -> void:
 	snap["header"] = {"Map": str(game.map_doc.get("name", "")), "Difficulty": game.config.difficulty_name().capitalize()}
 	if game.map != null and game.map.world_credits != "":
 		snap["header"]["Credits"] = game.map.world_credits
+	snap["header"]["Zombies"] = ZzZombieView.CREDITS
 	var pack_credits := preload("zz_packs.gd").credit_lines()
 	if not pack_credits.is_empty():
 		snap["header"]["Models"] = " | ".join(pack_credits)

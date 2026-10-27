@@ -44,7 +44,7 @@ var net_crouch: float = 0.0
 var net_flags: int = 0
 var net_modifiers: int = 0
 
-## Owner-only packed stamina (DotFpsNetSync.pack_stamina), so a predicting client's rewind restores it.
+## Owner-only packed stamina (DotFpsNetSync.pack_stamina) so a predicting client's rewind restores it.
 var net_stamina: int = 0
 
 ## Hit points, and the one field with a hard cap on the wire.

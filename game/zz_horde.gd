@@ -224,6 +224,8 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	# Smooth only a path's first metres: a zombie repaths every second and a half and never
 	# walks the rest. Through `set` so an older dot-npc without it is simply not told.
 	spawner.set(&"smooth_horizon", 16)
+	spawner.set(&"repath_drift_ratio", config.repath_drift_ratio)
+	spawner.set(&"repath_interval_per_m", config.repath_interval_per_m)
 	spawner.occlusion_mask = game.world_mask()
 	# Every zombie's own seed (`npc.seed`, what the brains draw their idle, pace and wander from)
 	# comes from the session's seed and its spawn count, so a server given the same seed plays
@@ -1749,6 +1751,9 @@ func _allowed_specials() -> Array[StringName]:
 
 	for kind in ZzNpcs.SPECIALS:
 		if config.special_kinds.is_empty() or config.special_kinds.has(String(kind)):
+			# The mutant is rare: a roll per pick, and not before its first wave.
+			if kind == ZzNpcs.MUTANT and (wave_index < config.mutant_min_wave or _rng.randf() >= config.mutant_chance):
+				continue
 			out.append(kind)
 
 	return out

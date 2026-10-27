@@ -4,7 +4,7 @@ extends Node
 ## graph, with the kind's nav filter, for a path to the nearest survivor, then spawns the kind there and plays `--seconds`
 ## (default 40) with the survivors standing at their spawns. Per map and kind: `path` origins with a path / origins,
 ## `reached` origins where the body got within reach of a survivor (`!n`: n of the misses had time to walk the whole path and did not, a snag), `t` median seconds to do so.
-## `godot --headless --path . res://tools/special_reach.tscn -- --all|--map=zs_lens [--origins=4] [--seconds=40] [--static] [--ai]`
+## `godot --headless --path . res://tools/special_reach.tscn -- --all|--map=zs_lens [--origins=4] [--seconds=40] [--static] [--ai] [--held] [--trace] [--kinds=brute,riot]`
 ## (run it through `./game.sh`'s heavy queue). The common walker leads each row as the control: a snag it shares is the map's, one it does not is the kind's. The nav graph is shared by every kind but the brute (NARROW points excluded).
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -21,6 +21,12 @@ var _seconds := 40.0
 var _static_only := false
 ## Let each kind's own tactics run (hiding, waiting for a moment) instead of walking the shared steering straight at the nearest survivor.
 var _ai := false
+## Keep the barricades: a zombie held at one is stopped by design, and 30 s will not bash a door through.
+var _held := false
+## Print the first origin's walk every two seconds (position, path, wish).
+var _trace := false
+## Only these kinds (comma separated), the common always first.
+var _only := PackedStringArray()
 ## The last _sim's end state: {state, moved over its final 8 s, gap}.
 var _last: Dictionary = {}
 ## kind -> [paths, reached, origins, snags] over all maps
@@ -45,6 +51,12 @@ func _run() -> void:
 			_seconds = float(arg.substr(10))
 		elif arg == "--ai":
 			_ai = true
+		elif arg.begins_with("--kinds="):
+			_only = arg.substr(8).split(",")
+		elif arg == "--trace":
+			_trace = true
+		elif arg == "--held":
+			_held = true
 		elif arg == "--static":
 			_static_only = true
 		elif arg == "--all":
@@ -61,6 +73,9 @@ func _run() -> void:
 	var kinds: Array[StringName] = ZzNpcs.SPECIALS.duplicate()
 	kinds.append(ZzNpcs.BRUTE)
 	kinds.push_front(ZzNpcs.COMMON)
+
+	if not _only.is_empty():
+		kinds = kinds.filter(func(k: StringName) -> bool: return k == ZzNpcs.COMMON or String(k) in _only)
 
 	for id in ids:
 		var game := await _built(id)
@@ -95,7 +110,8 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 
 	for kind in kinds:
 		var def: DotNpcDef = horde.spawner.catalogue.get_npc(kind)
-		var graph := DotNpcNavGraph.new(data)
+		var graph: DotNpcNavGraph = horde.spawner.nav
+		graph.filter = null
 
 		if def != null and def.nav_exclude_flags != 0:
 			graph.filter = DotNpcNavFilter.new()
@@ -129,7 +145,7 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 						and not _last.is_empty() and float(_last["moved"]) < 3.0:
 					# Time to arrive by a clear run, and still for the last eight seconds: a snag, not a long way round or a wait.
 					stuck += 1
-					print("   snag %s %s from %s path %.0f m, %s, %.0f m short, moved %.1f m" % [id, kind, origin.snapped(Vector3.ONE * 0.1), shortest, _last["state"], _last["gap"], _last["moved"]])
+					print("   snag %s %s from %s path %.0f m, %s, %.0f m short at %s, moved %.1f m, %s, blocked by %s" % [id, kind, origin.snapped(Vector3.ONE * 0.1), shortest, _last["state"], _last["gap"], (_last["pos"] as Vector3).snapped(Vector3.ONE * 0.1), _last["moved"], _last["barricade"], _last["blockers"]])
 
 		times.sort()
 		var med := "-" if times.is_empty() else "%.0fs" % times[times.size() / 2]
@@ -203,6 +219,11 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 			else:
 				npc.brain.set(&"probe_goal", horde.survivor_position(nearest))
 
+		if _trace and tick % 128 == 0:
+			var b = npc.brain.body()
+			var p = npc.brain.get(&"path")
+			print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
+
 		if tick == ticks - 8 * 64:
 			earlier = npc.position()
 
@@ -227,10 +248,54 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 		for sid in ids:
 			gap_now = minf(gap_now, npc.position().distance_to(horde.survivor_position(sid)))
 
-		_last = {"state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
+		_last = {"blockers": _blockers(npc), "pos": npc.position(), "barricade": _barricade_near(game, npc.position()), "state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
 
 	horde.spawner.remove(npc.instance_id)
 	return best
+
+
+## What a shape of the body's size overlaps where it stands, enlarged a little: names of the bodies touching it.
+func _blockers(npc: DotNpcInstance) -> String:
+	var body: CharacterBody3D = npc.brain.body() if npc.brain != null else null
+
+	if body == null:
+		return "?"
+
+	var shape := CapsuleShape3D.new()
+	shape.radius = (body.get(&"radius") as float) + 0.15
+	shape.height = 1.2
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = body.collision_mask
+	query.transform = Transform3D(Basis.IDENTITY, npc.position() + Vector3(0.0, 0.9, 0.0))
+	query.exclude = [body.get_rid()]
+	var names := PackedStringArray()
+
+	for hit in body.get_world_3d().direct_space_state.intersect_shape(query, 6):
+		var c := hit["collider"] as Node
+		names.append("%s(layer %d)" % [c.name if c != null else "?", (c as CollisionObject3D).collision_layer if c is CollisionObject3D else 0])
+
+	return ", ".join(names) if not names.is_empty() else "nothing"
+
+
+## The nearest barricade box to a stopping point: "at <id> 0.4 m" says a held board, not a snag.
+func _barricade_near(game: Node, at: Vector3) -> String:
+	var best := INF
+	var id := ""
+
+	for box in game.map.doc.get("boxes", []):
+		if not box is Dictionary or not box.has("barricade"):
+			continue
+
+		var c := ZzMapDoc.v3(box["at"])
+		var h := ZzMapDoc.v3(box["size"]) * 0.5
+		var d := Vector3(maxf(absf(at.x - c.x) - h.x, 0.0), maxf(absf(at.y - c.y) - h.y, 0.0), maxf(absf(at.z - c.z) - h.z, 0.0)).length()
+
+		if d < best:
+			best = d
+			id = str(box["barricade"])
+
+	return "no barricade" if id == "" else "barricade %s %.1f m" % [id, best]
 
 
 ## A ranged kind stands off at its minimum range (scream_min, spit_min, pounce_min) and counts as arrived there.
@@ -280,7 +345,18 @@ func _built(id: String) -> Node:
 		ticks += 32
 		await get_tree().physics_frame
 
-	return game if _graph_ready(game) else null
+	if not _graph_ready(game):
+		return null
+
+	if not _held:
+		for bid in game.barricades.keys():
+			game.bash_barricade(bid, 1.0e9)
+
+		# The collision shapes go off by set_deferred: they need a frame to leave the space.
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+
+	return game
 
 
 func _graph_ready(game: Node) -> bool:

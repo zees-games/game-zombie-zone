@@ -289,7 +289,6 @@ func _game_load() -> DotResult:
 	# Spread, recoil, sprint and stamina: the server's shot, and a client's prediction and view, read the same numbers.
 	world.combat_feel.bind_cvars(add_cvar)
 
-
 	# Water: how survivors wade, swim and drown, and how the horde wades (see ZzWaterRules). The
 	# movement ones are REPLICATED, because a client predicts its own swim.
 	var _water := world.water_rules.bind_cvars(
@@ -627,6 +626,16 @@ func _add_tunables(world: ZzGame) -> void:
 					wanted.append(part.strip_edges())
 			config.special_kinds = wanted
 			log_info("a tunable changed", {"cvar": "zz_special_kinds", "now": ",".join(wanted)}))
+	_tunable("zz_mutant_chance", config.mutant_chance, "Chance a special roll may pick the mutant (0 never)",
+		func(value: float) -> void: config.mutant_chance = clampf(value, 0.0, 1.0))
+	_tunable("zz_mutant_min_wave", float(config.mutant_min_wave), "First wave the mutant can appear on",
+		func(value: float) -> void: config.mutant_min_wave = maxi(int(value), 0))
+	for row: Array in [["zap_damage", "Damage of one gravity-gun zap", 0.0, 100.0], ["throw_damage", "Damage of a thrown prop", 0.0, 200.0],
+			["slam_damage", "Damage at the centre of the angry dive's slam", 0.0, 500.0], ["slam_radius", "Radius of the slam in metres", 1.0, 30.0],
+			["fuel", "Seconds of jetpack fuel", 1.0, 120.0], ["angry_health", "Health share below which the mutant gets angry", 0.0, 1.0]]:
+		var key: String = row[0]
+		_tunable("zz_mutant_" + key, float(ZzNpcs._mutant(config).meta[key]), String(row[1]),
+			func(value: float) -> void: _set_meta(world, ZzNpcs.MUTANT, key, clampf(value, float(row[2]), float(row[3]))))
 	_tunable("zz_brute_min", config.brute_interval_min, "Seconds between brutes, from (0 with zz_brute_max 0: never)",
 		func(value: float) -> void: config.brute_interval_min = clampf(value, 0.0, config.brute_interval_max))
 	_tunable("zz_brute_max", config.brute_interval_max, "Seconds between brutes, to",

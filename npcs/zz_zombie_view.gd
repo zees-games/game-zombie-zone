@@ -53,6 +53,11 @@ static var BODIES := {
 	&"shaun": ZzPaths.rebase("res://assets/zombies/zombie_shaun.glb"),
 	&"worker": ZzPaths.rebase("res://assets/zombies/zombie_worker.glb"),
 	&"city": ZzPaths.rebase("res://assets/zombies/zombie_city.glb"),
+	&"gent": ZzPaths.rebase("res://assets/zombies/zombie_gent.glb"),
+	&"cop": ZzPaths.rebase("res://assets/zombies/zombie_cop.glb"),
+	&"punk": ZzPaths.rebase("res://assets/zombies/zombie_punk.glb"),
+	&"convict": ZzPaths.rebase("res://assets/zombies/zombie_convict.glb"),
+	&"hazmat": ZzPaths.rebase("res://assets/zombies/zombie_hazmat.glb"),
 }
 
 ## The kit's atlas, in the three versions its bodies were painted against: they differ in a few
@@ -65,19 +70,33 @@ static var ATLASES := {
 	&"worker": ZzPaths.rebase("res://assets/zombies/atlas_worker.png"),
 	## A realistic body's baked colour (`art-src/zombie_city.py`); its tangent normal map is [constant CITY_NORMAL].
 	&"city": ZzPaths.rebase("res://assets/zombies/city_albedo_0.png"),
+	&"gent": ZzPaths.rebase("res://assets/zombies/gent_albedo.png"),
+	&"cop": ZzPaths.rebase("res://assets/zombies/cop_albedo.png"),
+	&"punk": ZzPaths.rebase("res://assets/zombies/punk_albedo.png"),
+	&"convict": ZzPaths.rebase("res://assets/zombies/convict_albedo.png"),
+	&"hazmat": ZzPaths.rebase("res://assets/zombies/hazmat_albedo.png"),
 }
 
 ## The city body's painted people (`art-src/zombie_city_paint.py`): skin, outfit and hair differ per texture.
 const CITY_LOOKS := 6
 
+## Shown in the scoreboard header: the CC-BY zombie bodies (README.md has the URLs).
+const CREDITS := "Walking Dead zombies by LasquetiSpice (CC-BY 4.0), Zombie Hazmat by LxNazarov (CC-BY 4.0), both modified"
+
 const CITY_NORMAL := "res://assets/zombies/city_normal.png"
+
+## Bodies baked with a tangent normal map (the city's and the Sketchfab characters', `art-src/zombie_sketchfab.py`):
+## colour, blood and dirt are in the texture, so the shader's splashes are off and only these sample a normal map.
+static var NORMALS := {&"city": CITY_NORMAL, &"gent": "res://assets/zombies/gent_normal.png", &"cop": "res://assets/zombies/cop_normal.png",
+	&"punk": "res://assets/zombies/punk_normal.png", &"convict": "res://assets/zombies/convict_normal.png", &"hazmat": "res://assets/zombies/hazmat_normal.png"}
 
 ## Where the head bone sits against the body's height, for the bodies that are not the kit's big-headed
 ## proportions (the kit's is 1.22, [method _measure]).
-const HEAD_TOP := {&"city": 1.137}
+const HEAD_TOP := {&"city": 1.137, &"gent": 1.077, &"cop": 1.107, &"punk": 1.124, &"convict": 1.087, &"hazmat": 1.138}
 
 const ATLAS_OF := {&"basic": &"basic", &"chubby": &"heavy", &"arm": &"heavy", &"matt": &"people",
-	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker", &"city": &"city"}
+	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker", &"city": &"city",
+	&"gent": &"gent", &"cop": &"cop", &"punk": &"punk", &"convict": &"convict", &"hazmat": &"hazmat"}
 
 ## Bodies that carry no clips of their own and are driven by another's (same rig, same bone names).
 const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic"}
@@ -95,10 +114,15 @@ const WEARS := {
 	&"shaun": {"skin": ["c09264"], "top": ["5f4009"], "bottom": ["466469"]},
 	&"worker": {},  # painted in the atlas: nothing to swap
 	&"city": {},  # baked likewise
+	&"gent": {},
+	&"cop": {},
+	&"punk": {},
+	&"convict": {},
+	&"hazmat": {},
 }
 
 ## The commons' bodies, in variant order.
-const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker", &"city"]
+const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker", &"city", &"gent", &"cop", &"punk", &"convict", &"hazmat"]
 
 ## Dead skin: grey-greens, ash, a bruised blue, jaundice, rot.
 const SKINS: Array[String] = ["7d8f6a", "8f9a84", "8c98a0", "a39f6c", "66734f", "8a7a86", "9aa58a", "75806e"]
@@ -395,9 +419,11 @@ static func look_for(p_kind: StringName, p_variant: int) -> Dictionary:
 	look["blood"] = lerpf(0.5, 0.72, float((v >> 2) & 7) / 7.0)
 	look["dirt"] = lerpf(0.3, 0.8, float((v >> 9) & 7) / 7.0)
 
-	if look["body"] == &"city":
+	if NORMALS.has(look["body"]):
 		# Colour, blood and dirt are painted in the texture; the shader's splashes would land on the baked ones.
-		look["tex"] = (v >> 3) % CITY_LOOKS
+		if look["body"] == &"city":
+			look["tex"] = (v >> 3) % CITY_LOOKS
+
 		look["blood"] = 2.0
 		look["dirt"] = 0.0
 
@@ -608,7 +634,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	if _materials.has(key):
 		return _materials[key]
 
-	var normal_tex: bool = look["body"] == &"city"
+	var normal_tex: bool = NORMALS.has(look["body"])
 
 	if _shader == null:
 		_shader = Shader.new()
@@ -623,7 +649,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	var atlas_id: StringName = ATLAS_OF.get(look["body"], &"basic")
 	var path: String = ATLASES[atlas_id]
 
-	if normal_tex:
+	if look["body"] == &"city":
 		atlas_id = StringName("city_%d" % int(look.get("tex", 0)))
 		path = path.replace("city_albedo_0", "city_albedo_%d" % int(look.get("tex", 0)))
 
@@ -635,10 +661,12 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	material.set_shader_parameter(&"atlas", _atlases[atlas_id])
 
 	if normal_tex:
-		if not _atlases.has(&"city_normal"):
-			_atlases[&"city_normal"] = DotHumanoidFigure.load_texture(ZzPaths.rebase(CITY_NORMAL))
+		var normal_id := StringName("%s_normal" % look["body"])
 
-		material.set_shader_parameter(&"normal_tex", _atlases[&"city_normal"])
+		if not _atlases.has(normal_id):
+			_atlases[normal_id] = DotHumanoidFigure.load_texture(ZzPaths.rebase(NORMALS[look["body"]]))
+
+		material.set_shader_parameter(&"normal_tex", _atlases[normal_id])
 
 	while from.size() < SWAPS:
 		from.append(Vector4(-9.0, -9.0, -9.0, 0.0))

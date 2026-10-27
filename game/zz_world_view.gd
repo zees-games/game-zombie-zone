@@ -8,6 +8,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
 
@@ -124,7 +125,7 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	if body == null or _zombies.has(key):
 		return
 
-	var view := ZzZombieView.new()
+	var view: ZzZombieView = ZzMutantView.new() if kind == &"mutant" else ZzZombieView.new()
 	view.name = "View"
 	view.lod = lod
 	body.add_child(view)

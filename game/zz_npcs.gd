@@ -66,10 +66,11 @@ const SLEEPER := &"sleeper"
 const SCREAMER := &"screamer"
 const CRAWLER := &"crawler"
 const RIOT := &"riot"
+const MUTANT := &"mutant"
 
 ## The specials the director chooses between. Not the brute (its own clock) or the sleeper
 ## (placed by the map).
-const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT]
+const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT, MUTANT]
 
 const FACTION := &"infected"
 
@@ -86,6 +87,7 @@ static var SLEEPER_BRAIN := ZzPaths.rebase("res://npcs/zz_sleeper_brain.gd")
 static var SCREAMER_BRAIN := ZzPaths.rebase("res://npcs/zz_screamer_brain.gd")
 static var CRAWLER_BRAIN := ZzPaths.rebase("res://npcs/zz_crawler_brain.gd")
 static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
+static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
 
 
 static func is_special(kind: StringName) -> bool:
@@ -122,11 +124,11 @@ static func catalogue(config: ZzConfig = null, roots: PackedStringArray = Packed
 	return out
 
 
-## The twelve kinds from code and [param c] alone, no profile; the floor the shipped ymls are written from.
+## The thirteen kinds from code and [param c] alone, no profile; the floor the shipped ymls are written from.
 static func builtin(c: ZzConfig) -> Array:
 	var out: Array = []
 	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c)]:
+			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c), _mutant(c)]:
 		out.append(_eyes(def))
 	return out
 
@@ -309,6 +311,24 @@ static func _spitter(c: ZzConfig) -> DotNpcDef:
 		"spit_range": 28.0, "spit_min": 6.0, "spit_cooldown": 18.0, "spit_speed": 15.0,
 		"acid_radius": 3.2, "acid_seconds": 7.0, "acid_damage": 6.0,
 		"body": "spitter", "radius": 0.3, "height": 1.9,
+	}
+	return def
+
+
+static func _mutant(c: ZzConfig) -> DotNpcDef:
+	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, DotNpcDef.Weight.HEAVY)
+	def.sight_range = 60.0
+	def.sight_half_angle_deg = 120.0
+	def.hearing_range = 25.0
+	def.meta = {
+		"damage": 14.0, "reach": 1.9, "attack_interval": 1.4,
+		"zap_range": 24.0, "zap_damage": 4.0, "zap_interval": 2.5,
+		"prop_chance": 0.5, "prop_range": 14.0, "prop_mass": 40.0, "pull_speed": 14.0,
+		"hold_time": 1.0, "throw_speed": 22.0, "throw_range": 30.0, "throw_damage": 8.0, "throw_interval": 4.0,
+		"fuel": 14.0, "fuel_regen": 1.4, "fly_speed": 8.0, "cruise_height": 7.0, "fly_from": 14.0, "fly_time": 9.0,
+		"angry_health": 0.4, "charge_time": 1.4, "charge_height": 12.0, "dive_speed": 26.0,
+		"slam_radius": 7.0, "slam_damage": 30.0, "slam_recover": 3.0, "dive_cooldown": 8.0,
+		"body": "mutant", "radius": 0.55, "height": 2.4,
 	}
 	return def
 

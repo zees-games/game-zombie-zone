@@ -41,3 +41,20 @@ limbs:
   zhm_trex:
     head:
       kills: false
+  # The mutant's own machinery (its bones, not the zombie's): shoot a gun or the pack off.
+  mutant:
+    gunL:
+      bones: [GunL]
+      radius: 0.3
+      tip: 0.3
+      health: 60.0
+    gunR:
+      bones: [GunR]
+      radius: 0.3
+      tip: 0.3
+      health: 60.0
+    pack:
+      bones: [Jetpack]
+      radius: 0.4
+      tip: 0.3
+      health: 45.0
