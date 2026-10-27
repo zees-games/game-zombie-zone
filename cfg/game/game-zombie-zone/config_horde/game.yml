@@ -136,6 +136,10 @@
 # crawler_grab_dps: 6.0
 # The share of a hit on a riot zombie's shield that gets through (0 none, 1 all of it). [0.0..1.0]
 # riot_shield: 0.1
+# The chance a special roll may pick the mutant at all (rare), and the first wave it can appear on. [0.0..1.0]
+# mutant_chance: 0.12
+#  [0..100]
+# mutant_min_wave: 3
 # Seconds between brutes, from and to, on a campaign map. 0 never. [0.0..3600.0]
 # brute_interval_min: 300.0
 #  [0.0..3600.0]
