@@ -2057,12 +2057,12 @@ func _test_crawling_and_speed_boxes() -> void:
 	game.crawl_rules.set_cvar("1.4")
 
 	var drain_was := me.controller.tunables.stamina_drain
-	var _drain := game.sprint_rules.set_cvar("sv_stamina_drain", "1.5")
-	var _noaim := game.sprint_rules.set_cvar("sv_sprint_noaim", "0")
+	var _drain: Variant = game.combat_feel.sprint.set_cvar("sv_stamina_drain", "1.5")
+	var _noaim: Variant = game.combat_feel.sprint.set_cvar("sv_sprint_noaim", "0")
 	_check(is_equal_approx(me.controller.tunables.stamina_drain, 1.5) and not me.controller.tunables.sprint_blocks_aim,
 		"sv_stamina_drain and sv_sprint_noaim reach a live player's tunables", "was %.2f" % drain_was)
-	var _back := game.sprint_rules.set_cvar("sv_stamina_drain", str(drain_was))
-	var _on := game.sprint_rules.set_cvar("sv_sprint_noaim", "1")
+	var _back: Variant = game.combat_feel.sprint.set_cvar("sv_stamina_drain", str(drain_was))
+	var _on: Variant = game.combat_feel.sprint.set_cvar("sv_sprint_noaim", "1")
 
 	# The boxes: in the file, four ways of being faster.
 	var file := ZzBoxes.new(null)

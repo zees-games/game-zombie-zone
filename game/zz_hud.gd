@@ -133,9 +133,7 @@ var _use_fill: ColorRect = null
 var _use_label: Label = null
 var _held: Label = null
 var _crosshair: Control = null
-## The player's `cl_crosshair_*` cvars (dot-ui API 10); null on an older shell, which keeps the dot.
-var crosshair_cvars: RefCounted = null
-## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
+## The player's `cl_crosshair_*` cvars (dot-ui API 10); null on an older shell, which keeps the dot.## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
 var aim_fraction: float = 0.0
@@ -1058,12 +1056,8 @@ func _make_crosshair() -> Control:
 	if DotAddonApi.build_level("dot_ui") >= 10:
 		var shape: Variant = DotCrosshair
 		var cross := (shape as GDScript).new() as Control
-		var cvars_class: Variant = DotCrosshairCvars
-		crosshair_cvars = (cvars_class as GDScript).new() as RefCounted
-		crosshair_cvars.set(&"target", cross)
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		crosshair_cvars.call(&"apply_to", cross)
 		return cross
 
 	var dot := ColorRect.new()
@@ -1076,6 +1070,10 @@ func _make_crosshair() -> Control:
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return dot
 
+
+## The crosshair control, for the feel's cl_crosshair_* binding.
+func crosshair() -> Control:
+	return _crosshair
 
 ## The weapon's spread cone in degrees, from the arsenal; the crosshair opens with it.
 func set_spread(degrees: float, fov: float = 75.0) -> void:

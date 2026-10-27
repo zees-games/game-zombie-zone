@@ -209,8 +209,7 @@ func _ready() -> void:
 
 	_sampler = DotFpsSampler.new(ZzPlayer.tunables_for(config))
 	ZzPlayer.register_actions(_sampler)
-	game.sprint_rules.apply_to(_sampler.tunables)
-	game.sprint_rules.changed.connect(func() -> void: game.sprint_rules.apply_to(_sampler.tunables))
+	game.combat_feel.track_tunables(_sampler.tunables)
 
 	_build_hud()
 	_build_chat()
@@ -493,12 +492,10 @@ func _build_netcode() -> DotResult:
 			if link.has_signal(&"replicated_cvar_changed"):
 				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
-		var _recoil := game.recoil_rules.follow_cvars(link)
-		var _sprint := game.sprint_rules.follow_cvars(link)
+		game.combat_feel.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
-		var _spread := game.spread_rules.follow_cvars(link)
 		var _wading := game.water_rules.follow_cvars(link)
 		var _ambient := game.ambient_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
@@ -1256,11 +1253,10 @@ func _arm_locally(weapon_id: StringName) -> void:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
 	player.view_rig = weapons
-	weapons.arsenal.recoil_rules = game.recoil_rules
 	_mirror.mirror = true
 	var _moved := _mirror.sync(game.config)
 	weapons.arsenal.carry = _mirror.carry
-	weapons.arsenal.spread_rules = game.spread_rules
+	game.combat_feel.attach(weapons.arsenal)
 
 	if not weapons.give(weapon_id).ok:
 		return
@@ -1835,12 +1831,8 @@ func _build_settings() -> void:
 
 ## The player's `cl_crosshair_*` cvars at the console's local source.
 func _bind_crosshair_console() -> void:
-	if console == null or hud == null or hud.crosshair_cvars == null:
-		return
-	for source: Variant in console.sources():
-		if source is DotConsoleLocal:
-			var _bound: bool = hud.crosshair_cvars.bind_console(source)
-			return
+	if console != null and hud != null:
+		var _bound := game.combat_feel.bind_console(console, hud.crosshair())
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
