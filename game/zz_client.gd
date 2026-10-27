@@ -2635,6 +2635,8 @@ func _key_event(event: InputEvent) -> bool:
 		# Offline the world's arsenal is this one and the server path cycles it.
 		if not _offline and weapons != null and weapons.arsenal != null:
 			var _moded := weapons.arsenal.cycle_fire_mode()
+		if audio != null and weapons != null and weapons.arsenal != null and weapons.arsenal.fire_modes_available().size() > 1:
+			var _clicked := audio.click()
 		return true
 
 	if event.is_action_pressed(ZzBindings.SHOVE):

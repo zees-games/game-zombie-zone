@@ -7,6 +7,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzHud := preload("../game/zz_hud.gd")
@@ -31,8 +32,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 26
-const CHECKS := 171
+const SECTIONS := 27
+const CHECKS := 174
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -85,6 +86,7 @@ func _run() -> void:
 		await _test_the_map_arrives()
 		await _test_the_local_player_is_predicted()
 		await _test_shots_count_online()
+		await _test_fire_mode_reaches_the_server()
 		await _test_zombies_replicate()
 		await _test_a_head_shot_off_reaches_the_client()
 		await _test_gore_off_takes_no_limb()
@@ -560,6 +562,46 @@ func _test_shots_count_online() -> void:
 	rig.queue_free()
 	hud.queue_free()
 	_finished()
+
+
+func _test_fire_mode_reaches_the_server() -> void:
+	_section("B on the client switches the server's fire mode, and a burst fires exactly three there")
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	var armed := _server_game.arm(server_me, ZzWeaponIds.M4)
+	await _steps(4)
+	var arsenal := server_me.weapons.arsenal
+	var slot: int = ZzWeapons.def_of(ZzWeaponIds.M4).slot
+	for _i in range(90):
+		await _mode_step(false, 0, slot)
+	_check(armed and arsenal.current_def().id == ZzWeaponIds.M4 and arsenal.fire_modes_available().size() >= 3, "the server holds a rifle with several modes")
+	var start := arsenal.fire_mode()
+	var guard := 0
+	while arsenal.fire_mode() != DotWeaponDef.Fire.BURST and guard < 4:
+		for _i in range(6):
+			await _mode_step(false, ZzNetCommand.ACT_FIRE_MODE if _i < 3 else 0, slot)
+		guard += 1
+	_check(arsenal.fire_mode() == DotWeaponDef.Fire.BURST and arsenal.fire_mode() != start, "pressing B reaches the server's arsenal", "%d presses" % guard)
+	await _steps(20)
+	var mag := arsenal.current().magazine
+	await _mode_step(true, 0, slot)
+	await _mode_step(true, 0, slot)
+	for _i in range(40):
+		await _mode_step(false, 0, slot)
+	_check(mag - arsenal.current().magazine == 3, "one pull in burst spends three rounds on the server", "%d -> %d" % [mag, arsenal.current().magazine])
+	_finished()
+
+
+func _mode_step(fire: bool, actions: int, slot: int) -> void:
+	var move := DotFpsCommand.new()
+	move.set_button(ZzNetCommand.BUTTON_FIRE, fire)
+	_tick += 1
+	var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
+	_server_bridge.server_tick(_tick)
+	_flush()
+	_client_bridge.client_tick(_tick + INPUT_LEAD, move, slot, actions)
+	_flush()
+	await get_tree().physics_frame
 
 
 ## Steps with the trigger and R as the client's buttons, sent to the server and given to the

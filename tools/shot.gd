@@ -571,6 +571,10 @@ func _run() -> void:
 			await _crosshair_frames(game, local)
 			get_tree().quit(0)
 			return
+		"firemode":
+			await _fire_mode_frames(game, local)
+			get_tree().quit(0)
+			return
 		"weapons":
 			await _weapon_sheets(game, local)
 			get_tree().quit(0)
@@ -794,6 +798,27 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 			Input.action_release(action)
 		_client.set("_aiming", false)
 		await _seconds_of(0.8)
+
+
+## The fire-mode indicator in each state the held gun offers: `--view=firemode [--weapons=zz_m4]`.
+func _fire_mode_frames(game: ZzGame, local) -> void:
+	var id: StringName = StringName(_weapons[0]) if not _weapons.is_empty() else &"zz_m4"
+	if not game.arm(local, id):
+		print("not armed with %s" % id)
+		return
+	local.health.invulnerable = true
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var arsenal: DotWeaponArsenal = _client.get("weapons").arsenal
+	var _picked := arsenal.select(ZzWeapons.def_of(id).slot, 0)
+	await _seconds_of(2.0)
+	for mode in arsenal.fire_modes_available():
+		var _set := arsenal.set_fire_mode(mode)
+		await _seconds_of(0.6)
+		await RenderingServer.frame_post_draw
+		var image := get_viewport().get_texture().get_image()
+		var path := dir.path_join("firemode_%d.png" % mode)
+		print("mode %d -> %s" % [mode, error_string(image.save_png(path))])
 
 
 func _ads_save(dir: String, id: StringName, stage: String, hud) -> void:

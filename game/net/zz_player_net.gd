@@ -113,6 +113,7 @@ var net_fire_seq: int = 0
 var net_fire_kind: int = 0
 var net_reloading: bool = false
 var net_switching: bool = false
+var net_fire_mode: int = 0
 
 # --- An administrator's marks, from the live tools ---------------------------
 
@@ -177,7 +178,9 @@ func _register_net_vars() -> void:
 	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_watching", DotNetVar.Type.BOOL)
 
-	for spec in ZeeWeaponNet.all_specs():
+	var weapon_specs := ZeeWeaponNet.all_specs()
+	weapon_specs.append_array(DotWeaponNetSync.fire_mode_specs())
+	for spec in weapon_specs:
 		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
