@@ -30,7 +30,7 @@ const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
 const SHOVE := &"zz_shove"
-## Switches the flashlight (on F's neighbour, T, because F is the shove).
+## Switches the flashlight (on F since 2026-10-27; the shove moved to T).
 const FLASHLIGHT := &"zz_flashlight"
 ## Takes a carried box out of the pack into the hands, or puts it away; the box in the hands is
 ## deployed with primary fire, held.
@@ -57,8 +57,8 @@ static func make() -> DotMenuBindings:
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
-	keys.add(SHOVE, &"bind_shove", "Shove", "F", "Hands")
-	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "T", "Hands")
+	keys.add(SHOVE, &"bind_shove", "Shove", "T", "Hands")
+	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "F", "Hands")
 	keys.add(BOX, &"bind_box", "Take out or put away a carried box", "X", "Hands")
 	keys.add(FIRE, &"bind_fire", "Primary fire (hold to deploy a box)", "Mouse 1", "Weapons")
 	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Weapons")
@@ -72,5 +72,5 @@ static func make() -> DotMenuBindings:
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# Defaults that moved under saved documents: the medkit left H for help, the shove left V
 	# for push to talk. A player who never touched them follows; a key they chose stays.
-	var _r := keys.renamed(&"bind_heal", ["H"]).renamed(&"bind_shove", ["V"])
+	var _r := keys.renamed(&"bind_heal", ["H"]).renamed(&"bind_shove", ["V", "F"]).renamed(&"bind_flashlight", ["T"])
 	return keys

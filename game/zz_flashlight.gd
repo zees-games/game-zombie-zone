@@ -7,10 +7,10 @@ const ZzAudio := preload("zz_audio.gd")
 const GAME_ID := "game-zombie-zone"
 
 
-## A config with this game's defaults: the key is T because F is the shove.
+## A config with this game's defaults: the key is F; the shove moved to T.
 static func make_config() -> DotFlashlightConfig:
 	var cfg := DotFlashlightConfig.new()
-	cfg.key = "T"
+	cfg.key = "F"
 	return cfg
 
 
