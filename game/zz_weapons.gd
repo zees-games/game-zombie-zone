@@ -129,7 +129,7 @@ static func ids_of(tier: StringName) -> Array[StringName]:
 
 ## A weighted pick among the weapons of [param tier] (or any), drawn for [param channel] (`box`, `loot`,
 ## `cache`, or "" for none; the spawner pools use `spawner`, `wall`, `crate`, `trader` through channel_weight): `weapons.not_in.<channel>` keeps ids out of one channel, `weapons.weights`
-## weighs each draw (default 1, 0 never), both from `cfg/addons/zombie_zone/packs.yml`.
+## weighs each draw (default 1, 0 never), both from `cfg/addon/zombie_zone/packs.yml`.
 static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: StringName = &"") -> StringName:
 	var ids := ids_of(tier) if tier != &"any" else _any()
 	var barred: Array = ZzPackList.cfg("weapons.not_in.%s" % channel, []) if channel != &"" else []

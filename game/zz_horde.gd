@@ -550,6 +550,7 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	DotLog.info(CHANNEL, "navigation built", {
 		"map": str(_doc.get("id", "")), "points": nav.point_count(), "edges": nav.edge_count(),
 		"spawns": kept, "ms": Time.get_ticks_msec() - _nav_started, "cached": job.from_cache,
+		"cache": job.cache_path.get_file() if job.cache_path != "" else "off", "cache_file": job.cache_path != "" and FileAccess.file_exists(job.cache_path),
 	})
 	return DotResult.success(kept)
 

@@ -23,7 +23,7 @@ extends RefCounted
 ## monster is a re-skinned body, not a scene of its own), `brain` a script path (default: the
 ## common's chase and bite). Both ends scan, so both end up with the same catalogue.
 ##
-## [b]Tuning is `cfg/addons/zombie_zone/*.yml`[/b], every file read by dot-core's
+## [b]Tuning is `cfg/addon/zombie_zone/*.yml`[/b], every file read by dot-core's
 ## `DotAddonConfig` (see its docs/addon-config.md); the defaults are [constant DEFAULTS].
 
 const CHANNEL := "zz.packs"

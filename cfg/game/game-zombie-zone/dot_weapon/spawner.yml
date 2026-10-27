@@ -3,7 +3,7 @@
 default_pool: wall_guns
 
 # Every pool has a `channel` (where it is offered); the weapons.not_in / weapons.weights keys of
-# cfg/addons/zombie_zone/packs.yml are applied per channel: spawner, wall, crate, trader.
+# cfg/addon/zombie_zone/packs.yml are applied per channel: spawner, wall, crate, trader.
 pools:
   wall_guns:
     channel: wall

@@ -7,7 +7,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 ## (every special and the brute), each kind with its own odds. The boxes are [ZzBoxes]' and stay a
 ## separate, rarer drop.
 ##
-## [b]Tuning is `cfg/addons/zombie_zone/drops.yml`[/b] (every `*.yml` there, then the game, then the
+## [b]Tuning is `cfg/addon/zombie_zone/drops.yml`[/b] (every `*.yml` there, then the game, then the
 ## operator's `cfg/server/...` tiers, then `ZOMBIE_ZONE_DROPS_*` and `--zombie_zone.drops.*`), read
 ## by dot-core's [DotAddonConfig]. A kind's setting is the first found of `types.<kind>`, then its
 ## class (`common`, or `mutant` for every other kind, a pack's monster included), then the top level.

@@ -92,7 +92,7 @@ func backpack_price(tier: int) -> int:
 
 # --- Weapon weights ------------------------------------------------------------
 
-## Gives every def of [param catalogue] that no profile weighed (`weight:` in `cfg/addons/zee_weapons/weapon/<id>.yml`,
+## Gives every def of [param catalogue] that no profile weighed (`weight:` in `cfg/addon/zee_weapons/weapon/<id>.yml`,
 ## which the workbench edits) the default of its tier.
 func tune_catalogue(catalogue: DotWeaponCatalogue) -> void:
 	for id in catalogue.ids():
