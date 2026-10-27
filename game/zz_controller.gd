@@ -53,6 +53,11 @@ const WADING := &"zz_wading"
 ## Carrying more than the limit allows (`zz_weight_over_limit slow`): the scale is the carry rule's, set by [method set_weight_scale].
 const WEIGHT := &"zz_weight"
 
+## Standing in goo: the slow comes in four fixed steps (a definition is what both ends registered at start), the nearest to the puddle's `slow_factor`; held 0.35 s past the last tick in it.
+const GOO_SLOW := &"zz_goo_slow_0"
+const GOO_SLOW_PREFIX := "zz_goo_slow_"
+const GOO_SLOW_LEVELS: Array[float] = [0.4, 0.55, 0.7, 0.85]
+
 ## Knocked flying, toward one of eight compass points (index 0 is -Z, then clockwise).
 const KNOCK_PREFIX := "zz_knock_"
 const KNOCK_DIRECTIONS := 8
@@ -135,6 +140,13 @@ func _register_extensions() -> void:
 		knock.impulse_clears_velocity = true
 		var _k := motor.register_modifier(knock)
 
+	for i in GOO_SLOW_LEVELS.size():
+		var goo := DotFpsModifier.make(StringName(GOO_SLOW_PREFIX + str(i)))
+		goo.duration_sec = 0.35
+		goo.refreshable = true
+		goo.max_speed_scale = GOO_SLOW_LEVELS[i]
+		var _g := motor.register_modifier(goo)
+
 
 ## Sets the pace of a downed survivor, [param metres_per_second] (0: cannot move). Registers the
 ## DOWN modifier again, which replaces its definition and keeps its place in the order; called
@@ -176,6 +188,24 @@ func set_weight_scale(scale: float) -> void:
 		var _on := add_modifier(WEIGHT)
 	else:
 		var _off := remove_modifier(WEIGHT)
+
+
+## Slows to the step nearest [param factor] (a multiple of a run, 1 or more is none) for the next third of a second.
+func goo_slow(factor: float) -> void:
+	if factor >= 0.999:
+		return
+
+	var best := 0
+	for i in GOO_SLOW_LEVELS.size():
+		if absf(GOO_SLOW_LEVELS[i] - factor) < absf(GOO_SLOW_LEVELS[best] - factor):
+			best = i
+
+	for i in GOO_SLOW_LEVELS.size():
+		var id := StringName(GOO_SLOW_PREFIX + str(i))
+		if i == best:
+			var _on := add_modifier(id)
+		elif has_modifier(id):
+			var _off := remove_modifier(id)
 
 
 ## The knock modifier that throws somebody along [param direction] (horizontal).

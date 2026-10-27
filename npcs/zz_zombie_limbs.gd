@@ -14,9 +14,9 @@ const BASE := &"zombie"
 ## [param max_health] becomes its `health` (0 leaves `health` as written, or 100).
 static func defs_for(kind: StringName, max_health: float) -> Dictionary:
 	# A kind with a body of its own lists every limb and takes none of the zombie's.
-	var base := DotNpcLimbs.defs_from_config(BASE) if kind != &"mutant" else {}
+	var base := DotNpcLimbs.defs_from_config(BASE) if kind != &"mutant" and kind != &"oil_monster" else {}
 
-	if base.is_empty() and kind != &"mutant":
+	if base.is_empty() and kind != &"mutant" and kind != &"oil_monster":
 		return {}
 
 	var defs := base.duplicate(true)

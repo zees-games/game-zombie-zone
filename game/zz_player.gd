@@ -133,6 +133,9 @@ var burning_until: float = -1.0
 ## Replicated flags for the two above, on a client.
 var biled: bool = false
 var burning: bool = false
+## Goo on the screen: stacks (0 to 3) until [member goo_until], simulated seconds. Server side; replicated in `net_status`.
+var goo_stacks: int = 0
+var goo_until: float = -1.0
 
 ## A box's flash: their screen white. Set from the box effects on the server, replicated.
 var box_blind: bool = false
@@ -795,6 +798,8 @@ func reset_map() -> void:
 	shove_ready_at = 0.0
 	biled_until = -1.0
 	burning_until = -1.0
+	goo_stacks = 0
+	goo_until = -1.0
 	biled = false
 	burning = false
 	died_at = -1.0
@@ -815,7 +820,7 @@ func reset_map() -> void:
 	if controller != null:
 		for id in [ZzController.PINNED, ZzController.DOWN, ZzController.LIMP, ZzController.BUSY,
 				ZzController.HASTE, ZzController.LOW_GRAVITY, ZzController.HEAVY,
-				ZzController.MOVE_BOOST, ZzController.CRAWL_BOOST, ZzController.WADING]:
+				ZzController.MOVE_BOOST, ZzController.CRAWL_BOOST, ZzController.WADING, ZzController.GOO_SLOW, &"zz_goo_slow_1", &"zz_goo_slow_2", &"zz_goo_slow_3"]:
 			var _off := controller.remove_modifier(id)
 
 	fit_hitboxes()

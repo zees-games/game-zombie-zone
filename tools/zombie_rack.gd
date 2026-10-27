@@ -17,10 +17,10 @@ extends SceneTree
 
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SPECIALS: Array[StringName] = [&"leaper", &"strangler", &"bloater", &"ram", &"spitter", &"rider",
-	&"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant"]
+	&"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant", &"oil_monster"]
 
 ## Column title, the state, and whether it is a death.
 const COLUMNS := [
@@ -132,7 +132,7 @@ func _initialize() -> void:
 		root.add_child(floor_mesh)
 
 		for c in _columns.size():
-			var view: ZzZombieView = ZzMutantView.new() if rows[r][0] == &"mutant" else ZzZombieView.new()
+			var view: ZzZombieView = ZzWorldView.view_for(rows[r][0])
 			root.add_child(view)
 			view.position = Vector3(float(c) * cell.x, -float(r) * cell.y, 0.0)
 			view.rotation.y = deg_to_rad(180.0 - 30.0)

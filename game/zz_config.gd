@@ -551,6 +551,14 @@ func setup_seconds() -> float:
 @export_range(0.0, 1.0, 0.01) var mutant_chance: float = 0.12
 @export_range(0, 100, 1) var mutant_min_wave: int = 3
 
+## The oil monster: the chance a special roll may pick it (rare), and the first wave it can appear on. Its slide, spit, goo and trail numbers are its profile's keys (`zz_oil_*`).
+@export_range(0.0, 1.0, 0.01) var oil_monster_chance: float = 0.3
+@export_range(0, 100, 1) var oil_monster_min_wave: int = 2
+
+## The black goo a spit leaves on the screen (drawing only, replicated): how much one stack covers, the most the stacks reach (1 is a blackout).
+@export_range(0.0, 1.0, 0.01) var goo_screen_per_stack: float = 0.4
+@export_range(0.0, 1.0, 0.01) var goo_screen_max: float = 0.9
+
 ## Seconds between brutes, from and to, on a campaign map. 0 never.
 @export_range(0.0, 3600.0, 10.0) var brute_interval_min: float = 300.0
 @export_range(0.0, 3600.0, 10.0) var brute_interval_max: float = 480.0

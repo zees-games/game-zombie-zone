@@ -143,6 +143,8 @@ var _scoped: bool = false
 ## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
 var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
 var _bile: ColorRect = null
+## The black goo a spit leaves on the screen; stacks come from the server in `net_status`.
+var _goo: DotFxScreenGoo = null
 var _blind: ColorRect = null
 var _fire: ColorRect = null
 var _grey: ColorRect = null
@@ -177,6 +179,11 @@ func _build() -> void:
 	_wet = _cover("Wet", Color(0.04, 0.30, 0.40))
 	_bile = _cover("Bile", Color(0.38, 0.52, 0.08))
 	_fire = _cover("Fire", Color(0.95, 0.4, 0.05))
+	_goo = DotFxScreenGoo.new()
+	_goo.name = "Goo"
+	_goo.layer = layer - 1
+	_goo.status_fade_in = 1.0
+	add_child(_goo)
 	_grey = _cover("LastLife", Color(0.12, 0.12, 0.12))
 	_blind = _cover("Blind", Color(0.97, 0.97, 0.94))
 
@@ -1014,6 +1021,9 @@ func _draw_effects() -> void:
 func _draw_overlays(delta: float) -> void:
 	var step := maxf(delta, 0.0) / BLIND_FADE_SEC
 	_fade(_bile, 0.42 if player.biled else 0.0, step)
+	_goo.per_stack_amount = game.config.goo_screen_per_stack
+	_goo.max_amount = game.config.goo_screen_max
+	_goo.set_status(player.goo_stacks, 1.0)
 	_fade(_wet, 0.38 if player.submerged else 0.0, step * 2.0)
 	_draw_air()
 	_fade(_blind, 1.0 if (player.blinded or player.box_blind) else 0.0, step * 0.5)

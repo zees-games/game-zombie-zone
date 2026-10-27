@@ -2,7 +2,7 @@ extends Node
 
 const ZzPlayer := preload("zz_player.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzWorldView := preload("zz_world_view.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## Row key of the zombies in a recorded frame (a player's key is never this).
@@ -235,7 +235,7 @@ func _ghost(key: int, kind: StringName, variant: int) -> Dictionary:
 	if not _ghosts.has(key):
 		var holder := Node3D.new()
 		_ghost_root.add_child(holder)
-		var view: ZzZombieView = ZzMutantView.new() if kind == &"mutant" else ZzZombieView.new()
+		var view: ZzZombieView = ZzWorldView.view_for(kind)
 		holder.add_child(view)
 		view.build(kind, variant)
 		# A view built this frame is in its bind pose (arms out) until a clip has run.

@@ -7,7 +7,7 @@ extends SceneTree
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
-const KINDS: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloater", &"ram", &"spitter", &"rider", &"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant"]
+const KINDS: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloater", &"ram", &"spitter", &"rider", &"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant", &"oil_monster"]
 const SKY := Color(0.3, 0.32, 0.36)
 
 var _out := "res://screenshots/range"

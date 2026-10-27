@@ -1289,6 +1289,20 @@ func beam(kind: StringName, from: Vector3, to: Vector3) -> void:
 	game.hazards.beam(kind, from, to)
 
 
+## Hands the oil monster's `goo_*` and `trail_*` numbers (its profile) to the pools.
+func configure_goo(meta: Dictionary) -> void:
+	game.hazards.configure_from_meta(meta)
+
+
+## Leaves a trail puddle behind [param npc] if it has moved far enough since the last; returns its id or 0.
+func goo_trail(npc: DotNpcInstance) -> int:
+	return game.hazards.trail(entity_id_for(npc), npc.position())
+
+
+func end_goo_trail(npc: DotNpcInstance) -> void:
+	game.hazards.end_trail(entity_id_for(npc))
+
+
 ## The mutant's dive landing: survivors within [param radius] take [param amount] and are thrown.
 func slam(npc: DotNpcInstance, at: Vector3, radius: float, amount: float) -> int:
 	return game.hazards.slam(at, radius, amount, entity_id_for(npc) if npc != null else 0)
@@ -1882,6 +1896,9 @@ func _allowed_specials() -> Array[StringName]:
 		if config.special_kinds.is_empty() or config.special_kinds.has(String(kind)):
 			# The mutant is rare: a roll per pick, and not before its first wave.
 			if kind == ZzNpcs.MUTANT and (wave_index < config.mutant_min_wave or _rng.randf() >= config.mutant_chance):
+				continue
+			# The oil monster is rare too, by its own roll and first wave.
+			if kind == ZzNpcs.OIL_MONSTER and (wave_index < config.oil_monster_min_wave or _rng.randf() >= config.oil_monster_chance):
 				continue
 			out.append(kind)
 

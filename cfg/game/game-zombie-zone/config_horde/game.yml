@@ -160,6 +160,14 @@
 # mutant_chance: 0.12
 #  [0..100]
 # mutant_min_wave: 3
+# The oil monster: the chance a special roll may pick it (rare), and the first wave it can appear on. Its sli... [0.0..1.0]
+# oil_monster_chance: 0.3
+#  [0..100]
+# oil_monster_min_wave: 2
+# The black goo a spit leaves on the screen (drawing only, replicated): how much one stack covers, the most t... [0.0..1.0]
+# goo_screen_per_stack: 0.4
+#  [0.0..1.0]
+# goo_screen_max: 0.9
 # Seconds between brutes, from and to, on a campaign map. 0 never. [0.0..3600.0]
 # brute_interval_min: 300.0
 #  [0.0..3600.0]

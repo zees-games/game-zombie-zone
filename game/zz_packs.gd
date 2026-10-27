@@ -36,7 +36,7 @@ const MAX_ENTRIES_PER_PROVIDER := 256
 
 ## The game's own kinds: a pack monster of the same name would shadow one, so it is refused.
 const RESERVED: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloater", &"ram", &"spitter",
-	&"rider", &"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant"]
+	&"rider", &"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant", &"oil_monster"]
 
 const TIERS_ALL: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]
 

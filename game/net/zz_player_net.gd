@@ -80,7 +80,7 @@ var net_kits: int = 0
 ## the type when `box_labels` is off.
 var net_carry: int = 0
 
-## Bile in bit 0, burning in bit 1, a box's blinding in bit 2.
+## Bile in bit 0, burning in bit 1, a box's blinding in bit 2, goo stacks on the screen (0 to 3) in bits 3-4.
 var net_status: int = 0
 
 const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride"]
@@ -172,7 +172,7 @@ func _register_net_vars() -> void:
 	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7)
 	replicate(&"net_using", DotNetVar.Type.UINT).bits(3)
 	replicate(&"net_kits", DotNetVar.Type.UINT).bits(5)
-	replicate(&"net_status", DotNetVar.Type.UINT).bits(3)
+	replicate(&"net_status", DotNetVar.Type.UINT).bits(5)
 	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
 	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
@@ -265,7 +265,7 @@ func pull() -> void:
 	net_using = maxi(USES.find(player.using), 0)
 	net_kits = (1 if player.medkits > 0 else 0) | (2 if player.pills > 0 else 0) | (mini(player.defibs, 7) << 2)
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
-	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0)
+	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3)
 	net_points = clampi(player.points, 0, 65535)
 	net_ping = clampi(player.ping_ms, 0, 1023)
 	net_watching = player.watching
@@ -369,6 +369,7 @@ func _adopt() -> void:
 	player.biled = (net_status & 1) != 0
 	player.burning = (net_status & 2) != 0
 	player.box_blind = (net_status & 4) != 0
+	player.goo_stacks = (net_status >> 3) & 3
 	player.points = net_points
 	player.ping_ms = net_ping
 	player.watching = net_watching

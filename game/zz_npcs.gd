@@ -67,10 +67,11 @@ const SCREAMER := &"screamer"
 const CRAWLER := &"crawler"
 const RIOT := &"riot"
 const MUTANT := &"mutant"
+const OIL_MONSTER := &"oil_monster"
 
 ## The specials the director chooses between. Not the brute (its own clock) or the sleeper
 ## (placed by the map).
-const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT, MUTANT]
+const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT, MUTANT, OIL_MONSTER]
 
 const FACTION := &"infected"
 
@@ -88,6 +89,7 @@ static var SCREAMER_BRAIN := ZzPaths.rebase("res://npcs/zz_screamer_brain.gd")
 static var CRAWLER_BRAIN := ZzPaths.rebase("res://npcs/zz_crawler_brain.gd")
 static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
 static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
+static var OIL_MONSTER_BRAIN := ZzPaths.rebase("res://npcs/zz_oil_monster_brain.gd")
 
 
 static func is_special(kind: StringName) -> bool:
@@ -128,7 +130,7 @@ static func catalogue(config: ZzConfig = null, roots: PackedStringArray = Packed
 static func builtin(c: ZzConfig) -> Array:
 	var out: Array = []
 	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c), _mutant(c)]:
+			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c), _mutant(c), _oil_monster(c)]:
 		out.append(_eyes(def))
 	return out
 
@@ -329,6 +331,27 @@ static func _mutant(c: ZzConfig) -> DotNpcDef:
 		"angry_health": 0.4, "charge_time": 1.4, "charge_height": 12.0, "dive_speed": 26.0,
 		"slam_radius": 7.0, "slam_damage": 30.0, "slam_recover": 3.0, "dive_cooldown": 8.0,
 		"body": "mutant", "radius": 0.55, "height": 2.4,
+	}
+	return def
+
+
+## The oil monster: slides, leaves a trail, spits goo that blinds and pools. `goo_*` keys are the spit's puddle, `trail_*` the trail's
+## (dot-effects' DotHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
+static func _oil_monster(c: ZzConfig) -> DotNpcDef:
+	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, DotNpcDef.Weight.HEAVY)
+	def.sight_range = 50.0
+	def.sight_half_angle_deg = 110.0
+	def.hearing_range = 22.0
+	def.meta = {
+		"damage": 12.0, "reach": 2.0, "attack_interval": 1.6,
+		"spit_range": 26.0, "spit_min": 5.0, "spit_cooldown": 7.0, "spit_speed": 16.0, "spit_damage": 8.0, "spit_windup": 0.5,
+		"blind_seconds": 4.0, "blind_max_stacks": 3,
+		"goo_radius": 2.6, "goo_seconds": 9.0, "goo_dps": 9.0, "goo_dps_start": 9.0, "goo_slow_factor": 0.6,
+		"goo_tick_interval": 0.25, "goo_fade_seconds": 2.0, "goo_global_cap": 40,
+		"trail_radius": 1.1, "trail_seconds": 6.0, "trail_dps": 5.0, "trail_dps_start": 5.0, "trail_slow_factor": 0.75,
+		"trail_tick_interval": 0.5, "trail_fade_seconds": 1.5, "trail_max_per_owner": 30, "trail_global_cap": 120,
+		"trail_spacing": 1.4, "trail_interval": 0.2,
+		"body": "oil_monster", "radius": 0.6, "height": 2.5,
 	}
 	return def
 

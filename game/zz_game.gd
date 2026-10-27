@@ -3120,6 +3120,20 @@ func hazard_damage(player: ZzPlayer, amount: float, owner: int, kind: StringName
 	player_hurt.emit(player.player_id, floorf(owed), player.feet())
 
 
+## A glob of the oil monster's goo struck [param victim]: damage, and one more stack of blinding goo on their screen (up to the monster's `blind_max_stacks`) for `blind_seconds`.
+func goo_hit(victim: StringName, amount: float, owner: int) -> void:
+	var player := player_by_id(victim)
+
+	if player == null or not player.is_alive():
+		return
+
+	var npc: DotNpcInstance = horde.npc_for_entity(owner) if horde != null else null
+	var meta: Dictionary = npc.def.meta if npc != null else {}
+	hazard_damage(player, amount, owner, ZzHazards.GOO)
+	player.goo_stacks = mini(player.goo_stacks + 1, int(meta.get("blind_max_stacks", 3)))
+	player.goo_until = now() + float(meta.get("blind_seconds", 4.0))
+
+
 ## Thrown sideways by something big: damage, and a knock away from [param from].
 func knock_survivor(victim: StringName, from: Vector3, amount: float, owner: int) -> void:
 	var player := player_by_id(victim)
@@ -3500,6 +3514,12 @@ func _advance_bodies(delta: float) -> void:
 
 		player.biled = player.biled_until > now_s
 		player.burning = player.burning_until > now_s
+
+		if player.goo_stacks > 0 and player.goo_until <= now_s:
+			player.goo_stacks = 0
+
+		if hazards != null and player.controller != null and player.is_up():
+			player.controller.goo_slow(hazards.slow_of(player.player_id))
 		player.box_blind = boxes != null and boxes.is_blind(player.player_id)
 
 		if player.protected_until >= 0.0 and now_s >= player.protected_until:

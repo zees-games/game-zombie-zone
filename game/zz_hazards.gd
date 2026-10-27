@@ -42,6 +42,12 @@ const BEAM_ZAP := &"beam_zap"
 const BEAM_PULL := &"beam_pull"
 ## The mutant's dive landing: survivors only, unlike [method ZzGame.explode].
 const SLAM := &"slam"
+## The oil monster's: black goo (a puddle), the trail it leaves sliding, and the glob it spits (hits a survivor directly, then leaves a GOO puddle).
+const GOO := &"goo"
+const GOO_TRAIL := &"goo_trail"
+const GOO_SPIT := &"goo_spit"
+## A goo glob hits a survivor whose middle passes this close to it.
+const GOO_HIT_RADIUS := 1.1
 
 ## A bile jar draws the horde this far, for this long.
 const BILE_LURE := 35.0
@@ -84,7 +90,11 @@ var _next_id: int = 1
 var pool := DotHazardPool.new()
 
 ## Hazard kind -> its [DotHazardProfile]; a kind not here is simulated by this file.
-var profiles: Dictionary = {ACID: DotHazardProfile.acid()}
+var profiles: Dictionary = {ACID: DotHazardProfile.acid(), GOO: goo_profile(), GOO_TRAIL: trail_profile()}
+
+## The slow of the puddles a survivor stood in at the last tick, by player id (1 is none).
+func slow_of(player_id: StringName) -> float:
+	return pool.slow_of(player_id)
 
 
 func _init(p_game: Object) -> void:
@@ -108,6 +118,46 @@ func _pay(player: Object, amount: float, owner: int, kind: StringName) -> void:
 
 func _victim_key(player: Object) -> Variant:
 	return player.player_id
+
+
+## The spit's puddle: black, slow, hurts at once and at a steady rate, fades out over its last seconds.
+static func goo_profile() -> DotHazardProfile:
+	return DotHazardProfile.from_values({"kind": "goo", "radius": 2.6, "seconds": 9.0, "dps": 9.0, "dps_start": 9.0,
+		"ramp_seconds": 0.0, "tick_interval": 0.25, "slow_factor": 0.6, "fade_seconds": 2.0, "global_cap": 40,
+		"color": "050508cc"})
+
+
+## What the oil monster leaves behind as it slides: small, short, weaker than the spit's puddle.
+static func trail_profile() -> DotHazardProfile:
+	return DotHazardProfile.from_values({"kind": "goo_trail", "radius": 1.1, "seconds": 6.0, "dps": 5.0, "dps_start": 5.0,
+		"ramp_seconds": 0.0, "tick_interval": 0.5, "slow_factor": 0.75, "fade_seconds": 1.5, "grow_seconds": 0.4,
+		"start_fraction": 0.5, "max_per_owner": 30, "global_cap": 120, "trail_spacing": 1.4, "trail_interval": 0.2,
+		"color": "0a0a10b3"})
+
+
+## Reads the oil monster's profile (its `goo_*` keys for the puddle, `trail_*` for the trail) onto the two pool profiles.
+## A key not in [param meta] keeps what it was, so a cvar or a profile file changes only what it names.
+func configure_from_meta(meta: Dictionary) -> void:
+	for pair: Array in [[GOO, "goo_"], [GOO_TRAIL, "trail_"]]:
+		var values := {}
+
+		for key: String in DotHazardProfile.KEYS:
+			# trail_spacing and trail_interval are the profile's own names; the trail's radius and life are its `radius` and `seconds`.
+			var mk: String = key if key.begins_with("trail_") else String(pair[1]) + key
+
+			if pair[0] == GOO_TRAIL and key in ["trail_radius", "trail_seconds"]:
+				continue
+
+			if pair[0] == GOO_TRAIL and key in ["radius", "seconds"]:
+				mk = "trail_" + key
+
+			if pair[0] == GOO and key.begins_with("trail_"):
+				continue
+
+			if meta.has(mk):
+				values[key] = meta[mk]
+
+		configure(pair[0], values)
 
 
 func _on_pool_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> void:
@@ -177,6 +227,15 @@ func slam(at: Vector3, radius: float, amount: float, owner: int) -> int:
 	return hit
 
 
+## Drops a goo puddle behind [param owner] (a monster's entity id) at [param at] if it has slid far enough since the last.
+func trail(owner: int, at: Vector3) -> int:
+	return pool.trail(profiles[GOO_TRAIL], owner, at, game.now())
+
+
+func end_trail(owner: int) -> void:
+	pool.end_trail(owner)
+
+
 ## A shell called down on [param at]: it falls for [param delay] seconds and goes off.
 func strike(at: Vector3, delay: float, amount: float, owner: int = 0) -> int:
 	var from := at + Vector3(0.0, GRAVITY * delay * delay * 0.5, 0.0)
@@ -227,6 +286,16 @@ func _advance_flying(delta: float) -> void:
 				landed.emit(id, ROCK, to)
 				continue
 
+		if p["kind"] == GOO_SPIT:
+			var struck: StringName = game.survivor_near_segment(from, to, GOO_HIT_RADIUS)
+
+			if struck != &"":
+				flying.erase(id)
+				game.goo_hit(struck, float(p["amount"]), int(p["owner"]))
+				var _g := add(GOO, to, -1.0, -1.0, -1.0, int(p["owner"]))
+				landed.emit(id, GOO_SPIT, to)
+				continue
+
 		# A rocket goes off on the first zombie it meets, not on the wall behind the crowd: the
 		# world ray does not see zombies.
 		if p["kind"] == ROCKET and game.horde != null and not game.horde.spawner.npcs_near(to + Vector3(0.0, -1.0, 0.0), 1.1).is_empty():
@@ -250,6 +319,9 @@ func _land(id: int, p: Dictionary, at: Vector3) -> void:
 		SPIT:
 			flying.erase(id)
 			var _a := add(ACID, at, 3.2, 7.0, float(p["amount"]), int(p["owner"]))
+		GOO_SPIT:
+			flying.erase(id)
+			var _o := add(GOO, at, -1.0, -1.0, -1.0, int(p["owner"]))
 		MOLOTOV:
 			flying.erase(id)
 			var _f := add(FIRE, at, 4.0, 12.0, float(p["amount"]), int(p["owner"]))

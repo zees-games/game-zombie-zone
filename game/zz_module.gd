@@ -75,6 +75,25 @@ var voteban: RefCounted = null
 ## The drawn ballot's notice topic. The client shell draws one menu per topic.
 const MAP_BALLOT_TOPIC := &"map_ballot"
 
+## [key, description, min, max] of the oil monster's tunables; `goo_*` and `trail_*` are DotHazardProfile keys (see ZzHazards.configure_from_meta).
+const OIL_TUNABLES: Array = [
+	["damage", "Damage of its bite", 0.0, 200.0], ["reach", "Reach of its bite in metres", 0.5, 6.0],
+	["spit_damage", "Damage of one glob of goo", 0.0, 200.0], ["spit_range", "Farthest it spits, metres", 1.0, 80.0],
+	["spit_min", "Closest it spits, metres", 0.0, 40.0], ["spit_cooldown", "Seconds between spits", 0.5, 120.0],
+	["spit_speed", "Speed of a glob, m/s", 4.0, 60.0], ["spit_windup", "Seconds the mouth opens before the glob leaves", 0.1, 3.0],
+	["blind_seconds", "Seconds a glob's goo stays on the screen", 0.0, 60.0], ["blind_max_stacks", "Most globs that stack on a screen (1 to 3)", 1.0, 3.0],
+	["goo_radius", "Radius of the spit's puddle, metres", 0.2, 20.0], ["goo_seconds", "Seconds the spit's puddle lasts", 0.5, 120.0],
+	["goo_dps", "Damage a second in the spit's puddle", 0.0, 200.0], ["goo_slow_factor", "Speed multiplier in the spit's puddle (1 none)", 0.05, 1.0],
+	["goo_tick_interval", "Seconds between the puddle's damage payments", 0.0, 5.0], ["goo_fade_seconds", "Seconds the puddle fades out at its end", 0.0, 30.0],
+	["goo_global_cap", "Spit puddles at once on the server (0 no limit)", 0.0, 1000.0],
+	["trail_radius", "Radius of a trail puddle, metres", 0.2, 10.0], ["trail_seconds", "Seconds a trail puddle lasts", 0.5, 120.0],
+	["trail_dps", "Damage a second in the trail", 0.0, 200.0], ["trail_slow_factor", "Speed multiplier in the trail (1 none)", 0.05, 1.0],
+	["trail_tick_interval", "Seconds between the trail's damage payments", 0.0, 5.0], ["trail_fade_seconds", "Seconds a trail puddle fades at its end", 0.0, 30.0],
+	["trail_spacing", "Metres slid between trail puddles", 0.2, 20.0], ["trail_interval", "Fewest seconds between trail puddles", 0.0, 10.0],
+	["trail_max_per_owner", "Trail puddles one monster may have at once (0 no limit)", 0.0, 1000.0],
+	["trail_global_cap", "Trail puddles at once on the server (0 no limit)", 0.0, 5000.0],
+]
+
 
 ## The cvars a map's `dot_map/map/<name>.yml` may set (zz_map_config.gd).
 func _map_config_keys() -> Dictionary:
@@ -640,6 +659,16 @@ func _add_tunables(world: ZzGame) -> void:
 		var key: String = row[0]
 		_tunable("zz_mutant_" + key, float(ZzNpcs._mutant(config).meta[key]), String(row[1]),
 			func(value: float) -> void: _set_meta(world, ZzNpcs.MUTANT, key, clampf(value, float(row[2]), float(row[3]))))
+	_tunable("zz_oil_monster_chance", config.oil_monster_chance, "Chance a special roll may pick the oil monster (0 never)",
+		func(value: float) -> void: config.oil_monster_chance = clampf(value, 0.0, 1.0))
+	_tunable("zz_oil_monster_min_wave", float(config.oil_monster_min_wave), "First wave the oil monster can appear on",
+		func(value: float) -> void: config.oil_monster_min_wave = maxi(int(value), 0))
+	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, dot-effects' DotHazardProfile keys).
+	var oil := ZzNpcs._oil_monster(config).meta
+	for row: Array in OIL_TUNABLES:
+		var key: String = row[0]
+		_tunable("zz_oil_" + key, float(oil[key]), String(row[1]),
+			func(value: float) -> void: _set_meta(world, ZzNpcs.OIL_MONSTER, key, clampf(value, float(row[2]), float(row[3]))))
 	_tunable("zz_brute_min", config.brute_interval_min, "Seconds between brutes, from (0 with zz_brute_max 0: never)",
 		func(value: float) -> void: config.brute_interval_min = clampf(value, 0.0, config.brute_interval_max))
 	_tunable("zz_brute_max", config.brute_interval_max, "Seconds between brutes, to",
@@ -1606,7 +1635,7 @@ func _bind_config(world: ZzGame) -> void:
 		if console.has_name(cvar_name):
 			hand[HAND_FIELDS[cvar_name]] = cvar_name
 	binder.replicate_groups = PackedStringArray(["Carry weight"])
-	binder.replicate_keys = PackedStringArray(["trader_closed_message", "grace_hud", "mutant_fade", "mutant_min_alpha", "mutant_fade_per_stack", "common_fade"])
+	binder.replicate_keys = PackedStringArray(["trader_closed_message", "grace_hud", "mutant_fade", "mutant_min_alpha", "mutant_fade_per_stack", "common_fade", "goo_screen_per_stack", "goo_screen_max"])
 	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, func(n: String) -> bool:
 		return console.has_name(n) or hand.has(n.trim_prefix("zz_")))
 	binder.bind_commands(add_command)

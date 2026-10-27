@@ -9,6 +9,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzOilMonsterView := preload("../npcs/zz_oil_monster_view.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
 
@@ -121,11 +122,22 @@ func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> 
 
 # --- Zombies -----------------------------------------------------------------
 
+## The view class a kind draws with: the mutant and the oil monster have bodies of their own.
+static func view_for(kind: StringName) -> ZzZombieView:
+	match kind:
+		&"mutant":
+			return ZzMutantView.new()
+		&"oil_monster":
+			return ZzOilMonsterView.new()
+
+	return ZzZombieView.new()
+
+
 func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	if body == null or _zombies.has(key):
 		return
 
-	var view: ZzZombieView = ZzMutantView.new() if kind == &"mutant" else ZzZombieView.new()
+	var view: ZzZombieView = view_for(kind)
 	view.name = "View"
 	view.lod = lod
 	body.add_child(view)
@@ -435,6 +447,10 @@ func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: 
 			node.add_child(light)
 		&"heal":
 			colour = Color(0.3, 1.0, 0.45, 0.3)
+		&"goo", &"goo_trail":
+			colour = Color(0.02, 0.02, 0.04, 0.85)
+			if kind == &"goo" and audio != null:
+				var _glop := audio.at(ZzAudio.SPLAT, at)
 		&"acid":
 			if audio != null:
 				var _splat := audio.at(ZzAudio.SPLAT, at)
@@ -608,6 +624,9 @@ func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 		&"bile":
 			colour = Color(0.45, 0.65, 0.1)
 			size = 0.16
+		&"goo_spit":
+			colour = Color(0.02, 0.02, 0.04)
+			size = 0.45
 
 	sphere.radius = size * 0.5
 	sphere.height = size

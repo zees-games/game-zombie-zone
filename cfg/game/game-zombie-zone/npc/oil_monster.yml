@@ -1,0 +1,46 @@
+name: Oil monster
+category: zombie
+faction: infected
+weight: heavy
+cost: 6
+health: 700.0
+speed: 3.0
+sight: 50.0
+sight_angle: 110.0
+hearing: 22.0
+los: true
+eye: 2.25
+extra:
+  damage: 12.0
+  reach: 2.0
+  attack_interval: 1.6
+  spit_range: 26.0
+  spit_min: 5.0
+  spit_cooldown: 7.0
+  spit_speed: 16.0
+  spit_damage: 8.0
+  spit_windup: 0.5
+  blind_seconds: 4.0
+  blind_max_stacks: 3
+  goo_radius: 2.6
+  goo_seconds: 9.0
+  goo_dps: 9.0
+  goo_dps_start: 9.0
+  goo_slow_factor: 0.6
+  goo_tick_interval: 0.25
+  goo_fade_seconds: 2.0
+  goo_global_cap: 40
+  trail_radius: 1.1
+  trail_seconds: 6.0
+  trail_dps: 5.0
+  trail_dps_start: 5.0
+  trail_slow_factor: 0.75
+  trail_tick_interval: 0.5
+  trail_fade_seconds: 1.5
+  trail_max_per_owner: 30
+  trail_global_cap: 120
+  trail_spacing: 1.4
+  trail_interval: 0.2
+  body: oil_monster
+  radius: 0.6
+  height: 2.5
