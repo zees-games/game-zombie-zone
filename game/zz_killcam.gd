@@ -1,6 +1,12 @@
 extends Node
 
 const ZzPlayer := preload("zz_player.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+
+## Row key of the zombies in a recorded frame (a player's key is never this).
+const ZOMBIES := "~zombies"
 
 ## The killcam at a map's end. Client side: every frame drawn goes into dot-replay's
 ## [DotKillcamBuffer], each decisive moment (the last death, the final wave cleared) is
@@ -24,6 +30,12 @@ var player_for_fn: Callable = Callable()
 ## `func(p: ZzPlayer) -> Vector3`: where this frame draws the player's feet.
 var feet_fn: Callable = Callable()
 
+## `func() -> Array`: the zombies near the survivors this frame, `ZzWorldView.snapshot` rows.
+var zombies_fn: Callable = Callable()
+
+## `func(on: bool)`: hides the live zombies while the replay draws its own.
+var replaying_fn: Callable = Callable()
+
 ## `func(p: ZzPlayer) -> Color`: the colour of the player's side.
 var colour_fn: Callable = func(_p: Node) -> Color: return Color.WHITE
 
@@ -43,6 +55,9 @@ var camera: Camera3D = null
 var _previous_camera: Camera3D = null
 var _touched: Dictionary = {}
 var _hidden: Dictionary = {}
+var _ghosts: Dictionary = {}
+var _ghost_root: Node3D = null
+var _last_real: float = -1.0
 
 
 func _ready() -> void:
@@ -128,6 +143,8 @@ func _record() -> void:
 		var row := _state_of(p)
 		if not row.is_empty():
 			shot[String(p.get(&"player_id"))] = row
+	if zombies_fn.is_valid():
+		shot[ZOMBIES] = zombies_fn.call()
 	var _kept := buffer.push_frame(now_fn.call(), shot)
 
 
@@ -147,6 +164,12 @@ func _on_started(_kill: Dictionary) -> void:
 		camera.fov = _previous_camera.fov
 		camera.cull_mask = _previous_camera.cull_mask
 	camera.make_current()
+	_ghost_root = Node3D.new()
+	_ghost_root.name = "ZombieGhosts"
+	add_child(_ghost_root)
+	_last_real = Time.get_ticks_usec() / 1000000.0
+	if replaying_fn.is_valid():
+		replaying_fn.call(true)
 	for n: Variant in hide_while_playing:
 		if n is Object and is_instance_valid(n) and (n as Object).get(&"visible") != null:
 			_hidden[n] = bool((n as Object).get(&"visible"))
@@ -161,7 +184,10 @@ func _apply(s: Dictionary) -> void:
 	var subject := String(killcam.kill()["data"].get("subject", ""))
 	if not camera.current:
 		camera.make_current()
+	_apply_zombies(a.get(ZOMBIES, []), b.get(ZOMBIES, []), alpha)
 	for id: Variant in b:
+		if String(id) == ZOMBIES:
+			continue
 		var p := _player(StringName(String(id)))
 		if p == null:
 			continue
@@ -180,6 +206,45 @@ func _apply(s: Dictionary) -> void:
 			_place_body(p, feet, yaw, alive, pitch, lerpf(ra[4], rb[4], alpha), rb[5] if alpha >= 0.5 else ra[5])
 
 
+# Zombies are drawn as ghosts of the recorded rows: the live bodies are where the map ended.
+func _apply_zombies(a: Array, b: Array, alpha: float) -> void:
+	var now := Time.get_ticks_usec() / 1000000.0
+	var delta := clampf(now - _last_real, 0.0, 0.1)
+	_last_real = now
+	var before := {}
+	for row: Array in a:
+		before[row[0]] = row
+	var seen := {}
+	for rb: Array in b:
+		var key: int = rb[0]
+		seen[key] = true
+		var ra: Array = before.get(key, rb)
+		var ghost := _ghost(key, rb[1], rb[2])
+		var holder: Node3D = ghost["root"]
+		holder.global_position = (ra[3] as Vector3).lerp(rb[3], alpha)
+		holder.global_rotation = Vector3(0.0, lerp_angle(ra[4], rb[4], alpha), 0.0)
+		(ghost["view"] as ZzZombieView).present(delta, rb[5], rb[6])
+	# Gone from the frame: it died, so it falls where it stood and stays down.
+	for key: Variant in _ghosts:
+		if not seen.has(key):
+			var g: Dictionary = _ghosts[key]
+			(g["view"] as ZzZombieView).present(delta, ZzZombieBody.Anim.DEAD, 0)
+
+
+func _ghost(key: int, kind: StringName, variant: int) -> Dictionary:
+	if not _ghosts.has(key):
+		var holder := Node3D.new()
+		_ghost_root.add_child(holder)
+		var view: ZzZombieView = ZzMutantView.new() if kind == &"mutant" else ZzZombieView.new()
+		holder.add_child(view)
+		view.build(kind, variant)
+		# A view built this frame is in its bind pose (arms out) until a clip has run.
+		view.present(0.1, ZzZombieBody.Anim.IDLE, 0)
+		view.present(0.1, ZzZombieBody.Anim.IDLE, 0)
+		_ghosts[key] = {"root": holder, "view": view}
+	return _ghosts[key]
+
+
 func _place_body(p: Node, feet: Vector3, yaw: float, shown: bool, pitch: float, speed: float, downed: bool) -> void:
 	var figure: Node3D = p.get(&"figure")
 	if figure == null and shown:
@@ -190,6 +255,9 @@ func _place_body(p: Node, feet: Vector3, yaw: float, shown: bool, pitch: float, 
 		return
 	if not _touched.has(p):
 		_touched[p] = [figure.transform, figure.visible]
+		var person: Object = figure.get(&"person")
+		if shown and person != null:
+			person.call(&"animate", speed, 0.1)
 	figure.visible = shown
 	if not shown:
 		return
@@ -198,6 +266,12 @@ func _place_body(p: Node, feet: Vector3, yaw: float, shown: bool, pitch: float, 
 
 
 func _on_finished(skipped: bool) -> void:
+	if replaying_fn.is_valid():
+		replaying_fn.call(false)
+	if _ghost_root != null:
+		_ghost_root.queue_free()
+		_ghost_root = null
+	_ghosts.clear()
 	for p: Variant in _touched:
 		if is_instance_valid(p):
 			var figure: Node3D = (p as Node).get(&"figure")

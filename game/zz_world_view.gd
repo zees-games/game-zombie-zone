@@ -147,6 +147,38 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 			entry["voice"] = handle
 
 
+## What the killcam records: [key, kind, variant, position, yaw, anim, flags] for each zombie
+## within [param radius] of [param centre].
+func snapshot(centre: Vector3, radius: float) -> Array:
+	var rows: Array = []
+	for key: int in _zombies:
+		var entry: Dictionary = _zombies[key]
+		var body: Node3D = entry["body"]
+		var view: ZzZombieView = entry["view"]
+		if body == null or not is_instance_valid(body) or view == null or not is_instance_valid(view):
+			continue
+		var at := body.global_position
+		if at.distance_squared_to(centre) > radius * radius:
+			continue
+		rows.append([key, entry["kind"], view.variant, at, body.global_rotation.y, int(body.get(&"anim")), int(body.get(&"flags"))])
+	return rows
+
+
+## Hides the live zombies and their corpses while a replay draws its own, and shows them again.
+func set_replaying(on: bool) -> void:
+	for key: int in _zombies:
+		var body: Node3D = _zombies[key]["body"]
+		if body != null and is_instance_valid(body):
+			body.visible = not on
+	for corpse: Array in _corpses:
+		var view: Node3D = corpse[0]
+		if view != null and is_instance_valid(view):
+			view.visible = not on
+	# The dead lie where they fell, in the replay's frame too: a still, sprawled body at the camera.
+	if ragdolls != null:
+		ragdolls.visible = not on
+
+
 ## The kind of the zombie drawn under [param key], or empty.
 func kind_of(key: int) -> StringName:
 	var entry: Variant = _zombies.get(key)

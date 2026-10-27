@@ -1632,6 +1632,11 @@ func _build_killcam() -> void:
 	killcam.name = "MapKillcam"
 	killcam.players_fn = func() -> Array: return game.players.values() if game != null else []
 	killcam.player_for_fn = func(key: StringName) -> Variant: return game.players.get(key) if game != null else null
+	killcam.zombies_fn = func() -> Array:
+		return world_view.snapshot(player.global_position, 40.0) if world_view != null and player != null else []
+	killcam.replaying_fn = func(on: bool) -> void:
+		if world_view != null:
+			world_view.set_replaying(on)
 	killcam.feet_fn = func(p: ZzPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
 	killcam.colour_fn = func(_p: ZzPlayer) -> Color: return game.side_colour(ZzGame.SURVIVORS)
 	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds

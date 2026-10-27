@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 52
 
-const CHECKS := 392
+const CHECKS := 393
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -3021,6 +3021,19 @@ func _check_killcam_time() -> void:
 	world.apply_intermission()
 	_check(is_equal_approx(world.match_node.rules.intermission_sec, 15.0), "and is added to the pause otherwise",
 		str(world.match_node.rules.intermission_sec))
+
+	# The replay draws the zombies too, so each recorded frame holds them.
+	var recorder: Node = load("res://game/zz_killcam.gd").new()
+	var tick := [0.0]
+	recorder.now_fn = func() -> float:
+		tick[0] += 0.016
+		return tick[0]
+	recorder.players_fn = func() -> Array: return []
+	recorder.zombies_fn = func() -> Array: return [[7, &"common", 0, Vector3(1.0, 0.0, 2.0), 0.5, 0, 0]]
+	recorder.call(&"frame")
+	var held: Dictionary = recorder.buffer.sample(tick[0])["b"]
+	_check(held.has("~zombies") and (held["~zombies"] as Array).size() == 1, "a killcam frame records the zombies near the survivors", str(held.keys()))
+	recorder.free()
 
 
 func _world(configure: Callable = Callable()) -> ZzGame:
