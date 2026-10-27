@@ -29,6 +29,8 @@ const ZzWorldView := preload("zz_world_view.gd")
 const ZzShopMenu := preload("zz_shop_menu.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzOilMonsterModel := preload("../npcs/zz_oil_monster_model.gd")
 const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
@@ -381,6 +383,14 @@ func _warm_zombies() -> void:
 				world_view.add_child(view)
 				view.build(kind, variant)
 				view.queue_free()
+
+	# The mutant and the oil monster draw their own models: build one of each so the glb loads and
+	# its materials compile under the cover (they have no recolourable look to warm).
+	for kind: StringName in [ZzNpcs.MUTANT, ZzNpcs.OIL_MONSTER]:
+		var own := ZzWorldView.view_for(kind)
+		world_view.add_child(own)
+		own.build(kind, 0)
+		own.queue_free()
 
 	gate.warm_up(materials)
 
@@ -1603,7 +1613,7 @@ func _prepare_board(snap: Dictionary) -> void:
 	snap["header"] = {"Map": str(game.map_doc.get("name", "")), "Difficulty": game.config.difficulty_name().capitalize()}
 	if game.map != null and game.map.world_credits != "":
 		snap["header"]["Credits"] = game.map.world_credits
-	snap["header"]["Zombies"] = ZzZombieView.CREDITS
+	snap["header"]["Zombies"] = " | ".join([ZzZombieView.CREDITS, ZzMutantView.MUTANT_CREDITS, ZzOilMonsterModel.OIL_MONSTER_CREDITS])
 	var pack_credits := preload("zz_packs.gd").credit_lines()
 	if not pack_credits.is_empty():
 		snap["header"]["Models"] = " | ".join(pack_credits)

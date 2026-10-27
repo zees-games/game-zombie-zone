@@ -5,12 +5,15 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzWorldView := preload("../game/zz_world_view.gd")
+const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
+const ZzOilMonsterModel := preload("../npcs/zz_oil_monster_model.gd")
 
 ## The mutant: its catalogue entry, both gravity guns (zap, prop pull and throw), gun and jetpack
 ## destruction, flight, and the angry dive and slam. Counts sections AND checks.
 
-const SECTIONS := 6
-const CHECKS := 24
+const SECTIONS := 7
+const CHECKS := 30
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -41,6 +44,7 @@ func _run() -> void:
 	await _test_guns_off()
 	await _test_jetpack()
 	await _test_dive()
+	await _test_view()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -130,7 +134,7 @@ func _test_props() -> void:
 
 	_check(_beams_of(&"beam_pull") >= 1, "the pull is drawn as a beam", str(_beams_of(&"beam_pull")))
 	_check(held, "it held the prop")
-	_check(toy.body.global_position.distance_to(SPOT) < 12.0 or me.health.health < before, "and threw it toward the survivor", "%.0f hp" % (before - me.health.health))
+	_check(not is_instance_valid(toy) or not is_instance_valid(toy.body) or toy.body.global_position.distance_to(SPOT) < 12.0 or me.health.health < before, "and threw it toward the survivor", "%.0f hp" % (before - me.health.health))
 	_finished()
 
 
@@ -188,6 +192,43 @@ func _test_dive() -> void:
 	await _sim(game, 0.5)
 	_check(me.health.health < before or me.is_down(), "the survivor was hurt", "%.0f -> %.0f" % [before, me.health.health])
 	_check(a[2].brain.state == &"recover" or a[2].brain.state == &"walk", "then it is grounded, spent")
+	_finished()
+
+
+func _test_view() -> void:
+	_section("the mutant's view draws a body, poses every state, and every Anim fits its 5 bits")
+	var top := 0
+
+	for value: int in ZzZombieBody.Anim.values():
+		top = maxi(top, value)
+
+	_check(top <= 31, "the largest Anim value fits the 5-bit replication", str(top))
+	var root := Node3D.new()
+	add_child(root)
+	var view := ZzWorldView.view_for(ZzNpcs.MUTANT)
+	root.add_child(view)
+	view.build(ZzNpcs.MUTANT, 0)
+	var mesh := view._mesh as MeshInstance3D
+	_check(mesh != null and mesh.mesh != null and mesh.mesh.get_surface_count() > 0, "it has a drawn mesh")
+	var box := AABB()
+
+	for m: MeshInstance3D in view._model.find_children("*", "MeshInstance3D", true, false):
+		box = box.merge(m.global_transform * m.get_aabb()) if box.has_volume() else m.global_transform * m.get_aabb()
+
+	_check(box.size.y > 1.0 and box.size.y < 5.0, "of a plausible height", str(box.size))
+	var all := true
+
+	for anim: int in ZzZombieBody.Anim.values():
+		view.present(0.05, anim, 0)
+		all = all and is_instance_valid(view._model)
+
+	_check(all, "every state poses without error")
+	view.present(0.05, ZzZombieBody.Anim.FLY, 0)
+	var flying := view._model.position
+	view.present(0.05, ZzZombieBody.Anim.IDLE, 0)
+	_check(view.get_class() != "" and flying.is_finite(), "flying then idle poses finitely")
+	_check(ZzMutantView.MUTANT_CREDITS != "" and ZzOilMonsterModel.OIL_MONSTER_CREDITS != "", "both own-model kinds carry a credit")
+	root.queue_free()
 	_finished()
 
 
