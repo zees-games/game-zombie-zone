@@ -16,7 +16,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## directory; a real game spawns the special and the boss.
 
 const FIXTURE := "res://examples/fixtures/addons"
-const CFG_DIR := "user://cfg/addons/zombie_zone"
+const CFG_DIR := "user://cfg/addon/zombie_zone"
 const SECTIONS := 5
 const CHECKS := 44
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
@@ -173,7 +173,7 @@ func _installed() -> void:
 
 func _tuned() -> void:
 	_entered += 1
-	print("tuning from cfg/addons/zombie_zone/*.yml")
+	print("tuning from cfg/addon/zombie_zone/*.yml")
 	_clean()
 	_write("10-base.yml", "monsters:\n  weight: 3.0\n  boss_chance: 1.0\n")
 	_write("20-server.yml", "monsters:\n  weights:\n    fx_titan: 0\n")
@@ -280,7 +280,7 @@ func _damage_of(id: StringName) -> float:
 
 func _clean_real() -> void:
 	for pack: String in REAL_PACKS:
-		var dir := "user://cfg/addons/%s" % pack
+		var dir := "user://cfg/addon/%s" % pack
 
 		if DirAccess.dir_exists_absolute(dir):
 			for f in DirAccess.get_files_at(dir):
@@ -288,7 +288,7 @@ func _clean_real() -> void:
 
 
 func _write_real(pack: String, name: String, body: String) -> void:
-	var dir := "user://cfg/addons/%s" % pack
+	var dir := "user://cfg/addon/%s" % pack
 	DirAccess.make_dir_recursive_absolute(dir)
 	var f := FileAccess.open("%s/%s" % [dir, name], FileAccess.WRITE)
 	f.store_string(body)
@@ -360,7 +360,7 @@ func _real_packs() -> void:
 	_check(tiger != null and is_equal_approx(tiger.max_health, 520.0) and is_equal_approx(float(tiger.meta.get("damage", 0)), 14.0),
 		"a monster's health and damage come from the pack's yml")
 
-	# Tuning: cfg/addons/<pack>/*.yml, name order, a later file wins.
+	# Tuning: cfg/addon/<pack>/*.yml, name order, a later file wins.
 	_write_real("zz_modern_weapons", "90-test.yml", "m4:\n  damage: 77\n")
 	_write_real("zz_medieval_weapons", "90-test.yml", "dagger:\n  damage: 41\n")
 	_write_real("zz_historical_monsters", "90-test.yml", "tiger:\n  claw:\n    damage: 33.0\n")
