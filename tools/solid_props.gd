@@ -24,6 +24,8 @@ func _initialize() -> void:
 		return
 
 	var out := {}
+	# What the world marks loose (free barrels) and the breakables holding them up, per id: `{id: {loose_toys, supports}}`.
+	var loose := {}
 	var failed := false
 	var ids := args.slice(1)
 	var from_doc := ids.has("--from-doc")
@@ -46,6 +48,8 @@ func _initialize() -> void:
 				printerr(id, ": ", read.error.message)
 				failed = true
 				continue
+			read.value.set(&"skip_loose", true)
+			loose[id] = {"loose_toys": read.value.call(&"loose_toys"), "supports": read.value.call(&"supports")}
 			body = read.value.call(&"build_prop_collision")
 		if body != null:
 			for child in body.get_children():
@@ -67,6 +71,7 @@ func _initialize() -> void:
 		print(id, ": ", kept.size(), " solid props")
 
 	var f := FileAccess.open(args[0], FileAccess.WRITE)
+	out["_loose"] = loose
 	f.store_string(JSON.stringify(out))
 	f.close()
 	quit(1 if failed else 0)

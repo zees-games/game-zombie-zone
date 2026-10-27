@@ -129,6 +129,7 @@ signal blast_received(at: Vector3, radius: float, kind: StringName)
 signal bile_received(player_id: int, seconds: float)
 signal objective_received(index: int, state: int)
 signal gate_received(gate: String)
+signal support_received(index: int)
 signal effects_received(rows: Array)
 signal hurt_received(amount: float, from: Vector3)
 signal ammo_received()
@@ -346,6 +347,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_broadcast(ZzEvents.Kind.OBJECTIVE, ZzEvents.write_objective(index, _objective_code(state))))
 		game.gate_opened.connect(func(gate: String) -> void:
 			_broadcast(ZzEvents.Kind.GATE, ZzEvents.write_gate(gate)))
+		game.support_broken.connect(func(index: int) -> void:
+			_broadcast(ZzEvents.Kind.SUPPORT, ZzEvents.write_id(index)))
 		game.mover_changed.connect(func(index: int) -> void:
 			if game.map != null and game.map.mechanics != null:
 				_broadcast(ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index)))
@@ -1211,6 +1214,11 @@ func _tell_the_world(peer_id: int) -> void:
 		for gate in game.horde.open_gates:
 			_tell(peer_id, ZzEvents.Kind.GATE, ZzEvents.write_gate(gate))
 
+	if game.map != null:
+		for support in game.map.supports:
+			if support.is_broken():
+				_tell(peer_id, ZzEvents.Kind.SUPPORT, ZzEvents.write_id(support.index))
+
 	if game.map != null and game.map.mechanics != null:
 		for index in game.map.mechanics.told_indices():
 			_tell(peer_id, ZzEvents.Kind.MOVER, ZzEvents.write_mover(game.map.mechanics.snapshot(index), index))
@@ -1633,6 +1641,11 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				if int(o["index"]) < game.objective_states.size():
 					game.objective_states[int(o["index"])] = [&"waiting", &"holding", &"done", &"done"][int(o["state"])]
 				objective_received.emit(int(o["index"]), int(o["state"]))
+		ZzEvents.Kind.SUPPORT:
+			var sp := ZzEvents.read_id(reader)
+			if bool(sp["ok"]) and game.map != null:
+				game.map.break_support(int(sp["id"]))
+				support_received.emit(int(sp["id"]))
 		ZzEvents.Kind.GATE:
 			var g := ZzEvents.read_gate(reader)
 			if bool(g["ok"]):

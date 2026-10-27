@@ -133,6 +133,8 @@ signal player_hurt(player_id: StringName, amount: float, from: Vector3)
 signal zombie_killed(npc_kind: StringName, by: StringName, headshot: bool)
 signal objective_changed(index: int, state: StringName)
 signal gate_opened(gate: String)
+## A support of the map's broke and what stood on it falls (its index in `map.supports`).
+signal support_broken(index: int)
 ## A moving part of the map changed state ([method ZzMechanics.snapshot] has it).
 signal mover_changed(index: int)
 ## A brush the map's point_template made or killed: `(id, model, offset, alive)`; the bridge tells clients.
@@ -352,6 +354,8 @@ var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
+## The harm a barrel does by rolling into a survivor (dot-props); server only.
+var rolling := DotPropRolling.new()
 
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
@@ -698,6 +702,7 @@ func _build_map() -> void:
 	map.volume_move_fn = _volume_move
 	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	map.logic_event.connect(_on_map_logic_event)
+	map.support_broken.connect(func(index: int) -> void: support_broken.emit(index))
 	map.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void: copy_changed.emit(id, model, offset, alive))
 	add_child(map)
 
@@ -3945,6 +3950,26 @@ func _advance_toys(delta: float) -> void:
 		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
 		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
 	map.toys.advance(delta)
+	_roll_into_survivors(delta)
+
+
+## A loose barrel going fast hurts the survivor it runs into (once per cooldown), as the original supports' barrels did.
+func _roll_into_survivors(delta: float) -> void:
+	var victims: Array = []
+	for id: StringName in players:
+		var player: ZzPlayer = players[id]
+		if player.is_alive() and not player.watching:
+			victims.append({"id": id, "position": player.feet()})
+	for hit: Dictionary in rolling.scan(map.toys, victims, delta):
+		var player: ZzPlayer = players.get(hit["victim"])
+		if player == null:
+			continue
+		var damage := DotDamage.make(0, player.entity_id, float(hit["damage"]), combat.damage_type(&"strike"))
+		damage.tick = _tick
+		damage.weapon_id = &"barrel"
+		damage.context = {"why": BY_HAZARD}
+		var _applied := combat.apply_damage(damage)
+		player_hurt.emit(player.player_id, float(hit["damage"]), player.feet())
 
 
 ## A survivor's shot against the toys: the first one on its ray, nearer than a wall, is pushed
@@ -3959,6 +3984,9 @@ func _shoot_toys(shot: DotShot) -> void:
 			var _crate := crates.shoot(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage)
 		if map.toys != null and map.toys.count() > 0:
 			var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
+		if not map.supports.is_empty():
+			var wall := _wall_distance(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0))
+			var _broke := DotMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
 
 
 func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
@@ -3999,6 +4027,12 @@ func clear_between(from: Vector3, to: Vector3) -> bool:
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.collision_mask = world_mask()
 	return world.direct_space_state.intersect_ray(query).is_empty()
+
+
+## How far along a ray the first wall is, or INF.
+func _wall_distance(from: Vector3, direction: Vector3, reach: float) -> float:
+	var hit := ray_hit(from, from + direction.normalized() * reach)
+	return from.distance_to(hit) if hit.is_finite() else INF
 
 
 ## Where a segment first hits the world, or INF.

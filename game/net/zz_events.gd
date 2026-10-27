@@ -125,6 +125,8 @@ enum Kind {
 	CARRY,
 	## One piece of a map document too big for one message: which map, which piece of how many.
 	MAP_PART,
+	## A shootable support broke (its index in the map's list); what stood on it is the toys' own.
+	SUPPORT,
 }
 
 ## What a MAP_FX says.

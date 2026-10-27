@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 52
+const SECTIONS := 53
 
-const CHECKS := 393
+const CHECKS := 402
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -86,6 +86,7 @@ func _run() -> void:
 	await _test_zombie_loot()
 	await _test_zombie_drops()
 	await _test_toys()
+	await _test_supports()
 	await _test_crates()
 	await _test_the_room_wakes()
 	await _test_downs()
@@ -790,6 +791,57 @@ func _test_toys() -> void:
 	var fresh := game.map.toys
 	_check(fresh != box and fresh.count() == 4 and fresh.toy(0).body.global_position.distance_to(b0) < 0.05,
 		"a new map builds every toy home again")
+	_finished()
+
+
+## A drawn world's breakable that holds a barrel up: a shot breaks it, the barrel falls and rolls, and a rolling barrel hurts.
+func _test_supports() -> void:
+	_section("a shot support lets its barrel fall, and a rolling barrel hurts")
+	var game := await _team(1, _quiet)
+	var base := game.map.toys.toy(1).body.global_position + Vector3(8.0, 0.0, 0.0)
+	var src: Dictionary = game.map_doc.duplicate(true)
+	src["loose_toys"] = [{"toy": "barrel", "at": [base.x, 1.1, base.z]}]
+	src["supports"] = [{"bounds": [base.x - 0.6, 0.0, base.z - 0.6, base.x + 0.6, 1.0, base.z + 0.6], "health": 40.0, "holds": [0], "model": -1}]
+	var checked := ZzMapDoc.validate(src)
+	_check(checked.ok and (checked.value as Dictionary).get("supports", []).size() == 1 and (checked.value as Dictionary).get("loose_toys", []).size() == 1,
+		"the document keeps its loose props and supports", str(checked.error.message if not checked.ok else ""))
+	var bad := src.duplicate(true)
+	bad["supports"] = [{"health": 5}]
+	_check(not ZzMapDoc.validate(bad).ok, "a support with no bounds refuses the document")
+	var built := game.build_map(checked.value)
+	_check(built.ok and game.map.supports.size() == 1 and game.map.toys.count() == (src["toys"] as Array).size() + 1, "the map builds the support and the barrel after its own toys")
+	for _i in range(60):
+		await get_tree().physics_frame
+	var barrel := game.map.toys.toy((src["toys"] as Array).size())
+	_check(barrel.body.global_position.y > 0.9, "the barrel stands on the support", "%.2f" % barrel.body.global_position.y)
+	var told := []
+	var _c := game.support_broken.connect(func(index: int) -> void: told.append(index))
+	var me := game.survivors()[0]
+	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	shot.origin = base + Vector3(-5.0, 0.5, 0.0)
+	shot.direction = Vector3(1.0, 0.0, 0.0)
+	shot.damage = 100.0
+	shot.max_range = 40.0
+	game._shoot_toys(shot)
+	_check(game.map.supports[0].is_broken() and told == [0], "a shot breaks the support and the game says which", str(told))
+	for _i in range(60):
+		await get_tree().physics_frame
+	_check(barrel.body.global_position.y < 0.7, "the barrel falls when its support goes", "%.2f" % barrel.body.global_position.y)
+	barrel.body.linear_velocity = Vector3(6.0, 0.0, 0.0)
+	var hits := game.rolling.scan(game.map.toys, [{"id": me.player_id, "position": barrel.body.global_position - Vector3(0.0, 0.2, 0.0)}], 0.1)
+	_check(hits.size() == 1 and float(hits[0]["damage"]) > 0.0, "a barrel rolling at speed hurts whoever it reaches", str(hits.size()))
+	var slow := game.rolling.scan(game.map.toys, [{"id": &"other", "position": barrel.body.global_position}], 0.1)
+	barrel.body.linear_velocity = Vector3(0.5, 0.0, 0.0)
+	var none := game.rolling.scan(game.map.toys, [{"id": &"third", "position": barrel.body.global_position}], 2.0)
+	_check(none.is_empty(), "a barrel that is merely nudged hurts nobody", str(slow.size()))
+	var client := ZzMap.new()
+	client.physics = game.physics
+	client.authoritative = false
+	game.add_child(client)
+	var _b := client.build(checked.value)
+	client.break_support(0)
+	_check(client.supports.size() == 1 and client.supports[0].is_broken(), "a client's support breaks on the host's word")
+	client.queue_free()
 	_finished()
 
 

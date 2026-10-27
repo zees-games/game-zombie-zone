@@ -153,6 +153,8 @@ var _pending_copies: Array = []
 signal built()
 ## A moving part changed state on the server (see [method ZzMechanics.snapshot]).
 signal mover_changed(index: int)
+## A support broke (its index in [member supports]); the host tells clients.
+signal support_broken(index: int)
 ## The map's point_template made or killed a brush copy; see [signal ZzMechanics.copy_changed].
 signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 ## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
@@ -185,6 +187,8 @@ var _barricades: Dictionary = {}
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
 var toys: DotPropToyBox = null
+## Breakables of a drawn world with loose props on them ([DotMapSupport]); a shot breaks one and what stood on it falls.
+var supports: Array[DotMapSupport] = []
 var authoritative: bool = true
 var toy_rules: DotPropToyRules = null
 var gravity: float = 20.0
@@ -310,9 +314,48 @@ func _build_toys() -> void:
 		toys.footprint_layer = physics.layer_mask(&"footprint")
 		toys.aim_mask = physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"toy") | physics.layer_mask(&"barricade")
 	add_child(toys)
-	var built := toys.build(doc.get("toys", []))
+	var placed: Array = (doc.get("toys", []) as Array).duplicate()
+	var first_loose := placed.size()
+	placed.append_array(doc.get("loose_toys", []))
+	var built := toys.build(placed)
+	if built.ok and not (doc.get("supports", []) as Array).is_empty() and physics != null:
+		supports = DotMapSupport.build_all(doc["supports"], physics.layer_mask(&"toy"), authoritative, first_loose)
+		for support in supports:
+			add_child(support)
+			var _c := support.broken.connect(_on_support_broken.bind(support.index))
 	if not built.ok:
 		DotLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
+
+
+## What stood on a broken support wakes and falls (a barrel rolls on).
+func _on_support_broken(held: PackedInt32Array, _at: Vector3, index: int) -> void:
+	if toys == null:
+		return
+	for slot in held:
+		if slot >= 0 and slot < toys.toys.size():
+			var toy := toys.toys[slot]
+			if toy.body != null:
+				var _woke := toy.hit(toy.body.global_position, Vector3.DOWN, 0.05)
+	support_broken.emit(index)
+
+
+## Each support hides the drawn brush model it replaces when it breaks.
+func _bind_support_visuals() -> void:
+	if supports.is_empty() or _drawn == null:
+		return
+	for c in _drawn.find_children("*", "Node3D", true, false):
+		if c.has_meta(&"model"):
+			for support in supports:
+				if support.model >= 0 and support.model == int(c.get_meta(&"model")):
+					support.visual = c as Node3D
+					if support.is_broken():
+						support.visual.visible = false
+
+
+## The host said support [param index] broke (a client).
+func break_support(index: int) -> void:
+	if index >= 0 and index < supports.size():
+		supports[index].apply_broken()
 
 
 func clear() -> void:
@@ -339,6 +382,7 @@ func clear() -> void:
 	baked = null
 	world_drawn = false
 	toys = null
+	supports.clear()
 	_solid = null
 	_furniture = null
 	_clip = null
@@ -1532,6 +1576,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	_attach_fx(world, node)
 	_lap(stages, "fx", lap)
 	DotLog.info(CHANNEL, "world extras stages", {"ms": stages})
+	_bind_support_visuals()
 
 
 ## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.

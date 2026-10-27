@@ -73,6 +73,9 @@ const WORLD_PREFIX := "zz_world_"
 const MAX_BOXES := 400000
 const MAX_PROPS := 20000
 const MAX_TOYS := 96
+## Loose props the converter marked (free barrels) and the breakables that hold them up; the drawn world's own.
+const MAX_LOOSE := 256
+const MAX_SUPPORTS := 128
 ## Every lamp of the source is kept (the bake uses all of them); the game lights only the nearest few
 ## at once ([constant ZzMap.REALTIME_LAMPS]), so this bounds the document, not the frame.
 const MAX_LIGHTS := 16384
@@ -343,6 +346,25 @@ static func validate(source: Dictionary) -> DotResult:
 		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
 
 	doc["toys"] = toys
+
+	# Loose props of a drawn world and the supports under them (dot-map's `loose_toys()` and `supports()`).
+	var loose: Array = []
+	for raw: Variant in source.get("loose_toys", []):
+		var placed := DotPropToyBox.normal_placement(raw)
+		if placed.is_empty():
+			return _refuse("loose toy %d is not {toy, at}" % loose.size(), source)
+		loose.append(placed)
+	var supports: Array = []
+	for raw: Variant in source.get("supports", []):
+		if not (raw is Dictionary) or (raw as Dictionary).get("bounds", []).size() != 6:
+			return _refuse("support %d has no six bounds" % supports.size(), source)
+		supports.append(raw)
+	if loose.size() > MAX_LOOSE or supports.size() > MAX_SUPPORTS:
+		return _refuse("%d loose props and %d supports; the most are %d and %d" % [loose.size(), supports.size(), MAX_LOOSE, MAX_SUPPORTS], source)
+	if not loose.is_empty():
+		doc["loose_toys"] = loose
+	if not supports.is_empty():
+		doc["supports"] = supports
 
 	var lights: Array = []
 	for raw: Variant in source.get("lights", []):
