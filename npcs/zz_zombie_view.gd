@@ -52,6 +52,7 @@ static var BODIES := {
 	&"sam": ZzPaths.rebase("res://assets/zombies/zombie_sam.glb"),
 	&"shaun": ZzPaths.rebase("res://assets/zombies/zombie_shaun.glb"),
 	&"worker": ZzPaths.rebase("res://assets/zombies/zombie_worker.glb"),
+	&"city": ZzPaths.rebase("res://assets/zombies/zombie_city.glb"),
 }
 
 ## The kit's atlas, in the three versions its bodies were painted against: they differ in a few
@@ -62,10 +63,18 @@ static var ATLASES := {
 	&"people": ZzPaths.rebase("res://assets/zombies/atlas_people.png"),
 	## Ours, not the kit's: the worker's gear and dirt are baked in (`art-src/zombie_worker.py`).
 	&"worker": ZzPaths.rebase("res://assets/zombies/atlas_worker.png"),
+	## A realistic body's baked colour (`art-src/zombie_city.py`); its tangent normal map is [constant CITY_NORMAL].
+	&"city": ZzPaths.rebase("res://assets/zombies/city_albedo.png"),
 }
 
+const CITY_NORMAL := "res://assets/zombies/city_normal.png"
+
+## Where the head bone sits against the body's height, for the bodies that are not the kit's big-headed
+## proportions (the kit's is 1.22, [method _measure]).
+const HEAD_TOP := {&"city": 1.137}
+
 const ATLAS_OF := {&"basic": &"basic", &"chubby": &"heavy", &"arm": &"heavy", &"matt": &"people",
-	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker"}
+	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker", &"city": &"city"}
 
 ## Bodies that carry no clips of their own and are driven by another's (same rig, same bone names).
 const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic"}
@@ -82,10 +91,11 @@ const WEARS := {
 	&"sam": {"skin": ["7c4e26"], "top": ["504c43"], "bottom": ["2a2927"], "hat": ["ac741d"]},
 	&"shaun": {"skin": ["c09264"], "top": ["5f4009"], "bottom": ["466469"]},
 	&"worker": {},  # painted in the atlas: nothing to swap
+	&"city": {},  # baked likewise
 }
 
 ## The commons' bodies, in variant order.
-const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker"]
+const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker", &"city"]
 
 ## Dead skin: grey-greens, ash, a bruised blue, jaundice, rot.
 const SKINS: Array[String] = ["7d8f6a", "8f9a84", "8c98a0", "a39f6c", "66734f", "8a7a86", "9aa58a", "75806e"]
@@ -282,6 +292,7 @@ static var _libraries: Dictionary = {}
 static var detail := true
 static var _materials: Dictionary = {}
 static var _shader: Shader = null
+static var _shader_normal: Shader = null
 static var _atlases: Dictionary = {}
 
 
@@ -327,7 +338,7 @@ func build(p_kind: StringName, p_variant: int) -> void:
 	_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
 
 	# The kit faces +Z; this family's forward is -Z.
-	var raw := _measure(_skeleton, _model)
+	var raw := _measure(_skeleton, _model, float(HEAD_TOP.get(body_id, 1.22)))
 	_scale = float(_look["height"]) / maxf(raw, 0.01)
 	var girth := float(_look["girth"])
 	_model.basis = Basis(Vector3.UP, PI).scaled(Vector3(_scale * girth, _scale, _scale * girth))
@@ -587,9 +598,17 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	if _materials.has(key):
 		return _materials[key]
 
+	var normal_tex: bool = look["body"] == &"city"
+
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = SHADER
+
+	if normal_tex and _shader_normal == null:
+		# Only the body that has a normal map pays for sampling one.
+		_shader_normal = Shader.new()
+		_shader_normal.code = SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
+			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
 
 	var atlas_id: StringName = ATLAS_OF.get(look["body"], &"basic")
 
@@ -598,8 +617,14 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
 
 	var material := ShaderMaterial.new()
-	material.shader = _shader
+	material.shader = _shader_normal if normal_tex else _shader
 	material.set_shader_parameter(&"atlas", _atlases[atlas_id])
+
+	if normal_tex:
+		if not _atlases.has(&"city_normal"):
+			_atlases[&"city_normal"] = DotHumanoidFigure.load_texture(ZzPaths.rebase(CITY_NORMAL))
+
+		material.set_shader_parameter(&"normal_tex", _atlases[&"city_normal"])
 
 	while from.size() < SWAPS:
 		from.append(Vector4(-9.0, -9.0, -9.0, 0.0))
@@ -636,7 +661,7 @@ static func _raw(hex: String) -> Vector4:
 
 ## The model's height at rest, from its skeleton's bones: a skinned mesh's own bounds are the
 ## unposed mesh.
-static func _measure(skeleton: Skeleton3D, model: Node3D) -> float:
+static func _measure(skeleton: Skeleton3D, model: Node3D, head_top := 1.22) -> float:
 	if skeleton == null:
 		return 1.75
 
@@ -661,7 +686,7 @@ static func _measure(skeleton: Skeleton3D, model: Node3D) -> float:
 	var top := high
 
 	if head >= 0:
-		top = (chain * skeleton.get_bone_global_rest(head)).origin.y * 1.22
+		top = (chain * skeleton.get_bone_global_rest(head)).origin.y * head_top
 
 	return maxf(top, high) - minf(low, 0.0)
 
@@ -695,7 +720,7 @@ static func limb_rest(p_kind: StringName, p_variant: int) -> String:
 				chain = (node as Node3D).transform * chain
 			node = node.get_parent()
 
-		var fit := float(look["height"]) / maxf(_measure(skeleton, root), 0.01)
+		var fit := float(look["height"]) / maxf(_measure(skeleton, root, float(HEAD_TOP.get(look["body"], 1.22))), 0.01)
 		var girth := float(look["girth"])
 		var drawn := Basis(Vector3.UP, PI).scaled(Vector3(fit * girth, fit, fit * girth))
 

@@ -7,6 +7,7 @@ extends SceneTree
 ## xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=specials --out=res://screenshots/specials.png
 ## xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=commons --out=res://screenshots/commons.png
 ## xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=horde --out=res://screenshots/horde.png
+## xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=commons --variants=6,13 --cols=idle,walk,attack,death
 ## [/codeblock]
 ##
 ## [b]Looked at, because no check can say whether a zombie looks like one.[/b] Every look in
@@ -35,6 +36,7 @@ var _at := 1.3
 var _kinds: PackedStringArray = PackedStringArray()
 var _cols: PackedStringArray = PackedStringArray()
 var _first := 0
+var _variants: PackedStringArray = PackedStringArray()
 var _columns: Array = []
 var _times: Array[float] = []
 var _last_us := 0
@@ -50,6 +52,8 @@ func _initialize() -> void:
 			_out = arg.trim_prefix("--out=")
 		elif arg.begins_with("--first="):
 			_first = int(arg.trim_prefix("--first="))
+		elif arg.begins_with("--variants="):
+			_variants = arg.trim_prefix("--variants=").split(",")
 		elif arg.begins_with("--cols="):
 			_cols = arg.trim_prefix("--cols=").split(",")
 		elif arg.begins_with("--kinds="):
@@ -88,7 +92,10 @@ func _initialize() -> void:
 		if _cols.is_empty() or _cols.has(column[0]):
 			_columns.append(column)
 
-	if _set == "commons":
+	if _set == "commons" and not _variants.is_empty():
+		for v in _variants:
+			rows.append([&"common", int(v)])
+	elif _set == "commons":
 		for i in range(_first, _first + 5):
 			rows.append([&"common", i * 4111 + 7 + i])
 	elif _set == "horde":
