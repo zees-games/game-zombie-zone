@@ -70,6 +70,7 @@ func _test_defibrillator() -> void:
 		c.defib_charge_seconds = 1.0
 		c.defib_cooldown_seconds = 3.0
 		c.defib_max_body_age = 20.0
+		c.intermission_seconds = 60.0
 		c.defib_charges = 2
 		c.defib_invulnerable_seconds = 2.0)
 	var me := game.survivors()[0]

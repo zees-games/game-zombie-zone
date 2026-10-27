@@ -1714,6 +1714,8 @@ func _test_throwables() -> void:
 	await _sim(game, 3.0)
 	_check(not frag.is_alive(), "a frag goes off on its fuse")
 
+	# A rocket goes off on the first zombie it meets: the pipe bomb's survivors must not stand in its way.
+	var _cleared := game.horde.spawner.clear_all()
 	var target := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -12.0), &"test")
 	await _sim(game, 0.1)
 	var rocket := DotWeaponSpawn.make(&"rocket_launcher", me.eye_position(), (target.position() + Vector3(0, 1.0, 0) - me.eye_position()).normalized() * 36.0, me.entity_id)
