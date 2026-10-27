@@ -79,6 +79,7 @@ func _run() -> void:
 	await _test_solid_prop_budget()
 	await _test_worlds()
 	await _test_footing()
+	_test_library_indices()
 
 	var only := ""
 
@@ -102,8 +103,8 @@ func _run() -> void:
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := 6 + _maps.size()
-	var checks := 1 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := 7 + _maps.size()
+	var checks := 2 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 
 	if _sections_entered != _sections_finished or _sections_entered != sections:
 		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
@@ -488,6 +489,20 @@ func _test_worlds() -> void:
 		host.free()
 		extras.free()
 
+	_finished()
+
+
+## A glTF whose indices reach past its vertices makes the engine log an error per read and name no file; this names it.
+func _test_library_indices() -> void:
+	_section("library models")
+	var store := ProjectSettings.globalize_path("res://.stores/model-library")
+	if DirAccess.dir_exists_absolute(store):
+		var out := []
+		var tool := ProjectSettings.globalize_path("res://addons/dot_map/store/check_gltf_indices.py")
+		var code := OS.execute("python3", ["-I", tool, store], out, true)
+		_check(code == 0, "every library model's indices are within its vertices", str(out[0] if out.size() > 0 else "no output").strip_edges().right(400))
+	else:
+		_check(true, "no model library linked: nothing to scan")
 	_finished()
 
 
