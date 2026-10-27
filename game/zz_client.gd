@@ -256,6 +256,10 @@ func _draw_world() -> void:
 	var ticket := _world_ticket
 	if gate != null:
 		gate.hold(&"world", "Loading the world")
+	# A world opened offline builds its map twice in one frame (ZzGame.start rebuilds for listeners that came late): only the last draws.
+	await get_tree().process_frame
+	if ticket != _world_ticket or game == null or game.map == null:
+		return
 	game.map.vis_mode = _vis_mode()
 	var _mode := platform.set_vis_mode(game.map.vis_mode)
 	game.map.cull_fn = platform.attach_visibility
@@ -268,7 +272,9 @@ func _draw_world() -> void:
 		game.map.set_sun_shadow_splits(int(game.config.get(&"sun_shadow_splits")))
 		game.map.set_model_lod(int(game.config.get(&"prop_lod_min_tris")), int(game.config.get(&"prop_max_tris")))
 		get_viewport().mesh_lod_threshold = maxf(float(game.config.get(&"mesh_lod_threshold")), 0.0)
+	var t_draw := Time.get_ticks_msec()
 	var _drawn: DotResult = await game.map.load_world()
+	DotLog.info(CHANNEL, "world drawn under the cover", {"map": str(game.map.id()), "ms": Time.get_ticks_msec() - t_draw})
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")
 
