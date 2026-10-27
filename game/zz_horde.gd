@@ -173,6 +173,8 @@ var _time: float = 0.0
 
 ## Infected that make no progress toward the survivors: repath, then relocate near them out of sight.
 var stuck := DotNpcStuckRescue.new()
+## Sideways nudges given to stuck infected (a repath step), for [method describe].
+var stuck_nudges: int = 0
 var _left_at: float = -100.0
 var _left: int = 0
 
@@ -1107,7 +1109,9 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 			npc.brain.call(&"force_target", nearest_id)
 
-		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
+		var nudged := _nudge_sideways(b, survivor_position(nearest_id))
+		stuck_nudges += int(nudged)
+		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged,
 			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 		return
 
@@ -1140,6 +1144,27 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
 		"to": str(spot.snappedf(0.1)), "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+
+
+## Steps [param b] half a metre sideways to its way to [param toward], to the side with room (a corner its path cut); false when both are shut.
+func _nudge_sideways(b: ZzZombieBody, toward: Vector3) -> bool:
+	var heading := toward - b.global_position
+	heading.y = 0.0
+
+	if heading.length() < 0.1:
+		return false
+
+	var side := heading.normalized().cross(Vector3.UP) * 0.5
+
+	if _rng.randf() < 0.5:
+		side = -side
+
+	for step: Vector3 in [side, -side]:
+		if not b.test_move(b.global_transform, step):
+			b.global_position += step
+			return true
+
+	return false
 
 
 ## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
@@ -2477,6 +2502,7 @@ func describe() -> Dictionary:
 		"next mob": "%.0f s" % maxf(_next_mob - _time, 0.0) if pacing else "-",
 		"panic": "%.0f s" % (_panic_until - _time) if panicking() else "-",
 		"nav": "%d points" % nav.point_count() if nav != null else "-",
+		"stuck": "%d repaths, %d nudges, %d relocated, %d removed" % [stuck.repaths, stuck_nudges, stuck.relocations, stuck.removals],
 	}
 
 

@@ -25,6 +25,8 @@ const ZzNpcs := preload("../game/zz_npcs.gd")
 const KINDS := [&"standin", &"common", &"special"]
 const EVERY := 0.5
 const AFTER := 4.0
+## The zombie probe's threshold: seconds still after which [method per_1000] counts a zombie as stuck.
+const REPORT_AFTER := 3.0
 const RADIUS := 0.75
 const FIGHT := 3.0
 const ARRIVED := 2.5
@@ -36,6 +38,10 @@ const GRACE := 1.5
 const CAPTURE_AT := [15.0, 28.0]
 
 var game = null
+## Zombie goal-seconds spent still for REPORT_AFTER or more (a stretch counts from its first second).
+var zombie_over: float = 0.0
+## The horde's rescue counters at the end of the run (its describe()).
+var rescue: String = "-"
 
 var _next: float = 0.0
 ## id -> {at: Vector3, since: float}
@@ -126,6 +132,9 @@ func _mover(key: String, kind: StringName, at: Vector3, goal: bool, now: float, 
 
 	(totals[kind] as Dictionary)["goal"] += EVERY
 	var still: float = now - float(anchor["since"])
+
+	if kind != &"standin" and still >= REPORT_AFTER:
+		zombie_over += EVERY
 
 	if still < AFTER:
 		return
@@ -408,6 +417,12 @@ func ratio(kind: StringName, at_least: float = 1.0) -> float:
 	return float(t["stuck"]) / maxf(float(t["goal"]), at_least)
 
 
+## Zombie-seconds still for over REPORT_AFTER per 1000 zombie-seconds with a goal (commons and specials).
+func per_1000() -> float:
+	var goal := float((totals[&"common"] as Dictionary)["goal"]) + float((totals[&"special"] as Dictionary)["goal"])
+	return 1000.0 * zombie_over / goal if goal > 0.0 else 0.0
+
+
 func line() -> String:
 	var parts := PackedStringArray()
 
@@ -416,6 +431,7 @@ func line() -> String:
 		parts.append("%s %.1f%% of %.0f s goal (%d stuck, worst %.0f s)" % [
 			kind, 100.0 * ratio(kind), float(t["goal"]), (ever[kind] as Dictionary).size(), float(longest[kind])])
 
+	parts.append("zombies still over %.0f s: %.1f per 1000 zombie-seconds" % [REPORT_AFTER, per_1000()])
 	parts.append("queued %.0f s, no path to goal %.0f s, goal flickers %s" % [float((totals[&"standin"] as Dictionary)["queued"]), unreachable, flickers])
 	return " | ".join(parts)
 

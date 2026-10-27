@@ -104,9 +104,14 @@ func _run() -> void:
 		# Development: `--only=stuck` every map, `--only=stuck:zz_mall` one; prints the table.
 		var ids: Array = ALL_MAPS if only == "stuck" else [only.substr(6)]
 
+		# `--only=stuck_survival`: every survival map in maps/, however it got there (the manor, ze_potc).
+		if only == "stuck_survival":
+			ids = _survival_maps()
+
 		for id: String in ids:
 			var meter: StuckMeter = await _stuck(StringName(id))
 			print("STUCK %-24s %s" % [id, meter.line()])
+			print("      rescue: %s" % meter.rescue)
 			for kind: StringName in StuckMeter.KINDS:
 				print("      %s worst cells %s" % [kind, meter.worst_cells(kind)])
 			for line in meter.cases.slice(0, 8):
@@ -513,6 +518,7 @@ func _stuck(id: StringName) -> StuckMeter:
 		if i % 8 == 7:
 			await get_tree().physics_frame
 
+	meter.rescue = str(game.horde.describe().get("stuck", "-")) if game.horde != null else "-"
 	await _dispose(game)
 	return meter
 
