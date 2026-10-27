@@ -163,7 +163,7 @@ func _installed() -> void:
 	_check(ZzPacks.specials().size() == 1 and ZzPacks.bosses().size() == 1, "one special, one boss", "%d, %d" % [ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(not ZzPacks.is_pack_kind(&"brute"), "a monster named like a built-in is refused")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
-	_check(cat.size() == 14, "the catalogue gains both monsters", "%d" % cat.size())
+	_check(cat.size() == 15, "the catalogue gains both monsters", "%d" % cat.size())
 	var ghoul: DotNpcDef = cat.get_npc(&"fx_ghoul")
 	_check(ghoul != null and ghoul.move_speed == 5.0 and float(ghoul.meta.get("damage", 0)) == 7.0, "a row's numbers reach the definition")
 	_check(ZzNpcs.is_special(&"fx_ghoul"), "a pack monster counts as a special")

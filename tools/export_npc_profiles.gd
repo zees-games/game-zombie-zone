@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Writes cfg/game/game-zombie-zone/npc/<id>.yml for the twelve kinds from the code table:
+## Writes cfg/game/game-zombie-zone/npc/<id>.yml for the thirteen kinds from the code table:
 ## `godot --headless --path . --script tools/export_npc_profiles.gd`. The packs suite fails when they are stale.
 
 const ZzConfig := preload("res://game/zz_config.gd")
