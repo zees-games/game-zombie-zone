@@ -238,12 +238,21 @@ var _zombie_nets: Dictionary = {}
 var _zombie_mirrors: Dictionary = {}
 var _stale_clock := 0.0
 var _interest_applied: Array = []
+## Carries the game's profile runtime (rows down) over this manager; null when the types would not register.
+var profile_link: DotNetProfileLink = null
 var _zombie_world: Node3D = null
 
 ## Whether the last thing that removed a zombie was its death, so NPC_GONE can say so.
 var _died: Dictionary = {}
 
 static var ZOMBIE_SCENE := ZzPaths.rebase("res://npcs/zz_zombie.tscn")
+
+
+func _exit_tree() -> void:
+	# The link and the runtime hold each other through broadcast; left, both outlive the process's exit.
+	if profile_link != null:
+		profile_link.release()
+		profile_link = null
 
 
 # --- Wiring ----------------------------------------------------------------
@@ -293,6 +302,10 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 	net.messages.on(ZzEvent.NAME, _on_event)
 	net.messages.on(ZzRequest.NAME, _on_request)
+
+	# Edited profiles reach every client, so a remote admin's panel shows what the server holds. Nobody's
+	# request is honoured here (a peer id is no actor the permit knows): edits go through the remote workbench.
+	profile_link = DotNetProfileLink.attach(net, game.ensure_runtime())
 
 	# Both ends. The server's tick is `server_tick` and the client's is `client_tick`, which
 	# simulates what it predicts and leaves the rest to interpolation. A world still running
@@ -1135,6 +1148,9 @@ func _admit(peer_id: int) -> void:
 	_tell(peer_id, ZzEvents.Kind.HELLO, ZzEvents.write_hello(
 		session_id, game.tick_rate, net.clock.tick, game.config.difficulty, game.config.max_incaps
 	))
+
+	if profile_link != null:
+		profile_link.peer_joined(peer_id)
 
 	# The map, before anything that stands on it.
 	if not _map_body.is_empty():

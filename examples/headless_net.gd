@@ -32,8 +32,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 27
-const CHECKS := 174
+const SECTIONS := 28
+const CHECKS := 190
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -54,6 +54,8 @@ var _failures := PackedStringArray()
 var _server_game: ZzGame = null
 var _client_game: ZzGame = null
 var _server_net: DotNetManager = null
+var _server_remote: DotGameWorkbenchRemote = null
+var _client_remote: DotGameWorkbenchRemoteClient = null
 var _client_net: DotNetManager = null
 var _server_bridge: ZzNetBridge = null
 var _client_bridge: ZzNetBridge = null
@@ -108,6 +110,7 @@ func _run() -> void:
 		# After the hold: its section reads a time of day, and this one's hundred ticks moved the
 		# clock it was sampled on (daylight 0.53 against 0.76 when it ran earlier).
 		await _test_only_what_is_near_is_sent()
+		await _test_the_remote_workbench()
 		await _test_leaving()
 
 	OS.remove_logger(errors)
@@ -341,6 +344,9 @@ func _build() -> bool:
 
 	_server_bridge.open_link(server_side)
 	_client_bridge.open_link(client_side)
+	# The server's order (DotGameNetcode: after the bridge): the remote workbench's frame.
+	_server_remote = DotGameWorkbenchRemote.serve(_server_net).value as DotGameWorkbenchRemote
+	_client_remote = DotGameWorkbenchRemoteClient.attach(_client_net)
 	_server_net.messages.seal()
 	_client_net.messages.seal()
 	_check(_server_net.messages.schema_hash() == _client_net.messages.schema_hash(), "both ends agree on the schema")
@@ -399,6 +405,110 @@ func _build() -> bool:
 	_check(not _server_game.map_doc.is_empty(), "the server lays its map out on start")
 	_finished()
 	return _failed == failed_before
+
+
+## sv_workbench_remote over the real wire: the admin gets a panel and an edit that applies and reaches this client's
+## copy; a guest, a non-admin, a revoked admin and every player with the cvar off are refused, whatever the client sends.
+func _test_the_remote_workbench() -> void:
+	_section("a flagged admin edits the server's profiles, and nobody else can")
+	if not DotGameWorkbench.available():
+		print("  dot-workbench is not linked: skipped")
+		_passed += 16
+		_finished()
+		return
+	var flags := {"boss": ["cvar", "root"], "plain": []}
+	var state := {"on": false, "uid": "", "now": 100000}
+	var swb := DotGameWorkbench.new()
+	swb.name = "ServerWorkbench"
+	swb.dedicated = true
+	swb.add_set(_server_game.bot_persona_set(), "bots")
+	_server_net.get_parent().add_child(swb)
+	var started := swb.start(_server_game.ensure_runtime())
+	var remote := swb.serve_remote(_server_net)
+	_check(started.ok and remote != null and remote == _server_remote, "the server's workbench serves the remote frame")
+	remote.enabled_fn = func() -> bool: return state["on"]
+	remote.uid_fn = func(_p: int) -> String: return state["uid"]
+	remote.connected_fn = func(_p: int) -> bool: return true
+	remote.permit_uid_fn = func(uid: String, flag: String) -> bool: return (flags.get(uid, []) as Array).has(flag)
+	remote.now_fn = func() -> int: return state["now"]
+	remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
+	var cwb := DotGameWorkbench.new()
+	cwb.name = "ClientWorkbench"
+	cwb.remote_client = _client_remote
+	cwb.remote_fn = func() -> bool: return true
+	cwb.add_set(_client_game.bot_persona_set(), "bots")
+	_client_net.get_parent().add_child(cwb)
+	var cstarted := cwb.start(_client_game.ensure_runtime())
+	_check(cstarted.ok and cwb.overlay == null, "the client's workbench starts with no panel")
+	var srt := _server_game.ensure_runtime()
+	var crt := _client_game.ensure_runtime()
+	var edit := {"op": "set", "kind": "bot", "id": "wbtest", "key": "weight", "value": 5.0}
+
+	# Off: nobody, not even an admin.
+	state["uid"] = "boss"
+	_client_remote.ask()
+	_exchange()
+	_check(not _client_remote.allowed and cwb.overlay == null, "with the cvar off even an admin is told no and gets no panel")
+	var _seq := _client_remote.request(edit)
+	_exchange()
+	_check(srt.revision("bot", "wbtest") == 0, "and a request it forges anyway changes nothing on the server")
+
+	# On: the admin.
+	state["on"] = true
+	_client_remote.ask()
+	_exchange()
+	_check(_client_remote.allowed and _client_remote.flags.has("cvar"), "with the cvar on an admin is told the flags it holds")
+	_check(cwb.overlay != null, "and gets the panel")
+	var added: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, {"op": "add", "kind": "bot", "id": "wbtest"})
+	_exchange()
+	var applied: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, edit)
+	_exchange()
+	_check(added.ok and applied.ok and srt.revision("bot", "wbtest") > 0, "an edit from the panel is applied on the server", "%s rev %d" % ["" if applied.ok else applied.error.message, srt.revision("bot", "wbtest")])
+	_check(is_equal_approx(float(_client_game.bot_persona_set().runtime_paths("wbtest").get("weight", 0.0)), 5.0) and crt.revision("bot", "wbtest") > 0, "and its row replicated to the client")
+	var rev := srt.revision("bot", "wbtest")
+
+	# A guest.
+	state["uid"] = ""
+	var _s2 := _client_remote.request(edit.merged({"value": 6.0}))
+	_exchange()
+	_check(srt.revision("bot", "wbtest") == rev, "a guest's forged edit is refused")
+	state["now"] += 2000
+	_server_remote.poll()
+	_exchange()
+	_check(not _client_remote.allowed and cwb.overlay == null, "and the panel is taken away from it")
+
+	# A player who is not an admin.
+	state["uid"] = "plain"
+	_client_remote.ask()
+	_exchange()
+	var _s3 := _client_remote.request(edit.merged({"value": 7.0}))
+	_exchange()
+	_check(not _client_remote.allowed and srt.revision("bot", "wbtest") == rev, "a player holding no flag is told no and refused")
+
+	# A revoked admin.
+	state["uid"] = "boss"
+	_client_remote.ask()
+	_exchange()
+	_check(_client_remote.allowed and cwb.overlay != null, "an admin is let back in")
+	flags["boss"] = []
+	var _s4 := _client_remote.request(edit.merged({"value": 8.0}))
+	_exchange()
+	_check(srt.revision("bot", "wbtest") == rev, "the revoked admin's next edit is refused at once")
+	state["now"] += 2000
+	_server_remote.poll()
+	_exchange()
+	_check(not _client_remote.allowed and cwb.overlay == null, "and the panel closes")
+
+	# Off again.
+	flags["boss"] = ["cvar", "root"]
+	state["on"] = false
+	var _s5 := _client_remote.request(edit.merged({"value": 9.0}))
+	_exchange()
+	_check(srt.revision("bot", "wbtest") == rev, "switching the cvar off refuses a restored admin too")
+	_check(not _server_remote.permit_actor("remote:boss", "cvar"), "and revokes the server-made actors")
+	swb.queue_free()
+	cwb.queue_free()
+	_finished()
 
 
 func _test_a_client_joins() -> void:

@@ -16,7 +16,7 @@ const ZzNetLink := preload("../game/net/zz_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 13
-const CHECKS := 98
+const CHECKS := 105
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -207,12 +207,57 @@ func _test_the_module_loads() -> void:
 	var amb: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "ambience", "id": DotGameWorkbench.CVAR_SET_ID, "key": "zz_ambient_volume", "value": 0.2}) if wb != null and wb.api != null else null
 	_check(amb != null and amb.ok and is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.2), "the zz_ambient* cvars are a workbench set and an edit moves the cvar", "" if amb == null or amb.ok else amb.error.message)
 	var _restore := server.console.set_cvar("zz_ambient_volume", "0.5")
+	_test_the_remote_workbench(wb)
 
 	var net: DotNetManager = module.get("net") if module != null else null
 	_check(net != null and net.config.tick_rate == TICK_RATE, "the netcode runs at the configured rate")
 	_check(net != null and absf(net.config.world_extent - ZzGame.NET_WORLD_EXTENT) < 0.01,
 		"against the world extent both ends decode with")
 	_finished()
+
+
+## The module's own wiring of sv_workbench_remote: off by default, then the real admin table decides, per request.
+func _test_the_remote_workbench(wb: DotGameWorkbench) -> void:
+	var remote: DotGameWorkbenchRemote = wb.remote_server if wb != null else null
+	var cvar := server.console.find_cvar("sv_workbench_remote")
+	_check(remote != null and cvar != null and cvar.get_int() == 0, "the module serves the remote workbench, and sv_workbench_remote is off by default")
+	if remote == null or cvar == null:
+		_passed += 6
+		return
+	var who := {"uid": "zzroot"}
+	remote.uid_fn = func(_p: int) -> String: return who["uid"]
+	remote.connected_fn = func(_p: int) -> bool: return true
+	remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
+	var net: DotNetManager = _module().get("net")
+	var real_send := net.send_fn
+	net.send_fn = func(_p: int, _b: PackedByteArray, _d: int) -> void: pass
+	var _a := server.admins.set_admin("zzroot", PackedStringArray(["cvar"]), 50)
+	var ask := func(value: float) -> void:
+		var m := DotGameWorkbenchMessage.new()
+		m.kind = DotGameWorkbenchMessage.KIND_REQUEST
+		m.sender_peer_id = 99
+		m.seq = 1
+		m.text = JSON.stringify({"op": "set", "kind": "ambience", "id": DotGameWorkbench.CVAR_SET_ID, "key": "zz_ambient_volume", "value": value})
+		remote.handle_message(m)
+	ask.call(0.3)
+	_check(is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.5), "with the cvar off a flagged admin's edit changes nothing")
+	var _on := server.console.set_cvar("sv_workbench_remote", "1")
+	who["uid"] = ""
+	ask.call(0.3)
+	_check(is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.5), "a guest is refused with it on")
+	who["uid"] = "zznobody"
+	ask.call(0.3)
+	_check(is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.5), "an account with no admin entry is refused")
+	who["uid"] = "zzroot"
+	ask.call(0.3)
+	_check(is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.3), "the admin's edit moves the real cvar")
+	var _rm := server.admins.remove_admin("zzroot")
+	ask.call(0.4)
+	_check(is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.3), "a revoked admin is refused on the next edit")
+	var _off := server.console.set_cvar("sv_workbench_remote", "0")
+	var _back := server.console.set_cvar("zz_ambient_volume", "0.5")
+	net.send_fn = real_send
+	_check(cvar.get_int() == 0 and is_equal_approx(server.console.get_float("zz_ambient_volume"), 0.5), "and the suite leaves the cvar off")
 
 
 func _test_the_commands() -> void:

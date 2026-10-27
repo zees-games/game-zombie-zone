@@ -1707,6 +1707,9 @@ func _start_workbench(world: ZzGame) -> void:
 	if not started.ok:
 		log_warn("the workbench", {"why": started.error.message})
 		return
+	# Off until the owner sets sv_workbench_remote 1; then flagged admins edit from a client.
+	if net != null:
+		var _served := workbench.serve_remote(net)
 	if world.config_binder != null:
 		world.config_binder.attach(rt)
 	if world.flashlight_binder != null:
