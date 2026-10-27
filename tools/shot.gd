@@ -382,6 +382,23 @@ func _run() -> void:
 			await _seconds_of(0.35)
 			await _save_extra("_t035")
 			await _seconds_of(maxf(_seconds - 0.35, 0.65))
+		"mutant":
+			# A mutant 9 m off, angry and flying: both gravity-gun beams fired at the start, then
+			# frames as it cruises, charges and dives (_a, _b, _c, each --seconds apart).
+			_clear_view(game, local, stand)
+			var mut: DotNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -9.0)))
+			if mut != null and mut.brain != null:
+				mut.brain.set(&"_angry", true)
+				mut.brain.set(&"_flight_until", game.now() + 30.0)
+				mut.brain.set(&"_flight_ready_at", 0.0)
+			var chest := stand + Vector3(0.0, 1.3, 0.0)
+			var zap_from := stand + Vector3(-1.5, 3.2, -9.0)
+			game.hazards.beam(&"beam_zap", zap_from, chest)
+			game.hazards.beam(&"beam_pull", zap_from + Vector3(3.0, 0.0, 0.0), stand + Vector3(2.0, 0.6, -4.0))
+			_free_camera().look_at_from_position(stand + Vector3(7.0, 3.5, 3.0), stand + Vector3(0.0, 3.0, -7.0))
+			for suffix in ["_a", "_b", "_c"]:
+				await _seconds_of(_seconds)
+				await _save_extra(suffix)
 		"fire":
 			# A Molotov pool lit a few metres ahead, from a low three-quarter camera.
 			_clear_view(game, local, stand)
