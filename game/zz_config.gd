@@ -296,10 +296,13 @@ func setup_seconds() -> float:
 @export var stuck_rescue: bool = true
 
 ## Seconds without getting closer before an infected is repathed. `zz_stuck_repath_seconds`.
-@export_range(1.0, 120.0, 1.0) var stuck_repath_seconds: float = 3.0
+@export_range(1.0, 120.0, 1.0) var stuck_repath_seconds: float = 6.0
 
 ## Seconds without getting closer before it is moved near the survivors, out of sight. `zz_stuck_relocate_seconds`.
-@export_range(2.0, 300.0, 1.0) var stuck_relocate_seconds: float = 8.0
+@export_range(2.0, 300.0, 1.0) var stuck_relocate_seconds: float = 14.0
+
+## Seconds the places a zombie stalled at cost the whole horde extra to path through.
+@export_range(0.0, 600.0, 1.0) var stuck_bad_edge_seconds: float = 60.0
 
 ## At or under this many infected left, those waits shrink to a third. 0 off. `zz_stuck_low_count`.
 @export_range(0, 100, 1) var stuck_low_count: int = 8

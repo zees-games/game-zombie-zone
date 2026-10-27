@@ -64,6 +64,8 @@
 # stuck_repath_seconds: 6.0
 # Seconds without getting closer before it is moved near the survivors, out of sight. `zz_stuck_relocate_seco... [2.0..300.0]
 # stuck_relocate_seconds: 14.0
+# Seconds the places a zombie stalled at cost the whole horde extra to path through. [0.0..600.0]
+# stuck_bad_edge_seconds: 60.0
 # At or under this many infected left, those waits shrink to a third. 0 off. `zz_stuck_low_count`. [0..100]
 # stuck_low_count: 8
 # Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 neve... [0..10]

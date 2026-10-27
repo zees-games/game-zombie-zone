@@ -175,6 +175,9 @@ var _time: float = 0.0
 var stuck := DotNpcStuckRescue.new()
 ## Sideways nudges given to stuck infected (a repath step), for [method describe].
 var stuck_nudges: int = 0
+## Nav points costed up after a stall, and the last pair marked (point indexes), for the log.
+var stuck_marked: int = 0
+var _last_edge: String = "-"
 var _left_at: float = -100.0
 var _left: int = 0
 
@@ -1102,6 +1105,11 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 	var kind := String(npc.def.id) if npc.def != null else "?"
 
+	if action == DotNpcStuckRescue.REPATH or action == DotNpcStuckRescue.RELOCATE:
+		_mark_stall(npc)
+
+	var edge := _last_edge
+
 	if action == DotNpcStuckRescue.REPATH:
 		if npc.brain != null:
 			if npc.brain.get(&"path") != null:
@@ -1111,7 +1119,7 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 		var nudged := _nudge_sideways(b, survivor_position(nearest_id))
 		stuck_nudges += int(nudged)
-		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged,
+		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged, "edge": edge,
 			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 		return
 
@@ -1143,7 +1151,25 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 		npc.brain.call(&"force_target", nearest_id)
 
 	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
-		"to": str(spot.snappedf(0.1)), "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+		"to": str(spot.snappedf(0.1)), "edge": edge, "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+
+
+## Costs up, for the whole horde, the place [param npc] stalled at and the next corner of the path it was on, so later paths go round
+## them; the pair is kept in [member _last_edge] for the log line.
+func _mark_stall(npc: DotNpcInstance) -> void:
+	_last_edge = "-"
+
+	if spawner == null or not spawner.nav is DotNpcNavGraph:
+		return
+
+	var graph := spawner.nav as DotNpcNavGraph
+	graph.expire_bad(_time)
+	var path: DotNpcPath = npc.brain.get(&"path") if npc.brain != null else null
+	var next := path.current(Vector3.INF) if path != null else Vector3.INF
+	var here := graph.mark_bad(npc.position(), _time + config.stuck_bad_edge_seconds)
+	var there := graph.mark_bad(next, _time + config.stuck_bad_edge_seconds) if next != Vector3.INF else -1
+	stuck_marked += int(here >= 0) + int(there >= 0)
+	_last_edge = "%d>%d" % [here, there]
 
 
 ## Steps [param b] half a metre sideways to its way to [param toward], to the side with room (a corner its path cut); false when both are shut.
@@ -2502,7 +2528,7 @@ func describe() -> Dictionary:
 		"next mob": "%.0f s" % maxf(_next_mob - _time, 0.0) if pacing else "-",
 		"panic": "%.0f s" % (_panic_until - _time) if panicking() else "-",
 		"nav": "%d points" % nav.point_count() if nav != null else "-",
-		"stuck": "%d repaths, %d nudges, %d relocated, %d removed" % [stuck.repaths, stuck_nudges, stuck.relocations, stuck.removals],
+		"stuck": "%d repaths, %d nudges, %d points marked, %d relocated, %d removed" % [stuck.repaths, stuck_nudges, stuck_marked, stuck.relocations, stuck.removals],
 	}
 
 
