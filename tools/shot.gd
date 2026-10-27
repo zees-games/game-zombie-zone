@@ -382,6 +382,13 @@ func _run() -> void:
 			await _seconds_of(0.35)
 			await _save_extra("_t035")
 			await _seconds_of(maxf(_seconds - 0.35, 0.65))
+		"fire":
+			# A Molotov pool lit a few metres ahead, from a low three-quarter camera.
+			_clear_view(game, local, stand)
+			var pool := stand + Vector3(0.0, 0.0, -5.0)
+			var _burning := game.hazards.add(&"fire", game.ray_hit(pool + Vector3.UP, pool + Vector3.DOWN * 4.0), 1.6, 20.0, 6.0, 0)
+			_free_camera().look_at_from_position(pool + Vector3(2.6, 1.4, 2.6), pool + Vector3(0.0, 0.7, 0.0))
+			await _seconds_of(_seconds)
 		"third":
 			_client.call("toggle_view")
 			await _seconds_of(_seconds)
