@@ -423,6 +423,9 @@ const THIN_STEP := 0.4
 ## Metres above the higher end a link is tested for a wall at (a counter top and a chest), and trimmed off each end of it.
 const LINK_TEST_HEIGHTS := [0.4, 0.9]
 const LINK_TEST_TRIM := 0.15
+## How far (m) and how far off in height a graph point may stand from the foot or head of a ladder and still be its end.
+const LADDER_REACH := 6.5
+const LADDER_HEIGHT := 1.5
 
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
 ## them as an obstacle, and its links between storeys.
@@ -500,6 +503,26 @@ static func nav_job(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 		job.cache_path = "%s/%s-%s-v%d.nav" % [NAV_CACHE_DIR, str(source.get("id", "map")).validate_filename(), job.digest.left(16), NAV_CACHE_VERSION]
 
 	return job
+
+
+## [param doc] with one climb link per ladder box in [param ladders] (metres, world): foot to head, joined to the graph's
+## nearest points. Kept apart from `nav.links` because a ladder stands in a wall, which the links' wall test would drop.
+static func with_ladders(doc: Dictionary, ladders: Array[AABB]) -> Dictionary:
+	if ladders.is_empty():
+		return doc
+
+	var out := doc.duplicate()
+	var nav: Dictionary = (doc.get("nav", {}) as Dictionary).duplicate()
+	var rows: Array = []
+
+	for box in ladders:
+		var mid := box.get_center()
+		rows.append([snappedf(mid.x, 0.01), snappedf(box.position.y + 0.1, 0.01), snappedf(mid.z, 0.01),
+				snappedf(mid.x, 0.01), snappedf(box.end.y, 0.01), snappedf(mid.z, 0.01)])
+
+	nav["ladders"] = rows
+	out["nav"] = nav
+	return out
 
 
 ## [param doc] with the boxes of the whole map ([param extra], from the maps pack's `hulls/<id>.nav.json`)
@@ -683,6 +706,9 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 			continue
 
 		builder.add_link(from, to)
+
+	for link: Array in nav_doc.get("ladders", []):
+		builder.add_link(Vector3(float(link[0]), float(link[1]), float(link[2])), Vector3(float(link[3]), float(link[4]), float(link[5])), 0, LADDER_REACH, LADDER_HEIGHT)
 
 	info["rejected"] = rejected
 

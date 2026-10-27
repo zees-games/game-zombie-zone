@@ -116,7 +116,7 @@ func _explain(game: Node) -> void:
 	if game.map != null and game.map.mechanics != null:
 		blockers = game.map.mechanics.rest_blockers()
 
-	var job := ZzNpcs.nav_job(ZzNpcs.with_nav_extra(horde._doc, horde._nav_extra), props_size, horde.open_gates, blockers, false, false)
+	var job := ZzNpcs.nav_job(horde.nav_doc(), props_size, horde.open_gates, blockers, false, false)
 	var builder: DotNpcNavBuilder = job.make_builder.call([], {})
 	var a := Vector3(_between[0], _between[1], _between[2])
 	var b := Vector3(_between[3], _between[4], _between[5])

@@ -70,6 +70,8 @@ var move_fn: Callable = Callable()
 var _ents: Variant = null
 var _movers: Array[Dictionary] = []
 var _volumes: Array[Dictionary] = []
+var _ladders: Array[AABB] = []
+var _ladders_built := false
 var _toggles: Array[Dictionary] = []
 var _toggle_base: int = 0
 var _predicted: Array[Dictionary] = []
@@ -1031,6 +1033,17 @@ func _touches_player(t: Dictionary, feet: Vector3, height: float) -> bool:
 	if flags != 0 and (flags & 1) == 0:
 		return false
 	return (t["bounds"] as AABB).intersects(AABB(feet - Vector3(0.05, 0.0, 0.05), Vector3(0.1, height, 0.1))) and vol.touches_column(feet, height)
+
+
+## The ladder brushes as boxes in metres, for each survivor's DotFpsLadderMode. Built once: the same list on both ends is what keeps a replayed climb the server's.
+func ladder_boxes() -> Array[AABB]:
+	if _ladders_built or _ents == null:
+		return _ladders
+	_ladders_built = true
+	for vol: Variant in _ents.volumes:
+		if vol.kind == "ladder":
+			_ladders.append_array(vol.brush_boxes())
+	return _ladders
 
 
 ## Counts for checks: volumes by kind, and how many are live.

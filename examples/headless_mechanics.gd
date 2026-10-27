@@ -24,8 +24,8 @@ const ZzFooting := preload("../game/zz_footing.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 15
-const CHECKS := 141
+const SECTIONS := 16
+const CHECKS := 144
 
 var _passed := 0
 var _failed := 0
@@ -86,6 +86,7 @@ func _run() -> void:
 	await _test_map_events()
 	await _test_no_world()
 	await _test_footing_rescue()
+	await _test_ladders()
 
 	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
 	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed + _skipped == CHECKS
@@ -1279,6 +1280,47 @@ func _test_footing_rescue() -> void:
 	game.simulate(TICK)
 	_check(game.footing.rescued == count, "with zz_fall_rescue off the net lets a fall alone", "%d rescued" % game.footing.rescued)
 	game.queue_free()
+	_finished += 1
+
+
+## The drawn maps' ladder brushes reach a survivor's controller: standing at the foot of a tall one, looking up and
+## pressing forward, the survivor climbs one of the four tallest on some face.
+func _test_ladders() -> void:
+	_entered += 1
+	if _skip_without_world(3):
+		return
+	for id: StringName in [&"zm_roy_the_ship", &"zm_krusty_krab", &"zs_krusty_krab_large"]:
+		var game := await _game(id)
+		var me := game.add_player(&"u1", "Climber")
+		me.health.invulnerable = true
+		game.next_map_id = id
+		game.start()
+		await _sim(game, 8)
+		var boxes: Array[AABB] = game.map.mechanics.ladder_boxes() if game.map.mechanics != null else []
+		var tall := boxes.duplicate()
+		tall.sort_custom(func(l: AABB, r: AABB) -> bool: return l.size.y > r.size.y)
+		var gained := 0.0
+		var best := AABB()
+		for box: AABB in tall.slice(0, 4):
+			for side in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+				var at: Vector3 = box.get_center() + side * ((absf(side.x) * box.size.x + absf(side.z) * box.size.z) * 0.5 + 0.5)
+				at.y = box.position.y + 0.05
+				me.place_at(at, 0.0)
+				me.controller.state.velocity = Vector3.ZERO
+				var up := DotFpsCommand.new()
+				up.move = Vector2(0.0, 1.0)
+				up.yaw = rad_to_deg(atan2(side.x, side.z))
+				up.pitch = 60.0
+				me.controller.apply_command(up)
+				await _sim(game, TICK_RATE * 2)
+				if me.feet().y - at.y > gained:
+					gained = me.feet().y - at.y
+					best = box
+				me.controller.apply_command(DotFpsCommand.new())
+			if gained > 1.5:
+				break
+		_check(boxes.size() > 0 and gained > 1.5, "%s: a survivor climbs a ladder" % id, "%d ladder boxes, climbed %.1f m of a %.1f m one" % [boxes.size(), gained, best.size.y])
+		game.queue_free()
 	_finished += 1
 
 

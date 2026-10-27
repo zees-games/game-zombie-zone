@@ -232,6 +232,9 @@ var water: Array[AABB] = []
 ## `controller.extra_modes` so a style's rebuilt motor keeps it under the same id on every machine.
 var swim: DotFpsSwimMode = DotFpsSwimMode.new()
 
+## Ladder climbing (dot-player-controller's DotFpsLadderMode), fed the map's ladder brushes by [method ZzMechanics.ladder_boxes].
+var ladder: DotFpsLadderMode = DotFpsLadderMode.new()
+
 ## Breath left, in seconds under water; refilled with the head out. Each end counts its own
 ## from its own copy of the water: the server's decides the damage, the client's is the HUD's
 ## bar, and neither is on the wire.
@@ -264,7 +267,7 @@ func _ready() -> void:
 	controller.drive = DotFpsController.Drive.EXTERNAL
 	controller.tunables = tunables_for(config)
 	controller.admin_abilities = true
-	controller.extra_modes = [swim]
+	controller.extra_modes = [swim, ladder]
 	add_child(controller)
 	controller.simulated.connect(_on_simulated)
 	controller.before_fn = _before_tick
@@ -379,6 +382,11 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 	_volume_forces(state)
 
 	swim.update(controller.motor, state)
+	if mechanics_fn.is_valid():
+		var mech: Variant = mechanics_fn.call()
+		if mech != null:
+			ladder.volumes = mech.ladder_boxes()
+	ladder.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())
 	submerged = water_level == WaterLevel.EYES
 	# Waist-deep water too shallow to float in is waded too (DotFpsSwimMode.has_room_to_float).

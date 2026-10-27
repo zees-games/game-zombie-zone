@@ -438,6 +438,16 @@ func nav_stage() -> String:
 	return _nav_job.stage() if _nav_job != null else ""
 
 
+## The document the graph is built from: the map's, with its whole-map boxes and one climb link per ladder.
+func nav_doc() -> Dictionary:
+	var ladders: Array[AABB] = []
+
+	if game.map != null and game.map.mechanics != null:
+		ladders = game.map.mechanics.ladder_boxes()
+
+	return ZzNpcs.with_ladders(ZzNpcs.with_nav_extra(_doc, _nav_extra), ladders)
+
+
 ## Builds (or starts building) the graph for the map and the gates now open. Synchronous unless
 ## [member nav_async]; then the graph lands from [method tick] and a graph already in use stays in
 ## use until the new one is ready.
@@ -456,7 +466,7 @@ func rebuild_navigation() -> DotResult:
 	_drop_nav_job()
 	_nav_started = Time.get_ticks_msec()
 	var threads := config.nav_threads if DotPlatform.has_threads() else 0
-	var job := ZzNpcs.nav_job(ZzNpcs.with_nav_extra(_doc, _nav_extra), props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
+	var job := ZzNpcs.nav_job(nav_doc(), props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
 	job.workers = maxi(threads, 1)
 
 	if not nav_async:
