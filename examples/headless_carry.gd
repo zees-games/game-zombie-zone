@@ -13,7 +13,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## box modifiers, the slow and drop rules, and the wire. Counts sections AND checks, because a script error aborts a section silently.
 
 const SECTIONS := 7
-const CHECKS := 44
+const CHECKS := 46
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -142,6 +142,13 @@ func _test_cycle() -> void:
 	await _sim(game, 0.3)
 	_check(arsenal.current().id() == same[1], "a held bit is one press")
 	p.actions = 0
+	var m4 := ZzWeaponIds.M4
+	_check(_hand(game, m4) and arsenal.current().id() == m4, "the carbine is in hand")
+	var before := arsenal.fire_mode()
+	p.actions = ZzNetCommand.ACT_FIRE_MODE
+	await _sim(game, 0.3)
+	_check(arsenal.fire_mode() != before and arsenal.fire_mode() == DotWeaponDef.Fire.SEMI, "ACT_FIRE_MODE cycles auto to semi once, however long it is held")
+	p.actions = 0
 	_finished()
 
 
@@ -185,7 +192,7 @@ func _test_wire() -> void:
 	var reader := DotNetReader.new(body)
 	var back := ZzEvents.read_carry(reader)
 	_check(bool(back["ok"]) and str(back["json"]) == game.carry.state_json(p), "the CARRY event round-trips")
-	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_BITS == 8, "ACT_CYCLE fits the action bits")
+	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_FIRE_MODE == 256 and ZzNetCommand.ACT_BITS == 9, "ACT_CYCLE and ACT_FIRE_MODE fit the action bits")
 	var parsed := ZzCarry.parse_modifiers("hard=1.15,angry=1.1/0.9/-2,junk")
 	_check(parsed.size() == 2 and parsed["angry"] == [1.1, 0.9, -2.0] and parsed["hard"] == [1.15, 1.0, 0.0], "modifier specs parse")
 	var cfg := ZzConfig.new()

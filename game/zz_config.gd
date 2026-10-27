@@ -289,6 +289,21 @@ func setup_seconds() -> float:
 ## fall back along the route. `zz_bot_hold_overrun`.
 @export_range(2, 40, 1) var bot_hold_overrun: int = 6
 
+## Which bot personas the stand-ins are drawn from, as `id:weight,id:weight` (a bare id weighs 1); empty uses every `cfg/.../bot/*.yml` by its own weight. `zz_bot_personas`.
+@export var bot_personas: String = ""
+
+## Whether infected that make no progress toward the survivors are repathed, then moved near them out of sight. `zz_stuck_rescue`.
+@export var stuck_rescue: bool = true
+
+## Seconds without getting closer before an infected is repathed. `zz_stuck_repath_seconds`.
+@export_range(1.0, 120.0, 1.0) var stuck_repath_seconds: float = 6.0
+
+## Seconds without getting closer before it is moved near the survivors, out of sight. `zz_stuck_relocate_seconds`.
+@export_range(2.0, 300.0, 1.0) var stuck_relocate_seconds: float = 14.0
+
+## At or under this many infected left, those waits shrink to a third. 0 off. `zz_stuck_low_count`.
+@export_range(0, 100, 1) var stuck_low_count: int = 8
+
 ## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
 @export var bot_open_boxes: bool = true
 

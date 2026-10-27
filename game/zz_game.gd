@@ -2559,6 +2559,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	if (pressed & ZzNetCommand.ACT_CYCLE) != 0 and player.weapons != null and not player.is_held():
 		var _cycled := player.weapons.arsenal.cycle_slot(_tick)
 
+	if (pressed & ZzNetCommand.ACT_FIRE_MODE) != 0 and player.weapons != null and not player.is_held():
+		var _moded := player.weapons.arsenal.cycle_fire_mode()
+
 	var shove_pressed := player.shove_held and not player.previous_shove
 	player.previous_shove = player.shove_held
 

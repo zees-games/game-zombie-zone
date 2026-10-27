@@ -61,6 +61,8 @@ var player: ZzPlayer = null
 var flash: DotFlashlight = null
 var flash_crowd: DotFlashlightCrowd = null
 var _flash_ticks := 0
+## Ticks left to hold ACT_FIRE_MODE after the fire-mode key was pressed.
+var _fire_mode_ticks := 0
 ## Ticks left to hold ACT_CYCLE after the slot key was pressed twice.
 var _cycle_ticks := 0
 ## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
@@ -1928,6 +1930,9 @@ func _actions() -> int:
 	if _cycle_ticks > 0:
 		_cycle_ticks -= 1
 		out |= ZzNetCommand.ACT_CYCLE
+	if _fire_mode_ticks > 0:
+		_fire_mode_ticks -= 1
+		out |= ZzNetCommand.ACT_FIRE_MODE
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -2613,6 +2618,13 @@ func _key_event(event: InputEvent) -> bool:
 	if event.is_action_pressed(ZzBindings.FLASHLIGHT):
 		if flash != null:
 			var _asked := flash.toggle()
+		return true
+
+	if event.is_action_pressed(ZzBindings.FIRE_MODE):
+		_fire_mode_ticks = 3
+		# Offline the world's arsenal is this one and the server path cycles it.
+		if not _offline and weapons != null and weapons.arsenal != null:
+			var _moded := weapons.arsenal.cycle_fire_mode()
 		return true
 
 	if event.is_action_pressed(ZzBindings.SHOVE):

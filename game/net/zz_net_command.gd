@@ -42,7 +42,9 @@ const ACT_AIM := 32
 const ACT_FLASHLIGHT := 64
 ## Held for a few ticks by a client that pressed its slot key again; the server cycles the slot on the rising edge.
 const ACT_CYCLE := 128
-const ACT_BITS := 8
+## Held for a few ticks by a client that pressed the fire-mode key; the server cycles the gun's mode on the rising edge.
+const ACT_FIRE_MODE := 256
+const ACT_BITS := 9
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

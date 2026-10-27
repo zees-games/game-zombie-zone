@@ -98,6 +98,8 @@ var _top_sub: Label = null
 var vitals: DotVitals = null
 ## What is in hand and how much is in it.
 var ammo: DotAmmoCounter = null
+## The held gun's fire modes, above the ammunition.
+var fire_mode: DotFireModeIndicator = null
 ## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
 var strip: DotScoreStrip = null
 ## The medkit and pills, each with its key.
@@ -298,6 +300,15 @@ func _build() -> void:
 	ammo.offset_top = -100.0
 	ammo.offset_bottom = -24.0
 	_root.add_child(ammo)
+
+	fire_mode = DotFireModeIndicator.new()
+	fire_mode.name = "FireMode"
+	fire_mode.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	fire_mode.offset_left = -420.0
+	fire_mode.offset_right = -24.0
+	fire_mode.offset_top = -130.0
+	fire_mode.offset_bottom = -104.0
+	_root.add_child(fire_mode)
 
 	# While the map's graph is built: above the ammunition.
 	_nav_meter = ZzNavMeter.new()
@@ -894,7 +905,14 @@ func _draw_weapon() -> void:
 
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
+		fire_mode.clear()
 		return
+
+	var names := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
+	var offered: Array = []
+	for m in rig.arsenal.fire_modes_available():
+		offered.append(names.get(m, &""))
+	fire_mode.show_modes(offered, names.get(rig.arsenal.fire_mode(), &""))
 
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)

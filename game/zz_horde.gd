@@ -171,6 +171,11 @@ var _usable_posts_for: DotNpcNavData = null
 var _populated: bool = true
 var _time: float = 0.0
 
+## Infected that make no progress toward the survivors: repath, then relocate near them out of sight.
+var stuck := DotNpcStuckRescue.new()
+var _left_at: float = -100.0
+var _left: int = 0
+
 var _next_mob: float = INF
 var _next_special: float = INF
 var _next_brute: float = INF
@@ -1019,6 +1024,105 @@ func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 ## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
 ## there and not along the walk it had.
 func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
+## Hostile zombies alive that count as "infected left": everything but a sleeper still sitting. Cached for a second.
+func infected_left() -> int:
+	if _time - _left_at < 1.0:
+		return _left
+
+	_left_at = _time
+	_left = 0
+
+	for npc in spawner.all_npcs():
+		if npc.is_alive() and not _sitting_sleeper(npc):
+			_left += 1
+
+	return _left
+
+
+func _sitting_sleeper(npc: DotNpcInstance) -> bool:
+	return npc.def != null and npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting"
+
+
+## The live zombie nearest [param point], or null: a stand-in told to hunt the rest of the horde asks this.
+## A sleeper still sitting is left alone, and so is one the survivors cannot reach.
+func nearest_zombie(point: Vector3) -> DotNpcInstance:
+	var best: DotNpcInstance = null
+	var best_gap := INF
+
+	for npc in spawner.all_npcs():
+		if not npc.is_alive() or _sitting_sleeper(npc):
+			continue
+
+		var gap := npc.position().distance_to(point)
+
+		if gap < best_gap:
+			best = npc
+			best_gap = gap
+
+	return best
+
+
+## Tells the rescue where [param npc] is, and acts on its answer: a repath, or a relocation close to the survivors and out of their sight.
+func _rescue_if_stuck(npc: DotNpcInstance) -> void:
+	var b := npc.node as ZzZombieBody
+
+	if b == null or b.anchored or npc.owner_id == &"map" or _sitting_sleeper(npc):
+		return
+
+	var nearest := INF
+	var nearest_id := &""
+
+	for id in survivor_ids():
+		var gap := npc.position().distance_to(survivor_position(id))
+
+		if gap < nearest:
+			nearest = gap
+			nearest_id = id
+
+	if nearest_id == &"":
+		stuck.forget(npc.instance_id)
+		return
+
+	stuck.repath_after = config.stuck_repath_seconds
+	stuck.relocate_after = config.stuck_relocate_seconds
+	stuck.low_count = config.stuck_low_count
+	var action := stuck.observe(npc.instance_id, nearest, _time, infected_left())
+
+	if action == DotNpcStuckRescue.NONE:
+		return
+
+	var kind := String(npc.def.id) if npc.def != null else "?"
+
+	if action == DotNpcStuckRescue.REPATH:
+		if npc.brain != null:
+			if npc.brain.get(&"path") != null:
+				(npc.brain.get(&"path") as DotNpcPath).clear()
+
+			npc.brain.call(&"force_target", nearest_id)
+
+		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
+			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+		return
+
+	var spot := _spawn_point(14.0, 45.0, false)
+
+	if spot == Vector3.INF:
+		spot = _wave_origin()
+
+	if spot == Vector3.INF:
+		DotLog.warn(CHANNEL, "stuck infected has nowhere to be moved to", {"kind": kind, "at": str(npc.position().snappedf(0.1))})
+		return
+
+	var from := npc.position()
+	warp(npc, spot, _rng.randf_range(0.0, 360.0))
+
+	if npc.brain != null:
+		npc.brain.call(&"force_target", nearest_id)
+
+	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
+		"to": str(spot.snappedf(0.1)), "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+
+
 	var b := npc.node as ZzZombieBody
 
 	if b == null or not is_instance_valid(b) or b.anchored:

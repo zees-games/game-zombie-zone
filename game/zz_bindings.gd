@@ -41,6 +41,8 @@ const AIM := &"zz_aim"
 ## Primary fire: shoots the gun in the hands, or deploys the box when that is what they hold.
 const FIRE := &"zz_fire"
 const RELOAD := &"zz_reload"
+## Cycles the gun in hand through the fire modes it has (auto, semi, burst).
+const FIRE_MODE := &"zz_fire_mode"
 const VIEW := &"zz_view"
 const SCOREBOARD := &"zz_scoreboard"
 ## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
@@ -63,6 +65,7 @@ static func make() -> DotMenuBindings:
 	keys.add(FIRE, &"bind_fire", "Primary fire (hold to deploy a box)", "Mouse 1", "Weapons")
 	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Weapons")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Weapons")
+	keys.add(FIRE_MODE, &"bind_fire_mode", "Fire mode: auto, semi, burst", "B", "Weapons")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Slot %d: %s" % [i + 1, SLOT_NAMES[i]], str(i + 1), "Weapons")
 	keys.add_wheel_weapons()
