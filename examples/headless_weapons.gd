@@ -19,7 +19,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const ZzHud := preload("../game/zz_hud.gd")
 const SECTIONS := 12
-const CHECKS := 76
+const CHECKS := 78
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -88,6 +88,16 @@ func _test_the_weapon_art_is_vendored() -> void:
 	_check(count == 0, "zee's art table names no blaster models once its weapons are dropped (%d)" % count)
 	var models := ZeeWeaponArtTable.validate_models()
 	_check(models.ok, "no weapon model is missing", "" if models.ok else models.error.message)
+	var stock_ok := true
+	for sound: StringName in DotAudioWeaponStock.COUNTS:
+		stock_ok = stock_ok and (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue").find(DotAudioWeaponStock.id_of(sound)) != null
+	_check(stock_ok, "the game's sound catalogue carries every stock weapon sound")
+	var stock_streams := true
+	for sound in [ZeeWeaponSound.LIGHT, ZeeWeaponSound.SHOTGUN, ZeeWeaponSound.DRY, ZeeWeaponSound.EQUIP,
+			ZeeWeaponSound.RELOAD_OUT, ZeeWeaponSound.RELOAD_SHELL, ZeeWeaponSound.SUPPRESSED]:
+		var s := ZeeWeaponSound.stream(sound)
+		stock_streams = stock_streams and s is AudioStreamOggVorbis and s.resource_path.begins_with(DotWeaponSound.DIR)
+	_check(stock_streams, "weapon shots, dry, equip and reloads play the stock recordings, not the synth fallback")
 	_finished()
 
 
