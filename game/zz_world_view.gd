@@ -1123,12 +1123,8 @@ func _particles(colour: Color, radius: float, amount: int) -> CPUParticles3D:
 	p.scale_amount_max = 0.5
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.5)
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
-	material.albedo_color = Color(colour.r, colour.g, colour.b, 0.8)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	# dot-fx's soft sprite: an untextured quad was a hard square, the "big pixels" of the fire.
+	var material := DotFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0))
 	quad.material = material
 	p.mesh = quad
 	var gradient := Gradient.new()
