@@ -533,6 +533,14 @@ func remove_hazard(id: int) -> void:
 # --- Thrown things -------------------------------------------------------------------
 
 func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
+	if kind == &"beam_zap" or kind == &"beam_pull":
+		var zap := kind == &"beam_zap"
+		var _beam := DotFxBeam.zap(self, from, from + velocity,
+			Color(0.5, 0.85, 1.0) if zap else Color(0.9, 0.5, 1.0), 0.25, 0.12 if zap else 0.07)
+		if audio != null and zap:
+			var _zzt := audio.at(ZzAudio.WOOSH, from)
+		return
+
 	var node := MeshInstance3D.new()
 	node.name = "Thrown_%d" % id
 	var sphere := SphereMesh.new()
@@ -614,7 +622,7 @@ func blast(at: Vector3, radius: float, kind: StringName) -> void:
 	node.global_position = at
 
 	var bile := kind == &"bile"
-	var colour := Color(0.55, 0.75, 0.1) if bile else Color(1.0, 0.6, 0.2)
+	var colour := Color(0.55, 0.75, 0.1) if bile else (Color(0.6, 0.55, 0.5) if kind == &"slam" else Color(1.0, 0.6, 0.2))
 	var puff := _particles(colour, radius * 0.5, 60)
 	puff.one_shot = true
 	puff.explosiveness = 0.95

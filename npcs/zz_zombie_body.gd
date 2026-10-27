@@ -21,6 +21,8 @@ enum Anim {
 	THROW, CRY, RAGE, TONGUE, DEAD, SHAMBLE,
 	# Appended, never inserted: the value is replicated in 5 bits (ZzNpcNet), so 31 is the last.
 	CRAWL, SCREAM, GRAB, BLOCK, STRIKE_DOWN,
+	# The mutant's: a jetpack in flight, the charge-up, the dive, the landing, a gravity gun firing.
+	FLY, CHARGE_UP, DIVE, SLAM, ZAP,
 }
 
 ## Bits of [member flags].
@@ -72,6 +74,10 @@ var push: Vector3 = Vector3.ZERO
 ## A leap in progress: true from the jump until it lands. Its velocity is [member velocity].
 var flying: bool = false
 var landed_this_tick: bool = false
+
+## Under its own thrust (a jetpack): [member hover_velocity] is the whole velocity, gravity off.
+var hovering: bool = false
+var hover_velocity: Vector3 = Vector3.ZERO
 
 ## Held in place by the game (pinning somebody, or being carried along a tongue).
 var anchored: bool = false
@@ -177,7 +183,7 @@ func tick(delta: float, count: int = 1) -> void:
 	_waited += count
 	ticks_since_leap += count
 
-	if _waited < stride and not flying and push.length_squared() < 0.0004:
+	if _waited < stride and not flying and not hovering and push.length_squared() < 0.0004:
 		landed_this_tick = false
 		return
 
@@ -194,6 +200,12 @@ func advance(delta: float, ticks: int = 1) -> void:
 
 	if mirror or anchored:
 		velocity = Vector3.ZERO
+		return
+
+	if hovering:
+		velocity = hover_velocity + push
+		var _flown := _sweep(ticks)
+		push = push.move_toward(Vector3.ZERO, PUSH_DECAY * delta * maxf(push.length(), 1.0))
 		return
 
 	if flying:

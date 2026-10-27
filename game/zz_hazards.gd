@@ -37,6 +37,11 @@ const GRENADE := &"grenade"
 ## A grenade that flies straight and goes off on contact: what a launcher fires.
 const ROCKET := &"rocket"
 const BILE := &"bile"
+## A gravity gun's zap and its pull: drawn from the one announcement (a beam from [code]from[/code] to [code]from + velocity[/code]), never flown.
+const BEAM_ZAP := &"beam_zap"
+const BEAM_PULL := &"beam_pull"
+## The mutant's dive landing: survivors only, unlike [method ZzGame.explode].
+const SLAM := &"slam"
 
 ## A bile jar draws the horde this far, for this long.
 const BILE_LURE := 35.0
@@ -103,6 +108,27 @@ func launch(kind: StringName, from: Vector3, velocity: Vector3, owner: int, amou
 		"radius": radius if radius > 0.0 else 4.0, "gravity": gravity, "rest": false}
 	launched.emit(id, kind, from, velocity)
 	return id
+
+
+## A beam drawn from [param from] to [param to] for a quarter of a second on every machine.
+func beam(kind: StringName, from: Vector3, to: Vector3) -> void:
+	var id := _next_id
+	_next_id += 1
+	launched.emit(id, kind, from, to - from)
+
+
+## The mutant's dive landing at [param at]: every survivor within [param radius] takes
+## [param amount] (less with distance) and is thrown clear.
+func slam(at: Vector3, radius: float, amount: float, owner: int) -> int:
+	var hit := 0
+
+	for player in game.survivors_within(at, radius, 3.0):
+		var falloff := 1.0 - clampf(player.feet().distance_to(at) / radius, 0.0, 0.7)
+		game.knock_survivor(player.player_id, at, amount * falloff, owner)
+		hit += 1
+
+	game.exploded.emit(at, radius, SLAM)
+	return hit
 
 
 ## A shell called down on [param at]: it falls for [param delay] seconds and goes off.

@@ -1153,6 +1153,48 @@ func knock(victim: StringName, from: Vector3, amount: float, npc: DotNpcInstance
 	game.knock_survivor(victim, from, amount, entity_id_for(npc) if npc != null else 0)
 
 
+## A gravity-gun beam (`beam_zap` or `beam_pull`) drawn on every machine; it does no harm itself.
+func beam(kind: StringName, from: Vector3, to: Vector3) -> void:
+	game.hazards.beam(kind, from, to)
+
+
+## The mutant's dive landing: survivors within [param radius] take [param amount] and are thrown.
+func slam(npc: DotNpcInstance, at: Vector3, radius: float, amount: float) -> int:
+	return game.hazards.slam(at, radius, amount, entity_id_for(npc) if npc != null else 0)
+
+
+## Where the world is below [param at] (Y of the first hit within [param depth]), or [param at].y minus depth.
+func ground_y(at: Vector3, depth: float = 60.0) -> float:
+	var hit: Vector3 = game.ray_hit(at + Vector3(0.0, 0.5, 0.0), at - Vector3(0.0, depth, 0.0))
+	return hit.y if hit != Vector3.INF else at.y - depth
+
+
+## The nearest loose map prop (a toy's rigid body) within [param radius] of [param at] that weighs
+## no more than [param max_mass] and is not in [param taken]; null for none.
+func loose_prop_near(at: Vector3, radius: float, max_mass: float, taken: Array) -> RigidBody3D:
+	var toys: Variant = game.map.toys if game != null and game.map != null else null
+
+	if toys == null:
+		return null
+
+	var best: RigidBody3D = null
+	var best_gap := radius
+
+	for toy: Variant in toys.toys:
+		var rb: RigidBody3D = toy.body
+
+		if rb == null or not is_instance_valid(rb) or not rb.is_inside_tree() or rb.mass > max_mass or taken.has(rb):
+			continue
+
+		var gap := rb.global_position.distance_to(at)
+
+		if gap < best_gap:
+			best_gap = gap
+			best = rb
+
+	return best
+
+
 func now() -> float:
 	return spawner.now() if spawner != null else _time
 
