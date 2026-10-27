@@ -32,11 +32,17 @@ func _run() -> void:
 			ids = FallProbe.ids_in_checkout()
 		else:
 			ids.append_array(a.split(","))
+	var failed := false
 	var rows: Array[String] = []
 	for id in ids:
 		var sweep: DotCollisionSweep = await probe(StringName(id), step, stands, examples)
 		if sweep == null:
 			print("%s: no drawn world" % id)
+			continue
+		var verdict := sweep.verdict(true, false)
+		if not verdict.ok:
+			printerr("%s: %s" % [id, verdict.error.message])
+			failed = true
 			continue
 		var authored := 0
 		for kind in ["invisible_floor", "invisible_wall"]:
@@ -46,7 +52,7 @@ func _run() -> void:
 		print(line)
 		for l in sweep.describe_lines().slice(1):
 			print("   ", l)
-	get_tree().quit()
+	get_tree().quit(1 if failed else 0)
 
 
 func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollisionSweep:
