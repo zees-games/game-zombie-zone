@@ -62,6 +62,10 @@
 # bootstrap-link: zombie-zone-maps/world
 /world
 
+# The raw art stores (about 2 GB, in no repository): staged from DOT_STORES_FROM by dot-bootstrap.
+# bootstrap-link: zombie-zone-maps/.stores
+/.stores
+
 # Optional weapon and monster packs, content repositories of their own (docs/design.md): dot-bootstrap
 # links them by default and skips them under --min; the game parses and passes its suites without.
 # bootstrap-optional
