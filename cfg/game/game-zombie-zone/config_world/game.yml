@@ -26,6 +26,8 @@
 # light_floor: 0.6
 # The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves ... [0.0..2.0]
 # sun_floor: 0.6
+# Longest side of a texture file decoded from disk for a drawn world; larger ones are halved until they fit (... [0..8192]
+# map_texture_max: 2048
 # Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every mat...
 # shadow_proxy: true
 # Metres beyond which a chunk's shadow proxy is not drawn into the sun's cascades (0: all are). `--zz-shadow-... [0.0..]

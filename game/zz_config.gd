@@ -741,6 +741,9 @@ func setup_seconds() -> float:
 ## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
 @export_range(0.0, 2.0) var sun_floor: float = 0.6
 
+## Longest side of a texture file decoded from disk for a drawn world; larger ones are halved until they fit (0 keeps them). Store slices are untouched. 1024 saves roughly three quarters of the texture memory. `--zz-map-texture-max=`.
+@export_range(0, 8192, 1) var map_texture_max: int = 2048
+
 ## Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every material's surfaces. `--zz-shadow-proxy=`.
 @export var shadow_proxy: bool = true
 

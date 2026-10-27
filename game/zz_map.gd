@@ -218,6 +218,8 @@ var _lamp_budget := ZzLampBudget.new()
 @export var realtime_lamps := 128
 ## Cascades of the sun's shadow (1, 2 or 4), set by the client from `sun_shadow_splits`.
 var sun_shadow_splits := 4
+## Cap for decoded world texture files (dot-map's `max_texture_size`); 0 keeps them.
+var texture_max: int = 2048
 ## Props shorter than this cast no sun shadow (0: all do); set by the client from `prop_shadow_min`.
 var prop_shadow_min := 0.0
 ## The sun's least energy on a lightmapped world; set by the client from `sun_floor`.
@@ -1378,6 +1380,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		# The vendored kinds, rebased onto the mount: the addon's own folder never ships to a client.
 		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
 		surfaces.set(&"use_lightmap", use_lightmaps)
+		surfaces.set(&"max_texture_size", texture_max)
 		DotMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"), surfaces, world)
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
