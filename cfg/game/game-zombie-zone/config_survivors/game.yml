@@ -121,6 +121,8 @@
 # box_lifetime: 150.0
 # How many boxes a survivor carries (E picks one up into the hands; primary fire held opens it). 0: no carryi... [0..6]
 # box_carry: 1
+# Whether a fast-rolling barrel, crate or tyre also hurts zombies (cvar `zz_roll_damage_zombies`); survivors ...
+# roll_damage_zombies: true
 # Ammo piles and boxes on the ground are rigid bodies: pushed along by survivors and zombies, shot, thrown by...
 # physics_crates: true
 # Which loot kinds are crates, comma separated (ammo, box, medkit, pills, weapon, throwable, defib).
