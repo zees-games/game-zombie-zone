@@ -2113,7 +2113,7 @@ func _present_aim() -> void:
 	if hud != null:
 		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 		if weapons != null and weapons.arsenal != null:
-			hud.set_spread(weapons.arsenal.spread_now(), camera.fov)
+			hud.set_spread(weapons.arsenal.spread_now(), camera.fov, weapons.arsenal.crosshair_scale())
 
 
 ## What E would do now, for the HUD: who you would revive, what you would pick up.

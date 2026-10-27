@@ -1076,8 +1076,9 @@ func crosshair() -> Control:
 	return _crosshair
 
 ## The weapon's spread cone in degrees, from the arsenal; the crosshair opens with it.
-func set_spread(degrees: float, fov: float = 75.0) -> void:
+func set_spread(degrees: float, fov: float = 75.0, gap_scale: float = 1.0) -> void:
 	if _crosshair != null and _crosshair.has_method(&"set_spread"):
+		_crosshair.set(&"gap_scale", clampf(gap_scale, 0.1, 4.0))
 		_crosshair.set(&"fov_degrees", clampf(fov, 10.0, 170.0))
 		_crosshair.call(&"set_spread", degrees)
 
