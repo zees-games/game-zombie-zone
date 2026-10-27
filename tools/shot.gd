@@ -567,6 +567,10 @@ func _run() -> void:
 			await _ads_frames(game, local)
 			get_tree().quit(0)
 			return
+		"crosshair":
+			await _crosshair_frames(game, local)
+			get_tree().quit(0)
+			return
 		"weapons":
 			await _weapon_sheets(game, local)
 			get_tree().quit(0)
@@ -760,13 +764,45 @@ func _ads_frames(game: ZzGame, local) -> void:
 		_client.set("_aiming", false)
 
 
+## The spread crosshair at rest, walking, running, crouched and aimed, through the real client's
+## input actions (`crosshair_<stage>.png` in the `_out` directory), with the cone each frame shows.
+func _crosshair_frames(game: ZzGame, local) -> void:
+	var id: StringName = StringName(_weapons[0]) if not _weapons.is_empty() else &"zz_m4"
+	if not game.arm(local, id):
+		print("not armed with %s" % id)
+		return
+	local.health.invulnerable = true
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+	_client.set("_slot", ZzWeapons.def_of(id).slot)
+	var stages := {
+		"rest": [], "walk": ["dot_fps_forward", "dot_fps_walk"], "run": ["dot_fps_forward", "dot_fps_sprint"],
+		"crouch": ["dot_fps_crouch"], "aimed": [],
+	}
+	for stage: String in stages:
+		for action: String in stages[stage]:
+			Input.action_press(action)
+		_client.set("_aiming", stage == "aimed")
+		await _seconds_of(1.5)
+		await RenderingServer.frame_post_draw
+		var hud = _client.get("hud")
+		var image := get_viewport().get_texture().get_image()
+		var path := dir.path_join("crosshair_%s.png" % stage)
+		print("%s: spread %.2f gap %.1f -> %s" % [stage, _client.get("weapons").arsenal.spread_now(),
+			hud._crosshair.gap_pixels(), error_string(image.save_png(path))])
+		for action: String in stages[stage]:
+			Input.action_release(action)
+		_client.set("_aiming", false)
+		await _seconds_of(0.8)
+
+
 func _ads_save(dir: String, id: StringName, stage: String, hud) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
 	var path := dir.path_join("ads_%s_%s.png" % [id, stage])
 	var camera: Camera3D = _client.get("camera")
 	print("%s %s: crosshair %.2f scope %.2f fov %.1f -> %s" % [id, stage,
-		hud._crosshair.modulate.a if hud != null else -1.0, hud.scope.fraction if hud != null else -1.0,
+		hud._crosshair.aim_opacity if hud != null and hud._crosshair.get(&"aim_opacity") != null else -1.0, hud.scope.fraction if hud != null else -1.0,
 		camera.fov if camera != null else -1.0, error_string(image.save_png(path))])
 
 

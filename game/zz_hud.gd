@@ -130,7 +130,9 @@ var _use_back: ColorRect = null
 var _use_fill: ColorRect = null
 var _use_label: Label = null
 var _held: Label = null
-var _crosshair: ColorRect = null
+var _crosshair: Control = null
+## The player's `cl_crosshair_*` cvars (dot-ui API 10); null on an older shell, which keeps the dot.
+var crosshair_cvars: RefCounted = null
 ## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
@@ -245,6 +247,7 @@ func _build() -> void:
 	vitals.offset_bottom = -PLATE_BOTTOM
 	_root.add_child(vitals)
 
+
 	kits = DotKeyHints.new()
 	kits.name = "Kits"
 	kits.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -293,15 +296,8 @@ func _build() -> void:
 	_effects.add_theme_color_override("font_color", Color(0.98, 0.84, 0.5))
 
 	# The centre: crosshair, prompt, the bar of what you hold E for.
-	_crosshair = ColorRect.new()
+	_crosshair = _make_crosshair()
 	_crosshair.name = "Crosshair"
-	_crosshair.color = Color(1.0, 1.0, 1.0, 0.75)
-	_crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_crosshair.offset_left = -2.0
-	_crosshair.offset_top = -2.0
-	_crosshair.offset_right = 2.0
-	_crosshair.offset_bottom = 2.0
-	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_crosshair)
 
 	_prompt = _label(17)
@@ -1022,6 +1018,38 @@ func _draw_hurt(delta: float) -> void:
 				_place(rect, Vector2(-reach - 8, -60), Vector2(8, 120))
 
 
+## dot-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
+## directly, an older dot-ui fails to compile this script.
+func _make_crosshair() -> Control:
+	if DotAddonApi.build_level("dot_ui") >= 10:
+		var shape: Variant = DotCrosshair
+		var cross := (shape as GDScript).new() as Control
+		var cvars_class: Variant = DotCrosshairCvars
+		crosshair_cvars = (cvars_class as GDScript).new() as RefCounted
+		crosshair_cvars.set(&"target", cross)
+		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		crosshair_cvars.call(&"apply_to", cross)
+		return cross
+
+	var dot := ColorRect.new()
+	dot.color = Color(1.0, 1.0, 1.0, 0.75)
+	dot.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	dot.offset_left = -2.0
+	dot.offset_top = -2.0
+	dot.offset_right = 2.0
+	dot.offset_bottom = 2.0
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return dot
+
+
+## The weapon's spread cone in degrees, from the arsenal; the crosshair opens with it.
+func set_spread(degrees: float, fov: float = 75.0) -> void:
+	if _crosshair != null and _crosshair.has_method(&"set_spread"):
+		_crosshair.set(&"fov_degrees", clampf(fov, 10.0, 170.0))
+		_crosshair.call(&"set_spread", degrees)
+
+
 func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 	rect.offset_left = at.x
 	rect.offset_top = at.y
@@ -1036,7 +1064,10 @@ func set_aim(fraction: float, scoped: bool) -> void:
 	_scoped = scoped
 	if scope != null:
 		scope.fraction = aim_fraction if scoped else 0.0
-	if _crosshair != null:
+	if _crosshair != null and _crosshair.has_method(&"set_aim"):
+		_crosshair.call(&"set_aim", aim_fraction)
+		_crosshair.set(&"suppressed", scoped)
+	elif _crosshair != null:
 		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
 
 

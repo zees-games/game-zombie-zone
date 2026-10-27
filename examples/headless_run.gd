@@ -2840,12 +2840,12 @@ func _test_the_hud() -> void:
 
 	# Down the sights the dot fades with the aim (dot-ui's curve), and a scope hides it.
 	hud.set_aim(0.0, false)
-	var hip := hud._crosshair.modulate.a
+	var hip := _crosshair_alpha(hud)
 	hud.set_aim(1.0, false)
-	var aimed := hud._crosshair.modulate.a
+	var aimed := _crosshair_alpha(hud)
 	hud.set_aim(1.0, true)
 	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or DotAddonApi.build_level("dot_ui") < 5)
-		and hud._crosshair.modulate.a == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
+		and _crosshair_alpha(hud) == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
 		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
 	hud.set_aim(0.0, false)
@@ -2854,6 +2854,15 @@ func _test_the_hud() -> void:
 
 	hud.queue_free()
 	_finished()
+
+
+## What the crosshair shows: DotCrosshair fades itself (and hides when scoped), the old dot by modulate.
+func _crosshair_alpha(hud: ZzHud) -> float:
+	var c: Control = hud._crosshair
+	if c.has_method(&"set_aim"):
+		c.call(&"follow_aim", 10.0)
+		return 0.0 if bool(c.get(&"suppressed")) else float(c.get(&"aim_opacity"))
+	return c.modulate.a
 
 
 ## Christian's first play test (2026-10-11): the team list's missing-glyph boxes, "You is down",

@@ -486,6 +486,7 @@ func _build_netcode() -> DotResult:
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
+		var _spread := game.spread_rules.follow_cvars(link)
 		var _wading := game.water_rules.follow_cvars(link)
 		var _ambient := game.ambient_rules.follow_cvars(link)
 		# The server's sv_ragdoll* set: this end draws the bodies, survivors' and zombies'.
@@ -1246,6 +1247,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 	_mirror.mirror = true
 	var _moved := _mirror.sync(game.config)
 	weapons.arsenal.carry = _mirror.carry
+	weapons.arsenal.spread_rules = game.spread_rules
 
 	if not weapons.give(weapon_id).ok:
 		return
@@ -1810,8 +1812,19 @@ func _build_settings() -> void:
 		if hud != null:
 			hud.follow_menu(settings.menu)
 		_bind_bot_console()
+		_bind_crosshair_console()
 		board = platform.board as DotMenuScoreboard
 		_dress_board()
+
+
+## The player's `cl_crosshair_*` cvars at the console's local source.
+func _bind_crosshair_console() -> void:
+	if console == null or hud == null or hud.crosshair_cvars == null:
+		return
+	for source: Variant in console.sources():
+		if source is DotConsoleLocal:
+			var _bound: bool = hud.crosshair_cvars.bind_console(source)
+			return
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
@@ -2094,6 +2107,8 @@ func _present_aim() -> void:
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
 		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
+		if weapons != null and weapons.arsenal != null:
+			hud.set_spread(weapons.arsenal.spread_now(), camera.fov)
 
 
 ## What E would do now, for the HUD: who you would revive, what you would pick up.

@@ -285,6 +285,10 @@ var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 
+## Movement-dependent weapon spread (`sv_spread*`, REPLICATED, on here). Every arsenal reads it, so the shot and the crosshair agree.
+var spread_rules: DotWeaponSpreadRules = _spread_rules_on()
+
+
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
 ## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
 var water_rules: ZzWaterRules = ZzWaterRules.new()
@@ -3532,6 +3536,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 			return false
 
 		player.weapons = rig
+		rig.arsenal.spread_rules = spread_rules
 		_wire_carry(player)
 
 	var given := player.weapons.give(weapon_id)
@@ -3991,3 +3996,9 @@ func describe_lines() -> PackedStringArray:
 		lines.append_array(map.describe_lines())
 
 	return lines
+
+
+static func _spread_rules_on() -> DotWeaponSpreadRules:
+	var rules := DotWeaponSpreadRules.new()
+	rules.enabled = true
+	return rules

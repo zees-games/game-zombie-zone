@@ -22,6 +22,7 @@
 #   tools/shot.sh --view=deploy --seconds=2.5                        # carrying a box, primary fire held that long (deploy_third, deploy_side)
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope
+#   tools/shot.sh --view=crosshair --out=res://screenshots/crosshair   # the spread crosshair at rest, walking, running, crouched, aimed
 #   tools/shot.sh --view=room --zz-map-ids=zm_4way_tunnel --fire=break_roof_spawn:ForceSpawn --at=...   # a maker's copies
 #   tools/shot.sh --view=crates --seconds=1.2                         # a ring of crates, frames before the blast and 0, 0.35 s and --seconds after
 #   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
