@@ -629,6 +629,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	builder.spacing = float(nav_doc.get("spacing", 1.0))
 	builder.point_radius = builder.spacing * 1.25
 	builder.neighbour_reach = 1.6
+	builder.centre_narrow_floors = true
 	builder.obstacle_under_feet = float(nav_doc.get("under_feet", -1.0))
 	builder.bridge_gap = float(nav_doc.get("bridge", NAV_BRIDGE_GAP))
 	builder.clearance = float(nav_doc.get("clearance", 0.35))
