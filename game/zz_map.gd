@@ -1258,6 +1258,8 @@ func load_world() -> DotResult:
 		return DotResult.success(false)
 
 	var wanted := id()
+	# A rebuild while this awaits (start() rebuilds the map _ready laid out) replaces _drawn; its own load is the one that draws.
+	var drawn_for := _drawn
 	var prefix := local_world_prefix()
 
 	if not local_worlds or not FileAccess.file_exists(prefix + ".json"):
@@ -1265,7 +1267,7 @@ func load_world() -> DotResult:
 		if key == "":
 			return DotResult.success(false)
 		var got: DotResult = await DotGameContent.ensure_one(key)
-		if id() != wanted or _drawn == null:
+		if id() != wanted or _drawn != drawn_for:
 			return DotResult.success(false)
 		if not got.ok:
 			DotLog.warn(CHANNEL, "a map's world could not be fetched; its boxes are drawn", {
@@ -1285,7 +1287,7 @@ func load_world() -> DotResult:
 		DotLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
 		if not stored.ok:
 			DotLog.debug(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
-		if id() != wanted or _drawn == null:
+		if id() != wanted or _drawn != drawn_for:
 			return DotResult.success(false)
 
 	if not read.ok:
