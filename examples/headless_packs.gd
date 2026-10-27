@@ -23,7 +23,7 @@ const CHECKS := 44
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 31
+const REAL_CHECKS := 32
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79", "zz_ak", "zz_scar", "zz_bren", "zz_glock", "zz_deagle", "zz_p90", "zz_aa12", "zz_rpg", "zz_machete", "zz_bat", "zz_crowbar", "zz_axe", "zz_sledge", "zz_hunting"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
@@ -316,8 +316,12 @@ func _real_packs() -> void:
 	ZzPacks.root = "res://addons"
 	var found := ZzPacks.scan()
 	ZzWeapons.use_packs()
-	_check(found == 3, "three providers are loaded from addons/", "%d" % found)
-	_check(ZzPacks.weapon_rows.size() == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
+	# An optional extra weapon pack (arena_weapons) may be linked too: it adds a provider and rows, never removes any.
+	var extra := 1 if FileAccess.file_exists("res://addons/arena_weapons/%s" % ZzPacks.PROVIDER_FILE) else 0
+	var extra_rows := ZzPacks.weapon_rows.filter(func(r: Dictionary) -> bool: return str(r.get("id", "")).begins_with("aw_")).size()
+	_check(found == 3 + extra, "the three packs and any optional weapon pack are loaded from addons/", "%d" % found)
+	_check(ZzPacks.weapon_rows.size() - extra_rows == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
+	_check(extra == 0 or extra_rows > 0, "an optional weapon pack's rows join the catalogue", "%d" % extra_rows)
 
 	for id: String in MODERN_IDS + MEDIEVAL_IDS:
 		if not ZzWeapons.exists(StringName(id)):
