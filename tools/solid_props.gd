@@ -5,8 +5,10 @@ extends SceneTree
 ## into each document, so a server with no world pack collides where a client does.
 ##
 ## [codeblock]
-## godot --headless --path . --script tools/solid_props.gd -- OUT.json [id ...]
+## godot --headless --path . --script tools/solid_props.gd -- OUT.json [--from-doc] [id ...]
 ## [/codeblock]
+## `--from-doc` re-filters the boxes a document already has instead of rebuilding them from the world:
+## run it after a change to how `ZzNpcs.nav_for` cuts solid props, which can seal ground the last filter left open.
 
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
 const NPCS_SCRIPT := "res://game/zz_npcs.gd"
@@ -23,21 +25,28 @@ func _initialize() -> void:
 
 	var out := {}
 	var failed := false
+	var ids := args.slice(1)
+	var from_doc := ids.has("--from-doc")
+	ids.erase("--from-doc")
 
-	for id in args.slice(1):
+	for id in ids:
 		var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/%s.json" % id))
 		if not (doc is Dictionary) or str((doc as Dictionary).get("world", "")) == "":
 			printerr(id, ": no document or no world")
 			failed = true
 			continue
-		var prefix := "res://world/%s/%s" % [(doc as Dictionary)["world"], id]
-		var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
-		if not read.ok:
-			printerr(id, ": ", read.error.message)
-			failed = true
-			continue
-		var body: StaticBody3D = read.value.call(&"build_prop_collision")
 		var boxes := []
+		var body: StaticBody3D = null
+		if from_doc:
+			boxes = ((doc as Dictionary).get("solid_props", []) as Array).duplicate()
+		else:
+			var prefix := "res://world/%s/%s" % [(doc as Dictionary)["world"], id]
+			var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+			if not read.ok:
+				printerr(id, ": ", read.error.message)
+				failed = true
+				continue
+			body = read.value.call(&"build_prop_collision")
 		if body != null:
 			for child in body.get_children():
 				var cs := child as CollisionShape3D
@@ -121,11 +130,19 @@ func _keep_connected(doc: Dictionary, boxes: Array) -> Array:
 	if _reached(npcs, graph_class, work, gates, from, places) == reached:
 		return boxes
 	var kept := []
-	for box: Array in boxes:
-		work["solid_props"] = kept + [box]
-		if _reached(npcs, graph_class, work, gates, from, places) == reached:
-			kept.append(box)
+	_keep_run(npcs, graph_class, work, gates, from, places, reached, boxes, kept)
 	return kept
+
+
+## Adds [param run] to [param kept] whole when that loses no place, else each half in turn. A box only ever
+## takes ground away, so this keeps exactly what trying them one by one keeps, in far fewer graph builds.
+func _keep_run(npcs: GDScript, graph_class: GDScript, work: Dictionary, gates: PackedStringArray, from: Vector3, places: Array[Vector3], reached: String, run: Array, kept: Array) -> void:
+	work["solid_props"] = kept + run
+	if _reached(npcs, graph_class, work, gates, from, places) == reached:
+		kept.append_array(run)
+	elif run.size() > 1:
+		_keep_run(npcs, graph_class, work, gates, from, places, reached, run.slice(0, run.size() / 2), kept)
+		_keep_run(npcs, graph_class, work, gates, from, places, reached, run.slice(run.size() / 2), kept)
 
 
 ## Which of [param places] the first seat walks to, as a string of 0 and 1.
