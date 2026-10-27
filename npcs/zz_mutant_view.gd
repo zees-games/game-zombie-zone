@@ -5,6 +5,7 @@ extends "zz_zombie_view.gd"
 ## (build, present, flinch, die, the limb cuts) so the world view and the limbs treat it alike.
 
 const MODEL := "res://assets/zombies/zombie_mutant.glb"
+const MUTANT_CREDITS := "Buff Mutant 2.0 by Zeldrix (CC-BY 4.0), modified"
 const PARTS: Array[StringName] = [&"gunL", &"gunR", &"pack"]
 ## Where the exhaust sits on the back, in the view's own space (forward is -Z).
 const EXHAUST := Vector3(0.0, 1.5, 0.55)

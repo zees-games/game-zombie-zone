@@ -61,6 +61,7 @@ const DEFAULTS := {
 			"crawler": {"chance": 0.35, "categories": {"ammo": 0.9, "health": 1.0}},
 			"riot": {"chance": 0.7, "min": 2, "max": 2, "categories": {"ammo": 1.5, "health": 0.8}},
 			"sleeper": {"chance": 0.6, "min": 1, "max": 2},
+			"mutant": {"chance": 1.0, "min": 3, "max": 4, "ammo_fraction": 0.5, "categories": {"ammo": 1.2, "health": 1.4}},
 			"brute": {
 				"chance": 1.0, "min": 3, "max": 4, "ammo_fraction": 0.5,
 				"categories": {"ammo": 1.2, "health": 1.4},

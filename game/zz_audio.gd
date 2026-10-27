@@ -76,7 +76,7 @@ const MUSIC_BRUTE := &"music_brute"
 const SPECIAL_VOICES := {
 	&"leaper": LEAPER, &"strangler": STRANGLER, &"bloater": BLOATER, &"ram": RAM,
 	&"spitter": SPITTER, &"rider": RIDER, &"brute": BRUTE, &"sleeper": SLEEPER,
-	&"screamer": SCREAMER, &"crawler": CRAWLER, &"riot": RIOT,
+	&"screamer": SCREAMER, &"crawler": CRAWLER, &"riot": RIOT, &"mutant": BRUTE,
 }
 
 var manager: DotAudioManager = null

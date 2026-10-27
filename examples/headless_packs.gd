@@ -91,7 +91,7 @@ func _none_installed() -> void:
 		"a mounted pack's cfg root is found, a linked pack has none")
 	_check(not ZzWeapons.exists(&"fx_rifle"), "no pack weapon in the pool")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
-	_check(cat.size() == 12, "the catalogue is the twelve built-in kinds", "%d" % cat.size())
+	_check(cat.size() == 13, "the catalogue is the thirteen built-in kinds", "%d" % cat.size())
 	_check(ZzPacks.specials().is_empty() and ZzPacks.bosses().is_empty(), "no pack specials or bosses")
 	_finished += 1
 
@@ -114,7 +114,7 @@ func _npc_profiles() -> void:
 			same += 1
 		if FileAccess.get_file_as_string("%s/%s.yml" % [ZzNpcProfiles.DIR, String(def.id)]) != ZzNpcProfiles.yaml_of(def, c):
 			stale += 1
-	_check(DirAccess.get_files_at(ZzNpcProfiles.DIR).size() == built.size(), "a profile file for each of the twelve kinds", "%d" % DirAccess.get_files_at(ZzNpcProfiles.DIR).size())
+	_check(DirAccess.get_files_at(ZzNpcProfiles.DIR).size() == built.size(), "a profile file for each of the thirteen kinds", "%d" % DirAccess.get_files_at(ZzNpcProfiles.DIR).size())
 	_check(same == built.size(), "with the shipped files, every kind resolves to its code numbers", "%d of %d" % [same, built.size()])
 	_check(stale == 0, "the shipped files are what tools/export_npc_profiles.gd writes", "%d stale" % stale)
 
@@ -347,7 +347,7 @@ func _real_packs() -> void:
 	_check(ZzPacks.monsters.size() == 6 and ZzPacks.specials().size() == 5 and ZzPacks.bosses().size() == 1,
 		"six monsters: five specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
-	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 18, "the catalogue is the twelve built-in kinds and the six monsters")
+	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 19, "the catalogue is the thirteen built-in kinds and the six monsters")
 
 	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
 	_check(is_equal_approx(_damage_of(&"zz_m4"), 29.0), "a modern weapon carries the pack's damage", "%.1f" % _damage_of(&"zz_m4"))

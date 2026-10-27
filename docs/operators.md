@@ -155,6 +155,21 @@ Mutants (every zombie kind but a common) are drawn more transparent for each Har
 | `zz_mutant_fade_per_stack` | 0.1 | alpha lost per Hard Box stack (0 to 0.5) |
 | `zz_common_fade` | 0 | 1 fades commons the same way (they are many, so each one costs its own material copy while faded) |
 
+## The Mutant
+
+A rare special (gravity guns, jetpack, a dive and slam); see docs/zombies.md. Everything else about him is in `cfg/game/game-zombie-zone/npc/mutant.yml`.
+
+| Cvar | Default | Meaning |
+| --- | --- | --- |
+| `zz_mutant_chance` | 0.12 | chance per special roll that a mutant is allowed (0 turns him off) |
+| `zz_mutant_min_wave` | 3 | first wave he can appear in |
+| `zz_mutant_zap_damage` | 4 | damage per gun zap |
+| `zz_mutant_throw_damage` | 8 | damage of a thrown prop |
+| `zz_mutant_slam_damage` | 30 | damage at the centre of the ground slam |
+| `zz_mutant_slam_radius` | 7 | slam radius in metres |
+| `zz_mutant_fuel` | 14 | seconds of jetpack fuel |
+| `zz_mutant_angry_health` | 0.4 | health fraction below which he is angry |
+
 ## Physics crates
 
 Ammo piles and boxes lying on the ground are rigid bodies on the server (dot-props' `crate` toy, driven by `game/zz_crates.gd`): survivors and zombies shove them along the floor, an explosion throws them away from the blast, and a bullet knocks them. Pickup, use and buying read where the crate lies now, so they work on a moved crate, for bots too. Clients get the moved crates' places in one batched event at `zz_crate_sync_hz` and ease toward them. Crates come to rest and sleep, so a quiet map costs nothing.

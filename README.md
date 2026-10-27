@@ -269,5 +269,7 @@ The zombies are from [Quaternius](https://quaternius.com)' [Zombie Apocalypse Ki
 
 The defibrillator is [Defibrillator (Low Poly)](https://sketchfab.com/3d-models/defibrillator-low-poly-54d46d07faab45778b10304fbc9debc3) by yellowbeebee ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), scaled and re-pivoted by `art-src/defib_prep.py`; the notice is `assets/defib/LICENSE-defibrillator.txt`.
 
+The Mutant is [Buff Mutant 2.0](https://sketchfab.com/3d-models/buff-mutant-20-8933f1f4a728486e8bcbe09714b842be) by Zeldrix ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), modified: re-rigged, re-weighted and split into gun, pack and body parts by `art-src/mutant.py`.
+
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.
