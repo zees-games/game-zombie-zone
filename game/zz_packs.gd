@@ -287,44 +287,7 @@ static func _stand_in_art(provider_script: Script) -> Array[ZeeWeaponArt]:
 ## Gives [param art] the pack's own model and hold when its provider names them (`art_rows()`): the toy stand-in's model, magazine,
 ## attachments and muzzle would otherwise show for a weapon whose pack ships real art.
 static func _dress(art: ZeeWeaponArt, row: Dictionary) -> void:
-	var model := str(row.get("model", ""))
-
-	if model == "" or not ResourceLoader.exists(model):
-		return
-
-	var view: Dictionary = row.get("view", {})
-	var motion := str(row.get("motion", "gun"))
-	art.model_path = model
-
-	# A melee model stands along +Y and a thrown one has no front: the stand-in's carry stays.
-	if motion != "gun":
-		art.model_forward = Vector3.UP if motion == "melee" else art.model_forward
-		art.magazine_path = ""
-		art.attachments = []
-		return
-
-	art.model_forward = Vector3.FORWARD
-	art.muzzle_distance = float(row.get("muzzle", 0.0))
-	art.muzzle_offset = Vector3.ZERO
-	art.magazine_path = ""
-	art.attachments = []
-	art.ejects = false
-	art.iron_sight = false
-	art.view_scale = 1.0
-	art.view_rotation = Vector3.ZERO
-	art.world_offset = Vector3.ZERO
-	art.world_rotation = Vector3.ZERO
-	art.world_scale = 1.0
-	art.aim_rotation = Vector3.ZERO
-
-	if view.has("hold"):
-		art.view_offset = view["hold"]
-
-	if view.has("aim"):
-		art.aim_offset = view["aim"]
-
-	if view.has("zoom"):
-		art.aim_zoom = float(view["zoom"])
+	ZeeArtDress.apply(art, row)
 
 
 ## A pack weapon's definitions with a tier. The game draws boxes, loot and stand-in kits by tier

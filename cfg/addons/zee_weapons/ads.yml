@@ -1,5 +1,6 @@
 # Aiming down sights (ZeeAdsRules). Override on a server in cfg/server/addons/zee_weapons/ads.yml.
 # view_scale multiplies the gun's hip size, view_shift_* moves it (metres, view space); zoom is a field-of-view multiplier, 0 takes the art.
+# Default 1.0: the modern pack's guns carry their own hip size and hold (their weapon profile `extra: view:`).
 # The zed pack's guns are modelled at real size, so they take 0.9 to 1.15 where zee's toy blasters take 1.5.
 ads:
   default:
@@ -10,9 +11,9 @@ ads:
     spread_multiplier: 0.6
     sway_multiplier: 0.5
     toggle: false
-    view_scale: 1.5
-    view_shift_x: -0.05
-    view_shift_y: 0.06
+    view_scale: 1.0
+    view_shift_x: 0.0
+    view_shift_y: 0.0
     view_shift_z: 0.0
 # A weapon override lists only what it changes, by weapon id:
   weapons:
