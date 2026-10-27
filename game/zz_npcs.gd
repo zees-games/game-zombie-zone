@@ -359,7 +359,7 @@ static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
 		"damage": 24.0, "reach": 2.4, "attack_interval": 1.45, "knock": 1.0,
 		"rock_range": 40.0, "rock_min": 9.0, "rock_cooldown": 9.0, "rock_damage": 24.0, "rock_speed": 24.0,
 		"frustration_seconds": 25.0,
-		"body": "brute", "radius": 0.7, "height": 2.9,
+		"body": "brute", "radius": 0.7, "height": 2.9, "fit_height": 2.1,
 	}
 	return def
 
@@ -443,6 +443,8 @@ const THIN_STEP := 0.4
 ## Metres above the higher end a link is tested for a wall at (a counter top and a chest), and trimmed off each end of it.
 const LINK_TEST_HEIGHTS := [0.4, 0.9]
 const LINK_TEST_TRIM := 0.15
+## A link that rises more than this is a drop or a climb, and is tested against the floors it crosses.
+const LINK_STEEP := 1.2
 ## How far (m) and how far off in height a graph point may stand from the foot or head of a ladder and still be its end.
 const LADDER_REACH := 6.5
 const LADDER_HEIGHT := 1.5
@@ -669,6 +671,8 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 			builder.add_points((ground.value as DotMapTerrain).walk_points(builder.spacing), DotMapTerrain.WALK_RISE)
 
 	var solids: Array[AABB] = []
+	## The boxes taken for floors: no wall to a link, but a link that falls through one is no drop.
+	var slabs: Array[AABB] = []
 
 	for box: Dictionary in doc.get("boxes", []):
 		if not bool(box.get("solid", true)) or ZzMapDoc.is_trim(box):
@@ -687,6 +691,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 		var bounds := _box_bounds(box)
 
 		if not box.has("nav") and _is_floor(bounds, floors):
+			slabs.append(bounds)
 			continue
 
 		builder.add_obstacle(bounds)
@@ -704,7 +709,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 
 	# A drawn world's solid props (the boxes the bodies collide with), cut like a doc prop of that size.
 	for rec: Array in doc.get("solid_props", []):
-		if float(rec[4]) < SOLID_PROP_CUT_HEIGHT or float(rec[1]) - float(rec[4]) * 0.5 > SOLID_PROP_HEAD:
+		if float(rec[4]) < SOLID_PROP_CUT_HEIGHT or float(rec[1]) - float(rec[4]) * 0.5 - _floor_under(floors, float(rec[0]), float(rec[2]), float(rec[1])) > SOLID_PROP_HEAD:
 			continue
 
 		var base := Vector3(rec[0], float(rec[1]) - float(rec[4]) * 0.5, rec[2])
@@ -722,7 +727,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 		var from := Vector3(float(link[0]), float(link[1]), float(link[2]))
 		var to := Vector3(float(link[3]), float(link[4]), float(link[5]))
 
-		if _link_blocked(from, to, solids, heights):
+		if _link_blocked(from, to, solids, heights) or _link_through_floor(from, to, slabs):
 			rejected += 1
 			continue
 
@@ -768,6 +773,23 @@ static func _link_blocked(from: Vector3, to: Vector3, solids: Array[AABB], heigh
 	return false
 
 
+## Whether a link that changes level (a drop, a stair) runs through a floor slab rather than past its edge: the importer
+## puts links under decks that have no hole there, and the graph then sends zombies up through a ceiling they push at for ever.
+static func _link_through_floor(from: Vector3, to: Vector3, slabs: Array[AABB]) -> bool:
+	if absf(from.y - to.y) <= LINK_STEEP:
+		return false
+
+	var dir := (to - from).normalized()
+	var a := from + dir * LINK_TEST_TRIM
+	var b := to - dir * LINK_TEST_TRIM
+
+	for bounds in slabs:
+		if bounds.intersects_segment(a, b):
+			return true
+
+	return false
+
+
 ## The axis-aligned bounds of a (possibly turned) box.
 static func _box_bounds(box: Dictionary) -> AABB:
 	var size := ZzMapDoc.v3(box["size"])
@@ -783,6 +805,20 @@ static func _box_bounds(box: Dictionary) -> AABB:
 		absf(turn.x.x) * half.x + absf(turn.z.x) * half.z, half.y,
 		absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
 	return AABB(at - extent, extent * 2.0)
+
+
+## The height of the highest nav floor under (x, z) that is no higher than [param y] (a prop's middle), 0 when none: a prop's
+## head clearance is measured from the floor it stands on, not from sea level (a deck at 10 m has every prop above 1.8).
+static func _floor_under(floors: Array, x: float, z: float, y: float) -> float:
+	var best := -INF
+
+	for f: Array in floors:
+		var h := float(f[4])
+
+		if h <= y and h > best and x >= float(f[0]) and x <= float(f[2]) and z >= float(f[1]) and z <= float(f[3]):
+			best = h
+
+	return 0.0 if best == -INF else best
 
 
 ## Whether [param bounds] is a floor: its top at a nav floor's height, under that floor.

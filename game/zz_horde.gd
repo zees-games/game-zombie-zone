@@ -384,10 +384,13 @@ func _adopt_links() -> void:
 func _mark_narrow() -> void:
 	if spawner.nav.has_method(&"mark_narrow"):
 		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
-			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"))
+			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), radius, fit)
 
 
 ## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
+		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
+		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
+		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
 func usable_posts() -> Array:
 	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
 

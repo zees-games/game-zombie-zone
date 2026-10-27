@@ -87,6 +87,8 @@ var mirror: bool = false
 
 var radius: float = 0.32
 var height: float = 1.75
+## The collision capsule's height when it is less than [member height] (the brute stoops under a 2.4 m lintel; its hitboxes keep the full height).
+var fit_height: float = 0.0
 
 ## How fast a shove dies away, per second.
 const PUSH_DECAY := 6.0
@@ -121,7 +123,7 @@ func _ready() -> void:
 	_shape.name = "Shape"
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = radius
-	capsule.height = maxf(height, radius * 2.0 + 0.05)
+	capsule.height = maxf(fit_height if fit_height > 0.0 else height, radius * 2.0 + 0.05)
 	_shape.shape = capsule
 	_shape.position = Vector3(0.0, capsule.height * 0.5, 0.0)
 	add_child(_shape)
@@ -139,11 +141,12 @@ func configure(def: DotNpcDef) -> void:
 	kind = def.id
 	radius = float(def.meta.get("radius", radius))
 	height = float(def.meta.get("height", height))
+	fit_height = float(def.meta.get("fit_height", 0.0))
 
 	if _shape != null:
 		var capsule := _shape.shape as CapsuleShape3D
 		capsule.radius = radius
-		capsule.height = maxf(height, radius * 2.0 + 0.05)
+		capsule.height = maxf(fit_height if fit_height > 0.0 else height, radius * 2.0 + 0.05)
 		_shape.position = Vector3(0.0, capsule.height * 0.5, 0.0)
 
 

@@ -156,10 +156,10 @@ func _relaxed(base: DotNpcNavFilter) -> DotNpcNavFilter:
 
 ## Flags every point where a body of [param radius] would overlap [param mask] (furniture packed
 ## into a classroom leaves gaps the graph walks through and a brute cannot). Returns how many.
-func mark_narrow(space: PhysicsDirectSpaceState3D, mask: int, radius: float = 0.65) -> int:
+func mark_narrow(space: PhysicsDirectSpaceState3D, mask: int, radius: float = 0.7, height: float = 2.1) -> int:
 	var shape := CapsuleShape3D.new()
 	shape.radius = radius
-	shape.height = 1.9
+	shape.height = maxf(height, radius * 2.0 + 0.05)
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
 	query.collision_mask = mask

@@ -25,6 +25,8 @@ var _ai := false
 var _held := false
 ## Print the first origin's walk every two seconds (position, path, wish).
 var _trace := false
+## `--edges=x,y,z`: the graph points around that place and whether a ray between neighbours meets something.
+var _edges := Vector3.INF
 ## Only these kinds (comma separated), the common always first.
 var _only := PackedStringArray()
 ## The last _sim's end state: {state, moved over its final 8 s, gap}.
@@ -53,6 +55,9 @@ func _run() -> void:
 			_ai = true
 		elif arg.begins_with("--kinds="):
 			_only = arg.substr(8).split(",")
+		elif arg.begins_with("--edges="):
+			var f := arg.substr(8).split_floats(",")
+			_edges = Vector3(f[0], f[1], f[2])
 		elif arg == "--trace":
 			_trace = true
 		elif arg == "--held":
@@ -83,6 +88,9 @@ func _run() -> void:
 		if game == null:
 			print("%-24s no graph" % id)
 			continue
+
+		if _edges != Vector3.INF:
+			_dump_edges(game)
 
 		await _map(id, game, kinds)
 		game.queue_free()
@@ -145,7 +153,7 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 						and not _last.is_empty() and float(_last["moved"]) < 3.0:
 					# Time to arrive by a clear run, and still for the last eight seconds: a snag, not a long way round or a wait.
 					stuck += 1
-					print("   snag %s %s from %s path %.0f m, %s, %.0f m short at %s, moved %.1f m, %s, blocked by %s" % [id, kind, origin.snapped(Vector3.ONE * 0.1), shortest, _last["state"], _last["gap"], (_last["pos"] as Vector3).snapped(Vector3.ONE * 0.1), _last["moved"], _last["barricade"], _last["blockers"]])
+					print("   snag %s %s from %s path %.0f m, %s, %.0f m short at %s, moved %.1f m, %s, blocked by %s, unstick %s" % [id, kind, origin.snapped(Vector3.ONE * 0.1), shortest, _last["state"], _last["gap"], (_last["pos"] as Vector3).snapped(Vector3.ONE * 0.1), _last["moved"], _last["barricade"], _last["blockers"], _last["unstick"]])
 
 		times.sort()
 		var med := "-" if times.is_empty() else "%.0fs" % times[times.size() / 2]
@@ -154,6 +162,29 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 		parts.append("%s %d/%d/%d%s %s" % [String(kind).left(5), paths, reached, origins.size(), "" if stuck == 0 else " !%d" % stuck, med])
 
 	print("%-24s %s" % [id, "  ".join(parts)])
+
+
+func _dump_edges(game: Node) -> void:
+	var nav: DotNpcNavGraph = game.horde.spawner.nav
+	var data: DotNpcNavData = nav.data
+	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
+
+	for i in data.points.size():
+		var a := data.points[i]
+
+		if a.distance_to(_edges) > 1.6:
+			continue
+
+		for j in nav.neighbours(i):
+			var b := data.points[j]
+			var hits := PackedStringArray()
+
+			for h: float in [0.3, 0.9, 1.5]:
+				var q := PhysicsRayQueryParameters3D.create(a + Vector3(0, h, 0), b + Vector3(0, h, 0), 0xFFFFFFFF)
+				var hit := space.intersect_ray(q)
+				hits.append("-" if hit.is_empty() else "%s@%s" % [(hit["collider"] as Node).name, (hit["position"] as Vector3).snapped(Vector3.ONE * 0.1)])
+
+			print("   edge %d %s -> %d %s flags %d/%d rays %s" % [i, a.snapped(Vector3.ONE * 0.01), j, b.snapped(Vector3.ONE * 0.01), data.flags_of(i), data.flags_of(j), hits])
 
 
 ## Hint spawns spread over the list, then the horde's own pick.
@@ -223,6 +254,8 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 			var b = npc.brain.body()
 			var p = npc.brain.get(&"path")
 			print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
+			if p != null and tick % 512 == 256:
+				print("      ahead %s" % str(Array(p.points).slice(0, 6).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))))
 
 		if tick == ticks - 8 * 64:
 			earlier = npc.position()
@@ -248,7 +281,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 		for sid in ids:
 			gap_now = minf(gap_now, npc.position().distance_to(horde.survivor_position(sid)))
 
-		_last = {"blockers": _blockers(npc), "pos": npc.position(), "barricade": _barricade_near(game, npc.position()), "state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
+		_last = {"unstick": str(npc.brain.get(&"unstick_log")) if npc.brain != null else "", "blockers": _blockers(npc), "pos": npc.position(), "barricade": _barricade_near(game, npc.position()), "state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
 
 	horde.spawner.remove(npc.instance_id)
 	return best
@@ -262,12 +295,12 @@ func _blockers(npc: DotNpcInstance) -> String:
 		return "?"
 
 	var shape := CapsuleShape3D.new()
-	shape.radius = (body.get(&"radius") as float) + 0.15
-	shape.height = 1.2
+	shape.radius = (body.get(&"radius") as float) + 0.12
+	shape.height = maxf(body.get(&"height") as float, shape.radius * 2.0 + 0.05)
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
 	query.collision_mask = body.collision_mask
-	query.transform = Transform3D(Basis.IDENTITY, npc.position() + Vector3(0.0, 0.9, 0.0))
+	query.transform = Transform3D(Basis.IDENTITY, npc.position() + Vector3(0.0, shape.height * 0.5 + 0.05, 0.0))
 	query.exclude = [body.get_rid()]
 	var names := PackedStringArray()
 
