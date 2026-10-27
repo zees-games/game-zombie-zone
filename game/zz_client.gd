@@ -347,10 +347,6 @@ func _build_world_view() -> void:
 	blood.mask = game.world_mask()
 	game.add_child(blood)
 	blood.apply_settings(null)
-	var render_quality := DotFxRenderQuality.new()
-	render_quality.name = "RenderQuality"
-	add_child(render_quality)
-	render_quality.load_layers()
 	_warm_zombies()
 
 
