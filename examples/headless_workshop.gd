@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
@@ -23,11 +23,8 @@ const OTHER_KIND := "fixture_run"
 const BAD := "fixture_bad"
 const DIR := "user://ws_fixture/"
 
-var _passed := 0
-var _failed := 0
 var _entered := 0
 var _completed := 0
-var _failures: Array[String] = []
 
 
 func _ready() -> void:
@@ -270,13 +267,3 @@ func _test_play() -> void:
 	_check(not denied.ok and not online.catalogue.maps.has(StringName(MAP)), "online: the pack's map is not playable")
 	online.free()
 	_completed += 1
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		_failures.append(what)
-		print("  FAIL  %s" % what)

@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 ## ZzConfig through DotGameConfigBinder: fields, cvars, strict refusal, the diff, yml defaults and the workbench round trip.
 ##
@@ -11,22 +11,10 @@ const ROOT := "user://zz_cfgtest"
 const GAME := "game-zombie-zone"
 const CHECKS := 38
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
-
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
-
-
-func _check(ok: bool, what: String, _detail := "") -> void:
-	if ok:
-		_passed += 1
-	else:
-		_failed += 1
-		_failures.append(what)
 
 
 func _run() -> void:

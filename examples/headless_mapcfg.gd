@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzMapConfig := preload("../game/zz_map_config.gd")
 
@@ -11,10 +11,6 @@ const ZzMapConfig := preload("../game/zz_map_config.gd")
 ## The files are written into a scratch operator root, so the suite does not depend on a shipped map's file; the cvars start away from the values.
 
 const CHECKS := 8
-
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 
 
 func _ready() -> void:
@@ -50,28 +46,10 @@ func _run() -> void:
 	_check(ZzMapConfig.KEYS.keys().all(func(k: String) -> bool: return k.begins_with("zz_") and k != "zz_gravity"), "no movement key is whitelisted")
 
 	DirAccess.remove_absolute(dir.path_join("zz_probe_hold.yml"))
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_report(CHECKS)
 
 
 func _write(path: String, text: String) -> void:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	f.store_string(text)
 	f.close()
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		_failures.append(what)
-		print("  FAIL  %s" % what)
