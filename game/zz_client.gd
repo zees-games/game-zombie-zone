@@ -1156,11 +1156,6 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 	_draw_body_hit(weapons, point)
 	if world_view != null and not killed:
 		world_view.wound_near(point)
-	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
-	if blood != null and camera != null:
-		var _splat := blood.on_body_hit(victim, point, camera.global_position)
-
-
 	if audio != null and world_view != null:
 		var kind := world_view.kind_of(victim)
 		if kind != &"":
@@ -1168,6 +1163,11 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 				audio.gore_at(point, headshot)
 			else:
 				var _h := audio.cue_at(kind, &"hurt", point, 0.8)
+	var camera := get_viewport().get_camera_3d() if get_viewport() != null else null
+	if blood != null and camera != null:
+		var _splat := blood.on_body_hit(victim, point, camera.global_position)
+
+
 ## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
 ## body the client's presentation ray never meets (a zombie is drawn as a figure and hit through the server's hitboxes). The rig's effects skip a second drawing
 ## of a hit the ray already drew. Through `has_method`: an older shell's zee has no

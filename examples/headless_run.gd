@@ -1270,7 +1270,7 @@ func _test_the_flashlight() -> void:
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	var cfg := game.flashlight_conf()
-	_check(cfg.key == "T" and game.flashlight_binder != null, "the key is T, since F is the shove", cfg.key)
+	_check(cfg.key == "F" and game.flashlight_binder != null, "the key is F, since T is the shove", cfg.key)
 
 	cfg.default_state = DotFlashlightConfig.START_ON
 	me.flashlight_ready = false
@@ -2466,9 +2466,9 @@ func _test_help_and_menu() -> void:
 	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H (the medkit is on G)",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
-	# The right mouse button aims down the sights (the family's Aim row); the shove kept F.
+	# The right mouse button aims down the sights (the family's Aim row); the shove is on T.
 	_check(keys.key_for(ZzBindings.AIM) == "Mouse 2" and keys.defaults_on("Mouse 2").size() == 1
-		and keys.key_for(ZzBindings.SHOVE) == "F", "aim is the only row on the right mouse button, the shove is on F",
+		and keys.key_for(ZzBindings.SHOVE) == "T", "aim is the only row on the right mouse button, the shove is on T",
 		"%s %s %d" % [keys.key_for(ZzBindings.AIM), keys.key_for(ZzBindings.SHOVE), keys.defaults_on("Mouse 2").size()])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "T")
@@ -2505,8 +2505,8 @@ func _test_help_and_menu() -> void:
 	_check(rk.key_for(ZzBindings.HEAL) == "G" and rk.key_for(DotMenuBindings.HELP_ACTION) == "H",
 		"an old settings file with the medkit on H: the medkit moves to G, help keeps H",
 		"%s %s" % [rk.key_for(ZzBindings.HEAL), rk.key_for(DotMenuBindings.HELP_ACTION)])
-	_check(rk.key_for(ZzBindings.SHOVE) == "F" and rk.key_for(ZzBindings.USE) == "J",
-		"the shove leaves V for push to talk, and a key the player chose is kept",
+	_check(rk.key_for(ZzBindings.SHOVE) == "T" and rk.key_for(ZzBindings.USE) == "J",
+		"the shove leaves V for push to talk (it moves to T), and a key the player chose is kept",
 		"%s %s" % [rk.key_for(ZzBindings.SHOVE), rk.key_for(ZzBindings.USE)])
 	var fov_cam := Camera3D.new()
 	returning.add_child(fov_cam)
