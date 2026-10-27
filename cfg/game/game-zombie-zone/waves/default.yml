@@ -1,0 +1,51 @@
+# The default Zombie Zone hold: today numbers, as a wave set. Chosen with sv_waves default, a rotation entry or a map document survival.waves.
+count: 10
+first_quiet: 30
+quiet: 30
+size:
+  base: 16
+  per_player: 4
+growth:
+  linear: 0.22
+  accel: 0.018
+pool:
+  common: 10
+  crawler: 2
+director:
+  skill: true
+  specials_budget: 2
+difficulty:
+  easy:
+    size: 0.7
+    health: 0.8
+    speed: 0.95
+    reward: 1.2
+  hard:
+    size: 1.3
+    health: 1.2
+    speed: 1.1
+    reward: 0.9
+waves:
+  "2-10":
+    specials:
+      spitter: 1
+  "5":
+    boss:
+      npc: brute
+      count: 1
+      at: 0.33
+  last:
+    boss:
+      npc: brute
+      count: 2
+      at: 0.33
+extra:
+  zz:
+    twists: true
+    # Per-map size scale, replacing ZzConfig.wave_scale_by_map: a map's own set can
+    # extend this one and set size, or the rotation entry names a set per map.
+    wave_scale_by_map:
+      zz_stadium: 5.0
+      zz_high_school: 1.3
+      zz_mall: 1.15
+      zz_relief_camp: 0.85

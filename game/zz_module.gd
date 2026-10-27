@@ -744,6 +744,12 @@ func _add_tunables(world: ZzGame) -> void:
 			if picked >= 0:
 				config.survival_style = picked
 			log_info("survival style", {"now": config.survival_style_name()}))
+	var wave_set_cvar := add_cvar("sv_waves", config.waves_set,
+		"Wave set survival maps play (cfg/game/game-zombie-zone/waves/<id>.yml), over a rotation entry's and the map's; empty leaves them to decide")
+	if wave_set_cvar != null:
+		wave_set_cvar.changed.connect(func(_old: String, now: String) -> void:
+			config.waves_set = now.strip_edges()
+			log_info("wave set", {"now": config.waves_set}))
 	_tunable("zz_waves", float(config.waves), "Waves a survival map is held for (zz_survival waves)",
 		func(value: float) -> void: config.waves = clampi(int(value), 1, 50))
 	_tunable("zz_nights", float(config.nights), "Nights a survival map is held for (zz_survival nights)",
@@ -1699,6 +1705,7 @@ func _start_workbench(world: ZzGame) -> void:
 		for set: DotProfileSet in world.flashlight_binder.profile_sets():
 			workbench.add_set(set, "Flashlight")
 	workbench.add_set(world.bot_persona_set(), "Bot personas (add, edit, delete)")
+	workbench.add_set(DotWaveSet.make_set("game-zombie-zone"), "Wave sets (sizes, pools, bosses, difficulty)")
 	var ambient_set := DotGameWorkbench.cvar_set(console, world.ambient_rules.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (zz_ambient*)")

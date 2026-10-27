@@ -5,6 +5,7 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
 const ZzPlayer := preload("zz_player.gd")
+const ZzWaveSets := preload("zz_wave_sets.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 
 ## A survival map held: the schedule, what each stage does to the horde, and the breather.
@@ -52,6 +53,9 @@ const TWISTS := {
 var game = null
 var waves: DotNpcDirectorWaves = null
 
+## The wave set in play, or empty when the cvars set the schedule.
+var wave_set_id: String = ""
+
 ## The wave's twist, or empty.
 var twist: StringName = &""
 
@@ -77,10 +81,10 @@ func _init(p_game: Object) -> void:
 	game = p_game
 
 
-## Builds the schedule from the configuration and starts it.
-func begin() -> DotResult:
+## The cvar-built schedule, used when no wave set is chosen or none loads.
+func _legacy_schedule() -> DotNpcDirectorWaves:
 	var c = game.config
-	waves = DotNpcDirectorWaves.new()
+	var waves := DotNpcDirectorWaves.new()
 	waves.style = [DotNpcDirectorWaves.Style.ROUNDS, DotNpcDirectorWaves.Style.CYCLE, DotNpcDirectorWaves.Style.CLOCK][clampi(c.survival_style, 0, 2)]
 	waves.count = c.waves if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.nights
 	waves.first_quiet_seconds = c.setup_seconds() if waves.style != DotNpcDirectorWaves.Style.CLOCK else 0.0
@@ -92,6 +96,48 @@ func begin() -> DotResult:
 	waves.growth = c.wave_growth
 	waves.growth_accel = c.wave_growth_accel
 	waves.straggler_count = maxi(3, int(round(float(_team()) * c.wave_straggler_share)))
+
+	return waves
+
+
+## The first wave set that loads, from `sv_waves`, the rotation entry's `waves`, then the map
+## document's `survival.waves`; null when none is named or none loads (the cvars then rule).
+func _from_wave_set() -> DotNpcDirectorWaves:
+	var c = game.config
+	var map_id := str(game.map_doc.get("id", ""))
+	var doc_waves := str((game.map_doc.get("survival", {}) as Dictionary).get("waves", "")) if game.map_doc.get("survival") is Dictionary else ""
+	var play: Dictionary = game.catalogue.play_for(StringName(map_id)) if game.catalogue != null else {}
+	var names := ZzWaveSets.candidates(c.waves_set, play, doc_waves)
+	if names.is_empty():
+		return null
+	var difficulty := str(play.get("difficulty", "normal"))
+	var profiles := DotWaveSet.make_set(ZzWaveSets.GAME)
+	for set_name: String in names:
+		var res := DotWaveSet.load_set(profiles, set_name, difficulty, Callable(), ZzWaveSets.validate_extra)
+		if not res.ok:
+			DotLog.warn(CHANNEL, "a wave set did not load; trying the next", {"set": set_name, "why": res.error.message})
+			continue
+		var set: DotWaveSet = res.value
+		ZzWaveSets.scale_for_map(set, map_id)
+		set.map_key = map_id
+		var sched := DotNpcDirectorWaves.new()
+		set.fill_schedule(sched, _team())
+		if not sched.validate().ok:
+			DotLog.warn(CHANNEL, "a wave set made no usable schedule; trying the next", {"set": set_name})
+			continue
+		DotLog.info(CHANNEL, "wave set chosen", {"set": set_name, "difficulty": difficulty, "map": map_id})
+		wave_set_id = set_name
+		return sched
+	DotLog.error(CHANNEL, "no named wave set loaded; the survival cvars rule", {"tried": ",".join(names)})
+	return null
+
+
+## Builds the schedule from the configuration and starts it.
+func begin() -> DotResult:
+	var c = game.config
+	waves = _from_wave_set()
+	if waves == null:
+		waves = _legacy_schedule()
 
 	var valid := waves.validate()
 

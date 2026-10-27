@@ -338,6 +338,16 @@ func rotating(allowed: PackedStringArray) -> Array[StringName]:
 	return out if not out.is_empty() else every
 
 
+## What the rotation entry gives map [param id] (`{waves: "hard"}`), empty for a bare entry or no file.
+func play_for(id: StringName) -> Dictionary:
+	if not has_rotation_file():
+		return {}
+
+	apply_rotation()
+	var def := _defs.get_map(id)
+	return def.play if def != null else {}
+
+
 ## Records that [param id] was built, for the file's cooldown and cycle. Nothing without a file.
 func note_played(id: StringName) -> void:
 	if has_rotation_file() and maps.has(id):

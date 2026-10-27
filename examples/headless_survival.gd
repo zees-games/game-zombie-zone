@@ -12,6 +12,7 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzRespawn := preload("../game/zz_respawn.gd")
+const ZzWaveSets := preload("../game/zz_wave_sets.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## Survival maps, held: the three styles a server picks (`zz_survival`), the breather, a wipe,
@@ -25,8 +26,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 17
-const CHECKS := 106
+const SECTIONS := 18
+const CHECKS := 117
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -67,6 +68,7 @@ func _run() -> void:
 
 	await _test_waves()
 	await _test_prestart()
+	await _test_wave_sets()
 	await _test_respawn()
 	await _test_nights()
 	await _test_clock()
@@ -103,6 +105,56 @@ func _run() -> void:
 		await _dispose(game)
 
 	get_tree().quit(code)
+
+
+# --- Wave sets ------------------------------------------------------------------------------
+
+## `sv_waves`, the rotation entry and the map document pick a yml wave set; a missing one falls
+## through; none leaves the cvars in charge.
+func _test_wave_sets() -> void:
+	_section("wave sets: sv_waves, rotation entry and map document choose; a missing one falls through")
+	_check(ZzWaveSets.candidates("a", {"waves": "b"}, "c") == ["a", "b", "c"], "candidates: cvar > entry > map document")
+	_check(ZzWaveSets.candidates("", {}, "") == [], "candidates: nothing named is empty")
+	_check(ZzWaveSets.validate_extra({"zz": {"twists": true}}).ok, "extra.zz twists is accepted")
+	_check(not ZzWaveSets.validate_extra({"zz": {"twits": true}}).ok, "an extra.zz typo is refused")
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.survival_style = 0
+		c.waves_set = "nonesuch"
+		c.waves = 3
+		c.prestart_seconds = 4.0)
+	var doc := ZzCatalogue.practice().duplicate(true)
+	doc["id"] = "zz_wave_sets"
+	doc["mode"] = ZzMapDoc.SURVIVAL
+	doc["objectives"] = []
+	doc["caches"] = [[-2.0, 0.0, 10.0], [2.0, 0.0, 10.0]]
+	_check(ZzMapDoc.validate(doc).ok, "the test map validates", str(ZzMapDoc.validate(doc).error.message if not ZzMapDoc.validate(doc).ok else ""))
+	var checked := ZzMapDoc.validate(doc)
+	var _added := game.catalogue._add(checked.value, "test") if checked.ok else false
+	game.next_map_id = &"zz_wave_sets"
+	var _player := game.add_player(&"u310", "Sets")
+	game.start()
+	await _sim(game, 2.0)
+	_check(game.survival != null and game.survival.wave_set_id == "", "a set that does not exist leaves the cvars in charge", str(game.survival.wave_set_id if game.survival != null else "no survival"))
+	_check(game.survival != null and game.survival.waves.count == 3, "and zz_waves still counts", str(game.survival.waves.count if game.survival != null else -1))
+	await _dispose(game)
+
+	var named := await _world(func(c: ZzConfig) -> void:
+		c.survival_style = 0
+		c.waves_set = "default"
+		c.waves = 3
+		c.prestart_seconds = 4.0)
+	var _added2 := named.catalogue._add(checked.value, "test") if checked.ok else false
+	named.next_map_id = &"zz_wave_sets"
+	var _player2 := named.add_player(&"u311", "Sets")
+	named.start()
+	await _sim(named, 2.0)
+	_check(named.survival != null and named.survival.wave_set_id == "default", "sv_waves default loads the shipped set", str(named.survival.wave_set_id if named.survival != null else "no survival"))
+	_check(named.survival != null and named.survival.waves.count == 10, "its ten waves, not zz_waves", str(named.survival.waves.count if named.survival != null else -1))
+	_check(named.survival != null and named.survival.waves.wave_set != null and named.survival.waves.wave_set.resolve(5, 1).boss.get("npc", "") == "brute", "wave 5 brings the brute the yml names")
+	_check(named.survival != null and named.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET, "and the hold opens in its setup stage")
+	await _dispose(named)
+	_finished()
 
 
 # --- Setup time and respawns -----------------------------------------------------------------

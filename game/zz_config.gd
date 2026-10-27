@@ -343,6 +343,9 @@ func setup_seconds() -> float:
 ## is not a cvar: it is a measured table (docs/survival.md).
 @export var wave_scale_by_map: Dictionary = {"zz_stadium": 5.0, "zz_high_school": 1.3, "zz_mall": 1.15, "zz_relief_camp": 0.85}
 
+## The wave set `sv_waves` names (cfg/game/game-zombie-zone/waves/<id>.yml); empty lets the rotation entry, the map document or the cvars above decide.
+@export var waves_set: String = ""
+
 # --- The survivors ---------------------------------------------------------
 
 @export_group("The survivors")
