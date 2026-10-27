@@ -20,6 +20,7 @@ const ZzHud := preload("zz_hud.gd")
 const ZzKillcam := preload("zz_killcam.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
+const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzPlayer := preload("zz_player.gd")
@@ -168,6 +169,10 @@ func _ready() -> void:
 	# First, before anything can be drawn: the map, the player and the camera all arrive
 	# after this node is in the tree. The platform puts the loading cover up, held until the
 	# player exists and the camera is current, and finds the link.
+	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
+	if not OS.get_cmdline_user_args().any(func(a: String) -> bool: return a.begins_with("--map_load_threads=")):
+		MapThreads.client_value = -1
+		var _on := MapThreads.apply(-1)
 	platform = DotGameClient.new()
 	platform.name = "Platform"
 	platform.force_offline = force_offline
@@ -1897,6 +1902,13 @@ func _pointer_ours() -> bool:
 	return pointer_forced or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
+## The sound manager the flashlight clicks play through, or null before audio is up.
+func _flash_audio_ref() -> DotNodeRef:
+	if audio == null or audio.manager == null or not audio.manager.is_inside_tree():
+		return null
+	return DotNodeRef.of_path(audio.manager.get_path())
+
+
 ## The light on the eye follows the server's state (but not for 0.4 s after our own switch, which is shown at once), and everyone else's beams follow theirs.
 func _present_flashlights() -> void:
 	var cfg := game.flashlight_conf()
@@ -1908,6 +1920,7 @@ func _present_flashlights() -> void:
 		flash.handle_input = false
 		flash.authoritative = false
 		flash.allowed = DotFlashlightRules.allowed_on(cfg, str(game.map_doc.get("id", "")))
+		flash.audio = _flash_audio_ref()
 		flash.switch_requested.connect(func(_want: bool) -> void:
 			_flash_ticks = 3
 			_flash_msec = Time.get_ticks_msec())
@@ -1923,6 +1936,7 @@ func _present_flashlights() -> void:
 		flash_crowd = DotFlashlightCrowd.new()
 		flash_crowd.name = "Flashlights"
 		flash_crowd.config = cfg
+		flash_crowd.audio = _flash_audio_ref()
 		add_child(flash_crowd)
 
 	flash_crowd.set_viewer(camera.global_position)
