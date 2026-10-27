@@ -64,8 +64,11 @@ static var ATLASES := {
 	## Ours, not the kit's: the worker's gear and dirt are baked in (`art-src/zombie_worker.py`).
 	&"worker": ZzPaths.rebase("res://assets/zombies/atlas_worker.png"),
 	## A realistic body's baked colour (`art-src/zombie_city.py`); its tangent normal map is [constant CITY_NORMAL].
-	&"city": ZzPaths.rebase("res://assets/zombies/city_albedo.png"),
+	&"city": ZzPaths.rebase("res://assets/zombies/city_albedo_0.png"),
 }
+
+## The city body's painted people (`art-src/zombie_city_paint.py`): skin, outfit and hair differ per texture.
+const CITY_LOOKS := 6
 
 const CITY_NORMAL := "res://assets/zombies/city_normal.png"
 
@@ -391,6 +394,13 @@ static func look_for(p_kind: StringName, p_variant: int) -> Dictionary:
 	look["girth"] = lerpf(0.92, 1.12, float((v >> 4) & 3) / 3.0)
 	look["blood"] = lerpf(0.5, 0.72, float((v >> 2) & 7) / 7.0)
 	look["dirt"] = lerpf(0.3, 0.8, float((v >> 9) & 7) / 7.0)
+
+	if look["body"] == &"city":
+		# Colour, blood and dirt are painted in the texture; the shader's splashes would land on the baked ones.
+		look["tex"] = (v >> 3) % CITY_LOOKS
+		look["blood"] = 2.0
+		look["dirt"] = 0.0
+
 	return look
 
 
@@ -593,7 +603,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 
 	var glow := Color(str(look.get("glow", "000000")))
 	var mark := Color(str(look.get("mark", "000000"))).srgb_to_linear() if detail else Color.BLACK
-	var key := "%s|%s|%s|%.2f|%.2f|%s|%s" % [look["body"], from, to, float(look.get("blood", 0.6)), float(look.get("dirt", 0.5)), glow.to_html(), mark.to_html()]
+	var key := "%s%s|%s|%s|%.2f|%.2f|%s|%s" % [look["body"], look.get("tex", ""), from, to, float(look.get("blood", 0.6)), float(look.get("dirt", 0.5)), glow.to_html(), mark.to_html()]
 
 	if _materials.has(key):
 		return _materials[key]
@@ -611,9 +621,13 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
 
 	var atlas_id: StringName = ATLAS_OF.get(look["body"], &"basic")
+	var path: String = ATLASES[atlas_id]
+
+	if normal_tex:
+		atlas_id = StringName("city_%d" % int(look.get("tex", 0)))
+		path = path.replace("city_albedo_0", "city_albedo_%d" % int(look.get("tex", 0)))
 
 	if not _atlases.has(atlas_id):
-		var path: String = ATLASES[atlas_id]
 		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
 
 	var material := ShaderMaterial.new()

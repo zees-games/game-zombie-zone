@@ -101,6 +101,8 @@ dec.ratio = TRIS / float(len(lo.data.polygons))
 dec.use_collapse_triangulate = True
 bpy.ops.object.modifier_apply(modifier="Decimate")
 print("CITY tris", len(lo.data.polygons), "from", len(hi.data.polygons))
+# Clearing the slots for a bake resets every face to slot 0, so the slot of each face is kept here.
+slot_of = [p.material_index for p in lo.data.polygons]
 
 for uv in list(lo.data.uv_layers):
 	lo.data.uv_layers.remove(uv)
@@ -151,17 +153,98 @@ def bake(kind, name, colourspace):
 
 albedo = bake("DIFFUSE", "city_albedo", "sRGB")
 
-# The source colours are near black under game lighting: lift the darks and let the red off, so the wounds
-# are dark red on grey-green dead skin rather than the whole body being one.
-import numpy as np
-px = np.array(albedo.pixels[:], dtype=np.float32).reshape(-1, 4)
-rgb = np.clip(px[:, :3], 0.0, 1.0) ** 0.58
-grey = (rgb * np.array([0.3, 0.55, 0.15])).sum(axis=1, keepdims=True)
-rgb = grey + (rgb - grey) * 0.62
-rgb *= np.array([0.97, 1.0, 0.98])
-px[:, :3] = np.clip(rgb * 1.08, 0.0, 1.0)
-albedo.pixels = px.ravel().tolist()
+# The source colours are Voronoi smears (a dim, red-brown body), so the colour is repainted from this raw bake and
+# the masks below by art-src/zombie_city_paint.py; the raw bake only says where the wounds and the folds are.
+albedo.filepath_raw = os.path.join(out_dir, "city_raw.png")
 albedo.save()
+
+head_j, head_t = joints["Head"]
+toe_j = joints["LeftToeBase"][1]
+front = 1.0 if toe_j.y > joints["LeftFoot"][0].y else -1.0
+hh = max(head_t.z - head_j.z, 0.05)
+extremity = [i for i, g in enumerate(lo.vertex_groups) if any(k in g.name for k in ("Hand", "Foot", "Toe"))]
+head_group = [i for i, g in enumerate(lo.vertex_groups) if g.name in ("Head", "HeadTop_End")]
+head_v = [v.co for v in lo.data.vertices if sum(g.weight for g in v.groups if g.group in head_group) > 0.5]
+front_v = [c for c in head_v if (c.y - head_j.y) * front > 0.0]
+chin = min(c.z for c in front_v)
+crown = max(c.z for c in head_v)
+fh = crown - chin
+eye_z, mouth_z = chin + 0.52 * fh, chin + 0.2 * fh
+head_x = sum(c.x for c in head_v) / len(head_v)
+print("CITY head chin %.3f crown %.3f x %.3f" % (chin, crown, head_x))
+body_slot = [i for i, m in enumerate(hi.data.materials) if m and "Body" in m.name]
+top_z = max(v.co.z for v in lo.data.vertices)
+ma = lo.data.color_attributes.new("MaskA", "FLOAT_COLOR", "CORNER")
+lo.data.color_attributes.new("MaskB", "FLOAT_COLOR", "CORNER")
+lo.data.color_attributes.new("MaskC", "FLOAT_COLOR", "CORNER")
+ma = lo.data.color_attributes["MaskA"]
+mb = lo.data.color_attributes["MaskB"]
+mc = lo.data.color_attributes["MaskC"]
+for poly in lo.data.polygons:
+	skin = 1.0 if slot_of[poly.index] in body_slot else (0.5 if slot_of[poly.index] == 2 else 0.0)
+	for li in poly.loop_indices:
+		v = lo.data.vertices[lo.data.loops[li].vertex_index]
+		co = v.co
+		hw = sum(g.weight for g in v.groups if g.group in head_group)
+		ew = sum(g.weight for g in v.groups if g.group in extremity)
+		rel = (co.z - head_j.z) / hh
+		fwd = (co.y - head_j.y) * front / (0.5 * hh)
+		scalp = 1.0 if (hw > 0.5 and rel > 0.62 and (fwd < 0.2 or rel > 0.8)) else 0.0
+		face = 1.0 if (hw > 0.5 and fwd > 0.2 and 0.1 < rel < 0.75) else 0.0
+		ma.data[li].color = (skin, min(max(co.z / top_z, 0.0), 1.0), scalp, 1.0)
+		infront = (co.y - head_j.y) * front > 0.0 and hw > 0.5
+		dx = co.x - head_x
+		eyes = 0.0
+		if infront:
+			for sx in (-1.0, 1.0):
+				d = ((dx - sx * 0.17 * fh) / (0.1 * fh)) ** 2 + ((co.z - eye_z) / (0.07 * fh)) ** 2
+				eyes = max(eyes, math.exp(-d))
+		mouth = math.exp(-((dx / (0.2 * fh)) ** 2 + ((co.z - mouth_z) / (0.06 * fh)) ** 2)) if infront else 0.0
+		mc.data[li].color = (eyes, mouth, min(abs(co.x) / 0.9, 1.0), 1.0)
+		mb.data[li].color = (face, min(ew, 1.0), min(abs(co.x) / 0.9, 1.0), 1.0)
+
+
+def bake_attr(attr, name):
+	img = bpy.data.images.new(name, SIZE, SIZE, alpha=False)
+	img.colorspace_settings.name = "Non-Color"
+	mat = bpy.data.materials.new("Mask_" + name)
+	mat.use_nodes = True
+	nt = mat.node_tree
+	for n in list(nt.nodes):
+		nt.nodes.remove(n)
+	col = nt.nodes.new("ShaderNodeVertexColor")
+	col.layer_name = attr
+	em = nt.nodes.new("ShaderNodeEmission")
+	out = nt.nodes.new("ShaderNodeOutputMaterial")
+	nt.links.new(col.outputs["Color"], em.inputs["Color"])
+	nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+	node = nt.nodes.new("ShaderNodeTexImage")
+	node.image = img
+	nt.nodes.active = node
+	old = list(lo.data.materials)
+	lo.data.materials.clear()
+	lo.data.materials.append(mat)
+	bpy.ops.object.select_all(action="DESELECT")
+	lo.select_set(True)
+	bpy.context.view_layer.objects.active = lo
+	scene.render.bake.use_selected_to_active = False
+	bpy.ops.object.bake(type="EMIT")
+	scene.render.bake.use_selected_to_active = True
+	img.filepath_raw = os.path.join(out_dir, name + ".png")
+	img.file_format = "PNG"
+	img.save()
+	lo.data.materials.clear()
+	for m in old:
+		lo.data.materials.append(m)
+
+
+bake_attr("MaskA", "city_mask_a")
+bake_attr("MaskB", "city_mask_b")
+bake_attr("MaskC", "city_mask_c")
+
+lo.data.materials.clear()
+for m in list(hi.data.materials):
+	lo.data.materials.append(m)
 normal = bake("NORMAL", "city_normal", "Non-Color")
 
 final = bpy.data.materials.new("City")
@@ -281,8 +364,8 @@ for a in bpy.data.actions:
 				k.handle_right[1] *= f
 
 # ---- Wear: the family's three noise fields, which the view's dirt and blood read ----
-for old_attr in list(lo.data.color_attributes):
-	lo.data.color_attributes.remove(old_attr)
+while len(lo.data.color_attributes):
+	lo.data.color_attributes.remove(lo.data.color_attributes[0])
 attr = lo.data.color_attributes.new("Wear", "BYTE_COLOR", "POINT")
 head_idx = {g.index for g in lo.vertex_groups if g.name in ("Head", "Neck")}
 
@@ -315,6 +398,7 @@ for a in bpy.data.actions:
 	tr.name = a.name
 	tr.strips.new(a.name, int(a.frame_range[0]), a)
 
+print("CITY export", [u.name for u in lo.data.uv_layers], [m.name for m in lo.data.materials], [a.name for a in lo.data.color_attributes])
 bpy.ops.object.select_all(action="DESELECT")
 lo.select_set(True)
 rig.select_set(True)
