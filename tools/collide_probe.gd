@@ -11,7 +11,13 @@ const ZzPaths := preload("../game/zz_paths.gd")
 const FallProbe := preload("fall_probe.gd")
 
 
+## A suite (examples/headless_collide) calls probe() itself.
+var manual := false
+
+
 func _ready() -> void:
+	if manual:
+		return
 	DotLog.set_level(DotLog.Level.WARN)
 	_run.call_deferred()
 
