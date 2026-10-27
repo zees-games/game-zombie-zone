@@ -36,6 +36,8 @@ var state_since: float = 0.0
 ## A survivor this zombie was GIVEN — a mob's, bile's, a special's choice — as a candidate id.
 ## Chased whether or not it can be perceived. Empty when it has none.
 var forced: StringName = &""
+## Set by tools/special_reach: walk the shared steering to this point and nothing else (no tactics), so a kind's ground limits show.
+var probe_goal: Vector3 = Vector3.INF
 
 ## A place to go regardless of survivors: a beeping thing, a noise. INF when none.
 var lure: Vector3 = Vector3.INF
@@ -366,6 +368,12 @@ func _npc_think(delta: float) -> void:
 
 	if staggered():
 		halt()
+		return
+
+	if probe_goal != Vector3.INF:
+		go_to(probe_goal, npc.def.move_speed)
+		body().anim = ZzZombieBody.Anim.RUN
+		_unstick_watch(delta)
 		return
 
 	_decide(delta)
