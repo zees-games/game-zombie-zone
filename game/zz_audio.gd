@@ -414,6 +414,7 @@ func setup() -> DotResult:
 	ambience.manager = manager
 	ambience.fallback_bed = &"amb_night"
 	add_child(ambience)
+	director.beds = ambience
 	if not director.has_moods():
 		ambience.set_map_bed(&"amb_night")
 
