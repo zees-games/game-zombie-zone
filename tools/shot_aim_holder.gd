@@ -4,7 +4,9 @@ extends Node
 ## runs, each frame and each physics tick.
 
 var players: Array = []
-var pitch := 0.0
+var pitch := INF
+## `--sprint`: the stand-ins' state says they are sprinting.
+var sprint := false
 
 
 func _ready() -> void:
@@ -22,4 +24,7 @@ func _physics_process(_delta: float) -> void:
 func _hold() -> void:
 	for player in players:
 		if is_instance_valid(player) and player.controller != null:
-			player.controller.state.pitch = pitch
+			if pitch != INF:
+				player.controller.state.pitch = pitch
+			if sprint:
+				player.controller.state.sprinting = true

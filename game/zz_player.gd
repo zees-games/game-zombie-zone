@@ -884,6 +884,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 			"vertical": velocity.y,
 			"crouched": controller.state.crouch_fraction > 0.5,
 			"downed": is_down(),
+			"sprinting": controller.state.sprinting and not is_down(),
 			# The view's pitch bends the figure's spine and gun arm (dot-player-char people.md).
 			"aim": deg_to_rad(controller.state.pitch),
 		})

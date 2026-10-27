@@ -1,6 +1,7 @@
 extends Node
 
 const ZzConfig := preload("../game/zz_config.gd")
+const ZzFigure := preload("../game/zz_figure.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
@@ -11,8 +12,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## The weapon pool as a player meets it: every pack weapon has a source, every ammunition type has one, a late wave holds the heavy
 ## guns back, and a stand-in can fire each gun and chooses between two. Sections and checks are both counted.
 
-const SECTIONS := 5
-const CHECKS := 79
+const SECTIONS := 6
+const CHECKS := 101
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -45,6 +46,7 @@ func _run() -> void:
 	_waves()
 	await _stand_ins_choose(game)
 	await _stand_ins_fire()
+	await _remote_hands()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -268,6 +270,32 @@ func _stand_ins_fire() -> void:
 		await _dispose(game)
 
 	_check(guns >= 15 and fired == guns, "all %d guns fired" % guns, "%d" % fired)
+	_finished()
+
+
+func _remote_hands() -> void:
+	_section("a remote survivor holds each gun: a model is attached and shown")
+	var shown := 0
+	var guns := 0
+
+	for id in _ids:
+		var def := ZzWeapons.def_of(id)
+
+		if def == null or def.tags.has(&"melee") or def.tags.has(&"thrown"):
+			continue
+
+		guns += 1
+		var figure := ZzFigure.new()
+		add_child(figure)
+		figure.build(1.8, ZzFigure.ATLASES[0], Color.WHITE)
+		figure.hold(id, false)
+		var held: Node = figure.get("held")
+		var ok: bool = held != null and held.get(&"_weapon") != null and (held as Node3D).visible and held.call(&"equipped") == id
+		shown += 1 if ok else 0
+		_check(ok, "%s: a remote survivor's hand has its model" % id)
+		figure.queue_free()
+
+	_check(guns >= 15 and shown == guns, "all %d guns are drawn in a remote hand" % guns, "%d" % shown)
 	_finished()
 
 

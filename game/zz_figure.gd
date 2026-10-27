@@ -3,6 +3,7 @@ extends Node3D
 const ZzPaths := preload("zz_paths.gd")
 const ZzDefibModel := preload("zz_defib_model.gd")
 const ZzBoxCrate := preload("zz_box_crate.gd")
+const ZzWeapons := preload("zz_weapons.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
@@ -168,7 +169,9 @@ func hold(id: StringName, switching: bool) -> void:
 		var art: Variant = ZeeWeaponArtTable.table().get(id)
 
 		if art is ZeeWeaponArt:
-			var _drawn := held.equip(art as ZeeWeaponArt)
+			# A profile's `extra: art:` (grip, hands, sprint carry) over the table's art.
+			var def: DotWeaponDef = ZzWeapons.def_of(id)
+			var _drawn := held.equip((art as ZeeWeaponArt).with_overrides(def.params.get("art") if def != null else null))
 		else:
 			held.clear()
 

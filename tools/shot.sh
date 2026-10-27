@@ -46,7 +46,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
