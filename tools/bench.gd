@@ -171,6 +171,10 @@ func _without(kinds: PackedStringArray) -> void:
 				sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 		if n is Light3D and "lamps" in kinds and not n is DirectionalLight3D:
 			(n as Light3D).visible = false
+		if (n is GPUParticles3D or n is CPUParticles3D) and "particles" in kinds:
+			(n as Node3D).visible = false
+		if n is FogVolume and "fog" in kinds:
+			(n as Node3D).visible = false
 		if n is Decal and "decals" in kinds:
 			(n as Decal).visible = false
 		if n is MultiMeshInstance3D and "multimesh" in kinds:
@@ -192,6 +196,16 @@ func _without(kinds: PackedStringArray) -> void:
 			v.set(&"_dirty", true)
 	if "splits2" in kinds:
 		pass
+	var lod = _client.get("world_view").lod
+	if "zombie_anim" in kinds:
+		lod.near = 0.0
+		lod.far = 0.0
+	if "zombie_draw" in kinds:
+		lod.draw_until = 0.5
+	if "fog" in kinds:
+		for e in get_tree().root.find_children("*", "WorldEnvironment", true, false):
+			(e as WorldEnvironment).environment.fog_enabled = false
+			(e as WorldEnvironment).environment.volumetric_fog_enabled = false
 	if "env" in kinds:
 		for e in get_tree().root.find_children("*", "WorldEnvironment", true, false):
 			var env: Environment = (e as WorldEnvironment).environment
