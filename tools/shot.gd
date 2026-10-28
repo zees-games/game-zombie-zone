@@ -829,19 +829,22 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 	_client.set("_slot", ZzWeapons.def_of(id).slot)
 	var stages := {
 		"rest": [], "walk": ["dot_fps_forward", "dot_fps_walk"], "run": ["dot_fps_forward", "dot_fps_sprint"],
-		"crouch": ["dot_fps_crouch"], "aimed": [],
+		"crouch": ["dot_fps_crouch"], "aimed": [], "fired": [],
 	}
 	for stage: String in stages:
 		for action: String in stages[stage]:
 			Input.action_press(action)
 		_client.set("_aiming", stage == "aimed")
-		await _seconds_of(1.5)
+		_client.set("_firing", stage == "fired")
+		# The spread a shot kicks decays in well under a second: look at it while the trigger is held.
+		await _seconds_of(0.25 if stage == "fired" else 1.5)
 		await RenderingServer.frame_post_draw
 		var hud = _client.get("hud")
 		var image := get_viewport().get_texture().get_image()
 		var path := dir.path_join("crosshair_%s.png" % stage)
 		print("%s: spread %.2f gap %.1f -> %s" % [stage, _client.get("weapons").arsenal.spread_now(),
 			hud._crosshair.gap_pixels(), error_string(image.save_png(path))])
+		_client.set("_firing", false)
 		for action: String in stages[stage]:
 			Input.action_release(action)
 		_client.set("_aiming", false)

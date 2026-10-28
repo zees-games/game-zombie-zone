@@ -1,0 +1,83 @@
+gpu.sh: WARN no GPU box took the frame (down, busy or in use); rendering on dev02's CPU (llvmpipe), not a real GPU
+heavy: waiting for a build slot (0s). Held by:
+  christian@x-tmc-dev02 pid 3285849 since 01:00:32: timeout 600 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (60s). Held by:
+  christian@x-tmc-dev02 pid 3291331 since 01:03:06: timeout 400 godot --headless --path . --script tools/measure_props.gd -- --check
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (120s). Held by:
+  christian@x-tmc-dev02 pid 3291331 since 01:03:06: timeout 400 godot --headless --path . --script tools/measure_props.gd -- --check
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (181s). Held by:
+  christian@x-tmc-dev02 pid 3291331 since 01:03:06: timeout 400 godot --headless --path . --script tools/measure_props.gd -- --check
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (241s). Held by:
+  christian@x-tmc-dev02 pid 3300915 since 01:06:22: /home/christian/godot/dot-cloud/tools/publish_pack.sh --source /home/christian/godot/mg-deathrun-maps --id mg-deathrun-maps --version 1.0.0 --dry-run --out /tmp/claude-1000/-home-christian-godot/b661fc09-b700-42ac-bb7e-29ea120ac1cf/scratchpad/out --l
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (301s). Held by:
+  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-arena tools/screenshot.sh dm_box --feel --weapons=pistol:2
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (361s). Held by:
+  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-arena tools/screenshot.sh dm_box --feel --weapons=pistol:2
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (421s). Held by:
+  christian@x-tmc-dev02 pid 3291059 since 01:09:07: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (481s). Held by:
+  christian@x-tmc-dev02 pid 3291059 since 01:09:07: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (541s). Held by:
+  christian@x-tmc-dev02 pid 3291059 since 01:09:07: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
+  christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
+heavy: waiting for a build slot (601s). Held by:
+  christian@x-tmc-dev02 pid 3291059 since 01:09:07: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
+  christian@x-tmc-dev02 pid 3319943 since 01:12:23: timeout 120 godot --headless --path . --import
+heavy: build/2 acquired after 604s
+heavy: build/2: 3989 MB, 4 CPUs (6 GB free at start)
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
+
+WRN game.locked_content a content.lock.json is shipped but there is no dot-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
+inf config   applied command line keys=4
+inf game.config layer applied from="" game=game-zombie-zone keys="warmup_seconds, start_grace_seconds, wanderer_density, map_ids" layer=argv
+inf zz.packs packs scanned monsters=6 providers=4 weapons=47
+inf random   seed scope="" seed=277005138445207
+inf random   seed scope="" seed=20261010
+inf combat   lag compensation is enabled but no rewind function is wired; shots resolve against the present
+inf stats    stats tracker ready published=12 reporting=false stats=15 store=false
+inf achievements achievement tracker ready achievements=13 points=250 stats=12
+inf zz.boxes boxes loaded types=17
+inf zz.catalogue maps loaded maps=42 refused=0
+inf zz.game  map built id=zz_lot ms=288
+inf zz.game  world ready bots="4, or the map's team" boxes="4.0% common, 30% special" difficulty=normal downs="2, then death; rescue 75 s; crawl 1.4 m/s" horde="24 + 6/survivor, mobs every 90..180 s" maps=zz_lot specials="2 + 1 per 3.0 survivors, every 18..40 s" survival="10 waves, 30 s breathers"
+inf settings corrected 8 stored settings what="crowd_detail: 1.0 -> 1, field_of_view: 85.0 -> 85, fps_max: 0.0 -> 0, fx_quality: 3.0 -> 3, net_stat: 0.0 -> 0, net_stat_height: 96.0 -> 96, viewmodel_fov: 100.0 -> 100, vis_mode: 3.0 -> 3"
+WRN game.client a look-to-gag key is also another action's key; rebind one action=voice_gag key=U other=chat_open_team
+inf game.workbench workbench panel ready key=F9
+inf zz.boxes boxes loaded types=17
+inf fps      controller ready drive=EXTERNAL movement="speed 4.3 accel 10.0 air 12.0/1.2 grav 20.0 jump 1.10m [bd72cb39c57cb234]" tick_rate=60
+inf fps      controller ready drive=EXTERNAL movement="speed 4.3 accel 10.0 air 12.0/1.2 grav 20.0 jump 1.10m [bd72cb39c57cb234]" tick_rate=60
+inf fps      controller ready drive=EXTERNAL movement="speed 4.3 accel 10.0 air 12.0/1.2 grav 20.0 jump 1.10m [bd72cb39c57cb234]" tick_rate=60
+inf fps      controller ready drive=EXTERNAL movement="speed 4.3 accel 10.0 air 12.0/1.2 grav 20.0 jump 1.10m [bd72cb39c57cb234]" tick_rate=60
+inf zz.game  map built id=zz_lot ms=19
+inf dot.load_gate the game is ready to be seen hosted=false ms=7369 timed_out=[]
+inf random   seed scope="" seed=20268929
+inf weapon.spawner round begun map=zz_lot round=1 sites=1
+inf zz.horde navigation build started map=zz_lot threads=2
+inf zz.game  map began difficulty=normal map=zz_lot mode=survival number=1 seed=20268929 survivors=4
+inf npc      navigation adopted edges=9705 map=zz_lot points=2779
+inf npc.director spawn points taken from navigation kept=101 map=zz_lot points=2779 spacing=6.0
+inf zz.horde navigation built cache=zz_lot-e96e40a166bb00e2-v7.nav cache_file=true cached=true edges=9705 map=zz_lot ms=771 points=2779 spawns=107
+inf zz.survival the hold began count=10 style=rounds team=4
+inf zz.nav   navigation notes planned chokes=1 climbs=1 drops=0 found=4 routes=36
+rest: spread 0.00 gap 5.0 -> OK
+walk: spread 3.34 gap 43.2 -> OK
+run: spread 14.41 gap 90.0 -> OK
+crouch: spread 0.00 gap 5.0 -> OK
+aimed: spread 0.00 gap 5.0 -> OK
+fired: spread 0.00 gap 5.0 -> OK
+ERROR: Texture with GL ID of 128: leaked 87380 bytes.
+   at: ~Utilities (drivers/gles3/storage/utilities.cpp:82)
+ERROR: Texture with GL ID of 129: leaked 87380 bytes.
+   at: ~Utilities (drivers/gles3/storage/utilities.cpp:82)
