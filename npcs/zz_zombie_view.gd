@@ -58,6 +58,7 @@ static var BODIES := {
 	&"punk": ZzPaths.rebase("res://assets/zombies/zombie_punk.glb"),
 	&"convict": ZzPaths.rebase("res://assets/zombies/zombie_convict.glb"),
 	&"hazmat": ZzPaths.rebase("res://assets/zombies/zombie_hazmat.glb"),
+	&"walker": ZzPaths.rebase("res://assets/zombies/zombie_walker.glb"),
 }
 
 ## The kit's atlas, in the three versions its bodies were painted against: they differ in a few
@@ -75,28 +76,30 @@ static var ATLASES := {
 	&"punk": ZzPaths.rebase("res://assets/zombies/punk_albedo.png"),
 	&"convict": ZzPaths.rebase("res://assets/zombies/convict_albedo.png"),
 	&"hazmat": ZzPaths.rebase("res://assets/zombies/hazmat_albedo.png"),
+	&"walker": ZzPaths.rebase("res://assets/zombies/walker_albedo.png"),
 }
 
 ## The city body's painted people (`art-src/zombie_city_paint.py`): skin, outfit and hair differ per texture.
 const CITY_LOOKS := 6
 
 ## Shown in the scoreboard header: the CC-BY zombie bodies (README.md has the URLs).
-const CREDITS := "Walking Dead zombies by LasquetiSpice (CC-BY 4.0), Zombie Hazmat by LxNazarov (CC-BY 4.0), both modified"
+const CREDITS := "Walking Dead zombies by LasquetiSpice, Zombie Hazmat by LxNazarov, Zombie Walk Test by OSCAR CREATIVO (all CC-BY 4.0), modified"
 
 const CITY_NORMAL := "res://assets/zombies/city_normal.png"
 
 ## Bodies baked with a tangent normal map (the city's and the Sketchfab characters', `art-src/zombie_sketchfab.py`):
 ## colour, blood and dirt are in the texture, so the shader's splashes are off and only these sample a normal map.
 static var NORMALS := {&"city": CITY_NORMAL, &"gent": "res://assets/zombies/gent_normal.png", &"cop": "res://assets/zombies/cop_normal.png",
-	&"punk": "res://assets/zombies/punk_normal.png", &"convict": "res://assets/zombies/convict_normal.png", &"hazmat": "res://assets/zombies/hazmat_normal.png"}
+	&"punk": "res://assets/zombies/punk_normal.png", &"convict": "res://assets/zombies/convict_normal.png", &"hazmat": "res://assets/zombies/hazmat_normal.png",
+	&"walker": "res://assets/zombies/walker_normal.png"}
 
 ## Where the head bone sits against the body's height, for the bodies that are not the kit's big-headed
 ## proportions (the kit's is 1.22, [method _measure]).
-const HEAD_TOP := {&"city": 1.137, &"gent": 1.077, &"cop": 1.107, &"punk": 1.124, &"convict": 1.087, &"hazmat": 1.138}
+const HEAD_TOP := {&"city": 1.137, &"gent": 1.077, &"cop": 1.107, &"punk": 1.124, &"convict": 1.087, &"hazmat": 1.138, &"walker": 1.136}
 
 const ATLAS_OF := {&"basic": &"basic", &"chubby": &"heavy", &"arm": &"heavy", &"matt": &"people",
 	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker", &"city": &"city",
-	&"gent": &"gent", &"cop": &"cop", &"punk": &"punk", &"convict": &"convict", &"hazmat": &"hazmat"}
+	&"gent": &"gent", &"cop": &"cop", &"punk": &"punk", &"convict": &"convict", &"hazmat": &"hazmat", &"walker": &"walker"}
 
 ## Bodies that carry no clips of their own and are driven by another's (same rig, same bone names).
 const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic"}
@@ -119,10 +122,11 @@ const WEARS := {
 	&"punk": {},
 	&"convict": {},
 	&"hazmat": {},
+	&"walker": {},
 }
 
 ## The commons' bodies, in variant order: the realistic ones only; the kit's cartoon bodies stay for other roles.
-const COMMON_BODIES: Array[StringName] = [&"city", &"gent", &"cop", &"punk", &"convict", &"hazmat"]
+const COMMON_BODIES: Array[StringName] = [&"city", &"gent", &"cop", &"punk", &"convict", &"hazmat", &"walker"]
 
 ## Dead skin: grey-greens, ash, a bruised blue, jaundice, rot.
 const SKINS: Array[String] = ["7d8f6a", "8f9a84", "8c98a0", "a39f6c", "66734f", "8a7a86", "9aa58a", "75806e"]

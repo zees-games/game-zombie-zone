@@ -4,7 +4,7 @@
 
 Used for the commons `gent`, `cop`, `punk` and `convict` (one armature each of "Animated Zombie Characters Walking Dead
 loop" by LasquetiSpice, CC-BY 4.0, https://sketchfab.com/3d-models/animated-zombie-characters-walking-dead-loop-8088449c35634de18cbf531c58544f26)
-and `hazmat` ("Zombie Hazmat" by LxNazarov, CC-BY, https://sketchfab.com/3d-models/zombie-hazmat-49b3b4307f6a4d2386fdb02354158d04).
+`hazmat` ("Zombie Hazmat" by LxNazarov, CC-BY, https://sketchfab.com/3d-models/zombie-hazmat-49b3b4307f6a4d2386fdb02354158d04).
 Neither archive is vendored; the licence is on each page and in README.md.
 
 What is ours is the same as `zombie_city.py`: the character's meshes joined, decimated and baked (base colour and tangent
