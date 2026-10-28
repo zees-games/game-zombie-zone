@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
@@ -42,11 +42,8 @@ const BIG_MAPS := ["zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp"]
 ## Simulated seconds a full team plays a big map for.
 const PLAY_SECONDS := 75.0
 
-var _passed := 0
-var _failed := 0
 var _sections_entered := 0
 var _sections_finished := 0
-var _failures := PackedStringArray()
 var _worlds: Array[ZzGame] = []
 var _linked := false
 
@@ -84,27 +81,10 @@ func _run() -> void:
 	for id: String in BIG_MAPS:
 		await _test_big_map(StringName(id))
 
-	print("")
-	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
-	print("%d passed, %d failed" % [_passed, _failed])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
-	var code := 1 if _failed > 0 else 0
-
-	if _sections_entered != _sections_finished or _sections_entered != SECTIONS:
-		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, SECTIONS])
-		code = 1
-
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, CHECKS])
-		code = 1
-
 	for game in _worlds.duplicate():
 		await _dispose(game)
 
-	get_tree().quit(code)
+	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
 # --- Wave sets ------------------------------------------------------------------------------
@@ -919,15 +899,3 @@ func _section(name: String) -> void:
 
 func _finished() -> void:
 	_sections_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
-	_failures.append(line)
-	print("  FAIL  %s" % line)

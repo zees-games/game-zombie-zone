@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -27,8 +27,6 @@ const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 17
 const CHECKS := 148
 
-var _passed := 0
-var _failed := 0
 var _entered := 0
 var _finished := 0
 ## Checks of sections that need the drawn worlds, skipped because world/ is not linked (CI).
@@ -89,12 +87,9 @@ func _run() -> void:
 	await _test_ladders()
 	await _test_fall_damage()
 
-	print("\n%d sections entered, %d finished, %d passed, %d failed" % [_entered, _finished, _passed, _failed])
-	var ok := _failed == 0 and _entered == SECTIONS and _finished == SECTIONS and _passed + _failed + _skipped == CHECKS
 	if _skipped > 0:
 		print("SKIPPED: %d checks need world/ (not linked, as in CI); run dot-bootstrap for the full suite" % _skipped)
-	print("PASS" if ok else "FAIL (expected %d sections and %d checks)" % [SECTIONS, CHECKS])
-	get_tree().quit(0 if ok else 1)
+	_report_sections(_entered, _finished, SECTIONS, CHECKS - _skipped)
 
 
 ## Whether this section is skipped for want of world/ (zombie-zone-maps' drawn worlds, never in CI). Loud and counted,
@@ -1346,13 +1341,3 @@ func _test_fall_damage() -> void:
 	_check(hurt["off"] == 0.0, "cvar off: a 14 m drop does not hurt", "lost %.1f" % hurt["off"])
 	game.queue_free()
 	_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	print("  FAIL  %s%s" % [what, "" if detail == "" else "  (%s)" % detail])

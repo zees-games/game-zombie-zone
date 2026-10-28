@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -49,11 +49,8 @@ const MIN_SPAWNS := 4
 ## How far a point that matters (an objective, a route point) may be from the zombies' ground.
 const SNAP := 2.5
 
-var _passed := 0
-var _failed := 0
 var _sections_entered := 0
 var _sections_finished := 0
-var _failures := PackedStringArray()
 
 
 ## Shipped world maps whose spawner config was checked (three checks each).
@@ -91,30 +88,13 @@ func _run() -> void:
 		if only.is_empty() or only == id:
 			await _test_map(StringName(id))
 
-	print("")
-	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
-	print("%d passed, %d failed" % [_passed, _failed])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
-	var code := 1 if _failed > 0 else 0
-
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
 	var sections := 7 + _maps.size()
 	var checks := 2 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
-
-	if _sections_entered != _sections_finished or _sections_entered != sections:
-		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
-		code = 1
-
-	if _passed + _failed != checks or _maps.is_empty():
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, checks])
-		code = 1
-
-	get_tree().quit(code)
+	_broken = _maps.is_empty()
+	_report_sections(_sections_entered, _sections_finished, sections, checks)
 
 
 ## The height of the nav floor a point stands over, nearest the point's own height. The street maps
@@ -887,18 +867,6 @@ func _section(name: String) -> void:
 
 func _finished() -> void:
 	_sections_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
-	_failures.append(line)
-	print("  FAIL  %s" % line)
 
 
 ## The `game:` block of the spawner config the map resolved to (its traders and spawners).
