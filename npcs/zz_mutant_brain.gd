@@ -133,6 +133,25 @@ func take_flight(seconds: float = 30.0) -> void:
 	go(FLY)
 
 
+## Starts the charge-up and dive now (a tool or test that wants the dive on camera).
+func force_dive() -> void:
+	_dive_cool_until = 0.0
+	go(CHARGE)
+
+
+## Fires both guns' zap beams at the victim now, past the cooldown and the prop roll.
+func zap_now() -> int:
+	var h := horde()
+	var at := survivor_at(victim)
+
+	if h == null or at == Vector3.INF:
+		return 0
+
+	for slot in _guns.size():
+		h.call(&"beam", &"beam_zap", _muzzle(slot), at + Vector3(0.0, 1.1, 0.0))
+	return _guns.size()
+
+
 # --- Walking ---------------------------------------------------------------------------------
 
 func _walk(b: ZzZombieBody, at: Vector3, _delta: float) -> void:

@@ -389,13 +389,32 @@ func _run() -> void:
 			var mut: DotNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(-9.0, 0.0, -5.0)))
 			if mut != null and mut.brain != null:
 				mut.brain.call(&"take_flight", 30.0)
-			# The beams are the mutant's own guns (a few seconds in, a quarter second each): a frame may miss them.
+			# Deterministic: climb to altitude, then fire the guns, then force the dive; frames around each.
 			_free_camera().look_at_from_position(stand + Vector3(-3.0, 3.0, -1.0), stand + Vector3(-9.0, 6.0, -5.0))
-			for suffix in ["_a", "_b", "_c"]:
-				await _seconds_of(_seconds)
-				if mut != null and mut.brain != null:
-					print("mutant %s: %s state=%s hover=%s fuel=%.1f" % [suffix, mut.position(), mut.brain.get(&"state"), mut.brain.hover.state, mut.brain.hover.fuel])
-				await _save_extra(suffix)
+			var brain = mut.brain if mut != null else null
+			var waited := 0.0
+			while brain != null and waited < 15.0 and mut.position().y - stand.y < 7.0:
+				await _seconds_of(0.25)
+				waited += 0.25
+			await _save_extra("_a_altitude")
+			if brain != null:
+				print("mutant altitude: %s state=%s" % [mut.position(), brain.get(&"state")])
+				brain.call(&"zap_now")
+				await _save_extra("_b_zap0")
+				await _seconds_of(0.1)
+				brain.call(&"zap_now")
+				await _save_extra("_b_zap1")
+				brain.call(&"force_dive")
+				await _seconds_of(0.5)
+				await _save_extra("_c_charge")
+				var guard := 0.0
+				while brain.get(&"state") != &"dive" and guard < 8.0:
+					await _seconds_of(0.25)
+					guard += 0.25
+				for suffix in ["_d_dive0", "_e_dive1", "_f_dive2"]:
+					print("mutant %s: %s state=%s" % [suffix, mut.position(), brain.get(&"state")])
+					await _save_extra(suffix)
+					await _seconds_of(0.2)
 		"fire":
 			# A Molotov pool lit a few metres ahead, from a low three-quarter camera.
 			_clear_view(game, local, stand)
