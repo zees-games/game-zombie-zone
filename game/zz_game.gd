@@ -1658,7 +1658,7 @@ func start() -> void:
 	# Built again here: on a server nothing was listening when the world opened (the module
 	# builds the bridge after), and a map built before it is a map no client is ever sent.
 	if not map_doc.is_empty():
-		var _rebuilt := build_map(map_doc)
+		var _rebuilt := build_map(map_doc, true)
 		_place_everybody()
 	else:
 		_lay_out_map()
@@ -1902,9 +1902,19 @@ func _lay_out_map() -> void:
 	_place_everybody()
 
 
-## Builds [param doc] as the map. What the server does between maps, and what a client does
-## when it is sent one.
-func build_map(doc: Dictionary) -> DotResult:
+## Counts every [method ZzMap.build] this world ran; the tests read it.
+var map_builds: int = 0
+var _built_stamp: int = 0
+
+
+## What [method ZzMap.build] reads: the document and the map's own settings.
+func _build_stamp(doc: Dictionary) -> int:
+	return hash([doc.hash(), map.gravity, map.draw_world, map.authoritative, map.use_mechanics, ZzMap.use_bakes])
+
+
+## Builds [param doc] as the map: what the server does between maps, and a client when sent one.
+## With [param reuse], a map already built from the same inputs is kept and only the signals fire again.
+func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	var started := Time.get_ticks_msec()
 	world_clearing.emit()
 
@@ -1919,14 +1929,18 @@ func build_map(doc: Dictionary) -> DotResult:
 			doc = doc.duplicate()
 			doc["world_key"] = key
 
-	var built := map.build(doc)
+	var stamp := _build_stamp(doc)
+	var kept := reuse and _built_stamp == stamp
+	var built := DotResult.success(null) if kept else map.build(doc)
+	map_builds += 0 if kept else 1
+	_built_stamp = stamp if built.ok else 0
 
 	if not built.ok:
 		DotLog.error(CHANNEL, "a map would not build", {"id": str(doc.get("id", "?")), "why": built.error.message})
 		return built
 
 	map_doc = map.doc
-	if authoritative:
+	if authoritative and not kept:
 		var _hulls := map.build_world_collision_local(str(catalogue.roots.get(StringName(str(doc.get("id", ""))), "")) if catalogue != null else "")
 		var _props := map.build_world_props_local()
 		var _moving := map.build_mechanics_local()
