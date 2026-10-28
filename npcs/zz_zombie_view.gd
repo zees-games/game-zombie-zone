@@ -121,8 +121,8 @@ const WEARS := {
 	&"hazmat": {},
 }
 
-## The commons' bodies, in variant order.
-const COMMON_BODIES: Array[StringName] = [&"basic", &"matt", &"lis", &"sam", &"shaun", &"worker", &"city", &"gent", &"cop", &"punk", &"convict", &"hazmat"]
+## The commons' bodies, in variant order: the realistic ones only; the kit's cartoon bodies stay for other roles.
+const COMMON_BODIES: Array[StringName] = [&"city", &"gent", &"cop", &"punk", &"convict", &"hazmat"]
 
 ## Dead skin: grey-greens, ash, a bruised blue, jaundice, rot.
 const SKINS: Array[String] = ["7d8f6a", "8f9a84", "8c98a0", "a39f6c", "66734f", "8a7a86", "9aa58a", "75806e"]
