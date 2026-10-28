@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -55,11 +55,8 @@ const STUCK_SECONDS := 150.0
 ## What a stand-in map's team is raised to: the maps that say none are still held by a few.
 const TEAM := 8
 
-var _passed := 0
-var _failed := 0
 var _sections_entered := 0
 var _sections_finished := 0
-var _failures := PackedStringArray()
 var _worlds: Array[ZzGame] = []
 var _linked := false
 
@@ -124,10 +121,7 @@ func _run() -> void:
 
 	if only == "wave":
 		await _test_wave_origins()
-		print("%d passed, %d failed" % [_passed, _failed])
-		for line in _failures:
-			print("  FAIL  %s" % line)
-		get_tree().quit(_failed)
+		_report()
 		return
 
 	if only == "mend":
@@ -137,35 +131,23 @@ func _run() -> void:
 
 	if only == "thin":
 		_test_thin_props()
-		print("%d passed, %d failed" % [_passed, _failed])
-		for line in _failures:
-			print("  FAIL  %s" % line)
-		get_tree().quit(_failed)
+		_report()
 		return
 
 	if only == "wedge":
 		await _test_hop_wedge()
 		await _test_unstick_steps()
-		print("%d passed, %d failed" % [_passed, _failed])
-		for line in _failures:
-			print("  FAIL  %s" % line)
-		get_tree().quit(_failed)
+		_report()
 		return
 
 	if only == "steps":
 		await _test_unstick_steps()
-		print("%d passed, %d failed" % [_passed, _failed])
-		for line in _failures:
-			print("  FAIL  %s" % line)
-		get_tree().quit(_failed)
+		_report()
 		return
 
 	if only == "lure":
 		await _test_lure_crowd()
-		print("%d passed, %d failed" % [_passed, _failed])
-		for line in _failures:
-			print("  FAIL  %s" % line)
-		get_tree().quit(_failed)
+		_report()
 		return
 
 	if only.begins_with("hold:"):
@@ -203,27 +185,10 @@ func _run() -> void:
 	_test_thin_props()
 	await _test_wave_origins()
 
-	print("")
-	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
-	print("%d passed, %d failed" % [_passed, _failed])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
-	var code := 1 if _failed > 0 else 0
-
-	if _sections_entered != _sections_finished or _sections_entered != SECTIONS + _wave_maps():
-		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, SECTIONS])
-		code = 1
-
-	if _passed + _failed != CHECKS + 2 * _wave_maps():
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, CHECKS + 2 * _wave_maps()])
-		code = 1
-
 	for game in _worlds.duplicate():
 		await _dispose(game)
 
-	get_tree().quit(code)
+	_report_sections(_sections_entered, _sections_finished, SECTIONS + _wave_maps(), CHECKS + 2 * _wave_maps())
 
 
 # --- The graph built off the frame ---------------------------------------------------------------
@@ -1110,15 +1075,3 @@ func _section(name: String) -> void:
 
 func _finished() -> void:
 	_sections_finished += 1
-
-
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
-	_failures.append(line)
-	print("  FAIL  %s" % line)
