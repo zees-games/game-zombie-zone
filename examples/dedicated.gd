@@ -16,7 +16,7 @@ const ZzNetLink := preload("../game/net/zz_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 13
-const CHECKS := 105
+const CHECKS := 108
 
 const SERVER_DIR := "user://zz_dedicated"
 const PORT := 28931
@@ -274,6 +274,10 @@ func _test_the_commands() -> void:
 
 	# Shooting through team-mates is the operator's: dot-combat's cvar, bound by the module to
 	# the world's own combat rules, live from the next shot.
+	for feel_name in [ZeeViewFeel.CVAR_KICK, "mp_vm_sway", "mp_vm_bob"]:
+		var feel_cvar := server.console.find_cvar(feel_name)
+		_check(feel_cvar != null and (feel_cvar.flags & DotConVar.FLAG_REPLICATED) != 0,
+			"%s is registered on the server, replicated" % feel_name)
 	var passthrough := server.console.find_cvar("mp_teammate_passthrough")
 	_check(passthrough != null and passthrough.get_string() == "1" and game.combat.rules.pass_through_level() == 1,
 		"mp_teammate_passthrough is registered, at 1 (through a team-mate at the muzzle)",

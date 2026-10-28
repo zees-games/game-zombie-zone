@@ -33,7 +33,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 29
-const CHECKS := 194
+const CHECKS := 196
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -923,6 +923,13 @@ func _test_the_view_feel_crosses_to_the_client() -> void:
 	link.replicated_cvar_changed.emit(ZeeViewFeel.CVAR_KICK, "4")
 	_check(is_equal_approx(rules.kick, 0.0), "a value over the max of 3 is refused", str(rules.kick))
 	rules.kick = 1.0
+	# A headless run draws no view model, so the wiring is read from ZzClient's source.
+	var view := ZeeViewModel.new()
+	view.feel_rules = rules
+	_check(view.feel_rules == _client_game.feel_rules, "a view model given the game's feel_rules holds that very object")
+	view.free()
+	var wiring := FileAccess.get_file_as_string("res://game/zz_client.gd")
+	_check(wiring.contains("view_model.feel_rules = game.feel_rules"), "ZzClient hands its view model game.feel_rules")
 	_finished()
 
 
