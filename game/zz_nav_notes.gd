@@ -460,7 +460,16 @@ func hold_for(seat: int) -> Vector3:
 
 	if lap > 0:
 		var angle := float(lap) * 2.39996
-		at += Vector3(cos(angle), 0.0, sin(angle)) * 1.4
+		var off := Vector3(cos(angle), 0.0, sin(angle)) * 1.4
+		var toward: Vector3 = chokes[i]["at"] - at
+		toward.y = 0.0
+
+		# A crowd on one place fans out on the choke's side of it: behind it is further from the choke than the place was picked to be.
+		if toward.length() > 0.1 and off.dot(toward) < 0.0:
+			var n := toward.normalized()
+			off -= 2.0 * off.dot(n) * n
+
+		at += off
 
 	return at
 
