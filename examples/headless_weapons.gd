@@ -18,8 +18,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 12
-const CHECKS := 80
+const SECTIONS := 13
+const CHECKS := 84
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -41,6 +41,7 @@ func _run() -> void:
 	_test_the_weapon_art_is_vendored()
 
 	if await _test_armed():
+		_test_view_feel_wiring()
 		await _test_shots_count()
 		await _test_r_reloads()
 		await _test_empty_reloads()
@@ -129,6 +130,26 @@ func _test_armed() -> bool:
 		"the HUD shows its magazine and reserve", _client.hud.ammo.count_text())
 	_finished()
 	return _failed == failed_before
+
+
+func _test_view_feel_wiring() -> void:
+	_section("the client's view model draws with the game's feel rules, and cl_vm_kick 0 silences the kick")
+	var vm = _client.view_model
+	_check(vm != null and vm.feel_rules == _client.game.feel_rules, "the view model holds the game's feel_rules object")
+
+	if vm == null:
+		_finished()
+		return
+
+	_check(vm._pose.rules == _client.game.feel_rules, "and the pose it draws with reads the same object")
+	# An offline client's console has no module (the server owns cl_vm_kick and replicates it);
+	# the replicated value lands in set_cvar, which is what this drives.
+	var rules: ZeeViewFeel = _client.game.feel_rules
+	_check(rules.set_cvar("cl_vm_kick", "0") and vm._pose.rules.kick == 0.0,
+		"cl_vm_kick 0 reaches the drawn pose: kick multiplier zero", str(vm._pose.rules.kick))
+	_check(rules.set_cvar("cl_vm_kick", "1") and vm._pose.rules.kick == 1.0, "cl_vm_kick 1 gives the kick back")
+
+	_finished()
 
 
 func _test_shots_count() -> void:
