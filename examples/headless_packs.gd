@@ -21,6 +21,8 @@ const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
 const SECTIONS := 6
 const CHECKS := 51
+## Each real pack scanned alone from a directory holding only a link to it.
+const ALONE_CHECKS := 12
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
@@ -52,6 +54,9 @@ func _run() -> void:
 		_sections += 1
 		_checks += REAL_CHECKS
 		await _real_packs()
+		_sections += 1
+		_checks += ALONE_CHECKS
+		_each_pack_alone()
 	else:
 		print("\nreal packs: SKIP (link zz-modern-weapons, zz-medieval-weapons and zz-historical-monsters into addons/ to run)")
 
@@ -337,6 +342,40 @@ func _real_packs_linked() -> bool:
 			return false
 
 	return true
+
+
+## One pack at a time: `ZzPacks.only` scans to exactly that pack's offer, and an armed survivor needs nothing from the others.
+func _each_pack_alone() -> void:
+	_entered += 1
+	print("\neach real pack alone")
+	_clean()
+	_clean_real()
+	var expect := {
+		"zz_modern_weapons": [MODERN_IDS.size(), 0],
+		"zz_medieval_weapons": [MEDIEVAL_IDS.size(), 0],
+		"zz_historical_monsters": [0, 6],
+	}
+
+	for pack: String in expect:
+		ZzPacks.only = PackedStringArray([pack])
+		var found := ZzPacks.scan("res://addons")
+		ZzWeapons.use_packs()
+		var rows: int = expect[pack][0]
+		var kinds: int = expect[pack][1]
+		_check(found == 1 and ZzPacks.weapon_rows.size() == rows and ZzPacks.monsters.size() == kinds,
+			"%s alone: one provider, %d weapons, %d monsters" % [pack, rows, kinds],
+			"%d, %d, %d" % [found, ZzPacks.weapon_rows.size(), ZzPacks.monsters.size()])
+		var ids: Array = MODERN_IDS if pack == "zz_modern_weapons" else MEDIEVAL_IDS
+		var usable: bool = rows == 0 or ids.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id)) and ZzWeapons.def_of(StringName(id)) != null)
+		_check(usable, "%s alone: every weapon has a definition" % pack)
+		var cat_size := ZzNpcs.catalogue(ZzConfig.new()).size()
+		_check(cat_size == 14 + kinds, "%s alone: the catalogue holds the built-in kinds plus its monsters" % pack, "%d" % cat_size)
+		_check(kinds == 0 or ZzPacks.bosses().size() == 1, "%s alone: its boss is registered" % pack)
+
+	ZzPacks.only = PackedStringArray()
+	ZzPacks.scan()
+	ZzWeapons.use_packs()
+	_finished += 1
 
 
 func _damage_of(id: StringName) -> float:

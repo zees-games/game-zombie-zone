@@ -87,6 +87,8 @@ class Monster:
 
 ## Where packs are looked for; a test points it at a fixture.
 static var root: String = "res://addons"
+## When not empty, only these pack directories are scanned (a test runs one pack alone).
+static var only: PackedStringArray = PackedStringArray()
 static var config: Dictionary = DEFAULTS.duplicate(true)
 static var providers: Dictionary = {}
 static var weapon_rows: Array[Dictionary] = []
@@ -107,6 +109,9 @@ static func scan(from: String = "") -> int:
 	var found := 0
 
 	for dir_name in ZeePackScan.provider_dirs(base, PROVIDER_FILE):
+		if not only.is_empty() and not only.has(dir_name):
+			continue
+
 		var path := "%s/%s/%s" % [base, dir_name, PROVIDER_FILE]
 		var script := ZeePackScan.load_provider(CHANNEL, dir_name, path)
 
