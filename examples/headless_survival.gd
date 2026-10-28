@@ -98,6 +98,7 @@ func _test_wave_sets() -> void:
 	_check(ZzWaveSets.validate_extra({"zz": {"twists": true}}).ok, "extra.zz twists is accepted")
 	_check(not ZzWaveSets.validate_extra({"zz": {"twits": true}}).ok, "an extra.zz typo is refused")
 
+	DotLog.set_level(DotLog.Level.FATAL)  # an unknown wave set logs an ERROR on purpose
 	var game := await _world(func(c: ZzConfig) -> void:
 		c.survival_style = 0
 		c.waves_set = "nonesuch"
@@ -115,6 +116,7 @@ func _test_wave_sets() -> void:
 	var _player := game.add_player(&"u310", "Sets")
 	game.start()
 	await _sim(game, 2.0)
+	DotLog.set_level(DotLog.Level.ERROR)
 	_check(game.survival != null and game.survival.wave_set_id == "", "a set that does not exist leaves the cvars in charge", str(game.survival.wave_set_id if game.survival != null else "no survival"))
 	_check(game.survival != null and game.survival.waves.count == 3, "and zz_waves still counts", str(game.survival.waves.count if game.survival != null else -1))
 	await _dispose(game)

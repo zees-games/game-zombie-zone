@@ -154,7 +154,9 @@ func _box_profiles() -> void:
 	f2.close()
 	var bad := ZzBoxes.new(null)
 	var _l3 := bad.load_text(text)
+	DotLog.set_level(DotLog.Level.FATAL)  # the refusal logs an ERROR on purpose
 	var _n3 := bad.overlay_profiles(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg", "user://zz_box_cfg"])))
+	DotLog.set_level(DotLog.Level.ERROR)
 	_check(bad.types[&"explosive"]["title"] == "Explosive Box", "a bad server file is refused and the shipped type stays")
 	DirAccess.remove_absolute(base + "/explosive.yml")
 	_finished += 1

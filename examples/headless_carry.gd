@@ -332,7 +332,10 @@ func _test_class_profile() -> void:
 	_check(is_equal_approx(p.controller.tunables.max_speed, plain.run_speed * 1.5), "a spawned survivor moves at the class speed", "%.2f" % p.controller.tunables.max_speed)
 
 	_class_file("speed: 99\n")
-	_check(is_equal_approx(ZzPlayer.tunables_for(plain).max_speed, plain.run_speed), "an unsafe value is refused and the config speed stands")
+	DotLog.set_level(DotLog.Level.FATAL)  # the refusal logs an ERROR on purpose
+	var refused := ZzPlayer.tunables_for(plain).max_speed
+	DotLog.set_level(DotLog.Level.ERROR)
+	_check(is_equal_approx(refused, plain.run_speed), "an unsafe value is refused and the config speed stands")
 
 	ZzClasses.set_roots(PackedStringArray())
 	var _gone := DotPaths.remove_tree(CLASS_DIR)
