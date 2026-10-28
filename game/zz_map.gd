@@ -1342,8 +1342,10 @@ func load_world() -> DotResult:
 		})
 		return read
 
-	attach_world(read.value, prefix.get_base_dir())
-	return DotResult.success(true)
+	var attached: bool = await attach_world(read.value, prefix.get_base_dir())
+	if id() != wanted or _drawn != drawn_for:
+		return DotResult.success(false)
+	return DotResult.success(attached)
 
 
 ## Fades and spins the drawn world's ambient players on the map's `sound_fade` and `sound_spin` events; null without ambient sounds.
@@ -1360,9 +1362,11 @@ var world_credits: String = ""
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
 ## drawn as boxes; they are not in the original's faces. A bake is made from the boxes, so it is
 ## taken off and the lamps light the world live.
-func attach_world(world: RefCounted, dir: String = "") -> void:
+## Awaits the texture prefetch (a frame yielded every 8 ms, so pack-fetch callbacks run); false when a rebuild replaced the map meanwhile.
+func attach_world(world: RefCounted, dir: String = "") -> bool:
 	if _drawn == null:
-		return
+		return false
+	var drawn_for := _drawn
 
 	var lap := Time.get_ticks_msec()
 	var stages := {}
@@ -1382,9 +1386,14 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 		surfaces.set(&"use_lightmap", use_lightmaps)
 		surfaces.set(&"max_texture_size", texture_max)
 		DotMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"), surfaces, world)
+		lap = _lap(stages, "store_apply", lap)
+		await surfaces.call(&"prefetch", world, dir)
+		if _drawn != drawn_for or not is_instance_valid(drawn_for):
+			return false
+		lap = _lap(stages, "prefetch", lap)
 		material_for = surfaces.call(&"world_material_for", world, dir)
 
-	lap = _lap(stages, "store_apply", lap)
+	lap = _lap(stages, "materials", lap)
 	var lit: bool = global_pack and use_lightmaps and world.call(&"has_lightmap")
 	if not lit:
 		_unbake()
@@ -1445,6 +1454,7 @@ func attach_world(world: RefCounted, dir: String = "") -> void:
 	world_drawn = true
 	_attach_extras_later(world, node)
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+	return true
 
 
 ## Probes, sounds, prop stand-ins and fx after the first drawn frames: they cost about 3 s on the biggest map and nothing needs them to play.
