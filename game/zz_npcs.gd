@@ -45,7 +45,7 @@ const CHANNEL := "zz.npcs"
 ## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 4
+const NAV_CACHE_VERSION := 7
 
 ## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
 const NAV_BRIDGE_GAP := 2.5
@@ -460,6 +460,8 @@ const PROP_CUT_HEIGHT := 0.3
 ## A drawn world's solid prop is cut only above a zombie's step (STEP_UP 0.45) and below head height: a low crate in a corridor is stepped over.
 const SOLID_PROP_CUT_HEIGHT := 0.5
 const SOLID_PROP_HEAD := 1.8
+## A box whose underside is lower than this above a point blocks it: a body does not fit under a desk top on legs.
+const NAV_OVERHEAD := 1.2
 ## A turned prop thinner than this is cut as a row of boxes along its length, not one box round its corners.
 const THIN_PROP := 0.6
 const THIN_STEP := 0.4
@@ -678,6 +680,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	builder.neighbour_reach = 1.6
 	builder.centre_narrow_floors = true
 	builder.obstacle_under_feet = float(nav_doc.get("under_feet", -1.0))
+	builder.obstacle_overhead = float(nav_doc.get("overhead", NAV_OVERHEAD))
 	builder.bridge_gap = float(nav_doc.get("bridge", NAV_BRIDGE_GAP))
 	builder.clearance = float(nav_doc.get("clearance", 0.35))
 	builder.generate_cover = true
