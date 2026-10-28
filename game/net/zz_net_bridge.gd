@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../zz_config.gd")
 const ZzEvent := preload("zz_event.gd")
 const ZzEvents := preload("zz_events.gd")
+const ZzClasses := preload("../zz_classes.gd")
 const ZzNetCommand := preload("zz_net_command.gd")
 const ZzNetLink := preload("zz_net_link.gd")
 const ZzPlayerNet := preload("zz_player_net.gd")
@@ -390,6 +391,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		# wired there that reached nobody in it.
 		game.player_armed.connect(announce_armed)
 		game.player_disarmed.connect(func(id: StringName) -> void: announce_armed(id, &""))
+		game.player_classed.connect(announce_classed)
 		# To the one who asked, never broadcast: a refusal is that person's business.
 		game.refused.connect(func(id: StringName, why: String) -> void:
 			var peer_id := peer_for_player(session_of(id))
@@ -826,6 +828,11 @@ func announce_armed(player_id: StringName, weapon_id: StringName) -> void:
 	_broadcast(ZzEvents.Kind.ARMED, ZzEvents.write_armed(session_of(player_id), weapon_id))
 
 
+## Says which class somebody is and the skin it gave them.
+func announce_classed(player_id: StringName, class_id: StringName, skin: StringName) -> void:
+	_broadcast(ZzEvents.Kind.CLASSED, ZzEvents.write_classed(session_of(player_id), class_id, skin))
+
+
 # --- Server: the tick ------------------------------------------------------
 
 func server_tick(tick: int) -> void:
@@ -1167,6 +1174,10 @@ func _admit(peer_id: int) -> void:
 
 	_tell_the_world(peer_id)
 	_tell(peer_id, ZzEvents.Kind.PHASE, ZzEvents.write_phase(game.phase))
+	for who: StringName in game.players:
+		var classed: ZzPlayer = game.players[who]
+		if classed.class_id != &"":
+			_tell(peer_id, ZzEvents.Kind.CLASSED, ZzEvents.write_classed(session_of(who), classed.class_id, classed.class_skin))
 	if game.shop != null:
 		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
 	for owner_session: int in _peer_of_player:
@@ -1715,6 +1726,11 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var shop := ZzEvents.read_shop(reader)
 			if bool(shop["ok"]):
 				shop_received.emit(str(shop["json"]))
+		ZzEvents.Kind.CLASSED:
+			var classed := ZzEvents.read_classed(reader)
+			var holder: ZzPlayer = game.players.get(player_key(int(classed["player_id"]))) if bool(classed["ok"]) and game != null else null
+			if holder != null:
+				game.set_class(holder, classed["class_id"], classed["skin"], ZzClasses.def_of(String(classed["class_id"])))
 		ZzEvents.Kind.CARRY:
 			var carried := ZzEvents.read_carry(reader)
 			if bool(carried["ok"]):

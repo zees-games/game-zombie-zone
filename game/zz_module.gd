@@ -11,6 +11,7 @@ const ZzGame := preload("zz_game.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzPlayer := preload("zz_player.gd")
 const ZzAvatars := preload("zz_avatars.gd")
+const ZzClasses := preload("zz_classes.gd")
 const ZzVote := preload("zz_vote.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 
@@ -225,6 +226,7 @@ func _game_load() -> DotResult:
 			vote.refresh_maps())
 	add_command("zz_say", _cmd_say, "Say something to everybody, as the server")
 	add_command("zz_boxes", _cmd_boxes, "List the box types and what each can do")
+	add_command("zz_class", _cmd_class, "List the classes, or pick one for your next spawn: zz_class [id] [model]")
 	# What an admin does to a server to see what happens: a zombie, a box, a mob, a brute.
 	add_command("zz_spawn", _cmd_spawn, "Spawn a zombie: zz_spawn <kind> [count] (near you, or the team)", "z")
 	add_command("zz_box", _cmd_box, "Drop a box: zz_box [type] (in front of you, or the team)", "z")
@@ -1527,6 +1529,26 @@ func _cmd_spawn(ctx: DotCmdContext) -> void:
 			made += 1
 
 	ctx.reply("%d %s." % [made, String(kind)])
+
+
+func _cmd_class(ctx: DotCmdContext) -> void:
+	var world := game as ZzGame
+
+	if world == null:
+		return
+
+	var offered := ZzClasses.offered(world.config.class_select, world.config.class_allowed)
+
+	if ctx.argc() == 0:
+		var mine: ZzPlayer = world.players.get(ZzNetBridge.player_key(ctx.session.userid)) if ctx.session != null else null
+		ctx.reply("You are %s. %s" % [String(mine.class_id) if mine != null else "?",
+			"Offered: " + ", ".join(offered) if not offered.is_empty() else "Class selection is off."])
+		return
+
+	var who: ZzPlayer = world.players.get(ZzNetBridge.player_key(ctx.session.userid)) if ctx.session != null else null
+	var res := world.request_class(who.player_id, ctx.arg(0), ctx.arg(1) if ctx.argc() > 1 else "") if who != null \
+		else DotResult.fail(DotError.CODE_INVALID, "Not in the game.")
+	ctx.reply("You will be %s from your next spawn." % ctx.arg(0) if res.ok else res.error.message)
 
 
 func _cmd_box(ctx: DotCmdContext) -> void:

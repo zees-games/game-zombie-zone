@@ -2,6 +2,7 @@ extends RefCounted
 
 ## Optional content packs: weapons and monsters that an installed addon adds to the game.
 ##
+const ZzClasses := preload("zz_classes.gd")
 ## [b]The game ships without them and nothing here is needed to run.[/b] At start every
 ## directory under `res://addons` is looked at for one file, `spawn_provider.gd` (the contract
 ## game-playground's spawn menu reads too). An addon without it is never loaded. One with it is
@@ -124,13 +125,33 @@ static func scan(from: String = "") -> int:
 		found += 1
 		_take(dir_name, provider)
 
+	_collect_class_roots()
+
 	DotLog.info(CHANNEL, "packs scanned", {
 		"providers": found, "weapons": weapon_rows.size(), "monsters": monsters.size(),
 	})
 	return found
 
 
+## A provider may define `class_cfg_root() -> String`: a cfg tree whose `game/<game>/class/*.yml` are
+## player and stand-in class profiles (the weakest config root; the game's cfg and a server's win).
+static func _collect_class_roots() -> void:
+	var roots := PackedStringArray()
+
+	for dir_name in providers:
+		var provider: Object = providers[dir_name]
+
+		if provider.has_method(&"class_cfg_root"):
+			var root := str(provider.call(&"class_cfg_root"))
+
+			if root != "" and DirAccess.dir_exists_absolute(root):
+				roots.append(root)
+
+	ZzClasses.set_pack_roots(roots)
+
+
 static func clear() -> void:
+	ZzClasses.set_pack_roots(PackedStringArray())
 	for source in _sources:
 		ZeePackSource.unregister(source)
 

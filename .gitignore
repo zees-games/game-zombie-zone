@@ -74,6 +74,8 @@
 /addons/zz_medieval_weapons
 # bootstrap-optional
 /addons/zz_historical_monsters
+# bootstrap-optional
+/addons/zz_ply_class_pack
 
 # Exports
 build/

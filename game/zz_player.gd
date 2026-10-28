@@ -48,6 +48,14 @@ enum Life { UP, DOWN, DEAD }
 
 ## What this player looks like, as a dot-user-avatar document; null is the stock person.
 var avatar: DotAvatar = null
+## The class this survivor plays (empty before the first spawn), the skin it gave them (empty: their
+## own avatar) and its definition, which [method tunables_for] reads. Set by [method apply_class].
+var class_id: StringName = &""
+var class_skin: StringName = &""
+var class_def: DotPlayerClassDef = null
+## What the player asked for, landing on the next spawn: a class id and (in `select` mode) a skin.
+var class_wanted: StringName = &""
+var model_wanted: StringName = &""
 
 var config: ZzConfig = null
 
@@ -421,7 +429,7 @@ func breathe(delta: float, rules: ZzWaterRules) -> float:
 
 ## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
 ## the two must agree.
-static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
+static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null) -> DotFpsTunables:
 	var t := DotFpsTunables.with_profile("legacy")
 	t.max_speed = p_config.run_speed if p_config != null else 6.2
 	t.gravity = p_config.gravity if p_config != null else 20.0
@@ -444,7 +452,7 @@ static func tunables_for(p_config: ZzConfig) -> DotFpsTunables:
 	t.stand_height = BODY_HEIGHT
 	t.crouch_height = BODY_CROUCH
 	t.step_height = BODY_STEP
-	var _classed := DotPlayerClassApply.to_movement(ZzClasses.survivor(), t)
+	var _classed := DotPlayerClassApply.to_movement(p_class if p_class != null else ZzClasses.survivor(), t)
 	return t
 
 
@@ -829,11 +837,20 @@ func reset_map() -> void:
 	fit_hitboxes()
 
 
+## Becomes [param id] with [param skin] on and [param def]'s movement; both ends run it (the server
+## when it deals the class, a client when CLASSED arrives), so what they predict agrees.
+func apply_class(id: StringName, skin: StringName, def: DotPlayerClassDef) -> void:
+	class_id = id
+	class_skin = skin
+	class_def = def
+	retune()
+
+
 func retune() -> void:
 	if controller == null:
 		return
 
-	controller.tunables = tunables_for(config)
+	controller.tunables = tunables_for(config, class_def)
 
 	if sampler != null:
 		sampler.tunables = controller.tunables
@@ -976,7 +993,7 @@ func _rig() -> ZeeWeaponRig:
 
 
 func _atlas() -> String:
-	var index := ZzAvatars.skin_index(avatar)
+	var index := ZzAvatars.SKINS.find(class_skin) if class_skin != &"" else ZzAvatars.skin_index(avatar)
 
 	if index < 0 or index >= ZzFigure.ATLASES.size():
 		index = ZzAvatars.stock_index(player_id)

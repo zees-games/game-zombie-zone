@@ -119,7 +119,9 @@ func _memory(player) -> Dictionary:
 
 ## Draws this stand-in's character from the server's pool, and gives it that character's aim when the persona states one.
 func _apply_persona(id: StringName, memory: Dictionary) -> void:
-	var persona: DotBotPersona = game.personas().assign(id, _rng)
+	var persona: DotBotPersona = _class_persona(id)
+	if persona == null:
+		persona = game.personas().assign(id, _rng)
 	memory["persona"] = persona
 	memory.erase("behave")
 	var own := persona.profile_over(DotBotSettings.of(game).profile)
@@ -130,6 +132,20 @@ func _apply_persona(id: StringName, memory: Dictionary) -> void:
 		settings.profile = own
 
 	memory["aim"] = DotBotAim.new(hash(String(id)), settings)
+
+
+## The persona this stand-in's class names (`persona:` in its class profile), or null to draw from the pool.
+func _class_persona(id: StringName) -> DotBotPersona:
+	var player = game.players.get(id) if "players" in game else null
+	if player == null or player.class_def == null:
+		return null
+	var want := str(player.class_def.attributes.get("persona", ""))
+	if want == "":
+		return null
+	for persona: DotBotPersona in game.personas().personas:
+		if String(persona.id) == want:
+			return persona
+	return null
 
 
 ## A persona was added, edited or deleted: every stand-in draws again.

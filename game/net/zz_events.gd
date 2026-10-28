@@ -127,6 +127,8 @@ enum Kind {
 	MAP_PART,
 	## A shootable support broke (its index in the map's list); what stood on it is the toys' own.
 	SUPPORT,
+	## A survivor's class and the skin it wears this spawn: player, class id, skin id (empty: their own avatar).
+	CLASSED,
 }
 
 ## What a MAP_FX says.
@@ -1209,6 +1211,21 @@ static func read_carry(r: DotNetReader) -> Dictionary:
 	var raw := r.read_bytes(CARRY_BYTES)
 	return {"json": raw.get_string_from_utf8(), "ok": r.ok()}
 
+
+
+static func write_classed(player_id: int, class_id: StringName, skin: StringName) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(player_id)
+	w.write_string(String(class_id), ID_BYTES)
+	w.write_string(String(skin), ID_BYTES)
+	return w.to_bytes()
+
+
+static func read_classed(r: DotNetReader) -> Dictionary:
+	var player_id := r.read_varint()
+	var class_id := r.read_string(ID_BYTES)
+	var skin := r.read_string(ID_BYTES)
+	return {"player_id": player_id, "class_id": StringName(class_id), "skin": StringName(skin), "ok": r.ok()}
 
 
 static func write_shop(json: String) -> PackedByteArray:

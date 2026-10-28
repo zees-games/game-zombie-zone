@@ -163,6 +163,8 @@ signal player_armed(player_id: StringName, weapon_id: StringName)
 ## Everything [param player_id] held was taken away (a new map, a rescue): an empty ARMED on the
 ## wire, so a client's own rig and everybody's drawn hands start again.
 signal player_disarmed(player_id: StringName)
+## A survivor was dealt a class and a skin (empty: their own avatar) for this spawn.
+signal player_classed(player_id: StringName, class_id: StringName, skin: StringName)
 signal exploded(at: Vector3, radius: float, kind: StringName)
 
 ## A survivor's ammunition was filled by the server: a pile, a box. A predicting client's own
@@ -1424,6 +1426,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 	health.max_health = config.max_health
 	health.health = health.max_health
 	player.add_child(health)
+	set_class(player, &"", &"", ZzClasses.survivor())
 	player.health = health
 
 	if combat != null:
@@ -1482,6 +1485,9 @@ func place_one(player: ZzPlayer) -> void:
 		player.place_at(spot[0], spot[1])
 
 	if authoritative:
+		assign_class(player)
+		player.health.max_health = class_health(player)
+		player.health.health = player.health.max_health
 		_equip(player, false)
 
 	if spectate != null:
@@ -1971,8 +1977,9 @@ func _place_everybody() -> void:
 		player.reset_map()
 
 		if player.health != null:
-			player.health.max_health = config.max_health
-			player.health.health = config.max_health
+			assign_class(player)
+			player.health.max_health = class_health(player)
+			player.health.health = player.health.max_health
 			player.health.alive = true
 			player.health.invulnerable = false
 
@@ -1988,6 +1995,60 @@ func _place_everybody() -> void:
 			spectate.on_spawned(player.player_id)
 
 
+## A survivor's health pool: the game's `max_health` scaled by their class (a class's 100 is the game's).
+func class_health(player: ZzPlayer) -> float:
+	if player.class_def == null:
+		return config.max_health
+	return maxf(1.0, config.max_health * player.class_def.max_health / 100.0)
+
+
+var _class_rng := RandomNumberGenerator.new()
+
+
+## Deals [param player] a class and a skin for this spawn (server only): a stand-in draws by
+## `bot_weight`, a person gets what they asked for if the server offers it, else the default. The
+## result is told to every client.
+func assign_class(player: ZzPlayer) -> void:
+	if not authoritative:
+		return
+	ZzClasses.set_default(config.class_default)
+	var id := ""
+	if player.is_bot:
+		id = ZzClasses.draw_for_bot(_class_rng)
+	elif player.class_wanted != &"" and ZzClasses.check_choice(String(player.class_wanted), config.class_select, config.class_allowed).ok:
+		id = String(player.class_wanted)
+	else:
+		id = ZzClasses.default_id()
+	var def := ZzClasses.def_of(id)
+	var skin := ZzClasses.pick_model(def, String(player.model_wanted), _class_rng) if def != null else ""
+	set_class(player, StringName(id), StringName(skin), def)
+	player_classed.emit(player.player_id, StringName(id), StringName(skin))
+
+
+## Puts [param player] in a class on this end. The sprint rules re-apply on tracking, so the class's
+## own numbers go on after them.
+func set_class(player: ZzPlayer, id: StringName, skin: StringName, def: DotPlayerClassDef) -> void:
+	player.apply_class(id, skin, def)
+	combat_feel.track_tunables(player.controller.tunables)
+	var _classed := DotPlayerClassApply.to_movement(def, player.controller.tunables, ZzPlayer.tunables_for(config, DotPlayerClassDef.new()))
+
+
+## A survivor asks to be [param id] (and, if that class lets them pick, [param model]) from the next spawn.
+func request_class(player_id: StringName, id: String, model: String = "") -> DotResult:
+	var player: ZzPlayer = players.get(player_id)
+	if player == null:
+		return DotResult.fail(DotError.CODE_INVALID, "No such player.")
+	var ok := ZzClasses.check_choice(id, config.class_select, config.class_allowed)
+	if not ok.ok:
+		return ok
+	var def := ZzClasses.def_of(id)
+	if model != "" and not ZzClasses.models_of(def).has(model):
+		return DotResult.fail(DotError.CODE_INVALID, "'%s' has no model '%s'." % [id, model])
+	player.class_wanted = StringName(id)
+	player.model_wanted = StringName(model)
+	return DotResult.success(id)
+
+
 ## What a survivor holds at the start of a map ([param fresh]) or after a rescue.
 func _equip(player: ZzPlayer, fresh: bool) -> void:
 	_disarm(player)
@@ -1996,6 +2057,12 @@ func _equip(player: ZzPlayer, fresh: bool) -> void:
 		var _immune := ZzClasses.apply_immunity(combat, player.entity_id)
 
 	var kit := config.start_weapons if fresh else PackedStringArray([config.start_weapons[0]])
+	var class_kit := PackedStringArray()
+	if player.class_def != null and String(player.class_def.loadout_id) != "":
+		for part in String(player.class_def.loadout_id).split(",", false):
+			class_kit.append(part.strip_edges())
+	if not class_kit.is_empty():
+		kit = class_kit if fresh else PackedStringArray([class_kit[0]])
 
 	for weapon_id in kit:
 		var _armed := arm(player, StringName(weapon_id))
@@ -3353,7 +3420,7 @@ func _revive(player: ZzPlayer, by: ZzPlayer) -> void:
 		return
 
 	player.life = ZzPlayer.Life.UP
-	player.health.max_health = config.max_health
+	player.health.max_health = class_health(player)
 	player.health.health = config.revive_health
 	player.temp_health = maxf(config.revive_health - 1.0, 0.0)
 	player.helped_fraction = 0.0
@@ -3393,7 +3460,7 @@ func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
 	body.incaps = maxi(config.max_incaps - 1, 0)
 	body.died_at = -1.0
 	body.temp_health = 0.0
-	body.health.max_health = config.max_health
+	body.health.max_health = class_health(body)
 	body.health.revive(d.revive_fraction)
 	body.shield_until = now() + d.invulnerable_seconds
 	body.fit_hitboxes()
@@ -3522,7 +3589,7 @@ func rescue(player: ZzPlayer) -> bool:
 	player.watching = false
 	player.incaps = 0
 	player.died_at = -1.0
-	player.health.max_health = config.max_health
+	player.health.max_health = class_health(player)
 	player.health.revive(0.5)
 	player.temp_health = 0.0
 	player.fit_hitboxes()

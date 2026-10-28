@@ -4,6 +4,12 @@
 # --- The survivors
 #  [1.0..400.0]
 # max_health: 100.0
+# The class every survivor starts as (cfg/game/game-zombie-zone/class/<id>.yml, shipped by zz-ply-class-pack,...
+# class_default: "survivor"
+# Whether a survivor may pick another class with `zz_class <id>` (server-authoritative; lands on the next spa...
+# class_select: false
+# The classes a survivor may pick, as a comma list of ids; empty offers every class whose profile is `selecta...
+# class_allowed: ""
 # Below this health a survivor limps: slower (by `ZzController.LIMP`, which both ends register identically, s... [0.0..100.0]
 # limp_health: 40.0
 # Temporary health (pills, a revive) drains this much a second. [0.0..10.0]

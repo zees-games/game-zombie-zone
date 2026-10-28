@@ -352,6 +352,15 @@ func setup_seconds() -> float:
 
 @export_range(1.0, 400.0, 1.0) var max_health: float = 100.0
 
+## The class every survivor starts as (cfg/game/game-zombie-zone/class/<id>.yml, shipped by zz-ply-class-pack, else the built-in survivor). `zz_class_default`.
+@export var class_default: String = "survivor"
+
+## Whether a survivor may pick another class with `zz_class <id>` (server-authoritative; lands on the next spawn). Off: everybody is the default class. `zz_class_select`.
+@export var class_select: bool = false
+
+## The classes a survivor may pick, as a comma list of ids; empty offers every class whose profile is `selectable`. `zz_class_allowed`.
+@export var class_allowed: String = ""
+
 ## Below this health a survivor limps: slower (by `ZzController.LIMP`, which both ends
 ## register identically, so how much slower is not a server setting), and told so by the screen.
 @export_range(0.0, 100.0, 1.0) var limp_health: float = 40.0
