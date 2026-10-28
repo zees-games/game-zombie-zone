@@ -240,6 +240,10 @@ func advance(delta: float, ticks: int = 1) -> void:
 	else:
 		velocity.y = maxf(velocity.y - GRAVITY * delta, -FALL_FASTEST)
 
+	if cheap_step and is_on_floor() and _cheap_move(Vector3(horizontal.x, 0.0, horizontal.z) * delta):
+		last_floor_at = global_position
+		return
+
 	var before := global_position
 	var _moved := _sweep(ticks)
 
@@ -291,6 +295,39 @@ func _step_up(direction: Vector3) -> void:
 
 	_no_step_at = global_position
 	_no_step_dir = direction
+
+
+## Set by the brain past `zz_body_cheap_from`: [method advance] tries [method _cheap_move] first.
+var cheap_step: bool = false
+var _ray: PhysicsRayQueryParameters3D = null
+
+
+## A move in the open by rays: two ahead (above a step's lip, and at the chest) and one down onto
+## the floor there. False, having moved nothing, when either ray ahead hits or there is no walkable
+## floor; the caller then sweeps, so walls, ledges and barricades behave exactly as before.
+func _cheap_move(motion: Vector3) -> bool:
+	var length := motion.length()
+	if length < 0.0001:
+		return true
+	if _ray == null:
+		_ray = PhysicsRayQueryParameters3D.new()
+	_ray.collision_mask = collision_mask
+	var space := get_world_3d().direct_space_state
+	var at := global_position
+	var ahead := motion * ((length + radius) / length)
+	for rise: float in [STEP_UP + 0.05, height * 0.8]:
+		_ray.from = at + Vector3(0.0, rise, 0.0)
+		_ray.to = _ray.from + ahead
+		if not space.intersect_ray(_ray).is_empty():
+			return false
+	var to := at + motion
+	_ray.from = to + Vector3(0.0, STEP_UP + 0.05, 0.0)
+	_ray.to = to - Vector3(0.0, floor_snap_length, 0.0)
+	var hit := space.intersect_ray(_ray)
+	if hit.is_empty() or (hit["normal"] as Vector3).y < cos(floor_max_angle):
+		return false
+	global_position = Vector3(to.x, (hit["position"] as Vector3).y, to.z)
+	return true
 
 
 ## Starts a leap with [param launch] as its velocity.

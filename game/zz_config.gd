@@ -280,11 +280,18 @@ func setup_seconds() -> float:
 @export_range(5.0, 500.0, 1.0) var body_stride_near: float = 20.0
 ## Metres past which a zombie's body moves every fourth tick. `zz_body_stride_far`.
 @export_range(5.0, 500.0, 1.0) var body_stride_far: float = 45.0
+## Metres past which a zombie in the open moves by three rays instead of a capsule sweep, which
+## costs a tenth; any wall ahead or a missing floor still sweeps. 0 always sweeps.
+@export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
 
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per
 ## catch-up step. 0 keeps it on every step (servers and headless runs always do).
 @export_range(0, 8) var horde_frame_ticks: int = 4
+
+## A drawn solo world's cap on physics steps per drawn frame (the engine's is 8): a frame slower
+## than this many ticks slows the game instead of spiralling. Online never changes it. 0 keeps 8.
+@export_range(0, 8) var solo_max_steps: int = 3
 
 ## Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in
 ## place of a post at a window. `zz_bot_hold_chokes`.

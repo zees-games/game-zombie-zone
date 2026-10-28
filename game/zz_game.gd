@@ -3959,6 +3959,8 @@ func now() -> float:
 var horde_per_frame: bool = false
 var _horde_frame: int = -1
 var _horde_owed: int = 0
+## The last per-frame horde tick's cost, µs (tools/bench.gd reads it).
+var horde_frame_us: int = 0
 
 
 func _tick_horde(delta: float) -> void:
@@ -3974,7 +3976,9 @@ func _tick_horde(delta: float) -> void:
 
 	if frame != _horde_frame:
 		_horde_frame = frame
+		var began := Time.get_ticks_usec()
 		horde.tick(delta, _horde_owed)
+		horde_frame_us = Time.get_ticks_usec() - began
 		_horde_owed = 0
 
 

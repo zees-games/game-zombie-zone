@@ -81,6 +81,8 @@ var unstick_log: PackedStringArray = PackedStringArray()
 const THINK_CLOSE := 6.0
 const THINK_NEAR := 20.0
 const THINK_FAR := 45.0
+## Past this it thinks every eighth tick: nobody sees a decision that far off a beat late.
+const THINK_DISTANT := 60.0
 
 ## Metres from the nearest survivor past which its body moves every second tick, every fourth past
 ## `BODY_STRIDE_FAR_FROM` (`ZzZombieBody.stride`). Fallbacks for `ZzConfig.body_stride_*`.
@@ -513,6 +515,8 @@ func _think_every() -> int:
 			var near := float(config.body_stride_near) if config != null else BODY_STRIDE_FROM
 			var far := float(config.body_stride_far) if config != null else BODY_STRIDE_FAR_FROM
 			b.set_stride(1 if _nearest < near else (2 if _nearest < far else 4))
+			var cheap := float(config.body_cheap_from) if config != null else 0.0
+			b.cheap_step = cheap > 0.0 and _nearest >= cheap
 
 	# Within reach of a swing or the ring round somebody, every tick; a run at somebody from
 	# further off, every second tick (its body still moves every tick), every third past twenty
@@ -525,7 +529,9 @@ func _think_every() -> int:
 	if _nearest < THINK_NEAR:
 		return 2
 
-	return 3 if _nearest < THINK_FAR else 4
+	if _nearest < THINK_FAR:
+		return 3
+	return 4 if _nearest < THINK_DISTANT else 8
 
 
 ## A kind's own machine. Called every think after sensing, unless staggered.

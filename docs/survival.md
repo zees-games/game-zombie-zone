@@ -157,6 +157,13 @@ Then (zz-tick-cost, `tickcut`): `DotNpcAiSquad.pull` walks the log rows since th
 
 Still three times the budget: the players' motor (80 µs a survivor), the brains' per-zombie script (zz decide 4.5 ms, of it the attack move 3.1) and the stand-ins, which a server of humans does not pay.
 
+**A solo frame at 120 zombies on a converted map (zz-perf-biohazard-2, 2026-10-28).** The physics monitor is the frame's slowest step, and a drawn solo world ticks the horde once a frame (`horde_per_frame`), so that one step carries the whole horde: that is why it read 34.6 ms against a profile's 14.6 a tick (`--profile` ticks the horde every step instead). `tools/bench.gd` now prints `horde_frame_ms` and takes `--ring=a,b`, `--bodyprobe` (each zombie's `move_and_slide`, `test_move` and rays timed, and the static shapes under it) and `--census` lists what is drawn. The sweep was 540 µs a zombie. Three levers, all cvars: past `zz_body_cheap_from` (12 m) a zombie in the open moves by three rays and falls back to the sweep at any wall, ledge or missing floor (`ZzZombieBody._cheap_move`); past 60 m a brain thinks every eighth tick; a drawn solo world caps the engine at `zz_solo_max_steps` (3) steps a frame, so a slow frame slows the game instead of spiralling (online never changes it). Shadows are not the GPU's cost here: casting only the nearest 24 (115 casters to 33, 521k primitives to 438k) left GPU time at 21 ms, so it was not kept. Laptop box, seed 7, `--ring=8,85 --zombies=120 --zz-commons-base=130` (119 alive):
+
+| ze_biohazard_manor | fps | p50 (p99) ms | physics ms (steps) | horde a frame ms | render ms | gpu ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| before | 6.7 | 146.4 (216.6) | 90.6 (7.96) | 28.7 | 44.5 | 34.6 |
+| rays, think, step cap | 12.4 | 69.9 (110.0) | 34.1 (3.00) | 9.4 | 36.6 | 19.8 |
+
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
 
 `tools/survival_long_run.tscn` plays a whole hold on one map with its full team of stand-ins, headless, and prints a row per wave: seconds, sent, most alive, downs and deaths (and what downed them), barricades broken, the team up at its end, the tick's mean and worst, and a `RESULT` JSON line. `--from=K` starts at wave K (barricades whole, nobody hurt, the caches at K's tier), `--profile` splits the tick by part, `--watch=S --detail` says where the wave's zombies are and why. A school's ten waves are about 35 minutes of play and longer than that on a shared VM, so the runs were split: from wave 1 as far as nine minutes go, and from 4, 7, 9 and 10, several seeds, eight at a time.

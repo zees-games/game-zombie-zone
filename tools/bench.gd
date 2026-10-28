@@ -33,6 +33,9 @@ func _run() -> void:
 			_measure = arg.trim_prefix("--measure=").to_float()
 		elif arg == "--profile":
 			_profile = true
+		elif arg.begins_with("--ring="):
+			var r := arg.trim_prefix("--ring=").split(",")
+			_ring = Vector2(r[0].to_float(), r[1].to_float())
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
 	var waited := 0.0
@@ -120,7 +123,7 @@ func _run() -> void:
 			alive_sum += _alive(game)
 			_monitors.append(PackedFloat64Array([Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
 				Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS), Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS),
-				Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT)]))
+				Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT), float(game.horde_frame_us) / 1000.0]))
 			gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp))
 			cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu())
 	_clock.stop()
@@ -129,13 +132,15 @@ func _run() -> void:
 		for part: String in parts:
 			print("PROFILE %-10s %.3f ms/tick" % [part, float(parts[part]) / 1000.0 / maxf(1.0, _ticks)])
 		_profiler.free()
-	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0])
+	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0])
 	for m in _monitors:
-		for i in 4:
+		for i in 5:
 			sums[i] += m[i] / maxf(1.0, _monitors.size())
-	print("MONITORS physics_process_ms=%.2f active_3d=%.1f pairs=%.1f islands=%.1f" % [sums[0], sums[1], sums[2], sums[3]])
+	print("MONITORS physics_process_ms=%.2f (the frame's slowest step) active_3d=%.1f pairs=%.1f islands=%.1f horde_frame_ms=%.2f" % [sums[0], sums[1], sums[2], sums[3], sums[4]])
 	if "--census" in OS.get_cmdline_user_args():
 		_census()
+	if "--bodyprobe" in OS.get_cmdline_user_args():
+		_body_probe(game, local)
 	_report(draws, objects, prims, float(alive_sum) / maxf(1.0, draws.size()), game, gpu, cpu)
 	# The last frame, to look at: the numbers say nothing about what a crowd detail level looks like.
 	var path := ProjectSettings.globalize_path(_out)
@@ -341,6 +346,77 @@ func _print_perf(game: ZzGame, wall: PackedFloat64Array, phys_ms: float, draws: 
 		"resolution": "%dx%d" % [vp.x, vp.y], "godot": Engine.get_version_info().get("string", "")}))
 
 
+
+
+## --bodyprobe: what one zombie's move costs, and against what: move_and_slide at its own velocity,
+## one test_move, two rays, and the static shapes its capsule's swept box overlaps, by shape class.
+func _body_probe(game: ZzGame, local) -> void:
+	var space: PhysicsDirectSpaceState3D = local.get_world_3d().direct_space_state
+	var classes := {}
+	var n := 0
+	var t_slide := 0
+	var t_test := 0
+	var t_ray := 0
+	var overlaps := 0
+	var rayq := PhysicsRayQueryParameters3D.new()
+	for npc in game.horde.spawner.all_npcs():
+		var b := npc.node as CharacterBody3D
+		if b == null or not npc.is_alive():
+			continue
+		n += 1
+		var keep := b.global_transform
+		var wish: Vector3 = b.get(&"wish")
+		var v := Vector3(wish.x, -1.0, wish.z)
+		if v.length_squared() < 0.01:
+			v = Vector3(1.0, -1.0, 0.0)
+		b.velocity = v
+		var t0 := Time.get_ticks_usec()
+		for i in 20:
+			b.global_transform = keep
+			b.velocity = v
+			b.move_and_slide()
+		t_slide += Time.get_ticks_usec() - t0
+		b.global_transform = keep
+		t0 = Time.get_ticks_usec()
+		for i in 20:
+			var _hit := b.test_move(keep, v / 60.0)
+		t_test += Time.get_ticks_usec() - t0
+		rayq.collision_mask = b.collision_mask
+		t0 = Time.get_ticks_usec()
+		for i in 20:
+			rayq.from = keep.origin + Vector3(0, 0.5, 0)
+			rayq.to = rayq.from + v / 60.0 + Vector3(v.x, 0, v.z).normalized() * 0.4
+			var _a := space.intersect_ray(rayq)
+			rayq.from = keep.origin + Vector3(0, 0.6, 0)
+			rayq.to = keep.origin + Vector3(0, -0.6, 0)
+			var _c := space.intersect_ray(rayq)
+		t_ray += Time.get_ticks_usec() - t0
+		var q := PhysicsShapeQueryParameters3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(0.94, 2.05, 0.94)
+		q.shape = box
+		q.transform = Transform3D(Basis(), keep.origin + Vector3(0, 0.9, 0))
+		q.collision_mask = b.collision_mask
+		for r in space.intersect_shape(q, 128):
+			overlaps += 1
+			var owner: Object = r.get("collider")
+			var shape_class := "?"
+			if owner is CollisionObject3D:
+				var sid: int = (owner as CollisionObject3D).shape_find_owner(int(r.get("shape", 0)))
+				var sh := (owner as CollisionObject3D).shape_owner_get_shape(sid, 0) if sid >= 0 else null
+				shape_class = sh.get_class() if sh != null else "?"
+				if sh is ConcavePolygonShape3D:
+					shape_class += "(%d faces)" % ((sh as ConcavePolygonShape3D).get_faces().size() / 3)
+				elif sh is ConvexPolygonShape3D:
+					shape_class += "(%d pts)" % (sh as ConvexPolygonShape3D).points.size()
+			classes[shape_class] = int(classes.get(shape_class, 0)) + 1
+	n = maxi(n, 1)
+	print("BODYPROBE bodies=%d move_and_slide=%.1f us test_move=%.1f us two_rays=%.1f us overlaps=%.1f per body" % [
+		n, t_slide / 20.0 / n, t_test / 20.0 / n, t_ray / 20.0 / n, float(overlaps) / n])
+	var keys := classes.keys()
+	keys.sort_custom(func(a, c): return int(classes[a]) > int(classes[c]))
+	for k in keys.slice(0, 12):
+		print("BODYPROBE shape %-36s %d" % [k, classes[k]])
 
 
 ## --physprobe: static shapes by body and what one capsule overlap query costs near the survivor.

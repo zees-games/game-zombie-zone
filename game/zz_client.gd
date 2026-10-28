@@ -225,6 +225,9 @@ func _ready() -> void:
 	# Before the world is added: a world that ticks itself must not run in front of a picture.
 	game.hold_clock = _covered
 	game.horde_per_frame = _offline and DisplayServer.get_name() != "headless"
+	if game.horde_per_frame and config.solo_max_steps > 0:
+		_steps_before = Engine.max_physics_steps_per_frame
+		Engine.max_physics_steps_per_frame = config.solo_max_steps
 	_hold_for_maps()
 	add_child(game)
 
@@ -341,8 +344,14 @@ func _avatar_figure(peer_id: int) -> Object:
 	return who.figure.body_node() if who != null and who.figure != null else null
 
 
+## The engine's step cap before a solo world lowered it (`zz_solo_max_steps`); 0 when untouched.
+var _steps_before := 0
+
+
 func _exit_tree() -> void:
 	reset_slowmo()
+	if _steps_before > 0:
+		Engine.max_physics_steps_per_frame = _steps_before
 	ZeeModelCache.set_asset_root("res://")
 
 
