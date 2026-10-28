@@ -14,7 +14,7 @@ const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.
 
 const MAP := &"zm_lila_panic"
 const SECTIONS := 2
-const CHECKS := 8
+const CHECKS := 10
 
 var _entered := 0
 var _finished := 0
@@ -36,7 +36,7 @@ func _test_world() -> void:
 	_entered += 1
 	if not ZzMap.can_draw_world() or not FileAccess.file_exists(ZzPaths.rebase(ZzMap.LOCAL_WORLD % ["zz_world_zm_lila_panic", String(MAP)]) + ".json"):
 		print("SKIPPED: %s's world is not linked (run dot-bootstrap)" % MAP)
-		_checks -= 4
+		_checks -= 6
 		_finished += 1
 		return
 	var config := ZzConfig.new()
@@ -70,6 +70,34 @@ func _test_world() -> void:
 	game.queue_free()
 	await get_tree().process_frame
 	_finished += 1
+	await _test_concurrent(config)
+
+
+## Two loads in one frame (the client's draw and a tool's own call) draw one World and run the extras once.
+func _test_concurrent(config: ZzConfig) -> void:
+	var game := ZzGame.new()
+	game.config = config
+	game.authoritative = true
+	game.draw_world = true
+	game.register_service = false
+	add_child(game)
+	game.set_physics_process(false)
+	await get_tree().process_frame
+	var both := [0]
+	var load_one := func() -> void:
+		var r: DotResult = await game.map.load_world()
+		both[0] += 1 if r.ok else 0
+	load_one.call()
+	load_one.call()
+	while both[0] < 2:
+		await get_tree().process_frame
+	for i in 8:
+		await get_tree().process_frame
+	var worlds := game.map._drawn.get_children().filter(func(c: Node) -> bool: return String(c.name).contains("World"))
+	_check(worlds.size() == 1, "two concurrent loads attach one World", str(worlds.size()))
+	_check(game.map.extras_runs == 1, "two concurrent loads run the extras once", str(game.map.extras_runs))
+	game.queue_free()
+	await get_tree().process_frame
 
 
 func _test_baked() -> void:

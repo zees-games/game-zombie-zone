@@ -1367,6 +1367,34 @@ func attach_world(world: RefCounted, dir: String = "") -> bool:
 	if _drawn == null:
 		return false
 	var drawn_for := _drawn
+	# A second load while the prefetch awaits would attach a second World and run the extras twice: it waits for the first.
+	if _world_loading == drawn_for:
+		var first: bool = await _world_attached
+		return first and _drawn == drawn_for
+	if _world_for == drawn_for:
+		return true
+	_world_loading = drawn_for
+	var done := await _attach_world_now(world, dir, drawn_for)
+	_world_loading = null
+	if done:
+		_world_for = drawn_for
+	_world_attached.emit(done)
+	return done
+
+
+## Emitted when the attach in flight ends; true when it drew the world.
+signal _world_attached(drawn: bool)
+
+var _world_loading: Node3D = null
+
+## The _drawn that already carries its World: a later load for it is a no-op.
+var _world_for: Node3D = null
+
+## How many times the world extras ran (a regression check counts them).
+var extras_runs: int = 0
+
+
+func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> bool:
 
 	var lap := Time.get_ticks_msec()
 	var stages := {}
@@ -1545,6 +1573,7 @@ func _light_from_world(world: RefCounted) -> void:
 ## sets none (the document's own sun and sky stay: a second sun lit everything twice), ambient
 ## sounds and prop stand-ins, drawn only. Each is nothing for a world without it.
 func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
+	extras_runs += 1
 	var lap := Time.get_ticks_msec()
 	var stages := {}
 	var env_node: Node3D = world.call(&"build_environment", 8, false)
