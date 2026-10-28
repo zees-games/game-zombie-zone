@@ -842,8 +842,10 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 		var hud = _client.get("hud")
 		var image := get_viewport().get_texture().get_image()
 		var path := dir.path_join("crosshair_%s.png" % stage)
-		print("%s: spread %.2f gap %.1f -> %s" % [stage, _client.get("weapons").arsenal.spread_now(),
-			hud._crosshair.gap_pixels(), error_string(image.save_png(path))])
+		var held_slot = _client.get("weapons").arsenal.current()
+		print("%s: spread %.2f gap %.1f mag %d bloom %.2f -> %s" % [stage, _client.get("weapons").arsenal.spread_now(),
+			hud._crosshair.gap_pixels(), held_slot.magazine, float(held_slot.behaviour.state.get(&"bloom", 0.0)),
+			error_string(image.save_png(path))])
 		_client.set("_firing", false)
 		for action: String in stages[stage]:
 			Input.action_release(action)

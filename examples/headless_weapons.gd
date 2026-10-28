@@ -18,8 +18,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 13
-const CHECKS := 84
+const SECTIONS := 14
+const CHECKS := 90
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -48,6 +48,7 @@ func _run() -> void:
 		await _test_ammo_pile()
 		await _test_rearmed()
 		await _test_box_guns_are_drawn()
+		await _test_fire_bloom()
 		_test_spawner()
 		_test_trader()
 		_test_shop()
@@ -169,6 +170,32 @@ func _test_shots_count() -> void:
 	_check(me.view_rig.arsenal.current().magazine == me.weapons.arsenal.current().magazine,
 		"the drawn gun counted the same shots", "%d against %d" % [me.view_rig.arsenal.current().magazine, me.weapons.arsenal.current().magazine])
 	_check(_hud_magazine() == me.weapons.arsenal.current().magazine, "the HUD says so", _client.hud.ammo.count_text())
+	_finished()
+
+
+func _test_fire_bloom() -> void:
+	_section("a held trigger opens the crosshair: rifle, SMG and sniper carry bloom and the drawn arsenal reports it")
+	var me := _client.player
+	for id: StringName in [&"zz_m4", &"zz_smg", &"zz_sniper"]:
+		var def := ZzWeapons.def_of(id)
+		var b := def.tuning as DotWeaponBallistics if def != null else null
+		_check(b != null and b.bloom > 0.0, "%s sets bloom" % id, str(b.bloom) if b != null else "pack not loaded")
+
+		if def == null or not _client.game.arm(me, id):
+			_check(false, "%s opens while firing" % id, "not armed")
+			continue
+
+		_client._slot = def.slot
+		# The sniper's draw is 0.75 s: a trigger held before it ends fires nothing.
+		await _frames(100)
+		var rest: float = _client.weapons.arsenal.spread_now()
+		var peak := rest
+		_client._firing = true
+		for _tick in 24:
+			await _frames(1)
+			peak = maxf(peak, _client.weapons.arsenal.spread_now())
+		_client._firing = false
+		_check(peak > rest + 0.4, "%s: the drawn cone is wider while firing" % id, "%.2f over %.2f" % [peak, rest])
 	_finished()
 
 
