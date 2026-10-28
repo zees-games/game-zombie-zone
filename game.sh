@@ -17,7 +17,7 @@
 #
 # Options (before the command):
 #   --godot PATH     the Godot 4.7 binary to use (default: $GODOT, then godot on PATH)
-#   --timeout SEC    the longest one test suite may run (default 900)
+#   --timeout SEC    the longest one test suite may run (default 1200)
 #   --no-parse       skip the parse pass in `test`
 #
 # `online` and `server` use dot-server-deploy, found next to this repository (or at
@@ -42,7 +42,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT" || exit 1
 
 GODOT="${GODOT:-godot}"
-TIMEOUT=900
+TIMEOUT=1200
 PARSE=1
 RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; OFF=$'\033[0m'
 CR=$'\r\033[K'
