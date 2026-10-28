@@ -1740,13 +1740,13 @@ func _start_workbench(world: ZzGame) -> void:
 			workbench.add_set(set, "Flashlight")
 	workbench.add_set(world.bot_persona_set(), "Bot personas (add, edit, delete)")
 	workbench.add_set(DotWaveSet.make_set("game-zombie-zone"), "Wave sets (sizes, pools, bosses, difficulty)")
+	workbench.add_set(world.box_profile_set(), "Boxes (odds, effects, colours, sounds)")
 	var ambient_set := DotGameWorkbench.cvar_set(console, world.ambient_rules.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (zz_ambient*)")
 	add_child(workbench)
 	var started := workbench.start(rt)
 	if not started.ok:
-	workbench.add_set(world.box_profile_set(), "Boxes (odds, effects, colours, sounds)")
 		log_warn("the workbench", {"why": started.error.message})
 		return
 	# Off until the owner sets sv_workbench_remote 1; then flagged admins edit from a client.
