@@ -372,6 +372,11 @@ func _note_seeds() -> PackedVector3Array:
 		var spot: Array = game.map.spawn("survivors", i)
 		seeds.append(spot[0])
 
+	# Where the horde comes from and where survivors hold: both ends of a street a car cuts in two.
+	for key: String in ["zombie_spawns", "posts"]:
+		for p: Variant in _doc.get(key, []):
+			seeds.append(ZzMapDoc.v3(p))
+
 	return seeds
 
 

@@ -45,10 +45,11 @@ const MAX_CHOKES := 14
 
 ## What counts as a choke: the annotator's defaults (3 m, 15 percent of 48 routes) found none on a
 ## school or a stadium, where parallel corridors split the traffic, so a way in is a narrow place
-## a twelfth of many routes go through. Tuned by looking (tools/nav_probe.tscn).
+## a twelfth of many routes go through. Tuned by looking (tools/nav_probe.tscn). At 192 routes
+## which chokes cleared the share was the luck of the draw; 768 settles it for a few ms more.
 var choke_width: float = 4.5
 var choke_traffic: float = 0.07
-var choke_routes: int = 192
+var choke_routes: int = 768
 
 var state: State = State.OFF
 var annotations: DotNpcAiNavAnnotations = null
@@ -184,7 +185,9 @@ func _bake() -> bool:
 	annotator.routes = choke_routes
 	annotator.collision_mask = _mask
 	annotator.seeds = _seeds
-	annotator.reach_only = false
+	# Only floor a body reaches from the seeds: kept roofs drew most routes off the street, and a
+	# street cut in two by a parked car then had too few routes left to show a choke.
+	annotator.reach_only = true
 	annotator.slice = 24
 	var key := annotator.cache_key()
 	var path := "user://nav/%s.json" % key
