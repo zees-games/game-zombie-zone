@@ -81,6 +81,10 @@ func _run() -> void:
 		print("MICRO combat.tick %.1f us" % [float(Time.get_ticks_usec() - t0) / n])
 		get_tree().quit(0)
 		return
+	if "--physprobe" in OS.get_cmdline_user_args():
+		_phys_probe(local)
+		get_tree().quit(0)
+		return
 	if _profile:
 		_profiler = (load("res://tools/survival_long_run.gd") as GDScript).new()
 		_profiler.set(&"_game", game)
@@ -337,3 +341,47 @@ func _print_perf(game: ZzGame, wall: PackedFloat64Array, phys_ms: float, draws: 
 		"resolution": "%dx%d" % [vp.x, vp.y], "godot": Engine.get_version_info().get("string", "")}))
 
 
+
+
+## --physprobe: static shapes by body and what one capsule overlap query costs near the survivor.
+func _phys_probe(local: Node3D) -> void:
+	var shapes := 0
+	var bodies := 0
+	var procs := {}
+	var stack: Array[Node] = [get_tree().root]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		stack.append_array(n.get_children())
+		if n.is_physics_processing():
+			var sc: Script = n.get_script()
+			var pk := "%s|%s" % [n.get_class(), sc.resource_path.get_file() if sc != null else ""]
+			procs[pk] = int(procs.get(pk, 0)) + 1
+		if n is StaticBody3D:
+			bodies += 1
+			for c in n.get_children():
+				if c is CollisionShape3D:
+					shapes += 1
+	print("PHYSPROBE static_bodies=%d shapes=%d" % [bodies, shapes])
+	print("PHYSPROBE physics_processing ", procs)
+	var space := local.get_world_3d().direct_space_state
+	var cap := CapsuleShape3D.new()
+	cap.radius = 0.4
+	cap.height = 1.8
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = cap
+	q.collision_mask = 0xFFFFF
+	var rng := RandomNumberGenerator.new()
+	var n := 2000
+	var hits := 0
+	var t0 := Time.get_ticks_usec()
+	for i in n:
+		q.transform = Transform3D(Basis(), local.global_position + Vector3(rng.randf_range(-20, 20), 1.0, rng.randf_range(-20, 20)))
+		hits += space.intersect_shape(q, 8).size()
+	print("PHYSPROBE intersect_shape %.1f us/call hits=%d" % [float(Time.get_ticks_usec() - t0) / n, hits])
+	var rayq := PhysicsRayQueryParameters3D.new()
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		rayq.from = local.global_position + Vector3(rng.randf_range(-20, 20), 1.0, rng.randf_range(-20, 20))
+		rayq.to = rayq.from + Vector3(rng.randf_range(-10, 10), 0.0, rng.randf_range(-10, 10))
+		hits += space.intersect_ray(rayq).size()
+	print("PHYSPROBE intersect_ray %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
