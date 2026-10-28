@@ -619,6 +619,10 @@ func _run() -> void:
 			await _crosshair_frames(game, local)
 			get_tree().quit(0)
 			return
+		"stamina":
+			await _stamina_frames(local)
+			get_tree().quit(0)
+			return
 		"firemode":
 			await _fire_mode_frames(game, local)
 			get_tree().quit(0)
@@ -851,6 +855,45 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 			Input.action_release(action)
 		_client.set("_aiming", false)
 		await _seconds_of(0.8)
+
+
+## The stamina bar while sprinting: full, draining to half, empty (exhausted), then recovering
+## (`stamina_<stage>.png`, with the controller's stamina printed): `--view=stamina`.
+func _stamina_frames(local) -> void:
+	local.health.invulnerable = true
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+	var state: DotFpsState = local.controller.state
+	state.stamina = 1.0
+	Input.action_press("dot_fps_forward")
+	Input.action_press("dot_fps_sprint")
+	var hud = _client.get("hud")
+	for stage: String in ["full", "half", "empty"]:
+		var waited := 0.0
+		if stage == "full":
+			while waited < 3.0 and not state.sprinting:
+				await _seconds_of(0.05)
+				waited += 0.05
+		else:
+			while waited < 40.0 and (state.stamina > 0.5 if stage == "half" else not state.stamina_exhausted):
+				await _seconds_of(0.1)
+				waited += 0.1
+		await _stamina_save(dir, stage, state, hud)
+	Input.action_release("dot_fps_sprint")
+	Input.action_release("dot_fps_forward")
+	await _seconds_of(2.0)
+	await _stamina_save(dir, "recovering", state, hud)
+	await _seconds_of(6.0)
+	await _stamina_save(dir, "recovered", state, hud)
+
+
+func _stamina_save(dir: String, stage: String, state: DotFpsState, hud) -> void:
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var bar: Control = hud.stamina_bar
+	print("%s: stamina %.2f exhausted %s sprinting %s bar visible %s rect %s -> %s" % [stage, state.stamina,
+		state.stamina_exhausted, state.sprinting, bar.visible, bar.get_global_rect(),
+		error_string(image.save_png(dir.path_join("stamina_%s.png" % stage)))])
 
 
 ## The fire-mode indicator in each state the held gun offers: `--view=firemode [--weapons=zz_m4]`.
