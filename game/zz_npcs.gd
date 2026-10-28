@@ -896,5 +896,6 @@ static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStr
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
 		",".join(open_gates), str(extra_solids),
+		NAV_OVERHEAD, str(NAV_OVERHEAD_BY_MAP), SLAB_THICK, SLAB_TOP_CUT,
 		float(doc.get("nav", {}).get("spacing", 1.0)), float(doc.get("nav", {}).get("clearance", 0.35)), NAV_COVER_RANGE,
 	])
