@@ -35,6 +35,11 @@ func _run() -> void:
 			_profile = true
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
+	var waited := 0.0
+	while not game.map.world_drawn and str(game.map.doc.get("world", "")) != "" and waited < 400.0:
+		await get_tree().create_timer(1.0).timeout
+		waited += 1.0
+	print("BENCH world_drawn=%s after %.0f s" % [game.map.world_drawn, waited])
 	_load_s = Time.get_ticks_msec() / 1000.0
 	var local = _client.get("player")
 	for player in game.survivors():
