@@ -45,7 +45,7 @@ const CHANNEL := "zz.npcs"
 ## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 8
+const NAV_CACHE_VERSION := 9
 
 ## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
 const NAV_BRIDGE_GAP := 2.5
@@ -723,6 +723,14 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 
 		if not box.has("nav") and _is_floor(bounds, floors):
 			slabs.append(bounds)
+
+			# A wall or a mass whose top meets a floor is still a wall to the floors beside and below it (a cellar wall reaching the ground floor).
+			if bounds.size.y > SLAB_THICK:
+				var body := bounds
+				body.size.y -= SLAB_TOP_CUT
+				builder.add_obstacle(body)
+				solids.append(body)
+
 			continue
 
 		builder.add_obstacle(bounds)
@@ -863,6 +871,11 @@ static func _floor_under(floors: Array, x: float, z: float, y: float) -> float:
 
 
 ## Whether [param bounds] is a floor: its top at a nav floor's height, under that floor.
+## A box taller than this that meets a floor is a wall as well; its top is cut down by SLAB_TOP_CUT so the floor's own surface stays free.
+const SLAB_THICK := 1.0
+const SLAB_TOP_CUT := 0.5
+
+
 static func _is_floor(bounds: AABB, floors: Array) -> bool:
 	var top := bounds.end.y
 

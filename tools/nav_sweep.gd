@@ -3,12 +3,13 @@ extends Node
 ## Builds each map's horde graph and reports the posts and survivor spawns the graph cannot use:
 ## no point within the stand-ins' snap radius ("nopoint"), or a point in a piece the first spawn
 ## cannot reach ("island"). `godot --headless --path . res://tools/nav_sweep.tscn -- --all`
-## or `-- --map=zs_goth_house`. A post or spawn on either list is a place a stand-in idles.
+## or `-- --map=zs_goth_house`. `inwall` and `ontop` count graph points inside a box or on a wall's top (tools/nav_walls.gd). A post or spawn on either list is a place a stand-in idles.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const NavWalls := preload("nav_walls.gd")
 
 const TICK := 1.0 / 64.0
 ## What a stand-in's path start and goal snap to (idle_probe's `_why_empty`).
@@ -181,7 +182,12 @@ func _report(game: Node) -> String:
 				out.append("%s %s %s" % [why, entry[0], at.snapped(Vector3.ONE * 0.1)])
 
 	var tail := "" if out.is_empty() else "  " + "; ".join(out.slice(0, 6))
-	return "points=%d checked=%d bad=%d%s" % [data.point_count(), checked, bad, tail]
+	var walls := NavWalls.count(data, game.horde.nav_doc())
+
+	if walls["inwall"] + walls["ontop"] > 0:
+		tail += "  walls: %s" % [walls["examples"]]
+
+	return "points=%d checked=%d bad=%d inwall=%d ontop=%d%s" % [data.point_count(), checked, bad, walls["inwall"], walls["ontop"], tail]
 
 
 func _graph_ready(game: Node) -> bool:
