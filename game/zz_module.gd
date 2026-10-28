@@ -576,6 +576,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_zombie_think_range", config.think_range,
 		"Scales the distances past which far zombies think and move less often; below 1 is cheaper",
 		func(value: float) -> void: config.think_range = clampf(value, 0.25, 4.0))
+	_tunable("zz_body_stride_near", config.body_stride_near,
+		"Metres past which a zombie's body moves every second tick; lower is cheaper",
+		func(value: float) -> void: config.body_stride_near = clampf(value, 5.0, 500.0))
+	_tunable("zz_body_stride_far", config.body_stride_far,
+		"Metres past which a zombie's body moves every fourth tick; lower is cheaper",
+		func(value: float) -> void: config.body_stride_far = clampf(value, 5.0, 500.0))
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
@@ -1644,6 +1650,7 @@ const HAND_FIELDS := {
 	"zz_specials": "specials_base", "zz_start_grace": "start_grace_seconds", "zz_survival": "survival_style",
 	"zz_survival_warmup": "survival_warmup_seconds", "zz_trader": "trader_enabled",
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
+	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
 }
 
 ## The admin web page and F9 panel over the config; HTTP only with `workbench.enabled` in cfg/server.yml.

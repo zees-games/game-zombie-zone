@@ -82,9 +82,10 @@ const THINK_CLOSE := 6.0
 const THINK_NEAR := 20.0
 const THINK_FAR := 45.0
 
-## Metres from the nearest survivor past which its body moves every second tick, twice as far
-## (`ZzZombieBody.stride`). The mall at wave 10 had a third of its crowd past this.
-const BODY_STRIDE_FROM := 30.0
+## Metres from the nearest survivor past which its body moves every second tick, every fourth past
+## `BODY_STRIDE_FAR_FROM` (`ZzZombieBody.stride`). Fallbacks for `ZzConfig.body_stride_*`.
+const BODY_STRIDE_FROM := 20.0
+const BODY_STRIDE_FAR_FROM := 45.0
 
 
 func _npc_ready() -> void:
@@ -509,7 +510,9 @@ func _think_every() -> int:
 		_nearest = float(h.call(&"nearest_survivor_distance", npc.position())) / scale
 		var b := body()
 		if b != null:
-			b.set_stride(1 if _nearest < BODY_STRIDE_FROM else 2)
+			var near := float(config.body_stride_near) if config != null else BODY_STRIDE_FROM
+			var far := float(config.body_stride_far) if config != null else BODY_STRIDE_FAR_FROM
+			b.set_stride(1 if _nearest < near else (2 if _nearest < far else 4))
 
 	# Within reach of a swing or the ring round somebody, every tick; a run at somebody from
 	# further off, every second tick (its body still moves every tick), every third past twenty

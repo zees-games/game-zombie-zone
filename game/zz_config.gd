@@ -276,6 +276,11 @@ func setup_seconds() -> float:
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
 @export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
 
+## Metres to the nearest survivor past which a zombie's body moves every second tick (before `think_range`). `zz_body_stride_near`.
+@export_range(5.0, 500.0, 1.0) var body_stride_near: float = 20.0
+## Metres past which a zombie's body moves every fourth tick. `zz_body_stride_far`.
+@export_range(5.0, 500.0, 1.0) var body_stride_far: float = 45.0
+
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per
 ## catch-up step. 0 keeps it on every step (servers and headless runs always do).
