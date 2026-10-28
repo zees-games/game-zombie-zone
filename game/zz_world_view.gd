@@ -604,7 +604,7 @@ func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 	if kind == &"beam_zap" or kind == &"beam_pull":
 		var zap := kind == &"beam_zap"
 		var _beam := DotFxBeam.zap(self, from, from + velocity,
-			Color(0.5, 0.85, 1.0) if zap else Color(0.9, 0.5, 1.0), 0.25, 0.12 if zap else 0.07)
+			Color(0.5, 0.85, 1.0) if zap else Color(0.9, 0.5, 1.0), 0.25, 0.3 if zap else 0.2)
 		if audio != null:
 			var _zzt := audio.cue_at(&"mutant", &"zap" if zap else &"grab", from)
 		return
@@ -914,6 +914,8 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 					var _c := audio.cue_at(entry["kind"], &"attack", at)
 				ZzZombieBody.Anim.THROW when entry["kind"] == &"mutant":
 					var _t := audio.cue_at(&"mutant", &"throw", at)
+				ZzZombieBody.Anim.FLY when entry["kind"] == &"mutant" and last != ZzZombieBody.Anim.CHARGE_UP:
+					var _j := audio.cue_at(&"mutant", &"jet", at)
 				ZzZombieBody.Anim.LEAP, ZzZombieBody.Anim.CHARGE, ZzZombieBody.Anim.VOMIT, \
 						ZzZombieBody.Anim.SPIT, ZzZombieBody.Anim.TONGUE, ZzZombieBody.Anim.THROW, \
 						ZzZombieBody.Anim.SCREAM, ZzZombieBody.Anim.GRAB:

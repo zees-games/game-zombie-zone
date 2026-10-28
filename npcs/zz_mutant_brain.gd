@@ -31,6 +31,7 @@ var _recover_until: float = 0.0
 var _angry: bool = false
 var _known_parts: int = 0
 var _thrown: Array[Dictionary] = []
+var _enraged_until: float = 0.0
 
 
 func _build() -> void:
@@ -66,7 +67,7 @@ func _decide(delta: float) -> void:
 		return
 
 	_watch_parts()
-	_angry = npc.health_fraction() < tune(&"angry_health", 0.4) or _known_parts != 0
+	_angry = npc.health_fraction() < tune(&"angry_health", 0.4) or _known_parts != 0 or now() < _enraged_until
 
 	victim = choose_victim()
 
@@ -121,6 +122,15 @@ func _watch_parts() -> void:
 				go(WALK)
 
 	_known_parts = gone
+
+
+## Takes off now and stays angry for [param seconds] (a tool or test that wants the airborne look).
+func take_flight(seconds: float = 30.0) -> void:
+	_enraged_until = now() + seconds
+	_flight_until = now() + seconds
+	_flight_ready_at = 0.0
+	hover.fuel = hover.fuel_max
+	go(FLY)
 
 
 # --- Walking ---------------------------------------------------------------------------------
