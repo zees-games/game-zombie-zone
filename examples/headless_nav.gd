@@ -972,7 +972,7 @@ func _horde(id: StringName, spread: bool) -> Dictionary:
 
 	for i in maxi(game.team_size(), TEAM):
 		var p := game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
-		p.is_bot = true
+		p.is_bot = false  # idle: a bot shoots, and the wave then dies at the first choke it meets
 		p.health.invulnerable = true
 
 	game.start()
