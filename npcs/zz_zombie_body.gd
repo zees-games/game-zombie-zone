@@ -32,8 +32,6 @@ const FLAG_MOB := 4
 const FLAG_STARTLED := 8
 const FLAG_BILED := 16
 
-const CHANNEL := "zz.zombie"
-
 ## A limb came off (the server's shot, or a mirror told by [member limb_mask]).
 signal limb_severed(limb: StringName, info: Dictionary)
 

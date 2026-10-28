@@ -6,7 +6,6 @@ const ZzWeapons := preload("zz_weapons.gd")
 ##
 ## The catalogue is built from the weapons the game has (every pack), the supplies and the box types, then bent by the `game: shop:` block of `dot_weapon/spawner.yml` (docs/operators.md): `menu`, `radius`, `price_multiplier`, `categories`, `disabled`, `items`, `supplies`, `boxes`, `ammo`. A client is sent the list as JSON and asks to buy by id; the price and the reach are decided here, never on the client.
 
-const CHANNEL := "zz.shop"
 const DEFAULT_CATEGORIES: Array = ["weapons", "grenades", "ammo", "supplies", "entities"]
 const MAX_ITEMS := 400
 

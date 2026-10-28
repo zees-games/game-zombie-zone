@@ -26,8 +26,6 @@ const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
 ## plays when it appears and when it uses what it has. The sleeper's crying is a loop that
 ## follows her, so it is louder the closer you are, which is the only warning she gives.
 
-const CHANNEL := "zz.world_view"
-
 ## Seconds a killed zombie's body stays before it sinks away, when nothing gave the rules.
 const CORPSE_SECONDS := 6.0
 

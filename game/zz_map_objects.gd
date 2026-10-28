@@ -5,8 +5,6 @@ const ZzLoot := preload("zz_loot.gd")
 ## What a map's `spawn_object` event (a breakable's `spawnobject` key) may leave lying. The key is untrusted map data: only
 ## the numbers below do anything, each lays one ordinary loot entry, and the counts are capped.
 
-const CHANNEL := "zz.map_objects"
-
 ## spawnobject -> [loot kind, ammo fraction]. The list is the breakable's menu in the order the map editor shows it: 2 a
 ## health kit, 3 to 9 the ammunition boxes. Everything else (a battery, a weapon, an out-of-range number) does nothing.
 const OBJECTS := {

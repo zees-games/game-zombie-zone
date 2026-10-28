@@ -15,8 +15,6 @@ const ZzWeapons := preload("zz_weapons.gd")
 ## reach, which is the genre's way: walking over a shotgun in a fight and swapping your rifle for
 ## it without meaning to is the thing nobody wants.
 
-const CHANNEL := "zz.loot"
-
 const WEAPON := &"weapon"
 const AMMO := &"ammo"
 const MEDKIT := &"medkit"
