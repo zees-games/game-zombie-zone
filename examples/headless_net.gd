@@ -32,8 +32,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 28
-const CHECKS := 190
+const SECTIONS := 29
+const CHECKS := 194
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -93,6 +93,7 @@ func _run() -> void:
 		await _test_a_downed_crawl_is_predicted()
 		await _test_crouch_reaches_both_ends()
 		await _test_the_ads_rules_cross_to_the_client()
+		_test_the_view_feel_crosses_to_the_client()
 		await _test_a_pin_reaches_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
@@ -907,6 +908,21 @@ func _test_the_ads_rules_cross_to_the_client() -> void:
 	_check(is_equal_approx(server_me.weapons.ads_move_scale(), 1.0), "letting go of the sights restores full pace")
 	var _d := server_rules.adopt_wire(kept)
 	var _e := client_rules.adopt_wire(kept)
+	_finished()
+
+
+func _test_the_view_feel_crosses_to_the_client() -> void:
+	_section("cl_vm_kick and the other view feel cvars reach the client")
+	var rules := _client_game.feel_rules
+	var link := FakeLink.new()
+	link.held[ZeeViewFeel.CVAR_KICK] = "2.5"
+	_check(rules.follow_cvars(link), "a client follows the server's view feel cvars")
+	_check(is_equal_approx(rules.kick, 2.5), "cl_vm_kick is followed", str(rules.kick))
+	link.replicated_cvar_changed.emit(ZeeViewFeel.CVAR_KICK, "0")
+	_check(is_equal_approx(rules.kick, 0.0), "and 0 disables the kick", str(rules.kick))
+	link.replicated_cvar_changed.emit(ZeeViewFeel.CVAR_KICK, "4")
+	_check(is_equal_approx(rules.kick, 0.0), "a value over the max of 3 is refused", str(rules.kick))
+	rules.kick = 1.0
 	_finished()
 
 

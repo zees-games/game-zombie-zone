@@ -309,6 +309,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# mp_vm_* and cl_vm_kick: the view model's feel, drawn on each client, hence REPLICATED.
+	var _feel := world.feel_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# Spread, recoil, sprint and stamina: the server's shot, and a client's prediction and view, read the same numbers.
 	world.combat_feel.bind_cvars(add_cvar)
 

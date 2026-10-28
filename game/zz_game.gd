@@ -352,6 +352,9 @@ var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 
+## The view model's motion amounts: zee-dot-weapons' `mp_vm_*` cvars and `cl_vm_kick` (REPLICATED). The client's view model is handed this object, so one cvar change reaches the drawn hands.
+var feel_rules: ZeeViewFeel = ZeeViewFeel.new()
+
 ## Movement-dependent spread, recoil patterns, sprint and stamina (`sv_spread*`, `sv_recoil*`, `sv_sprint*`, `sv_stamina*`, REPLICATED, on here) and the `cl_crosshair_*` cvars: dot-game's opt-in.
 var combat_feel: DotGameCombatFeel = DotGameCombatFeel.new(true)
 
