@@ -855,6 +855,13 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 			Input.action_release(action)
 		_client.set("_aiming", false)
 		await _seconds_of(0.8)
+	# Dead: the crosshair must be gone (DotCrosshair.alive_source), the rest of the HUD stays.
+	local.health.alive = false
+	await _seconds_of(0.5)
+	await RenderingServer.frame_post_draw
+	var dead_path := dir.path_join("crosshair_dead.png")
+	print("dead: crosshair shown %s -> %s" % [_client.get("hud")._crosshair.is_shown(),
+		error_string(get_viewport().get_texture().get_image().save_png(dead_path))])
 
 
 ## The stamina bar while sprinting: full, draining to half, empty (exhausted), then recovering

@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 53
 
-const CHECKS := 409
+const CHECKS := 411
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2910,6 +2910,16 @@ func _test_the_hud() -> void:
 		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
 	hud.set_aim(0.0, false)
+	var cross: Control = hud._crosshair
+	var hides := DotAddonApi.build_level("dot_ui") >= 14
+	if hides:
+		cross.call(&"_process", 0.016)
+	_check(not hides or bool(cross.call(&"is_shown")), "the crosshair is drawn while the survivor lives")
+	me.health.alive = false
+	if hides:
+		cross.call(&"_process", 0.016)
+	_check(not hides or not bool(cross.call(&"is_shown")), "and gone once they are dead (alive_source)")
+	me.health.alive = true
 	_check_requires()
 	await _check_killcam_time()
 

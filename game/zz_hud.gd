@@ -1106,6 +1106,9 @@ func _make_crosshair() -> Control:
 		var cross := (shape as GDScript).new() as Control
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Dead or spectating: nothing in hand to aim (dot-ui API 14; older ones ignore the property).
+		if DotAddonApi.build_level("dot_ui") >= 14:
+			cross.set(&"alive_source", func() -> bool: return player != null and player.is_alive() and not player.watching)
 		return cross
 
 	var dot := ColorRect.new()
