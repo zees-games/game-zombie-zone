@@ -23,6 +23,10 @@ var _anim := 0
 var _speed := 0.0
 var _pos := Vector3.ZERO
 var _skeleton: Skeleton3D = null
+var _parts: Array[Node3D] = []
+var _last_places: Array[Vector3] = []
+var _worst_hop := 0.0
+var _worst_at := 0.0
 var _log: Array[String] = []
 var _zombie_script: GDScript = null
 
@@ -112,14 +116,25 @@ func _set_up() -> void:
 			other.call("place_at", stand + Vector3(0.0, 0.0, 400.0), 0.0)
 	if _view == "tp":
 		_client.call("toggle_view")
+		_camera = Camera3D.new()
+		_camera.fov = 50.0
+		root.add_child(_camera)
+		_camera.make_current()
 	_time = -0.3
 	_start_frame = _all
+
+
+## Everything the client draws on a canvas, hidden every frame (a banner or cover can reappear).
+func _hide_overlays() -> void:
+	for layer in _client.find_children("*", "CanvasLayer", true, false):
+		(layer as CanvasLayer).visible = false
 	var hud: Object = _client.get("hud")
 	if hud != null:
 		hud.visible = false
 
 
 func _survivor_frame() -> void:
+	_hide_overlays()
 	var live := _time >= 0.0
 	var state := _clip.state_at(maxf(_time, 0.0))
 	var want: Array = state["buttons"] if live else []
@@ -134,15 +149,46 @@ func _survivor_frame() -> void:
 	if not live:
 		return
 	var feet: Vector3 = _local.call("feet")
+	if _view == "fp":
+		_first_person_sample(feet)
+		return
+	# Own camera: the game's chase view crops the legs and the death cuts to the spectate view.
+	_camera.look_at_from_position(feet + Vector3(3.2, 1.4, 2.0), feet + Vector3(0.0, 0.85, 0.0))
+	_camera.make_current()
 	var sample := _metrics.pose_sample(_time, _find_skeleton(_local.get("figure")), feet, true)
-	var cam: Camera3D = _client.get("camera")
-	if _view == "tp" and cam != null:
-		var points: Array[Vector2] = []
-		for spot: Vector3 in [feet, feet + Vector3(0.0, 1.6, 0.0)]:
-			points.append(_unit(cam, spot))
-		sample["points"] = points
+	var points: Array[Vector2] = []
+	for spot: Vector3 in [feet, feet + Vector3(0.0, 1.6, 0.0)]:
+		points.append(_unit(_camera, spot))
+	sample["points"] = points
 	_metrics.add(sample)
 	_log.append("%.2f pos=(%.1f,%.1f,%.1f) %s" % [_time, feet.x, feet.y, feet.z, str(sample.get("points", ""))])
+
+
+## The hands and weapon in the eye's frame: their rotations feed the bone-pop check and the
+## largest hop of any part's position is the "view_pop" row (the body is hidden in first person).
+func _first_person_sample(feet: Vector3) -> void:
+	var cam: Camera3D = _client.get("camera")
+	var model: Node = _client.get("view_model")
+	if cam == null or model == null:
+		return
+	if _parts.is_empty() or _parts.any(func(n: Node3D) -> bool: return not is_instance_valid(n)):
+		_parts.assign(model.find_children("*", "Node3D", true, false))
+		_last_places.clear()
+	var inverse := cam.global_transform.affine_inverse()
+	var rotations: Array = []
+	var places: Array[Vector3] = []
+	for part: Node3D in _parts:
+		var local := inverse * part.global_transform
+		rotations.append(local.basis.get_rotation_quaternion())
+		places.append(local.origin)
+	_metrics.add({"t": _time, "root": feet, "ground_y": feet.y, "grounded": true, "rotations": rotations})
+	if not _last_places.is_empty() and _last_places.size() == places.size():
+		for i in places.size():
+			var hop := places[i].distance_to(_last_places[i])
+			if hop > _worst_hop:
+				_worst_hop = hop
+				_worst_at = _time
+	_last_places = places
 
 
 func _actions(move: Array, want: Array) -> void:
@@ -223,7 +269,12 @@ func _finish() -> bool:
 	var label: String = _clip.name if _zombie != null else "%s_%s" % [_clip.name, _view]
 	var limits := DotClipMetrics.limits_for("res://tools/filmstrip_thresholds.json", _clip.name)
 	print("FILMSTRIP_CLIP start_frame=%d frames=%d" % [_start_frame, _all - _start_frame])
-	var text := DotClipMetrics.table(label, _metrics.evaluate(limits))
+	var rows := _metrics.evaluate(limits)
+	if _view == "fp" and _zombie == null:
+		var cap := float(limits.get("view_hop_m", 0.15))
+		rows.append({"check": "view_pop", "pass": _worst_hop <= cap, "value": "%.3f" % _worst_hop, "limit": "%.3f" % cap,
+			"note": "m, largest hop of a hand or weapon part between frames (eye frame), at %.2f s; %d parts" % [_worst_at, _parts.size()]})
+	var text := DotClipMetrics.table(label, rows)
 	print(text)
 	DotClipMetrics.write_report("res://screenshots/filmstrip/%s_report.txt" % label, text, _log)
 	return true

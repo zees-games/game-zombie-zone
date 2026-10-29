@@ -1,5 +1,5 @@
 {
-  "defaults": {"subject": "survivor", "views": ["fp", "tp"], "spawn": [0.0, 0.05, 14.0], "spawn_yaw": 180.0},
+  "defaults": {"subject": "survivor", "views": ["fp", "tp"], "spawn": [0.0, 0.05, 14.0], "spawn_yaw": 0.0},
   "clips": [
     {"name": "walk", "duration": 4.0, "steps": [{"t": 0.0, "move": [0.0, 0.0]}, {"t": 0.5, "move": [0.0, -1.0], "buttons": ["walk"]}]},
     {"name": "sprint", "duration": 4.0, "steps": [{"t": 0.0, "move": [0.0, 0.0]}, {"t": 0.5, "move": [0.0, -1.0], "buttons": ["sprint"]}]},
