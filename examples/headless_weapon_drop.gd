@@ -144,7 +144,7 @@ func _test_rules() -> void:
 
 func _test_wire() -> void:
 	_section("wire: the action bit drops through the tick, and the key is bound")
-	_check(ZzNetCommand.ACT_DROP == 512 and ZzNetCommand.ACT_BITS == 10, "ACT_DROP is bit 9")
+	_check(ZzNetCommand.ACT_DROP == 512 and ZzNetCommand.ACT_BITS == 12, "ACT_DROP is bit 9")
 	var game := await _solo()
 	var p := game.survivors()[0]
 	var ars := p.weapons.arsenal

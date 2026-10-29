@@ -226,7 +226,8 @@ func _crouch() -> void:
 		await _seconds(0.6)
 		# The eye eases down by frames, so a slow renderer needs longer than 0.6 s of wall time.
 		for _w in 20:
-			if cam.global_position.y - local.controller.state.position.y < base_eye - 0.3:
+			if cam.global_position.y - local.controller.state.position.y < base_eye - 0.3 \
+					and local.controller.state.crouch_fraction > 0.99:
 				break
 			await _seconds(0.25)
 		var eye: float = cam.global_position.y - local.controller.state.position.y
@@ -238,6 +239,10 @@ func _crouch() -> void:
 		await _shot("crouch_1_%s" % pair[1])
 		_key(pair[0], false)
 		await _seconds(0.6)
+		for _w in 20:
+			if absf(cam.global_position.y - local.controller.state.position.y - base_eye) < 0.05:
+				break
+			await _seconds(0.25)
 		var up: float = cam.global_position.y - local.controller.state.position.y
 		_ok(absf(up - base_eye) < 0.05, "%s released: standing again" % pair[1], "%.2f" % up)
 
