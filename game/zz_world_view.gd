@@ -458,6 +458,25 @@ func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: 
 			node.add_child(light)
 		&"heal":
 			colour = Color(0.3, 1.0, 0.45, 0.3)
+		&"flash":
+			var burst := OmniLight3D.new()
+			burst.light_color = Color(1.0, 1.0, 0.95)
+			burst.omni_range = radius
+			burst.light_energy = 16.0
+			burst.position.y = 1.2
+			node.add_child(burst)
+			_hazards[id] = node
+			return
+		&"smoke":
+			var cloud := _particles(Color(0.75, 0.75, 0.75), radius, 36)
+			cloud.lifetime = 3.5
+			cloud.gravity = Vector3(0.0, 0.3, 0.0)
+			cloud.scale_amount_min = 2.0
+			cloud.scale_amount_max = 4.0
+			(cloud.mesh as QuadMesh).size = Vector2(1.5, 1.5)
+			node.add_child(cloud)
+			_hazards[id] = node
+			return
 		&"goo", &"goo_trail":
 			colour = Color(0.02, 0.02, 0.04, 0.85)
 			if kind == &"goo" and audio != null:

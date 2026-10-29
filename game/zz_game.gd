@@ -15,6 +15,7 @@ const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzWeaponDrop := preload("zz_weapon_drop.gd")
+const ZzGrenades := preload("zz_grenades.gd")
 const ZzConsumables := preload("zz_consumables.gd")
 const ZzCrates := preload("zz_crates.gd")
 const ZzDrops := preload("zz_drops.gd")
@@ -255,6 +256,8 @@ var turrets: ZzTurrets = null
 var loot: ZzLoot = null
 ## The drop-weapon key (Q): see [ZzWeaponDrop].
 var weapon_drop := ZzWeaponDrop.new(self)
+## arena-weapons' thrown grenades, when that pack is mounted.
+var grenades := ZzGrenades.new(self)
 ## Pills and medkits: slots, stack limits, use times, healing and handing over a friend.
 var consumables := ZzConsumables.new(self)
 
@@ -1708,6 +1711,7 @@ func _on_round_started(number: int) -> void:
 		pins.clear()
 	if hazards != null:
 		hazards.clear()
+	grenades.clear()
 	if turrets != null:
 		turrets.clear()
 	if loot != null:
@@ -3894,6 +3898,11 @@ func _advance_weapons() -> void:
 ## anything else explosive is a grenade on its fuse, or on contact without one.
 func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
 	var def := ZzWeapons.def_of(spawn.id)
+
+	if grenades.handles(def):
+		grenades.throw(player, spawn, def)
+		return
+
 	var tags: Array = def.tags if def != null else []
 	var amount := spawn.splash_damage if spawn.splash_damage > 0.0 else spawn.damage
 	var kind := ZzHazards.GRENADE
@@ -4063,6 +4072,7 @@ func _step(delta: float) -> void:
 			pins.advance(delta)
 		if hazards != null:
 			hazards.tick(delta)
+			grenades.tick()
 		if turrets != null:
 			turrets.tick(delta)
 		if boxes != null:
