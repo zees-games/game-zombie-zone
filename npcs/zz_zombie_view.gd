@@ -1243,7 +1243,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 			if clip == &"walk" and _gait == GAIT_SHAMBLE:
 				var sh := shamble_numbers(_look)
 				# Shorter steps are taken a little quicker to keep the feet near the ground's pace.
-				rate = clampf(_speed / (natural * lerpf(1.0, float(sh["swing"]), 0.5)), 0.35, float(sh["cadence"]) * (1.4 if kind == &"common" else 1.0))
+				rate = clampf(_speed / (natural * lerpf(1.0, float(sh["swing"]), 0.15 if kind == &"common" else 0.5)), 0.35, float(sh["cadence"]) * (1.6 if kind == &"common" else 1.0))
 			else:
 				rate = clampf(_speed / natural, 0.7, 1.8)
 

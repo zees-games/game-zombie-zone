@@ -13,7 +13,8 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const STEP := 1.0 / 30.0
 const COLS := 7
-const EVERY := 8
+var _every := 8
+var _first := 30
 
 var _speeds: PackedFloat64Array = [1.1, 2.2, 6.3]
 var _out := "res://screenshots/gait.png"
@@ -34,6 +35,10 @@ func _initialize() -> void:
 			_kind = StringName(arg.trim_prefix("--kind="))
 		elif arg.begins_with("--variant="):
 			_variant = int(arg.trim_prefix("--variant="))
+		elif arg.begins_with("--every="):
+			_every = int(arg.trim_prefix("--every="))
+		elif arg.begins_with("--first="):
+			_first = int(arg.trim_prefix("--first="))
 		elif arg == "--run-state":
 			_anim = ZzZombieBody.Anim.RUN
 
@@ -80,7 +85,7 @@ func _process(_delta: float) -> bool:
 	# view's position, so each frame it is put one step on, drawn, and put back in its cell.
 	for r in _speeds.size():
 		for c in COLS:
-			if _frames > 30 + c * EVERY:
+			if _frames > _first + c * _every:
 				continue
 
 			var view := _views[r * COLS + c]
@@ -89,10 +94,12 @@ func _process(_delta: float) -> bool:
 			view.present(STEP, _anim, 0)
 			view.global_position = home
 
-	if _frames == 30 + (COLS - 1) * EVERY + 2:
+	if _frames == _first + (COLS - 1) * _every + 2:
 		var image := get_root().get_texture().get_image()
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_out.get_base_dir()))
 		image.save_png(_out)
+		var probe := _views[0]
+		print("clip ", probe._clip, " length ", probe._anim.current_animation_length if probe._anim != null else -1.0)
 		print("wrote ", _out)
 		quit()
 		return true
