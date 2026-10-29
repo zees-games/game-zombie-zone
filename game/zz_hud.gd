@@ -959,7 +959,7 @@ func _draw_use() -> void:
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}.get(player.using, "")
+		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"pills": "Taking a pill — hold still…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"

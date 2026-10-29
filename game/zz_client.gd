@@ -2034,13 +2034,13 @@ func _actions() -> int:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
 		out |= ZzNetCommand.ACT_AIM
-	return out
 	if _give_pills_ticks > 0:
 		_give_pills_ticks -= 1
 		out |= ZzNetCommand.ACT_GIVE_PILLS
 	if _give_kit_ticks > 0:
 		_give_kit_ticks -= 1
 		out |= ZzNetCommand.ACT_GIVE_KIT
+	return out
 
 
 # --- The frame -------------------------------------------------------------
@@ -2736,11 +2736,11 @@ func _key_event(event: InputEvent) -> bool:
 		_slot = 0
 		return true
 
-	if event.is_action_pressed(ZzBindings.FIRE_MODE):
 	if event.is_action_pressed(ZzBindings.GIVE_PILLS):
 		_give_pills_ticks = 3
 	if event.is_action_pressed(ZzBindings.GIVE_KIT):
 		_give_kit_ticks = 3
+	if event.is_action_pressed(ZzBindings.FIRE_MODE):
 		_fire_mode_ticks = 3
 		# Offline the world's arsenal is this one and the server path cycles it.
 		if not _offline and weapons != null and weapons.arsenal != null:
