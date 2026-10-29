@@ -174,6 +174,12 @@ const LOOKS := {
 }
 
 ## Which clip an animation state plays, and how fast.
+const GAIT_SHAMBLE := &"shamble"
+const GAIT_RUN := &"run"
+## A look's `gait` key overrides these: below `shamble_below` m/s the body shambles (the walk clip
+## at its real speed, stiff and dragging), from `run_from` it runs; between, it keeps what it did.
+const GAIT := {"shamble_below": 2.7, "run_from": 3.1}
+
 const CLIPS := {
 	ZzZombieBody.Anim.IDLE: [&"idle", 1.0],
 	ZzZombieBody.Anim.WALK: [&"walk", 1.0],
@@ -301,6 +307,8 @@ var _drip: CPUParticles3D = null
 var _last_at: Vector3 = Vector3.INF
 var _last_y: float = 0.0
 var _speed: float = 0.0
+var _gait: StringName = GAIT_SHAMBLE
+var _shamble: float = 0.0
 var _climb: float = 0.0
 var _dead_for: float = -1.0
 var _owed: float = 0.0
@@ -1088,6 +1096,20 @@ func _make_drip() -> CPUParticles3D:
 
 # --- The frame -----------------------------------------------------------------------------------
 
+## The locomotion style for a body moving at [param speed] m/s that was last in [param prior]; a
+## look's [param gait] overrides [constant GAIT]. Hysteresis keeps a body at the edge from flickering.
+static func gait_for(speed: float, prior: StringName, gait: Dictionary = {}) -> StringName:
+	var below := float(gait.get("shamble_below", GAIT["shamble_below"]))
+	var from := float(gait.get("run_from", GAIT["run_from"]))
+
+	if speed < below:
+		return GAIT_SHAMBLE
+	if speed >= from:
+		return GAIT_RUN
+
+	return prior
+
+
 ## One frame: the clip for [param anim], the pose over it, and the flags drawn.
 func present(delta: float, anim: int, flags: int) -> void:
 	if _model == null:
@@ -1109,11 +1131,24 @@ func present(delta: float, anim: int, flags: int) -> void:
 	var wanted: Array = CLIPS.get(anim, CLIPS[ZzZombieBody.Anim.IDLE])
 	var clip: StringName = wanted[0]
 	var rate := float(wanted[1])
+	var moving := false
 
 	# A moving zombie whose state says idle (a mirror between states) walks rather than slides.
 	if (anim == ZzZombieBody.Anim.IDLE or anim == ZzZombieBody.Anim.RAGE) and _speed > 0.6:
-		clip = &"walk" if _speed < 3.0 else &"run_arms"
+		clip = &"walk"
 		rate = 1.0
+		moving = true
+
+	# Walking, shambling and running are told apart by how fast the body really moves, not by the
+	# brain's state: a chase at 2 m/s is still a shamble, and a run cycle slowed to fit is the
+	# "weird running" the players saw.
+	if moving or anim == ZzZombieBody.Anim.WALK or anim == ZzZombieBody.Anim.RUN or anim == ZzZombieBody.Anim.SHAMBLE:
+		if _speed > 0.2:
+			_gait = gait_for(_speed, _gait, _look.get("gait", {}))
+			clip = &"walk" if _gait == GAIT_SHAMBLE else &"run_arms"
+		elif anim == ZzZombieBody.Anim.RUN:
+			clip = &"walk"
+			_gait = GAIT_SHAMBLE
 
 	# Off the ground and going up or falling fast: a climb, a leap, a drop from a ledge.
 	if anim != ZzZombieBody.Anim.DEAD and anim != ZzZombieBody.Anim.LEAP and absf(_climb) > 2.5:
@@ -1153,7 +1188,9 @@ func present(delta: float, anim: int, flags: int) -> void:
 		var natural := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}[clip] as float
 		natural *= float(_look["height"]) / 1.75
 		if _speed > 0.2 and rate > 0.0:
-			rate = clampf(_speed / natural, 0.5, 1.8)
+			rate = clampf(_speed / natural, 0.35, 1.15) if clip == &"walk" and _gait == GAIT_SHAMBLE else clampf(_speed / natural, 0.7, 1.8)
+
+	_shamble = move_toward(_shamble, 1.0 if clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
 
 	_play(clip, rate)
 
@@ -1244,6 +1281,9 @@ func _pose(anim: int) -> void:
 
 	var head: int = _bones.get(&"Head", -1)
 
+	if _shamble > 0.01 and anim != ZzZombieBody.Anim.DEAD:
+		_pose_shamble()
+
 	if anim == ZzZombieBody.Anim.STRIKE_DOWN:
 		_pose_ground_strike()
 	elif anim == ZzZombieBody.Anim.ATTACK and _look.get("clips", {}).get(&"attack", &"") == &"crawl":
@@ -1275,6 +1315,40 @@ func _pose(anim: int) -> void:
 			_skeleton.set_bone_pose_rotation(spine, Quaternion(Vector3(-1.0, 0.0, _flinch_side * 0.4).normalized(), snap) * _skeleton.get_bone_pose_rotation(spine))
 		if head >= 0:
 			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
+
+
+## The shamble over the walk clip: head hung forward and lolling, back bent, one arm or both
+## reaching, knees stiff and one foot dragging, the whole body rolling with each step.
+func _pose_shamble() -> void:
+	var k := _shamble
+	var length := maxf(_anim.current_animation_length, 0.01) if _anim != null else 1.0
+	var phase := (_anim.current_animation_position / length) if _anim != null else 0.0
+	var roll := sin(phase * TAU)
+	var drag := &".L" if (variant & 2) != 0 else &".R"
+	var reach := (variant & 1) != 0
+
+	_pitch(&"Abdomen", 0.16 * k)
+	_pitch(&"Torso", 0.2 * k)
+	_pitch(&"Head", 0.3 * k)
+
+	var torso: int = _bones.get(&"Torso", -1)
+
+	if torso >= 0:
+		_skeleton.set_bone_pose_rotation(torso, Quaternion(Vector3.FORWARD, roll * 0.14 * k) * _skeleton.get_bone_pose_rotation(torso))
+
+	var head: int = _bones.get(&"Head", -1)
+
+	if head >= 0:
+		_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.FORWARD, (0.3 * k) * sin(phase * TAU * 0.5 + float(variant))) * _skeleton.get_bone_pose_rotation(head))
+
+	for side in [&".L", &".R"]:
+		_pitch(StringName("UpperArm" + side), (0.9 if reach else 0.25) * k)
+		_pitch(StringName("LowerArm" + side), (0.5 if reach else 0.2) * k)
+		_pitch(StringName("LowerLeg" + side), -0.1 * k)
+
+	# The dragged leg: the thigh held back and the shin left trailing.
+	_pitch(StringName("UpperLeg" + drag), -0.28 * k)
+	_pitch(StringName("LowerLeg" + drag), 0.35 * k)
 
 
 ## How far into the blow it is: 0 at rest, rising to 1 on the swing's landing frame.

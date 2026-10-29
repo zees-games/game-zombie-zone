@@ -1652,7 +1652,7 @@ func _test_what_zombies_look_like() -> void:
 		common.present(0.05, state, 0)
 		picked.append(String(common.clip()))
 	crawler.present(0.05, ZzZombieBody.Anim.RUN, 0)
-	_check(picked == ["walk", "run_arms", "attack", "hit"], "a state picks its clip", ", ".join(picked))
+	_check(picked == ["walk", "walk", "attack", "hit"], "a state picks its clip (a run state standing still is a walk, the gait follows the speed)", ", ".join(picked))
 	_check(crawler.clip() == &"crawl", "and a crawler crawls whatever it is doing", String(crawler.clip()))
 	common.die(&"headshot_launch", Vector3(0, 0, -1.5), 3)
 	for i in 30:
