@@ -1243,16 +1243,23 @@ func present(delta: float, anim: int, flags: int) -> void:
 			if clip == &"walk" and _gait == GAIT_SHAMBLE:
 				var sh := shamble_numbers(_look)
 				# Shorter steps are taken a little quicker to keep the feet near the ground's pace.
-				rate = clampf(_speed / (natural * lerpf(1.0, float(sh["swing"]), 0.5)), 0.35, float(sh["cadence"]))
+				rate = clampf(_speed / (natural * lerpf(1.0, float(sh["swing"]), 0.5)), 0.35, float(sh["cadence"]) * (1.4 if kind == &"common" else 1.0))
 			else:
 				rate = clampf(_speed / natural, 0.7, 1.8)
 
 	_shamble = move_toward(_shamble, 1.0 if clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
 
 	# Each common keeps its own tempo (plus or minus 15%) so a crowd does not step together.
+	_ual = false
+
 	if kind == &"common" and UAL_FOR.has(clip) and _anim != null and _anim.has_animation(_qualified(UAL_FOR[clip])):
 		clip = UAL_FOR[clip]
 		rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
+		_ual = true
+
+		if striking and clip == &"ual_zombie_scratch":
+			# The free scratch clip is 1.8 s: played at this rate one swing is one whole windup, strike and recovery.
+			rate = 1.8 / SWING_PERIOD
 
 	_play(clip, rate)
 
@@ -1408,6 +1415,9 @@ func _pitch_limb(bone: String, angle: float) -> void:
 
 ## The shamble over the walk clip: stooped, head hung and lolling, short uneven steps with one foot
 ## dragged, the torso and hips rolling with each step. Numbers are per look ([constant SHAMBLE]).
+var _ual := false
+
+
 func _pose_shamble() -> void:
 	var k := _shamble
 	var n := shamble_numbers(_look)
@@ -1417,6 +1427,10 @@ func _pose_shamble() -> void:
 	var drag := ".L" if (variant & 2) != 0 else ".R"
 	var reach := (variant & 1) != 0
 	var swing := lerpf(1.0, float(n["swing"]), k)
+
+	if _ual:
+		# The free clip already has a full stride; the made clip's cut-down would shorten it to a shuffle.
+		swing = lerpf(1.0, swing, 0.3)
 
 	# Legs first: the clip's stride cut short, the dragged leg nearly still.
 	for side in [".L", ".R"]:

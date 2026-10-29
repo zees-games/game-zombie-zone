@@ -63,13 +63,13 @@ func _test_view() -> void:
 	print("a common told to RUN at a walking pace draws the shamble; at a run it draws the run")
 	var slow := _drive(1.1, 1.5)
 	_check(slow._gait == ZzZombieView.GAIT_SHAMBLE, "at 1.1 m/s the gait is the shamble")
-	_check(slow._clip == &"walk", "at 1.1 m/s the clip is the walk, not the run cycle slowed down")
+	_check(slow._clip in [&"walk", ZzZombieView.UAL_FOR[&"walk"]], "at 1.1 m/s the clip is the walk, not the run cycle slowed down")
 	_check(slow._shamble > 0.95, "the shamble pose is fully applied")
 	var chase := _drive(2.2, 1.5)
-	_check(chase._gait == ZzZombieView.GAIT_SHAMBLE and chase._clip == &"walk", "at the slow chase speed (2.2 m/s) it still shambles")
+	_check(chase._gait == ZzZombieView.GAIT_SHAMBLE and chase._clip in [&"walk", ZzZombieView.UAL_FOR[&"walk"]], "at the slow chase speed (2.2 m/s) it still shambles")
 	var fast := _drive(6.3, 1.5)
 	_check(fast._gait == ZzZombieView.GAIT_RUN, "at 6.3 m/s the gait is the run")
-	_check(fast._clip == &"run_arms", "at 6.3 m/s the clip is the run cycle")
+	_check(fast._clip in [&"run_arms", ZzZombieView.UAL_FOR[&"run_arms"]], "at 6.3 m/s the clip is the run cycle")
 	_check(fast._shamble < 0.01, "the shamble pose is gone at a run")
 
 	for view: ZzZombieView in [slow, chase, fast]:
