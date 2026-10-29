@@ -550,6 +550,7 @@ func _build_netcode() -> DotResult:
 		var _solid := game.body_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
+		var _downed_rules := game.downed_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
 		var _feel := game.feel_rules.follow_cvars(link)
 		game.combat_feel.follow_cvars(link)

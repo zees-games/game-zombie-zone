@@ -306,6 +306,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# What a downed survivor holds and whether they crawl with it: part of the prediction (can_crawl).
+	var _downed := world.downed_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# Aim down sights: spread and pace while aimed are part of the prediction, so the numbers the
 	# simulation reads cross as one JSON cvar (see ZeeAdsRules.PREDICTED).
 	var _ads := world.ads_rules.bind_cvars(

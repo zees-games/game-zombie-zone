@@ -218,6 +218,21 @@ static var _slots: Dictionary = {}
 ## corrected from the server's (see [method correct_view_rig]).
 var view_rig: ZeeWeaponRig = null
 
+## The downed rules (`sv_downed_*`) and the default pistol a downed survivor falls back to, set by the game.
+var downed_rules: DotDownedRules = null
+var downed_default: StringName = &"zz_pistol"
+
+## The slot a downed survivor is held to on the server's rig, and on the drawn one (0: not picked yet).
+var downed_slot: int = 0
+var _view_down_slot: int = 0
+
+## Ticks left of the crawl pose after the last movement, so the gun does not flicker out and in.
+var _crawl_ticks: int = 0
+var _rooted: bool = false
+var _seen_moving_until: int = 0
+const CRAWL_HOLD_TICKS := 15
+const CRAWL_SPEED_MIN := 0.15
+
 ## Simulated seconds [member view_rig] has gone without a trigger, a reload or a switch.
 var _view_rig_quiet: float = 0.0
 
@@ -395,6 +410,7 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 
 	_ride(tick, state)
 	_volume_forces(state)
+	_downed_tick(state)
 
 	swim.update(controller.motor, state)
 	if mechanics_fn.is_valid():
@@ -412,6 +428,23 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 		var _on := controller.motor.add_modifier(state, ZzController.WADING)
 	elif not wading and has:
 		var _off := controller.motor.remove_modifier(state, ZzController.WADING)
+
+
+## A downed survivor who may not crawl with what they hold is rooted (BUSY: no move, no jump), on
+## every end that simulates them; the modifier is taken off again once they may, or are up.
+func _downed_tick(state: DotFpsState) -> void:
+	var speed := Vector2(state.velocity.x, state.velocity.z).length()
+	_crawl_ticks = CRAWL_HOLD_TICKS if is_down() and speed > CRAWL_SPEED_MIN else maxi(_crawl_ticks - 1, 0)
+	var root := is_down() and not can_crawl_now()
+	var has := controller.motor.has_modifier(state, ZzController.BUSY)
+
+	if root and not has:
+		_rooted = controller.motor.add_modifier(state, ZzController.BUSY)
+	elif _rooted and not root:
+		_rooted = false
+
+		if has:
+			var _free := controller.motor.remove_modifier(state, ZzController.BUSY)
 
 
 ## One tick of breath, from the level the last tick ended at. Returns the damage owed, in health
@@ -567,10 +600,46 @@ func is_pinned() -> bool:
 	return pinned_by != 0
 
 
+## The weapon in hand, from the server's rig or the drawn one.
+func held_id() -> StringName:
+	var rig := _rig()
+
+	if rig != null and rig.arsenal != null:
+		var def := rig.arsenal.current_def()
+		return def.id if def != null else &""
+
+	return &""
+
+
+## Pistol or primary, by the weapon in hand (a mirrored body has no rig: its remembered id).
+func downed_kind() -> StringName:
+	return ZzWeapons.downed_kind_of(held_id() if _rig() != null else held_by_slot(dealt, mirror_slot))
+
+
+## Whether a downed survivor may crawl with what they hold.
+func can_crawl_now() -> bool:
+	return downed_rules == null or downed_rules.can_crawl(downed_kind())
+
+
+## Down, able to crawl and moving (or just stopped): the crawl pose.
+func is_crawling() -> bool:
+	return is_down() and (_crawl_ticks > 0 or Time.get_ticks_msec() < _seen_moving_until) and can_crawl_now()
+
+
+## Crawling with the gun put away.
+func is_holstered() -> bool:
+	return downed_rules != null and is_crawling() and downed_rules.holstered(DotDownedRules.POSE_CRAWL)
+
+
+## The pose a downed body is drawn in, [constant DotDownedRules.POSE_PROPPED] or POSE_CRAWL.
+func downed_pose() -> StringName:
+	return DotDownedRules.POSE_CRAWL if is_crawling() else DotDownedRules.POSE_PROPPED
+
+
 ## Pinned, using something with both hands, or a box in them: the gun does nothing (down, you
 ## still shoot; and grabbed by the ankle, too, which is the one pin you fight your own way out of).
 func is_held() -> bool:
-	return (is_pinned() and pin_kind != &"grab") or using != &"" or (box_out and carried_count > 0)
+	return is_holstered() or (is_pinned() and pin_kind != &"grab") or using != &"" or (box_out and carried_count > 0)
 
 
 ## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig
@@ -580,6 +649,15 @@ func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float
 		return DotWeaponOutcome.nothing("No drawn rig.")
 
 	var state := controller.state if controller != null else null
+
+	if is_down() and downed_rules != null:
+		if _view_down_slot == 0:
+			_view_down_slot = ZzWeapons.downed_slot(view_rig.arsenal, downed_rules, downed_default)
+
+		slot = _view_down_slot
+	else:
+		_view_down_slot = 0
+
 	var command := ZzWeapons.command_for(fire, reload, is_held(), state.yaw if state != null else 0.0,
 		state.pitch if state != null else 0.0, slot, view_rig.arsenal, aim)
 	var outcome := view_rig.simulate_tick(command, tick)
@@ -901,6 +979,11 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	if shown:
 		_present_held()
 		var velocity := controller.state.velocity
+
+		# A body nobody simulates here (another player's) shows its crawl from the speed it is drawn at.
+		if is_down() and Vector2(velocity.x, velocity.z).length() > CRAWL_SPEED_MIN:
+			_seen_moving_until = Time.get_ticks_msec() + 250
+
 		# Down is on the floor, crawling: the person's crawl clip (the zombies' own, same rig),
 		# slowed to the crawling pace. It used to be the standing figure tipped onto its back,
 		# which slid along the ground lying flat (the first play test, 1:44).
@@ -909,6 +992,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 			"vertical": velocity.y,
 			"crouched": controller.state.crouch_fraction > 0.5,
 			"downed": is_down(),
+			"propped": is_down() and not is_crawling(),
 			"sprinting": controller.state.sprinting and not is_down(),
 			# The view's pitch bends the figure's spine and gun arm (dot-player-char people.md).
 			"aim": deg_to_rad(controller.state.pitch),
@@ -966,7 +1050,7 @@ func _present_held() -> void:
 		kind = mirror_fire_kind
 
 	mirror_fired = 0
-	figure.hold(id, switching)
+	figure.hold(&"" if is_holstered() else id, switching)
 	figure.fired(fired, kind)
 
 

@@ -353,6 +353,9 @@ var footing: ZzFooting = ZzFooting.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
+## `sv_downed_*`: what a downed survivor holds and whether they crawl with it. REPLICATED, followed by a client.
+var downed_rules: DotDownedRules = DotDownedRules.new()
+
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults. One per game, not
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
@@ -1418,6 +1421,8 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		_apply_body_mask(player)
 
 	player.controller.set_crawl_speed(crawl_rules.speed)
+	player.downed_rules = downed_rules
+	player.downed_default = StringName(config.start_weapons[0])
 	combat_feel.track_tunables(player.controller.tunables)
 	player.set_water(_water_boxes(), water_rules)
 
@@ -3407,12 +3412,14 @@ func _go_down(player: ZzPlayer, by: StringName, why: StringName) -> void:
 	var _unlimp := player.controller.remove_modifier(ZzController.LIMP)
 	player.fit_hitboxes()
 
-	# The sidearm comes out: a downed survivor can still shoot, with what is in their hand.
+	# What comes out is the mode's choice (sv_downed_weapon); the slot is held until they are up.
 	if player.weapons != null and player.weapons.arsenal != null:
-		var sidearm := player.weapons.arsenal.catalogue.get_def(ZzWeapons.resolve(StringName(config.start_weapons[0])))
-		if sidearm != null and player.weapons.arsenal.carries(sidearm.id):
-			var _drawn := player.weapons.arsenal.select(sidearm.slot, _tick)
-			player.wanted_slot = sidearm.slot
+		var slot := ZzWeapons.downed_slot(player.weapons.arsenal, downed_rules, player.downed_default)
+
+		if slot > 0:
+			var _drawn := player.weapons.arsenal.select(slot, _tick)
+			player.downed_slot = slot
+			player.wanted_slot = slot
 
 	if progress != null:
 		progress.on_downed(player.player_id)
@@ -3901,6 +3908,11 @@ func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
 	var held := player.is_held() or ui_holds(player)
 	var pending := player.controller.current_command
 	var arsenal := player.weapons.arsenal if player.weapons != null else null
+
+	if player.is_down() and player.downed_slot > 0:
+		player.wanted_slot = player.downed_slot
+	elif not player.is_down():
+		player.downed_slot = 0
 
 	if pending == null:
 		return ZzWeapons.command_for(false, false, held, 0.0, 0.0, player.wanted_slot, arsenal, false)

@@ -227,6 +227,50 @@ static func title_of(id: StringName) -> String:
 	return def.display_name if def != null and def.display_name != "" else String(id).capitalize()
 
 
+## The kind ([constant DotDownedRules.KIND_PRIMARY] or pistol) of the weapon [param id].
+static func downed_kind_of(id: StringName) -> StringName:
+	return DotDownedRules.kind_of_tier(tier_of(id))
+
+
+## The slot a survivor who has just gone down takes out, by [param rules] and what [param arsenal]
+## carries; the default pistol [param default_id] is given if the mode wants it and it is not carried.
+## One function for the server's rig and the one a client draws, so both pick the same slot.
+static func downed_slot(arsenal: DotWeaponArsenal, rules: DotDownedRules, default_id: StringName) -> int:
+	if arsenal == null:
+		return 0
+
+	var primary := 0
+	var secondary := 0
+	var default_def := arsenal.catalogue.get_def(resolve(default_id))
+
+	for slot_number in arsenal.slots():
+		for held in arsenal.weapons_in(slot_number):
+			var tier := tier_of(held.def.id)
+
+			if tier == &"primary" or tier == &"heavy":
+				if primary == 0 or slot_number == arsenal.current_slot():
+					primary = slot_number
+			elif tier == &"sidearm" and (default_def == null or held.def.id != default_def.id) and secondary == 0:
+				secondary = slot_number
+
+	var kind := rules.choose_weapon(secondary != 0, primary != 0)
+
+	if kind == DotDownedRules.KIND_PRIMARY:
+		return primary
+
+	if kind == DotDownedRules.KIND_SECONDARY:
+		return secondary
+
+	if default_def == null:
+		return arsenal.current_slot()
+
+	# A slot already holding a sidearm is the pistol to use; giving over it would lose that gun.
+	if not arsenal.carries(default_def.id) and not arsenal.has_slot(default_def.slot):
+		var _given := arsenal.give(default_def.id)
+
+	return default_def.slot
+
+
 ## The weapon command a survivor's buttons make, on every end that simulates their gun: the
 ## server's rig, and the rig a client draws (offline and connected).
 ##
