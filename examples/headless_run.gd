@@ -2401,6 +2401,9 @@ func _test_stand_ins_take_a_box() -> void:
 	var seats := game.survivors()
 	for i in seats.size():
 		seats[i].place_at(STREET + Vector3(float(i) * 1.5 - 1.5, 0.0, 0.0), 0.0)
+	# A stand-in may already have latched onto a far shelf item during setup, and a latched item is kept past its reach: judge afresh.
+	for p in seats:
+		game.bots._memory(p).erase("pick")
 	var box := game.loot.add(ZzLoot.BOX, &"medical", STREET + Vector3(0, 0, -3.0))
 	var seen: Array = []
 	game.boxes.opened.connect(func(_id: StringName, _t: StringName, _u: String, _m: String) -> void: seen.append(_t))
