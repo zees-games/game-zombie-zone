@@ -538,6 +538,9 @@ func _scout_goal(here: Vector3) -> Vector3:
 
 # --- Holding a survival map ------------------------------------------------------------------
 
+var _spawn_posts: Dictionary = {}
+
+
 ## This stand-in's post: the map's posts shared out by seat (its place among the stand-ins,
 ## sorted by id, so it does not change while it plays), a ring round the post when there are
 ## more stand-ins than posts. The spawns when the map has no posts.
@@ -545,8 +548,13 @@ func _post_of(player) -> Vector3:
 	var posts: Array = game.horde.usable_posts() if game.horde != null else game.map_doc.get("posts", [])
 
 	if posts.is_empty():
-		var spot: Array = game.map.spawn("survivors", _seat(player))
-		return spot[0]
+		var key := [game.map.get_instance_id(), _seat(player)]
+
+		# spawn() probes the physics world and scans the map's entities (~3 ms): a start does not move.
+		if not _spawn_posts.has(key):
+			_spawn_posts[key] = (game.map.spawn("survivors", key[1]) as Array)[0]
+
+		return _spawn_posts[key]
 
 	var seat := _seat(player)
 	var at := ZzMapDoc.v3(posts[seat % posts.size()])
@@ -1116,8 +1124,12 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
 	var path: PackedVector3Array = memory["path"]
 
-	if nav != null and nav.is_ready() and (game.now() - float(memory["path_at"]) > 1.0 \
-			or (memory["goal"] as Vector3).distance_to(goal) > 2.0 or path.is_empty()):
+	# An empty path (unreachable goal, or arrived) retries at most every 0.5 s: searching the
+	# whole graph every tick for an unreachable post cost 9 ms a tick on Boat Escape.
+	var age: float = game.now() - float(memory["path_at"])
+
+	if nav != null and nav.is_ready() and (age > 1.0 \
+			or (memory["goal"] as Vector3).distance_to(goal) > 2.0 or (path.is_empty() and age > 0.5)):
 		# Its own filter: the graph keeps the last searcher's, and a zombie's would send a
 		# stand-in off a balcony.
 		var kept = nav.filter
