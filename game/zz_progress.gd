@@ -19,9 +19,8 @@ const ZzPlayer := preload("zz_player.gd")
 ##
 ## [b]Server side, and on an offline client — wherever the world is authoritative.[/b]
 ##
-## [b]A player's numbers are filed under their scoped profile key when they have one[/b] — see
-## mg-wipeout's note, which this is, unchanged: [member durable_key_fn] supplies it, and
-## without one the key is the world's id and lasts a connection.
+## [b]A player's numbers are filed under a stable per-server key[/b]: [member durable_key_fn]
+## supplies it (dot-game's DotGameStatsFeed.key_for); without one the key is the world's id.
 
 const CHANNEL := "zz.progress"
 
