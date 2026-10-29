@@ -8,8 +8,8 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## How a zombie moves: the locomotion style is chosen from the speed it really has, so a
 ## zombie at a walking or slow chasing pace shambles and only one at running pace runs.
 
-const SECTIONS := 3
-const CHECKS := 16
+const SECTIONS := 4
+const CHECKS := 21
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -27,6 +27,7 @@ func _run() -> void:
 	_test_bands()
 	_test_view()
 	_test_speeds()
+	_test_looks()
 	await get_tree().process_frame
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
@@ -87,4 +88,16 @@ func _test_speeds() -> void:
 	_check(ZzNpcs.common_chase_speed(c, 0, false) < below, "the base chase speed is a shamble")
 	_check(ZzNpcs.common_chase_speed(c, 0, true) >= from, "a runner's speed is a run")
 	_check(c.common_run_speed >= from, "the full run speed is a run")
+	_sections_finished += 1
+
+
+func _test_looks() -> void:
+	_sections_entered += 1
+	var common := ZzZombieView.shamble_numbers(ZzZombieView.look_for(&"common", 0))
+	var brute := ZzZombieView.shamble_numbers(ZzZombieView.look_for(&"brute", 0))
+	_check(common["swing"] == ZzZombieView.SHAMBLE["swing"], "a look without its own numbers gets the defaults")
+	_check(brute["stoop"] != common["stoop"], "the brute has its own stoop")
+	_check(float(brute["drag"]) > float(common["drag"]), "the brute drags less than the common: a heavy lurch, not a limp")
+	_check(float(common["swing"]) < 1.0 and float(common["drag"]) < float(common["swing"]), "the common's stride is cut short and the dragged leg is cut further")
+	_check(not ZzZombieView.SHAMBLE.is_empty() and float(ZzZombieView.SHAMBLE["stoop"]) == float(common["stoop"]), "the defaults are not overwritten by a look")
 	_sections_finished += 1
