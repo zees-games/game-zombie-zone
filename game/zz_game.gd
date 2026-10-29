@@ -14,6 +14,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
+const ZzWeaponDrop := preload("zz_weapon_drop.gd")
 const ZzCrates := preload("zz_crates.gd")
 const ZzDrops := preload("zz_drops.gd")
 const ZzMapObjects := preload("zz_map_objects.gd")
@@ -251,6 +252,8 @@ var hazards: ZzHazards = null
 ## Server only. The sentry turrets a box deployed.
 var turrets: ZzTurrets = null
 var loot: ZzLoot = null
+## The drop-weapon key (Q): see [ZzWeaponDrop].
+var weapon_drop := ZzWeaponDrop.new(self)
 
 ## Ammo piles and boxes as rigid bodies (server only; null on a client).
 var crates: ZzCrates = null
@@ -2756,6 +2759,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		cancel_use(player)
 		return
 
+	if (pressed & ZzNetCommand.ACT_DROP) != 0 and weapon_drop.drop(player):
+		cancel_use(player)
+
 	_box_in_hands(player, pressed)
 	_flashlight_hands(player, pressed)
 
@@ -3720,7 +3726,7 @@ var arm_failure: String = ""
 
 
 ## Hands [param player] a weapon, building their rig the first time.
-func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
+func arm(player: ZzPlayer, weapon_id: StringName, kept: Dictionary = {}) -> bool:
 	weapon_id = ZzWeapons.resolve(weapon_id)
 	arm_failure = ""
 	if player.weapons == null:
@@ -3745,10 +3751,13 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		combat_feel.attach(rig.arsenal)
 		_wire_carry(player)
 
-	var given := player.weapons.give(weapon_id)
+	var given := player.weapons.give(weapon_id, kept.is_empty())
 	if not given.ok:
 		arm_failure = given.error.message if given.error.code == DotError.CODE_QUOTA else ""
 		return false
+
+	if not kept.is_empty():
+		player.weapons.arsenal.apply_dropped(kept)
 
 	player_armed.emit(player.player_id, weapon_id)
 	return true

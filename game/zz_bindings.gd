@@ -8,7 +8,7 @@ extends RefCounted
 ## row, and the help screen lists them with the key each is on now.
 ##
 ## [b]The genre's keys.[/b] E does everything with the hands (pick up, open, revive, press), F
-## shoves, G holds a medkit on yourself or on the friend you are looking at, Q takes pills, and
+## shoves, G holds a medkit on yourself or on the friend you are looking at, P takes pills, Q drops the weapon in hand, and
 ## the number keys pick a slot.
 ##
 ## [b]The right mouse button aims down the sights[/b] (zee's `ZeeViewModel.aim`, the family's
@@ -29,6 +29,8 @@ extends RefCounted
 const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
+## Puts the weapon in hand down in front of you (server cvar `zz_weapon_drop`).
+const DROP := &"zz_drop_weapon"
 const SHOVE := &"zz_shove"
 ## Switches the flashlight (on F since 2026-10-27; the shove moved to T).
 const FLASHLIGHT := &"zz_flashlight"
@@ -58,7 +60,8 @@ static func make() -> DotMenuBindings:
 	keys.add_movement()
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
-	keys.add(PILLS, &"bind_pills", "Take pills", "Q", "Hands")
+	keys.add(PILLS, &"bind_pills", "Take pills", "P", "Hands")
+	keys.add(DROP, &"bind_drop_weapon", "Drop the weapon in hand", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "T", "Hands")
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "F", "Hands")
 	keys.add(BOX, &"bind_box", "Take out or put away a carried box", "X", "Hands")
@@ -75,5 +78,5 @@ static func make() -> DotMenuBindings:
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# Defaults that moved under saved documents: the medkit left H for help, the shove left V
 	# for push to talk. A player who never touched them follows; a key they chose stays.
-	var _r := keys.renamed(&"bind_heal", ["H"]).renamed(&"bind_shove", ["V", "F"]).renamed(&"bind_flashlight", ["T"])
+	var _r := keys.renamed(&"bind_heal", ["H"]).renamed(&"bind_shove", ["V", "F"]).renamed(&"bind_flashlight", ["T"]).renamed(&"bind_pills", ["Q"])
 	return keys

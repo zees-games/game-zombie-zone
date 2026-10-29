@@ -70,6 +70,8 @@ var _flash_ticks := 0
 var _fire_mode_ticks := 0
 ## Ticks left to hold ACT_CYCLE after the slot key was pressed twice.
 var _cycle_ticks := 0
+## Ticks left to hold ACT_DROP after the drop-weapon key was pressed.
+var _drop_ticks := 0
 ## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
 var _mirror := ZzCarry.new()
 var _flash_msec := -100000
@@ -2022,6 +2024,9 @@ func _actions() -> int:
 	if _fire_mode_ticks > 0:
 		_fire_mode_ticks -= 1
 		out |= ZzNetCommand.ACT_FIRE_MODE
+	if _drop_ticks > 0:
+		_drop_ticks -= 1
+		out |= ZzNetCommand.ACT_DROP
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -2714,6 +2719,12 @@ func _key_event(event: InputEvent) -> bool:
 	if event.is_action_pressed(ZzBindings.FLASHLIGHT):
 		if flash != null:
 			var _asked := flash.toggle()
+		return true
+
+	if event.is_action_pressed(ZzBindings.DROP):
+		_drop_ticks = 3
+		# The slot just asked for is gone; 0 leaves the server's choice of the next weapon alone.
+		_slot = 0
 		return true
 
 	if event.is_action_pressed(ZzBindings.FIRE_MODE):

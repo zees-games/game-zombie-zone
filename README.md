@@ -116,7 +116,8 @@ Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.ym
 | **E** | Use, pick up, revive a friend (hold) |
 | **F** | Shove |
 | **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
-| **Q** | Take pills |
+| **P** | Take pills |
+| **Q** | Drop the weapon in hand (server `zz_weapon_drop`, `zz_weapon_drop_seconds`, `zz_weapon_drop_max`); pick it up with **E** |
 | **V** | Talk (voice) |
 | **F5** | First or third person |
 | **Tab** | Scoreboard (hold) |

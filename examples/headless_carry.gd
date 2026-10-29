@@ -173,7 +173,7 @@ func _test_wire() -> void:
 	var reader := DotNetReader.new(body)
 	var back := ZzEvents.read_carry(reader)
 	_check(bool(back["ok"]) and str(back["json"]) == game.carry.state_json(p), "the CARRY event round-trips")
-	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_FIRE_MODE == 256 and ZzNetCommand.ACT_BITS == 9, "ACT_CYCLE and ACT_FIRE_MODE fit the action bits")
+	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_FIRE_MODE == 256 and ZzNetCommand.ACT_BITS == 10, "ACT_CYCLE and ACT_FIRE_MODE fit the action bits")
 	var parsed := ZzCarry.parse_modifiers("hard=1.15,angry=1.1/0.9/-2,junk")
 	_check(parsed.size() == 2 and parsed["angry"] == [1.1, 0.9, -2.0] and parsed["hard"] == [1.15, 1.0, 0.0], "modifier specs parse")
 	var cfg := ZzConfig.new()

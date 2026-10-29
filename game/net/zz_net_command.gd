@@ -44,7 +44,9 @@ const ACT_FLASHLIGHT := 64
 const ACT_CYCLE := 128
 ## Held for a few ticks by a client that pressed the fire-mode key; the server cycles the gun's mode on the rising edge.
 const ACT_FIRE_MODE := 256
-const ACT_BITS := 9
+## Held for a few ticks by a client that pressed the drop-weapon key; the server drops the weapon in hand on the rising edge.
+const ACT_DROP := 512
+const ACT_BITS := 10
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

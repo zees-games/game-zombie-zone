@@ -89,7 +89,8 @@ func shown(kind: StringName, item: StringName) -> StringName:
 	return item
 
 
-func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0, price: int = 0) -> int:
+## [param state] is what a dropped weapon keeps (magazine and reserve, see [method DotWeaponArsenal.drop_current]).
+func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0, price: int = 0, state: Dictionary = {}) -> int:
 	var id := _next_id
 	_next_id += 1
 	if kind == WEAPON or kind == THROWABLE:
@@ -97,7 +98,7 @@ func add(kind: StringName, item: StringName, at: Vector3, lifetime: float = -1.0
 	# A drop never lands inside another one: two crates drawn through each other cannot be told apart or picked.
 	if lifetime > 0.0:
 		at = _clear_spot(at)
-	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0, "price": price}
+	entries[id] = {"kind": kind, "item": item, "at": at, "until": game.now() + lifetime if lifetime > 0.0 else -1.0, "price": price, "state": state}
 	added.emit(id, kind, item, at)
 	return id
 
@@ -223,7 +224,7 @@ func use(id: int, player) -> void:
 
 	match e["kind"]:
 		WEAPON, THROWABLE:
-			if game.arm(player, item):
+			if game.arm(player, item, e.get("state", {})):
 				# A gun picked up is drawn, as the genre does; a grenade is pocketed, or a
 				# survivor who walked over one in a fight finds a grenade in their hand.
 				if e["kind"] == WEAPON:
@@ -288,6 +289,20 @@ static func give_ammo(player, fraction: float = 1.0) -> int:
 		total += arsenal.add_ammo(pool, maxi(ceili(arsenal.ammo().cap(pool) * fraction), 1))
 
 	return total
+
+
+## Removes the oldest survivor-dropped weapons until at most [param keep] lie.
+func trim_dropped(keep: int) -> void:
+	var dropped: Array[int] = []
+
+	for id: int in entries:
+		if not ((entries[id] as Dictionary).get("state", {}) as Dictionary).is_empty():
+			dropped.append(id)
+
+	dropped.sort()
+
+	while dropped.size() > maxi(keep, 0):
+		remove(dropped.pop_front(), &"")
 
 
 func tick(_delta: float) -> void:
