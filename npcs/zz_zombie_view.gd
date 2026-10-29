@@ -1242,8 +1242,12 @@ func present(delta: float, anim: int, flags: int) -> void:
 		if _speed > 0.2 and rate > 0.0:
 			if clip == &"walk" and _gait == GAIT_SHAMBLE:
 				var sh := shamble_numbers(_look)
-				# Shorter steps are taken a little quicker to keep the feet near the ground's pace.
-				rate = clampf(_speed / (natural * lerpf(1.0, float(sh["swing"]), 0.15 if kind == &"common" else 0.5)), 0.35, float(sh["cadence"]) * (1.6 if kind == &"common" else 1.0))
+				# A planted foot must stand still on the ground, so stride times rate equals the ground speed:
+				# short steps are taken quicker, and the stride lengthens where the rate would pass its cap.
+				natural = 1.8 * float(_look["height"]) / 1.75 if _ual else natural
+				var cap := float(sh["cadence"]) * (1.6 if kind == &"common" else 1.0)
+				_stride = clampf(_speed / (natural * cap), float(sh["swing"]), 1.0)
+				rate = clampf(_speed / (natural * _stride), 0.35, cap)
 			else:
 				rate = clampf(_speed / natural, 0.7, 1.8)
 
@@ -1448,6 +1452,8 @@ func _pitch_limb(bone: String, angle: float) -> void:
 ## The shamble over the walk clip: stooped, head hung and lolling, short uneven steps with one foot
 ## dragged, the torso and hips rolling with each step. Numbers are per look ([constant SHAMBLE]).
 var _ual := false
+## The stride [method present] matched to the ground speed: the share of the clip's leg swing kept.
+var _stride := 0.4
 
 
 func _pose_shamble() -> void:
@@ -1458,17 +1464,12 @@ func _pose_shamble() -> void:
 	var roll := sin(phase * TAU)
 	var drag := ".L" if (variant & 2) != 0 else ".R"
 	var reach := (variant & 1) != 0
-	var swing := lerpf(1.0, float(n["swing"]), k)
+	var swing := lerpf(1.0, _stride, k)
 
-	if _ual:
-		# The free clip already has a full stride; the made clip's cut-down would shorten it to a shuffle.
-		swing = lerpf(1.0, swing, 0.3)
-
-	# Legs first: the clip's stride cut short, the dragged leg nearly still.
+	# Legs first: the stride matched to the ground speed, so a planted foot holds still.
 	for side in [".L", ".R"]:
-		var keep := swing * (lerpf(1.0, float(n["drag"]), k) if side == drag else 1.0)
-		_damp("UpperLeg" + side, keep)
-		_damp("LowerLeg" + side, lerpf(1.0, 0.6, k) if side != drag else keep)
+		_damp("UpperLeg" + side, swing)
+		_damp("LowerLeg" + side, 1.6)
 
 	_pitch(&"Abdomen", 0.8 * float(n["stoop"]) * k)
 	_pitch(&"Torso", float(n["stoop"]) * k)

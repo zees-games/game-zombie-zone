@@ -73,7 +73,7 @@ func _stage() -> void:
 	var views: GDScript = load("res://game/zz_world_view.gd")
 	_zombie = views.view_for(&"common")
 	root.add_child(_zombie)
-	_zombie.rotation.y = deg_to_rad(90.0)
+	_zombie.rotation.y = deg_to_rad(-90.0)
 	_zombie.call("build", &"common", 1)
 	_pos = Vector3(-4.0, 0.0, 0.0)
 	_zombie.position = _pos
