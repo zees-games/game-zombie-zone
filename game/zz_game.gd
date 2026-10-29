@@ -3678,6 +3678,7 @@ func _advance_bodies(delta: float) -> void:
 		if hazards != null and player.controller != null and player.is_up():
 			player.controller.goo_slow(hazards.slow_of(player.player_id))
 		player.box_blind = boxes != null and boxes.is_blind(player.player_id)
+		player.flashed = now_s < player.flash_until
 
 		if player.protected_until >= 0.0 and now_s >= player.protected_until:
 			player.protected_until = -1.0

@@ -18,6 +18,7 @@
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --spawn=ram:2 --hard=5          # five Hard Box stacks: mutants drawn faded
 #   tools/shot.sh --view=survivor --goo=3                         # three stacks of black goo: the screen impair
+#   tools/shot.sh --view=survivor --flash                          # a flash grenade in the face: the screen white
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=crawl                                       # down, crawling, the speed boxes in the strip (crawl_third: the figure)
 #   tools/shot.sh --view=crawl_down                                 # as crawl, then the view at its steepest look-down (_level first)
@@ -50,7 +51,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--goo=*|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

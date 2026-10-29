@@ -149,6 +149,7 @@ var _bile: ColorRect = null
 ## The black goo a spit leaves on the screen; stacks come from the server in `net_status`.
 var _goo: DotFxScreenGoo = null
 var _blind: ColorRect = null
+var _flash: ColorRect = null
 var _fire: ColorRect = null
 var _grey: ColorRect = null
 var _low: ColorRect = null
@@ -189,6 +190,7 @@ func _build() -> void:
 	add_child(_goo)
 	_grey = _cover("LastLife", Color(0.12, 0.12, 0.12))
 	_blind = _cover("Blind", Color(0.97, 0.97, 0.94))
+	_flash = _cover("Flash", Color(1.0, 1.0, 1.0))
 
 	# Under every HUD piece: the scope is the view, the HUD still reads over it.
 	scope = ZeeScopeOverlay.new()
@@ -1047,6 +1049,12 @@ func _draw_overlays(delta: float) -> void:
 	_fade(_wet, 0.38 if player.submerged else 0.0, step * 2.0)
 	_draw_air()
 	_fade(_blind, 1.0 if (player.blinded or player.box_blind) else 0.0, step * 0.5)
+	# A flash is white at once and clears slowly; a box blind eases in.
+	if player.flashed:
+		_flash.modulate.a = 1.0
+		_flash.visible = true
+	else:
+		_fade(_flash, 0.0, step * 0.4)
 	_fade(_fire, 0.18 if player.burning else 0.0, step)
 	_fade(_grey, 0.35 if player.is_alive() and player.incaps >= game.config.max_incaps and not player.is_down() else 0.0, step * 0.3)
 

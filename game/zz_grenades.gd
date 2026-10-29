@@ -20,6 +20,8 @@ var _blast: GDScript = null
 ## id -> {g, def}
 var _flying: Dictionary = {}
 var _loaded := false
+## hazard area id -> dot-npc sight blocker id, for the smoke clouds up
+var _blockers: Dictionary = {}
 
 
 func _init(p_game: Object) -> void:
@@ -84,6 +86,12 @@ func tick() -> void:
 
 func clear() -> void:
 	_flying.clear()
+	_blockers.clear()
+
+
+## True when dot-npc has the blind and sight-blocker hooks (API 6).
+func has_senses() -> bool:
+	return DotAddonApi.build_level("dot_npc") >= 6 and game.horde != null and game.horde.senses != null
 
 
 ## `{position, normal}` of the first world hit on the segment, or empty.
@@ -162,7 +170,8 @@ func _apply(e: Dictionary, g: Object, def: DotWeaponDef) -> void:
 		"blind":
 			_blind(int(e["victim"]), float(e["seconds"]), g.get(&"position"))
 		"smoke":
-			var _s: int = game.hazards.add(SMOKE, e["position"], float(e["radius"]), float(e["seconds"]), 0.0, owner)
+			var area: int = game.hazards.add(SMOKE, e["position"], float(e["radius"]), float(e["seconds"]), 0.0, owner)
+			_block_sight(area, e["position"], float(e["radius"]), float(e["seconds"]))
 		"fire":
 			var _i: int = game.hazards.add(ZzHazards.FIRE, e["position"], float(e["radius"]), float(e["seconds"]), float(e["dps"]), owner)
 
@@ -187,13 +196,40 @@ func _damage(victim: int, amount: float, type: Variant, owner: int, weapon: Stri
 	var _applied: Variant = game.combat.apply_damage(hit)
 
 
-## A blinded zombie is shoved off. No sense is switched off (dot-npc has no blind hook), so
-## it keeps hunting once up; the flash's lure (see [method _go_off]) is what distracts the commons.
+## A smoke cloud stops zombies seeing through it (hearing passes) until it ends.
+func _block_sight(area: int, at: Vector3, radius: float, seconds: float) -> void:
+	if not has_senses():
+		return
+
+	if not game.hazards.area_ended.is_connected(_on_area_ended):
+		game.hazards.area_ended.connect(_on_area_ended)
+
+	_blockers[area] = game.horde.senses.add_sight_blocker(at + Vector3(0.0, 1.6, 0.0), radius, seconds)
+
+
+func _on_area_ended(area: int) -> void:
+	if _blockers.has(area):
+		if game.horde != null and game.horde.senses != null:
+			game.horde.senses.remove_sight_blocker(int(_blockers[area]))
+
+		_blockers.erase(area)
+
+
+## A blinded survivor's screen goes white; a blinded zombie is blind to sight and shoved off.
 func _blind(victim: int, seconds: float, at: Vector3) -> void:
+	var player: Object = game.player_for_entity(victim)
+
+	if player != null:
+		player.flash_until = maxf(player.flash_until, game.now() + seconds)
+		return
+
 	if game.horde == null or not DotEntity.is_kind(victim, DotEntity.KIND_NPC):
 		return
 
 	var npc: DotNpcInstance = game.horde.npc_for_entity(victim)
+
+	if npc != null and has_senses():
+		npc.blind_for(game.horde.now(), seconds)
 
 	if npc != null and npc.is_alive() and npc.brain != null and npc.brain.has_method(&"stagger"):
 		var away: Vector3 = npc.position() - at

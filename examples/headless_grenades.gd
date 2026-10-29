@@ -8,8 +8,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## arena-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
 
-const SECTIONS := 4
-const CHECKS := 14
+const SECTIONS := 7
+const CHECKS := 25
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -34,6 +34,9 @@ func _run() -> void:
 	await _test_frag()
 	await _test_fire_smoke_flash()
 	await _test_flash_lures()
+	await _test_flash_blinds_zombie()
+	await _test_smoke_blocks_sight()
+	await _test_flash_whites_survivor()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -117,6 +120,89 @@ func _test_flash_lures() -> void:
 	_throw(game, me, &"aw_flash", at, Vector3.ZERO)
 	await _sim(game, 4.0)
 	_check(game.grenades.count() == 0 and original.is_valid(), "the flash went off with the horde present", str(lured.size()))
+	_finished()
+
+
+## A zombie in the open, facing a silent survivor 6 m away: the horde's senses, asked now.
+func _watcher(game: ZzGame, me: Object) -> Array:
+	var spot: Vector3 = SPOT + Vector3(0.0, 0.0, 6.0)
+	var spawned := game.horde.spawn_common_at(spot)
+	await _sim(game, 0.5)
+	var npcs: Array = game.horde.spawner.npcs_near(spot, 3.0)
+	var npc: DotNpcInstance = npcs[0] if spawned and not npcs.is_empty() else null
+
+	if npc != null and npc.node is Node3D:
+		(npc.node as Node3D).look_at(me.feet() + Vector3(0.0, 0.0, 0.0), Vector3.UP, false)
+
+	return [npc]
+
+
+func _sees(game: ZzGame, npc: DotNpcInstance, me: Object) -> bool:
+	var senses: DotNpcSenses = game.horde.senses
+	senses.now = game.horde.now()
+	return senses.perceives(npc, DotNpcSenses.Candidate.new(&"me", me.eye_position(), &"survivor", 0.0))
+
+
+func _test_flash_blinds_zombie() -> void:
+	_section("a flash blinds the zombie it reaches, and it clears")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	_check(npc != null and _sees(game, npc, me), "before the flash the zombie sees the survivor (so the next check can fail)")
+
+	if npc == null:
+		_finished()
+		return
+
+	var at: Vector3 = npc.position() + Vector3(0.0, 0.6, -1.5)
+	_throw(game, me, &"aw_flash", at, Vector3.ZERO)
+	await _sim(game, 0.3)
+	_check(npc.blind_until > game.horde.now(), "the flash blinded it", "%.2f vs %.2f" % [npc.blind_until, game.horde.now()])
+	_check(not _sees(game, npc, me), "a blind zombie does not see a survivor in the open")
+	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
+	_check(_sees(game, npc, me), "when the blindness ends it sees again")
+	_finished()
+
+
+func _test_smoke_blocks_sight() -> void:
+	_section("a smoke cloud blocks sight between them, and clears")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	_check(npc != null and _sees(game, npc, me), "before the smoke the zombie sees the survivor")
+
+	if npc == null:
+		_finished()
+		return
+
+	var mid := SPOT + Vector3(0.0, 0.6, 3.0)
+	_throw(game, me, &"aw_smoke", mid, Vector3.ZERO)
+	await _sim(game, 1.0)
+	_check(not _sees(game, npc, me), "with the cloud between them it does not")
+	var area := game.grenades._blockers.keys()
+	_check(area.size() == 1, "one sight blocker is registered")
+	game.hazards.clear()
+	_check(game.grenades._blockers.is_empty() and _sees(game, npc, me), "clearing the hazards removes it and sight returns")
+	_finished()
+
+
+func _test_flash_whites_survivor() -> void:
+	_section("a flash in a survivor's face whites the screen; behind them it does not")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var ahead := me.eye_position() + me.aim_direction() * 3.0
+	_throw(game, me, &"aw_flash", ahead, Vector3.ZERO)
+	await _sim(game, 0.3)
+	_check(me.flashed, "facing it, the survivor is flashed")
+	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
+	_check(not me.flashed, "and it wears off")
+	var behind := me.eye_position() - me.aim_direction() * 3.0
+	_throw(game, me, &"aw_flash", behind, Vector3.ZERO)
+	await _sim(game, 0.3)
+	_check(not me.flashed, "facing away, they are not")
 	_finished()
 
 

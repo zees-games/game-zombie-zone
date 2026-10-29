@@ -32,6 +32,8 @@ var _box := &""
 var _hard := 0
 ## --goo=N: N stacks of the oil monster's black goo on the local survivor, so a frame shows the screen impair.
 var _goo := 0
+## --flash: the local survivor is flashed, so a frame shows the white screen.
+var _flash := false
 ## --aim=DEG: every stand-in but you holds this view pitch (up positive), so a frame from the
 ## side shows the figures' spines and gun arms following it (`"aim"` in ZzPlayer's set_motion).
 var _aim := INF
@@ -126,6 +128,8 @@ func _ready() -> void:
 			_aim = arg.trim_prefix("--aim=").to_float()
 		elif arg.begins_with("--hard="):
 			_hard = arg.trim_prefix("--hard=").to_int()
+		elif arg == "--flash":
+			_flash = true
 		elif arg.begins_with("--goo="):
 			_goo = arg.trim_prefix("--goo=").to_int()
 		elif arg.begins_with("--box="):
@@ -340,6 +344,9 @@ func _run() -> void:
 			if body != null and body.get(&"limbs") != null:
 				for limb in _sever:
 					body.limbs.sever(StringName(limb), body.global_position + Vector3(0.0, 1.2, 0.0), Vector3(0.0, 2.0, 1.0))
+
+	if _flash:
+		local.flash_until = game.now() + 600.0
 
 	if _goo > 0:
 		local.goo_stacks = _goo
