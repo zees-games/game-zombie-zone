@@ -36,9 +36,9 @@
 # stuck_rescue_seconds: 12.0
 # What everybody starts a map holding, by weapon id. The first is drawn.
 # start_weapons: ["zz_pistol", "zz_knife"]
-# How many medkits and pills each survivor starts a map with. [0..1]
+# How many medkits and pills each survivor starts a map with. [0..7]
 # start_medkits: 1
-#  [0..1]
+#  [0..15]
 # start_pills: 0
 #  [1.0..20.0]
 # run_speed: 4.3
