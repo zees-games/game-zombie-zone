@@ -1,4 +1,3 @@
-class_name ZzGrenadeFx
 extends RefCounted
 
 ## arena-weapons' smoke and fire clouds, reached by path because the pack is optional (no pack: no cloud).

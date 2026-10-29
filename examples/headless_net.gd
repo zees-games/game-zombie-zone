@@ -32,8 +32,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 29
-const CHECKS := 196
+const SECTIONS := 30
+const CHECKS := 199
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -95,6 +95,7 @@ func _run() -> void:
 		await _test_the_ads_rules_cross_to_the_client()
 		_test_the_view_feel_crosses_to_the_client()
 		await _test_a_pin_reaches_the_client()
+		await _test_flash_strength_reaches_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
 		await _test_a_gate_reaches_the_client()
@@ -958,6 +959,20 @@ func _test_a_pin_reaches_the_client() -> void:
 	_hurt_npc(strangler, 100000.0)
 	await _steps(10)
 	_check(int(_heard.get("unpin", 0)) == SESSION and not _mine().is_pinned(), "killed: free on both ends")
+	_finished()
+
+
+func _test_flash_strength_reaches_the_client() -> void:
+	_section("a flash's strength reaches the client, so the white is scaled there too")
+	var server_me := _server_me()
+	server_me.flash_strength = 0.4
+	server_me.flash_until = _server_game.now() + 30.0
+	await _steps(10)
+	_check(_mine().flashed, "the flash reaches the client")
+	_check(absf(_mine().flash_strength - 0.4) < 0.04, "with its strength, not full cover", "%.2f" % _mine().flash_strength)
+	server_me.flash_until = 0.0
+	await _steps(10)
+	_check(not _mine().flashed, "and it lifts there when it lifts here")
 	_finished()
 
 
