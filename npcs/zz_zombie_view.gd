@@ -221,7 +221,14 @@ const HIT_AT := 0.37
 
 
 ## Clips that loop; the rest play once and hold their last frame.
-const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run"]
+const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run", &"ual_zombie_idle", &"ual_zombie_walk", &"ual_sprint"]
+
+## Real clips (Universal Animation Library, CC0, baked by dot-player-char) a common plays in place
+## of the made one when they are in the library; absent, the made clip plays as before.
+const UAL_FOR := {&"idle": &"ual_zombie_idle", &"walk": &"ual_zombie_walk", &"run_arms": &"ual_sprint",
+	&"attack": &"ual_zombie_scratch", &"hit": &"ual_hit_chest"}
+const UAL_LIBRARY := "res://addons/dot_player_char/people/people_ual.res"
+const UAL_FROM := "res://addons/dot_player_char/people/people_matt.glb"
 
 ## The palette shader. Up to [constant SWAPS] atlas colours swapped for others (matched within a
 ## tolerance, so the gradient swatches keep their shading), then dirt and blood from the
@@ -376,7 +383,7 @@ func build(p_kind: StringName, p_variant: int) -> void:
 		_anim.name = "AnimationPlayer"
 		_model.add_child(_anim)
 
-	var library := _library_for(body_id, _skeleton)
+	var library := _with_ual(body_id, _skeleton, _library_for(body_id, _skeleton))
 
 	if library != null and not _anim.has_animation_library(&"zz"):
 		var _added := _anim.add_animation_library(&"zz", library)
@@ -560,6 +567,39 @@ static func _library_for(id: StringName, skeleton: Skeleton3D) -> AnimationLibra
 
 	if not _libraries.has(key):
 		_libraries[key] = _retarget(_library(CLIPS_FROM[id]), _rests(CLIPS_FROM[id]), skeleton)
+
+	return _libraries[key]
+
+
+## [param library] plus the real clips, carried from the people kit's rest onto [param skeleton]'s
+## once per body; [param library] unchanged when the file or the kit is missing.
+static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLibrary) -> AnimationLibrary:
+	if library == null or skeleton == null:
+		return library
+
+	var key := StringName("ual:" + String(id))
+
+	if not _libraries.has(key):
+		var merged := library
+		var real := load(UAL_LIBRARY) as AnimationLibrary if ResourceLoader.exists(UAL_LIBRARY) else null
+		var kit := _scene(UAL_FROM)
+
+		if real != null and kit != null:
+			var probe := kit.instantiate()
+			var from := {}
+			var kit_skeleton := probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D
+			for i in kit_skeleton.get_bone_count():
+				from[kit_skeleton.get_bone_name(i)] = kit_skeleton.get_bone_rest(i)
+			probe.free()
+			merged = AnimationLibrary.new()
+			for clip in library.get_animation_list():
+				var _kept := merged.add_animation(clip, library.get_animation(clip))
+			var carried := _retarget(real, from, skeleton)
+			for clip in carried.get_animation_list():
+				var animation := carried.get_animation(clip)
+				animation.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(StringName(clip)) else Animation.LOOP_NONE
+				var _added := merged.add_animation(clip, animation)
+		_libraries[key] = merged
 
 	return _libraries[key]
 
@@ -1209,6 +1249,11 @@ func present(delta: float, anim: int, flags: int) -> void:
 
 	_shamble = move_toward(_shamble, 1.0 if clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
 
+	# Each common keeps its own tempo (plus or minus 15%) so a crowd does not step together.
+	if kind == &"common" and UAL_FOR.has(clip) and _anim != null and _anim.has_animation(_qualified(UAL_FOR[clip])):
+		clip = UAL_FOR[clip]
+		rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
+
 	_play(clip, rate)
 
 	# Level of detail: how often this one is advanced, by where it is from the camera.
@@ -1269,6 +1314,10 @@ func _play(clip: StringName, _rate: float) -> void:
 
 	_clip = clip
 	_anim.play(name, 0.15)
+
+	# A looping real clip starts at this body's own phase, not at frame zero with its neighbours.
+	if LOOPING.has(clip) and String(clip).begins_with("ual_"):
+		_anim.seek(fposmod(float(variant) * 0.618034, 1.0) * _anim.current_animation_length, true)
 
 
 ## The kind's shape and stance over whatever the clip is doing: its bones' scales, a hunch, the
