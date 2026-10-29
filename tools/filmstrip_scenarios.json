@@ -1,0 +1,17 @@
+{
+  "defaults": {"subject": "survivor", "views": ["fp", "tp"], "spawn": [0.0, 0.05, 14.0], "spawn_yaw": 180.0},
+  "clips": [
+    {"name": "walk", "duration": 4.0, "steps": [{"t": 0.0, "move": [0.0, 0.0]}, {"t": 0.5, "move": [0.0, -1.0], "buttons": ["walk"]}]},
+    {"name": "sprint", "duration": 4.0, "steps": [{"t": 0.0, "move": [0.0, 0.0]}, {"t": 0.5, "move": [0.0, -1.0], "buttons": ["sprint"]}]},
+    {"name": "fire", "duration": 3.0, "steps": [{"t": 0.5, "buttons": ["fire"]}, {"t": 2.0, "buttons": []}]},
+    {"name": "reload", "duration": 3.5, "steps": [{"t": 0.5, "buttons": ["reload"]}, {"t": 0.7, "buttons": []}]},
+    {"name": "hit", "duration": 2.5, "steps": [{"t": 0.5, "event": "hit"}, {"t": 1.0, "event": "hit"}]},
+    {"name": "die", "duration": 3.5, "steps": [{"t": 0.5, "event": "die"}]},
+    {"name": "crawl", "duration": 4.5, "steps": [{"t": 0.3, "event": "down"}, {"t": 1.5, "move": [0.0, -1.0]}]},
+    {"name": "zombie_walk", "duration": 4.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 1.1, "anim": "WALK"}]},
+    {"name": "zombie_sprint", "duration": 3.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 6.3, "anim": "RUN"}]},
+    {"name": "zombie_scratch", "duration": 3.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 0.0, "anim": "ATTACK"}]},
+    {"name": "zombie_hit", "duration": 2.5, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 0.0, "anim": "IDLE"}, {"t": 0.5, "event": "flinch"}, {"t": 1.2, "event": "flinch"}]},
+    {"name": "zombie_die", "duration": 3.5, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 0.0, "anim": "IDLE"}, {"t": 0.5, "event": "die"}]}
+  ]
+}

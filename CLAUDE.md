@@ -164,6 +164,7 @@ xvfb-run -a godot --path . --script tools/zombie_rack.gd -- --set=horde --at=5  
 tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons
 tools/shot.sh --view=ads --out=res://screenshots/ads              # hip, raising, aimed: an iron sight and a scope
 tools/shot.sh --view=ragdoll --reaction=face_plant --seconds=2.5   # a stand-in killed and its fall
+tools/filmstrip.sh [clip...]   # survivor (fp, tp) and common-infected clips as contact sheets, mp4 and a metrics report in screenshots/filmstrip/, on staging02 under xvfb; clips in tools/filmstrip_scenarios.json, limits in filmstrip_thresholds.json, logic in dot-core's DotScenario/DotClipMetrics
 ```
 
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
