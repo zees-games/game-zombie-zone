@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Plays the scripted clips of tools/filmstrip_scenarios.json on GPU box staging02 (xvfb, never the
+# Plays the scripted clips of tools/filmstrip_scenarios.json on GPU box staging02, or GPU_SHOT_BOXES (xvfb, never the
 # desktop session) and brings back screenshots/filmstrip/<clip>[_fp|_tp]_sheet.png, .mp4 and
 # _report.txt (foot slide, floor contact, framing, bone pops against tools/filmstrip_thresholds.json).
 #   tools/filmstrip.sh [clip...]     # default: every clip, in each of its views
@@ -19,11 +19,12 @@ for c in doc["clips"]:
         print(c["name"], v)
 PY
 )
-host=gamedev@staging02.deacon.internal
+box=${GPU_SHOT_BOXES:-staging02}
+host=gamedev@${box%%[ ,]*}.deacon.internal   # GPU_SHOT_BOXES=staging runs it on the laptop
 for job in "${jobs[@]}"; do
   read -r clip view <<< "$job"
   name=$clip; [[ $clip == zombie_* ]] || name=${clip}_$view
-  GPU_SHOT_BOXES=${GPU_SHOT_BOXES:-staging02} ../gpu.sh shot game-zombie-zone tools/filmstrip_run.sh "$clip" "$view" "${FPS:-15}"
+  GPU_SHOT_BOXES=$box ../gpu.sh shot game-zombie-zone tools/filmstrip_run.sh "$clip" "$view" "${FPS:-15}"
   rsync -az -e "ssh -i $HOME/.ssh/gpu-laptop -o BatchMode=yes" \
     "$host:gpu/shot/game-zombie-zone/$out/$name.mp4" "$host:gpu/shot/game-zombie-zone/$out/${name}_report.txt" "$out/"
 done

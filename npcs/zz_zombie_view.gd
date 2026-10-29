@@ -183,6 +183,13 @@ const GAIT := {"shamble_below": 2.7, "run_from": 3.1}
 ## head: neck hang; arms/hang: upper arm pitch over the clip's forward-held arms, reaching or hanging; swing: share of the clip's leg
 ## swing kept (stride length); drag: share of that kept by the dragged leg; trail: its shin's trail;
 ## sway/hip: torso and hip roll; cadence: top clip rate; lurch: uneven step timing, 0 even.
+## The anims played on both feet, whose ankles [method _ground_feet] keeps out of the floor.
+const STANDING_ANIMS: Array[int] = [ZzZombieBody.Anim.IDLE, ZzZombieBody.Anim.WALK, ZzZombieBody.Anim.RUN,
+	ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.STAGGER, ZzZombieBody.Anim.VOMIT, ZzZombieBody.Anim.SPIT,
+	ZzZombieBody.Anim.CHARGE, ZzZombieBody.Anim.CARRY, ZzZombieBody.Anim.THROW, ZzZombieBody.Anim.CRY,
+	ZzZombieBody.Anim.RAGE, ZzZombieBody.Anim.SHAMBLE, ZzZombieBody.Anim.SCREAM, ZzZombieBody.Anim.GRAB,
+	ZzZombieBody.Anim.BLOCK, ZzZombieBody.Anim.CHARGE_UP, ZzZombieBody.Anim.ZAP]
+
 const SHAMBLE := {"stoop": 0.2, "head": 0.3, "arms": -0.4, "hang": -1.2, "swing": 0.4, "drag": 0.15,
 	"trail": 0.5, "sway": 0.14, "hip": 0.12, "cadence": 1.0, "lurch": 0.3}
 
@@ -324,6 +331,13 @@ var _gait: StringName = GAIT_SHAMBLE
 var _shamble: float = 0.0
 var _limbs: Dictionary = {}
 var _climb: float = 0.0
+## The body's ground velocity, smoothed like [member _speed], and the rate the clip last played at.
+var _velocity := Vector3.ZERO
+var _rate := 1.0
+## Each foot planted on the floor through the shamble ([method _plant_feet]).
+var _plant := DotFootPlant.new()
+## Per side: [upper, lower, ankle in the lower bone's frame, rest ankle, leg length], skeleton space.
+var _legs: Array = []
 var _dead_for: float = -1.0
 var _owed: float = 0.0
 var _frame: int = 0
@@ -402,6 +416,8 @@ func build(p_kind: StringName, p_variant: int) -> void:
 		_bones[bone] = _skeleton.find_bone(String(bone))
 
 	_limbs.clear()
+	_legs.clear()
+	_plant.reset()
 	for bone in ["UpperArm", "LowerArm", "UpperLeg", "LowerLeg", "Foot"]:
 		for side in [".L", ".R"]:
 			_limbs[bone + side] = _skeleton.find_bone(bone + side)
@@ -1173,6 +1189,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 	if _last_at != Vector3.INF and delta > 0.0:
 		var moved := Vector2(at.x - _last_at.x, at.z - _last_at.z).length() / delta
 		_speed = lerpf(_speed, moved, clampf(delta * 8.0, 0.0, 1.0))
+		_velocity = _velocity.lerp(Vector3(at.x - _last_at.x, 0.0, at.z - _last_at.z) / delta, clampf(delta * 8.0, 0.0, 1.0))
 		_climb = lerpf(_climb, (at.y - _last_y) / delta, clampf(delta * 10.0, 0.0, 1.0))
 	_last_at = at
 	_last_y = at.y
@@ -1265,6 +1282,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 			# The free scratch clip is 1.8 s: played at this rate one swing is one whole windup, strike and recovery.
 			rate = 1.8 / SWING_PERIOD
 
+	_rate = rate
 	_play(clip, rate)
 
 	# Level of detail: how often this one is advanced, by where it is from the camera.
@@ -1360,7 +1378,11 @@ func _pose(anim: int) -> void:
 
 	if _shamble > 0.01 and anim != ZzZombieBody.Anim.DEAD:
 		_pose_shamble()
-		_keep_feet_up()
+		_plant_feet()
+	else:
+		_plant.reset()
+		if anim in STANDING_ANIMS and _clip != &"crawl":
+			_ground_feet()
 
 	if anim == ZzZombieBody.Anim.STRIKE_DOWN:
 		_pose_ground_strike()
@@ -1395,35 +1417,79 @@ func _pose(anim: int) -> void:
 			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
 
 
-## The shamble bends the legs under a body the clip never lowers, so a swinging ankle goes below the
-## floor: the body root the thighs hang from rises by however far the lowest one sank (the Foot bones
-## are IK controls the mesh does not follow).
-func _keep_feet_up() -> void:
-	var pelvis := -1
-	var sink := 0.0
+## The leg chains of [member _legs], found once per body; empty when a bone is missing.
+func _leg_chains() -> Array:
+	if _legs.is_empty() and _skeleton != null:
+		for side in [".L", ".R"]:
+			var upper: int = _limbs.get("UpperLeg" + side, -1)
+			var lower: int = _limbs.get("LowerLeg" + side, -1)
+			var foot: int = _limbs.get("Foot" + side, -1)
+			if upper < 0 or lower < 0 or foot < 0:
+				_legs.clear()
+				break
+			var rest := _skeleton.get_bone_global_rest(foot).origin
+			var ankle := _skeleton.get_bone_global_rest(lower).affine_inverse() * rest
+			_legs.append([upper, lower, ankle, rest, _skeleton.get_bone_rest(lower).origin.length() + ankle.length()])
+	return _legs
 
-	for side in [".L", ".R"]:
-		var leg: int = _limbs.get("LowerLeg" + side, -1)
-		var foot: int = _limbs.get("Foot" + side, -1)
-		var thigh: int = _limbs.get("UpperLeg" + side, -1)
 
-		if leg < 0 or foot < 0 or thigh < 0:
-			continue
+## Moves the bone the thighs hang from by [param up] (skeleton space) from the clip's key of it, or
+## its rest when the clip keys none: an earlier clip's key otherwise stays and sinks the legs.
+func _lift_pelvis(up: Vector3) -> void:
+	var pelvis := _skeleton.get_bone_parent(int(_legs[0][0]))
+	var above := _skeleton.get_bone_parent(pelvis)
+	var base := _skeleton.get_bone_rest(pelvis).origin
+	var playing := _anim.get_animation(_qualified(_clip)) if _anim != null and _anim.has_animation(_qualified(_clip)) else null
+	var suffix := ":" + _skeleton.get_bone_name(pelvis)
+	for t in (playing.get_track_count() if playing != null else 0):
+		if playing.track_get_type(t) == Animation.TYPE_POSITION_3D and String(playing.track_get_path(t)).ends_with(suffix):
+			base = playing.position_track_interpolate(t, _anim.current_animation_position)
+			break
+	if above >= 0:
+		up = DotHumanoidIk.global_pose(_skeleton, above).basis.inverse() * up
+	_skeleton.set_bone_pose_position(pelvis, base + up)
 
-		pelvis = _skeleton.get_bone_parent(thigh)
-		var rest_ankle := _skeleton.get_bone_global_rest(foot).origin
-		var ankle := _skeleton.get_bone_global_pose(leg) * (_skeleton.get_bone_global_rest(leg).affine_inverse() * rest_ankle)
-		sink = maxf(sink, rest_ankle.y - ankle.y)
 
-	if pelvis >= 0:
-		# The clip does not key it, so adding to the current pose would pile up every frame.
-		var up := Vector3(0.0, sink, 0.0)
-		var above := _skeleton.get_bone_parent(pelvis)
+## A standing clip's legs: the bone the thighs hang from back on the clip's key (or rest), then
+## each ankle the clip puts under the floor bent up onto it, the hips left where the clip has them.
+func _ground_feet() -> void:
+	if _leg_chains().is_empty():
+		return
+	_lift_pelvis(Vector3.ZERO)
+	for leg: Array in _legs:
+		var ankle := DotHumanoidIk.global_pose(_skeleton, leg[1]) * (leg[2] as Vector3)
+		var floor_y := (leg[3] as Vector3).y
+		if ankle.y < floor_y:
+			DotHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], Vector3(ankle.x, floor_y, ankle.z), Vector3(0.0, 0.0, 1.0), 1.0)
 
-		if above >= 0:
-			up = _skeleton.get_bone_global_pose(above).basis.inverse() * up
 
-		_skeleton.set_bone_pose_position(pelvis, _skeleton.get_bone_rest(pelvis).origin + up)
+## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
+## step (dot-player-char's DotFootPlant over the clip's own phase), the hips lowered where a leg
+## would not reach and both legs bent to their feet. Weighted by [member _shamble].
+func _plant_feet() -> void:
+	var legs := _leg_chains()
+	if legs.is_empty() or _anim == null:
+		return
+	_lift_pelvis(Vector3.ZERO)
+	var length := maxf(_anim.current_animation_length, 0.01)
+	var to_world := _skeleton.global_transform
+	var to_skeleton := to_world.affine_inverse()
+	var homes: Array[Vector3] = []
+	for leg: Array in legs:
+		homes.append(to_world * (leg[3] as Vector3))
+	var feet := _plant.step(_anim.current_animation_position / length, homes, _velocity, length / maxf(_rate, 0.05))
+	var drop := 0.0
+	for i in legs.size():
+		var hip := DotHumanoidIk.global_pose(_skeleton, legs[i][0]).origin
+		var gap := to_skeleton * feet[i] - hip
+		var flat := Vector2(gap.x, gap.z).length()
+		var longest := float(legs[i][4]) * 0.97
+		if gap.length() > longest and flat < longest:
+			drop = maxf(drop, -gap.y - sqrt(longest * longest - flat * flat))
+	if drop > 0.0:
+		_lift_pelvis(Vector3(0.0, -drop * _shamble, 0.0))
+	for i in legs.size():
+		var _reached := DotHumanoidIk.two_bone_to(_skeleton, legs[i][0], legs[i][1], legs[i][2], to_skeleton * feet[i], Vector3(0.0, 0.0, 1.0), _shamble)
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.

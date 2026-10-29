@@ -220,6 +220,9 @@ func _event(event: String) -> void:
 
 func _zombie_frame(delta: float) -> bool:
 	_frames += 1
+	if _frames == 1:
+		# Soles from the body standing at rest: a run's first live frame can be both feet in the air.
+		_metrics.pose_sample(0.0, _find_skeleton(_zombie), _pos, true)
 	if _frames > 2:
 		_time += delta
 	var live := _time >= 0.0
