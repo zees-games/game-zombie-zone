@@ -1076,6 +1076,11 @@ func _rig() -> ZeeWeaponRig:
 	return get_node_or_null(^"Weapons") as ZeeWeaponRig
 
 
+## The drawn person's look, for the first-person arms (the figure is never built for your own eyes).
+func view_look(team_colour: Color) -> DotHumanoidLook:
+	return ZzFigure.look_for(_atlas(), team_colour)
+
+
 func _atlas() -> String:
 	var index := ZzAvatars.SKINS.find(class_skin) if class_skin != &"" else ZzAvatars.skin_index(avatar)
 

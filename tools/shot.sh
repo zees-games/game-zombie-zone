@@ -20,6 +20,7 @@
 #   tools/shot.sh --view=survivor --goo=3                         # three stacks of black goo: the screen impair
 #   tools/shot.sh --view=survivor --box=mystery                      # a box on the ground
 #   tools/shot.sh --view=crawl                                       # down, crawling, the speed boxes in the strip (crawl_third: the figure)
+#   tools/shot.sh --view=crawl_down                                 # as crawl, then the view at its steepest look-down (_level first)
 #   tools/shot.sh --view=killcam --seconds=3                         # the last stand replayed (--seconds=9: the podium)
 #   tools/shot.sh --view=trader                                      # the trader menu open at the start
 #   tools/shot.sh --view=deploy --seconds=2.5                        # carrying a box, primary fire held that long (deploy_third, deploy_side)

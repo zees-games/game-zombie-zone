@@ -94,11 +94,7 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	# The gun hung off the old person's hand and goes with it; [method hold] builds it again on
 	# the next frame, from [member holding], which outlives a rebuild.
 	held = null
-	var look := DotHumanoidLook.from_letter(atlas_path)
-	if look == null:
-		look = DotHumanoidLook.stock(hash(atlas_path))
-	if colour != Color.WHITE:
-		look = look.with_side(colour, TEAM_TINT)
+	var look := look_for(atlas_path, colour)
 	if person != null:
 		remove_child(person)
 		person.queue_free()
@@ -107,6 +103,16 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	add_child(person)
 	person.build(look, height)
 	from_art = person.from_art
+
+
+## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same.
+static func look_for(atlas_path: String, colour: Color) -> DotHumanoidLook:
+	var look := DotHumanoidLook.from_letter(atlas_path)
+	if look == null:
+		look = DotHumanoidLook.stock(hash(atlas_path))
+	if colour != Color.WHITE:
+		look = look.with_side(colour, TEAM_TINT)
+	return look
 
 
 ## The drawn model, for a death that breaks it apart or falls. Null before [method build].

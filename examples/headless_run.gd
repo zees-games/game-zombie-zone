@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 54
 
-const CHECKS := 415
+const CHECKS := 418
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2794,6 +2794,15 @@ func _test_the_client_platform() -> void:
 	_check(client.camera.global_position.distance_to(client.player.global_position) > 5.0, "the camera is there, away from the survivor's eyes")
 	await get_tree().create_timer(0.8).timeout
 	_check(client.end_camera_weight() == 0.0, "and gives the survivor's eyes back after it")
+	await get_tree().process_frame
+	var arms: DotPlayerViewArms = client.view_arms
+	var arms_up: bool = arms != null and arms.get_parent() != null and arms.get_parent() is Node3D and not (arms.get_parent() is Camera3D)
+	_check(arms_up and not arms.shown and not arms.arms().visible, "the first-person arms are mounted under a yaw pivot, hidden while up")
+	_hurt(client.game, client.player, 500.0)
+	for _i in 6:
+		await get_tree().process_frame
+	_check(client.player.is_down() and arms.shown and arms.arms().visible, "and shown once the survivor is down", str(client.player.is_down()))
+	_check(arms.get_parent().global_position.distance_to(client.camera.global_position) < 0.01, "at the eye")
 	rules.enabled = 0.0
 	client.game.map_ending.emit(true, 1.0, 0.4, spot)
 	for _i in 5:

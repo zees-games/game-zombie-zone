@@ -144,6 +144,9 @@ var _covered_by_reveal: Dictionary = {}
 var _sampler: DotFpsSampler = null
 var _watch_id: int = -1
 var _arm: DotCameraBoom = null
+## The local survivor's crawling arms in first person while down, under a yaw-only pivot at the eye.
+var view_arms: DotPlayerViewArms = null
+var _arms_yaw: Node3D = null
 var _fade: DotCameraFade = null
 var _rig_height: float = 0.0
 var _started_msec: int = Time.get_ticks_msec()
@@ -2168,6 +2171,7 @@ func _process(delta: float) -> void:
 	_present_defib_hands(delta)
 
 	_present_box_hands(delta)
+	_present_view_arms(delta, yaw)
 
 	if hud != null:
 		var prompt := _prompt()
@@ -2177,6 +2181,29 @@ func _process(delta: float) -> void:
 		_follow_shop_menu()
 
 	_present_effects(delta)
+
+
+## Your crawling arms while down in first person. The pivot turns with the yaw only: under the pitch they would swing with the look.
+func _present_view_arms(delta: float, yaw: float) -> void:
+	if view_arms == null or not is_instance_valid(view_arms):
+		_arms_yaw = Node3D.new()
+		_arms_yaw.name = "ViewArmsYaw"
+		_arms_yaw.top_level = true
+		add_child(_arms_yaw)
+		view_arms = DotPlayerViewArms.new()
+		view_arms.name = "ViewArms"
+		_arms_yaw.add_child(view_arms)
+		view_arms.build(player.view_look(game.side_colour(ZzGame.SURVIVORS)), ZzPlayer.BODY_HEIGHT)
+
+	_arms_yaw.global_position = camera.global_position
+	_arms_yaw.global_rotation = Vector3(0.0, yaw, 0.0)
+	var on := player.is_down() and player.is_alive() and not third_person and not is_spectating() and _end_weight < 0.3
+
+	if on != view_arms.shown:
+		view_arms.set_downed(on)
+
+	var velocity := player.controller.state.velocity
+	view_arms.tick(Vector2(velocity.x, velocity.z).length(), delta)
 
 
 ## The box in the hands, drawn under the camera in first person while one is out.

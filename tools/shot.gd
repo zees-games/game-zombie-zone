@@ -494,7 +494,7 @@ func _run() -> void:
 					mover.global_position = eye + Vector3(-3.5 + t * 3.0, 0.4 + sin(t * 5.0) * 0.5, -5.0)
 					await get_tree().create_timer(0.02).timeout
 			await _seconds_of(_seconds if _view == "ending" else 0.0)
-		"crawl", "crawl_third":
+		"crawl", "crawl_third", "crawl_down":
 			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
 			# effects strip is in the frame, and the status line saying you may crawl. The third
 			# person one is the figure's crawl clip, at the server's crawl pace.
@@ -511,6 +511,13 @@ func _run() -> void:
 			await _seconds_of(_seconds)
 			print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
 			Input.action_release(&"dot_fps_forward")
+			if _view == "crawl_down":
+				# The steepest look-down: the arms' edge, and the backpack, may peek in.
+				await _save_extra("_level")
+				local.controller.state.pitch = -89.0
+				if local.sampler != null:
+					local.sampler.look_at_angles(local.controller.state.yaw, -89.0)
+				await _seconds_of(0.3)
 		"deploy", "deploy_third", "deploy_side":
 			_clear_view(game, local, stand)
 			# Carrying a box: --seconds is how long primary fire has been held, of a 4 s deploy

@@ -107,7 +107,7 @@ tools/               soak.tscn (bot soak, docs/soak.md), idle_probe (`-- --map=M
 - After rebuilding a GLB run `godot --headless --path . --import` before anything renders it. [history](docs/history.md)
 - The palette shader samples like a StandardMaterial3D (`source_color`); a survivor body plays zombie clips through `_retarget`; an attachment's offset is in the body's axes from the joint.
 - `ZzZombieBody.Anim` is replicated in 5 bits: append, never insert, stop at 31. `WEARS` colours come from `tools/zombie_palette.gd`.
-- Survivors are dot-player-char's people (`ZzFigure`, the zombies' kit and rig); a killed zombie falls as a skeletal ragdoll (`ZzWorldView.ragdolls`; the animated fall past the machine's cap or under `sv_ragdoll 0`); needs dot-player-char API 3. [zombies](docs/zombies.md#how-it-moves-and-falls)
+- Survivors are dot-player-char's people (`ZzFigure`, the zombies' kit and rig); a killed zombie falls as a skeletal ragdoll (`ZzWorldView.ragdolls`; the animated fall past the machine's cap or under `sv_ragdoll 0`); needs dot-player-char API 7 (v0.1.14: the local survivor sees its own arms when downed, `DotPlayerViewArms`, mounted by `ZzClient._present_view_arms` under a yaw-only pivot). [zombies](docs/zombies.md#how-it-moves-and-falls)
 - A dead survivor falls into the same yard: `ZzGame.decide_death` picks it, DEATH carries it (last, optional), `ZzClient._fall` copies the figure. One `sv_ragdoll*` set for both (`ZzGame.ragdoll_rules`, REPLICATED, followed, read by the horde). `tools/shot.sh --view=ragdoll`. [zombies](docs/zombies.md#how-it-moves-and-falls)
 
 **The HUD and the screen** ([design](docs/design.md#the-hud-dot-uis-glance-pieces))
