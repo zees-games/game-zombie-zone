@@ -9,7 +9,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## arena-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
 
 const SECTIONS := 7
-const CHECKS := 25
+const CHECKS := 26
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -197,6 +197,7 @@ func _test_flash_whites_survivor() -> void:
 	_throw(game, me, &"aw_flash", ahead, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(me.flashed, "facing it, the survivor is flashed")
+	_check(me.flash_strength > 0.0 and me.flash_strength < 1.0, "the blind is scaled by distance, not full (%.2f)" % me.flash_strength)
 	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
 	_check(not me.flashed, "and it wears off")
 	var behind := me.eye_position() - me.aim_direction() * 3.0

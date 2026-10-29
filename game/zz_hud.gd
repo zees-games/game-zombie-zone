@@ -1051,7 +1051,7 @@ func _draw_overlays(delta: float) -> void:
 	_fade(_blind, 1.0 if (player.blinded or player.box_blind) else 0.0, step * 0.5)
 	# A flash is white at once and clears slowly; a box blind eases in.
 	if player.flashed:
-		_flash.modulate.a = 1.0
+		_flash.modulate.a = player.flash_strength
 		_flash.visible = true
 	else:
 		_fade(_flash, 0.0, step * 0.4)

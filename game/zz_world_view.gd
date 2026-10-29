@@ -36,6 +36,8 @@ const BLAST_SECONDS := 0.6
 const GRAVITY := 18.0
 
 var audio: ZzAudio = null
+## The client's effects layer: where the smoke and fire clouds spawn.
+var effects: DotFxManager = null
 ## The config the fade cvars live in, and the Hard Box stacks last heard of; a change of either redraws.
 var fade_config: Object = null
 var hard_stacks := 0
@@ -420,6 +422,14 @@ func remove_loot(id: int) -> void:
 
 # --- Hazards ---------------------------------------------------------------------
 
+## Shows arena-weapons' smoke or fire cloud for a hazard; freed with [param node].
+func _attach_cloud(node: Node3D, fx: int, at: Vector3, radius: float, seconds: float) -> void:
+	var cloud := ZzGrenadeFx.show(effects, get_tree(), fx, at, radius, seconds)
+
+	if cloud != null:
+		cloud.reparent(node)
+
+
 func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> void:
 	remove_hazard(id)
 	var node := Node3D.new()
@@ -435,27 +445,7 @@ func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: 
 	match kind:
 		&"fire":
 			colour = Color(1.0, 0.45, 0.08, 0.35)
-			var fire := _particles(Color(1.0, 0.55, 0.12), radius, 40)
-			node.add_child(fire)
-			var smoke := _particles(Color(0.3, 0.3, 0.3), radius, 14)
-			smoke.lifetime = 1.8
-			smoke.initial_velocity_min = 1.2
-			smoke.initial_velocity_max = 2.4
-			smoke.scale_amount_min = 0.6
-			smoke.scale_amount_max = 1.2
-			smoke.position.y = 0.8
-			(smoke.mesh as QuadMesh).material = DotFxSoftSprite.material(Color(0.3, 0.3, 0.3, 0.45), false)
-			var smoke_ramp := Gradient.new()
-			smoke_ramp.set_color(0, Color(0.35, 0.33, 0.3, 0.5))
-			smoke_ramp.set_color(1, Color(0.15, 0.15, 0.15, 0.0))
-			smoke.color_ramp = smoke_ramp
-			node.add_child(smoke)
-			var light := OmniLight3D.new()
-			light.light_color = Color(1.0, 0.5, 0.15)
-			light.omni_range = radius * 2.5
-			light.light_energy = 1.6
-			light.position.y = 1.0
-			node.add_child(light)
+			_attach_cloud(node, ZzGrenadeFx.FIRE, at, radius, seconds)
 		&"heal":
 			colour = Color(0.3, 1.0, 0.45, 0.3)
 		&"flash":
@@ -468,13 +458,7 @@ func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: 
 			_hazards[id] = node
 			return
 		&"smoke":
-			var cloud := _particles(Color(0.75, 0.75, 0.75), radius, 36)
-			cloud.lifetime = 3.5
-			cloud.gravity = Vector3(0.0, 0.3, 0.0)
-			cloud.scale_amount_min = 2.0
-			cloud.scale_amount_max = 4.0
-			(cloud.mesh as QuadMesh).size = Vector2(1.5, 1.5)
-			node.add_child(cloud)
+			_attach_cloud(node, ZzGrenadeFx.SMOKE, at, radius, seconds)
 			_hazards[id] = node
 			return
 		&"goo", &"goo_trail":

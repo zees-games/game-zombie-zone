@@ -1237,6 +1237,10 @@ func _build_effects() -> void:
 		def.flash_decay_ms = 380
 		fx.add(def)
 
+	var aw_fx: GDScript = ZzGrenadeFx.script()
+	if aw_fx != null:
+		aw_fx.call(&"add_defs", fx)
+
 	effects = DotFxManager.new()
 	effects.name = "Effects"
 	effects.catalogue = fx

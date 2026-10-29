@@ -151,6 +151,8 @@ var box_blind: bool = false
 ## A flash grenade went off in view: the screen is white while this is set (replicated); the server holds it until [member flash_until].
 var flashed: bool = false
 var flash_until: float = 0.0
+## How hard the flash blinds, 0..1 (distance and facing); the cover alpha. Replicated as five bits.
+var flash_strength: float = 1.0
 
 ## When they died, for the rescue clock. Simulated seconds.
 var died_at: float = -1.0

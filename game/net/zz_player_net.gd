@@ -123,6 +123,8 @@ var net_blind: bool = false
 ## `ZzPlayer.beacon`, an admin's mark. Everybody's.
 var net_beacon: bool = false
 var net_flashlight: bool = false
+## The flash blind strength in 31sts (0 when not flashed).
+var net_flash: int = 0
 
 ## `ZzPlayer.warps`, four bits of it: how many times the server has put this player
 ## somewhere rather than moved them there. See [method _forget_the_path].
@@ -173,6 +175,7 @@ func _register_net_vars() -> void:
 	replicate(&"net_using", DotNetVar.Type.UINT).bits(4)
 	replicate(&"net_kits", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(6)
+	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5)
 	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
 	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
@@ -266,6 +269,7 @@ func pull() -> void:
 	net_kits = mini(player.medkits, 7) | (mini(player.pills, 15) << 3) | (mini(player.defibs, 7) << 7)
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3) | (32 if player.flashed else 0)
+	net_flash = clampi(roundi(player.flash_strength * 31.0), 1, 31) if player.flashed else 0
 	net_points = clampi(player.points, 0, 65535)
 	net_ping = clampi(player.ping_ms, 0, 1023)
 	net_watching = player.watching
@@ -370,6 +374,7 @@ func _adopt() -> void:
 	player.burning = (net_status & 2) != 0
 	player.box_blind = (net_status & 4) != 0
 	player.flashed = (net_status & 32) != 0
+	player.flash_strength = net_flash / 31.0 if net_flash > 0 else 1.0
 	player.goo_stacks = (net_status >> 3) & 3
 	player.points = net_points
 	player.ping_ms = net_ping

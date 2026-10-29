@@ -269,6 +269,7 @@ func _blind(victim: int, at: Vector3) -> void:
 
 	if player != null:
 		player.flash_until = maxf(player.flash_until, game.now() + seconds)
+		player.flash_strength = float(zones.get(&"ledger").call(&"strength", victim))
 		return
 
 	if game.horde == null or not DotEntity.is_kind(victim, DotEntity.KIND_NPC):
