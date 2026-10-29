@@ -72,7 +72,7 @@ var net_use: float = 0.0
 var net_helped: float = 0.0
 var net_using: int = 0
 
-## Medkit in bit 0, pills in bit 1, the defibrillator's charges in bits 2 to 4.
+## Medkits in bits 0 to 2, pills in bits 3 to 6, the defibrillator's charges in bits 7 to 9.
 var net_kits: int = 0
 
 ## Boxes carried (bits 0-2) and the type of the top one, an index into the box file plus one,
@@ -84,7 +84,7 @@ var net_carry: int = 0
 var net_status: int = 0
 
 const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride"]
-const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair", &"deploy", &"defib"]
+const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair", &"deploy", &"defib", &"pills"]
 
 ## Points this match and the server's ping for the player, for everybody's Tab board.
 var net_points: int = 0
@@ -170,8 +170,8 @@ func _register_net_vars() -> void:
 	replicate(&"net_pin", DotNetVar.Type.UINT).bits(3)
 	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7)
 	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7)
-	replicate(&"net_using", DotNetVar.Type.UINT).bits(3)
-	replicate(&"net_kits", DotNetVar.Type.UINT).bits(5)
+	replicate(&"net_using", DotNetVar.Type.UINT).bits(4)
+	replicate(&"net_kits", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(5)
 	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10)
 	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
@@ -263,7 +263,7 @@ func pull() -> void:
 	net_use = player.use_fraction
 	net_helped = player.helped_fraction
 	net_using = maxi(USES.find(player.using), 0)
-	net_kits = (1 if player.medkits > 0 else 0) | (2 if player.pills > 0 else 0) | (mini(player.defibs, 7) << 2)
+	net_kits = mini(player.medkits, 7) | (mini(player.pills, 15) << 3) | (mini(player.defibs, 7) << 7)
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3)
 	net_points = clampi(player.points, 0, 65535)
@@ -360,9 +360,9 @@ func _adopt() -> void:
 	player.use_fraction = net_use
 	player.helped_fraction = net_helped
 	player.using = USES[clampi(net_using, 0, USES.size() - 1)]
-	player.medkits = net_kits & 1
-	player.pills = (net_kits >> 1) & 1
-	player.defibs = (net_kits >> 2) & 7
+	player.medkits = net_kits & 7
+	player.pills = (net_kits >> 3) & 15
+	player.defibs = (net_kits >> 7) & 7
 	player.carried_count = net_carry & 7
 	player.carried_index = (net_carry >> 3) & 63
 	player.box_out = (net_carry & 512) != 0

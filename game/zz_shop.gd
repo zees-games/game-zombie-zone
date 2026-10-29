@@ -185,14 +185,12 @@ func _give(player, item_id: String, found: Dictionary) -> String:
 	var arsenal: DotWeaponArsenal = player.weapons.arsenal if player.weapons != null else null
 
 	if item_id == "medkit":
-		if player.medkits >= 1:
-			return "You already have a medkit."
-		player.medkits = 1
+		if not game.consumables.add_medkit(player, false):
+			return "Your medkits are full."
 		return ""
 	if item_id == "pills":
-		if player.pills >= 1:
-			return "You already have pills."
-		player.pills = 1
+		if not game.consumables.add_pills(player, false):
+			return "Your pills are full."
 		return ""
 	if item_id == "heal":
 		if player.health == null or player.health.health >= player.health.max_health:

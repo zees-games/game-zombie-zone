@@ -239,6 +239,7 @@ func _game_load() -> DotResult:
 	_wire_progress(world)
 	_add_tunables(world)
 	world.weapon_drop.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+	world.consumables.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
 	# The top-left team-mate list: `zz_team_roster` 0 (the default) or 1. REPLICATED, because
 	# the HUD is drawn by each client; the config file / argv set it through ZzConfig, and a

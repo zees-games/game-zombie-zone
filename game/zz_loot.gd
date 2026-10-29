@@ -241,16 +241,12 @@ func use(id: int, player) -> void:
 			if spent and filled > 0:
 				remove(id, player.player_id)
 		MEDKIT:
-			if player.medkits >= 1:
-				game.refused.emit(player.player_id, "You already have a medkit.")
+			if not game.consumables.add_medkit(player):
 				return
-			player.medkits = 1
 			remove(id, player.player_id)
 		PILLS:
-			if player.pills >= 1:
-				game.refused.emit(player.player_id, "You already have pills.")
+			if not game.consumables.add_pills(player):
 				return
-			player.pills = 1
 			remove(id, player.player_id)
 		DEFIB:
 			if player.defibs >= 1:

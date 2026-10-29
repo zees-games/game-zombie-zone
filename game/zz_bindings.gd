@@ -29,6 +29,9 @@ extends RefCounted
 const USE := &"zz_use"
 const HEAL := &"zz_heal"
 const PILLS := &"zz_pills"
+## Hands one pill / one medkit to the friend you aim at (server cvars `zz_give_pills`, `zz_give_medkits`).
+const GIVE_PILLS := &"zz_give_pills"
+const GIVE_KIT := &"zz_give_medkit"
 ## Puts the weapon in hand down in front of you (server cvar `zz_weapon_drop`).
 const DROP := &"zz_drop_weapon"
 const SHOVE := &"zz_shove"
@@ -60,7 +63,9 @@ static func make() -> DotMenuBindings:
 	keys.add_movement()
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
-	keys.add(PILLS, &"bind_pills", "Take pills", "P", "Hands")
+	keys.add(PILLS, &"bind_pills", "Take pills (hold)", "P", "Hands")
+	keys.add(GIVE_PILLS, &"bind_give_pills", "Give a friend pills", "N", "Hands")
+	keys.add(GIVE_KIT, &"bind_give_medkit", "Give a friend a medkit", "K", "Hands")
 	keys.add(DROP, &"bind_drop_weapon", "Drop the weapon in hand", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "T", "Hands")
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "F", "Hands")

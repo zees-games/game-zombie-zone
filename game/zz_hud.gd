@@ -730,9 +730,9 @@ func _draw_health() -> void:
 
 	var rows: Array = []
 	if player.medkits > 0:
-		rows.append(["medkit", _key(ZzBindings.HEAL)])
+		rows.append(["medkit x%d" % player.medkits, _key(ZzBindings.HEAL)])
 	if player.pills > 0:
-		rows.append(["pills", _key(ZzBindings.PILLS)])
+		rows.append(["pills x%d" % player.pills, _key(ZzBindings.PILLS)])
 	if player.defibs > 0:
 		rows.append(["defibrillator x%d" % player.defibs, _key(ZzBindings.USE)])
 	kits.show_hints(rows)

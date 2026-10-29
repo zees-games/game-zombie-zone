@@ -623,9 +623,9 @@ func _do_give_item(a: Dictionary, ctx: Dictionary) -> void:
 	for p in _who(a, ctx):
 		match str(a.get("item", "pills")):
 			"medkit":
-				p.medkits = 1
+				var _m: bool = game.consumables.add_medkit(p, false)
 			_:
-				p.pills = 1
+				var _p: bool = game.consumables.add_pills(p, false)
 
 
 func _do_haste(a: Dictionary, ctx: Dictionary) -> void:

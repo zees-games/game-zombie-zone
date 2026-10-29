@@ -148,7 +148,7 @@ func _test_items() -> void:
 	_check(game.loot.exists(id), "and a second is left where it lies")
 
 	var uses: Array = ZzPlayerNet.USES
-	_check(uses.has(&"defib") and uses.size() <= 8, "the use fits the three bits on the wire", "%d of 8" % uses.size())
+	_check(uses.has(&"defib") and uses.size() <= 16, "the use fits the four bits on the wire", "%d of 16" % uses.size())
 	var kits := (1 if me.medkits > 0 else 0) | (2 if me.pills > 0 else 0) | (mini(7, 7) << 2)
 	_check(kits < 32 and ((kits >> 2) & 7) == 7, "seven charges and both kits fit net_kits' five bits")
 	var pair := ZzEvents.read_pair(DotNetReader.new(ZzEvents.write_pair(5, 9)))

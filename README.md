@@ -116,13 +116,17 @@ Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.ym
 | **E** | Use, pick up, revive a friend (hold) |
 | **F** | Shove |
 | **G** | Medkit: on yourself, or on the friend you are looking at (hold) |
-| **P** | Take pills |
+| **P** | Take pills (hold; a bottle each, up to `zz_pills_max`) |
+| **N** | Give the friend you aim at a bottle of pills |
+| **K** | Give the friend you aim at a medkit |
 | **Q** | Drop the weapon in hand (server `zz_weapon_drop`, `zz_weapon_drop_seconds`, `zz_weapon_drop_max`); pick it up with **E** |
 | **V** | Talk (voice) |
 | **F5** | First or third person |
 | **Tab** | Scoreboard (hold) |
 | **H** | Help: the goal, the rules and every key as you have it bound |
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
+
+Pills and medkits have their own slots and are server cvars: `zz_medkit_max`, `zz_pills_max`, `zz_pills_seconds`, `zz_heal_others` (hold the medkit key on a friend you aim at), `zz_heal_range`, `zz_give_pills`, `zz_give_medkits`, `zz_give_range`. Taking damage, moving away or looking away cancels a heal.
 
 ## Getting started
 You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:

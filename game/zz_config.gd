@@ -414,8 +414,8 @@ func setup_seconds() -> float:
 @export var start_weapons: PackedStringArray = PackedStringArray(["zz_pistol", "zz_knife"])
 
 ## How many medkits and pills each survivor starts a map with.
-@export_range(0, 1, 1) var start_medkits: int = 1
-@export_range(0, 1, 1) var start_pills: int = 0
+@export_range(0, 7, 1) var start_medkits: int = 1
+@export_range(0, 15, 1) var start_pills: int = 0
 
 @export_range(1.0, 20.0, 0.1) var run_speed: float = 4.3
 @export_range(0.1, 1.0, 0.01) var walk_speed_scale: float = 0.45

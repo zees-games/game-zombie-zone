@@ -15,6 +15,7 @@ const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzWeaponDrop := preload("zz_weapon_drop.gd")
+const ZzConsumables := preload("zz_consumables.gd")
 const ZzCrates := preload("zz_crates.gd")
 const ZzDrops := preload("zz_drops.gd")
 const ZzMapObjects := preload("zz_map_objects.gd")
@@ -254,6 +255,8 @@ var turrets: ZzTurrets = null
 var loot: ZzLoot = null
 ## The drop-weapon key (Q): see [ZzWeaponDrop].
 var weapon_drop := ZzWeaponDrop.new(self)
+## Pills and medkits: slots, stack limits, use times, healing and handing over a friend.
+var consumables := ZzConsumables.new(self)
 
 ## Ammo piles and boxes as rigid bodies (server only; null on a client).
 var crates: ZzCrates = null
@@ -2774,7 +2777,13 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		_shove(player)
 
 	if (pressed & ZzNetCommand.ACT_PILLS) != 0:
-		_take_pills(player)
+		consumables.begin_pills(player)
+
+	if (pressed & ZzNetCommand.ACT_GIVE_PILLS) != 0:
+		var _gave := consumables.give(player, &"pills")
+
+	if (pressed & ZzNetCommand.ACT_GIVE_KIT) != 0:
+		var _gave_kit := consumables.give(player, &"medkit")
 
 	# Holding: E, or the medkit. Whatever was started keeps going while its key is held.
 	if player.using != &"":
@@ -2782,12 +2791,17 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 		if player.using == &"heal":
 			key = ZzNetCommand.ACT_HEAL
+		elif player.using == &"pills":
+			key = ZzNetCommand.ACT_PILLS
 		elif player.using == &"deploy":
 			key = ZzNetCommand.ACT_DEPLOY
 
 		var keyed := (held & key) != 0 or (player.using == &"deploy" and fire_now)
 
 		if not keyed or not _use_still_valid(player):
+			if keyed and player.using == &"heal":
+				consumables.lock(player)
+
 			cancel_use(player)
 		else:
 			_advance_use(player, delta)
@@ -2796,7 +2810,7 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	if boxes != null and (((held & ZzNetCommand.ACT_DEPLOY) != 0 and (pressed & ZzNetCommand.ACT_DEPLOY) != 0) \
 			or (fire_pressed and player.box_out and not player.carried.is_empty())):
 		_begin_deploy(player)
-	elif (held & ZzNetCommand.ACT_HEAL) != 0 and player.medkits > 0:
+	elif consumables.may_start(player, (held & ZzNetCommand.ACT_HEAL) != 0) and player.medkits > 0:
 		_begin_heal(player)
 	elif (held & ZzNetCommand.ACT_USE) != 0 and (pressed & ZzNetCommand.ACT_USE) != 0:
 		_begin_use(player)
@@ -2926,7 +2940,7 @@ func _begin_deploy(player: ZzPlayer) -> void:
 
 
 func _begin_heal(player: ZzPlayer) -> void:
-	var friend := _looked_at_survivor(player, config.use_reach, false)
+	var friend := _looked_at_survivor(player, consumables.heal_range, false) if consumables.heal_others else null
 	var who := friend if friend != null and friend.real_health() < friend.health.max_health * 0.95 else player
 
 	if who == player and player.real_health() >= player.health.max_health * 0.95:
@@ -2935,6 +2949,7 @@ func _begin_heal(player: ZzPlayer) -> void:
 		return
 
 	_start(player, &"heal", who.entity_id, config.medkit_seconds)
+	consumables.watch(player)
 
 
 ## The dead teammate's body [param player] could shock back: the nearest within the defibrillator's
@@ -3017,8 +3032,9 @@ func _use_still_valid(player: ZzPlayer) -> bool:
 				and drift.length() <= config.defib_move_tolerance
 		&"heal":
 			var who := player_for_entity(player.use_target)
-			return player.medkits > 0 and who != null and who.is_up() \
-				and (who == player or who.feet().distance_to(player.feet()) <= config.use_reach + 0.6)
+			return player.medkits > 0 and who != null and who.is_up() and consumables.heal_ok(player, who)
+		&"pills":
+			return player.pills > 0 and consumables.hold_ok(player)
 		&"loot":
 			return loot != null and loot.exists(player.use_target) \
 				and loot.position_of(player.use_target).distance_to(player.eye_position()) <= config.use_reach + 0.8
@@ -3053,6 +3069,8 @@ func _advance_use(player: ZzPlayer, _delta: float) -> void:
 			_revive(player_for_entity(target), player)
 		&"heal":
 			_heal_with_kit(player_for_entity(target), player)
+		&"pills":
+			_take_pills(player)
 		&"defib":
 			_defib_revive(player_for_entity(target), player)
 		&"loot":

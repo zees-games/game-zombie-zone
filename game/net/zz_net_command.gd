@@ -46,7 +46,10 @@ const ACT_CYCLE := 128
 const ACT_FIRE_MODE := 256
 ## Held for a few ticks by a client that pressed the drop-weapon key; the server drops the weapon in hand on the rising edge.
 const ACT_DROP := 512
-const ACT_BITS := 10
+## Held for a few ticks by a client that pressed give-pills / give-medkit; the server hands one to the friend aimed at on the rising edge.
+const ACT_GIVE_PILLS := 1024
+const ACT_GIVE_KIT := 2048
+const ACT_BITS := 12
 
 var move: DotFpsCommand = DotFpsCommand.new()
 

@@ -72,6 +72,8 @@ var _fire_mode_ticks := 0
 var _cycle_ticks := 0
 ## Ticks left to hold ACT_DROP after the drop-weapon key was pressed.
 var _drop_ticks := 0
+var _give_pills_ticks := 0
+var _give_kit_ticks := 0
 ## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
 var _mirror := ZzCarry.new()
 var _flash_msec := -100000
@@ -2033,6 +2035,12 @@ func _actions() -> int:
 	if _aim_sent():
 		out |= ZzNetCommand.ACT_AIM
 	return out
+	if _give_pills_ticks > 0:
+		_give_pills_ticks -= 1
+		out |= ZzNetCommand.ACT_GIVE_PILLS
+	if _give_kit_ticks > 0:
+		_give_kit_ticks -= 1
+		out |= ZzNetCommand.ACT_GIVE_KIT
 
 
 # --- The frame -------------------------------------------------------------
@@ -2360,9 +2368,9 @@ func _shop_item_state(item: Dictionary) -> String:
 	var weapon := StringName(str(item.get("w", "")))
 	var def := ZzWeapons.def_of(weapon) if weapon != &"" else null
 	if id == "medkit":
-		return "Carrying" if player.medkits >= 1 else ""
+		return "Carrying" if player.medkits >= game.consumables.medkit_max else ""
 	if id == "pills":
-		return "Carrying" if player.pills >= 1 else ""
+		return "Carrying" if player.pills >= game.consumables.pills_max else ""
 	if id == "heal":
 		return "Full" if player.health != null and player.health.health >= player.health.max_health else ""
 	if id == "armour":
@@ -2729,6 +2737,10 @@ func _key_event(event: InputEvent) -> bool:
 		return true
 
 	if event.is_action_pressed(ZzBindings.FIRE_MODE):
+	if event.is_action_pressed(ZzBindings.GIVE_PILLS):
+		_give_pills_ticks = 3
+	if event.is_action_pressed(ZzBindings.GIVE_KIT):
+		_give_kit_ticks = 3
 		_fire_mode_ticks = 3
 		# Offline the world's arsenal is this one and the server path cycles it.
 		if not _offline and weapons != null and weapons.arsenal != null:

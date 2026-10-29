@@ -1203,7 +1203,7 @@ func _test_borrowed_health() -> void:
 	_hurt(game, me, 70.0)
 	me.pills = 1
 	me.actions = ZzNetCommand.ACT_PILLS
-	await _sim(game, 0.1)
+	await _sim(game, game.consumables.pills_seconds + 0.3)
 	me.actions = 0
 	_check(me.pills == 0 and me.temp_health > 45.0 and me.health.health > 75.0, "pills are borrowed health",
 		"%.0f, %.0f borrowed" % [me.health.health, me.temp_health])
@@ -2837,7 +2837,7 @@ func _test_the_hud() -> void:
 		hud.vitals.number_text() == "30" and is_equal_approx(hud.vitals.bonus, 25.0) and hud.vitals.status == "",
 		"DotVitals: real health as the number, borrowed health as its bonus", str(hud.vitals.describe())
 	)
-	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit" and str(hud.kits.rows[0][1]) != "",
+	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit x1" and str(hud.kits.rows[0][1]) != "",
 		"the medkit is a DotKeyHints row with its key", str(hud.kits.rows))
 
 	# The team-mate list is a server setting, off by default; the board carries the same facts.
