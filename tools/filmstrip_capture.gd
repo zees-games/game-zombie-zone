@@ -223,6 +223,13 @@ func _event(event: String) -> void:
 			_local.health.invulnerable = true
 		"die":
 			_game.call("_die", _local, &"strike", &"filmstrip")
+		"revive":
+			# A stand-in kneels beside the downed survivor and holds the real revive (config seconds).
+			for other in _game.call("survivors"):
+				if other != _local:
+					other.call("place_at", _local.call("feet") + Vector3(0.6, 0.0, 0.0), 0.0)
+					_game.call("_start", other, &"revive", _local.get("entity_id"), float(_game.get("config").revive_seconds))
+					return
 
 
 func _zombie_frame(delta: float) -> bool:
