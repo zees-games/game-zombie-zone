@@ -16,10 +16,13 @@ var game = null
 var rules: Object = null
 
 var _grenade: GDScript = null
-var _blast: GDScript = null
+## arena-weapons' AwUtilityZones (API 4): victims, line of sight, blind ledger and fire pulses as the thrower.
+var zones: Object = null
 ## id -> {g, def}
 var _flying: Dictionary = {}
 var _loaded := false
+## `{at, reach, until}` of each going-off grenade and burning fire: who [member zones] may hurt or blind.
+var _spots: Array[Dictionary] = []
 ## hazard area id -> dot-npc sight blocker id, for the smoke clouds up
 var _blockers: Dictionary = {}
 
@@ -41,16 +44,27 @@ func _load() -> bool:
 		return _grenade != null
 
 	_loaded = true
-	var paths := ["aw_grenade.gd", "aw_grenade_blast.gd", "aw_grenade_rules.gd"]
+	var paths := ["aw_grenade.gd", "aw_utility_zones.gd", "aw_grenade_rules.gd"]
 
 	for file: String in paths:
 		if not ResourceLoader.exists(ZzPaths.rebase(DIR + file)):
 			return false
 
 	_grenade = load(ZzPaths.rebase(DIR + paths[0]))
-	_blast = load(ZzPaths.rebase(DIR + paths[1]))
+	var zones_script: GDScript = load(ZzPaths.rebase(DIR + paths[1]))
 	rules = (load(ZzPaths.rebase(DIR + paths[2])) as GDScript).new()
-	return _grenade != null and _blast != null
+
+	if _grenade == null or zones_script == null:
+		return false
+
+	zones = zones_script.new()
+	zones.set(&"rules", rules)
+	zones.set(&"victims", _victims_at_large)
+	zones.set(&"los", zones_script.call(&"los_from_ray", _blocked))
+	zones.set(&"damage", _damage)
+	# The blast's own damage goes through the same callable, so a frag, a fire pulse and a flash's victims share one rule.
+	zones.set(&"apply_blast_damage", true)
+	return true
 
 
 ## Registers the `sv_grenade_*` cvars ([param add] is the module's `add_cvar`).
@@ -75,6 +89,12 @@ func throw(player: Object, spawn: DotWeaponSpawn, def: DotWeaponDef) -> void:
 
 
 func tick() -> void:
+	var now: float = game.now()
+	_spots = _spots.filter(func(spot: Dictionary) -> bool: return float(spot["until"]) > now)
+
+	if zones != null:
+		zones.call(&"tick", 1.0 / float(maxi(game.tick_rate, 1)))
+
 	for id: int in _flying.keys():
 		var entry: Dictionary = _flying[id]
 		var g: Object = entry["g"]
@@ -87,6 +107,10 @@ func tick() -> void:
 func clear() -> void:
 	_flying.clear()
 	_blockers.clear()
+	_spots.clear()
+
+	if zones != null:
+		zones.call(&"clear")
 
 
 ## True when dot-npc has the blind and sight-blocker hooks (API 6).
@@ -107,8 +131,9 @@ func _trace(from: Vector3, to: Vector3) -> Dictionary:
 	return {} if hit.is_empty() else {"position": hit["position"], "normal": hit["normal"]}
 
 
-func _clear_air(from: Vector3, to: Vector3) -> bool:
-	return game.ray_hit(from, to) == Vector3.INF
+## World geometry only, as AwUtilityZones.los_from_ray wants it: true when the ray hits.
+func _blocked(from: Vector3, direction: Vector3, dist: float) -> bool:
+	return game.ray_hit(from, from + direction * dist) != Vector3.INF
 
 
 func _go_off(id: int, g: Object, def: DotWeaponDef) -> void:
@@ -116,23 +141,37 @@ func _go_off(id: int, g: Object, def: DotWeaponDef) -> void:
 	g.set(&"position", at)
 	var b := def.tuning as DotWeaponBallistics
 	var reach := maxf(float(def.params.get(&"effect_radius", 0.0)), b.splash_radius if b != null else 0.0)
-	var events: Array = _blast.call(&"detonate", g, def, _victims(at, reach), _clear_air)
+	_spots.append({"at": at, "reach": reach, "until": game.now()})
+	var events: Array = zones.call(&"detonate", g, def)
 	game.hazards.landed.emit(id, SMOKE, at)
 
 	var blinded := 0.0
 
 	for e: Dictionary in events:
-		_apply(e, g, def)
+		_apply(e, g)
 
 		if String(e["event"]) == "blind" and DotEntity.is_kind(int(e["victim"]), DotEntity.KIND_NPC):
-			blinded = maxf(blinded, float(e["seconds"]))
+			blinded = maxf(blinded, _blind_left(int(e["victim"])))
 
 	# One lure for the whole flash: the commons it blinded go to the bang, not at the survivors.
 	if blinded > 0.0 and game.horde != null:
 		game.horde.lure(at, blinded, reach)
 
 
-## Every survivor and zombie in reach, as the blast wants them.
+## Every survivor and zombie near a going-off grenade or a fire still burning, as AwUtilityZones wants them.
+func _victims_at_large() -> Array:
+	var out: Array = []
+	var seen := {}
+
+	for spot: Dictionary in _spots:
+		for v: Dictionary in _victims(spot["at"], float(spot["reach"])):
+			if not seen.has(v["id"]):
+				seen[v["id"]] = true
+				out.append(v)
+
+	return out
+
+
 func _victims(at: Vector3, reach: float) -> Array:
 	var out: Array = []
 
@@ -156,7 +195,7 @@ func _victims(at: Vector3, reach: float) -> Array:
 	return out
 
 
-func _apply(e: Dictionary, g: Object, def: DotWeaponDef) -> void:
+func _apply(e: Dictionary, g: Object) -> void:
 	var owner: int = g.get(&"owner_entity")
 
 	match String(e["event"]):
@@ -165,15 +204,16 @@ func _apply(e: Dictionary, g: Object, def: DotWeaponDef) -> void:
 				_bang(e["position"], float(e["radius"]), owner)
 			elif StringName(e["kind"]) == FLASH:
 				var _f: int = game.hazards.add(FLASH, e["position"], float(e["radius"]), 0.5, 0.0, owner)
-		"damage":
-			_damage(int(e["victim"]), float(e["damage"]), e["type"], owner, def.id)
 		"blind":
-			_blind(int(e["victim"]), float(e["seconds"]), g.get(&"position"))
+			_blind(int(e["victim"]), g.get(&"position"))
 		"smoke":
 			var area: int = game.hazards.add(SMOKE, e["position"], float(e["radius"]), float(e["seconds"]), 0.0, owner)
 			_block_sight(area, e["position"], float(e["radius"]), float(e["seconds"]))
 		"fire":
-			var _i: int = game.hazards.add(ZzHazards.FIRE, e["position"], float(e["radius"]), float(e["seconds"]), float(e["dps"]), owner)
+			# The zone hurts, as the thrower; this area is what clients draw and what sets zombies alight.
+			var seconds := float(e["seconds"])
+			var _i: int = game.hazards.add(ZzHazards.FIRE, e["position"], float(e["radius"]), seconds, 0.0, owner)
+			_spots.append({"at": e["position"], "reach": float(e["radius"]) + 2.0, "until": game.now() + seconds})
 
 
 ## The shared part of a bang: clients draw it, toys and the crowd feel it.
@@ -185,10 +225,12 @@ func _bang(at: Vector3, radius: float, _owner: int) -> void:
 		game.horde.sounds.emit(DotNpcAiSounds.Kind.COMBAT, at, 50.0, game.horde.now(), 0.5)
 
 
-func _damage(victim: int, amount: float, type: Variant, owner: int, weapon: StringName) -> void:
-	var hit := DotDamage.make(owner, victim, amount, type)
+## Through combat.apply_damage, so friendly fire, armour and the difficulty are the rules every other hit follows.
+func _damage(attacker: int, victim: int, amount: float, type: Variant, weapon: StringName) -> void:
+	var kind: Variant = game.combat.damage_type(type as StringName) if type is StringName else type
+	var hit := DotDamage.make(attacker, victim, amount, kind)
 	hit.tick = game.current_tick()
-	hit.weapon_id = weapon
+	hit.weapon_id = weapon if weapon != &"" else &"fire"
 
 	if game.player_for_entity(victim) != null:
 		hit.context = {"why": game.BY_HAZARD}
@@ -215,8 +257,14 @@ func _on_area_ended(area: int) -> void:
 		_blockers.erase(area)
 
 
+## Seconds the ledger still holds [param victim] blind: a second flash extends, none passes the cap.
+func _blind_left(victim: int) -> float:
+	return float(zones.get(&"ledger").call(&"remaining", victim))
+
+
 ## A blinded survivor's screen goes white; a blinded zombie is blind to sight and shoved off.
-func _blind(victim: int, seconds: float, at: Vector3) -> void:
+func _blind(victim: int, at: Vector3) -> void:
+	var seconds := _blind_left(victim)
 	var player: Object = game.player_for_entity(victim)
 
 	if player != null:
