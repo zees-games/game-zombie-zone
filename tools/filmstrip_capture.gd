@@ -25,6 +25,7 @@ var _pos := Vector3.ZERO
 var _skeleton: Skeleton3D = null
 var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
+var _last_shown: Array[bool] = []
 var _worst_hop := 0.0
 var _worst_at := 0.0
 var _worst_part := ""
@@ -178,19 +179,25 @@ func _first_person_sample(feet: Vector3) -> void:
 	var inverse := cam.global_transform.affine_inverse()
 	var rotations: Array = []
 	var places: Array[Vector3] = []
+	var shown: Array[bool] = []
 	for part: Node3D in _parts:
 		var local := inverse * part.global_transform
 		rotations.append(local.basis.get_rotation_quaternion())
 		places.append(local.origin)
+		shown.append(part.is_visible_in_tree())
 	_metrics.add({"t": _time, "root": feet, "ground_y": feet.y, "grounded": true, "rotations": rotations})
 	if not _last_places.is_empty() and _last_places.size() == places.size():
 		for i in places.size():
+			# A hidden part (the holstered gun while crawling) is never seen to hop.
+			if not shown[i] or not _last_shown[i]:
+				continue
 			var hop := places[i].distance_to(_last_places[i])
 			if hop > _worst_hop:
 				_worst_hop = hop
 				_worst_at = _time
 				_worst_part = "%s (%s)" % [_parts[i].get_path(), _parts[i].get_class()]
 	_last_places = places
+	_last_shown = shown
 	_log.append("%.2f pos=(%.1f,%.1f,%.1f)" % [_time, feet.x, feet.y, feet.z])
 
 
