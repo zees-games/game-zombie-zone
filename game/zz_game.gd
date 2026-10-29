@@ -15,7 +15,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
 const ZzLoot := preload("zz_loot.gd")
-const ZzWeaponDrop := preload("zz_weapon_drop.gd")
+const ZzWeaponLayer := preload("zz_weapon_layer.gd")
 const ZzGrenades := preload("zz_grenades.gd")
 const ZzConsumables := preload("zz_consumables.gd")
 const ZzCrates := preload("zz_crates.gd")
@@ -255,8 +255,8 @@ var hazards: ZzHazards = null
 ## Server only. The sentry turrets a box deployed.
 var turrets: ZzTurrets = null
 var loot: ZzLoot = null
-## The drop-weapon key (Q): see [ZzWeaponDrop].
-var weapon_drop := ZzWeaponDrop.new(self)
+## Weapons lying in the world (the drop key, Q; deaths): see [ZzWeaponLayer].
+var weapon_layer := ZzWeaponLayer.new(self)
 ## arena-weapons' thrown grenades, when that pack is mounted.
 var grenades := ZzGrenades.new(self)
 ## Pills and medkits: slots, stack limits, use times, healing and handing over a friend.
@@ -497,6 +497,7 @@ func _ready() -> void:
 	_build_props()
 	_build_map()
 	_build_combat()
+	weapon_layer.build()
 	_build_effects()
 	_build_match()
 	_build_spectate()
@@ -1719,6 +1720,7 @@ func _on_round_started(number: int) -> void:
 	grenades.clear()
 	if turrets != null:
 		turrets.clear()
+	weapon_layer.clear()
 	if loot != null:
 		loot.clear()
 		if map_objects != null:
@@ -2776,8 +2778,10 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		cancel_use(player)
 		return
 
-	if (pressed & ZzNetCommand.ACT_DROP) != 0 and weapon_drop.drop(player):
+	if (pressed & ZzNetCommand.ACT_DROP) != 0 and weapon_layer.throw(player):
 		cancel_use(player)
+
+	weapon_layer.take(player)
 
 	_box_in_hands(player, pressed)
 	_flashlight_hands(player, pressed)
@@ -3541,6 +3545,8 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 		boxes.drop_carried(player)
 		_sync_carry(player)
 
+	weapon_layer.drop_dead(player)
+
 	if pins != null:
 		pins.release(player.player_id, &"died")
 
@@ -3761,7 +3767,7 @@ var arm_failure: String = ""
 
 
 ## Hands [param player] a weapon, building their rig the first time.
-func arm(player: ZzPlayer, weapon_id: StringName, kept: Dictionary = {}) -> bool:
+func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 	weapon_id = ZzWeapons.resolve(weapon_id)
 	arm_failure = ""
 	if player.weapons == null:
@@ -3786,13 +3792,10 @@ func arm(player: ZzPlayer, weapon_id: StringName, kept: Dictionary = {}) -> bool
 		combat_feel.attach(rig.arsenal)
 		_wire_carry(player)
 
-	var given := player.weapons.give(weapon_id, kept.is_empty())
+	var given := player.weapons.give(weapon_id, true)
 	if not given.ok:
 		arm_failure = given.error.message if given.error.code == DotError.CODE_QUOTA else ""
 		return false
-
-	if not kept.is_empty():
-		player.weapons.arsenal.apply_dropped(kept)
 
 	player_armed.emit(player.player_id, weapon_id)
 	return true

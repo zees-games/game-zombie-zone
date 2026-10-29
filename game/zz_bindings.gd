@@ -32,7 +32,7 @@ const PILLS := &"zz_pills"
 ## Hands one pill / one medkit to the friend you aim at (server cvars `zz_give_pills`, `zz_give_medkits`).
 const GIVE_PILLS := &"zz_give_pills"
 const GIVE_KIT := &"zz_give_medkit"
-## Puts the weapon in hand down in front of you (server cvar `zz_weapon_drop`).
+## Puts the weapon in hand down in front of you (server cvar `sv_weapon_drop_key`).
 const DROP := &"zz_drop_weapon"
 const SHOVE := &"zz_shove"
 ## Switches the flashlight (on F since 2026-10-27; the shove moved to T).

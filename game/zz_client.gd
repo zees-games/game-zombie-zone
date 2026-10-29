@@ -566,6 +566,7 @@ func _build_netcode() -> DotResult:
 		var _dead := game.ragdoll_rules.follow_cvars(link)
 		# And sv_toys*: a client hides the toys a server took away.
 		var _toys := game.toy_rules.follow_cvars(link)
+		var _weapon_drops := game.weapon_layer.rules.follow_cvars(link)
 		var _roster := follow_roster(link, game.config)
 
 	net = DotNetManager.new()

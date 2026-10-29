@@ -3,11 +3,12 @@ extends DotGameCheckSuite
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
 
-## Q drops the weapon in hand: server side, ammo kept, picked up again, cvar, melee, cap, downed, the action bit and the binding.
+## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 3
 const CHECKS := 20
@@ -29,7 +30,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("zombiezone weapon drop")
 	print("")
-	await _test_drop()
+	await _test_throw()
 	await _test_rules()
 	await _test_wire()
 
@@ -44,122 +45,130 @@ func _solo() -> ZzGame:
 	return await _team(1, _quiet)
 
 
-func _lying(game: ZzGame, id: StringName) -> int:
-	for key: int in game.loot.entries:
-		var e: Dictionary = game.loot.entries[key]
-		if e["kind"] == &"weapon" and e["item"] == id and not (e.get("state", {}) as Dictionary).is_empty():
-			return key
-	return -1
+func _equip_primary(game: ZzGame, p: ZzPlayer) -> StringName:
+	var id: StringName = ZzWeapons.ids_of(&"primary")[0]
+	var _g := game.arm(p, id)
+	var def := p.weapons.arsenal.catalogue.get_def(id)
+	p.wanted_slot = def.slot
+	var _on := p.weapons.arsenal.equip(def.slot)
+	await _sim(game, 1.0)
+	return id
 
 
-func _dropped_count(game: ZzGame) -> int:
-	var n := 0
-	for key: int in game.loot.entries:
-		if not ((game.loot.entries[key] as Dictionary).get("state", {}) as Dictionary).is_empty():
-			n += 1
-	return n
+func _holds(p: ZzPlayer, id: StringName) -> bool:
+	var ars := p.weapons.arsenal
+	for w in ars.weapons_in(ars.catalogue.get_def(id).slot):
+		if w.id() == id:
+			return true
+	return false
 
 
-func _test_drop() -> void:
-	_section("drop: the weapon leaves the hand, ammo and a despawn time ride with it, E picks it up")
+func _press_q(game: ZzGame, p: ZzPlayer) -> void:
+	p.actions = ZzNetCommand.ACT_DROP
+	await _sim(game, 0.1)
+	p.actions = 0
+	await _sim(game, 0.1)
+
+
+func _test_throw() -> void:
+	_section("throw: Q leaves the hands, the empty slot takes it back, a full one swaps")
 	var game := await _solo()
 	var p := game.survivors()[0]
 	var ars := p.weapons.arsenal
-	var primaries := ZzWeapons.ids_of(&"primary")
-	_check(primaries.size() >= 1 and game.arm(p, primaries[0]), "a primary is handed over")
-	var id: StringName = primaries[0]
-	var def := ars.catalogue.get_def(id)
-	p.wanted_slot = def.slot
-	var _on := ars.equip(def.slot)
-	await _sim(game, 1.0)
+	var drops := game.weapon_layer.drops
+	_check(drops != null and drops.is_inside_tree(), "the drop layer is built")
+	var id := await _equip_primary(game, p)
 	ars.current().magazine = 3
+	var def := ars.catalogue.get_def(id)
 	var reserve := ars.ammo().count(def.ammo_type)
-	var shelf_before := ars.weapons_in(def.slot).size()
-	_check(game.weapon_drop.drop(p), "drop() accepts")
-	var held := false
-	for w in ars.weapons_in(def.slot):
-		held = held or w.id() == id
-	_check(not held, "the weapon is out of the arsenal", str(shelf_before))
-	var key := _lying(game, id)
-	_check(key >= 0, "a pickup with its state lies on the ground")
-	_check(key >= 0 and game.loot.position_of(key).distance_to(p.global_position) < 3.0, "it lies near the survivor")
-	_check(key >= 0 and float((game.loot.entries[key] as Dictionary).get("until", 0.0)) > 0.0, "it has a despawn time")
-	_check(p.wanted_slot == ars.current_slot(), "the wanted slot follows the arsenal, never a stale one", str(ars.current_slot()))
-	if key >= 0:
-		game.loot.use(key, p)
+
+	game.weapon_layer.rules.key_enabled = false
+	await _press_q(game, p)
+	_check(drops.count() == 0 and _holds(p, id), "sv_weapon_drop_key 0 throws nothing")
+	game.weapon_layer.rules.key_enabled = true
+
+	await _press_q(game, p)
+	_check(drops.count() == 1, "Q throws the held weapon once per press", str(drops.count()))
+	_check(not _holds(p, id), "it left the hands")
+	_check(p.wanted_slot == ars.current_slot(), "the wanted slot follows the arsenal", str(ars.current_slot()))
+	game.weapon_layer.rules.pickup_radius = 60.0
+	for i in 12:
+		await _sim(game, 1.0)
+		if drops.count() == 0:
+			break
+	_check(drops.count() == 0 and _holds(p, id), "the empty slot picks it back up")
 	var back: Variant = null
 	for w in ars.weapons_in(def.slot):
 		if w.id() == id:
 			back = w
-	_check(back != null and back.magazine == 3, "picking it up restores the magazine")
+	_check(back != null and back.magazine == 3, "with its magazine")
 	_check(ars.ammo().count(def.ammo_type) == reserve, "and the reserve", "%d of %d" % [ars.ammo().count(def.ammo_type), reserve])
-	_check(_lying(game, id) < 0, "the pickup is used up")
 	_finished()
 
 
 func _test_rules() -> void:
-	_section("rules: cvar off, melee, downed, the cap")
+	_section("rules: radius, melee, the cap, downed, death")
 	var game := await _solo()
 	var p := game.survivors()[0]
 	var ars := p.weapons.arsenal
-	var primaries := ZzWeapons.ids_of(&"primary")
-	var _g1 := game.arm(p, primaries[0])
-	var d0 := ars.catalogue.get_def(primaries[0])
-	p.wanted_slot = d0.slot
-	var _on := ars.equip(d0.slot)
-	await _sim(game, 1.0)
+	var drops := game.weapon_layer.drops
+	var rules := game.weapon_layer.rules
+	var id := await _equip_primary(game, p)
 
-	game.weapon_drop.enabled = false
-	_check(not game.weapon_drop.drop(p) and _dropped_count(game) == 0, "zz_weapon_drop 0 refuses")
-	game.weapon_drop.enabled = true
+	rules.pickup_radius = 0.0
+	_check(game.weapon_layer.throw(p) and drops.count() == 1, "a throw is accepted")
+	await _sim(game, 2.0)
+	_check(drops.count() == 1, "pickup_radius 0 leaves it on the floor")
+	rules.pickup_radius = 2.0
 
-	_check(ars.weapons_in(1).size() > 0, "the survivor carries a melee weapon")
+	drops.clear()
+	_check(drops.count() == 0, "clear() empties the layer")
+
 	p.wanted_slot = 1
 	var _m := ars.equip(1)
-	await _sim(game, 1.0)
-	_check(ars.current_slot() == 1 and not game.weapon_drop.drop(p) and ars.weapons_in(1).size() > 0, "the permanent melee weapon is never dropped")
+	await _sim(game, 0.5)
+	_check(not game.weapon_layer.throw(p) and ars.weapons_in(1).size() > 0, "the permanent melee weapon is never thrown")
 
-	p.wanted_slot = d0.slot
-	var _a := ars.equip(d0.slot)
-	await _sim(game, 1.0)
-	game.weapon_drop.max_lying = 1
-	_check(game.weapon_drop.drop(p), "a first weapon drops")
-	var _g4 := game.arm(p, primaries[0])
-	p.wanted_slot = d0.slot
-	var _b := ars.equip(d0.slot)
-	await _sim(game, 1.0)
-	_check(game.weapon_drop.drop(p), "a second drops")
-	_check(_dropped_count(game) == 1, "only zz_weapon_drop_max lie; the oldest went", str(_dropped_count(game)))
+	rules.max_count = 1
+	rules.pickup_radius = 0.0
+	for i in 2:
+		var _id := await _equip_primary(game, p)
+		var _t := game.weapon_layer.throw(p)
+	_check(drops.count() == 1, "max_count 1 cleans the oldest", str(drops.count()))
+	drops.clear()
 
 	var other := await _solo()
 	var q := other.survivors()[0]
-	var _g3 := other.arm(q, primaries[0])
-	q.wanted_slot = d0.slot
-	var _s := q.weapons.arsenal.equip(d0.slot)
-	await _sim(other, 1.0)
+	var _oid := await _equip_primary(other, q)
 	q.life = ZzPlayer.Life.DOWN
-	_check(not other.weapon_drop.drop(q), "a dead or downed survivor drops nothing")
+	_check(not other.weapon_layer.throw(q), "a downed survivor throws nothing")
+	q.life = ZzPlayer.Life.UP
+
+	var dead := await _solo()
+	var r := dead.survivors()[0]
+	var rid := await _equip_primary(dead, r)
+	dead.weapon_layer.drop_dead(r)
+	_check(dead.weapon_layer.drops.count() >= 1 and not _holds(r, rid), "a death leaves the weapon on the floor")
+	dead.weapon_layer.drops.clear()
+	var off := await _solo()
+	var s := off.survivors()[0]
+	var _sid := await _equip_primary(off, s)
+	off.weapon_layer.rules.on_death = false
+	off.weapon_layer.drop_dead(s)
+	_check(off.weapon_layer.drops.count() == 0, "sv_weapon_drop_death 0 leaves nothing")
 	_finished()
 
 
 func _test_wire() -> void:
-	_section("wire: the action bit drops through the tick, and the key is bound")
+	_section("wire: the action bit, the key binding and the event codecs")
 	_check(ZzNetCommand.ACT_DROP == 512 and ZzNetCommand.ACT_BITS == 12, "ACT_DROP is bit 9")
-	var game := await _solo()
-	var p := game.survivors()[0]
-	var ars := p.weapons.arsenal
-	var primaries := ZzWeapons.ids_of(&"primary")
-	var _g := game.arm(p, primaries[0])
-	var def := ars.catalogue.get_def(primaries[0])
-	p.wanted_slot = def.slot
-	var _on := ars.equip(def.slot)
-	await _sim(game, 1.0)
-	p.actions = ZzNetCommand.ACT_DROP
-	await _sim(game, 0.2)
-	p.actions = 0
-	_check(_lying(game, primaries[0]) >= 0, "the bit makes the server drop the weapon")
 	var table := ZzBindings.make()
 	_check(not table.row_for_action(ZzBindings.DROP).is_empty(), "the Controls page lists the drop key")
+	var at := Transform3D(Basis.IDENTITY, Vector3(4, 1, -7))
+	var d := ZzEvents.read_weapon_drop(DotNetReader.new(ZzEvents.write_weapon_drop(7, &"m4", 12, 90, at, Vector3(1, 2, 3), 20.0, false)))
+	_check(d["ok"] and d["id"] == 7 and d["magazine"] == 12 and d["reserve"] == 90 and d["at"].origin.distance_to(at.origin) < 0.1, "a weapon drop round-trips")
+	var st := ZzEvents.read_weapon_settled(DotNetReader.new(ZzEvents.write_weapon_settled(7, at)))
+	_check(st["id"] == 7 and st["at"].origin.distance_to(at.origin) < 0.1, "a settle round-trips")
 	_finished()
 
 

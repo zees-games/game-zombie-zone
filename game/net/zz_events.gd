@@ -129,6 +129,12 @@ enum Kind {
 	SUPPORT,
 	## A survivor's class and the skin it wears this spawn: player, class id, skin id (empty: their own avatar).
 	CLASSED,
+	## A weapon left a hand or a corpse: id, weapon, ammo, pose, throw, seconds left, lying still. Also one per lying weapon at signon.
+	WEAPON_DROP,
+	## A dropped weapon came to rest: its id and the pose to snap to.
+	WEAPON_SETTLED,
+	## A dropped weapon is gone: its id and who took it (0 for expiry, the cap or a new round).
+	WEAPON_GONE,
 }
 
 ## What a MAP_FX says.
@@ -638,6 +644,47 @@ static func read_loot(r: DotNetReader) -> Dictionary:
 	var at := _read_pos(r)
 	var price := r.read_varint()
 	return {"id": id, "kind": StringName(kind), "item": StringName(item), "at": at, "price": price, "ok": r.ok()}
+
+
+static func write_weapon_drop(id: int, weapon: StringName, magazine: int, reserve: int, at: Transform3D, velocity: Vector3, seconds: float, rest: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	w.write_string(String(weapon), ID_BYTES)
+	w.write_varint(maxi(0, magazine))
+	w.write_varint(maxi(0, reserve))
+	_pos(w, at.origin)
+	w.write_quaternion(at.basis.get_rotation_quaternion(), 9)
+	w.write_vector3_range(velocity, -SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	w.write_varint(ceili(maxf(seconds, 0.0)))
+	w.write_bool(rest)
+	return w.to_bytes()
+
+
+static func read_weapon_drop(r: DotNetReader) -> Dictionary:
+	var out := {"id": r.read_varint(), "weapon": StringName(r.read_string(ID_BYTES)), "magazine": r.read_varint(), "reserve": r.read_varint()}
+	var origin := _read_pos(r)
+	out["at"] = Transform3D(Basis(r.read_quaternion(9)), origin)
+	out["velocity"] = r.read_vector3_range(-SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	out["seconds"] = r.read_varint()
+	out["rest"] = r.read_bool()
+	out["ok"] = r.ok()
+	return out
+
+
+static func write_weapon_settled(id: int, at: Transform3D) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	_pos(w, at.origin)
+	w.write_quaternion(at.basis.get_rotation_quaternion(), 9)
+	return w.to_bytes()
+
+
+static func read_weapon_settled(r: DotNetReader) -> Dictionary:
+	var out := {"id": r.read_varint()}
+	var origin := _read_pos(r)
+	out["at"] = Transform3D(Basis(r.read_quaternion(9)), origin)
+	out["ok"] = r.ok()
+	return out
 
 
 ## The most crates one LOOT_MOVED carries (the cap on awake crates is 256).

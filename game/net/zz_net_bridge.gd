@@ -442,6 +442,15 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			game.loot.moved_many.connect(func(batch: Array) -> void:
 				_broadcast(ZzEvents.Kind.LOOT_MOVED, ZzEvents.write_loot_moved(batch)))
 
+		var layer: DotWeaponDrops = game.weapon_layer.drops
+		if layer != null:
+			layer.dropped.connect(func(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, _owner: int) -> void:
+				_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, state, at, velocity, layer.rules.lifetime, false)))
+			layer.settled.connect(func(id: int, at: Transform3D) -> void:
+				_broadcast(ZzEvents.Kind.WEAPON_SETTLED, ZzEvents.write_weapon_settled(id, at)))
+			layer.removed.connect(func(id: int, taker: int) -> void:
+				_broadcast(ZzEvents.Kind.WEAPON_GONE, ZzEvents.write_loot_gone(id, taker)))
+
 		if game.boxes != null:
 			game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
 				# The outcome's title and message are the reveal; the TYPE is not, with box_labels off.
@@ -1216,6 +1225,11 @@ func _tell_the_world(peer_id: int) -> void:
 			var e: Dictionary = game.loot.entries[id]
 			_tell(peer_id, ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, e["kind"], game.loot.shown(e["kind"], e["item"]), e["at"], int(e.get("price", 0))))
 
+	if game.weapon_layer.drops != null:
+		for entry in game.weapon_layer.drops.snapshot():
+			_tell(peer_id, ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(
+				int(entry["id"]), entry["state"], entry["at"], Vector3.ZERO, float(entry["life"]), bool(entry["rest"])))
+
 	if game.hazards != null:
 		for id: int in game.hazards.areas:
 			var a: Dictionary = game.hazards.areas[id]
@@ -1317,6 +1331,11 @@ func refresh_player(session_id: int, display_name: String, avatar: DotAvatar) ->
 ## something that had already gone — a player whose entity was released before the LEAVE was
 ## written — and a zero-length event decodes on the far end as a valid message about
 ## nothing, which is the truncation bug this family has already paid for once.
+func _weapon_drop_body(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, seconds: float, rest: bool) -> PackedByteArray:
+	return ZzEvents.write_weapon_drop(id, StringName(state["id"]), int(state.get("magazine", 0)),
+		int(state.get("reserve", 0)), at, velocity, seconds, rest)
+
+
 func _broadcast(kind: int, body: PackedByteArray) -> void:
 	if net == null or not net.is_server or body.is_empty():
 		return
@@ -1622,6 +1641,20 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var taken := ZzEvents.read_loot_gone(reader)
 			if bool(taken["ok"]):
 				loot_removed.emit(int(taken["id"]), int(taken["by"]))
+		ZzEvents.Kind.WEAPON_DROP:
+			var wd := ZzEvents.read_weapon_drop(reader)
+			if bool(wd["ok"]) and game.weapon_layer.drops != null:
+				game.weapon_layer.drops.mirror_drop(int(wd["id"]), {
+					"id": wd["weapon"], "magazine": int(wd["magazine"]), "reserve": int(wd["reserve"]),
+				}, wd["at"], wd["velocity"], float(wd["seconds"]), bool(wd["rest"]))
+		ZzEvents.Kind.WEAPON_SETTLED:
+			var ws := ZzEvents.read_weapon_settled(reader)
+			if bool(ws["ok"]) and game.weapon_layer.drops != null:
+				game.weapon_layer.drops.mirror_settled(int(ws["id"]), ws["at"])
+		ZzEvents.Kind.WEAPON_GONE:
+			var wg := ZzEvents.read_loot_gone(reader)
+			if bool(wg["ok"]) and game.weapon_layer.drops != null:
+				game.weapon_layer.drops.mirror_removed(int(wg["id"]))
 		ZzEvents.Kind.BOX:
 			var box := ZzEvents.read_box(reader)
 			if bool(box["ok"]):
