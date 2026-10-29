@@ -809,6 +809,11 @@ func _threat(player) -> DotNpcInstance:
 		return null
 
 	var memory := _memory(player)
+
+	if player.flashed:
+		memory["threat"] = null
+		return null
+
 	var held: Variant = memory.get("threat")
 
 	# Nobody in sight is an answer too: kept as long as a sighting is.
@@ -875,6 +880,15 @@ func _shot_point(player, npc: DotNpcInstance) -> Vector3:
 
 
 func _sees(player, at: Vector3) -> bool:
+	# A flashed stand-in sees nothing; smoke stops sight the way it does for zombies.
+	if player.flashed:
+		return false
+
+	var senses: Object = game.horde.senses if game.horde != null else null
+
+	if senses != null and senses.sight_blocked(player.eye_position(), at):
+		return false
+
 	return game.clear_between(player.eye_position(), at)
 
 
@@ -895,7 +909,7 @@ func _crowd_within(player, reach: float) -> int:
 ## in bursts at range ([DotBotAim.trigger]), and never through a friend.
 func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 	var aim: DotBotAim = memory["aim"]
-	if aim.target_id != npc.instance_id:
+	if player.flashed or aim.target_id != npc.instance_id:
 		return false
 	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
 	if held != null and ZzWeapons.explosive(held.id) and npc.position().distance_to(player.feet()) < BLAST_SAFE:

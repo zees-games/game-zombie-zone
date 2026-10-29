@@ -8,8 +8,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## arena-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
 
-const SECTIONS := 7
-const CHECKS := 26
+const SECTIONS := 9
+const CHECKS := 36
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -37,6 +37,8 @@ func _run() -> void:
 	await _test_flash_blinds_zombie()
 	await _test_smoke_blocks_sight()
 	await _test_flash_whites_survivor()
+	await _test_bot_smoke()
+	await _test_bot_flash()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -204,6 +206,60 @@ func _test_flash_whites_survivor() -> void:
 	_throw(game, me, &"aw_flash", behind, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(not me.flashed, "facing away, they are not")
+	_finished()
+
+
+func _test_bot_smoke() -> void:
+	_section("a stand-in does not see a zombie through smoke, and does again when it clears")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+
+	if npc == null:
+		_check(false, "a zombie spawned")
+		_finished()
+		return
+
+	game.bots._memory(me).erase("threat_until")
+	_check(game.bots._sees(me, game.bots._aim_point(npc)), "before the smoke the stand-in sees it")
+	_check(game.bots._threat(me) == npc, "and picks it as a threat")
+	_throw(game, me, &"aw_smoke", SPOT + Vector3(0.0, 0.6, 3.0), Vector3.ZERO)
+	await _sim(game, 1.0)
+	game.bots._memory(me).erase("threat_until")
+	_check(not game.bots._sees(me, game.bots._aim_point(npc)), "with the cloud between them it does not")
+	_check(game.bots._threat(me) == null, "and it has no threat")
+	game.hazards.clear()
+	game.bots._memory(me).erase("threat_until")
+	_check(game.bots._threat(me) == npc, "when the cloud ends it picks it again")
+	_finished()
+
+
+func _test_bot_flash() -> void:
+	_section("a flashed stand-in has no threat and holds its fire, until it wears off")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+
+	if npc == null:
+		_check(false, "a zombie spawned")
+		_finished()
+		return
+
+	game.bots._memory(me).erase("threat_until")
+	_check(game.bots._threat(me) == npc, "before the flash it has a threat")
+	_throw(game, me, &"aw_flash", me.eye_position() + me.aim_direction() * 3.0, Vector3.ZERO)
+	await _sim(game, 0.3)
+	_check(me.flashed, "the stand-in is flashed")
+	_check(game.bots._threat(me) == null, "a blind stand-in has no threat")
+	var memory: Dictionary = game.bots._memory(me)
+	memory["aim"] = DotBotAim.new()
+	memory["aim"].target_id = npc.instance_id
+	_check(not game.bots._fire_ok(me, memory, npc), "and does not fire")
+	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
+	memory.erase("threat_until")
+	_check(not me.flashed and game.bots._threat(me) != null, "when it wears off it sees the zombie again")
 	_finished()
 
 
