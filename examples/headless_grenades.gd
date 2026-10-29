@@ -30,6 +30,10 @@ func _ready() -> void:
 func _run() -> void:
 	print("zombiezone grenades")
 	print("")
+	if not FileAccess.file_exists("res://addons/arena_weapons/%s" % ZzPacks.PROVIDER_FILE):
+		print("SKIPPED: arena_weapons is an optional pack and is not linked; run dot-bootstrap for the full suite")
+		get_tree().quit(0)
+		return
 	await _test_which_weapons()
 	await _test_frag()
 	await _test_fire_smoke_flash()
