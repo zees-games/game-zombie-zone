@@ -707,6 +707,14 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.box_carry = clampi(int(value), 0, 6))
 	_tunable("zz_box_deploy_seconds", config.box_deploy_seconds, "Seconds primary fire is held to open a carried box (0.5 to 15, default 1; the config file key is box_deploy_seconds)",
 		func(value: float) -> void: config.box_deploy_seconds = clampf(value, 0.5, 15.0))
+	_tunable("zz_revive_seconds", config.revive_seconds, "Seconds E is held to pick a downed teammate up (0.5 to 30)",
+		func(value: float) -> void: config.revive_seconds = clampf(value, 0.5, 30.0))
+	_tunable("zz_revive_range", config.revive_range, "Metres a reviver may stand from the downed (0.5 to 5)",
+		func(value: float) -> void: config.revive_range = clampf(value, 0.5, 5.0))
+	_tunable("zz_revive_health", config.revive_health, "Temporary health a revived survivor gets up with (1 to 100)",
+		func(value: float) -> void: config.revive_health = clampf(value, 1.0, 100.0))
+	_tunable("zz_revive_bleed_per_second", config.downed_bleed_per_second, "Health a downed survivor loses a second until revived (0 to 100; 0 never bleeds out)",
+		func(value: float) -> void: config.downed_bleed_per_second = clampf(value, 0.0, 100.0))
 	_tunable("zz_defib_start", float(config.start_defibs), "Whether each survivor starts a map holding a defibrillator (0 or 1)",
 		func(value: float) -> void: config.start_defibs = clampi(int(value), 0, 1))
 	_tunable("zz_defib_charge_seconds", config.defib_charge_seconds, "Seconds E is held at a dead teammate's body before the shock (0.5 to 30)",

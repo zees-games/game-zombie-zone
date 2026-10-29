@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 53
+const SECTIONS := 54
 
-const CHECKS := 411
+const CHECKS := 415
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -87,6 +87,7 @@ func _run() -> void:
 	await _test_crates()
 	await _test_the_room_wakes()
 	await _test_downs()
+	await _test_revive_tuning()
 	await _test_ground_strike()
 	await _test_a_legless_zombie_still_attacks()
 	await _test_every_kind_animates()
@@ -1005,6 +1006,30 @@ func _test_the_room_wakes() -> void:
 	await _sim(game, 2.0)
 	var awake := crowd.filter(func(n: DotNpcInstance) -> bool: return str(n.brain.get(&"state")) != "idle").size()
 	_check(awake == 6, "the one woken wakes the rest", "%d of 6" % awake)
+	_finished()
+
+
+func _test_revive_tuning() -> void:
+	_section("revive and bleed-out numbers (zz_revive_*) are the config's")
+	var game := await _team(2, _quiet)
+	var me := game.survivors()[0]
+	var friend := game.survivors()[1]
+	game.config.revive_seconds = 1.0
+	game.config.downed_bleed_per_second = 100.0
+	me.place_at(STREET, 0.0)
+	friend.place_at(STREET + Vector3(1.2, 0, 0), 270.0)
+	_hurt(game, me, 500.0)
+	await _sim(game, 1.0)
+	_check(me.is_down() and me.health.health < game.config.downed_health - 80.0, "a fast bleed drains the pool", "%.0f" % me.health.health)
+	_aim(friend, me.feet() + Vector3(0, 0.3, 0))
+	friend.actions = ZzNetCommand.ACT_USE
+	await _sim(game, 1.3)
+	friend.actions = 0
+	_check(me.is_up(), "a one-second revive picks them up in about one second")
+	_hurt(game, me, 500.0)
+	await _sim(game, 5.0)
+	_check(me.life == ZzPlayer.Life.DEAD, "left alone, a downed survivor bleeds out", str(me.life))
+	_check(game.config.revive_range > 0.0 and game.config.revive_health > 0.0, "the range and borrowed health stay set")
 	_finished()
 
 
