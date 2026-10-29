@@ -27,6 +27,7 @@ var _parts: Array[Node3D] = []
 ## Where each part was when last visible: a part that reappears is measured against that.
 var _last_places: Array[Vector3] = []
 var _worst_hop := 0.0
+var _frame_hop := 0.0
 var _worst_at := 0.0
 var _worst_part := ""
 var _log: Array[String] = []
@@ -188,17 +189,19 @@ func _first_person_sample(feet: Vector3) -> void:
 	_metrics.add({"t": _time, "root": feet, "ground_y": feet.y, "grounded": true, "rotations": rotations})
 	if _last_places.size() != places.size():
 		_last_places = places.duplicate()
+	_frame_hop = 0.0
 	for i in places.size():
 		# Hidden pairs and a part going hidden are never seen; a reappearing part is judged from where it vanished.
 		if not shown[i]:
 			continue
 		var hop := places[i].distance_to(_last_places[i])
+		_frame_hop = maxf(_frame_hop, hop)
 		if hop > _worst_hop:
 			_worst_hop = hop
 			_worst_at = _time
 			_worst_part = "%s (%s)" % [_parts[i].get_path(), _parts[i].get_class()]
 		_last_places[i] = places[i]
-	_log.append("%.2f pos=(%.1f,%.1f,%.1f)" % [_time, feet.x, feet.y, feet.z])
+	_log.append("%.2f pos=(%.1f,%.1f,%.1f) down=%s wall=%.3f hop=%.3f" % [_time, feet.x, feet.y, feet.z, _local.is_down(), model.call("wall_amount"), _frame_hop])
 
 
 func _actions(move: Array, want: Array) -> void:

@@ -8,7 +8,7 @@
     {"name": "hit", "duration": 2.5, "steps": [{"t": 0.5, "event": "hit"}, {"t": 1.0, "event": "hit"}]},
     {"name": "die", "duration": 3.5, "steps": [{"t": 0.5, "event": "die"}]},
     {"name": "crawl", "duration": 4.5, "steps": [{"t": 0.3, "event": "down"}, {"t": 1.5, "move": [0.0, -1.0]}]},
-    {"name": "revive", "duration": 9.5, "steps": [{"t": 0.3, "event": "down"}, {"t": 1.0, "event": "revive"}]},
+    {"name": "revive", "duration": 9.5, "fields": {"views": ["fp"]}, "steps": [{"t": 0.3, "event": "down"}, {"t": 1.0, "event": "revive"}]},
     {"name": "zombie_walk", "duration": 4.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 1.1, "anim": "WALK"}]},
     {"name": "zombie_sprint", "duration": 3.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 6.3, "anim": "RUN"}]},
     {"name": "zombie_scratch", "duration": 3.0, "fields": {"subject": "zombie", "views": ["tp"]}, "steps": [{"t": 0.0, "speed": 0.0, "anim": "ATTACK"}]},
