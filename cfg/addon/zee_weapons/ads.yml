@@ -9,6 +9,7 @@ ads:
     zoom: 0.0
     move_speed_multiplier: 0.8
     spread_multiplier: 0.6
+    recoil_multiplier: 0.6
     sway_multiplier: 0.5
     toggle: false
     view_scale: 1.0
