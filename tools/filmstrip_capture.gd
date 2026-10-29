@@ -248,7 +248,8 @@ func _zombie_frame(delta: float) -> bool:
 			points.append(_unit(_camera, spot))
 		sample["points"] = points
 		_metrics.add(sample)
-		_log.append("%.2f x=%.2f speed=%.2f" % [_time, _pos.x, _speed])
+		var feet: Array = sample.get("feet", [])
+		_log.append("%.2f x=%.2f speed=%.2f feet=%s" % [_time, _pos.x, _speed, str(feet.map(func(f: Vector3) -> String: return "%.3f,%.3f" % [f.x - _pos.x, f.y - _pos.y]))])
 	if _time >= _clip.duration:
 		return _finish()
 	return false
