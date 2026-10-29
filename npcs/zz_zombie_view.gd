@@ -1356,6 +1356,7 @@ func _pose(anim: int) -> void:
 
 	if _shamble > 0.01 and anim != ZzZombieBody.Anim.DEAD:
 		_pose_shamble()
+		_keep_feet_up()
 
 	if anim == ZzZombieBody.Anim.STRIKE_DOWN:
 		_pose_ground_strike()
@@ -1388,6 +1389,37 @@ func _pose(anim: int) -> void:
 			_skeleton.set_bone_pose_rotation(spine, Quaternion(Vector3(-1.0, 0.0, _flinch_side * 0.4).normalized(), snap) * _skeleton.get_bone_pose_rotation(spine))
 		if head >= 0:
 			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
+
+
+## The shamble bends the legs under a body the clip never lowers, so a swinging ankle goes below the
+## floor: the body root the thighs hang from rises by however far the lowest one sank (the Foot bones
+## are IK controls the mesh does not follow).
+func _keep_feet_up() -> void:
+	var pelvis := -1
+	var sink := 0.0
+
+	for side in [".L", ".R"]:
+		var leg: int = _limbs.get("LowerLeg" + side, -1)
+		var foot: int = _limbs.get("Foot" + side, -1)
+		var thigh: int = _limbs.get("UpperLeg" + side, -1)
+
+		if leg < 0 or foot < 0 or thigh < 0:
+			continue
+
+		pelvis = _skeleton.get_bone_parent(thigh)
+		var rest_ankle := _skeleton.get_bone_global_rest(foot).origin
+		var ankle := _skeleton.get_bone_global_pose(leg) * (_skeleton.get_bone_global_rest(leg).affine_inverse() * rest_ankle)
+		sink = maxf(sink, rest_ankle.y - ankle.y)
+
+	if pelvis >= 0:
+		# The clip does not key it, so adding to the current pose would pile up every frame.
+		var up := Vector3(0.0, sink, 0.0)
+		var above := _skeleton.get_bone_parent(pelvis)
+
+		if above >= 0:
+			up = _skeleton.get_bone_global_pose(above).basis.inverse() * up
+
+		_skeleton.set_bone_pose_position(pelvis, _skeleton.get_bone_rest(pelvis).origin + up)
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.

@@ -27,6 +27,7 @@ var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
 var _worst_hop := 0.0
 var _worst_at := 0.0
+var _worst_part := ""
 var _log: Array[String] = []
 var _zombie_script: GDScript = null
 
@@ -188,7 +189,9 @@ func _first_person_sample(feet: Vector3) -> void:
 			if hop > _worst_hop:
 				_worst_hop = hop
 				_worst_at = _time
+				_worst_part = "%s (%s)" % [_parts[i].get_path(), _parts[i].get_class()]
 	_last_places = places
+	_log.append("%.2f pos=(%.1f,%.1f,%.1f)" % [_time, feet.x, feet.y, feet.z])
 
 
 func _actions(move: Array, want: Array) -> void:
@@ -273,7 +276,7 @@ func _finish() -> bool:
 	if _view == "fp" and _zombie == null:
 		var cap := float(limits.get("view_hop_m", 0.15))
 		rows.append({"check": "view_pop", "pass": _worst_hop <= cap, "value": "%.3f" % _worst_hop, "limit": "%.3f" % cap,
-			"note": "m, largest hop of a hand or weapon part between frames (eye frame), at %.2f s; %d parts" % [_worst_at, _parts.size()]})
+			"note": "m, largest hop of a hand or weapon part between frames (eye frame), at %.2f s, %s; %d parts" % [_worst_at, _worst_part, _parts.size()]})
 	var text := DotClipMetrics.table(label, rows)
 	print(text)
 	DotClipMetrics.write_report("res://screenshots/filmstrip/%s_report.txt" % label, text, _log)
