@@ -108,6 +108,8 @@ Thumbs.db
 
 # Godot writes an .import beside each golden when a test run loads it; goldens are read as raw images.
 /tests/golden/*.import
+# The same for the render reports: they are images for people, nothing loads them.
+/reports/**/*.import
 /addons/dot_flashlight
 
 # Optional weapon pack (not a required dependency, so no leading slash)
