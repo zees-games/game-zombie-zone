@@ -1335,6 +1335,12 @@ func _wire_progress(world: ZzGame) -> void:
 
 	# Filed under dot-game's stable per-server key (guests too), so it outlives the connection
 	# and a restart; see [ZzProgress].
+	if world.progress != null and stats_feed != null:
+		# The board reads ZzProgress's own tracker, under the feed's own key (what durable_key_fn
+		# below returns), so no player_key_fn: it would call back into key_for.
+		stats_feed.tracker = world.progress.stats
+		stats_feed.open_sessions = false
+
 	if world.progress != null:
 		world.progress.durable_key_fn = func(id: StringName) -> String:
 			var session := server.session_by_userid(ZzNetBridge.session_of(id)) \

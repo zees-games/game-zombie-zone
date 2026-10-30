@@ -79,6 +79,10 @@ var _ids: Dictionary = {}
 
 # --- The documents -----------------------------------------------------------
 
+## Shown on the Tab board by default.
+const BOARD_COLUMNS: Array[StringName] = [COMMONS_KILLED, HEADSHOTS, REVIVES, DOWNS]
+
+
 static func ids() -> Array[StringName]:
 	return [
 		MAPS_PLAYED, MAPS_WON, HOLDS_SURVIVED, COMMONS_KILLED, SPECIALS_KILLED, BRUTES_KILLED,
@@ -115,6 +119,8 @@ static func _add(
 	var def := DotStatsDef.make(id, kind, display)
 	def.unit = unit
 	def.publish = publish
+	if id in BOARD_COLUMNS:
+		def.column = "default"
 	out.stats.append(def)
 
 
@@ -346,6 +352,11 @@ func playtime_of(player_id: StringName) -> float:
 
 	var held := achievements.progress_of(String(_keys.get(player_id, player_id)))
 	return (held.value_of(SECONDS_PLAYED) if held != null else 0.0) + float(_playtime_pending.get(player_id, 0.0))
+
+
+## [member stats] key for a player id, for the shared stats board.
+func key_of(player_id: StringName) -> StringName:
+	return _key(player_id)
 
 
 ## The key a player's numbers are filed under. Asked of [member durable_key_fn] once, then
