@@ -1357,6 +1357,16 @@ func _wire_progress(world: ZzGame) -> void:
 		if report.get_string() == "1":
 			progress.set_reporting(true)
 
+	if world.progress != null:
+		var progress := world.progress
+		var report := add_cvar("zz_report_progress", "1" if world.config.report_progress else "0",
+			"File player stats with the backbone (1) or keep them on this server (0); needs a STATS_WRITE client",
+			DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY).with_min(0.0).with_max(1.0)
+		report.changed.connect(func(_old: String, new_value: String) -> void:
+			progress.set_reporting(new_value.to_int() != 0))
+		if report.get_string() == "1":
+			progress.set_reporting(true)
+
 	world.achievement_earned.connect(func(id: StringName, title: String, points: int) -> void:
 		var peer_id: int = bridge.call("peer_for_player", ZzNetBridge.session_of(id))
 
