@@ -1149,8 +1149,14 @@ func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 	rect.offset_bottom = at.y + size.y
 
 
-## The aim this frame, from the client: the dot fades out as the gun comes up (dot-ui's
-## `DotCrosshair.opacity_for_aim`, the arena's curve) and a scope hides it for its own reticle.
+## The client's hands this frame: the scope follows their progressive fade-in and the crosshair gives way as it rises.
+func follow_hands(hands: ZeeViewModel) -> void:
+	set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.scope_fraction() > 0.0)
+	if scope != null and hands != null:
+		scope.follow(hands)
+
+
+## The aim this frame: the dot fades as the gun comes up; [param scoped] hides it for the scope.
 func set_aim(fraction: float, scoped: bool) -> void:
 	aim_fraction = clampf(fraction, 0.0, 1.0) if is_finite(fraction) else 0.0
 	_scoped = scoped

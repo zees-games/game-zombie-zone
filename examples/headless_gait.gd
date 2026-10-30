@@ -8,8 +8,8 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## How a zombie moves: the locomotion style is chosen from the speed it really has, so a
 ## zombie at a walking or slow chasing pace shambles and only one at running pace runs.
 
-const SECTIONS := 4
-const CHECKS := 21
+const SECTIONS := 5
+const CHECKS := 31
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -28,6 +28,7 @@ func _run() -> void:
 	_test_view()
 	_test_speeds()
 	_test_looks()
+	_test_poses()
 	await get_tree().process_frame
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
@@ -100,4 +101,54 @@ func _test_looks() -> void:
 	_check(float(brute["drag"]) > float(common["drag"]), "the brute drags less than the common: a heavy lurch, not a limp")
 	_check(float(common["swing"]) < 1.0 and float(common["drag"]) < float(common["swing"]), "the common's stride is cut short and the dragged leg is cut further")
 	_check(not ZzZombieView.SHAMBLE.is_empty() and float(ZzZombieView.SHAMBLE["stoop"]) == float(common["stoop"]), "the defaults are not overwritten by a look")
+	_sections_finished += 1
+
+
+## Every bone's pose rotation, so a pose that writes none of them shows as an empty difference.
+func _snapshot(view: ZzZombieView) -> Array:
+	var out: Array = []
+
+	for i in view._skeleton.get_bone_count():
+		out.append(view._skeleton.get_bone_pose_rotation(i))
+
+	return out
+
+
+func _moved(view: ZzZombieView, before: Array) -> int:
+	var n := 0
+
+	for i in before.size():
+		if not (before[i] as Quaternion).is_equal_approx(view._skeleton.get_bone_pose_rotation(i)):
+			n += 1
+
+	return n
+
+
+## A pose that pitches a bone the view never found does nothing; each one must move a limb.
+func _test_poses() -> void:
+	_sections_entered += 1
+	print("each attack pose moves bones")
+	var cases := [
+		[&"common", &"_pose_ground_strike"], [&"crawler", &"_pose_lunge"], [&"crawler", &"_pose_reach"],
+		[&"rider", &"_pose_hold"], [&"strangler", &"_pose_hold"], [&"ram", &"_pose_hold"], [&"leaper", &"_pose_hold"],
+		[&"strangler", &"_pose_reel"], [&"leaper", &"_pose_leap"], [&"brute", &"_pose_leap"],
+	]
+
+	for c in cases:
+		var view := ZzZombieView.new()
+		add_child(view)
+		view.build(c[0], 2)
+		view.present(STEP, ZzZombieBody.Anim.IDLE, 0)
+		view._strike_phase = ZzZombieView.HIT_AT + 0.05
+		var before := _snapshot(view)
+		view.call(c[1])
+		var arms := 0
+
+		for bone in ["UpperArm.L", "UpperArm.R", "UpperLeg.L", "UpperLeg.R"]:
+			var index: int = view._limbs.get(bone, -1)
+			arms += 1 if index >= 0 and not (before[index] as Quaternion).is_equal_approx(view._skeleton.get_bone_pose_rotation(index)) else 0
+
+		_check(_moved(view, before) > 0 and arms > 0, "%s %s moves a limb" % [c[0], c[1]], "%d bones, %d limbs" % [_moved(view, before), arms])
+		view.queue_free()
+
 	_sections_finished += 1

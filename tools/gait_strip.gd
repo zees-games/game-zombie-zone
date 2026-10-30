@@ -5,7 +5,9 @@ extends SceneTree
 ## xvfb-run -a godot --path . --script tools/gait_strip.gd -- --speeds=1.1,2.2,6.3 --out=res://screenshots/gait.png
 ## [/codeblock]
 ## One row per speed, one column per 0.2 s of walking, so a run cycle played slow or a shamble
-## that is not one shows at a glance. `--variant=N` picks the body, `--kind=` the kind.
+## that is not one shows at a glance. `--variant=N` picks the body, `--kind=` the kind,
+## `--anim=ATTACK|STRIKE_DOWN|PIN|LEAP|TONGUE|GRAB` shows that pose instead (use `--speeds=0`).
+## The cell grows with the kind's height, so a brute is not cropped.
 
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
@@ -35,6 +37,8 @@ func _initialize() -> void:
 			_kind = StringName(arg.trim_prefix("--kind="))
 		elif arg.begins_with("--variant="):
 			_variant = int(arg.trim_prefix("--variant="))
+		elif arg.begins_with("--anim="):
+			_anim = ZzZombieBody.Anim[arg.trim_prefix("--anim=")]
 		elif arg.begins_with("--every="):
 			_every = int(arg.trim_prefix("--every="))
 		elif arg.begins_with("--first="):
@@ -55,7 +59,8 @@ func _initialize() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-35, 155, 0)
 	root.add_child(sun)
-	var cell := Vector2(1.8, 2.4)
+	var tall_kind: float = float(ZzZombieView.look_for(_kind, _variant).get("height", 1.75))
+	var cell := Vector2(maxf(1.8, tall_kind * 1.0), maxf(2.4, tall_kind * 1.35))
 
 	for r in _speeds.size():
 		for c in COLS:
@@ -70,10 +75,10 @@ func _initialize() -> void:
 	var camera := Camera3D.new()
 	root.add_child(camera)
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.keep_aspect = Camera3D.KEEP_WIDTH
 	var tall := cell.y * float(_speeds.size())
-	camera.size = tall
-	var middle := Vector3(cell.x * float(COLS - 1) * 0.5, -tall * 0.5 + cell.y * 0.62, 0.0)
+	camera.size = cell.x * float(COLS)
+	var middle := Vector3(cell.x * float(COLS - 1) * 0.5, -float(_speeds.size() - 1) * cell.y * 0.5 + tall_kind * 0.5, 0.0)
 	camera.look_at_from_position(middle + Vector3(0.0, 0.0, 30.0), middle)
 	get_root().size = Vector2i(1500, int(1500.0 * tall / (cell.x * float(COLS))))
 

@@ -1584,7 +1584,7 @@ func _strike_curve() -> float:
 ## Swings [param bone]'s tip forward by [param angle] (negative backward) about the body's own side
 ## axis, whatever the bone's own axes are. The kit faces +Z in skeleton space.
 func _pitch(bone: StringName, angle: float) -> void:
-	var index: int = _bones.get(bone, -1)
+	var index: int = _bones.get(bone, _limbs.get(String(bone), -1))
 
 	if index >= 0:
 		_pitch_index(index, angle)

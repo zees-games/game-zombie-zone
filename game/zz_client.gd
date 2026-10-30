@@ -1205,6 +1205,7 @@ func _on_objective(index: int, state: int) -> void:
 
 
 func _on_hurt(amount: float, from: Vector3) -> void:
+	platform.note_hit(amount)
 	if game.effects != null:
 		var _flash := game.effects.flash(&"hurt")
 
@@ -1877,6 +1878,10 @@ func _build_settings() -> void:
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
+	var _flinch := platform.add_hit_flinch(
+		func() -> Variant: return player.sampler if _offline and player != null and player.sampler != null else _sampler,
+		func() -> Variant: return camera,
+		_aim_sent)
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
 	DotLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
@@ -2262,7 +2267,7 @@ func _present_aim() -> void:
 	if player != null and player.sampler != null:
 		player.sampler.look_scale = zoom
 	if hud != null:
-		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
+		hud.follow_hands(hands)
 		if weapons != null and weapons.arsenal != null:
 			hud.set_spread(weapons.arsenal.spread_now(), camera.fov, weapons.arsenal.crosshair_scale())
 
