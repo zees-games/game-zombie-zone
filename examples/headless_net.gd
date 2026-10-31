@@ -33,7 +33,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 30
-const CHECKS := 199
+const CHECKS := 200
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -364,6 +364,8 @@ func _build() -> bool:
 		_heard["effects"] = rows)
 	_client_bridge.gate_received.connect(func(gate: String) -> void:
 		_heard["gate"] = gate)
+	_client_bridge.armed_received.connect(func(who: int, weapon_id: StringName) -> void:
+		_heard["armed"] = _heard.get("armed", []) + [[who, weapon_id]])
 	_client_bridge.ammo_received.connect(func() -> void:
 		_heard["ammo"] = int(_heard.get("ammo", 0)) + 1)
 	_client_bridge.round_changed.connect(func(n: int, began: bool, won: bool, why: String) -> void:
@@ -504,6 +506,9 @@ func _test_a_client_joins() -> void:
 	await _steps(6)
 
 	_check(_client_bridge.local_player_id == SESSION, "the client is told who it is")
+	var told_armed: Array = _heard.get("armed", []).filter(func(row: Array) -> bool: return row[0] == SESSION)
+	_check(not told_armed.is_empty() and told_armed[0][1] != &"",
+		"a joiner is told what it holds (the load gate's weapon item), though it was armed before its READY", str(told_armed))
 	_check(_client_game.tick_rate == SERVER_TICK_RATE, "it adopts the server's tick rate", "%d" % _client_game.tick_rate)
 	_check(Engine.max_physics_steps_per_frame >= ceili(0.25 * float(SERVER_TICK_RATE)),
 		"the engine's step cap covers a quarter second at the adopted rate",

@@ -1191,7 +1191,11 @@ func _admit(peer_id: int) -> void:
 		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
 	for owner_session: int in _peer_of_player:
 		if int(_peer_of_player[owner_session]) == peer_id and game.players.has(player_key(owner_session)):
-			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(game.players[player_key(owner_session)])))
+			var mine: ZzPlayer = game.players[player_key(owner_session)]
+			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(mine)))
+			# The seat was armed before this READY, so that ARMED reached nobody; the client's load gate waits on it.
+			var held := mine.weapons.current_def() if mine.weapons != null else null
+			_tell(peer_id, ZzEvents.Kind.ARMED, ZzEvents.write_armed(owner_session, held.id if held != null else &""))
 	_tell(peer_id, ZzEvents.Kind.CLOCK, _clock_body())
 
 	if _nav_sent >= 0:
