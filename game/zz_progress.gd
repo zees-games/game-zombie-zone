@@ -107,7 +107,7 @@ static func schema() -> DotStatsSchema:
 	_add(out, SAVES, DotStatsDef.Kind.COUNTER, "Teammates freed", "saves", true)
 	_add(out, TEAM_HEALS, DotStatsDef.Kind.COUNTER, "Teammates healed", "heals", true)
 	_add(out, BOXES_OPENED, DotStatsDef.Kind.COUNTER, "Boxes opened", "boxes", true)
-	_add(out, DOWNS, DotStatsDef.Kind.COUNTER, "Times down", "downs", false)
+	_add(out, DOWNS, DotStatsDef.Kind.COUNTER, "Times down", "downs", true)
 	_add(out, DEATHS, DotStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
 	return out
 
