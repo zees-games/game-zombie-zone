@@ -8,7 +8,7 @@ const ZzMaterials := preload("../game/zz_materials.gd")
 ## Stats wiring through the shared addons: ammo profiles, per-shape materials, hitzone and penetration stats, rank.
 
 const SECTIONS := 3
-const CHECKS := 16
+const CHECKS := 19
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -109,6 +109,10 @@ func _test_rank() -> void:
 	game.progress.on_zombie_killed(p.player_id, &"brute", true)
 	var score := _stat(game, p, &"rank_score")
 	_check(score > 0.0, "kills raise the published rank score", str(score))
+	_check(game.progress.points.totals.get(p.player_id, 0) == 265, "a common (10) and a headshot brute (250 + 5) file 265 points", str(game.progress.points.totals.get(p.player_id, 0)))
+	_check(is_equal_approx(_stat(game, p, &"zz.points"), 265.0), "and the tracker holds them as zz.points")
+	game.progress.on_revived(p.player_id)
+	_check(game.progress.points.totals.get(p.player_id, 0) == 315, "a pick-up is an objective: 50 more")
 	game.progress.on_zombie_killed(p.player_id, &"brute", false)
 	_check(_stat(game, p, &"rank_score") != score, "a special kill moves it again")
 	_check(game.progress.rank != null and game.progress.rank.terms.size() >= 5, "the rank has its terms")

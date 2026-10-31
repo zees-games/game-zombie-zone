@@ -46,6 +46,8 @@ const DOWNS := &"zz.downs"
 const DEATHS := &"zz.deaths"
 ## The published skill figure the site orders by (dot-stats' DotStatsRank).
 const RANK_SCORE := &"rank_score"
+## Lifetime points, scored by dot-stats' DotStatsPoints from the events the game reports.
+const POINTS := &"zz.points"
 
 ## Seconds a person has been in the game, lifetime. Not a schema stat (nothing shows it): it is
 ## kept on the achievements' progress with [method DotAchievementTracker.set_value], which files
@@ -60,6 +62,8 @@ var link: DotAchievementStatsLink = null
 ## Files hits by zone and penetration; its ids are entity ids.
 var feed: DotStatsEventFeed = null
 var rank: DotStatsRank = null
+## The one points score; amounts live in its source table, the game only reports events.
+var points: DotStatsPoints = null
 ## `func(entity_id) -> StringName`: the survivor an entity is, or empty for a zombie or the world. Set by the game.
 var player_of_entity: Callable = Callable()
 
@@ -117,6 +121,7 @@ static func schema() -> DotStatsSchema:
 	_add(out, DOWNS, DotStatsDef.Kind.COUNTER, "Times down", "downs", true)
 	_add(out, DEATHS, DotStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
 	var _rank := DotStatsRank.declare(out, RANK_SCORE, "Rank score")
+	var _points := DotStatsPoints.declare(out, POINTS, "Points")
 	var _pen := DotStatsPenetration.declare(out)
 	var _zones := DotStatsHitzones.declare(out)
 	return out
@@ -299,6 +304,11 @@ func _build_feed() -> void:
 			return StringName("npc:%s" % str(id))
 		var body: ZzPlayer = players.get(who)
 		return _begin_for(who, body) if body != null and not body.is_bot else &""
+	points = DotStatsPoints.new()
+	points.stat_id = POINTS
+	# A kill pays 10 times its weight (common 1, special 5, brute 25, as the survivor's in-game points); a rescue is an objective.
+	points.sources = {DotStatsPoints.SOURCE_KILL: 10, DotStatsPoints.SOURCE_HEADSHOT: 5, DotStatsPoints.SOURCE_OBJECTIVE: 50}
+	points.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(StringName(who), stat, value)
 	rank = DotStatsRank.new()
 	rank.stat_id = RANK_SCORE
 	rank.terms = [
@@ -467,6 +477,9 @@ func leave(player_id: StringName) -> void:
 	_in_round.erase(player_id)
 	_map_kills.erase(player_id)
 
+	if points != null:
+		points.forget(player_id)
+
 	var key: StringName = _keys.get(player_id, player_id)
 	_keys.erase(player_id)
 	_ids.erase(key)
@@ -522,6 +535,13 @@ func on_survived(player_id: StringName, hold: bool) -> void:
 
 
 func on_zombie_killed(player_id: StringName, kind: StringName, headshot: bool) -> void:
+	if points != null:
+		var weight := 1.0 if kind == &"common" or kind == &"sleeper" else (25.0 if kind == &"brute" else 5.0)
+		var _got := points.award(player_id, DotStatsPoints.SOURCE_KILL, weight)
+
+		if headshot:
+			var _bonus := points.award(player_id, DotStatsPoints.SOURCE_HEADSHOT)
+
 	match kind:
 		&"common":
 			record(player_id, COMMONS_KILLED)
@@ -541,10 +561,17 @@ func on_zombie_killed(player_id: StringName, kind: StringName, headshot: bool) -
 
 
 func on_revived(by: StringName) -> void:
+	_award_rescue(by)
 	record(by, REVIVES)
 
 
+func _award_rescue(by: StringName) -> void:
+	if points != null:
+		var _got := points.award(by, DotStatsPoints.SOURCE_OBJECTIVE)
+
+
 func on_saved(by: StringName) -> void:
+	_award_rescue(by)
 	record(by, SAVES)
 
 
