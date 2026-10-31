@@ -446,6 +446,12 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		if layer != null:
 			layer.dropped.connect(func(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, _owner: int) -> void:
 				_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, state, at, velocity, layer.rules.lifetime, false)))
+			var changed := func(id: int) -> void:
+				var pose := layer.pose_of(id)
+				if not pose.is_empty():
+					_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, pose["state"], pose["at"], pose["velocity"], layer.rules.lifetime, bool(pose["rest"])))
+			layer.pushed.connect(func(id: int, _at: Transform3D, _v: Vector3, _spin: Vector3) -> void: changed.call(id))
+			layer.ammo_changed.connect(func(id: int, _state: Dictionary) -> void: changed.call(id))
 			layer.settled.connect(func(id: int, at: Transform3D) -> void:
 				_broadcast(ZzEvents.Kind.WEAPON_SETTLED, ZzEvents.write_weapon_settled(id, at)))
 			layer.removed.connect(func(id: int, taker: int) -> void:

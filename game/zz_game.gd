@@ -2782,6 +2782,8 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		cancel_use(player)
 
 	weapon_layer.take(player)
+	weapon_layer.hook_shots()
+	var weapon_aimed := weapon_layer.use_key(player, (held & ZzNetCommand.ACT_USE) != 0, delta) and player.using == &""
 
 	_box_in_hands(player, pressed)
 	_flashlight_hands(player, pressed)
@@ -2825,7 +2827,7 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		_begin_deploy(player)
 	elif consumables.may_start(player, (held & ZzNetCommand.ACT_HEAL) != 0) and player.medkits > 0:
 		_begin_heal(player)
-	elif (held & ZzNetCommand.ACT_USE) != 0 and (pressed & ZzNetCommand.ACT_USE) != 0:
+	elif not weapon_aimed and (held & ZzNetCommand.ACT_USE) != 0 and (pressed & ZzNetCommand.ACT_USE) != 0:
 		_begin_use(player)
 
 
