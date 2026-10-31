@@ -41,6 +41,7 @@ func _ready() -> void:
 	game.name = "World"
 	game.config = config
 	game.config_binder = loaded.value
+	game.stats_file = "user://zombiezone_stats.json"
 	# [b]The engine's rate, which the server has already set from `sv_tickrate`.[/b] Read
 	# rather than chosen: this scene is loaded after the server has booted and executed its
 	# config, so the number is already decided — and a game that picked its own would be a

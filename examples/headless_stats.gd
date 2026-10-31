@@ -7,8 +7,8 @@ const ZzMaterials := preload("../game/zz_materials.gd")
 
 ## Stats wiring through the shared addons: ammo profiles, per-shape materials, hitzone and penetration stats, rank.
 
-const SECTIONS := 3
-const CHECKS := 19
+const SECTIONS := 4
+const CHECKS := 25
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -16,6 +16,8 @@ const TICK := 1.0 / float(TICK_RATE)
 var _sections_entered := 0
 var _sections_finished := 0
 var _worlds: Array[ZzGame] = []
+## Set before _world(): the lifetime file the next world keeps.
+var _stats_file := ""
 
 
 func _ready() -> void:
@@ -30,6 +32,7 @@ func _run() -> void:
 	await _test_ammo()
 	await _test_stats()
 	await _test_rank()
+	await _test_rejoin()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -119,6 +122,40 @@ func _test_rank() -> void:
 	_finished()
 
 
+func _test_rejoin() -> void:
+	_section("rejoin: lifetime totals seed the rank baseline and persist")
+	var path := "user://headless_stats_zz.json"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	_stats_file = path
+	var game := await _team(1, _quiet)
+	_stats_file = ""
+	var progress := game.progress
+	var p := game.survivors()[0]
+	var tracker := progress.stats
+	_check(tracker.store is DotStatsStoreFile, "a game with stats_file keeps a file store")
+	var id := p.player_id
+	var key := progress.key_of(id)
+	var heads := StringName(progress.HEADSHOTS)
+	progress.record(id, heads, 3.0)
+	progress.leave(id)
+	var _w: DotResult = await tracker.flush_store()
+	var stored: float = (await tracker.store.values_for(key)).value.get_value(heads)
+	_check(stored == 3.0, "a leave files the session into the lifetime store", str(stored))
+	progress.record(id, heads, 2.0)
+	var base: DotStatsValues = progress.rank.baselines.get(id, null)
+	_check(base != null and base.get_value(heads) == 3.0, "a rejoin reads the stored total as the rank baseline")
+	var _w2: DotResult = await tracker.flush()
+	var after: float = (await tracker.store.values_for(key)).value.get_value(heads)
+	_check(after == 5.0, "a flush after the rejoin adds only the new session", str(after))
+	var _w3: DotResult = await tracker.flush()
+	_check((await tracker.store.values_for(key)).value.get_value(heads) == 5.0, "a second flush adds nothing")
+	var reread := DotStatsStoreFile.new(path)
+	reread.schema = tracker.schema
+	_check((await reread.values_for(key)).value.get_value(heads) == 5.0, "the file holds the same total for a fresh process")
+	_finished()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
 func _world(configure: Callable = Callable()) -> ZzGame:
 	for old in _worlds.duplicate():
 		await _dispose(old)
@@ -142,6 +179,7 @@ func _world(configure: Callable = Callable()) -> ZzGame:
 	game.tick_rate = TICK_RATE
 	game.authoritative = true
 	game.register_service = false
+	game.stats_file = _stats_file
 	add_child(game)
 	game.set_physics_process(false)
 	_worlds.append(game)

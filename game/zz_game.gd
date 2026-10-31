@@ -252,6 +252,9 @@ var effects: DotFxManager = null
 var spectate: ZzSpectate = null
 var progress: ZzProgress = null
 
+## Where lifetime stat totals persist (a user:// JSON file). Empty keeps none, so a suite is the same on every run; the server sets it.
+var stats_file: String = ""
+
 ## Server only. A client is told about zombies, pins, hazards and loot by the bridge.
 var horde: ZzHorde = null
 var pins: ZzPins = null
@@ -1347,6 +1350,7 @@ func _build_progress() -> void:
 	progress.player_of_entity = func(entity: int) -> StringName:
 		var body := player_for_entity(entity)
 		return body.player_id if body != null else &""
+	progress.stats_file = stats_file
 	add_child(progress)
 
 	var ready_now := progress.setup(config.progress_directory, config.report_progress)

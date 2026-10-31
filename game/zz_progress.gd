@@ -80,6 +80,9 @@ var _map_kills: Dictionary = {}
 ## "" for none. Set by the module from dot-platform; see the class note.
 var durable_key_fn: Callable = Callable()
 
+## A user:// JSON file the lifetime totals persist in; empty keeps none. Set before [method setup].
+var stats_file: String = ""
+
 ## World id -> the key their numbers are filed under, and back. Fixed at [method record]'s
 ## first reading for them.
 const PLAYTIME_FLUSH := 30.0
@@ -254,6 +257,9 @@ func setup(directory: String, report: bool) -> DotResult:
 	stats.schema = schema()
 	stats.report_to_backbone = report
 	stats.define_on_start = report
+	# Before add_child, so the tracker's flush timer also writes the store.
+	if stats_file != "":
+		stats.store = DotStatsStoreFile.new(stats_file)
 	add_child(stats)
 
 	var counted := stats.start()
@@ -320,6 +326,7 @@ func _build_feed() -> void:
 		{"stat": String(DEATHS), "weight": -0.5},
 	]
 	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(who, stat, value)
+	rank.key_fn = func(who: Variant) -> StringName: return _key(StringName(who))
 
 
 ## Files a survivor's landed hit by body zone and penetration (shots by anybody else are refused by the feed).
@@ -373,6 +380,9 @@ func _begin_for(player_id: StringName, body: ZzPlayer) -> StringName:
 	if not stats.has_player(key):
 		stats.begin(key, body.display_name)
 		_begin(key)
+		# Before the session's first flush, or the flushed figures would count twice. The file store answers without suspending.
+		if stats.store != null and rank != null:
+			rank.load_baseline(stats.store, player_id)
 
 	return key
 
