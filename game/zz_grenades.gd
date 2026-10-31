@@ -47,12 +47,12 @@ func _load() -> bool:
 	var paths := ["aw_grenade.gd", "aw_utility_zones.gd", "aw_grenade_rules.gd"]
 
 	for file: String in paths:
-		if not ResourceLoader.exists(ZzPaths.rebase(DIR + file)):
+		if _path(file).is_empty():
 			return false
 
-	_grenade = load(ZzPaths.rebase(DIR + paths[0]))
-	var zones_script: GDScript = load(ZzPaths.rebase(DIR + paths[1]))
-	rules = (load(ZzPaths.rebase(DIR + paths[2])) as GDScript).new()
+	_grenade = load(_path(paths[0]))
+	var zones_script: GDScript = load(_path(paths[1]))
+	rules = (load(_path(paths[2])) as GDScript).new()
 
 	if _grenade == null or zones_script == null:
 		return false
@@ -65,6 +65,15 @@ func _load() -> bool:
 	# The blast's own damage goes through the same callable, so a frag, a fire pulse and a flash's victims share one rule.
 	zones.set(&"apply_blast_damage", true)
 	return true
+
+
+## The host's copy of an arena-weapons file first: loading a bundled copy of a class the host already declares errors "hides a global script class".
+func _path(file: String) -> String:
+	for path: String in [DIR + file, ZzPaths.rebase(DIR + file)]:
+		if ResourceLoader.exists(path):
+			return path
+
+	return ""
 
 
 ## Registers the `sv_grenade_*` cvars ([param add] is the module's `add_cvar`).
