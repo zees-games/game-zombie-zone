@@ -10,8 +10,8 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
-const SECTIONS := 3
-const CHECKS := 20
+const SECTIONS := 4
+const CHECKS := 26
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -33,6 +33,7 @@ func _run() -> void:
 	await _test_throw()
 	await _test_rules()
 	await _test_wire()
+	await _test_shot_hold()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -156,6 +157,63 @@ func _test_rules() -> void:
 	off.weapon_layer.rules.on_death = false
 	off.weapon_layer.drop_dead(s)
 	_check(off.weapon_layer.drops.count() == 0, "sv_weapon_drop_death 0 leaves nothing")
+	_finished()
+
+
+func _test_shot_hold() -> void:
+	_section("shot and hold: a traced shot wakes a drop, a tap does not swap, a hold does")
+	var game := await _solo()
+	var p := game.survivors()[0]
+	var ars := p.weapons.arsenal
+	var layer := game.weapon_layer
+	var drops := layer.drops
+	var id := await _equip_primary(game, p)
+	layer.rules.pickup_radius = 0.0
+	layer.rules.pickup_delay = 0.0
+	_check(layer.throw(p), "a throw is accepted")
+	for _k in 20:
+		await _sim(game, 1.0)
+		if drops.active_count() == 0:
+			break
+	var snap: Dictionary = drops.snapshot()[0]
+	var rest: Vector3 = snap["at"].origin if snap.has("at") else Vector3.ZERO
+	var awake: int = drops.active_count()
+	var tr: DotTrace = game.combat.trace
+	var _miss := tr.ray(rest + Vector3(3, 1, 0), Vector3.DOWN, 5.0)
+	_check(drops.active_count() == awake, "a trace that misses wakes nothing")
+	var _hit := tr.ray(rest + Vector3(0, 1, 0), Vector3.DOWN, 5.0)
+	_check(drops.active_count() > awake, "a traced shot wakes the dropped weapon")
+
+	var def := ars.catalogue.get_def(id)
+	var other := &""
+	for cid in ZzWeapons.ids_of(&"primary"):
+		if cid != id and ars.catalogue.get_def(cid).slot == def.slot:
+			other = cid
+			break
+	var _g := game.arm(p, other)
+	_check(other != &"" and _holds(p, other), "another primary fills the slot")
+	var slot_def := ars.catalogue.get_def(other)
+	if ars.carry != null:
+		ars.carry.slot_capacity = ars.weapons_in(slot_def.slot).size()
+	var third := &""
+	for cid in ZzWeapons.ids_of(&"primary"):
+		if not _holds(p, cid) and ars.catalogue.get_def(cid).slot == slot_def.slot:
+			third = cid
+			break
+	var at: Vector3 = p.eye_position() + p.aim_direction() * 1.0
+	drops.clear()
+	layer.rules.pickup_radius = 2.0
+	var state: Dictionary = (snap["state"] as Dictionary).duplicate()
+	state["id"] = third
+	var d := drops.spawn(state, at, Vector3.ZERO, 0)
+	await _sim(game, 0.02)
+	for _k in 3:
+		var _tap := layer.use_key(p, true, 0.05)
+		var _rel := layer.use_key(p, false, 0.05)
+	_check(third != &"" and drops.has_drop(d) and not _holds(p, third), "a tap on a different weapon in a full slot swaps nothing")
+	for _k in 40:
+		var _hold := layer.use_key(p, true, 0.05)
+	_check(not drops.has_drop(d) and _holds(p, third), "a hold takes it")
 	_finished()
 
 
