@@ -18,8 +18,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 14
-const CHECKS := 90
+const SECTIONS := 15
+const CHECKS := 95
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -39,6 +39,7 @@ func _run() -> void:
 	print("")
 
 	_test_the_weapon_art_is_vendored()
+	_test_every_pack_weapon_sounds_and_reloads()
 
 	if await _test_armed():
 		_test_view_feel_wiring()
@@ -83,6 +84,48 @@ func _test_the_weapon_art_is_vendored() -> void:
 	var problems := DotWeaponSound.check_stock()
 	_check(problems.is_empty(), "every weapon class resolves a non-silent, unclipped voice", ", ".join(problems))
 	_check(DotWeaponSound.pick_tail(&"rifle", true) != null and DotWeaponSound.pick_tail(&"rifle", false) == null, "indoors a shot gets a tail, outdoors none")
+	_finished()
+
+
+## The modern pack's weapons each resolve a fire, draw and (guns) reload and dry sound from dot-audio's
+## stock, and a gun a reload clip; a melee weapon and a grenade a fire sound. A weapon missing from
+## the pack's class table plays nothing, and no other suite would hear it.
+func _test_every_pack_weapon_sounds_and_reloads() -> void:
+	_section("Every modern-pack weapon resolves its sounds and its reload clip")
+	var pack_path := "res://addons/zz_modern_weapons/zz_weapon_pack.gd"
+	if not ResourceLoader.exists(pack_path):
+		_check(true, "the modern pack is not installed: nothing to resolve")
+		for i in 4:
+			_check(true, "(skipped without the pack)")
+		_finished()
+		return
+	var sound_script: GDScript = load("res://addons/zz_modern_weapons/view/zz_weapon_sound.gd")
+	var pose_script: GDScript = load("res://addons/zz_modern_weapons/view/zz_weapon_pose.gd")
+	var defs: Array = (load(pack_path) as GDScript).call("weapons")
+	var no_fire: PackedStringArray = []
+	var no_draw: PackedStringArray = []
+	var no_reload: PackedStringArray = []
+	var no_clip: PackedStringArray = []
+	var guns := 0
+	for def: DotWeaponDef in defs:
+		var id := def.id
+		if sound_script.call("stream_for", id, &"fire") == null:
+			no_fire.append(String(id))
+		var bash: bool = sound_script.CLASSES.get(id, &"") == &"bash"
+		if not bash and sound_script.call("stream_for", id, &"draw") == null:
+			no_draw.append(String(id))
+		if def.uses_magazine():
+			guns += 1
+			if sound_script.call("stream_for", id, &"reload") == null or sound_script.call("stream_for", id, &"dry") == null:
+				no_reload.append(String(id))
+			var keys: Array = pose_script.call("reload_keys_for", id)
+			if keys.size() < 2:
+				no_clip.append(String(id))
+	_check(defs.size() >= 20 and guns >= 15, "the pack lists its weapons and magazine guns", "%d, %d guns" % [defs.size(), guns])
+	_check(no_fire.is_empty(), "every weapon has a fire sound", ", ".join(no_fire))
+	_check(no_draw.is_empty(), "every gun, blade and grenade has a draw sound", ", ".join(no_draw))
+	_check(no_reload.is_empty(), "every magazine gun has a reload and a dry sound", ", ".join(no_reload))
+	_check(no_clip.is_empty(), "every magazine gun has a reload clip (two or more keys)", ", ".join(no_clip))
 	_finished()
 
 
