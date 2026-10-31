@@ -44,6 +44,8 @@ const TEAM_HEALS := &"zz.team_heals"
 const BOXES_OPENED := &"zz.boxes_opened"
 const DOWNS := &"zz.downs"
 const DEATHS := &"zz.deaths"
+## The published skill figure the site orders by (dot-stats' DotStatsRank).
+const RANK_SCORE := &"rank_score"
 
 ## Seconds a person has been in the game, lifetime. Not a schema stat (nothing shows it): it is
 ## kept on the achievements' progress with [method DotAchievementTracker.set_value], which files
@@ -55,6 +57,11 @@ signal earned(player_id: StringName, title: String, points: int)
 var stats: DotStatsTracker = null
 var achievements: DotAchievementTracker = null
 var link: DotAchievementStatsLink = null
+## Files hits by zone and penetration; its ids are entity ids.
+var feed: DotStatsEventFeed = null
+var rank: DotStatsRank = null
+## `func(entity_id) -> StringName`: the survivor an entity is, or empty for a zombie or the world. Set by the game.
+var player_of_entity: Callable = Callable()
 
 ## The world's own dictionary of players, shared. See [ZzSpectate] for why not a reference to it.
 var players: Dictionary = {}
@@ -109,6 +116,9 @@ static func schema() -> DotStatsSchema:
 	_add(out, BOXES_OPENED, DotStatsDef.Kind.COUNTER, "Boxes opened", "boxes", true)
 	_add(out, DOWNS, DotStatsDef.Kind.COUNTER, "Times down", "downs", true)
 	_add(out, DEATHS, DotStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
+	var _rank := DotStatsRank.declare(out, RANK_SCORE, "Rank score")
+	var _pen := DotStatsPenetration.declare(out)
+	var _zones := DotStatsHitzones.declare(out)
 	return out
 
 
@@ -246,6 +256,8 @@ func setup(directory: String, report: bool) -> DotResult:
 	if not counted.ok:
 		return counted.wrap("zombiezone stats")
 
+	_build_feed()
+
 	achievements = DotAchievementTracker.new()
 	achievements.name = "Achievements"
 	achievements.catalogue = catalogue()
@@ -277,6 +289,41 @@ func setup(directory: String, report: bool) -> DotResult:
 	add_child(link)
 
 	return link.start().wrap("zombiezone's stats-to-achievements link")
+
+
+func _build_feed() -> void:
+	feed = DotStatsEventFeed.new(stats)
+	feed.key_of = func(id: Variant) -> StringName:
+		var who: StringName = player_of_entity.call(id) if player_of_entity.is_valid() else StringName(str(id))
+		if who == &"":
+			return StringName("npc:%s" % str(id))
+		var body: ZzPlayer = players.get(who)
+		return _begin_for(who, body) if body != null and not body.is_bot else &""
+	rank = DotStatsRank.new()
+	rank.stat_id = RANK_SCORE
+	rank.terms = [
+		{"stat": String(COMMONS_KILLED), "weight": 0.1},
+		{"stat": String(SPECIALS_KILLED), "weight": 1.0},
+		{"stat": String(HEADSHOTS), "weight": 0.25},
+		{"stat": String(REVIVES), "weight": 1.0},
+		{"stat": String(SAVES), "weight": 1.0},
+		{"stat": String(DEATHS), "weight": -0.5},
+	]
+	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(who, stat, value)
+
+
+## Files a survivor's landed hit by body zone and penetration (shots by anybody else are refused by the feed).
+func on_damage(damage: DotDamage) -> void:
+	if feed != null and damage.health_lost > 0.0:
+		var _n := DotStatsDamage.report(feed, damage)
+
+
+## Republishes [param player_id]'s rank score from this session's numbers.
+func publish_rank(player_id: StringName) -> void:
+	var body: ZzPlayer = players.get(player_id)
+	if rank == null or stats == null or body == null or body.is_bot:
+		return
+	var _s := rank.publish_lifetime(player_id, stats.session_values(_begin_for(player_id, body)), stats.schema)
 
 
 # --- Counting ---------------------------------------------------------------
@@ -490,6 +537,8 @@ func on_zombie_killed(player_id: StringName, kind: StringName, headshot: bool) -
 	if headshot:
 		record(player_id, HEADSHOTS)
 
+	publish_rank(player_id)
+
 
 func on_revived(by: StringName) -> void:
 	record(by, REVIVES)
@@ -514,6 +563,7 @@ func on_downed(player_id: StringName) -> void:
 
 func on_died(player_id: StringName) -> void:
 	record(player_id, DEATHS)
+	publish_rank(player_id)
 
 
 func _on_unlocked(player: String, achievement: DotAchievement) -> void:

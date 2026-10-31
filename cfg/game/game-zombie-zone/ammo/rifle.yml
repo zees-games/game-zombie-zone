@@ -1,0 +1,15 @@
+# Ammo type: Rifle. Penetration power is metres of resistance-1 material; materials/body_zones are "id:cost" lists.
+name: "Rifle"
+penetration: 0.6
+max_depth: 1.0
+default_resistance: 1.0
+materials: "glass:0.1,wood:0.4,dirt:1,concrete:2.5,metal:4,steel:6"
+body_cost: 0.2
+body_zones: "head:1.5,chest:1,legs:0.6,arms:0.6"
+min_damage: 0.2
+max_passes: 4
+guns: "zz_m4,zz_ak,zz_scar,zz_bren,zz_lmg,zz_aa12"
+default: false
+ricochet_materials: "metal,steel,concrete"
+ricochet_angle: 12
+ricochet_keep: 0.6

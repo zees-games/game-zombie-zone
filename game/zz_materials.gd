@@ -115,6 +115,35 @@ const SURFACES := {
 	"flat": {"pattern": "flat", "a": Color(0.8, 0.8, 0.8), "b": Color(0.8, 0.8, 0.8), "metres": 2.0, "rough": 0.8},
 }
 
+## A mat's material for a bullet's penetration (the ids of the `ammo` profiles' `materials`); a mat not here costs the profile's default.
+const PENETRATION_OF := {
+	"glass": "glass", "whiteboard": "glass",
+	"wood": "wood", "wood_floor": "wood", "parquet": "wood", "gym": "wood", "carpet": "wood", "fabric": "wood",
+	"dirt": "dirt", "grass": "dirt", "sand": "dirt", "hedge": "dirt", "rubber": "dirt",
+	"concrete": "concrete", "stone": "concrete", "brick": "concrete", "sidewalk": "concrete", "asphalt": "concrete",
+	"ceiling": "concrete", "paint": "concrete", "plaster": "concrete", "tile": "concrete", "tile_small": "concrete",
+	"tile_check": "concrete", "roof": "concrete", "chalkboard": "concrete",
+	"metal": "metal", "locker": "metal",
+}
+
+
+## The penetration material of a hit: the hit box's `surface` meta (one body is built of many boxes, so it is on the shape), else empty.
+static func penetration_of(collider: Object, shape_index: int) -> StringName:
+	if shape_index < 0 or not collider is CollisionObject3D:
+		return &""
+	var body := collider as CollisionObject3D
+	var total := 0
+	for o in body.get_shape_owners():
+		total += body.shape_owner_get_shape_count(o)
+	if shape_index >= total:
+		return &""
+	var owner_id := body.shape_find_owner(shape_index)
+	var node := body.shape_owner_get_owner(owner_id) as Node if owner_id >= 0 else null
+	if node == null or not node.has_meta(&"surface"):
+		return &""
+	return StringName(PENETRATION_OF.get(str(node.get_meta(&"surface")), ""))
+
+
 ## Where the photographic kinds are (dot-map's DotMapSurfaces), in this game's own tree: the
 ## client shell bundles dot-map without its textures, so the ones used ship in this pack
 ## (assets/surfaces, [code]tools/sync-surfaces.sh[/code] in dot-map writes it). Rebased, for a

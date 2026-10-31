@@ -24,6 +24,7 @@ const ZzMapObjects := preload("zz_map_objects.gd")
 const ZzSpawners := preload("zz_spawners.gd")
 const ZzShop := preload("zz_shop.gd")
 const ZzMap := preload("zz_map.gd")
+const ZzMaterials := preload("zz_materials.gd")
 const ZzPacks := preload("zz_packs.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzMapCommands := preload("zz_map_commands.gd")
@@ -237,6 +238,9 @@ var catalogue: ZzCatalogue = null
 var content_index: DotContentIndex = null
 var props_catalogue: ZzProps = null
 var combat: DotCombatManager = null
+
+## Ammo profiles (`cfg/game/game-zombie-zone/ammo`): what each gun's round can penetrate and ricochet off.
+var ammo_types: DotWeaponAmmoTypes = _load_ammo_types()
 
 ## `func(player_id: StringName) -> bool`: whether a survivor may be hurt now, assigned by the
 ## module from dot-game's `can_peer_be_harmed`. Unset offline, and a stand-in is never loading.
@@ -1105,6 +1109,7 @@ func _build_combat() -> void:
 	var trace := DotTracePhysics.new()
 	trace.bind(get_world_3d())
 	trace.collision_mask = world_mask()
+	trace.material_shape_fn = ZzMaterials.penetration_of
 
 	combat.trace = trace
 	combat.resolver = DotDamageResolver.with_rules(damage_rules)
@@ -1120,6 +1125,15 @@ func _build_combat() -> void:
 	add_child(combat)
 	combat.damage_applied.connect(_on_hit_landed)
 	combat.damage_applied.connect(_on_limb_damage)
+	combat.damage_applied.connect(func(damage: DotDamage) -> void:
+		if progress != null and DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
+			progress.on_damage(damage))
+
+
+static func _load_ammo_types() -> DotWeaponAmmoTypes:
+	var types := DotWeaponAmmoTypes.new()
+	var _n := types.load_set(DotWeaponAmmoTypes.make_set("", "game-zombie-zone"))
+	return types
 
 
 static func _type(id: StringName, armour_share: float) -> DotDamageType:
@@ -1330,6 +1344,9 @@ func _build_progress() -> void:
 	progress = ZzProgress.new()
 	progress.name = "Progress"
 	progress.players = players
+	progress.player_of_entity = func(entity: int) -> StringName:
+		var body := player_for_entity(entity)
+		return body.player_id if body != null else &""
 	add_child(progress)
 
 	var ready_now := progress.setup(config.progress_directory, config.report_progress)
@@ -3791,6 +3808,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 			return false
 
 		player.weapons = rig
+		rig.arsenal.ammo_types = ammo_types
 		combat_feel.attach(rig.arsenal)
 		_wire_carry(player)
 
