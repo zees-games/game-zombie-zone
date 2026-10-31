@@ -2800,7 +2800,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 	weapon_layer.take(player)
 	weapon_layer.hook_shots()
-	var weapon_aimed := weapon_layer.use_key(player, (held & ZzNetCommand.ACT_USE) != 0, delta) and player.using == &""
+	# A body that can be shocked beats the weapon it dropped lying under the same aim.
+	var weapon_aimed := not _defib_ready_for(player) and weapon_layer.use_key(player, (held & ZzNetCommand.ACT_USE) != 0, delta) \
+		and player.using == &""
 
 	_box_in_hands(player, pressed)
 	_flashlight_hands(player, pressed)
@@ -3024,6 +3026,11 @@ func _defib_of(player: ZzPlayer) -> DotDefib:
 func _defib_check(user: ZzPlayer, body: ZzPlayer) -> DotResult:
 	var age := now() - body.died_at if body.died_at >= 0.0 else 0.0
 	return _defib_of(user).check(now(), age, body.feet().distance_to(user.feet()))
+
+
+func _defib_ready_for(player: ZzPlayer) -> bool:
+	var body := _body_to_defib(player)
+	return body != null and _defib_check(player, body).ok
 
 
 func _begin_defib(player: ZzPlayer, body: ZzPlayer) -> void:
