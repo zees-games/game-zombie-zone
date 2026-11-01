@@ -7,6 +7,7 @@ extends SceneTree
 ## One row per speed, one column per 0.2 s of walking, so a run cycle played slow or a shamble
 ## that is not one shows at a glance. `--variant=N` picks the body, `--kind=` the kind,
 ## `--anim=ATTACK|STRIKE_DOWN|PIN|LEAP|TONGUE|GRAB` shows that pose instead (use `--speeds=0`).
+## `--hit=head|chest` flinches once at the start, `--rise` sits first and then plays `--anim`.
 ## The cell grows with the kind's height, so a brute is not cropped.
 
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -25,6 +26,8 @@ var _variant := 1
 var _views: Array[ZzZombieView] = []
 var _frames := 0
 var _anim := ZzZombieBody.Anim.WALK
+var _hit := ""
+var _rise := false
 
 
 func _initialize() -> void:
@@ -43,6 +46,10 @@ func _initialize() -> void:
 			_every = int(arg.trim_prefix("--every="))
 		elif arg.begins_with("--first="):
 			_first = int(arg.trim_prefix("--first="))
+		elif arg.begins_with("--hit="):
+			_hit = arg.trim_prefix("--hit=")
+		elif arg == "--rise":
+			_rise = true
 		elif arg == "--run-state":
 			_anim = ZzZombieBody.Anim.RUN
 
@@ -95,8 +102,15 @@ func _process(_delta: float) -> bool:
 
 			var view := _views[r * COLS + c]
 			var home := view.global_position
+
+			# --hit=head|chest: one flinch at the start; --rise: sitting for a second, then the anim.
+			if _frames == 1 and _hit != "":
+				view.flinch(1.0, _hit == "head")
+			var anim := _anim
+			if _rise and _frames < 20:
+				anim = ZzZombieBody.Anim.SIT
 			view.global_position = home + Vector3(_speeds[r] * STEP * float(_frames), 0.0, 0.0)
-			view.present(STEP, _anim, 0)
+			view.present(STEP, anim, 0)
 			view.global_position = home
 
 	if _frames == _first + (COLS - 1) * _every + 2:

@@ -228,12 +228,16 @@ const HIT_AT := 0.37
 
 
 ## Clips that loop; the rest play once and hold their last frame.
-const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run", &"ual_zombie_idle", &"ual_zombie_walk", &"ual_sprint"]
+const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run", &"ual_zombie_idle", &"ual_zombie_walk", &"ual_sprint", &"ual_jog", &"ual_crouch_walk"]
 
-## Real clips (Universal Animation Library, CC0, baked by dot-player-char) a common plays in place
+## Real clips (Universal Animation Library, CC0, baked by dot-player-char) a body plays in place
 ## of the made one when they are in the library; absent, the made clip plays as before.
 const UAL_FOR := {&"idle": &"ual_zombie_idle", &"walk": &"ual_zombie_walk", &"run_arms": &"ual_sprint",
 	&"attack": &"ual_zombie_scratch", &"hit": &"ual_hit_chest"}
+## Under this ground speed (m/s) a run is the jog; the clips' own ground speeds, for the playback rate.
+const JOG_BELOW := 4.2
+const JOG_NATURAL := 3.6
+const CROUCH_NATURAL := 1.4
 const UAL_LIBRARY := "res://addons/dot_player_char/people/people_ual.res"
 const UAL_FROM := "res://addons/dot_player_char/people/people_matt.glb"
 
@@ -574,7 +578,7 @@ static func _library(id: StringName) -> AnimationLibrary:
 
 
 ## The clips [param id] plays: its own, or (a survivor body) zombie_basic's carried over onto its
-## skeleton by [method _retarget], once per body and shared.
+## skeleton by [method DotHumanoidClips.retarget], once per body and shared.
 static func _library_for(id: StringName, skeleton: Skeleton3D) -> AnimationLibrary:
 	if not CLIPS_FROM.has(id):
 		return _library(id)
@@ -582,7 +586,7 @@ static func _library_for(id: StringName, skeleton: Skeleton3D) -> AnimationLibra
 	var key := StringName("%s<-%s" % [id, CLIPS_FROM[id]])
 
 	if not _libraries.has(key):
-		_libraries[key] = _retarget(_library(CLIPS_FROM[id]), _rests(CLIPS_FROM[id]), skeleton)
+		_libraries[key] = DotHumanoidClips.retarget(_library(CLIPS_FROM[id]), _rests(CLIPS_FROM[id]), skeleton)
 
 	return _libraries[key]
 
@@ -602,15 +606,12 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 
 		if real != null and kit != null:
 			var probe := kit.instantiate()
-			var from := {}
-			var kit_skeleton := probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D
-			for i in kit_skeleton.get_bone_count():
-				from[kit_skeleton.get_bone_name(i)] = kit_skeleton.get_bone_rest(i)
+			var from := DotHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
 			probe.free()
 			merged = AnimationLibrary.new()
 			for clip in library.get_animation_list():
 				var _kept := merged.add_animation(clip, library.get_animation(clip))
-			var carried := _retarget(real, from, skeleton)
+			var carried := DotHumanoidClips.retarget(real, from, skeleton)
 			for clip in carried.get_animation_list():
 				var animation := carried.get_animation(clip)
 				animation.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(StringName(clip)) else Animation.LOOP_NONE
@@ -624,64 +625,18 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 static func _rests(id: StringName) -> Dictionary:
 	var key := StringName("rests:" + String(id))
 
-	if _libraries.has(key):
-		return _libraries[key]
+	if not _libraries.has(key):
+		var scene := _scene(BODIES.get(id, ""))
+		var out := {}
 
-	var out := {}
-	var scene := _scene(BODIES.get(id, ""))
+		if scene != null:
+			var probe := scene.instantiate()
+			out = DotHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
+			probe.free()
 
-	if scene != null:
-		var probe := scene.instantiate()
-		var skeleton := probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D
-		for i in skeleton.get_bone_count():
-			out[skeleton.get_bone_name(i)] = skeleton.get_bone_rest(i)
-		probe.free()
+		_libraries[key] = out
 
-	_libraries[key] = out
-	return out
-
-
-## [param library]'s clips, moved from a skeleton with rests [param from] onto [param to].
-##
-## [b]A clip stores where each bone is, not how far it moved.[/b] The survivor bodies share the
-## zombie's bone names but not its rest pose (their chest bone points up, the zombie's leans
-## forward), so the zombie's clips played as they are bent every survivor over at the waist and
-## swung their gear about. What the animator made is the motion away from rest, so each key is
-## taken off the zombie's rest and put on the survivor's: rotation `to * from^-1 * key`, a
-## position by the same turn about the new rest.
-static func _retarget(library: AnimationLibrary, from: Dictionary, to: Skeleton3D) -> AnimationLibrary:
-	if library == null or to == null:
-		return library
-
-	var out := AnimationLibrary.new()
-
-	for clip in library.get_animation_list():
-		var animation := library.get_animation(clip).duplicate(true) as Animation
-
-		for t in animation.get_track_count():
-			var bone := String(animation.track_get_path(t).get_concatenated_subnames())
-			var index := to.find_bone(bone)
-
-			if index < 0 or not from.has(bone):
-				continue
-
-			var a: Transform3D = from[bone]
-			var b := to.get_bone_rest(index)
-			var turn := b.basis.get_rotation_quaternion() * a.basis.get_rotation_quaternion().inverse()
-
-			match animation.track_get_type(t):
-				Animation.TYPE_ROTATION_3D:
-					for k in animation.track_get_key_count(t):
-						var q: Quaternion = animation.track_get_key_value(t, k)
-						animation.track_set_key_value(t, k, (turn * q).normalized())
-				Animation.TYPE_POSITION_3D:
-					for k in animation.track_get_key_count(t):
-						var p: Vector3 = animation.track_get_key_value(t, k)
-						animation.track_set_key_value(t, k, b.origin + turn * (p - a.origin))
-
-		var _added := out.add_animation(clip, animation)
-
-	return out
+	return _libraries[key]
 
 
 ## One material per look: zombies with the same colours share it, and a crowd of forty is a
@@ -1262,7 +1217,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 				# A planted foot must stand still on the ground, so stride times rate equals the ground speed:
 				# short steps are taken quicker, and the stride lengthens where the rate would pass its cap.
 				natural = 1.8 * float(_look["height"]) / 1.75 if _ual else natural
-				var real := kind == &"common" and _anim != null and _anim.has_animation(_qualified(&"ual_zombie_walk"))
+				var real := _anim != null and _anim.has_animation(_qualified(&"ual_zombie_walk"))
 				# The real walk reads small below a 0.6 stride, so it takes a lower floor and a lower rate cap.
 				var cap := float(sh["cadence"]) * (1.3 if real else (1.6 if kind == &"common" else 1.0))
 				_stride = clampf(_speed / (natural * cap), maxf(float(sh["swing"]), 0.6) if real else float(sh["swing"]), 1.0)
@@ -1275,7 +1230,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 	# Each common keeps its own tempo (plus or minus 15%) so a crowd does not step together.
 	_ual = false
 
-	if kind == &"common" and UAL_FOR.has(clip) and _anim != null and _anim.has_animation(_qualified(UAL_FOR[clip])):
+	if UAL_FOR.has(clip) and _has(UAL_FOR[clip]):
 		clip = UAL_FOR[clip]
 		rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
 		_ual = true
@@ -1283,6 +1238,43 @@ func present(delta: float, anim: int, flags: int) -> void:
 		if striking and clip == &"ual_zombie_scratch":
 			# The free scratch clip is 1.8 s: played at this rate one swing is one whole windup, strike and recovery.
 			rate = 1.8 / SWING_PERIOD
+
+		# A slow run is the jog: the sprint clip's stride at 3 m/s is a skid.
+		if clip == &"ual_sprint" and _speed > 0.2 and _speed < JOG_BELOW and _has(&"ual_jog"):
+			clip = &"ual_jog"
+			rate = clampf(_speed / (JOG_NATURAL * float(_look["height"]) / 1.75), 0.7, 1.5)
+
+	# A stalking crouch (not a crawler's or a leaper's, which crawl all the time) is the real squat walk.
+	if anim == ZzZombieBody.Anim.CROUCH and clip == &"crawl" and overrides.get(&"walk", &"") != &"crawl" and _has(&"ual_crouch_walk"):
+		clip = &"ual_crouch_walk"
+		rate = clampf(_speed / (CROUCH_NATURAL * float(_look["height"]) / 1.75), 0.5, 1.6) if _speed > 0.2 else 1.0
+
+	_hit_left = maxf(_hit_left - delta, 0.0)
+	_rise_left = maxf(_rise_left - delta, 0.0)
+
+	# A shove or a stagger is a stumble back; a bullet's flinch on a standing body is a short hit clip.
+	if anim == ZzZombieBody.Anim.STAGGER and _has(&"ual_knockback"):
+		clip = &"ual_knockback"
+		rate = 1.0
+	elif _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
+			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
+		clip = &"ual_hit_head" if _hit_head else &"ual_hit_chest"
+		rate = 1.0
+
+	# Getting up from sitting, feeding or lying: the lay-to-idle clip, if it stands still while it plays.
+	if _rise_left > 0.0 and _speed < 0.6 and _has(&"ual_lay_to_idle") and not striking and anim != ZzZombieBody.Anim.DEAD:
+		clip = &"ual_lay_to_idle"
+		rate = 1.0
+	elif anim == ZzZombieBody.Anim.CHARGE and _speed > 4.5 and _has(&"ual_slide"):
+		# A charge at full tilt is a slide in: the feet go first.
+		clip = &"ual_slide"
+		rate = 1.0
+
+	if (_prior_anim == ZzZombieBody.Anim.SIT or _prior_anim == ZzZombieBody.Anim.FEED or _prior_anim == ZzZombieBody.Anim.CRY) \
+			and anim != _prior_anim and _has(&"ual_lay_to_idle"):
+		_rise_left = _anim.get_animation(_qualified(&"ual_lay_to_idle")).length
+
+	_prior_anim = anim
 
 	_rate = rate
 	_play(clip, rate)
@@ -1328,6 +1320,11 @@ func present(delta: float, anim: int, flags: int) -> void:
 	if anim == ZzZombieBody.Anim.DEAD:
 		_dead_for = maxf(_dead_for, 0.0) + delta
 		_present_death(delta)
+
+
+## True when this body has the real clip [param clip] (the file is missing or the body is a capsule otherwise).
+func _has(clip: StringName) -> bool:
+	return _anim != null and _anim.has_animation(_qualified(clip))
 
 
 func _qualified(clip: StringName) -> StringName:
@@ -1524,6 +1521,10 @@ func _pitch_limb(bone: String, angle: float) -> void:
 ## The shamble over the walk clip: stooped, head hung and lolling, short uneven steps with one foot
 ## dragged, the torso and hips rolling with each step. Numbers are per look ([constant SHAMBLE]).
 var _ual := false
+var _hit_left := 0.0
+var _hit_head := false
+var _rise_left := 0.0
+var _prior_anim := -1
 ## The stride [method present] matched to the ground speed: the share of the clip's leg swing kept.
 var _stride := 0.4
 
@@ -1704,9 +1705,11 @@ func _pose_reach() -> void:
 
 ## Hit: a flinch over whatever it is doing. [param from_side] is -1 or 1 for which side the hit
 ## came from; a flinch already running is not restarted, so a shotgun's pellets are one flinch.
-func flinch(from_side: float = 1.0) -> void:
+func flinch(from_side: float = 1.0, head := false) -> void:
 	if _death.is_empty() and _flinch < 0.5:
 		_flinch = 1.0
+		_hit_left = 0.6
+		_hit_head = head
 		_flinch_side = signf(from_side) if from_side != 0.0 else 1.0
 
 

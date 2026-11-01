@@ -888,7 +888,8 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 		var was := float(entry.get("health", health))
 		entry["health"] = health
 		if health < was - 0.5 and health > 0.0:
-			view.flinch(-1.0 if (int(health) & 1) == 0 else 1.0)
+			# The snapshot carries no hit location: the second health bit picks the head or the chest clip for variety.
+			view.flinch(-1.0 if (int(health) & 1) == 0 else 1.0, (int(health) & 2) != 0)
 
 		view.present(delta, anim, flags)
 

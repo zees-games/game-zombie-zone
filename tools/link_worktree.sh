@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 main="$(cd "${1:-../game-zombie-zone}" && pwd)"
 [ "$main" != "$(pwd)" ] || { echo "this is the main checkout" >&2; exit 2; }
 n=0
-for p in "$main"/* "$main"/addons/*; do
+for p in "$main"/* "$main"/.stores "$main"/addons/*; do
     [ -L "$p" ] || continue
     rel="${p#"$main"/}"
     if [ -e "$rel" ] || [ -L "$rel" ]; then continue; fi
