@@ -615,10 +615,21 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 			for clip in carried.get_animation_list():
 				var animation := carried.get_animation(clip)
 				animation.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(StringName(clip)) else Animation.LOOP_NONE
+				if String(clip).begins_with("ual_hit"):
+					_hold_legs(animation)
 				var _added := merged.add_animation(clip, animation)
 		_libraries[key] = merged
 
 	return _libraries[key]
+
+
+## A flinch is played where the body stands: its leg tracks are dropped so the legs keep the idle stance.
+static func _hold_legs(animation: Animation) -> void:
+	for t in range(animation.get_track_count() - 1, -1, -1):
+		var bone := String(animation.track_get_path(t).get_concatenated_subnames())
+
+		if bone.begins_with("UpperLeg") or bone.begins_with("LowerLeg") or bone.begins_with("Foot") or bone.begins_with("Toes"):
+			animation.remove_track(t)
 
 
 ## The rest pose of [param id]'s skeleton, bone name -> local rest transform.
@@ -1220,7 +1231,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 				var real := _anim != null and _anim.has_animation(_qualified(&"ual_zombie_walk"))
 				# The real walk reads small below a 0.6 stride, so it takes a lower floor and a lower rate cap.
 				var cap := float(sh["cadence"]) * (1.3 if real else (1.6 if kind == &"common" else 1.0))
-				_stride = clampf(_speed / (natural * cap), maxf(float(sh["swing"]), 0.6) if real else float(sh["swing"]), 1.0)
+				_stride = 1.0 if real else clampf(_speed / (natural * cap), float(sh["swing"]), 1.0)
 				rate = clampf(_speed / (natural * _stride), 0.35, cap)
 			else:
 				rate = clampf(_speed / natural, 0.7, 1.8)
