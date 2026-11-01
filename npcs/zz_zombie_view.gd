@@ -1262,8 +1262,10 @@ func present(delta: float, anim: int, flags: int) -> void:
 				# A planted foot must stand still on the ground, so stride times rate equals the ground speed:
 				# short steps are taken quicker, and the stride lengthens where the rate would pass its cap.
 				natural = 1.8 * float(_look["height"]) / 1.75 if _ual else natural
-				var cap := float(sh["cadence"]) * (1.6 if kind == &"common" else 1.0)
-				_stride = clampf(_speed / (natural * cap), float(sh["swing"]), 1.0)
+				var real := kind == &"common" and _anim != null and _anim.has_animation(_qualified(&"ual_zombie_walk"))
+				# The real walk reads small below a 0.6 stride, so it takes a lower floor and a lower rate cap.
+				var cap := float(sh["cadence"]) * (1.3 if real else (1.6 if kind == &"common" else 1.0))
+				_stride = clampf(_speed / (natural * cap), maxf(float(sh["swing"]), 0.6) if real else float(sh["swing"]), 1.0)
 				rate = clampf(_speed / (natural * _stride), 0.35, cap)
 			else:
 				rate = clampf(_speed / natural, 0.7, 1.8)
@@ -1343,6 +1345,10 @@ func _play(clip: StringName, _rate: float) -> void:
 
 	_clip = clip
 	_anim.play(name, 0.15)
+
+	# play() leaves the position where the last clip ended until the next evaluation, so a repeated swing was read as already over and held its last frame.
+	if not LOOPING.has(clip):
+		_anim.seek(0.0, true)
 
 	# A looping real clip starts at this body's own phase, not at frame zero with its neighbours.
 	if LOOPING.has(clip) and String(clip).begins_with("ual_"):
