@@ -157,7 +157,7 @@ func _is_gone(part: StringName) -> bool:
 	return _stump_fx.has(part)
 
 
-func flinch(_from_side: float = 1.0) -> void:
+func flinch(_from_side: float = 1.0, _head := false) -> void:
 	_jolt = 1.0
 
 

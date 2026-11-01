@@ -87,7 +87,7 @@ func present(delta: float, anim: int, _flags: int) -> void:
 	_anim.advance(delta)
 
 
-func flinch(_from_side: float = 1.0) -> void:
+func flinch(_from_side: float = 1.0, _head := false) -> void:
 	if _dead_t < 0.0:
 		_flinch_left = 0.4
 		_clip = &""

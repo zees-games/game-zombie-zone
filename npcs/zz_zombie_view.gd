@@ -1252,11 +1252,8 @@ func present(delta: float, anim: int, flags: int) -> void:
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	_rise_left = maxf(_rise_left - delta, 0.0)
 
-	# A shove or a stagger is a stumble back; a bullet's flinch on a standing body is a short hit clip.
-	if anim == ZzZombieBody.Anim.STAGGER and _has(&"ual_knockback"):
-		clip = &"ual_knockback"
-		rate = 1.0
-	elif _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
+	# A bullet's flinch on a standing body is a short hit clip.
+	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
 			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
 		clip = &"ual_hit_head" if _hit_head else &"ual_hit_chest"
 		rate = 1.0
@@ -1264,10 +1261,6 @@ func present(delta: float, anim: int, flags: int) -> void:
 	# Getting up from sitting, feeding or lying: the lay-to-idle clip, if it stands still while it plays.
 	if _rise_left > 0.0 and _speed < 0.6 and _has(&"ual_lay_to_idle") and not striking and anim != ZzZombieBody.Anim.DEAD:
 		clip = &"ual_lay_to_idle"
-		rate = 1.0
-	elif anim == ZzZombieBody.Anim.CHARGE and _speed > 4.5 and _has(&"ual_slide"):
-		# A charge at full tilt is a slide in: the feet go first.
-		clip = &"ual_slide"
 		rate = 1.0
 
 	if (_prior_anim == ZzZombieBody.Anim.SIT or _prior_anim == ZzZombieBody.Anim.FEED or _prior_anim == ZzZombieBody.Anim.CRY) \
