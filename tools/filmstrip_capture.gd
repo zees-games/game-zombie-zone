@@ -170,14 +170,15 @@ func _survivor_frame() -> void:
 ## The hands and weapon in the eye's frame: their rotations feed the bone-pop check and the
 ## largest hop of any part's position is the "view_pop" row (the body is hidden in first person).
 func _first_person_sample(feet: Vector3) -> void:
-	var cam: Camera3D = _client.get("camera")
-	var model: Node = _client.get("view_model")
-	if cam == null or model == null:
+	# Untyped on purpose: a typed local or lambda parameter holding a freed node is itself the script error.
+	var cam = _client.get("camera")
+	var model = _client.get("view_model")
+	if not is_instance_valid(cam) or not is_instance_valid(model):
 		return
-	if _parts.is_empty() or _parts.any(func(n: Node3D) -> bool: return not is_instance_valid(n)):
+	if _parts.is_empty() or _parts.any(func(n) -> bool: return not is_instance_valid(n)):
 		_parts.assign(model.find_children("*", "Node3D", true, false))
 		_last_places.clear()
-	var inverse := cam.global_transform.affine_inverse()
+	var inverse: Transform3D = (cam as Camera3D).global_transform.affine_inverse()
 	var rotations: Array = []
 	var places: Array[Vector3] = []
 	var shown: Array[bool] = []
@@ -201,7 +202,7 @@ func _first_person_sample(feet: Vector3) -> void:
 			_worst_at = _time
 			_worst_part = "%s (%s)" % [_parts[i].get_path(), _parts[i].get_class()]
 		_last_places[i] = places[i]
-	_log.append("%.2f pos=(%.1f,%.1f,%.1f) down=%s wall=%.3f hop=%.3f" % [_time, feet.x, feet.y, feet.z, _local.is_down(), model.call("wall_amount"), _frame_hop])
+	_log.append("%.2f pos=(%.1f,%.1f,%.1f) down=%s wall=%.3f hop=%.3f" % [_time, feet.x, feet.y, feet.z, _local.is_down(), (model as Node).call("wall_amount"), _frame_hop])
 
 
 func _actions(move: Array, want: Array) -> void:
