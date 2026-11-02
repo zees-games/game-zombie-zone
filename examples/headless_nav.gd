@@ -88,7 +88,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("zombiezone navigation notes")
 	print("")
-	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
+	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps")) and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://world"))
 
 	# Development only: `-- --only=spread` runs the sections whose name has it (counts then skipped).
 	var only := ""
