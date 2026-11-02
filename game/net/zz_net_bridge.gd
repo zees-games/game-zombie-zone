@@ -819,7 +819,7 @@ func _on_player_died(player_id: StringName, by: StringName, why: StringName) -> 
 ## [b]To the one peer, because a camera is private.[/b] Who somebody is watching is a fact
 ## about them that nobody else has any business knowing — and a stand-in, whose peer is
 ## zero, is told nothing, which `_tell` guarantees rather than this.
-func _on_spectate_changed(player_id: StringName) -> void:
+func _on_spectate_changed(player_id: String) -> void:
 	if game == null or game.spectate == null or game.spectate.manager == null:
 		return
 
@@ -829,7 +829,7 @@ func _on_spectate_changed(player_id: StringName) -> void:
 	if peer_id <= 0 or not _ready_peers.has(peer_id):
 		return
 
-	var view := game.spectate.manager.view(String(player_id))
+	var view := game.spectate.manager.view(player_id)
 	var target := session_of(StringName(view.target)) if view.target != "" else 0
 	var killer := session_of(StringName(view.killer)) if view.killer != "" else 0
 
@@ -1140,7 +1140,7 @@ func _spectate_step(peer_id: int, direction: int) -> void:
 	if session_id == 0 or game.spectate == null:
 		return
 
-	var moved: DotResult = game.spectate.step(player_key(session_id), direction)
+	var moved: DotResult = game.spectate.step(String(player_key(session_id)), direction)
 
 	if not moved.ok:
 		notice(peer_id, moved.error.message)

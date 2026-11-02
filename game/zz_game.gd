@@ -1331,12 +1331,12 @@ func _decision() -> Dictionary:
 func _build_spectate() -> void:
 	spectate = ZzSpectate.new()
 	spectate.name = "Spectate"
-	spectate.players = players
-	spectate.sides = sides
-	spectate.phase_fn = func() -> int: return phase
 	add_child(spectate)
 
-	var ready_now := spectate.setup(authoritative, tick_rate, config.spectate_camera)
+	var ready_now := spectate.setup_world(
+		players, sides, authoritative, tick_rate, config.spectate_camera,
+		func() -> int: return _tick
+	)
 
 	if not ready_now.ok:
 		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
@@ -1537,7 +1537,7 @@ func place_one(player: ZzPlayer) -> void:
 		_equip(player, false)
 
 	if spectate != null:
-		spectate.on_spawned(player.player_id)
+		spectate.spawned(String(player.player_id))
 
 
 func remove_player(player_id: StringName) -> void:
@@ -1570,7 +1570,7 @@ func remove_player(player_id: StringName) -> void:
 	player.queue_free()
 
 	if spectate != null:
-		spectate.on_left(player_id)
+		spectate.left(String(player_id))
 
 	if progress != null:
 		progress.leave(player_id)
@@ -2005,7 +2005,8 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	_reset_objectives()
 
 	if spectate != null:
-		spectate.set_overviews(map.overview(), map.overview())
+		var overview: Array[Transform3D] = [map.overview(), map.overview()]
+		spectate.set_overviews(overview)
 
 	for p: ZzPlayer in players.values():
 		p.flashlight_ready = false
@@ -2040,7 +2041,7 @@ func _place_everybody() -> void:
 			_equip(player, true)
 
 		if spectate != null:
-			spectate.on_spawned(player.player_id)
+			spectate.spawned(String(player.player_id))
 
 
 ## A survivor's health pool: the game's `max_health` scaled by their class (a class's 100 is the game's).
@@ -3546,7 +3547,7 @@ func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
 	_equip(body, false)
 
 	if spectate != null:
-		spectate.on_spawned(body.player_id)
+		spectate.spawned(String(body.player_id))
 
 	by.revives_done += 1
 	by.points += 5
@@ -3678,7 +3679,7 @@ func rescue(player: ZzPlayer) -> bool:
 	_equip(player, false)
 
 	if spectate != null:
-		spectate.on_spawned(player.player_id)
+		spectate.spawned(String(player.player_id))
 
 	if config.timed_respawn and config.respawn_protect_seconds > 0.0:
 		player.protected_until = now() + config.respawn_protect_seconds
