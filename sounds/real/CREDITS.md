@@ -29,3 +29,10 @@ Where a Freesound sound was fetched, the high-quality preview (mp3) was the sour
 | `mutant_jet_1` | [Jetpack Loop](https://freesound.org/s/402816/) | jacksonacademyashmore | CC0 |
 | `mutant_jet_2` | [Jetpack SFX Looped 06](https://freesound.org/s/733986/) | velcronator | CC0 |
 | `mutant_jet_3` | [Good Jetpack sound Loop](https://freesound.org/s/512815/) | MostyXS | CC0 |
+| `bite_1`, `bite_2`, `bite_3` | [zombie flesh bites](https://freesound.org/s/155973/), cut at the silences | MrPokephile | CC0 |
+| `bite_4` | [Biting on bones](https://freesound.org/s/445987/) | Breviceps | CC0 |
+| `bite_5` | [zombie bite](https://freesound.org/s/518155/) | Lukeo135 | CC0 |
+| `bite_6`, `bite_7` | [wet crunching](https://freesound.org/s/655708/), cut at the silences | Zott820 | CC0 |
+| `bite_8`, `bite_9` | [Impact](https://opengameart.org/content/impact) (`qubodupImpactMeat01`, `qubodupImpactMeat02`) | qubodup (Iwan Gabovitch) | CC0 |
+
+The `bite_*` files are played as extra variants of the `real_claw` cue, so every zombie's melee hit is sometimes a bite.

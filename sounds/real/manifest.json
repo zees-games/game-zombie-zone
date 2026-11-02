@@ -602,5 +602,43 @@
    "file": "mutant_jet_3",
    "source": "mostyxs"
   }
+ ],
+ "bite": [
+  {
+   "file": "bite_1",
+   "source": "mrpokephile"
+  },
+  {
+   "file": "bite_2",
+   "source": "mrpokephile"
+  },
+  {
+   "file": "bite_3",
+   "source": "mrpokephile"
+  },
+  {
+   "file": "bite_4",
+   "source": "breviceps"
+  },
+  {
+   "file": "bite_5",
+   "source": "lukeo135"
+  },
+  {
+   "file": "bite_6",
+   "source": "zott820"
+  },
+  {
+   "file": "bite_7",
+   "source": "zott820"
+  },
+  {
+   "file": "bite_8",
+   "source": "qubodup"
+  },
+  {
+   "file": "bite_9",
+   "source": "qubodup"
+  }
  ]
 }

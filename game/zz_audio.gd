@@ -75,7 +75,7 @@ const REAL_COUNTS := {
 	&"moan": 16, &"rage": 13, &"claw": 8, &"die": 7, &"hurt": 6, &"leaper": 5, &"strangler": 5, &"bloater": 4,
 	&"ram": 5, &"spitter": 7, &"rider": 6, &"brute": 4, &"screamer": 4, &"crawler": 5, &"riot": 5, &"mutant": 8,
 	&"mutant_zap": 4, &"mutant_grab": 4, &"mutant_throw": 3, &"mutant_jet": 3, &"gore_bone": 10, &"gore_rip": 1,
-	&"gore_splat": 2, &"horde": 4,
+	&"gore_splat": 2, &"horde": 4, &"bite": 9,
 }
 const GORE_BONE := &"real_gore_bone"
 const GORE_SPLAT := &"real_gore_splat"
@@ -268,6 +268,9 @@ static func _add_real(c: DotAudioCatalogue) -> void:
 		var r: Array = rows[event]
 		var def := _placed(StringName("real_" + String(event)), r[1], r[2], r[3], r[4], r[5], r[6], r[0])
 		def.variants = _real_files(event)
+		if event == &"claw":
+			# Melee hits are claws and bites alike; one set keeps the cue (real_claw) in every NPC profile.
+			def.variants.append_array(_real_files(&"bite"))
 		def.cooldown_ms = 90 if event in [&"die", &"hurt", &"gore_bone", &"gore_splat"] else 0
 		c.add(def)
 	var jet := _placed(&"real_mutant_jet", 60.0, 8.0, 1, 70, 1.0, 1.0, "brute_roar")

@@ -143,6 +143,15 @@ for i, (num, who) in enumerate(((402816, "jacksonacademyashmore"), (733986, "vel
     if make(P("freesound", f"{num}.mp3"), name, loop=True):
         manifest["mutant_jet"].append({"file": name, "source": who})
 
+# Bites and flesh hits, from the staging folders (one folder per source; qubodup's is a 7z).
+QT = tempfile.mkdtemp()
+subprocess.run(["7z", "x", "-y", "-o" + QT, P("oga-qubodup-impact", "qubodupImpact.7z")], capture_output=True)
+add("bite", cut(P("fs-155973-zombie-flesh-bites", "155973_hq.mp3"), "mrpokephile", min_len=0.25, max_len=1.8, limit=3)
+    + [whole(P("fs-445987-biting-on-bones", "445987_hq.mp3"), "breviceps"),
+       whole(P("fs-518155-zombie-bite", "518155_hq.mp3"), "lukeo135")]
+    + cut(P("fs-655708-wet-crunching", "655708_hq.mp3"), "zott820", min_len=0.25, max_len=1.8, limit=2)
+    + [whole(os.path.join(QT, "qubodupImpact", f"qubodupImpactMeat0{n}.ogg"), "qubodup") for n in (1, 2)])
+
 json.dump(manifest, open(os.path.join(OUT, "manifest.json"), "w"), indent=1)
 for k, v in manifest.items():
     print(k, len(v))

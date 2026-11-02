@@ -9,7 +9,7 @@ extends DotGameCheckSuite
 const ZzAudio := preload("../game/zz_audio.gd")
 const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const CHECKS := 71
+const CHECKS := 72
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
@@ -211,6 +211,9 @@ func _run() -> void:
 			if not FileAccess.file_exists(path) and not FileAccess.file_exists(path + ".import"):
 				absent.append(path)
 	_check(absent.is_empty(), "every recorded variant exists: %s" % ", ".join(absent))
+	var claw_def := ZzAudio.sound_catalogue().find(&"real_claw")
+	var claw_paths := PackedStringArray(claw_def.variants) if claw_def != null else PackedStringArray()
+	_check(claw_paths.has(ZzAudio._file("real/bite_9")) and claw_paths.size() == 17, "real_claw carries the 8 claws and 9 bites (%d)" % claw_paths.size())
 	var real_credits := FileAccess.get_file_as_string("res://sounds/real/CREDITS.md")
 	var uncredited_real: Array[String] = []
 	for f in DirAccess.get_files_at("res://sounds/real"):
