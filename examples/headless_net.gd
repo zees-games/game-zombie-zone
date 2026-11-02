@@ -33,7 +33,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 31
-const CHECKS := 200
+const CHECKS := 204
 
 const CLIENT_PEER := 7
 const SESSION := 42
