@@ -92,9 +92,11 @@ func _test_throw() -> void:
 	_check(drops.count() == 1, "Q throws the held weapon once per press", str(drops.count()))
 	_check(not _holds(p, id), "it left the hands")
 	_check(p.wanted_slot == ars.current_slot(), "the wanted slot follows the arsenal", str(ars.current_slot()))
-	game.weapon_layer.rules.pickup_radius = 60.0
+	game.weapon_layer.rules.use_radius = 60.0
 	for i in 12:
 		await _sim(game, 1.0)
+		var _tap := game.weapon_layer.use_key(p, true, 0.05)
+		var _rel := game.weapon_layer.use_key(p, false, 0.05)
 		if drops.count() == 0:
 			break
 	_check(drops.count() == 0 and _holds(p, id), "the empty slot picks it back up")
@@ -171,13 +173,14 @@ func _test_shot_hold() -> void:
 	layer.rules.pickup_radius = 0.0
 	layer.rules.pickup_delay = 0.0
 	_check(layer.throw(p), "a throw is accepted")
-	for _k in 20:
+	for _k in 60:
 		await _sim(game, 1.0)
 		if drops.active_count() == 0:
 			break
 	var snap: Dictionary = drops.snapshot()[0]
 	var rest: Vector3 = snap["at"].origin if snap.has("at") else Vector3.ZERO
 	var awake: int = drops.active_count()
+	_check(awake == 0, "the dropped weapon came to rest first", str(awake))
 	var tr: DotTrace = game.combat.trace
 	var _miss := tr.ray(rest + Vector3(3, 1, 0), Vector3.DOWN, 5.0)
 	_check(drops.active_count() == awake, "a trace that misses wakes nothing")
