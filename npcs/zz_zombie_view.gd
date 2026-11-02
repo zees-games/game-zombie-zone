@@ -820,6 +820,7 @@ static func limb_rest(p_kind: StringName, p_variant: int) -> String:
 				filed["@" + bone] = StringName(skeleton.get_bone_name(skeleton.get_bone_parent(i)))
 
 	root.free()
+	DotNpcLimbs.store_rest_points(key, filed)
 	return key
 
 
