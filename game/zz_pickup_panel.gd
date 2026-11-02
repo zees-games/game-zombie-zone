@@ -26,12 +26,14 @@ func _process(delta: float) -> void:
 		add_child(view)
 	hold.hold_time = layer.rules.hold_time
 	var pressed := InputMap.has_action(ZzBindings.USE) and Input.is_action_pressed(ZzBindings.USE)
-	var _event := hold.step(pressed, delta, info.get("mode", "") == "swap")
+	var _event := hold.step(pressed, delta, info.get("mode", "") == "ammo")
 	view.key_text = _key_text()
 	view.name_of = func(id: StringName) -> String:
 		var def: Variant = me.weapons.arsenal.catalogue.get_def(id)
 		return def.name_or_id() if def != null else String(id)
-	view.show_prompt(info, hold.progress)
+	view.show_prompt(info, 0.0)
+	if game.has_meta(&"hud"):
+		game.get_meta(&"hud").set_hold_progress(hold.progress)
 
 
 func _nearest_player(at: Vector3):

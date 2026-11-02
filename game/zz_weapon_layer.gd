@@ -27,6 +27,7 @@ func build() -> void:
 		return
 	drops = DotWeaponDrops.new()
 	drops.name = "WeaponDrops"
+	rules.auto_pickup = true
 	drops.rules = rules
 	drops.is_authority = game.authoritative
 	drops.draws = DisplayServer.get_name() != "headless"
@@ -84,24 +85,18 @@ func take(player) -> void:
 	var _taken := drops.take_for(player.weapons.arsenal, at, player.entity_id, player.class_def)
 
 
-## The use key (E) on a dropped weapon in view: a tap unloads ammo or fills an empty slot, a hold swaps.
+## The use key (E) on a dropped weapon in view, by [DotWeaponUseKey]'s shared rules.
 ## True while the key belongs to the weapon, so the caller leaves loot and objectives alone.
 func use_key(player, held: bool, delta: float) -> bool:
 	if drops == null or drops.count() == 0 or not _free(player):
 		return false
-	var holds: Dictionary = game.get_meta(&"use_holds", {})
-	game.set_meta(&"use_holds", holds)
-	var hold: DotWeaponUseHold = holds.get(player.entity_id)
-	if hold == null:
-		hold = DotWeaponUseHold.new()
-		holds[player.entity_id] = hold
-	hold.hold_time = drops.rules.resolve(player.class_def).hold_time
-	var info := drops.prompt_for(player.weapons.arsenal, player.eye_position(), player.aim_direction(), player.class_def)
-	var event := hold.step(held, delta, not info.is_empty())
-	if event != DotWeaponUseHold.Event.NONE:
-		var _used := drops.use(player.weapons.arsenal, player.eye_position(), player.aim_direction(), player.entity_id,
-			player.class_def, event == DotWeaponUseHold.Event.HOLD)
-	return not info.is_empty()
+	var keys: Dictionary = game.get_meta(&"use_keys", {})
+	game.set_meta(&"use_keys", keys)
+	var key: DotWeaponUseKey = keys.get(player.entity_id)
+	if key == null:
+		key = DotWeaponUseKey.new()
+		keys[player.entity_id] = key
+	return key.step(drops, player.weapons.arsenal, player.eye_position(), player.aim_direction(), player.entity_id, held, delta, player.class_def)
 
 
 ## Lets traced shots and splash push dropped weapons about (the trace is built after this layer).

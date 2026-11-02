@@ -552,6 +552,16 @@ func _run() -> void:
 			await _seconds_of(1.0)
 			game.boxes.run([{"do": "give_weapon", "id": "smg"}], {"opener": local, "at": stand, "box": &"upgrade"})
 			await _seconds_of(maxf(_seconds, 1.0))
+		"pickup":
+			# A rifle in hand and the same one lying ahead: the prompt and the hold ring part-way round the crosshair.
+			_clear_view(game, local, stand)
+			game.boxes.run([{"do": "give_weapon", "id": "rifle"}], {"opener": local, "at": stand, "box": &"upgrade"})
+			var layer = game.weapon_layer
+			layer.rules.pickup_delay = 0.0
+			var _spawned: int = layer.drops.spawn({"id": &"rifle", "magazine": 12, "reserve": 60}, local.eye_position() + local.aim_direction() * 1.0, Vector3.ZERO, 0)
+			await _seconds_of(maxf(_seconds, 1.0))
+			game.get_meta(&"hud").set_hold_progress(0.6)
+			await _frames(3)
 		"carry":
 			# Two primaries in one slot, a backpack on, and the weight bar and slot list on the HUD.
 			_clear_view(game, local, stand)

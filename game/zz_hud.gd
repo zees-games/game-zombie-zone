@@ -1106,6 +1106,12 @@ func _draw_hurt(delta: float) -> void:
 				_place(rect, Vector2(-reach - 8, -60), Vector2(8, 120))
 
 
+## The ring round the crosshair that fills while the use key is held over a dropped weapon (dot-ui API 18).
+func set_hold_progress(fraction: float) -> void:
+	if _crosshair != null and DotAddonApi.build_level("dot_ui") >= 18:
+		_crosshair.set(&"hold_progress", fraction)
+
+
 ## dot-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
 ## directly, an older dot-ui fails to compile this script.
 func _make_crosshair() -> Control:

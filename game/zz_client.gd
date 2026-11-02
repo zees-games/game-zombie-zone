@@ -1524,6 +1524,7 @@ func _build_hud() -> void:
 	hud.name = "Hud"
 	hud.key_fn = _key
 	add_child(hud)
+	game.set_meta(&"hud", hud)
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)

@@ -11,7 +11,7 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 4
-const CHECKS := 26
+const CHECKS := 29
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -161,7 +161,7 @@ func _test_rules() -> void:
 
 
 func _test_shot_hold() -> void:
-	_section("shot and hold: a traced shot wakes a drop, a tap does not swap, a hold does")
+	_section("shot and hold: a traced shot wakes a drop, a tap replaces a different weapon, a hold trades the same one")
 	var game := await _solo()
 	var p := game.survivors()[0]
 	var ars := p.weapons.arsenal
@@ -207,13 +207,23 @@ func _test_shot_hold() -> void:
 	state["id"] = third
 	var d := drops.spawn(state, at, Vector3.ZERO, 0)
 	await _sim(game, 0.02)
-	for _k in 3:
-		var _tap := layer.use_key(p, true, 0.05)
-		var _rel := layer.use_key(p, false, 0.05)
-	_check(third != &"" and drops.has_drop(d) and not _holds(p, third), "a tap on a different weapon in a full slot swaps nothing")
+	var _tap := layer.use_key(p, true, 0.05)
+	var _rel := layer.use_key(p, false, 0.05)
+	_check(third != &"" and not drops.has_drop(d) and _holds(p, third), "a tap on a different weapon in a full slot replaces it")
+	_check(drops.count() == 1, "and the old one lies on the floor", str(drops.count()))
+	# The same weapon: a tap only takes ammo, the weapon stays on the floor until the hold time passes.
+	drops.clear()
+	var same := drops.spawn(state, p.eye_position() + p.aim_direction() * 1.0, Vector3.ZERO, 0)
+	await _sim(game, 0.02)
+	var info := drops.prompt_for(ars, p.eye_position(), p.aim_direction(), p.class_def)
+	_check(info.get("mode", "") == "ammo", "the same weapon on the floor offers ammo", str(info))
+	_tap = layer.use_key(p, true, 0.05)
+	_rel = layer.use_key(p, false, 0.05)
+	_check(drops.has_drop(same), "a tap on the same weapon leaves it lying")
+	var mag_in_hand: int = ars.current().magazine
 	for _k in 40:
 		var _hold := layer.use_key(p, true, 0.05)
-	_check(not drops.has_drop(d) and _holds(p, third), "a hold takes it")
+	_check(_holds(p, third) and ars.current().magazine == mag_in_hand, "holding the use key on the same weapon keeps the rounds in hand")
 	_finished()
 
 
