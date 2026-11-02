@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 54
 
-const CHECKS := 418
+const CHECKS := 419
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -277,6 +277,11 @@ func _test_world_builds() -> void:
 			and player.weapons.arsenal.current_def().id == &"zz_pistol"
 	_check(all_in_start, "everybody starts in the start room")
 	_check(armed, "holding the sidearm")
+	var wall_ok := true
+	for player in game.survivors():
+		var motor: int = player.controller.tunables.collision_mask
+		wall_ok = wall_ok and motor != 0 and player.weapons.wall_extra_mask == motor
+	_check(wall_ok, "each server rig's wall_extra_mask is the player's motor mask")
 	_check(game.survivors()[0].medkits == 1 and game.survivors()[0].health.health == 100.0, "with a medkit and full health")
 	var laid := 0
 	for lid: int in game.spawners.loot_ids():

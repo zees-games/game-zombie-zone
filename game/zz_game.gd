@@ -624,6 +624,8 @@ func _apply_body_mask(player: ZzPlayer) -> void:
 
 	body_rules.apply_to(player.controller, mask, physics.layer_mask(&"player"))
 	var tunables := player.controller.tunables
+	if player.weapons != null:
+		player.weapons.wall_extra_mask = tunables.collision_mask
 	body_rules.apply_hull(player, tunables.stand_height, tunables.radius)
 
 
@@ -3806,6 +3808,8 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.role = ZeeWeaponRig.Role.SERVER
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
+		# The held weapon lowers at every brush that stops the player, fences and clip included.
+		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
 		rig.ads_rules = ads_rules
 		player.add_child(rig)
