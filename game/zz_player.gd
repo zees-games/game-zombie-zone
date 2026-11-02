@@ -423,6 +423,11 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 		var mech: Variant = mechanics_fn.call()
 		if mech != null:
 			ladder.volumes = mech.ladder_boxes()
+	var cmd := controller.current_command
+	if cmd != null:
+		var view := DotFpsMotor._view_basis(state.yaw, 0.0)
+		var intent: Vector3 = view.right * cmd.move.x + view.forward * cmd.move.y
+		ladder.wish = Vector3(intent.x, 0.0, intent.z).normalized()
 	ladder.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())
 	submerged = water_level == WaterLevel.EYES
