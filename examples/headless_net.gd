@@ -32,7 +32,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 30
+const SECTIONS := 31
 const CHECKS := 200
 
 const CLIENT_PEER := 7
@@ -92,6 +92,7 @@ func _run() -> void:
 		await _test_a_down_reaches_the_client()
 		await _test_a_downed_crawl_is_predicted()
 		await _test_crouch_reaches_both_ends()
+		await _test_a_slide_starts_and_ends()
 		await _test_the_ads_rules_cross_to_the_client()
 		_test_the_view_feel_crosses_to_the_client()
 		await _test_a_pin_reaches_the_client()
@@ -1145,6 +1146,38 @@ func _test_crouch_reaches_both_ends() -> void:
 	_check(low_server < stand_server - 0.3 and low_client < stand_client - 0.3, "and both eyes are lower", "%.2f -> %.2f, %.2f -> %.2f" % [stand_server, low_server, stand_client, low_client])
 	await _steps(40)
 	_check(server_me.controller.state.crouch_fraction < 0.01 and mine.controller.state.crouch_fraction < 0.01, "released, both stand again")
+	_finished()
+
+
+## Crouch at a run starts a slide on both ends, and it ends on its own into a crouch.
+func _test_a_slide_starts_and_ends() -> void:
+	_section("sliding: crouch at a run slides on both ends, then settles")
+	var server_me := _server_me()
+	var mine := _mine()
+	server_me.place_at(STREET, 0.0)
+	await _steps(30)
+	_check(not server_me.controller.state.is_sliding(), "standing still is not a slide")
+	var run := DotFpsCommand.new()
+	run.move = Vector2(0.0, 1.0)
+	run.set_button(DotFpsCommand.BUTTON_SPRINT, true)
+	await _steps(20, run)
+	var slide := DotFpsCommand.new()
+	slide.move = Vector2(0.0, 1.0)
+	slide.set_button(DotFpsCommand.BUTTON_SPRINT, true)
+	slide.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	var slid_server := false
+	var slid_client := false
+	for _i in 12:
+		await _step(slide)
+		slid_server = slid_server or server_me.controller.state.is_sliding()
+		slid_client = slid_client or mine.controller.state.is_sliding()
+	_check(slid_server and slid_client, "a crouch at a run starts a slide on the server and the client", "%s %s" % [slid_server, slid_client])
+	var held := DotFpsCommand.new()
+	held.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	await _steps(90, held)
+	_check(not server_me.controller.state.is_sliding() and not mine.controller.state.is_sliding(), "the slide ends by itself on both ends")
+	_check(server_me.controller.state.crouch_fraction > 0.9, "into a plain crouch", str(server_me.controller.state.crouch_fraction))
+	await _steps(40)
 	_finished()
 
 

@@ -484,6 +484,9 @@ static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null) 
 	apply_sprint(t, p_config)
 	t.can_crouch = true
 	t.crouch_speed_scale = 0.45
+	# Crouch at a run slides; the minimum is under the run and over a crouch-walk.
+	t.slide_enabled = true
+	t.slide_min_speed = 3.0
 	t.accelerate = 10.0
 	t.friction = 6.0
 	t.stop_speed = 2.5
