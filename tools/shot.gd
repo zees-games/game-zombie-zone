@@ -1039,6 +1039,7 @@ func _view_break(game: ZzGame) -> void:
 	await _seconds_of(2.5)
 	var camera := _free_camera()
 	var targets: Array = []
+	_synth_support(game)
 	var ids := game.map.barricade_ids()
 	if ids.size() > 0:
 		targets.append(["barricade", game.map.barricade_bounds(ids[0]), ids[0]])
@@ -1069,6 +1070,26 @@ func _view_break(game: ZzGame) -> void:
 				camera.current = true
 				await get_tree().process_frame
 			await _grab("%s_%s" % [t[0], str(mark)])
+
+
+## No converted map marks a support yet: make one of the world's first non-glass breakable so the break can be seen.
+func _synth_support(game: ZzGame) -> void:
+	if game.map.supports.size() > 0:
+		return
+	var id := String(game.map.id())
+	var text := FileAccess.get_file_as_string("res://world/zz_world_%s/%s.json" % [id, id])
+	var manifest: Variant = JSON.parse_string(text)
+	if not (manifest is Dictionary):
+		return
+	for rec: Dictionary in manifest.get("breakables", []):
+		if rec.get("glass") == null and rec.has("bounds"):
+			var built := DotMapSupport.build_all([rec], game.physics.layer_mask(&"toy"), true)
+			for support in built:
+				game.map.add_child(support)
+				game.map.supports.append(support)
+				var _c := support.broken.connect(game.map._on_support_broken.bind(0))
+			game.map._bind_support_visuals()
+			return
 
 
 func _grab(tag: String) -> void:
