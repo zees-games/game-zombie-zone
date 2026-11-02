@@ -12,9 +12,21 @@ const CHANNEL := "zz.weapon_layer"
 ## Slot 1 is the melee weapon, which a survivor never puts down.
 const KEEP_SLOTS: Array[int] = [1]
 
-var rules := DotWeaponDropRules.new()
+## Seconds Q is held before the weapon leaves the hand (cvar `sv_weapon_drop_key_hold`; 0 throws on the press).
+const KEY_HOLD := 0.5
+
+var rules := _make_rules()
 var drops: DotWeaponDrops = null
 var game = null
+## One [DotWeaponDropKey] per entity id, for the server's hold and (listen host) a separate one for the ring.
+var _keys: Dictionary = {}
+var _ring_key := DotWeaponDropKey.new()
+
+
+static func _make_rules() -> DotWeaponDropRules:
+	var made := DotWeaponDropRules.new()
+	made.key_hold = KEY_HOLD
+	return made
 
 
 func _init(p_game: Object) -> void:
@@ -75,6 +87,44 @@ func throw(player) -> bool:
 	player.wanted_slot = arsenal.current_slot()
 	DotLog.debug(CHANNEL, "threw", {"player": String(player.player_id), "drop": id})
 	return true
+
+
+## The drop key held or not this tick (server): a hold of [constant KEY_HOLD] throws, a tap or a let-go does not.
+## True if a weapon left.
+func drop_key(player, down: bool, delta: float) -> bool:
+	if not _free(player):
+		drop_reset(player)
+		return false
+	var key: DotWeaponDropKey = _keys.get(player.entity_id)
+	if key == null:
+		key = DotWeaponDropKey.new()
+		_keys[player.entity_id] = key
+	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var id := key.step(drops, arsenal, player.eye_position(), player.aim_direction(), player.entity_id, down, delta,
+		player.class_def, player.controller.state.velocity)
+	if id == 0:
+		return false
+	player.wanted_slot = arsenal.current_slot()
+	DotLog.debug(CHANNEL, "threw", {"player": String(player.player_id), "drop": id})
+	return true
+
+
+## Forgets a half-made hold: death, respawn, being held or downed, leaving.
+func drop_reset(player) -> void:
+	var key: DotWeaponDropKey = _keys.get(player.entity_id)
+	if key != null:
+		key.reset()
+
+
+func drop_forget(player) -> void:
+	var _gone := _keys.erase(player.entity_id)
+
+
+## Client side, 0..1 for the HUD ring while [param down] is held toward a throw.
+func drop_progress(player, down: bool, delta: float) -> float:
+	var can: bool = drops != null and rules.key_enabled and player != null and player.weapons != null \
+		and player.weapons.arsenal != null and player.is_alive() and not player.is_down() and not player.is_held()
+	return _ring_key.client_progress(down, delta, DotWeaponDropKey.hold_time_for(rules, player.class_def if player != null else null), can)
 
 
 ## Every tick: an empty slot takes a drop in reach.

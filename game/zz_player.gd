@@ -200,6 +200,7 @@ var in_end_area: bool = false
 
 ## What other people see this player as. Client side.
 var figure: ZzFigure = null
+var _legs_bound: Object = null
 
 ## How this survivor's body falls on their death: the server's pick ([method ZzGame.decide_death]),
 ## carried on DEATH and set here before anybody hears of it. Null before a first death.
@@ -973,7 +974,7 @@ func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) 
 
 ## Draws this player for one frame at [param at]: standing, crouched, or on the floor. Returns
 ## whether anything was shown.
-func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
+func present_body(hidden: bool, at: Vector3, team_colour: Color, own_view: bool = false, settings: Object = null) -> bool:
 	var shown := not hidden and is_alive() and not watching
 
 	if figure == null:
@@ -989,6 +990,12 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 		figure.build(BODY_HEIGHT, atlas, team_colour)
 
 	figure.visible = shown
+
+	# Your own eyes: legs and hips only (the `cl_legs` setting hides them, the shadow stays), not while crawling.
+	figure.person.first_person = DotHumanoidOwnView.LEGS if own_view and not is_down() else DotHumanoidOwnView.THIRD
+	if own_view and figure.person != _legs_bound:
+		_legs_bound = figure.person
+		DotOwnBodySetting.follow(figure.person, settings)
 
 	if shown:
 		_present_held()

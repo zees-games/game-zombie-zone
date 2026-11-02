@@ -7,11 +7,13 @@ const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
+const ZzSettings := preload("../game/zz_settings.gd")
+const ZzWeaponLayer := preload("../game/zz_weapon_layer.gd")
 
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
-const SECTIONS := 4
-const CHECKS := 30
+const SECTIONS := 6
+const CHECKS := 42
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -34,6 +36,8 @@ func _run() -> void:
 	await _test_rules()
 	await _test_wire()
 	await _test_shot_hold()
+	await _test_hold_key()
+	await _test_legs()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -66,7 +70,7 @@ func _holds(p: ZzPlayer, id: StringName) -> bool:
 
 func _press_q(game: ZzGame, p: ZzPlayer) -> void:
 	p.actions = ZzNetCommand.ACT_DROP
-	await _sim(game, 0.1)
+	await _sim(game, game.weapon_layer.rules.key_hold + 0.2)
 	p.actions = 0
 	await _sim(game, 0.1)
 
@@ -227,6 +231,71 @@ func _test_shot_hold() -> void:
 	for _k in 40:
 		var _hold := layer.use_key(p, true, 0.05)
 	_check(_holds(p, third) and ars.current().magazine == mag_in_hand, "holding the use key on the same weapon keeps the rounds in hand")
+	_finished()
+
+
+func _test_hold_key() -> void:
+	_section("hold Q: a tap throws nothing, a hold throws once, letting go cancels")
+	var game := await _solo()
+	var p := game.survivors()[0]
+	var drops := game.weapon_layer.drops
+	var layer := game.weapon_layer
+	var id := await _equip_primary(game, p)
+	_check(is_equal_approx(layer.rules.key_hold, ZzWeaponLayer.KEY_HOLD) and ZzWeaponLayer.KEY_HOLD > 0.0, "the default hold is above zero")
+
+	p.actions = ZzNetCommand.ACT_DROP
+	await _sim(game, 0.15)
+	p.actions = 0
+	await _sim(game, 0.2)
+	_check(drops.count() == 0 and _holds(p, id), "a tap throws nothing")
+
+	p.actions = ZzNetCommand.ACT_DROP
+	await _sim(game, layer.rules.key_hold * 0.6)
+	_check(drops.count() == 0 and layer.drop_progress(p, true, 0.1) > 0.0, "mid-hold nothing has left and the ring has progress")
+	p.actions = 0
+	await _sim(game, 0.1)
+	p.actions = ZzNetCommand.ACT_DROP
+	await _sim(game, layer.rules.key_hold * 0.6)
+	_check(drops.count() == 0, "letting go restarts the hold")
+
+	await _sim(game, layer.rules.key_hold)
+	_check(drops.count() == 1 and not _holds(p, id), "held long enough, the weapon is thrown")
+	await _sim(game, layer.rules.key_hold * 3.0)
+	_check(drops.count() <= 1, "and only once while the key stays down", str(drops.count()))
+	p.actions = 0
+
+	layer.rules.key_hold = 0.0
+	var other := await _equip_primary(game, p)
+	await _press_q(game, p)
+	_check(drops.count() >= 1 and not _holds(p, other), "sv_weapon_drop_key_hold 0 throws on the press")
+	layer.rules.key_hold = ZzWeaponLayer.KEY_HOLD
+	_finished()
+
+
+class FakeSettings extends RefCounted:
+	signal changed(key: StringName, value: Variant, reason: StringName)
+	var legs := true
+	func get_bool(key: StringName, fallback: bool) -> bool:
+		return legs if key == &"cl_legs" else fallback
+
+
+func _test_legs() -> void:
+	_section("cl_legs: the setting is in the schema and switches your own legs")
+	_check(ZzSettings.schema_for().find(&"cl_legs") != null, "cl_legs is in the settings schema")
+	var game := await _solo()
+	var p := game.survivors()[0]
+	var settings := FakeSettings.new()
+	var _drawn := p.present_body(false, Vector3.ZERO, Color.RED, true, settings)
+	var person: DotHumanoidFigure = p.figure.person
+	_check(person.first_person == DotHumanoidOwnView.LEGS and person.own_body_shown, "in first person the figure shows its legs")
+	settings.legs = false
+	settings.changed.emit(&"cl_legs", false, &"user")
+	_check(not person.own_body_shown, "cl_legs off hides the own body")
+	settings.legs = true
+	settings.changed.emit(&"cl_legs", true, &"user")
+	_check(person.own_body_shown, "cl_legs on shows it again")
+	var _third := p.present_body(false, Vector3.ZERO, Color.RED, false, settings)
+	_check(person.first_person == DotHumanoidOwnView.THIRD, "in third person the figure is drawn whole")
 	_finished()
 
 

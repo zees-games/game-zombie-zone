@@ -1545,6 +1545,7 @@ func remove_player(player_id: StringName) -> void:
 		return
 
 	var player: ZzPlayer = players[player_id]
+	weapon_layer.drop_forget(player)
 
 	if pins != null:
 		pins.release(player_id, &"left")
@@ -2803,9 +2804,10 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 	if player.is_down() or not player.is_alive() or player.watching or player.is_pinned():
 		cancel_use(player)
+		weapon_layer.drop_reset(player)
 		return
 
-	if (pressed & ZzNetCommand.ACT_DROP) != 0 and weapon_layer.throw(player):
+	if weapon_layer.drop_key(player, (held & ZzNetCommand.ACT_DROP) != 0, delta):
 		cancel_use(player)
 
 	weapon_layer.take(player)

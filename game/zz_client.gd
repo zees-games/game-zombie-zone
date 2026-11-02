@@ -73,6 +73,8 @@ var _fire_mode_ticks := 0
 var _cycle_ticks := 0
 ## Ticks left to hold ACT_DROP after the drop-weapon key was pressed.
 var _drop_ticks := 0
+## Q is down: the server times the hold, so the bit stays up for as long.
+var _drop_held := false
 var _give_pills_ticks := 0
 var _give_kit_ticks := 0
 ## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
@@ -2061,6 +2063,8 @@ func _actions() -> int:
 	if _drop_ticks > 0:
 		_drop_ticks -= 1
 		out |= ZzNetCommand.ACT_DROP
+	elif _drop_held:
+		out |= ZzNetCommand.ACT_DROP
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -2147,7 +2151,7 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 
 
 func _process(delta: float) -> void:
-	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
+	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes(), settings.settings if settings != null else null)
 
 	if killcam != null and game != null:
 		killcam.frame()
@@ -2202,6 +2206,7 @@ func _process(delta: float) -> void:
 	_present_view_arms(delta, yaw)
 
 	if hud != null:
+		hud.drop_fraction = game.weapon_layer.drop_progress(player, _drop_held, delta)
 		var prompt := _prompt()
 		if prompt == "" and _near_trader() and not (_shop_menu != null and _shop_menu.is_open()):
 			prompt = "%s — trade" % _key(ZzBindings.USE)
@@ -2622,7 +2627,8 @@ static func present_frame(
 	first_person: bool,
 	delta: float,
 	alpha: float = -1.0,
-	watched: ZzPlayer = null
+	watched: ZzPlayer = null,
+	p_settings: Object = null
 ) -> int:
 	var networked := p_net != null and p_net.is_running()
 
@@ -2652,9 +2658,9 @@ static func present_frame(
 		var mine := body == own
 		var at := drawn_position(body, networked and not mine)
 		var colour := p_game.side_colour(ZzGame.SURVIVORS)
-		var hidden := (mine and first_person) or body == watched
+		var hidden := body == watched
 
-		if body.present_body(hidden, at, colour):
+		if body.present_body(hidden, at, colour, mine and first_person, p_settings):
 			shown += 1
 
 		var _pinged := body.present_beacon(delta, at, mine and first_person, 2.0)
@@ -2781,7 +2787,10 @@ func _key_event(event: InputEvent) -> bool:
 			var _asked := flash.toggle()
 		return true
 
+	if event.is_action_released(ZzBindings.DROP):
+		_drop_held = false
 	if event.is_action_pressed(ZzBindings.DROP):
+		_drop_held = true
 		_drop_ticks = 3
 		# The slot just asked for is gone; 0 leaves the server's choice of the next weapon alone.
 		_slot = 0

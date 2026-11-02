@@ -78,6 +78,9 @@ static func schema_for() -> DotSettingsSchema:
 		"The quiet creepy sounds under a map: beds and distant one-shots."))
 	s.add(DotSettingsDef.number(&"ambient_volume", 1.0, 0.0, 1.0, &"audio"))
 	s.add(DotSettingsDef.number(&"ambient_frequency", 1.0, 0.0, 2.0, &"audio"))
+	var legs: Variant = DotOwnBodySetting.def()
+	if legs != null:
+		s.add(legs)
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
 
 

@@ -978,6 +978,10 @@ func _draw_weapon() -> void:
 		ammo.show_ammo(title, -1, -1)
 
 
+## 0..1 while Q is held toward putting the weapon down; the client sets it each frame (the use bar shows it).
+var drop_fraction := 0.0
+
+
 func _draw_use() -> void:
 	var fraction := 0.0
 	var text := ""
@@ -988,6 +992,9 @@ func _draw_use() -> void:
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"
+	elif drop_fraction > 0.0:
+		fraction = drop_fraction
+		text = "Dropping the weapon…"
 
 	_use_back.visible = fraction > 0.0
 	_use_label.visible = fraction > 0.0
