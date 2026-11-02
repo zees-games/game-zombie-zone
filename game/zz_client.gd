@@ -1389,6 +1389,11 @@ func _on_carry_json(json: String) -> void:
 			dropped = dropped or not told.has(held.id())
 	if dropped:
 		# The server put something down (an over-limit drop, a swap): this end rebuilds to its list.
+		# A rebuilt gun starts in its first mode, so the chosen ones are put back after.
+		var modes := {}
+		for slot: int in arsenal.slots():
+			for held in arsenal.weapons_in(slot):
+				modes[held.id()] = held.fire_mode_index
 		for slot: int in arsenal.slots():
 			while not arsenal.weapons_in(slot).is_empty() and arsenal.take(slot).ok:
 				pass
@@ -1397,6 +1402,9 @@ func _on_carry_json(json: String) -> void:
 			ids.reverse()
 			for id: Variant in ids:
 				var _back := arsenal.give(StringName(str(id)), false)
+		for slot: int in arsenal.slots():
+			for held in arsenal.weapons_in(slot):
+				held.fire_mode_index = int(modes.get(held.id(), held.fire_mode_index))
 	for key in slots:
 		for id: Variant in slots[key]:
 			if not weapons.arsenal.carries(StringName(str(id))):
@@ -2788,8 +2796,8 @@ func _key_event(event: InputEvent) -> bool:
 		_give_kit_ticks = 3
 	if event.is_action_pressed(ZzBindings.FIRE_MODE):
 		_fire_mode_ticks = 3
-		# Offline the world's arsenal is this one and the server path cycles it.
-		if not _offline and weapons != null and weapons.arsenal != null:
+		# `weapons` is the drawn rig even offline; the world's gun is cycled by the action bit.
+		if weapons != null and weapons.arsenal != null:
 			var _moded := weapons.arsenal.cycle_fire_mode()
 		if audio != null and weapons != null and weapons.arsenal != null and weapons.arsenal.fire_modes_available().size() > 1:
 			var _clicked := audio.click()

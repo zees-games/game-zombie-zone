@@ -5,6 +5,7 @@ const ZzLoot := preload("../game/zz_loot.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
+const ZzBindings := preload("../game/zz_bindings.gd")
 
 ## The gun you hold, offline, through the real client: the buttons, the world's rig that decides,
 ## the rig the view model is drawn with, and the HUD's counter.
@@ -18,8 +19,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 15
-const CHECKS := 95
+const SECTIONS := 16
+const CHECKS := 101
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -48,6 +49,7 @@ func _run() -> void:
 		await _test_empty_reloads()
 		await _test_ammo_pile()
 		await _test_rearmed()
+		await _test_fire_mode_key()
 		await _test_box_guns_are_drawn()
 		await _test_fire_bloom()
 		_test_spawner()
@@ -302,6 +304,53 @@ func _test_ammo_pile() -> void:
 	await _frames(int(ceilf(me.VIEW_RIG_SETTLE_SEC * Engine.physics_ticks_per_second)) + 4)
 	_check(_reserve(me.weapons) > 0 and _hud_reserve() == _reserve(me.weapons),
 		"refilled, and the HUD shows the world's reserve", "%s against %d" % [_client.hud.ammo.count_text(), _reserve(me.weapons)])
+	_finished()
+
+
+func _test_fire_mode_key() -> void:
+	_section("B changes the fire mode of the gun that is drawn and of the gun that decides")
+	var me := _client.player
+	var def := ZzWeapons.def_of(&"zz_m4")
+	var armed := _client.game.arm(me, &"zz_m4")
+	_client._slot = def.slot
+	await _frames(100)
+	var drawn := me.view_rig.arsenal
+	var truth := me.weapons.arsenal
+	_check(armed and drawn.current_def().id == &"zz_m4" and truth.current_def().id == &"zz_m4",
+		"both rigs hold the rifle", "%s and %s" % [drawn.current_def().id, truth.current_def().id])
+	var start := drawn.fire_mode()
+	var press := InputEventKey.new()
+	press.physical_keycode = KEY_B
+	press.keycode = KEY_B
+	press.pressed = true
+	_client._unhandled_input(press)
+	await _frames(12)
+	_check(drawn.fire_mode() != start, "the drawn gun left its mode", "%d -> %d, covered %s, bound %s" % [start, drawn.fire_mode(), _client._covered(), InputMap.has_action(ZzBindings.FIRE_MODE)])
+	_check(truth.fire_mode() == drawn.fire_mode(), "and the world's gun is in the same mode",
+		"%d against %d" % [truth.fire_mode(), drawn.fire_mode()])
+
+	for mode: int in drawn.fire_modes_available():
+		var _a := drawn.set_fire_mode(mode)
+		var _b := truth.set_fire_mode(mode)
+		await _frames(30)
+		var before := truth.current().magazine
+		var drawn_before := drawn.current().magazine
+		_client._firing = true
+		await _frames(30)
+		_client._firing = false
+		var shots := before - truth.current().magazine
+		var drawn_shots := drawn_before - drawn.current().magazine
+		var label := String(DotWeaponDef.Fire.keys()[mode])
+		match mode:
+			DotWeaponDef.Fire.SEMI:
+				_check(shots == 1 and drawn_shots == 1, "%s: a held trigger fires once" % label,
+					"world %d, drawn %d" % [shots, drawn_shots])
+			DotWeaponDef.Fire.BURST:
+				_check(shots > 1 and shots <= 6 and drawn_shots == shots, "%s: a held trigger fires one burst" % label,
+					"world %d, drawn %d" % [shots, drawn_shots])
+			_:
+				_check(shots >= 5 and drawn_shots >= 5, "%s: a held trigger keeps firing" % label,
+					"world %d, drawn %d" % [shots, drawn_shots])
 	_finished()
 
 
