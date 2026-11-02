@@ -365,6 +365,10 @@ func _run() -> void:
 			var centre := box.get_center()
 			var reach := maxf(box.size.length() * 0.42, 14.0)
 			_free_camera().look_at_from_position(centre + Vector3(reach * 0.45, reach * 0.6, reach * 0.55), centre)
+		"break":
+			await _view_break(game)
+			get_tree().quit(0)
+			return
 		"room":
 			await _seconds_of(_seconds)
 			if _aim != INF:
@@ -1025,6 +1029,53 @@ func _until_a_round(game: ZzGame) -> void:
 		if game.phase != ZzGame.Phase.IDLE and _client.get("player") != null:
 			return
 		await get_tree().process_frame
+
+
+## --view=break: a barricade and a support of the map broken in front of a free camera, frames before and after (_<what>_<t>.png).
+func _view_break(game: ZzGame) -> void:
+	var platform: DotGameClient = _client.get("platform")
+	while not platform.is_shown():
+		await get_tree().process_frame
+	await _seconds_of(2.5)
+	var camera := _free_camera()
+	var targets: Array = []
+	var ids := game.map.barricade_ids()
+	if ids.size() > 0:
+		targets.append(["barricade", game.map.barricade_bounds(ids[0]), ids[0]])
+	if game.map.supports.size() > 0:
+		targets.append(["support", game.map.supports[0].box, 0])
+	print("break targets: %d (barricades %d, supports %d)" % [targets.size(), ids.size(), game.map.supports.size()])
+	for t in targets:
+		var box: AABB = t[1]
+		var centre := box.get_center()
+		var reach := maxf(box.get_longest_axis_size() * 1.6, 3.0)
+		print("break %s: centre %s size %s" % [t[0], centre.snapped(Vector3.ONE * 0.01), box.size.snapped(Vector3.ONE * 0.01)])
+		camera.look_at_from_position(centre + Vector3(reach * 0.6, reach * 0.35, reach * 0.8), centre)
+		var pose := camera.global_transform
+		var until := Time.get_ticks_msec() + 800
+		while Time.get_ticks_msec() < until:
+			camera.global_transform = pose
+			camera.current = true
+			await get_tree().process_frame
+		await _grab("%s_0_before" % t[0])
+		if t[0] == "barricade":
+			game.map.set_barricade(t[2], false, 0.0)
+		else:
+			game.map.supports[t[2]].apply_broken(centre)
+		var t0 := Time.get_ticks_msec()
+		for mark in [0.1, 0.3, 1.0, 4.0]:
+			while (Time.get_ticks_msec() - t0) < int(mark * 1000.0):
+				camera.global_transform = pose
+				camera.current = true
+				await get_tree().process_frame
+			await _grab("%s_%s" % [t[0], str(mark)])
+
+
+func _grab(tag: String) -> void:
+	await RenderingServer.frame_post_draw
+	var path := ProjectSettings.globalize_path(_out.get_basename() + "_" + tag + ".png")
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	print("saved %s: %s" % [path, error_string(get_viewport().get_texture().get_image().save_png(path))])
 
 
 func _free_camera() -> Camera3D:
