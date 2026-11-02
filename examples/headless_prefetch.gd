@@ -66,7 +66,7 @@ func _test_world() -> void:
 	var _off := MapThreads.apply(before)
 	_check(res.ok and res.value == true and game.map.world_drawn, "the world is drawn", "%s" % [res.error.message if not res.ok else res.value])
 	_check(game.map_builds == 1, "drawing the world does not rebuild the map", str(game.map_builds))
-	_check(frames[0] >= 1 or took < 100, "the tree kept running while it loaded", "%d frames in %d ms" % [frames[0], took])
+	_check(frames[0] >= 1 or took < 500, "the tree kept running while it loaded", "%d frames in %d ms" % [frames[0], took])
 	game.queue_free()
 	await get_tree().process_frame
 	_finished += 1

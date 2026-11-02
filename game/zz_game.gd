@@ -3797,16 +3797,9 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 # --- Weapons ------------------------------------------------------------------------------------
 
-static var _weapon_catalogue: DotWeaponCatalogue = null
-
-
-## The weapon table, built once; every rig shares it so its behaviour scripts load once.
+## The weapon table every rig shares (see [method ZzWeapons.shared_catalogue]).
 static func weapon_catalogue() -> DotWeaponCatalogue:
-	if _weapon_catalogue == null:
-		_weapon_catalogue = ZeeWeaponPack.catalogue()
-		# Built under the loading cover; the first spawn then loads no script.
-		_weapon_catalogue.warm_scripts()
-	return _weapon_catalogue
+	return ZzWeapons.shared_catalogue()
 
 
 ## Why the last [method arm] refused ("" when it was not the weight); the caller says it to the player.

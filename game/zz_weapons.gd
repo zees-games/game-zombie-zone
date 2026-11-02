@@ -40,6 +40,19 @@ static func use_packs() -> void:
 	ZeeWeaponPack.keep_only([&"fists"])
 	_defs.clear()
 	_by_id.clear()
+	_shared = null
+
+
+static var _shared: DotWeaponCatalogue = null
+
+
+## The rigs' weapon table, built once per pack set so their behaviour scripts load once; [method use_packs] drops it.
+static func shared_catalogue() -> DotWeaponCatalogue:
+	if _shared == null:
+		_shared = ZeeWeaponPack.catalogue()
+		# Built under the loading cover; the first spawn then loads no script.
+		_shared.warm_scripts()
+	return _shared
 
 
 ## Every weapon from every pack, once.
