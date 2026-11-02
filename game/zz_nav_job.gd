@@ -104,6 +104,9 @@ func cancel() -> void:
 		WorkerThreadPool.wait_for_task_completion(_task)
 		_task = -1
 
+	# A build that finished before the flag was seen still counts as given up.
+	nav = null
+
 
 ## 0 to 1, never going back; the name of the pass is in [method stage]. Any thread.
 func progress() -> float:
