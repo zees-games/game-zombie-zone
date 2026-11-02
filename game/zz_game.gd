@@ -2923,7 +2923,7 @@ func _fire_held(player: ZzPlayer) -> bool:
 func flashlight_conf() -> DotFlashlightConfig:
 	if flashlight_config == null:
 		flashlight_config = ZzFlashlight.make_config()
-		flashlight_binder = ZzFlashlight.make_binder(flashlight_config)
+		flashlight_binder = ZzFlashlight.flashlight_binder(flashlight_config)
 		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
 	return flashlight_config
 

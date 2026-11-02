@@ -15,7 +15,7 @@ static func make_config() -> DotFlashlightConfig:
 
 
 ## The binder for the config: `zz_flashlight_<field>` cvars, `cfg/game/game-zombie-zone/flashlight/game.yml`, a workbench set.
-static func make_binder(cfg: DotFlashlightConfig) -> DotGameConfigBinder:
+static func flashlight_binder(cfg: DotFlashlightConfig) -> DotGameConfigBinder:
 	var b := DotGameConfigBinder.create(cfg, GAME_ID, "zz_flashlight")
 	b.profile_kind = "flashlight"
 	return b

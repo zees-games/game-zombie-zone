@@ -1,0 +1,25 @@
+# The second half of the suites; see ci.yml for why they are split.
+name: CI rest
+
+on:
+    push:
+        branches: ['**']
+        paths-ignore:
+            - '**/*.md'
+            - 'screenshots/**'
+    pull_request:
+    workflow_dispatch:
+
+# A suite added to examples/ goes in one of the two lists.
+jobs:
+    validate:
+        uses: modcommunity/dot-ci/.github/workflows/validate.yml@v1
+        with:
+            suite-timeout: 900
+            profiles: true
+            suites: >-
+                examples/headless_packs examples/headless_prefetch examples/headless_run examples/headless_start
+                examples/headless_stats examples/headless_survival examples/headless_weapon_drop examples/headless_weapons
+                examples/headless_workbench examples/headless_workshop
+        secrets:
+            DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
