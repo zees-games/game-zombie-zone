@@ -155,6 +155,8 @@ signal built()
 signal mover_changed(index: int)
 ## A support broke (its index in [member supports]); the host tells clients.
 signal support_broken(index: int)
+## Wood gave way (a barricade or a support) at a point, about this wide in metres; drawn on every end, no wire of its own.
+signal wood_broke(at: Vector3, size: float)
 ## The map's point_template made or killed a brush copy; see [signal ZzMechanics.copy_changed].
 signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 ## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
@@ -339,6 +341,9 @@ func _on_support_broken(held: PackedInt32Array, _at: Vector3, index: int) -> voi
 			if toy.body != null:
 				var _woke := toy.hit(toy.body.global_position, Vector3.DOWN, 0.05)
 	support_broken.emit(index)
+	if index >= 0 and index < supports.size():
+		var box := supports[index].box
+		wood_broke.emit(box.get_center(), clampf(box.get_longest_axis_size(), 0.5, 3.0))
 
 
 ## Each support hides the drawn brush model it replaces when it breaks.
@@ -893,6 +898,10 @@ func set_barricade(id: String, intact: bool, fraction: float) -> void:
 	var was := bool(e["intact"])
 	e["intact"] = intact
 	e["fraction"] = fraction
+
+	if was and not intact:
+		var bounds: AABB = e["bounds"]
+		wood_broke.emit(bounds.get_center(), clampf(bounds.get_longest_axis_size(), 0.5, 3.0))
 
 	if was != intact:
 		for shape: CollisionShape3D in e["shapes"]:

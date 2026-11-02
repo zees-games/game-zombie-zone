@@ -11,6 +11,7 @@ const ZzDefibHands := preload("zz_defib_hands.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzSettings := preload("zz_settings.gd")
 const ZzBlood := preload("zz_blood.gd")
+const ZzBreakFx := preload("zz_break_fx.gd")
 const ZzServices := preload("zz_services.gd")
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
@@ -97,6 +98,8 @@ var console: DotConsoleController = null
 var world_view: ZzWorldView = null
 ## Blood behind a body the local shooter hit (see zz_blood.gd).
 var blood: ZzBlood = null
+## Splinters where a barricade or a support breaks.
+var break_fx: ZzBreakFx = null
 
 ## Your own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
@@ -375,6 +378,9 @@ func _build_world_view() -> void:
 	blood.mask = game.world_mask()
 	game.add_child(blood)
 	blood.apply_settings(null)
+	break_fx = ZzBreakFx.new()
+	game.add_child(break_fx)
+	game.wood_broke.connect(break_fx.splinter)
 	_warm_zombies()
 
 
@@ -1899,6 +1905,9 @@ func _build_settings() -> void:
 
 	if blood != null:
 		blood.follow(settings.settings)
+
+	if break_fx != null:
+		break_fx.follow(settings.settings)
 
 	if world_view != null:
 		world_view.lod.follow(settings.settings)

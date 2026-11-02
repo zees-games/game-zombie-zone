@@ -2,6 +2,7 @@ extends DotGameCheckSuite
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzBlood := preload("../game/zz_blood.gd")
+const ZzBreakFx := preload("../game/zz_break_fx.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
@@ -13,7 +14,7 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## godot --headless --path . res://examples/headless_look.tscn
 ## [/codeblock]
 
-const CHECKS := 28
+const CHECKS := 31
 
 
 
@@ -25,6 +26,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("game-zombie-zone: blood and the hold's day")
 	await _blood()
+	_splinters()
 	_light()
 	_fade()
 	_report(CHECKS)
@@ -83,6 +85,21 @@ func _blood() -> void:
 	blood.decals.apply_config(low)
 	var _q := blood.on_body_hit(npc, Vector3(0, 1.2, -1), from, 8.0)
 	_check(blood.decals.blood_count() == 0, "effects quality 0 draws none")
+
+
+func _splinters() -> void:
+	var fx := ZzBreakFx.new()
+	add_child(fx)
+	fx.break_fx.config.headless = true
+	fx.splinter(Vector3(0, 1, -3), 1.5)
+	_check(fx.break_fx.spawned == 1, "a broken barricade or support throws one burst of splinters", str(fx.break_fx.spawned))
+	fx.break_fx.config.enabled = false
+	fx.splinter(Vector3(0, 1, -3))
+	_check(fx.break_fx.spawned == 1, "fx_quality 0 draws nothing", fx.break_fx.last_refusal)
+	fx.break_fx.config.enabled = true
+	fx.splinter(Vector3(0, 1, -3), 99.0)
+	_check(fx.break_fx.spawned == 2, "a huge size still draws one burst", fx.break_fx.last_refusal)
+	fx.free()
 
 
 func _light() -> void:

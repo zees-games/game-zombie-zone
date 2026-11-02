@@ -142,6 +142,8 @@ signal objective_changed(index: int, state: StringName)
 signal gate_opened(gate: String)
 ## A support of the map's broke and what stood on it falls (its index in `map.supports`).
 signal support_broken(index: int)
+## Wood gave way at a point (see [signal ZzMap.wood_broke]); both ends, the client draws it.
+signal wood_broke(at: Vector3, size: float)
 ## A moving part of the map changed state ([method ZzMechanics.snapshot] has it).
 signal mover_changed(index: int)
 ## A brush the map's point_template made or killed: `(id, model, offset, alive)`; the bridge tells clients.
@@ -757,6 +759,7 @@ func _build_map() -> void:
 	map.mover_changed.connect(func(index: int) -> void: mover_changed.emit(index))
 	map.logic_event.connect(_on_map_logic_event)
 	map.support_broken.connect(func(index: int) -> void: support_broken.emit(index))
+	map.wood_broke.connect(func(at: Vector3, size: float) -> void: wood_broke.emit(at, size))
 	map.copy_changed.connect(func(id: int, model: int, offset: Vector3, alive: bool) -> void: copy_changed.emit(id, model, offset, alive))
 	add_child(map)
 
