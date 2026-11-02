@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 430
+const CHECKS := 431
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2780,15 +2780,19 @@ func _test_the_client_platform() -> void:
 		"the wheel is not on jump")
 	var slots: Array = client.weapons.arsenal.slots() if client.weapons != null and client.weapons.arsenal != null else []
 	var before: int = client._slot
-	# The press itself is gated on a captured pointer, which a headless run cannot have; the
-	# routing is the action match above, so this drives what the action calls.
-	client._cycle_slot(1)
+	client.pointer_forced = false
+	var took_free: bool = client._wheel_pressed(wheel)
+	_check(not took_free and client._slot == before and client._wheel is DotWeaponWheel,
+		"the wheel leaves a slot alone while the pointer is free", "%d -> %d" % [before, client._slot])
+	client.pointer_forced = true
+	var took: bool = client._wheel_pressed(wheel)
 	var after: int = client._slot
 	var expected: int = before
 	if slots.size() > 1:
 		expected = slots[posmod((maxi(slots.find(before), 0)) + 1, slots.size())]
-	_check(after == expected and (slots.size() < 2 or after != before),
-		"the next-weapon step moves one slot", "slots %s, %d -> %d" % [str(slots), before, after])
+	_check(took and after == expected and (slots.size() < 2 or after != before),
+		"the next-weapon step moves one slot with the pointer ours", "slots %s, %d -> %d" % [str(slots), before, after])
+	client.pointer_forced = false
 	client.pointer_forced = true
 	client._aiming = true
 	for _i in 4:
