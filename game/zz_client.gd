@@ -1320,6 +1320,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 		weapons.name = "Weapons"
 		weapons.role = ZeeWeaponRig.Role.LOCAL
 		weapons.authority = false
+		weapons.catalogue = ZzGame.weapon_catalogue()
 		# Ticked once a physics frame (`_drive_view_model`), so timed by that rate: at the
 		# server's 64 against a 60 Hz client every reload here ran 7% long, and the counter
 		# sat empty after the server's gun had filled.
