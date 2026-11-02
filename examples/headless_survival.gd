@@ -406,17 +406,23 @@ func _test_barricades() -> void:
 	# Inside the classroom, a few metres back from the window.
 	me.place_at(Vector3(box.get_center().x, 0.05, 11.0), 0.0)
 	var outside := Vector3(box.get_center().x, 0.0, 19.0)
+	# Fixed offsets, and only those that snapped onto the outside count: a snap to the nearest
+	# nav point can land inside the room, which would read as "through the window".
+	var outsiders := []
 	for i in 8:
-		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(outside + Vector3(randf_range(-3, 3), 0, randf_range(0, 3))), &"test")
+		var offset := Vector3(-3.0 + 6.0 * i / 7.0, 0.0, 3.0 * float(i % 3) / 2.0)
+		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(outside + offset), &"test")
 		if npc != null:
 			npc.brain.call(&"force_target", me.player_id)
+			if npc.position().z >= box.position.z:
+				outsiders.append(npc)
 	# Whichever of the room's two windows the horde's path takes them to.
 	var pair := ["n2_w", "n2_e"]
 	var start := float(game.barricades[id]["health"])
 	var through_early := false
 	for i in 20:
 		await _sim(game, 0.5)
-		for npc in game.horde.spawner.npcs_of(&"test"):
+		for npc in outsiders:
 			if npc.is_alive() and npc.position().z < box.position.z - 0.3:
 				through_early = true
 	var weakest := ""
@@ -437,7 +443,7 @@ func _test_barricades() -> void:
 	for i in 16:
 		await _sim(game, 0.5)
 		inside = 0
-		for npc in game.horde.spawner.npcs_of(&"test"):
+		for npc in outsiders:
 			if npc.is_alive() and npc.position().z < box.position.z - 0.3:
 				inside += 1
 		if inside > 0:
