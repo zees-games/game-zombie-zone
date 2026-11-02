@@ -121,7 +121,8 @@ var _nav_meter: PanelContainer = null
 var _team: Control = null
 var _team_rows: Array[Dictionary] = []
 var _effects: Label = null
-var _prompt: Label = null
+var _prompt: DotKeyPrompt = null
+var _points: Label = null
 ## The box file's order, titles and colours, set by the client: the carried slot is drawn from
 ## `player.carried_index` (an index into it plus one; 0 is unknown, or nothing carried).
 var box_order: Array[StringName] = []
@@ -210,8 +211,8 @@ func _build() -> void:
 
 	_top_sub = _label(16)
 	_top_sub.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_top_sub.offset_top = 46.0
-	_top_sub.offset_bottom = 70.0
+	_top_sub.offset_top = 132.0
+	_top_sub.offset_bottom = 156.0
 	_top_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_top_sub.add_theme_color_override("font_color", Color(0.82, 0.86, 0.92))
 
@@ -226,8 +227,8 @@ func _build() -> void:
 
 	_shout = _label(36)
 	_shout.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_shout.offset_top = 150.0
-	_shout.offset_bottom = 210.0
+	_shout.offset_top = 166.0
+	_shout.offset_bottom = 222.0
 	_shout.offset_left = -640.0
 	_shout.offset_right = 640.0
 	_shout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -235,16 +236,16 @@ func _build() -> void:
 
 	_banner = _label(30)
 	_banner.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_banner.offset_top = 210.0
-	_banner.offset_bottom = 254.0
+	_banner.offset_top = 222.0
+	_banner.offset_bottom = 262.0
 	_banner.offset_left = -640.0
 	_banner.offset_right = 640.0
 	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	_banner_line = _label(18)
 	_banner_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	_banner_line.offset_top = 254.0
-	_banner_line.offset_bottom = 282.0
+	_banner_line.offset_top = 262.0
+	_banner_line.offset_bottom = 288.0
 	_banner_line.offset_left = -640.0
 	_banner_line.offset_right = 640.0
 	_banner_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -316,7 +317,7 @@ func _build() -> void:
 	_weapon_icon = TextureRect.new()
 	_weapon_icon.name = "WeaponIcon"
 	_weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_weapon_icon.offset_left = -310.0
+	_weapon_icon.offset_left = -300.0
 	_weapon_icon.offset_right = -150.0
 	_weapon_icon.offset_top = -96.0
 	_weapon_icon.offset_bottom = -28.0
@@ -343,7 +344,7 @@ func _build() -> void:
 	_effects.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_effects.offset_left = -420.0
 	_effects.offset_right = -22.0
-	_effects.offset_top = 90.0
+	_effects.offset_top = 112.0
 	_effects.offset_bottom = 360.0
 	_effects.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_effects.add_theme_color_override("font_color", Color(0.98, 0.84, 0.5))
@@ -353,14 +354,26 @@ func _build() -> void:
 	_crosshair.name = "Crosshair"
 	_root.add_child(_crosshair)
 
-	_prompt = _label(17)
+	# dot-ui's prompt: a plate and the key drawn as a key, so a bright map cannot wash it out.
+	_prompt = DotKeyPrompt.new()
+	_prompt.name = "Prompt"
 	_prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_prompt.offset_left = -400.0
 	_prompt.offset_right = 400.0
-	_prompt.offset_top = 40.0
-	_prompt.offset_bottom = 66.0
-	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_prompt.add_theme_color_override("font_color", Color(0.95, 0.95, 0.85))
+	_prompt.offset_top = 36.0
+	_prompt.offset_bottom = 72.0
+	_root.add_child(_prompt)
+
+	# Points, top right under the Help key: what the trader and the boxes cost is in these.
+	_points = _label(20)
+	_points.name = "Points"
+	_points.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_points.offset_left = -300.0
+	_points.offset_right = -22.0
+	_points.offset_top = 76.0
+	_points.offset_bottom = 104.0
+	_points.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_points.add_theme_color_override("font_color", Color(0.98, 0.84, 0.5))
 
 	_use_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_CENTER, -160.0, 74.0, 320.0, 12.0)
 	_use_fill = _rect(Color(0.95, 0.85, 0.35), Control.PRESET_CENTER, -160.0, 74.0, 0.0, 12.0)
@@ -506,7 +519,16 @@ func set_effects(rows: Array) -> void:
 
 func set_prompt(text: String) -> void:
 	if _prompt != null:
-		_prompt.text = text
+		var parts := prompt_parts(text)
+		_prompt.show_prompt(parts[0], parts[1])
+
+
+## "E — trade" as `["trade", "E"]`: the key is whatever precedes the dash when it is short.
+static func prompt_parts(text: String) -> Array:
+	var at := text.find(" — ")
+	if at < 0 or at > 12:
+		return [text, ""]
+	return [text.substr(at + 3), text.substr(0, at)]
 
 
 ## A hit of this survivor's that the server confirmed: the marker round the crosshair, and
@@ -624,6 +646,7 @@ func _draw_top() -> void:
 	if grace_left > 0.0:
 		sub = grace_line(grace_left)
 
+	_points.text = "%d points" % player.points if player.points > 0 else ""
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
 	strip.show_clock(clock, clock_low, under if clock != "" else "")

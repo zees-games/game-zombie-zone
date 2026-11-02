@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 428
+const CHECKS := 430
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2902,6 +2902,15 @@ func _test_the_hud() -> void:
 	)
 	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit x1" and str(hud.kits.rows[0][1]) != "",
 		"the medkit is a DotKeyHints row with its key", str(hud.kits.rows))
+
+	me.points = 450
+	hud.set_prompt("E — trade")
+	hud._process(0.0)
+	_check(hud._prompt.text().begins_with("trade") and hud._prompt.key == "E" and hud._points.text == "450 points",
+		"the prompt is a DotKeyPrompt with the key split off, and the points show", "%s / %s" % [hud._prompt.describe(), hud._points.text])
+	hud.set_prompt("")
+	_check(hud._prompt.text().strip_edges() == "" and ZzHud.prompt_parts("no dash") == ["no dash", ""],
+		"an empty prompt clears it and text with no key stays whole")
 
 	# The team-mate list is a server setting, off by default; the board carries the same facts.
 	_check(not game.config.team_roster and not hud._team.visible, "the team list is off by default and hidden")
