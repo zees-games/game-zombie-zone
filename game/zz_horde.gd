@@ -2290,6 +2290,17 @@ func _register_combat(npc: DotNpcInstance) -> void:
 	chest.position = Vector3(0.0, height * 0.41, 0.0)
 	set_node.add_child(chest)
 
+	# The belly is a zone of its own (dot-combat's stomach), a band of the body that wins over the
+	# capsule; with mp_hitzones 0 the resolver folds it into chest, so damage is unchanged.
+	var stomach := DotHitbox.new()
+	stomach.name = "Stomach"
+	stomach.group = DotHitGroup.STOMACH
+	stomach.shape = DotHitbox.Shape.BOX
+	stomach.half_extents = Vector3(radius + 0.06, height * (ZzZombieLimbs.STOMACH_TOP - ZzZombieLimbs.STOMACH_BOTTOM) * 0.5, radius + 0.06)
+	stomach.position = Vector3(0.0, height * (ZzZombieLimbs.STOMACH_TOP + ZzZombieLimbs.STOMACH_BOTTOM) * 0.5, 0.0)
+	stomach.precedence = 5
+	set_node.add_child(stomach)
+
 	# A riot zombie's shield: a hitbox of its own in front of it, nearer the gun than its body,
 	# so a frontal shot stops there (nearest entry wins in dot-combat) and does `shield` of its
 	# damage. From the side or behind, the body is nearer and takes it all.
@@ -2339,6 +2350,11 @@ func limb_hit(damage: DotDamage) -> void:
 
 	if limb == &"" or (limb == &"head" and not head):
 		return
+
+	# Which zone the hit was, in dot-combat's ids, for whoever reads the damage afterwards.
+	var feet: float = (npc.node as Node3D).global_position.y
+	var tall := maxf(0.5, float(npc.def.meta.get("height", 1.75)))
+	damage.context[&"limb_zone"] = ZzZombieLimbs.zone_of(limb, (damage.point.y - feet) / tall)
 
 	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
 	var _took := limbs.hit_limb(limb, damage.point, limb_damage(npc, damage), impulse)

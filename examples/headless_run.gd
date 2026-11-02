@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 54
+const SECTIONS := 55
 
-const CHECKS := 419
+const CHECKS := 428
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -90,6 +90,7 @@ func _run() -> void:
 	await _test_revive_tuning()
 	await _test_ground_strike()
 	await _test_a_legless_zombie_still_attacks()
+	await _test_limb_zones()
 	await _test_every_kind_animates()
 	await _test_borrowed_health()
 	await _test_the_shove()
@@ -1103,6 +1104,26 @@ func _test_ground_strike() -> void:
 		if is_instance_valid(other.node) and other.node.get(&"anim") == ZzZombieBody.Anim.STRIKE_DOWN:
 			seen["down"] = true
 	_check(not seen["down"], "with down_attack off it swings as usual")
+	_finished()
+
+
+## Knees, feet, hands and the stomach are dot-combat zone ids on a zombie, and fold into leg, arm and chest with mp_hitzones 0.
+func _test_limb_zones() -> void:
+	_section("zombie limbs use dot-combat's zone ids (knee, foot, hand, stomach)")
+	const L := preload("../npcs/zz_zombie_limbs.gd")
+	_check(L.zone_of(&"legL", 0.27) == DotHitGroup.KNEE and L.zone_of(&"legR", 0.27) == DotHitGroup.KNEE, "a leg hit at knee height is the knee")
+	_check(L.zone_of(&"legL", 0.03) == DotHitGroup.FOOT, "a leg hit at the ground is the foot")
+	_check(L.zone_of(&"legL", 0.45) == DotHitGroup.LEG, "a thigh is the leg")
+	_check(L.zone_of(&"armR", 0.3) == DotHitGroup.HAND and L.zone_of(&"armR", 0.7) == DotHitGroup.ARM, "a low arm hit is the hand, a high one the arm")
+	_check(L.zone_of(&"head", 0.95) == DotHitGroup.HEAD and L.zone_of(&"gunL", 0.5) == DotHitGroup.CHEST, "the head is the head and a mutant's gun the chest")
+	_check(DotHitzone.coarse(L.zone_of(&"legL", 0.27)) == DotHitGroup.LEG and DotHitzone.coarse(L.zone_of(&"armL", 0.3)) == DotHitGroup.ARM, "with zones off knee folds to leg and hand to arm")
+	_check(DotHitzone.coarse(DotHitGroup.STOMACH) == DotHitGroup.CHEST, "with zones off the stomach folds into chest")
+	var game := await _team(1, _quiet)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -8.0), &"test", Basis(Vector3.UP, PI))
+	var belly := npc.node.get_node_or_null(^"Hitboxes/Stomach") as DotHitbox
+	_check(belly != null and belly.group == DotHitGroup.STOMACH, "a zombie has a stomach hitbox in the stomach zone")
+	var chest := npc.node.get_node_or_null(^"Hitboxes/Body") as DotHitbox
+	_check(belly != null and chest != null and belly.precedence > chest.precedence, "the stomach wins over the body capsule where they overlap")
 	_finished()
 
 

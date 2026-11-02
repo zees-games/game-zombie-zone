@@ -10,6 +10,36 @@ const ZzZombieView := preload("zz_zombie_view.gd")
 const BASE := &"zombie"
 
 
+## The zone a limb belongs to when a shot lands on it, as dot-combat's [DotHitGroup] ids. Under `mp_hitzones` 0
+## dot-combat folds knee and foot into leg, hand into arm (DotHitzone.coarse), so these never change damage then.
+const LIMB_ZONE := {&"head": DotHitGroup.HEAD, &"armL": DotHitGroup.ARM, &"armR": DotHitGroup.ARM,
+	&"legL": DotHitGroup.LEG, &"legR": DotHitGroup.LEG}
+## Fractions of body height (from the feet): below FOOT is foot, FOOT to KNEE_TOP a shin or knee band is knee.
+const FOOT_TOP := 0.08
+const KNEE_BOTTOM := 0.2
+const KNEE_TOP := 0.34
+## An arm hit below this height is the hand; the stomach box sits between STOMACH_BOTTOM and STOMACH_TOP.
+const HAND_TOP := 0.42
+const STOMACH_BOTTOM := 0.4
+const STOMACH_TOP := 0.56
+
+
+## The zone of a hit on [param limb] at [param rel] (0 at the feet, 1 at the top of the head): the limb's
+## zone, refined to foot, knee or hand by height. An unknown limb (a mutant's gun) is the chest.
+static func zone_of(limb: StringName, rel: float) -> StringName:
+	var zone: StringName = LIMB_ZONE.get(limb, DotHitGroup.CHEST)
+
+	if zone == DotHitGroup.LEG:
+		if rel < FOOT_TOP:
+			return DotHitGroup.FOOT
+		if rel >= KNEE_BOTTOM and rel <= KNEE_TOP:
+			return DotHitGroup.KNEE
+	elif zone == DotHitGroup.ARM and rel < HAND_TOP:
+		return DotHitGroup.HAND
+
+	return zone
+
+
 ## The limbs of [param kind]: the base set with the kind's own keys over it. A limb's `share` of
 ## [param max_health] becomes its `health` (0 leaves `health` as written, or 100).
 static func defs_for(kind: StringName, max_health: float) -> Dictionary:
