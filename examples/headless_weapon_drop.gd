@@ -11,7 +11,7 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 4
-const CHECKS := 29
+const CHECKS := 30
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
