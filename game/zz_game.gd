@@ -3797,6 +3797,18 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 
 # --- Weapons ------------------------------------------------------------------------------------
 
+static var _weapon_catalogue: DotWeaponCatalogue = null
+
+
+## The weapon table, built once; every rig shares it so its behaviour scripts load once.
+static func weapon_catalogue() -> DotWeaponCatalogue:
+	if _weapon_catalogue == null:
+		_weapon_catalogue = ZeeWeaponPack.catalogue()
+		# Built under the loading cover; the first spawn then loads no script.
+		_weapon_catalogue.warm_scripts()
+	return _weapon_catalogue
+
+
 ## Why the last [method arm] refused ("" when it was not the weight); the caller says it to the player.
 var arm_failure: String = ""
 
@@ -3811,6 +3823,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.role = ZeeWeaponRig.Role.SERVER
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
+		rig.catalogue = weapon_catalogue()
 		# The held weapon lowers at every brush that stops the player, fences and clip included.
 		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
