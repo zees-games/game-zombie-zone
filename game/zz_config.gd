@@ -95,6 +95,15 @@ extends DotConfig
 ## Seconds the returned survivor cannot be hurt.
 @export_range(0.0, 30.0, 0.5) var respawn_protect_seconds: float = 3.0
 
+## Seconds into a round after which some survivors turn into zombies (cvar zz_infect_after). 0 is off.
+@export_range(0.0, 600.0, 1.0) var infect_after_seconds: float = 0.0
+
+## How many survivors turn (zz_infect_count); the last one never does.
+@export_range(1, 32, 1) var infect_count: int = 1
+
+## The zombie kind a turned survivor becomes (zz_infect_kind).
+@export var infect_kind: String = "common"
+
 ## The setup seconds in force.
 func setup_seconds() -> float:
 	return survival_warmup_seconds if survival_warmup_seconds >= 0.0 else prestart_seconds

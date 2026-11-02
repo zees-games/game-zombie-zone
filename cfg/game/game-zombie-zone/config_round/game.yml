@@ -54,6 +54,12 @@
 # respawn_difficulty_step: 0.0
 # Seconds the returned survivor cannot be hurt. [0.0..30.0]
 # respawn_protect_seconds: 3.0
+# Seconds into a round after which some survivors turn into zombies (cvar zz_infect_after). 0 is off. [0.0..600.0]
+# infect_after_seconds: 0.0
+# How many survivors turn (zz_infect_count); the last one never does. [1..32]
+# infect_count: 1
+# The zombie kind a turned survivor becomes (zz_infect_kind).
+# infect_kind: "common"
 # Seconds of breather between waves: the downed are up, the dead are back, the caches restock, and the barric... [0.0..300.0]
 # breather_seconds: 30.0
 # Seconds of day between nights, and of a night. [10.0..900.0]

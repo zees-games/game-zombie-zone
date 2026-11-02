@@ -46,6 +46,7 @@ const ZzSpectate := preload("zz_spectate.gd")
 const ZzSurvival := preload("zz_survival.gd")
 const ZzRespawn := preload("zz_respawn.gd")
 const ZzTeamDamage := preload("zz_team_damage.gd")
+const ZzInfection := preload("zz_infection.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorkshop := preload("zz_workshop.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -427,6 +428,7 @@ var survival_goal: float = 0.0
 
 ## Server: the survival map's hold, while one is being held. See [ZzSurvival].
 var survival: ZzSurvival = null
+var infection: ZzInfection = null
 
 ## What a client was told of the hold, the shape of [method ZzSurvival.state]; empty for none.
 var remote_survival: Dictionary = {}
@@ -2200,6 +2202,9 @@ func _advance_phase(delta: float) -> void:
 					survival.tick(delta)
 					survival_elapsed = survival.waves.elapsed if survival.waves != null else survival_elapsed + delta
 
+			if infection != null and authoritative and not grace.is_active():
+				infection.tick(delta)
+
 			_advance_objectives(delta)
 			_check_round()
 
@@ -2219,6 +2224,7 @@ func _anybody_left_start() -> bool:
 
 func _begin_play() -> void:
 	_set_phase(Phase.PLAY)
+	infection = ZzInfection.new(self)
 
 	var grace_seconds := grace_seconds_for_map()
 	if authoritative and grace_seconds > 0.0 and grace.begin(grace_seconds):

@@ -787,6 +787,10 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.breather_seconds = clampf(value, 0.0, 300.0))
 	_tunable("zz_prestart_time", config.prestart_seconds, "Setup seconds before a survival map's first wave: no zombies until it ends (0 skips)",
 		func(value: float) -> void: config.prestart_seconds = clampf(value, 0.0, 300.0))
+	_tunable("zz_infect_after", config.infect_after_seconds, "Seconds into a round after which survivors turn into zombies (0 off)",
+		func(value: float) -> void: config.infect_after_seconds = clampf(value, 0.0, 600.0))
+	_tunable("zz_infect_count", float(config.infect_count), "How many survivors turn (the last never does)",
+		func(value: float) -> void: config.infect_count = clampi(int(value), 1, 32))
 	_tunable("zz_survival_warmup", config.survival_warmup_seconds, "Overrides zz_prestart_time when 0 or more (-1 follows it)",
 		func(value: float) -> void: config.survival_warmup_seconds = clampf(value, -1.0, 300.0))
 	_tunable("zz_respawn_on_wave_end", 1.0 if config.respawn_on_wave_end else 0.0, "1: the dead return as each breather begins",
@@ -1670,6 +1674,7 @@ func describe() -> Dictionary:
 
 ## Hand-written cvars whose name is not `zz_<field>`: cvar -> config field.
 const HAND_FIELDS := {
+	"zz_infect_after": "infect_after_seconds", "zz_infect_count": "infect_count",
 	"zz_box_common": "box_drop_common", "zz_box_drops": "boxes_enabled", "zz_box_special": "box_drop_special",
 	"zz_breather": "breather_seconds", "zz_brute_every": "brute_every_waves", "zz_brute_max": "brute_interval_max",
 	"zz_brute_min": "brute_interval_min", "zz_commons": "commons_base", "zz_defib_start": "start_defibs",

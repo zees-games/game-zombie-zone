@@ -48,6 +48,10 @@ A map says the team it is built for (`survivors`: school 12, mall 14, ballpark 1
 
 Stand-ins on a survival map hold **posts** (the map's `posts`, shared out by seat), fight from them, mend the weakest barricade near their post when nothing is in sight (pulsing E, because a mend starts on the press), and in a breather walk to a stocked cache when short of ammunition, a medkit or a primary. Following one leader, twelve of them stood in one corridor with forty windows unwatched.
 
+## The opening that turns survivors
+
+`zz_infect_after <seconds>` (0, off, by default) turns `zz_infect_count` random living survivors into zombies of `infect_kind` once that many seconds of play have passed; the rest hold. The last human is never turned. Turned survivors become AI zombies; a player-controlled zombie body is not built yet.
+
 ## The light by day
 
 A survival map can carry `day_environment`; the map's `environment` is its night. `ZzMap` captures both lights once (`_capture_day`) and `set_daylight` blends sun, fill, fog and sky; the client eases toward the hold's `daylight` (sent in SURVIVAL, ramping through a ten-second dawn and dusk). A dawn is a blend, never a rebuild.

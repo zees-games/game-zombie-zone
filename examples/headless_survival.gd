@@ -26,8 +26,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 18
-const CHECKS := 117
+const SECTIONS := 19
+const CHECKS := 122
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _test_prestart()
 	await _test_wave_sets()
 	await _test_respawn()
+	await _test_infection()
 	await _test_nights()
 	await _test_clock()
 	await _test_wipe()
@@ -180,6 +181,30 @@ func _test_prestart() -> void:
 	_check(game.survival.waves.stage == DotNpcDirectorWaves.Stage.HORDE and game.horde.spawner.all_npcs().size() > 0,
 		"when it ends the wave and the map's own zombies appear", "%d zombies" % game.horde.spawner.all_npcs().size())
 	await _dispose(game)
+	_finished()
+
+
+func _test_infection() -> void:
+	_section("infection: after a delay some survivors turn, the last one never does")
+	_check(ZzConfig.new().infect_after_seconds == 0.0, "off by default")
+
+	for off in [true, false]:
+		var game := await _hold(func(cfg: ZzConfig) -> void:
+			cfg.survival_style = 0
+			cfg.survival_warmup_seconds = 100.0
+			cfg.infect_after_seconds = 0.0 if off else 2.0
+			cfg.infect_count = 9, 4)
+		await _sim(game, 3.5)
+		var up := game.survivors().filter(func(p: ZzPlayer) -> bool: return p.life != ZzPlayer.Life.DEAD).size()
+		var zombies := game.horde.spawner.all_npcs().size()
+		if off:
+			_check(up == 4 and zombies == 0, "off: nobody turns", "%d up, %d zombies" % [up, zombies])
+		else:
+			_check(up == 1, "on: all but the last turn", "%d up" % up)
+			_check(zombies == 3, "each leaves a zombie where they fell", "%d zombies" % zombies)
+			_check(game.infection.turned == 3, "and the count is kept", str(game.infection.turned))
+		await _dispose(game)
+
 	_finished()
 
 
