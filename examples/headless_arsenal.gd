@@ -12,8 +12,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## The weapon pool as a player meets it: every pack weapon has a source, every ammunition type has one, a late wave holds the heavy
 ## guns back, and a stand-in can fire each gun and chooses between two. Sections and checks are both counted.
 
-const SECTIONS := 6
-const CHECKS := 101
+const SECTIONS := 7
+const CHECKS := 104
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -42,6 +42,7 @@ func _run() -> void:
 	_ammunition(game)
 	_waves()
 	await _stand_ins_choose(game)
+	await _stand_ins_buy()
 	await _stand_ins_fire()
 	await _remote_hands()
 
@@ -211,6 +212,35 @@ func _stand_ins_choose(game: ZzGame) -> void:
 	bot.wanted_slot = ZzWeapons.def_of(best).slot
 	game.bots._choose_slot(bot, near)
 	_check(bot.wanted_slot != heavy_slot, "and against one 5 m off, the gun again")
+	_finished()
+
+
+func _stand_ins_buy() -> void:
+	_section("a stand-in with the points buys a priced pickup; one without leaves it alone")
+	var game := await _team(1, true)
+	var bot: ZzPlayer = game.survivors()[0]
+	game._disarm(bot)
+	bot.place_at(STREET, 0.0)
+	var at := STREET + Vector3(2.5, 0.0, 0.0)
+	var site := {"id": "buy_probe", "spawners": [{"id": "buy", "at": [at.x, at.y, at.z], "item": "zz_shotgun", "respawn": 0, "data": {"price": 250}}]}
+	game.spawners.start_round(site)
+	game.spawners.tick()
+	var lid := -1
+	for id: int in game.spawners.loot_ids():
+		if game.spawners.price_of(id) == 250:
+			lid = id
+	_check(lid >= 0 and game.spawners.price_of(lid) == 250, "a priced pickup is laid", str(lid))
+	for other: int in game.loot.entries.keys():
+		if other != lid:
+			game.loot.remove(other, &"")
+	bot.points = 75
+	await _sim(game, 8.0)
+	_check(game.loot.exists(lid) and bot.points == 75 and int(game.bots._memory(bot).get("pick", -1)) != lid, "with 75 points it does not set its goal on a 250 pickup", "%s %d %s" % [game.loot.exists(lid), bot.points, game.bots._memory(bot).get("pick")])
+	bot.place_at(STREET, 0.0)
+	bot.points = 400
+	await _sim(game, 10.0)
+	_check(not game.loot.exists(lid) and bot.points == 150, "with 400 it takes it and pays 250", "%s %d %s %s %s" % [game.loot.exists(lid), bot.points, game.bots._memory(bot).get("pick"), bot.feet(), game.bots._memory(bot).get("pick_ignore")])
+	await _dispose(game)
 	_finished()
 
 
