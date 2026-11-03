@@ -11,7 +11,7 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 4
-const CHECKS := 29
+const CHECKS := 30
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -171,10 +171,12 @@ func _test_shot_hold() -> void:
 	layer.rules.pickup_radius = 0.0
 	layer.rules.pickup_delay = 0.0
 	_check(layer.throw(p), "a throw is accepted")
-	for _k in 20:
-		await _sim(game, 1.0)
+	# The drops tick on real physics frames (SETTLE_MAX_SEC of them), which _sim only awaits every eighth tick.
+	for _k in 600:
+		await get_tree().physics_frame
 		if drops.active_count() == 0:
 			break
+	_check(drops.active_count() == 0, "the thrown weapon comes to rest")
 	var snap: Dictionary = drops.snapshot()[0]
 	var rest: Vector3 = snap["at"].origin if snap.has("at") else Vector3.ZERO
 	var awake: int = drops.active_count()
