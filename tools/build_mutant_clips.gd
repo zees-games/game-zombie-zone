@@ -64,8 +64,8 @@ func _attack_keys() -> Array:
 func _hit_keys() -> Array:
 	return [
 		[0.0, {}],
-		[0.2, {"Head": Vector3(-0.55, 0.15, 0), "Spine": Vector3(-0.22, 0.0, 0.0), "ArmL": Vector3(0.5, 0, 0), "ArmR": Vector3(0.5, 0, 0)}],
-		[0.55, {"Head": Vector3(-0.2, 0.05, 0), "Spine": Vector3(-0.08, 0, 0)}],
+		[0.2, {"Head": Vector3(-0.9, 0.2, 0), "Spine": Vector3(-0.45, 0.0, 0.0), "Hips": Vector3(-0.15, 0, 0), "ArmL": Vector3(0.9, 0, 0), "ArmR": Vector3(0.9, 0, 0)}],
+		[0.55, {"Head": Vector3(-0.35, 0.05, 0), "Spine": Vector3(-0.15, 0, 0), "Hips": Vector3(-0.05, 0, 0)}],
 		[1.0, {}],
 	]
 
