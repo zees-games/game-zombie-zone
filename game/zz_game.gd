@@ -3927,8 +3927,12 @@ func _advance_weapons() -> void:
 
 		var command := weapon_command_for(player)
 
-		if player.is_bot and _bot_weapon_idle(player, command):
-			continue
+		if player.is_bot:
+			# Nobody watches a stand-in's crosshair, so its idle ticks skip the spread context.
+			player.weapons.arsenal.crosshair_cone = false
+
+			if _bot_weapon_idle(player, command):
+				continue
 
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
@@ -4045,6 +4049,16 @@ var hold_clock: Callable = Callable()
 
 ## One tick, counted by this world. What an offline client and the suite use.
 func simulate(delta: float) -> void:
+	var began := Time.get_ticks_usec()
+	_simulate(delta)
+	tick_us_total += Time.get_ticks_usec() - began
+
+
+## Microseconds spent inside [method simulate] since the start (tools/bench.gd reads it).
+var tick_us_total: int = 0
+
+
+func _simulate(delta: float) -> void:
 	_tick += 1
 
 	if hold_clock.is_valid() and bool(hold_clock.call()):
