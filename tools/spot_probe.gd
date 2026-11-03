@@ -31,6 +31,8 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	if _verbose:
+		print("  engine up %d ms" % Time.get_ticks_msec())
 	var spots: Array = SPOTS
 	var args := OS.get_cmdline_user_args()
 	if args.size() >= 2 and not args[0].begins_with("--"):
@@ -54,10 +56,13 @@ func _run() -> void:
 			print(line)
 			if line.contains(" blocked") and not line.ends_with(" 0 blocked"):
 				code = 1
+	if _verbose:
+		print("  done %d ms" % Time.get_ticks_msec())
 	get_tree().quit(code)
 
 
 func _probe_map(id: String, at: Array) -> PackedStringArray:
+	var t0 := Time.get_ticks_msec()
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -75,11 +80,15 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	for i in 10:
 		_game.simulate(0.05)
 		await get_tree().physics_frame
+	var t1 := Time.get_ticks_msec()
 	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
 	for a in OS.get_cmdline_user_args():
 		if graph != null and a.begins_with("--ratio="):
 			graph.straight_width_ratio = float(a.substr(8))
+	var t1b := Time.get_ticks_msec()
 	var nav: DotNpcNavData = graph.data if graph != null else null
+	if _verbose:
+		print("  data %d ms (graph at %d)" % [Time.get_ticks_msec() - t1b, t1b - t0])
 	var out := PackedStringArray()
 	if nav == null:
 		out.append("%s: no nav blocked" % id)
@@ -96,6 +105,9 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 		all.sort()
 		for i in SURVEY_SPOTS:
 			at.append(nav.points[all[(i * 2 + 1) * all.size() / (SURVEY_SPOTS * 2)]])
+	var t2 := Time.get_ticks_msec()
+	if _verbose and nav != null:
+		print("  spots chosen after %d ms, %d points" % [t2 - t1b, nav.points.size()])
 	var total := 0
 	for spot: Vector3 in at:
 		var near := nav.points_within(spot, NEAR)
@@ -120,9 +132,16 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 		out.append("%s %s: %d paths, %d legs, %d blocked" % [id, _f(spot), checked, legs, bad.size()])
 		out.append_array(bad.slice(0, 6))
 		total += bad.size()
+	if _verbose:
+		print("  timing %s: start %d ms, probe %d ms" % [id, t1 - t0, Time.get_ticks_msec() - t2])
 	out.append("MAP %s: %d blocked" % [id, total])
+	var t3 := Time.get_ticks_msec()
 	remove_child(_game)
+	if _verbose:
+		print("  removed %d ms" % (Time.get_ticks_msec() - t3))
 	_game.free()
+	if _verbose:
+		print("  freed %d ms" % (Time.get_ticks_msec() - t3))
 	await get_tree().process_frame
 	return out
 
