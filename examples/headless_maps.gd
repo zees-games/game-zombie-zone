@@ -425,7 +425,7 @@ func _test_worlds() -> void:
 		add_child(mech)
 		mech.build(world, Callable())
 		_check(mech.mover_count() == movers, "%s: a mechanics builds from it" % id, "%d of %d" % [mech.mover_count(), movers])
-		mech.queue_free()
+		mech.free()
 
 		# Sounds and props: as many nodes as the manifest has stand-ins that exist, none for a
 		# world without them, and no collision on any.
