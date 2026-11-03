@@ -779,17 +779,25 @@ func _held_third_frames(game: ZzGame, local) -> void:
 	for other in game.survivors():
 		if other != local:
 			other.place_at(away, 0.0)
-	var eye: Vector3 = local.feet() + ahead * 2.2 + ahead.cross(Vector3.UP) * 0.9 + Vector3.UP * 1.3
+	# Low and close, the hand filling the frame, under a lamp of its own: the night map's own light left the gun a silhouette.
+	var eye: Vector3 = local.feet() + ahead * 1.3 + ahead.cross(Vector3.UP) * 0.55 + Vector3.UP * 0.85
+	var lamp := OmniLight3D.new()
+	lamp.omni_range = 8.0
+	lamp.light_energy = 3.0
+	add_child(lamp)
+	lamp.global_position = local.feet() + ahead * 1.6 + Vector3.UP * 1.8
 	for name in _weapons:
 		var id := StringName(name)
 		if not await _hold_exact(game, local, id):
 			continue
 		await _seconds_of(1.0)
-		_free_camera().look_at_from_position(eye, local.feet() + Vector3.UP * 1.05)
+		_free_camera().look_at_from_position(eye, local.feet() + Vector3.UP * 0.95)
 		await _frames(3)
 		await RenderingServer.frame_post_draw
 		var image := get_viewport().get_texture().get_image()
-		print("%s held: %s" % [id, error_string(image.save_png(dir.path_join("held_%s.png" % id)))])
+		var drawn: Variant = local.figure.held.equipped() if local.figure != null and local.figure.held != null else &"(none)"
+		print("%s held (figure draws %s): %s" % [id, drawn, error_string(image.save_png(dir.path_join("held_%s.png" % id)))])
+	lamp.queue_free()
 
 
 func _weapon_sheets(game: ZzGame, local) -> void:
