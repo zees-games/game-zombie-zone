@@ -201,7 +201,7 @@ func _run() -> void:
 	nc.snapshot_rate = SNAPSHOT_RATE
 	nc.enable_prediction = true
 	nc.enable_lag_compensation = false
-	nc.max_entities_per_snapshot = 192
+	nc.max_entities_per_snapshot = 0
 	nc.world_extent = ZzGame.NET_WORLD_EXTENT
 	nc.snapshot_workers = _workers
 	nc.native = _native

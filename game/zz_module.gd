@@ -157,9 +157,9 @@ func _net_config() -> DotNetConfig:
 	#
 	# A shot at a running zombie, from a hundred milliseconds away, is the ordinary reason.
 	config.enable_lag_compensation = true
-	# Survivors and every zombie: a full horde is a hundred and more, and a snapshot that cut
-	# it short would leave zombies frozen where the last one that fitted left them.
-	config.max_entities_per_snapshot = 256
+	# No cap: a snapshot that cut a 100+ horde short would leave zombies frozen where the last
+	# one that fitted left them.
+	config.max_entities_per_snapshot = 0
 	return config
 
 
