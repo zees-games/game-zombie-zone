@@ -66,6 +66,10 @@ func _run() -> void:
 		print("MICRO bots.drive %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
 		var survs = g.survivors()
 		print("MICRO survivors %d" % survs.size())
+		for pl in survs:
+			var st = pl.controller.state
+			var cm = pl.controller.current_command
+			print("MICRO motor bot=%s up=%s grounded=%s vel=%s move=%s btn=%s prevbtn=%s yawdiff=%s crouch=%s stam=%s mods=%d using=%s" % [pl.is_bot, pl.is_up(), st.is_grounded(), st.velocity, cm.move if cm else "-", cm.buttons if cm else "-", st.previous_buttons, (cm.yaw - st.yaw) if cm else "-", st.crouch_fraction, st.stamina, st.modifiers.size(), pl.using])
 		t0 = Time.get_ticks_usec()
 		for i in n:
 			for pl in survs:
@@ -135,7 +139,10 @@ func _run() -> void:
 		if local.sampler != null:
 			local.sampler.look_at_angles(local.controller.state.yaw, -4.0)
 		await get_tree().process_frame
+		var was_recording := _recording
 		_recording = Time.get_ticks_msec() - began >= _warm * 1000.0
+		if _recording and not was_recording:
+			_tick_us_at_warm = game.tick_us_total
 		if _recording:
 			draws.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
 			objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
@@ -156,6 +163,7 @@ func _run() -> void:
 	for m in _monitors:
 		for i in 5:
 			sums[i] += m[i] / maxf(1.0, _monitors.size())
+	print("TICKS game_tick_ms_per_frame=%.2f (of phys_ms; the rest is the engine step and other nodes)" % (float(game.tick_us_total - _tick_us_at_warm) / 1000.0 / maxf(1.0, _monitors.size())))
 	print("MONITORS physics_process_ms=%.2f (the frame's slowest step) active_3d=%.1f pairs=%.1f islands=%.1f horde_frame_ms=%.2f" % [sums[0], sums[1], sums[2], sums[3], sums[4]])
 	if "--census" in OS.get_cmdline_user_args():
 		_census()
@@ -175,6 +183,10 @@ func _without(kinds: PackedStringArray) -> void:
 	while not stack.is_empty():
 		var n: Node = stack.pop_back()
 		stack.append_array(n.get_children())
+		if n is RigidBody3D and "rigid_off" in kinds:
+			(n as RigidBody3D).freeze = true
+		if n is CollisionShape3D and "far_shapes_off" in kinds and n.get_parent() is StaticBody3D:
+			(n as CollisionShape3D).disabled = true
 		if n is Light3D and "shadows" in kinds:
 			(n as Light3D).shadow_enabled = false
 		if n is DirectionalLight3D and n.shadow_enabled:
@@ -296,6 +308,9 @@ func _triangles(mesh: Mesh) -> int:
 		n += (idx.size() if idx != null else (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()) / 3
 	_tri_cache[mesh] = n
 	return n
+
+
+var _tick_us_at_warm := 0
 
 
 func _physics_process(_delta: float) -> void:

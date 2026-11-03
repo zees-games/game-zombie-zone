@@ -294,9 +294,19 @@ func setup_seconds() -> float:
 @export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
 
 ## A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many
-## ticks (staggered per stand-in): an idle tick builds a whole context for the spread rules, 200 us each.
-## 1 ticks every tick. `zz_bot_weapon_idle_every`.
-@export_range(1, 16, 1) var bot_weapon_idle_every: int = 4
+## ticks (staggered per stand-in). 1 ticks every tick; the idle path is cheap since dot-weapon 0.1.39.
+## `zz_bot_weapon_idle_every`.
+@export_range(1, 16, 1) var bot_weapon_idle_every: int = 1
+
+## A stand-in standing still (grounded, no velocity, nothing pressed, every motor timer at rest)
+## runs its motor every this many ticks, staggered per stand-in: the tick would change nothing, and
+## costs 290 us. 1 ticks every tick. `zz_bot_motor_idle_every`.
+@export_range(1, 16, 1) var bot_motor_idle_every: int = 4
+
+## Metres from the player past which a drawn solo world moves a stand-in's motor every second tick
+## with two ticks' time: far off, the same walk costs half. 0 moves every stand-in every tick.
+## `zz_bot_motor_stride_far`.
+@export_range(0.0, 500.0, 1.0) var bot_motor_stride_far: float = 0.0
 
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per

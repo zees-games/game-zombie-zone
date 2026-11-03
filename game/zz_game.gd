@@ -3931,6 +3931,9 @@ func _advance_weapons() -> void:
 			# Nobody watches a stand-in's crosshair, so its idle ticks skip the spread context.
 			player.weapons.arsenal.crosshair_cone = false
 
+			if not player.weapons.arsenal.idle_posture.is_valid():
+				player.weapons.arsenal.idle_posture = DotWeaponPlayerBridge.posture_for.bind(player)
+
 			if _bot_weapon_idle(player, command):
 				continue
 
@@ -3953,6 +3956,67 @@ func _advance_weapons() -> void:
 		if authoritative and hazards != null:
 			for spawn in outcome.spawns:
 				_throw(player, spawn)
+
+
+var _view_origin := Vector3.INF
+var _motor_owed: Dictionary = {}
+
+
+## The first human's feet in a drawn solo world; INF anywhere else (servers and headless runs never stride).
+func _local_origin() -> Vector3:
+	if not horde_per_frame or config.bot_motor_stride_far <= 0.0:
+		return Vector3.INF
+
+	for id: StringName in players:
+		var player: ZzPlayer = players[id]
+
+		if not player.is_bot and player.is_alive():
+			return player.controller.state.position
+
+	return Vector3.INF
+
+
+## The time a stand-in's motor owes (see [member ZzConfig.bot_motor_stride_far]) to run this tick, or -1 to skip it.
+func _bot_motor_owed(player: ZzPlayer, delta: float) -> float:
+	if _view_origin == Vector3.INF or not player.is_bot or not player.is_up() or player.is_pinned():
+		return 0.0
+
+	var far := config.bot_motor_stride_far
+
+	if player.controller.state.position.distance_squared_to(_view_origin) < far * far:
+		return 0.0
+
+	if (_tick + hash(player.entity_id)) % 2 == 1:
+		_motor_owed[player.entity_id] = delta
+		return -1.0
+
+	return float(_motor_owed.get(player.entity_id, 0.0))
+
+
+## True on the ticks a stand-in that stands perfectly still may skip its motor (see [member ZzConfig.bot_motor_idle_every]).
+func _bot_motor_asleep(player: ZzPlayer) -> bool:
+	var every := config.bot_motor_idle_every
+
+	if every <= 1 or not player.is_bot or not player.is_up() or player.is_pinned() or player.using != &"":
+		return false
+
+	var controller := player.controller
+	var state := controller.state
+	var command := controller.current_command
+
+	if command == null or command.buttons != 0 or command.move != Vector2.ZERO or state.previous_buttons != 0 \
+			or command.yaw != state.yaw or command.pitch != state.pitch:
+		return false
+
+	if not state.is_grounded() or state.velocity != Vector3.ZERO or controller.get(&"_external_velocity") != Vector3.ZERO:
+		return false
+
+	if state.crouch_fraction != 0.0 or state.sprinting or state.stamina < 1.0 or state.slide_time >= 0.0 \
+			or state.slide_cooldown_left > 0.0 or state.launch_cooldown_left > 0.0 or state.dash_cooldown_left > 0.0 \
+			or state.wall_run_cooldown_left > 0.0 or not state.modifiers.is_empty():
+		return false
+
+	return (_tick + hash(player.entity_id)) % every != 0
 
 
 ## True on the ticks a stand-in's untouched weapon may sleep (see [member ZzConfig.bot_weapon_idle_every]).
@@ -4125,6 +4189,7 @@ func _tick_horde(delta: float) -> void:
 
 func _step(delta: float) -> void:
 	_advance_phase(delta)
+	_view_origin = _local_origin()
 
 	if authoritative and bots != null:
 		bots.drive(delta)
@@ -4136,7 +4201,10 @@ func _step(delta: float) -> void:
 		var player: ZzPlayer = players[id]
 
 		if player.is_alive() and not player.watching:
-			player.simulate(_tick, delta)
+			if not _bot_motor_asleep(player):
+				var owed := _bot_motor_owed(player, delta)
+				if owed >= 0.0:
+					player.simulate(_tick, delta + owed)
 			_advance_water(player, delta)
 
 			if authoritative:
