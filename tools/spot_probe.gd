@@ -14,7 +14,7 @@ const LIFT := 0.3
 const STEP := 0.25
 const PAIRS := 60
 const NEAR := 10.0
-const SURVEY_SPOTS := 8
+const SURVEY_SPOTS := 4
 const SPOTS := [
 	["zm_chaos_city", Vector3(-40.0, 0.0, -31.3)],
 	["ze_biohazard_manor", Vector3(-5.6, 1.8, 28.5)],
