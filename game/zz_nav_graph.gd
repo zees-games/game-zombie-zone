@@ -63,6 +63,7 @@ var up_count: int = 0
 func _init(p_data: DotNpcNavData = null) -> void:
 	bot_filter = DotNpcNavFilter.new()
 	bot_filter.avoid_cost = 3.9
+	straight_width_ratio = 0.5
 	super(p_data)
 
 

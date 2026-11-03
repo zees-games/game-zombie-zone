@@ -1,7 +1,8 @@
 extends Node
 ## Fixed-seed, physics-free-of-randomness check of the zombie nav around known snag spots: every nav edge
 ## near a spot is swept with a zombie-sized capsule against the world; an edge the body cannot walk is a snag.
-##   godot --headless --path . res://tools/spot_probe.tscn -- [--clear=N] [map x,y,z ...]
+##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [map x,y,z]
+## --survival: every survival map, SURVEY_SPOTS evenly spaced nav points each.
 ## Prints blocked edges per spot; exits 1 when any is blocked. No zombie, no timing: the same numbers every run.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -13,6 +14,7 @@ const LIFT := 0.3
 const STEP := 0.25
 const PAIRS := 60
 const NEAR := 10.0
+const SURVEY_SPOTS := 8
 const SPOTS := [
 	["zm_chaos_city", Vector3(-40.0, 0.0, -31.3)],
 	["ze_biohazard_manor", Vector3(-5.6, 1.8, 28.5)],
@@ -35,8 +37,17 @@ func _run() -> void:
 		spots = [[args[0], _vec(args[1])]]
 	var code := 0
 	var by_map := {}
-	for s: Array in spots:
-		(by_map.get_or_add(s[0], []) as Array).append(s[1])
+	if args.has("--survival"):
+		var only := PackedStringArray()
+		for a in args:
+			if a.begins_with("--maps="):
+				only = a.substr(7).split(",")
+		for id: String in _survival_maps():
+			if only.is_empty() or only.has(id):
+				by_map[id] = []
+	else:
+		for s: Array in spots:
+			(by_map.get_or_add(s[0], []) as Array).append(s[1])
 	for id: String in by_map:
 		var blocked := await _probe_map(id, by_map[id])
 		for line: String in blocked:
@@ -65,6 +76,9 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 		_game.simulate(0.05)
 		await get_tree().physics_frame
 	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
+	for a in OS.get_cmdline_user_args():
+		if graph != null and a.begins_with("--ratio="):
+			graph.straight_width_ratio = float(a.substr(8))
 	var nav: DotNpcNavData = graph.data if graph != null else null
 	var out := PackedStringArray()
 	if nav == null:
@@ -77,6 +91,12 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
 	query.collision_mask = _game.physics.layer_mask(&"world")
+	if at.is_empty():
+		var all := nav.points_within(nav.points[0], 100000.0)
+		all.sort()
+		for i in SURVEY_SPOTS:
+			at.append(nav.points[all[(i * 2 + 1) * all.size() / (SURVEY_SPOTS * 2)]])
+	var total := 0
 	for spot: Vector3 in at:
 		var near := nav.points_within(spot, NEAR)
 		var sorted := Array(near)
@@ -99,6 +119,8 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 					bad.append("    leg %s -> %s blocked at %s" % [_f(path[k]), _f(path[k + 1]), _f(hit)])
 		out.append("%s %s: %d paths, %d legs, %d blocked" % [id, _f(spot), checked, legs, bad.size()])
 		out.append_array(bad.slice(0, 6))
+		total += bad.size()
+	out.append("MAP %s: %d blocked" % [id, total])
 	remove_child(_game)
 	_game.free()
 	await get_tree().process_frame
@@ -124,6 +146,18 @@ func _edge_hit(space: PhysicsDirectSpaceState3D, query: PhysicsShapeQueryParamet
 
 func shape_half(query: PhysicsShapeQueryParameters3D) -> float:
 	return (query.shape as CapsuleShape3D).height * 0.5
+
+
+static func _survival_maps() -> PackedStringArray:
+	var out := PackedStringArray()
+	var dir := ProjectSettings.globalize_path("res://maps")
+	for file in DirAccess.get_files_at(dir):
+		if file.ends_with(".json"):
+			var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join(file)))
+			if doc is Dictionary and str(doc.get("mode", "")) == "survival":
+				out.append(file.get_basename())
+	out.sort()
+	return out
 
 
 static func _f(v: Vector3) -> String:
