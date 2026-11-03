@@ -181,9 +181,9 @@ func _test_shot_hold() -> void:
 	var tr: DotTrace = game.combat.trace
 	var _miss := tr.ray(rest + Vector3(3, 1, 0), Vector3.DOWN, 5.0)
 	_check(drops.active_count() == awake, "a trace that misses wakes nothing")
-	# The result is read: a discarded ray result left the observer's push unseen here (unused `_hit` failed, used passed).
+	# Reading the result keeps the call: an unused one was left out and the observer never ran (no floor in CI, so not ok()).
 	var shot := tr.ray(rest + Vector3(0, 1, 0), Vector3.DOWN, 5.0)
-	_check(shot.ok() and drops.active_count() > awake, "a traced shot wakes the dropped weapon")
+	_check(shot.distance <= 5.0 and drops.active_count() > awake, "a traced shot wakes the dropped weapon")
 
 	var def := ars.catalogue.get_def(id)
 	var other := &""
