@@ -4,6 +4,8 @@ extends RefCounted
 
 const CHANNEL := "zz.nav"
 const RADIUS := 0.32
+## Extra clearance so a smoothed leg that cuts a corner between two kept points still clears a thin post.
+const MARGIN := 0.1
 const HEIGHT := 1.75
 ## Feet lifted off the line: a stair tread or kerb is climbed, a hanging prop or a wall is not.
 const LIFT := 0.3
@@ -37,7 +39,7 @@ static func edge_test(space: PhysicsDirectSpaceState3D, mask: int) -> Callable:
 func _setup(space: PhysicsDirectSpaceState3D, mask: int) -> void:
 	_space = space
 	var shape := CapsuleShape3D.new()
-	shape.radius = RADIUS
+	shape.radius = RADIUS + MARGIN
 	shape.height = HEIGHT - LIFT
 	_query.shape = shape
 	_query.collision_mask = mask
