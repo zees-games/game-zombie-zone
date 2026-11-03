@@ -293,6 +293,11 @@ func setup_seconds() -> float:
 ## costs a tenth; any wall ahead or a missing floor still sweeps. 0 always sweeps.
 @export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
 
+## A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many
+## ticks (staggered per stand-in): an idle tick builds a whole context for the spread rules, 200 us each.
+## 1 ticks every tick. `zz_bot_weapon_idle_every`.
+@export_range(1, 16, 1) var bot_weapon_idle_every: int = 4
+
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per
 ## catch-up step. 0 keeps it on every step (servers and headless runs always do).

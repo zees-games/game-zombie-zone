@@ -3926,6 +3926,10 @@ func _advance_weapons() -> void:
 			continue
 
 		var command := weapon_command_for(player)
+
+		if player.is_bot and _bot_weapon_idle(player, command):
+			continue
+
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
 		var outcome := player.weapons.simulate_tick(command, _tick)
@@ -3945,6 +3949,22 @@ func _advance_weapons() -> void:
 		if authoritative and hazards != null:
 			for spawn in outcome.spawns:
 				_throw(player, spawn)
+
+
+## True on the ticks a stand-in's untouched weapon may sleep (see [member ZzConfig.bot_weapon_idle_every]).
+func _bot_weapon_idle(player: ZzPlayer, command: DotWeaponCommand) -> bool:
+	var every := config.bot_weapon_idle_every
+	var arsenal := player.weapons.arsenal
+
+	var held := arsenal.current()
+
+	if every <= 1 or held == null or command.buttons != 0 or arsenal.is_switching() or arsenal.is_reloading():
+		return false
+
+	if command.slot > 0 and command.slot != held.def.slot:
+		return false
+
+	return (_tick + hash(player.entity_id)) % every != 0
 
 
 ## What a weapon put into the world, as one of [ZzHazards]' projectiles.

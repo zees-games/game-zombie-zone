@@ -168,6 +168,8 @@ Still three times the budget: the players' motor (80 µs a survivor), the brains
 | before | 6.7 | 146.4 (216.6) | 90.6 (7.96) | 28.7 | 44.5 | 34.6 |
 | rays, think, step cap | 12.4 | 69.9 (110.0) | 34.1 (3.00) | 9.4 | 36.6 | 19.8 |
 
+**Stand-ins' idle weapons (zz-perf-weapons, 2026-11-03).** `bench.gd --micro` now times the weapon tick: an idle `ZeeWeaponRig.simulate_tick` costs 200 us a survivor because the server's spread rules make the hitscan behaviour need a context (`tick_needs_context`), so the idle fast path never applies, and 8 survivors paid 1.6 ms a tick doing nothing. `zz_bot_weapon_idle_every` (4; 1 is the old behaviour) ticks an untouched stand-in's weapon every fourth tick, staggered by id. zs_verystill, 5 zombies, GTX 1660 Ti box: weapons 2.89 to 1.87 ms a tick; fps stays 16 there because that box is render-bound under Xvfb (render 26 ms), so the gain is CPU a desktop frame sees. The addon-side fix (an idle path that needs no context when the cone is already settled) belongs in dot-weapon.
+
 ## Ten waves, played (zz-survival-long-run-1, 2026-10-12)
 
 `tools/survival_long_run.tscn` plays a whole hold on one map with its full team of stand-ins, headless, and prints a row per wave: seconds, sent, most alive, downs and deaths (and what downed them), barricades broken, the team up at its end, the tick's mean and worst, and a `RESULT` JSON line. `--from=K` starts at wave K (barricades whole, nobody hurt, the caches at K's tier), `--profile` splits the tick by part, `--watch=S --detail` says where the wave's zombies are and why. A school's ten waves are about 35 minutes of play and longer than that on a shared VM, so the runs were split: from wave 1 as far as nine minutes go, and from 4, 7, 9 and 10, several seeds, eight at a time.

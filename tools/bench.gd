@@ -75,6 +75,24 @@ func _run() -> void:
 		print("MICRO advance_weapons %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
 		t0 = Time.get_ticks_usec()
 		for i in n:
+			g._carry_update()
+		print("MICRO carry_update %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			for pl in survs:
+				var _c := g.weapon_command_for(pl)
+		print("MICRO weapon_command_for %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+		t0 = Time.get_ticks_usec()
+		for i in n:
+			for pl in survs:
+				var _o = pl.weapons.simulate_tick(g.weapon_command_for(pl), 1000 + i)
+		print("MICRO weapons.simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+		for pl in survs:
+			var cm := g.weapon_command_for(pl)
+			var sl = pl.weapons.arsenal.current()
+			print("MICRO idle buttons=%d slot=%d idle=%s needs_ctx=%s beh=%s" % [cm.buttons, cm.slot, pl.weapons.arsenal.is_idle_for(cm, pl.weapons._previous_command), sl.behaviour.tick_needs_context() if sl else "-", sl.behaviour.get_script().resource_path.get_file() if sl else "-"])
+		t0 = Time.get_ticks_usec()
+		for i in n:
 			for pl in survs:
 				g._advance_hands(pl, 1.0 / 60.0)
 		print("MICRO advance_hands %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
