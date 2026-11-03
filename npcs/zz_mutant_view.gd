@@ -1,11 +1,13 @@
 extends "zz_zombie_view.gd"
 
-## The mutant as drawn: its own rigid-skinned model, posed by code (it has no clips), with a
-## jetpack exhaust and sparks and smoke where a part is shot off. It keeps the zombie view's seams
+## The mutant as drawn: its own rigid-skinned model with idle, walk, run, attack, hit and death
+## clips (`assets/zombies/mutant_clips.tres`, `tools/build_mutant_clips.gd`); the jetpack and gun
+## moves are posed by code. A jetpack exhaust and sparks and smoke show where a part is shot off. It keeps the zombie view's seams
 ## (build, present, flinch, die, the limb cuts) so the world view and the limbs treat it alike.
 
 const MODEL := "res://assets/zombies/zombie_mutant.glb"
 const MUTANT_CREDITS := "Buff Mutant 2.0 by Zeldrix (CC-BY 4.0), modified"
+const MUTANT_CLIPS := "res://assets/zombies/mutant_clips.tres"
 const PARTS: Array[StringName] = [&"gunL", &"gunR", &"pack"]
 ## Where the exhaust sits on the back, in the view's own space (forward is -Z).
 const EXHAUST := Vector3(0.0, 1.5, 0.55)
@@ -19,6 +21,8 @@ var _stump_fx: Dictionary = {}
 var _dead_t := -1.0
 var _body_flash := 0.0
 var _jolt := 0.0
+var _player: AnimationPlayer = null
+var _hit_t := 0.0
 
 
 func build(p_kind: StringName, p_variant: int) -> void:
@@ -55,6 +59,14 @@ func build(p_kind: StringName, p_variant: int) -> void:
 		skin.cull_mode = BaseMaterial3D.CULL_DISABLED
 		(m as MeshInstance3D).material_override = skin
 
+	var library := load(ZzPaths.rebase(MUTANT_CLIPS)) as AnimationLibrary
+
+	if library != null:
+		_player = AnimationPlayer.new()
+		add_child(_player)
+		_player.root_node = _player.get_path_to(_model)
+		_player.add_animation_library(&"", library)
+
 	_thruster = DotFxThruster.new()
 	_thruster.position = EXHAUST
 	add_child(_thruster)
@@ -65,6 +77,39 @@ func _turn(bone: String, axis: Vector3, angle: float) -> void:
 
 	if i >= 0:
 		_skeleton.set_bone_pose_rotation(i, (_rest[bone] as Quaternion) * Quaternion(axis, angle))
+
+
+## The clip for a state, or &"" when code poses it (the jetpack and gun moves).
+func _clip_for(anim: int) -> StringName:
+	match anim:
+		ZzZombieBody.Anim.FLY, ZzZombieBody.Anim.CHARGE_UP, ZzZombieBody.Anim.DIVE, ZzZombieBody.Anim.SLAM, ZzZombieBody.Anim.ZAP:
+			return &""
+		ZzZombieBody.Anim.DEAD:
+			return &"death"
+		ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.STRIKE_DOWN:
+			return &"attack"
+		ZzZombieBody.Anim.STAGGER:
+			return &"hit"
+
+	if _hit_t > 0.0:
+		return &"hit"
+
+	if _speed > 3.4:
+		return &"run"
+
+	return &"walk" if _speed > 0.25 else &"idle"
+
+
+func _play_clip(clip: StringName) -> void:
+	if _player.current_animation != String(clip):
+		_player.play(clip, 0.12)
+
+	if clip == &"walk":
+		_player.speed_scale = clampf(_speed / 1.6, 0.5, 1.8)
+	elif clip == &"run":
+		_player.speed_scale = clampf(_speed / 4.5, 0.8, 1.5)
+	else:
+		_player.speed_scale = 1.0
 
 
 func present(delta: float, anim: int, flags: int) -> void:
@@ -81,6 +126,14 @@ func present(delta: float, anim: int, flags: int) -> void:
 	if anim == ZzZombieBody.Anim.DEAD and _dead_t < 0.0:
 		die(&"limp", Vector3.ZERO, 0)
 
+	if _dead_t >= 0.0 and _player != null:
+		_dead_t += delta
+		_thruster.throttle = 0.0
+		if _player.current_animation != "death":
+			_player.speed_scale = 1.0
+			_player.play(&"death", 0.1)
+		return
+
 	if _dead_t >= 0.0:
 		_dead_t += delta
 		var fall := clampf(_dead_t / 1.1, 0.0, 1.0)
@@ -90,6 +143,20 @@ func present(delta: float, anim: int, flags: int) -> void:
 		return
 
 	_jolt = maxf(_jolt - delta * 4.0, 0.0)
+	_hit_t = maxf(_hit_t - delta, 0.0)
+	var clip := _clip_for(anim) if _player != null else &""
+
+	if clip != &"":
+		_play_clip(clip)
+		_model.position = Vector3.ZERO
+		_model.rotation.x = 0.0
+		_thruster.throttle = 0.0
+		_collapse()
+		return
+
+	if _player != null:
+		_player.stop()
+
 	_phase += delta * clampf(_speed, 0.0, 6.0) * 1.9
 	var walk := clampf(_speed / 2.0, 0.0, 1.0)
 	var s := sin(_phase)
@@ -149,6 +216,10 @@ func present(delta: float, anim: int, flags: int) -> void:
 	else:
 		_thruster.throttle = 0.0
 
+	_collapse()
+
+
+func _collapse() -> void:
 	for gone: int in _skeleton.get_meta(DotNpcGibs.COLLAPSED, []):
 		_skeleton.set_bone_pose_scale(gone, Vector3.ONE * 0.001)
 
@@ -159,6 +230,7 @@ func _is_gone(part: StringName) -> bool:
 
 func flinch(_from_side: float = 1.0, _head := false) -> void:
 	_jolt = 1.0
+	_hit_t = 0.45
 
 
 func set_fade(_alpha: float) -> void:
