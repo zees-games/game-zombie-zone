@@ -54,6 +54,8 @@ func _run() -> void:
 		if arg.begins_with("--without="):
 			_without(arg.trim_prefix("--without=").split(","))
 	await _seconds_of(1.0)
+	for v in get_tree().root.find_children("*", "DotMapVisibility", true, false):
+		print("VIS ", v.call(&"describe"))
 
 	if "--micro" in OS.get_cmdline_user_args():
 		var g := game
@@ -208,7 +210,6 @@ func _without(kinds: PackedStringArray) -> void:
 		if n is GeometryInstance3D and "mesh_shadows" in kinds:
 			(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	for v in get_tree().root.find_children("*", "DotMapVisibility", true, false):
-		print("VIS ", v.call(&"describe"))
 		if "vis_noshadow" in kinds:
 			v.set(&"shadows", 0)
 			v.set(&"_dirty", true)
