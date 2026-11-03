@@ -1578,6 +1578,9 @@ func _light_from_world(world: RefCounted) -> void:
 	_build_environment()
 
 
+const MODEL_TEXTURE_MAX := 2048
+
+
 ## What the drawn world carries beyond its meshes: reflection probes, fog when the map document
 ## sets none (the document's own sun and sky stay: a second sun lit everything twice), ambient
 ## sounds and prop stand-ins, drawn only. Each is nothing for a world without it.
@@ -1611,6 +1614,8 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 		sounds.free()
 
 	lap = _lap(stages, "sounds", lap)
+	# Library model textures stay decoded RGBA with mips otherwise: 1.6 GB on the manor, 0.4 GB compressed.
+	(load(MESH_SCRIPT) as GDScript).set("model_texture_max", MODEL_TEXTURE_MAX)
 	var drawn_props: Node3D = world.call(&"build_props")
 	# The document's solid boxes collide whether or not the library models came; draw the ones nothing else shows.
 	if world.has_method(&"draw_unseen_boxes"):
