@@ -32,6 +32,7 @@
 #   tools/shot.sh --view=room --zz-map-ids=zm_4way_tunnel --fire=break_roof_spawn:ForceSpawn --at=...   # a maker's copies
 #   tools/shot.sh --view=crates --seconds=1.2                         # a ring of crates, frames before the blast and 0, 0.35 s and --seconds after
 #   tools/shot.sh --view=weapons --weapons=all --out=res://screenshots/weapons   # fire + reload sheet per gun
+#   tools/shot.sh --view=held --weapons=zz_m4,zz_pistol,zz_smg,zz_knife --out=res://screenshots/held   # third person, each gun in hand (held_<id>.png)
 #   tools/shot.sh --view=overview --zz-map-ids=zz_x --out=res://screenshots/x.png
 #
 # xvfb-run because this needs a rendering context: `--headless` gives a null renderer and saves

@@ -655,6 +655,10 @@ func _run() -> void:
 			await _fire_mode_frames(game, local)
 			get_tree().quit(0)
 			return
+		"held":
+			await _held_third_frames(game, local)
+			get_tree().quit(0)
+			return
 		"weapons":
 			await _weapon_sheets(game, local)
 			get_tree().quit(0)
@@ -743,6 +747,51 @@ func _run() -> void:
 ## each tile labelled with the HUD's count. `_out` is the directory (`sheet_<id>.png` in it).
 ## What `--view=weapons --weapons=all` is for: a counter that never moves and a reload that is
 ## a single tilt are both things only a picture says.
+## Arms [param id] and brings it into hand. Weapons share slots (the SMG and pistol are both 2), so
+## the slot key alone shows whichever is on top: cycle the slot until [param id] is the one held.
+func _hold_exact(game: ZzGame, local, id: StringName) -> bool:
+	if not game.arm(local, id):
+		print("skipped %s: not armed" % id)
+		return false
+	var def := ZzWeapons.def_of(id)
+	_client.set("_slot", def.slot)
+	var arsenal: DotWeaponArsenal = _client.get("weapons").arsenal
+	await _seconds_of(0.8)
+	for _i in 6:
+		var now := arsenal.current()
+		if now != null and now.def.id == id:
+			return true
+		var _cycled := arsenal.cycle_slot(Engine.get_physics_frames())
+		await _seconds_of(0.8)
+	print("could not bring %s into hand" % id)
+	return false
+
+
+## The figure holding each `--weapons=` id in third person (`held_<id>.png` in the `_out` directory).
+func _held_third_frames(game: ZzGame, local) -> void:
+	var dir := ProjectSettings.globalize_path(_out)
+	DirAccess.make_dir_recursive_absolute(dir)
+	local.health.invulnerable = true
+	_client.call("toggle_view")
+	var yaw := deg_to_rad(float(local.controller.state.yaw))
+	var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var away: Vector3 = local.feet() - ahead * 30.0
+	for other in game.survivors():
+		if other != local:
+			other.place_at(away, 0.0)
+	var eye: Vector3 = local.feet() + ahead * 2.2 + ahead.cross(Vector3.UP) * 0.9 + Vector3.UP * 1.3
+	for name in _weapons:
+		var id := StringName(name)
+		if not await _hold_exact(game, local, id):
+			continue
+		await _seconds_of(1.0)
+		_free_camera().look_at_from_position(eye, local.feet() + Vector3.UP * 1.05)
+		await _frames(3)
+		await RenderingServer.frame_post_draw
+		var image := get_viewport().get_texture().get_image()
+		print("%s held: %s" % [id, error_string(image.save_png(dir.path_join("held_%s.png" % id)))])
+
+
 func _weapon_sheets(game: ZzGame, local) -> void:
 	var ids: Array[StringName] = []
 	if _weapons.is_empty() or _weapons[0] == "all":
@@ -767,10 +816,8 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 
 	for id in ids:
 		var def := ZzWeapons.def_of(id)
-		if def == null or not game.arm(local, id):
-			print("skipped %s: not armed" % id)
+		if def == null or not await _hold_exact(game, local, id):
 			continue
-		_client.set("_slot", def.slot)
 		var rig: ZeeWeaponRig = local.view_rig
 		var tiles: Array[Image] = []
 		await _seconds_of(1.2)
@@ -840,10 +887,8 @@ func _ads_frames(game: ZzGame, local) -> void:
 	var hud = _client.get("hud")
 	for id in ids:
 		var def := ZzWeapons.def_of(id)
-		if def == null or not game.arm(local, id):
-			print("skipped %s: not armed" % id)
+		if def == null or not await _hold_exact(game, local, id):
 			continue
-		_client.set("_slot", def.slot)
 		_client.set("_aiming", false)
 		await _seconds_of(1.2)
 		await _ads_save(dir, id, "hip", hud)
