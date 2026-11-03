@@ -4,6 +4,7 @@ const ZzConfig := preload("zz_config.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
+const ZzNavPrune := preload("zz_nav_prune.gd")
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
@@ -534,6 +535,7 @@ func _poll_nav() -> void:
 
 func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	nav = graph
+	_prune_blocked(nav)
 	var valid := nav.validate()
 
 	if not valid.ok:
@@ -558,6 +560,14 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 		"cache": job.cache_path.get_file() if job.cache_path != "" else "off", "cache_file": job.cache_path != "" and FileAccess.file_exists(job.cache_path),
 	})
 	return DotResult.success(kept)
+
+
+## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
+func _prune_blocked(data: DotNpcNavData) -> void:
+	if game == null or game.physics == null or not game.is_inside_tree():
+		return
+
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
 
 
 ## A map's own `zombie_spawns` join the ones the graph gave: a mapper who wants a crowd to
