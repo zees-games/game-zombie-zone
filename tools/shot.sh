@@ -59,7 +59,7 @@ done
 
 # A contact sheet is of the gun in hand: the stand-ins an exodus map seats beside the camera put
 # their own rifles in the corner of every hip frame (the yellow and blue shape bottom-left).
-[ "$view" = "weapons" ] && config+=("--zz-exodus-team=1")
+{ [ "$view" = "weapons" ] || [ "$view" = "ads" ]; } && config+=("--zz-exodus-team=1")
 
 # The crates view wants flat open ground; the default map choice can land on a converted wall.
 if [ "$view" = "crates" ] && [[ " ${config[*]} " != *" --zz-map-ids="* ]]; then config+=("--zz-map-ids=zz_lot"); fi

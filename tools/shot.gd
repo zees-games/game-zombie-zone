@@ -810,6 +810,12 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 ## crosshair's alpha, the scope's fraction and the lens. Defaults to one iron-sighted gun and one
 ## scoped one; `--weapons=` names others.
 func _ads_frames(game: ZzGame, local) -> void:
+	# Seated beside the camera, a team-mate's body fills the frame; a player never sees that from a seat's own eyes with a gun, so stand them behind.
+	var yaw := deg_to_rad(float(local.controller.state.yaw))
+	var behind: Vector3 = local.feet() + Vector3(sin(yaw), 0.0, cos(yaw)) * 5.0
+	for other in game.survivors():
+		if other != local:
+			other.place_at(behind, 0.0)
 	var ids: Array[StringName] = []
 	if _weapons.is_empty():
 		var iron := &""
