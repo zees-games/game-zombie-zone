@@ -932,6 +932,9 @@ func open_gate(gate: String) -> void:
 	var body: StaticBody3D = (entry as Dictionary)["body"]
 
 	if is_instance_valid(body):
+		# Out of the tree now: a queue_free body stays in the space until frame end, and the nav rebuild
+		# that follows would prune against the shut gate.
+		remove_child(body)
 		body.queue_free()
 
 	for node: Node in (entry as Dictionary)["drawn"]:
