@@ -56,8 +56,8 @@
 # body_stride_far: 45.0
 # Metres past which a zombie in the open moves by three rays instead of a capsule sweep, which costs a tenth;... [0.0..500.0]
 # body_cheap_from: 12.0
-# A stand-in with nothing pressed ticks its weapon every this many ticks (staggered); 1 ticks every tick. [1..16]
-# bot_weapon_idle_every: 4
+# A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many ticks (st... [1..16]
+# bot_weapon_idle_every: 1
 # A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time, rather than once... [0..8]
 # horde_frame_ticks: 4
 # A drawn solo world's cap on physics steps per drawn frame (the engine's is 8): a frame slower than this man... [0..8]
