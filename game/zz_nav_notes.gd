@@ -28,6 +28,7 @@ extends RefCounted
 ## opinion" and the game plays as it did before.
 
 const CHANNEL := "zz.nav"
+const ZzNavPrune := preload("zz_nav_prune.gd")
 
 enum State { OFF, WAITING, ANNOTATING, READY, FAILED }
 
@@ -96,6 +97,9 @@ var _drops: Array = []
 var _climbs: Array = []
 
 ## The graph the plan last used and what it was given, so the picture can say.
+## Layers a drop or jump up must be clear of (the world's; props move). 0 keeps every link.
+var link_mask: int = 0
+var link_world: World3D = null
 var drops_applied: int = 0
 var climbs_applied: int = 0
 
@@ -408,13 +412,16 @@ func apply_links(graph) -> void:
 		return
 
 	graph.allow_climb = bool(_config.zombie_climb)
+	# A link joins two floors by a diagonal the grid prune never saw; a ledge or wall on it is a path no body takes.
+	var blocked: Callable = ZzNavPrune.edge_test(link_world.direct_space_state, link_mask) if link_world != null and link_mask != 0 else Callable()
 
 	if bool(_config.zombie_drops):
 		for pair: Array in _drops:
 			var high: int = _point_at(graph, pair[0])
 			var low: int = _point_at(graph, pair[1])
 
-			if high >= 0 and low >= 0 and high != low and absf(graph.data.points[high].y - graph.data.points[low].y) > 0.8:
+			if high >= 0 and low >= 0 and high != low and absf(graph.data.points[high].y - graph.data.points[low].y) > 0.8 \
+					and not _link_blocked(blocked, graph, high, low):
 				graph.add_drop(high, low)
 				drops_applied += 1
 
@@ -422,11 +429,15 @@ func apply_links(graph) -> void:
 		var low: int = _point_at(graph, pair[0])
 		var high: int = _point_at(graph, pair[1])
 
-		if high >= 0 and low >= 0 and high != low:
+		if high >= 0 and low >= 0 and high != low and not _link_blocked(blocked, graph, low, high):
 			graph.add_climb(low, high)
 			climbs_applied += 1
 
 	graph.relabel()
+
+
+func _link_blocked(blocked: Callable, graph, from: int, to: int) -> bool:
+	return blocked.is_valid() and bool(blocked.call(graph.data.points[from], graph.data.points[to]))
 
 
 func _point_at(graph, at: Vector3) -> int:

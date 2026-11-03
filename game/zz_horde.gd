@@ -5,6 +5,8 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
+## Bumped when the prune records more (2: the cut edges smoothing must not cross), so older caches prune again.
+const PRUNE_VERSION := 2
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
@@ -363,6 +365,8 @@ func _begin_notes() -> void:
 	if game == null or game.map == null or game.physics == null:
 		return
 
+	notes.link_mask = game.physics.layer_mask(&"world")
+	notes.link_world = game.get_world_3d()
 	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
 
 
@@ -564,11 +568,11 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 
 ## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
 func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
-	if data.meta.get("pruned", false) or game == null or game.physics == null or not game.is_inside_tree():
+	if int(data.meta.get("pruned", 0)) >= PRUNE_VERSION or game == null or game.physics == null or not game.is_inside_tree():
 		return
 
 	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
-	data.meta["pruned"] = true
+	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 
 

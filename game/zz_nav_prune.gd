@@ -17,18 +17,30 @@ var _query := PhysicsShapeQueryParameters3D.new()
 ## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask.
 static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int) -> Vector2i:
 	var pruner := new()
-	pruner._space = space
-	var shape := CapsuleShape3D.new()
-	shape.radius = RADIUS
-	shape.height = HEIGHT - LIFT
-	pruner._query.shape = shape
-	pruner._query.collision_mask = mask
+	pruner._setup(space, mask)
 	var dropped := nav.prune(pruner._point_blocked, pruner._edge_blocked)
 
 	if dropped != Vector2i.ZERO:
 		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y})
 
 	return dropped
+
+
+## The same test for a link added after the prune (a drop or a jump up): `func(a: Vector3, b: Vector3) -> bool`.
+static func edge_test(space: PhysicsDirectSpaceState3D, mask: int) -> Callable:
+	var pruner := new()
+	pruner._setup(space, mask)
+	# A lambda holds the pruner; a bound method would leave the Callable dangling once this returns.
+	return func(a: Vector3, b: Vector3) -> bool: return pruner._edge_blocked(a, b)
+
+
+func _setup(space: PhysicsDirectSpaceState3D, mask: int) -> void:
+	_space = space
+	var shape := CapsuleShape3D.new()
+	shape.radius = RADIUS
+	shape.height = HEIGHT - LIFT
+	_query.shape = shape
+	_query.collision_mask = mask
 
 
 func _point_blocked(p: Vector3) -> bool:
