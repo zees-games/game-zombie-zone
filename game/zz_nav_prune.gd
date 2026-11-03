@@ -7,6 +7,8 @@ const RADIUS := 0.32
 const HEIGHT := 1.75
 ## Feet lifted off the line: a stair tread or kerb is climbed, a hanging prop or a wall is not.
 const LIFT := 0.3
+## Metres between the samples along an edge: a post or slab thinner than the edge's midpoint gap still lands on one.
+const EDGE_STEP := 0.25
 
 var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
@@ -34,7 +36,13 @@ func _point_blocked(p: Vector3) -> bool:
 
 
 func _edge_blocked(a: Vector3, b: Vector3) -> bool:
-	return _hit(a.lerp(b, 0.5))
+	var steps := int(ceil(a.distance_to(b) / EDGE_STEP))
+
+	for i in range(1, steps):
+		if _hit(a.lerp(b, float(i) / steps)):
+			return true
+
+	return false
 
 
 func _hit(p: Vector3) -> bool:

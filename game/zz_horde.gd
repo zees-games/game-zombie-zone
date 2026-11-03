@@ -535,7 +535,7 @@ func _poll_nav() -> void:
 
 func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	nav = graph
-	_prune_blocked(nav)
+	_prune_blocked(nav, job)
 	var valid := nav.validate()
 
 	if not valid.ok:
@@ -563,11 +563,13 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 
 
 ## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
-func _prune_blocked(data: DotNpcNavData) -> void:
-	if game == null or game.physics == null or not game.is_inside_tree():
+func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
+	if data.meta.get("pruned", false) or game == null or game.physics == null or not game.is_inside_tree():
 		return
 
 	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
+	data.meta["pruned"] = true
+	job.save(data)
 
 
 ## A map's own `zombie_spawns` join the ones the graph gave: a mapper who wants a crowd to

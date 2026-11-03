@@ -239,6 +239,15 @@ func _do_try(deadline: int) -> void:
 		_step = Step.SAVE
 
 
+## Main thread: writes [param data] over the cache (the pruned graph, so the next load skips the physics pass).
+func save(data: DotNpcNavData) -> void:
+	nav = data
+	_do_save()
+
+	if _save_error != 0:
+		DotLog.warn(CHANNEL, "the pruned navigation cache could not be written", {"path": cache_path, "error": _save_error})
+
+
 func _do_save() -> void:
 	if cache_path == "" or nav == null:
 		return
