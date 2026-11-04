@@ -125,20 +125,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 	if anim == ZzZombieBody.Anim.DEAD and _dead_t < 0.0:
 		die(&"limp", Vector3.ZERO, 0)
 
-	if _dead_t >= 0.0 and _player != null:
-		_dead_t += delta
-		_thruster.throttle = 0.0
-		if _player.current_animation != "death":
-			_player.speed_scale = 1.0
-			_player.play(&"death", 0.1)
-		return
-
-	if _dead_t >= 0.0:
-		_dead_t += delta
-		var fall := clampf(_dead_t / 1.1, 0.0, 1.0)
-		_model.rotation.x = lerpf(0.0, -PI * 0.5, fall * fall)
-		_model.position.y = lerpf(0.0, 0.5, fall)
-		_thruster.throttle = 0.0
+	if _present_dead(delta):
 		return
 
 	_jolt = maxf(_jolt - delta * 4.0, 0.0)
@@ -174,6 +161,43 @@ func present(delta: float, anim: int, flags: int) -> void:
 	_turn("Head", Vector3.RIGHT, 0.0)
 	_model.rotation.x = 0.0
 	_model.position = Vector3(0.0, 0.05 * absf(s) * walk, 0.0)
+	var throttle := _pose_for(anim, delta)
+
+	if _jolt > 0.0:
+		_turn("Head", Vector3.RIGHT, -0.35 * _jolt)
+
+	if not pack_gone:
+		_thruster.throttle = throttle
+		_thruster.rotation.x = -0.5 if anim == ZzZombieBody.Anim.DIVE else 0.0
+	else:
+		_thruster.throttle = 0.0
+
+	_collapse()
+
+
+## Plays the death (the clip, or the fall of a model with no clip); true while the body is dead.
+func _present_dead(delta: float) -> bool:
+	if _dead_t >= 0.0 and _player != null:
+		_dead_t += delta
+		_thruster.throttle = 0.0
+		if _player.current_animation != "death":
+			_player.speed_scale = 1.0
+			_player.play(&"death", 0.1)
+		return true
+
+	if _dead_t >= 0.0:
+		_dead_t += delta
+		var fall := clampf(_dead_t / 1.1, 0.0, 1.0)
+		_model.rotation.x = lerpf(0.0, -PI * 0.5, fall * fall)
+		_model.position.y = lerpf(0.0, 0.5, fall)
+		_thruster.throttle = 0.0
+		return true
+
+	return false
+
+
+## The pose of the moment for [param anim] over the rest pose; returns the thruster's throttle.
+func _pose_for(anim: int, delta: float) -> float:
 	var throttle := 0.0
 
 	match anim:
@@ -206,16 +230,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 			_turn("ArmR", Vector3.RIGHT, 0.8)
 			_model.position.y = -0.25
 
-	if _jolt > 0.0:
-		_turn("Head", Vector3.RIGHT, -0.35 * _jolt)
-
-	if not pack_gone:
-		_thruster.throttle = throttle
-		_thruster.rotation.x = -0.5 if anim == ZzZombieBody.Anim.DIVE else 0.0
-	else:
-		_thruster.throttle = 0.0
-
-	_collapse()
+	return throttle
 
 
 func _collapse() -> void:
