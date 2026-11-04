@@ -9,7 +9,7 @@ const ZzTouch := preload("../game/zz_touch.gd")
 ## godot --headless --path . res://examples/headless_touch.tscn
 ## [/codeblock]
 
-const CHECKS := 17
+const CHECKS := 28
 
 
 func _ready() -> void:
@@ -34,15 +34,29 @@ func _run() -> void:
 	_check(not none is DotFpsTouchSampler, "no touch: the plain sampler")
 	DotPlatform.touch_override = 1
 	_check(ZzTouch.new_sampler(DotFpsTunables.new()) is DotFpsTouchSampler, "touch: the touch sampler")
-	var buttons := ZzTouch.new()
-	buttons.size = Vector2(844, 390)
-	add_child(buttons)
-	_check(buttons.visible, "touch: the buttons show")
-	var seen := _overlaps(buttons, ids)
-	_check(seen == "", "no two buttons overlap", seen)
-	var foot := buttons.footprint()
-	_check(Rect2(Vector2.ZERO, buttons.size).encloses(foot) and foot.position.y >= 66.0, "the cluster is on a phone screen and clear of the Menu button", str(foot))
-	buttons.free()
+	# Size is set after add_child: with full-rect anchors a size set before the node has a parent is turned into offsets against a zero-size parent, and the tree then adds the viewport's 64 px.
+	for screen in [Vector2(844, 390), Vector2(667, 375), Vector2(932, 430)]:
+		var buttons := ZzTouch.new()
+		add_child(buttons)
+		buttons.size = screen
+		var tag := " at %dx%d" % [screen.x, screen.y]
+		_check(buttons.visible, "touch: the buttons show" + tag)
+		_check(buttons.size == screen, "the control is the screen's size" + tag, str(buttons.size))
+		var seen := _overlaps(buttons, ids)
+		_check(seen == "", "no two buttons overlap" + tag, seen)
+		var foot := buttons.footprint()
+		_check(Rect2(Vector2.ZERO, buttons.size).encloses(foot) and (foot.position.y >= 66.0 or foot.position.x >= 130.0), "the cluster is on the screen and clear of the Menu button (top left, 130 x 66)" + tag, str(foot))
+		if screen.x == 844.0:
+			var downs := []
+			buttons.button_down.connect(func(id: StringName) -> void: downs.append(id))
+			var touch := InputEventScreenTouch.new()
+			touch.pressed = true
+			touch.position = buttons.centre_of(ZzBindings.FIRE)
+			buttons._input(touch)
+			_check(buttons.is_held(ZzBindings.FIRE) and downs == [ZzBindings.FIRE], "a touch on a button holds it")
+			buttons.release_all()
+			_check(not buttons.is_held(ZzBindings.FIRE), "release_all frees every held button")
+		buttons.free()
 	DotPlatform.touch_override = 0
 	var off := ZzTouch.new()
 	add_child(off)
