@@ -3,8 +3,9 @@ extends Node
 ## near a spot is swept with a zombie-sized capsule against the world; an edge the body cannot walk is a snag.
 ##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [map x,y,z]
 ## --survival: every survival map, SURVEY_SPOTS evenly spaced nav points each.
-## --reach (with --survival): from every survivor spawn to every post and from every zombie spawn to every post and
-## survivor spawn, the zombies' own path query must find a full path; prints the unreachable pairs, exits 1 on any.
+## --reach (with --survival): from every survivor spawn to every post (stand-in filter: stairs walked) and from every
+## zombie spawn to every post and survivor spawn (zombie filter: drops down only) a full path must exist; prints the
+## unreachable pairs and, per endpoint group, off-graph versus islanded counts. Exits 1 on any.
 ## Prints blocked edges per spot; exits 1 when any is blocked. No zombie, no timing: the same numbers every run.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -181,14 +182,23 @@ func _reach_map(id: String) -> PackedStringArray:
 	var jobs: Array = []
 	for a in survivors:
 		for b in posts:
-			jobs.append(["survivor spawn", a, "post", b])
+			jobs.append(["survivor spawn", a, "post", b, true])
 	for a in zombies:
 		for b in posts:
 			jobs.append(["zombie spawn", a, "post", b])
 		for b in survivors:
 			jobs.append(["zombie spawn", a, "survivor spawn", b])
+	graph.filter = graph.bot_filter
+	graph.relabel()
+	out.append("  as a stand-in (no drops, stairs walked):")
+	out.append_array(_reach_causes(graph, survivors, [] as Array[Vector3], posts))
+	graph.filter = null
+	graph.relabel()
+	out.append("  as a zombie (drops down only):")
+	out.append_array(_reach_causes(graph, [] as Array[Vector3], zombies, posts))
 	var bad := PackedStringArray()
 	for j: Array in jobs:
+		graph.filter = graph.bot_filter if j.size() > 4 else null
 		var path := graph.find_path(j[1], j[3], REACH_SNAP, false)
 		if path.size() < 2 or graph.last_partial:
 			bad.append("    %s %s -> %s %s unreachable" % [j[0], _f(j[1]), j[2], _f(j[3])])
@@ -198,6 +208,63 @@ func _reach_map(id: String) -> PackedStringArray:
 	out.append("MAP %s: %d unreachable" % [id, bad.size()])
 	_free_game()
 	await get_tree().process_frame
+	return out
+
+
+## Per endpoint: off the graph (no point within the snap), or the graph piece it lands in with that piece's size.
+func _reach_causes(graph: DotNpcNavGraph, survivors: Array[Vector3], zombies: Array[Vector3], posts: Array[Vector3]) -> PackedStringArray:
+	var out := PackedStringArray()
+	var sizes := {}
+	for c in graph._component:
+		sizes[c] = int(sizes.get(c, 0)) + 1
+	var biggest := -1
+	for c in sizes:
+		if biggest < 0 or int(sizes[c]) > int(sizes[biggest]):
+			biggest = c
+	out.append("  graph: %d points, %d pieces, main piece %d points" % [graph.data.point_count(), sizes.size(), int(sizes.get(biggest, 0))])
+	var pts := graph.data.points
+	var island_ids := {}
+	for i in pts.size():
+		var c: int = graph._component[i]
+		if c != biggest and not island_ids.has(c):
+			island_ids[c] = i
+	for c in island_ids:
+		var best := INF
+		var near := Vector3.ZERO
+		var mine := Vector3.ZERO
+		for i in pts.size():
+			if graph._component[i] != c:
+				continue
+			for j in graph.data.points_within(pts[i], 6.0):
+				if graph._component[j] == biggest and pts[i].distance_to(pts[j]) < best:
+					best = pts[i].distance_to(pts[j])
+					near = pts[j]
+					mine = pts[i]
+		out.append("  piece %d (%d points) at %s: %s" % [c, int(sizes[c]), _f(mine), "no main-piece point within 6 m" if best == INF else "nearest main point %s, %.1f m (dy %.2f)" % [_f(near), best, near.y - mine.y]])
+	var no_end := 0
+	var lines2 := PackedStringArray()
+	for l: Array in _game.map_doc.get("nav", {}).get("links", []):
+		var a := graph.data.nearest_point(Vector3(l[0], l[1], l[2]), 2.0)
+		var b := graph.data.nearest_point(Vector3(l[3], l[4], l[5]), 2.0)
+		if a < 0 or b < 0:
+			no_end += 1
+			lines2.append("      link end has no point: %s %s" % [_f(Vector3(l[0], l[1], l[2])) + (" (no point)" if a < 0 else ""), _f(Vector3(l[3], l[4], l[5])) + (" (no point)" if b < 0 else "")])
+	out.append("  doc links: %d, %d with an end on no point (2 m snap)" % [_game.map_doc.get("nav", {}).get("links", []).size(), no_end])
+	out.append_array(lines2.slice(0, 8))
+	for group: Array in [["survivor spawn", survivors], ["zombie spawn", zombies], ["post", posts]]:
+		var off := 0
+		var island := 0
+		var lines := PackedStringArray()
+		for p: Vector3 in group[1]:
+			var i := graph.data.nearest_point(p, REACH_SNAP)
+			if i < 0:
+				off += 1
+				lines.append("      off graph %s (nearest point %.1f m)" % [_f(p), p.distance_to(graph.data.points[graph.data.nearest_point(p, 4096.0)])])
+			elif graph._component[i] != biggest:
+				island += 1
+				lines.append("      island of %d points %s" % [int(sizes[graph._component[i]]), _f(p)])
+		out.append("  %s: %d total, %d off graph, %d on a non-main piece" % [group[0], (group[1] as Array).size(), off, island])
+		out.append_array(lines.slice(0, 6))
 	return out
 
 
