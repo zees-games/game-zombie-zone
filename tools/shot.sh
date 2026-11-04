@@ -7,6 +7,7 @@
 #   tools/shot.sh --view=room --alone --zz-map-ids=zz_blackout_1 --at=16.6,1.6,65.4 --look=18,1.1,66   # a close-up, stand-ins left in the start room
 #   tools/shot.sh --view=survivor --spawn=common:12,leaper:1        # your eyes, with a crowd coming
 #   tools/shot.sh --view=mutant --seconds=2                          # a flying mutant: beams, jet flame, charge, dive (_a, _b, _c)
+#   tools/shot.sh --view=walk --zombie=common --seconds=1.5          # a filmstrip of a zombie walking, tracked (_00, _01, ...)
 #   tools/shot.sh --view=fire --seconds=1.5                          # a Molotov fire pool, close
 #   tools/shot.sh --view=third --spawn=brute:1                       # third person
 #   tools/shot.sh --view=room --aim=40 --at=0,0.05,12          # the stand-ins aiming 40 degrees up, from the side

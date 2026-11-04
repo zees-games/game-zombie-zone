@@ -349,7 +349,10 @@ func _run() -> void:
 			if mut != null and mut.brain != null:
 				mut.brain.call(&"take_flight", 30.0)
 			# Deterministic: climb to altitude, then fire the guns, then force the dive; frames around each.
-			_free_camera().look_at_from_position(stand + Vector3(-3.0, 3.0, -1.0), stand + Vector3(-9.0, 6.0, -5.0))
+			# Kept on the mutant itself: it flies off, so a camera aimed at a fixed point shows sky.
+			var mut_cam := _free_camera()
+			mut_cam.track_offset = Vector3(-5.0, 1.0, -5.0)
+			mut_cam.track = func() -> Variant: return mut.position() + Vector3(0.0, 1.5, 0.0) if mut != null and mut.node != null else null
 			var brain = mut.brain if mut != null else null
 			var waited := 0.0
 			while brain != null and waited < 15.0 and mut.position().y - stand.y < 7.0:
@@ -374,6 +377,19 @@ func _run() -> void:
 					print("mutant %s: %s state=%s" % [suffix, mut.position(), brain.get(&"state")])
 					await _save_extra(suffix)
 					await _seconds_of(0.2)
+		"walk":
+			# A filmstrip of --zombie=<kind> walking at the survivor: a frame every 0.15 s for --seconds,
+			# a camera tracking it from the side (walk_00.. beside --out).
+			_clear_view(game, local, stand)
+			var walker: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(2.0, 0.0, -9.0)), &"shot", Basis(Vector3.UP, PI))
+			if walker != null and walker.brain != null:
+				walker.brain.call(&"force_target", local.player_id)
+			var walk_cam := _free_camera()
+			walk_cam.track_offset = Vector3(4.0, 1.2, 0.0)
+			walk_cam.track = func() -> Variant: return walker.position() + Vector3(0.0, 0.9, 0.0) if walker != null and walker.node != null else null
+			for n in int(_seconds / 0.15):
+				await _save_extra("_%02d" % n)
+				await _seconds_of(0.15)
 		"fire":
 			# A Molotov pool lit a few metres ahead, from a low three-quarter camera.
 			_clear_view(game, local, stand)
