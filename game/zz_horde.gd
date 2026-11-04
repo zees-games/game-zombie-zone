@@ -366,7 +366,10 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 	if game.map != null and game.map.mechanics != null:
 		ladders = game.map.mechanics.ladder_boxes()
 
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"), ladders)
+	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
+	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
+	var mask: int = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip")
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders)
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 
