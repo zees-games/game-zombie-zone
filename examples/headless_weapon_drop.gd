@@ -1,10 +1,7 @@
-extends DotGameCheckSuite
+extends "zz_suite.gd"
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
-const ZzPlayer := preload("../game/zz_player.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
 
@@ -12,13 +9,6 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 
 const SECTIONS := 4
 const CHECKS := 30
-
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
-
-var _sections_entered := 0
-var _sections_finished := 0
-var _worlds: Array[ZzGame] = []
 
 
 func _ready() -> void:
@@ -241,78 +231,6 @@ func _test_wire() -> void:
 	var st := ZzEvents.read_weapon_settled(DotNetReader.new(ZzEvents.write_weapon_settled(7, at)))
 	_check(st["id"] == 7 and st["at"].origin.distance_to(at.origin) < 0.1, "a settle round-trips")
 	_finished()
-
-
-func _world(configure: Callable = Callable()) -> ZzGame:
-	for old in _worlds.duplicate():
-		await _dispose(old)
-
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.map_ids = PackedStringArray(["zz_practice"])
-	config.keep_progress = false
-	config.start_grace_seconds = 1.0
-	config.escape_grace_seconds = 0.0
-	config.sleepers_enabled = true
-
-	if configure.is_valid():
-		configure.call(config)
-
-	var game := ZzGame.new()
-	game.name = "World%d" % _worlds.size()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	_worlds.append(game)
-
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	return game
-
-
-static func _quiet(c: ZzConfig) -> void:
-	c.wanderer_density = 0.0
-	c.specials_base = 0
-	c.mob_interval_min = 900.0
-	c.mob_interval_max = 900.0
-	c.sleepers_enabled = false
-
-
-func _dispose(game: ZzGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _sim(game: ZzGame, seconds: float) -> void:
-	var ticks := maxi(int(round(seconds * float(TICK_RATE))), 1)
-
-	for i in ticks:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
-
-	await get_tree().physics_frame
-
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
 
 
 func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> ZzGame:

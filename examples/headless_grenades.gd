@@ -1,7 +1,5 @@
-extends DotGameCheckSuite
+extends "zz_suite.gd"
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
 const ZzHazards := preload("../game/zz_hazards.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -11,13 +9,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const SECTIONS := 9
 const CHECKS := 36
 
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
 const SPOT := Vector3(0.0, 0.05, 14.0)
-
-var _sections_entered := 0
-var _sections_finished := 0
-var _worlds: Array[ZzGame] = []
 
 
 func _ready() -> void:
@@ -281,79 +273,6 @@ func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity:
 	s.splash_damage = b.splash_damage if b != null else 0.0
 	s.owner_entity = player.entity_id
 	game.grenades.throw(player, s, def)
-
-
-func _world(configure: Callable = Callable()) -> ZzGame:
-	for old in _worlds.duplicate():
-		await _dispose(old)
-
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.map_ids = PackedStringArray(["zz_practice"])
-	config.keep_progress = false
-	config.start_grace_seconds = 1.0
-	config.escape_grace_seconds = 0.0
-	config.sleepers_enabled = true
-
-	if configure.is_valid():
-		configure.call(config)
-
-	var game := ZzGame.new()
-	game.name = "World%d" % _worlds.size()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	_worlds.append(game)
-
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	return game
-
-
-
-
-static func _quiet(c: ZzConfig) -> void:
-	c.wanderer_density = 0.0
-	c.specials_base = 0
-	c.mob_interval_min = 900.0
-	c.mob_interval_max = 900.0
-	c.sleepers_enabled = false
-
-
-func _dispose(game: ZzGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _sim(game: ZzGame, seconds: float) -> void:
-	var ticks := maxi(int(round(seconds * float(TICK_RATE))), 1)
-
-	for i in ticks:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
-
-	await get_tree().physics_frame
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
 
 
 func _team(count: int) -> ZzGame:

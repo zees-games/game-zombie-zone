@@ -1,50 +1,19 @@
-extends Node
+extends "zz_water_probe.gd"
+
 ## Probe: drops a survivor at points of a map and walks it in eight directions with the real motor,
 ## printing where it moved less than a metre and its water level.
 ##   godot --headless --path . res://tools/water_walk.tscn -- <map id> x,z[,y] ...
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
-const TICK_RATE := 60
-const TICK := 1.0 / TICK_RATE
-
-
-func _ready() -> void:
-	_run.call_deferred()
+const ZzPlayer := preload("../game/zz_player.gd")
 
 
 func _run() -> void:
-	var args := Array(OS.get_cmdline_user_args())
-	var dir := ""
-	var trace := args.has("--trace")
-	args.erase("--trace")
-	for a: String in args.duplicate():
-		if a.begins_with("--dir="):
-			dir = a.substr(6)
-			args.erase(a)
-	var id := StringName(args[0]) if args.size() > 0 else &"zm_4way_tunnel"
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.start_grace_seconds = 600.0
-	config.map_ids = PackedStringArray([String(id)])
-	if dir != "":
-		config.map_directory = dir
-	var game := ZzGame.new()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	await get_tree().physics_frame
-	var p := game.add_player(&"u1", "Walker")
-	p.health.invulnerable = true
-	game.next_map_id = id
-	game.start()
-	for i in 8:
-		game.simulate(TICK)
+	await _open_walker()
+	var args := _args
+	var trace := _trace
+	var id := _id
+	var game := _game
+	var p: ZzPlayer = _walker
 	await get_tree().physics_frame
 	print("water boxes: ", game.map.water_boxes)
 	var stuck := 0

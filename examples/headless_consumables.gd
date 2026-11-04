@@ -1,22 +1,12 @@
-extends DotGameCheckSuite
+extends "zz_suite.gd"
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
-const ZzPlayer := preload("../game/zz_player.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
 
 ## Pills and medkits: own stack-limited slots, use on self, heal and give to a friend, and every cvar off.
 
 const SECTIONS := 4
 const CHECKS := 31
-
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
-
-var _sections_entered := 0
-var _sections_finished := 0
-var _worlds: Array[ZzGame] = []
 
 
 func _ready() -> void:
@@ -50,22 +40,6 @@ func _pair() -> Array:
 	await _sim(game, 0.3)
 	_aim(a, b.feet() + Vector3(0.0, 1.0, 0.0))
 	return [game, a, b]
-
-
-func _hurt(game: ZzGame, player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
-	hit.tick = game.current_tick()
-	var _applied := game.combat.apply_damage(hit)
-
-
-func _aim(player: ZzPlayer, target: Vector3) -> void:
-	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
-	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
-	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
-	player.controller.apply_command(command)
-	player.controller.state.yaw = command.yaw
-	player.controller.state.pitch = command.pitch
 
 
 func _press(game: ZzGame, player: ZzPlayer, bits: int, seconds: float) -> void:
@@ -260,78 +234,6 @@ func _test_give() -> void:
 	await _press(game, a, ZzNetCommand.ACT_GIVE_KIT, 0.2)
 	_check(a.medkits == 1 and b.medkits == 1, "zz_give_medkits 0 blocks it")
 	_finished()
-
-
-func _world(configure: Callable = Callable()) -> ZzGame:
-	for old in _worlds.duplicate():
-		await _dispose(old)
-
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.map_ids = PackedStringArray(["zz_practice"])
-	config.keep_progress = false
-	config.start_grace_seconds = 1.0
-	config.escape_grace_seconds = 0.0
-	config.sleepers_enabled = true
-
-	if configure.is_valid():
-		configure.call(config)
-
-	var game := ZzGame.new()
-	game.name = "World%d" % _worlds.size()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	_worlds.append(game)
-
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	return game
-
-
-static func _quiet(c: ZzConfig) -> void:
-	c.wanderer_density = 0.0
-	c.specials_base = 0
-	c.mob_interval_min = 900.0
-	c.mob_interval_max = 900.0
-	c.sleepers_enabled = false
-
-
-func _dispose(game: ZzGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _sim(game: ZzGame, seconds: float) -> void:
-	var ticks := maxi(int(round(seconds * float(TICK_RATE))), 1)
-
-	for i in ticks:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
-
-	await get_tree().physics_frame
-
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
 
 
 func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> ZzGame:

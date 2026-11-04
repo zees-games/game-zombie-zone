@@ -1,8 +1,5 @@
-extends DotGameCheckSuite
+extends "zz_suite.gd"
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
-const ZzPlayer := preload("../game/zz_player.gd")
 const ZzMaterials := preload("../game/zz_materials.gd")
 
 ## Stats wiring through the shared addons: ammo profiles, per-shape materials, hitzone and penetration stats, rank.
@@ -10,12 +7,7 @@ const ZzMaterials := preload("../game/zz_materials.gd")
 const SECTIONS := 4
 const CHECKS := 25
 
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
 
-var _sections_entered := 0
-var _sections_finished := 0
-var _worlds: Array[ZzGame] = []
 ## Set before _world(): the lifetime file the next world keeps.
 var _stats_file := ""
 
@@ -187,46 +179,6 @@ func _world(configure: Callable = Callable()) -> ZzGame:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	return game
-
-
-static func _quiet(c: ZzConfig) -> void:
-	c.wanderer_density = 0.0
-	c.specials_base = 0
-	c.mob_interval_min = 900.0
-	c.mob_interval_max = 900.0
-	c.sleepers_enabled = false
-
-
-func _dispose(game: ZzGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _sim(game: ZzGame, seconds: float) -> void:
-	var ticks := maxi(int(round(seconds * float(TICK_RATE))), 1)
-
-	for i in ticks:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
-
-	await get_tree().physics_frame
-
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
 
 
 func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> ZzGame:
