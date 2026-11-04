@@ -54,26 +54,8 @@ const ZzWorkshop := preload("zz_workshop.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
-##
-## [b]A round is a map.[/b] Everybody starts in the start area, where nothing comes for them
-## until somebody leaves it (or [member ZzConfig.start_grace_seconds] pass). Then the horde
-## runs: an exodus map is won when every survivor still standing is inside the end shelter, a
-## survival map when its hold is over ([ZzSurvival]: the last wave cleared, the last night
-## lived through, or the clock run out) with anybody alive. It is lost when nobody is left on
-## their feet and free. A won exodus map moves on to the map it names as `next`; a lost one is
-## played again, [member ZzConfig.retries] times.
-##
-## [b]What it owns and what it borrows.[/b] The round and the scoreboard are dot-match's
-## (decided through [ZzRules]); health and shots are dot-combat's; the weapons are
-## zee-dot-weapons'; the zombies are [ZzHorde], which is dot-npc, dot-npc-ai and
-## dot-npc-ai-director; the movement is dot-player-controller's, with this game's modifiers
-## ([ZzController]). Downs, revives, medkits, the shove, pins, hazards, boxes and objectives are
-## this game's own.
-##
-## [b]The order of a tick is the design.[/b] Bots decide; pins set their victims' velocities;
-## every survivor moves; every gun fires (at zombies where they were when the survivor aimed);
-## the horde perceives, thinks and moves; pins sit their specials on their victims and do their
-## damage; hazards, loot and the round are judged last, on a world that has finished moving.
+## A round is a map: the horde runs once somebody leaves the start area; exodus is won inside the end shelter, survival when the hold is over, and a lost map is replayed [member ZzConfig.retries] times.
+## Tick order is the design: bots, pins, movement, guns, horde, pin damage, then hazards, loot and the round on a world that has finished moving.
 
 const CHANNEL := "zz.game"
 
@@ -181,10 +163,9 @@ signal exploded(at: Vector3, radius: float, kind: StringName)
 ## rig has to be told, or it predicts an empty magazine the server has refilled.
 signal ammo_given(player_id: StringName)
 
-## A survivor's shot (or blast, or fire) took health off a zombie: the confirmation the
-## shooter's hit marker and damage numbers are drawn from. The authority's decision, never a
-## client's prediction; the bridge sends it to the shooter alone. [param victim] is the
-## zombie's entity id, which only groups hits on one body; [param point] is where it landed.
+## A survivor's shot (or blast, or fire) took health off a zombie: the confirmation the shooter's
+## hit marker is drawn from. The authority's decision, sent to the shooter alone; [param victim] is the
+## zombie's entity id and [param point] where it landed.
 signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 
 ## A barricade took damage, broke, or was mended: its strength as a share, and whether it stands.
@@ -341,10 +322,9 @@ var end_camera_rules: ZzEndCameraRules = ZzEndCameraRules.new()
 ## what a voteban and a ban do.
 var team_damage: ZzTeamDamage = ZzTeamDamage.new()
 
-## What a dead body does, survivor or zombie, and which death reactions the server allows:
-## dot-player-char's `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a
-## client through its link, because the client draws the bodies. One set for both: an owner who
-## turns ragdolls off means every body. A body lies [constant CORPSE_SECONDS] by default.
+## What a dead body does and which death reactions the server allows: dot-player-char's `sv_ragdoll*` cvars,
+## bound by the module (REPLICATED) and followed by a client through its link. One set for survivors and zombies.
+## A body lies [constant CORPSE_SECONDS] by default.
 var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
@@ -443,11 +423,9 @@ var _built_stamp: int = 0
 var _class_rng := RandomNumberGenerator.new()
 
 
-## Seconds after the last blow on a barricade before it can be mended. A mend under attack
-## outran any crowd at a window (120 every two seconds against 6 a second a zombie), so a team
-## behind boards it could not see through mended forever and no wave was ever cleared, only
-## timed out (zz-survival-long-run-1). The boards are held by killing what tears at them;
-## mending is the breather's job, or a lull's.
+## Seconds after the last blow on a barricade before it can be mended; mending under attack outran any crowd,
+## so a team behind boards mended for ever and no wave cleared.
+## The boards are held by killing what tears at them; mending is the breather's job.
 const MEND_LOCKOUT := 1.5
 
 
