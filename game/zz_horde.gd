@@ -6,7 +6,7 @@ const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
 ## Bumped when the prune records more (2: the cut edges smoothing must not cross), so older caches prune again.
-const PRUNE_VERSION := 4
+const PRUNE_VERSION := 5
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
@@ -571,7 +571,12 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 	if int(data.meta.get("pruned", 0)) >= PRUNE_VERSION or game == null or game.physics == null or not game.is_inside_tree():
 		return
 
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
+	var ladders: Array[AABB] = []
+
+	if game.map != null and game.map.mechanics != null:
+		ladders = game.map.mechanics.ladder_boxes()
+
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"), ladders)
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 

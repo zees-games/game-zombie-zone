@@ -15,13 +15,18 @@ const EDGE_STEP := 0.25
 const NUDGE := 0.3
 ## A rise or fall over this is a ledge or a ladder: crossed by a column beside the line, not along it.
 const CLIMB := 0.6
+## How far (m) from a ladder's foot or head, across and up or down, the point that ends its climb may stand.
+const LADDER_REACH := 3.0
+const LADDER_HEIGHT := 1.5
 
 var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
 
 
-## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask.
-static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int) -> Vector2i:
+## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask. Each of
+## [param ladders] is then joined foot to head: its shaft blocks the capsule, and the builder drops a ladder link
+## whose ends a stair link already joined, which this prune may then cut.
+static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = []) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN)
 	var bare := new()
@@ -35,11 +40,34 @@ static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: in
 	prune.nudge = NUDGE
 	prune.climb = CLIMB
 	var dropped := prune.apply(nav)
+	var climbs := join_ladders(nav, ladders)
 
-	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0:
-		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges})
+	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or climbs > 0:
+		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "ladders": climbs})
 
 	return dropped
+
+
+## Joins the floor points nearest each ladder's foot and head; returns how many ladders were joined.
+static func join_ladders(nav: DotNpcNavData, ladders: Array[AABB]) -> int:
+	var joined := 0
+
+	for box in ladders:
+		var mid := box.get_center()
+		var a := _ladder_end(nav, Vector3(mid.x, box.position.y + 0.1, mid.z))
+		var b := _ladder_end(nav, Vector3(mid.x, box.end.y, mid.z))
+
+		if a >= 0 and b >= 0 and absf(nav.points[a].y - nav.points[b].y) > CLIMB and nav.connect_points(a, b).ok:
+			joined += 1
+
+	if joined > 0:
+		nav.invalidate_index()
+
+	return joined
+
+
+static func _ladder_end(nav: DotNpcNavData, at: Vector3) -> int:
+	return nav.nearest_point_where(at, LADDER_REACH, func(p: int) -> bool: return absf(nav.points[p].y - at.y) <= LADDER_HEIGHT)
 
 
 ## The same test for a link added after the prune (a drop or a jump up): `func(a: Vector3, b: Vector3) -> bool`.
