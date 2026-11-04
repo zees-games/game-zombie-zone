@@ -150,9 +150,10 @@ func _edge_hit(space: PhysicsDirectSpaceState3D, query: PhysicsShapeQueryParamet
 	var n := maxi(ceili(a.distance_to(b) / STEP), 1)
 	for i in n + 1:
 		var p := a.lerp(b, float(i) / float(n))
-		query.transform = Transform3D(Basis.IDENTITY, p + Vector3.UP * (LIFT + shape_half(query)))
-		var found := space.intersect_shape(query, 1)
-		if not found.is_empty():
+		var found := _body_at(space, query, p)
+		# The line between two points' heights is not the ground: where the floor rises a little between them
+		# (a kerb, a hump) the body steps onto it. Only a sample blocked on the ground too is a real block.
+		if not found.is_empty() and not _body_at(space, query, _on_ground(space, query.collision_mask, p)).is_empty():
 			if _verbose:
 				var c: Variant = found[0]["collider"]
 				var owner_node: Variant = (c as CollisionObject3D).shape_owner_get_owner((c as CollisionObject3D).shape_find_owner(int(found[0]["shape"])))
@@ -161,6 +162,16 @@ func _edge_hit(space: PhysicsDirectSpaceState3D, query: PhysicsShapeQueryParamet
 				print("      hit at %s size %s yaw %.0f" % [_f(cs.global_position), box.size if box != null else cs.shape, rad_to_deg(cs.global_rotation.y)] if cs != null else "      hit ?")
 			return p
 	return Vector3.INF
+
+
+func _body_at(space: PhysicsDirectSpaceState3D, query: PhysicsShapeQueryParameters3D, p: Vector3) -> Array[Dictionary]:
+	query.transform = Transform3D(Basis.IDENTITY, p + Vector3.UP * (LIFT + shape_half(query)))
+	return space.intersect_shape(query, 1)
+
+
+func _on_ground(space: PhysicsDirectSpaceState3D, mask: int, p: Vector3) -> Vector3:
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(p + Vector3.UP * LIFT * 2.0, p + Vector3.DOWN * LIFT * 2.0, mask))
+	return hit["position"] if not hit.is_empty() else p
 
 
 func shape_half(query: PhysicsShapeQueryParameters3D) -> float:
