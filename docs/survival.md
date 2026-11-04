@@ -356,6 +356,24 @@ Zombies are no longer all `always_relevant`. `ZzNetBridge.make_interest` is a `D
 
 **Read this as: the snapshot is no longer the problem, the survivors are.** With the native snapshot the 100-survivor snapshot is 9 ms (was 196 to 223 in the table above, a different build and a busier VM, so not a like-for-like gain), and the new curve takes 17 ms off the 100 row (29 %) and halves the brains. What is left is linear in the team: the stand-ins' `bots` (6.4), `players` (7.9) and `logic` (7.3) together are 21 ms of 42, which no horde cap touches. 100 survivors at 64 Hz is 2.7 times the budget (p95 3.2) with the stand-ins driving all of them; at 33 Hz the budget is 30.3 ms, so the rate change is the lever that would bring it inside, and that is the owner's call (not measured in this pass). NPC simulation LOD is not new work: brains already think every 1, 2, 3, 4 or 8 ticks and bodies move every 1, 2 or 4 by distance to the nearest survivor (`ZzZombieBrain._think_every`, `zz_body_stride_*`), and dot-game ships `DotGameNpcLod`; with the horde this size brains are 4 of 42 ms, so a further LOD buys little before the survivors' own cost is cut. Next: a cheaper stand-in tick for far-from-action bots (`bots` plus `players`).
 
+### Far stand-ins and the weapon lever (zz-scale-levers-1, 2026-11-04)
+
+Profile at 100 survivors, 64 Hz, `GPU_OFFLOAD=0`, VM load 2 to 4: total 45.0 ms mean against the 15.6 ms budget, bots 8.0, players 8.7 (motor 7.6, simulate 7.8), logic 6.6 (weapons 4.2, toys 1.1, bodies 0.9), brains 4.8, snapshot 9.5. The stand-ins are about two thirds of the tick; the snapshot is a fifth.
+
+`bot_motor_stride_far` (now honoured on a server too, and per `ZzGame.stand_in_far`) lets a calm stand-in (no zombie within `bot_calm_radius`, not pinned, not using) that is farther than the stride radius from every human run its motor on every second tick with the delta carried, and decide every `bot_decide_every_far` ticks. It is off by default (0): it saves 1 to 2 ms of 28 to 45, and it changes the run, since `engaged_mean` falls by a fifth to a half and survivor damage taken falls to zero, so it is not the "no behaviour change" lever the item asked for. Stand-ins sleeping near no human is the same trade a player would notice, so it stays a server choice (`--cfg=bot_motor_stride_far=30` in the probe).
+
+`bot_weapon_idle_every=4` (already there, default 1) takes `logic.weapons` from 5.0 to 3.2 ms at 100 survivors with the same engagement (75 against 80, 56 kills against 62, inside run-to-run noise); the total did not separate from noise (43.1 against 45.0) on a shared VM.
+
+| survivors | Hz | stride_far | total mean / p95 | bots | players | brains | logic | net snapshot | engaged_mean |
+|---|---|---|---|---|---|---|---|---|---|
+| 16 | 64 | off | 10.5 / 13.8 | 1.27 | 1.45 | 2.09 | 2.26 | 1.1 | 47 |
+| 16 | 64 | 30 | 8.8 / 11.9 | 1.13 | 1.14 | 1.78 | 1.61 | 1.0 | 44 |
+| 64 | 64 | off | 27.5 / 34.4 | 4.80 | 4.89 | 3.32 | 4.78 | 4.7 | 68 |
+| 64 | 64 | 30 | 25.7 / 32.3 | 4.39 | 3.91 | 2.75 | 4.97 | 4.8 | 53 |
+| 100 | 64 | off | 45.0 / 51.8 | 7.99 | 8.68 | 4.76 | 6.57 | 9.5 | 80 |
+
+**Read this as: the far lever is not worth turning on, and what is left is not a cheaper tick.** Even sleeping every far stand-in, the three stand-in phases still cost about 21 ms at 100 survivors because most of them are near a human or a zombie in this arena. Getting to 15.6 ms at 100 needs fewer simulated stand-ins per server (a server of fifty survivors and fifty stand-ins), not a cheaper one. 33 Hz was not re-measured on this build: the heavy queue was full of other suites, so that number stays open.
+
 ## Stuck movers by map
 
 `headless_nav --only=stuck` plays each shipped map for 150 simulated seconds with a team of stand-ins against its horde, and `tools/stuck_meter.gd` counts the seconds a mover with a goal stayed within 0.75 m for 4 s (a zombie fighting, bashing or with no path does not count). Percent of the seconds a mover of that kind had a goal; one run per map each side, and a kind with a few dozen goal seconds swings by tens of points between two runs of the same code (a single wedged stand-in), so read the commons columns and the large moves. Specials have no goal time in 150 s and are unmeasured.

@@ -381,6 +381,7 @@ func _one_tick(tick: int) -> void:
 	var at := Time.get_ticks_usec()
 	var total_start := at
 	g._advance_phase(delta)
+	g._refresh_humans()
 	if g.bots != null:
 		g.bots.drive(delta)
 	if g.pins != null:
@@ -389,12 +390,21 @@ func _one_tick(tick: int) -> void:
 	for id: StringName in g.players:
 		var player = g.players[id]
 		if player.is_alive() and not player.watching:
+			var owed: float = 0.0
+			if g._bot_motor_asleep(player):
+				owed = -1.0
+			else:
+				owed = g._bot_motor_owed(player, delta)
+			if owed < 0.0:
+				g._advance_water(player, delta)
+				g._advance_hands(player, delta)
+				continue
 			if _detail:
 				var t0 := Time.get_ticks_usec()
 				var body: Object = player.controller.body if player.controller != null else null
 				var q0: int = int(body.get(&"query_count")) if body != null else 0
 				if player.sampler == null:
-					player.step_controller(g._tick, delta)
+					player.step_controller(g._tick, delta + owed)
 					var tm := Time.get_ticks_usec()
 					_accum("player.motor", tm - t0)
 					player.global_position = player.controller.state.position
@@ -409,7 +419,8 @@ func _one_tick(tick: int) -> void:
 				_accum("player.simulate", t1 - t0)
 				_accum("player.hands", Time.get_ticks_usec() - t1)
 			else:
-				player.simulate(g._tick, delta)
+				player.simulate(g._tick, delta + owed)
+				g._advance_water(player, delta)
 				g._advance_hands(player, delta)
 	at = _add("players", at)
 	var wt := Time.get_ticks_usec()

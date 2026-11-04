@@ -303,10 +303,17 @@ func setup_seconds() -> float:
 ## costs 290 us. 1 ticks every tick. `zz_bot_motor_idle_every`.
 @export_range(1, 16, 1) var bot_motor_idle_every: int = 4
 
-## Metres from the player past which a drawn solo world moves a stand-in's motor every second tick
-## with two ticks' time: far off, the same walk costs half. 0 moves every stand-in every tick.
-## `zz_bot_motor_stride_far`.
+## A stand-in with no zombie within `bot_calm_radius` and no person within this many metres moves its
+## motor every second tick with two ticks' time and decides every `bot_decide_every_far` ticks: far
+## from anyone watching, the same walk costs half. 0 ticks every stand-in fully. `zz_bot_motor_stride_far`.
 @export_range(0.0, 500.0, 1.0) var bot_motor_stride_far: float = 0.0
+
+## Metres of clear ground from the nearest zombie that make a stand-in calm (see `bot_motor_stride_far`).
+@export_range(4.0, 32.0, 1.0) var bot_calm_radius: float = 18.0
+
+## A calm stand-in far from every person decides every this many ticks (staggered). 2 is the pace of
+## every standing post. `zz_bot_decide_every_far`.
+@export_range(2, 16, 1) var bot_decide_every_far: int = 4
 
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per

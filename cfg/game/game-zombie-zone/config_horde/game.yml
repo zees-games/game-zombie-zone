@@ -60,8 +60,12 @@
 # bot_weapon_idle_every: 1
 # A stand-in standing still (grounded, no velocity, nothing pressed, every motor timer at rest) runs its moto... [1..16]
 # bot_motor_idle_every: 4
-# Metres from the player past which a drawn solo world moves a stand-in's motor every second tick with two ti... [0.0..500.0]
+# A stand-in with no zombie within `bot_calm_radius` and no person within this many metres moves its motor ev... [0.0..500.0]
 # bot_motor_stride_far: 0.0
+# Metres of clear ground from the nearest zombie that make a stand-in calm (see `bot_motor_stride_far`). [4.0..32.0]
+# bot_calm_radius: 18.0
+# A calm stand-in far from every person decides every this many ticks (staggered). 2 is the pace of every sta... [2..16]
+# bot_decide_every_far: 4
 # A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time, rather than once... [0..8]
 # horde_frame_ticks: 4
 # A drawn solo world's cap on physics steps per drawn frame (the engine's is 8): a frame slower than this man... [0..8]
@@ -106,6 +110,8 @@
 # commons_per_survivor: 6
 # Most commons alive at once whatever the survivor count; 0 leaves commons_cap uncapped. [0..2000]
 # commons_max: 0
+# Past sixteen survivors each adds 1 over this of commons_per_survivor: the team, not the horde, sets the ser... [1..60]
+# commons_far_divisor: 9
 # Commons standing about a map at its start, per hundred square metres of walkable floor. [0.0..10.0]
 # wanderer_density: 0.55
 # Seconds between mobs, from and to. A mob is a crowd that knows where you are. [10.0..900.0]

@@ -3958,32 +3958,57 @@ func _advance_weapons() -> void:
 				_throw(player, spawn)
 
 
-var _view_origin := Vector3.INF
+var _human_feet := PackedVector3Array()
 var _motor_owed: Dictionary = {}
+var _far_cache: Dictionary = {}
 
 
-## The first human's feet in a drawn solo world; INF anywhere else (servers and headless runs never stride).
-func _local_origin() -> Vector3:
-	if not horde_per_frame or config.bot_motor_stride_far <= 0.0:
-		return Vector3.INF
+## The living people's feet, once a tick: what a stand-in's distance to anyone watching is measured from.
+func _refresh_humans() -> void:
+	_human_feet.clear()
+
+	if config.bot_motor_stride_far <= 0.0:
+		return
 
 	for id: StringName in players:
 		var player: ZzPlayer = players[id]
 
 		if not player.is_bot and player.is_alive():
-			return player.controller.state.position
+			_human_feet.append(player.controller.state.position)
 
-	return Vector3.INF
+
+## True for a stand-in with no zombie close and no person within [member ZzConfig.bot_motor_stride_far]:
+## nothing there changes with a coarser tick (re-read every 8 ticks, staggered).
+func stand_in_far(player: ZzPlayer) -> bool:
+	var far := config.bot_motor_stride_far
+
+	if far <= 0.0 or not player.is_bot or not player.is_up() or player.is_pinned() or player.using != &"":
+		return false
+
+	if bots == null or not bots.is_calm(player):
+		return false
+
+	var id := player.entity_id
+	var cached: Array = _far_cache.get(id, [])
+
+	if cached.size() == 2 and _tick < int(cached[0]):
+		return bool(cached[1])
+
+	var at := player.controller.state.position
+	var clear := true
+
+	for feet in _human_feet:
+		if at.distance_squared_to(feet) < far * far:
+			clear = false
+			break
+
+	_far_cache[id] = [_tick + 8 + (hash(id) & 3), clear]
+	return clear
 
 
 ## The time a stand-in's motor owes (see [member ZzConfig.bot_motor_stride_far]) to run this tick, or -1 to skip it.
 func _bot_motor_owed(player: ZzPlayer, delta: float) -> float:
-	if _view_origin == Vector3.INF or not player.is_bot or not player.is_up() or player.is_pinned():
-		return 0.0
-
-	var far := config.bot_motor_stride_far
-
-	if player.controller.state.position.distance_squared_to(_view_origin) < far * far:
+	if not stand_in_far(player):
 		return 0.0
 
 	if (_tick + hash(player.entity_id)) % 2 == 1:
@@ -4189,7 +4214,7 @@ func _tick_horde(delta: float) -> void:
 
 func _step(delta: float) -> void:
 	_advance_phase(delta)
-	_view_origin = _local_origin()
+	_refresh_humans()
 
 	if authoritative and bots != null:
 		bots.drive(delta)

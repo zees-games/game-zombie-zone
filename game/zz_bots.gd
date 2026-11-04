@@ -212,9 +212,12 @@ func _drive_each() -> void:
 		# shoving or mid-mend decides every tick, as does the first tick.
 		var kept: Variant = _state.get(player.player_id, {}).get("last_command")
 		if kept is DotFpsCommand and player.is_up() and not player.is_pinned() and player.using == &"" \
-				and (game.current_tick() + _seat(player)) % 2 == 1 and game.phase != game.Phase.IDLE:
-			player.controller.apply_command(kept as DotFpsCommand)
-			continue
+				and game.phase != game.Phase.IDLE:
+			var turn: int = game.current_tick() + _seat(player)
+			var every: int = game.config.bot_decide_every_far if game.stand_in_far(player) else 2
+			if turn % every != 0:
+				player.controller.apply_command(kept as DotFpsCommand)
+				continue
 
 		var command := DotFpsCommand.new()
 		command.yaw = player.controller.state.yaw
@@ -826,9 +829,16 @@ func _threat(player) -> DotNpcInstance:
 	# Sorted as one packed key (millimetres above, the index below) rather than with a lambda,
 	# which was a script call per comparison: six thousand a frame at wave 7.
 	var keys := PackedInt64Array()
+	var calm_radius: float = game.config.bot_calm_radius
+	var close_sq := calm_radius * calm_radius
+	var feet: Vector3 = player.feet()
+	var calm := true
 
 	for i in near.size():
 		var npc: DotNpcInstance = near[i]
+
+		if calm and npc.position().distance_squared_to(feet) < close_sq:
+			calm = false
 
 		# The sleeper is left alone unless she is up.
 		if npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting":
@@ -855,7 +865,13 @@ func _threat(player) -> DotNpcInstance:
 	memory["threat"] = best
 	# Staggered by the stand-in's own seat, so a dozen do not all look on the same tick.
 	memory["threat_until"] = game.current_tick() + 3 + (hash(String(player.player_id)) & 1)
+	memory["calm_until"] = int(memory["threat_until"]) if calm and best == null else 0
 	return best
+
+
+## True while the last look found nothing in sight and no zombie within `bot_calm_radius`.
+func is_calm(player) -> bool:
+	return game.current_tick() < int(_memory(player).get("calm_until", 0))
 
 
 func _aim_point(npc: DotNpcInstance) -> Vector3:
