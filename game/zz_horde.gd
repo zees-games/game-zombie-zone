@@ -2257,37 +2257,8 @@ func npc_for_entity(entity_id: int) -> DotNpcInstance:
 	return _by_entity.get(entity_id)
 
 
-## Hitboxes and health, sized to the kind: a head a headshot can find, a body.
-func _register_combat(npc: DotNpcInstance) -> void:
-	var opened: DotResult = game.entities.open(
-		DotEntity.KIND_NPC, npc.node, &"", &"", game.now()
-	)
-
-	if not opened.ok:
-		DotLog.error(CHANNEL, "could not open an entity for a zombie", {
-			"npc": String(npc.def.id), "why": opened.error.message,
-		})
-		return
-
-	var entity: int = (opened.value as DotEntityHandle).id
-	var def := npc.def
-	var height := float(def.meta.get("height", 1.75))
-	var radius := float(def.meta.get("radius", 0.32))
-
-	# The health first, and that is not tidiness. A hitbox finds its owner as the nearest
-	# ancestor carrying a DotHealth and remembers the answer; built before the health, every
-	# hitbox settled on its own set as the owner, and every shot that hit a zombie was
-	# credited to a node dot-combat had never heard of — and did nothing.
-	var health := DotHealth.new()
-	health.name = "Health"
-	health.max_health = def.max_health
-	health.max_armour = 0.0
-	health.regen_per_second = 0.0
-	health.set_tick_rate(game.tick_rate)
-	npc.node.add_child(health)
-	health.reset(game.current_tick())
-	npc.health = health.health
-
+## A zombie's hitboxes: head, body, stomach and, on a riot zombie, its shield.
+func _hitbox_set(def: DotNpcDef, height: float, radius: float) -> DotHitboxSet:
 	var set_node := DotHitboxSet.new()
 	set_node.name = "Hitboxes"
 	set_node.bounds_offset = Vector3(0.0, height * 0.5, 0.0)
@@ -2336,6 +2307,41 @@ func _register_combat(npc: DotNpcInstance) -> void:
 		shield.precedence = 20
 		set_node.add_child(shield)
 
+	return set_node
+
+
+## Hitboxes and health, sized to the kind: a head a headshot can find, a body.
+func _register_combat(npc: DotNpcInstance) -> void:
+	var opened: DotResult = game.entities.open(
+		DotEntity.KIND_NPC, npc.node, &"", &"", game.now()
+	)
+
+	if not opened.ok:
+		DotLog.error(CHANNEL, "could not open an entity for a zombie", {
+			"npc": String(npc.def.id), "why": opened.error.message,
+		})
+		return
+
+	var entity: int = (opened.value as DotEntityHandle).id
+	var def := npc.def
+	var height := float(def.meta.get("height", 1.75))
+	var radius := float(def.meta.get("radius", 0.32))
+
+	# The health first, and that is not tidiness. A hitbox finds its owner as the nearest
+	# ancestor carrying a DotHealth and remembers the answer; built before the health, every
+	# hitbox settled on its own set as the owner, and every shot that hit a zombie was
+	# credited to a node dot-combat had never heard of — and did nothing.
+	var health := DotHealth.new()
+	health.name = "Health"
+	health.max_health = def.max_health
+	health.max_armour = 0.0
+	health.regen_per_second = 0.0
+	health.set_tick_rate(game.tick_rate)
+	npc.node.add_child(health)
+	health.reset(game.current_tick())
+	npc.health = health.health
+
+	var set_node := _hitbox_set(def, height, radius)
 	npc.node.add_child(set_node)
 	# Not optional: a set gathers its boxes on refresh, and one never refreshed has none — a
 	# zombie every shot passed through, stopped instead by its own movement capsule.
