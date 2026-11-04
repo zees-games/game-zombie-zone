@@ -6,7 +6,7 @@ const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
 ## Bumped when the prune records more (2: the cut edges smoothing must not cross), so older caches prune again.
-const PRUNE_VERSION := 3
+const PRUNE_VERSION := 4
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")

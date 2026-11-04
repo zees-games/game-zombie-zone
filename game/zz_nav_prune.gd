@@ -11,6 +11,10 @@ const HEIGHT := 1.75
 const LIFT := 0.3
 ## Metres between the samples along an edge: a post or slab thinner than the edge's midpoint gap still lands on one.
 const EDGE_STEP := 0.25
+## How far a point the margin blocks may slide; a grid point rarely lands where a doorway is widest.
+const NUDGE := 0.3
+## A rise or fall over this is a ledge or a ladder: crossed by a column beside the line, not along it.
+const CLIMB := 0.6
 
 var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
@@ -19,11 +23,21 @@ var _query := PhysicsShapeQueryParameters3D.new()
 ## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask.
 static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int) -> Vector2i:
 	var pruner := new()
-	pruner._setup(space, mask)
-	var dropped := nav.prune(pruner._point_blocked, pruner._edge_blocked)
+	pruner._setup(space, mask, MARGIN)
+	var bare := new()
+	bare._setup(space, mask, 0.0)
+	var prune := DotNpcNavPrune.new()
+	prune.point_blocked = pruner._point_blocked
+	prune.edge_blocked = pruner._edge_blocked
+	# The margin is for smoothing; where only the bare body fits, that gap is still the way between two pieces.
+	prune.loose_point_blocked = bare._point_blocked
+	prune.loose_edge_blocked = bare._edge_blocked
+	prune.nudge = NUDGE
+	prune.climb = CLIMB
+	var dropped := prune.apply(nav)
 
-	if dropped != Vector2i.ZERO:
-		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y})
+	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0:
+		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges})
 
 	return dropped
 
@@ -31,15 +45,16 @@ static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: in
 ## The same test for a link added after the prune (a drop or a jump up): `func(a: Vector3, b: Vector3) -> bool`.
 static func edge_test(space: PhysicsDirectSpaceState3D, mask: int) -> Callable:
 	var pruner := new()
-	pruner._setup(space, mask)
+	pruner._setup(space, mask, MARGIN)
 	# A lambda holds the pruner; a bound method would leave the Callable dangling once this returns.
-	return func(a: Vector3, b: Vector3) -> bool: return pruner._edge_blocked(a, b)
+	return func(a: Vector3, b: Vector3) -> bool:
+		return DotNpcNavPrune.level_change_blocked(pruner._edge_blocked, pruner._point_blocked, a, b, CLIMB)
 
 
-func _setup(space: PhysicsDirectSpaceState3D, mask: int) -> void:
+func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float) -> void:
 	_space = space
 	var shape := CapsuleShape3D.new()
-	shape.radius = RADIUS + MARGIN
+	shape.radius = RADIUS + margin
 	shape.height = HEIGHT - LIFT
 	_query.shape = shape
 	_query.collision_mask = mask
