@@ -46,6 +46,8 @@ tools/               soak.tscn (bot soak, docs/soak.md), idle_probe (`-- --map=M
                      verify_ui.sh trader|crouch|loot|nav (real key and mouse events through the real client under xvfb, frames in screenshots/verify_*; nav wants --zz-nav-cache=false --zz-nav-threads=0 --zz-nav-budget-ms=0.5 to be slow enough to see)
 ```
 
+Publishing: `tools/publish.sh [--version V | --bump patch] [--site URL --token-file F]` wraps dot-cloud `publish_pack.sh` for the pack id `game-zombie-zone` (world/ and maps/ are their own packs; `licence.json` lists the third-party art, update it when art is added).
+
 ## Rules
 
 **The split and the wire** ([design](docs/design.md#decision-1-the-zombies-are-the-servers-and-a-client-draws-them))

@@ -1,0 +1,183 @@
+[
+  {
+    "paths": [
+      ""
+    ],
+    "licence": "MIT",
+    "author": "TMC",
+    "url": "https://github.com/zees-games/game-zombie-zone",
+    "title": "game-zombie-zone (original content, including the worker gear, turret and kitbashed guns; bundled addons carry their own licences in their repositories)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_basic.glb",
+      "assets/zombies/zombie_chubby.glb",
+      "assets/zombies/zombie_lis.glb",
+      "assets/zombies/zombie_matt.glb",
+      "assets/zombies/zombie_sam.glb",
+      "assets/zombies/zombie_shaun.glb",
+      "assets/zombies/zombie_arm.glb",
+      "assets/zombies/atlas_"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Quaternius",
+    "url": "https://quaternius.com/packs/zombieapocalypsekit.html",
+    "title": "Zombie Apocalypse Kit (modified)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_city.glb",
+      "assets/zombies/city_"
+    ],
+    "licence": "CC0-1.0",
+    "author": "OpenGameArt contributor (Male City Zombie)",
+    "url": "https://opengameart.org/node/111870",
+    "title": "Male City Zombie (decimated, re-baked, re-rigged)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_gent.glb",
+      "assets/zombies/zombie_cop.glb",
+      "assets/zombies/zombie_punk.glb",
+      "assets/zombies/zombie_convict.glb",
+      "assets/zombies/gent_",
+      "assets/zombies/cop_",
+      "assets/zombies/punk_",
+      "assets/zombies/convict_"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "LasquetiSpice",
+    "url": "https://sketchfab.com/3d-models/animated-zombie-characters-walking-dead-loop-8088449c35634de18cbf531c58544f26",
+    "title": "Animated Zombie Characters Walking Dead loop (modified)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_hazmat.glb",
+      "assets/zombies/hazmat_"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "LxNazarov",
+    "url": "https://sketchfab.com/3d-models/zombie-hazmat-49b3b4307f6a4d2386fdb02354158d04",
+    "title": "Zombie Hazmat (modified)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_walker.glb",
+      "assets/zombies/walker_"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "OSCAR CREATIVO",
+    "url": "https://sketchfab.com/3d-models/zombie-walk-test-165fd9342c364216bfdd8c2f1102223c",
+    "title": "Zombie Walk Test (modified)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_mutant.glb",
+      "assets/zombies/mutant_clips.tres"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "Zeldrix",
+    "url": "https://sketchfab.com/3d-models/buff-mutant-20-8933f1f4a728486e8bcbe09714b842be",
+    "title": "Buff Mutant 2.0 (re-rigged, split)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_oil_monster"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "lealeelu",
+    "url": "https://sketchfab.com/3d-models/scary-lovcraftian-toothy-oil-monster-7b89564025b94fceb3153668f538f8f5",
+    "title": "Scary, Lovcraftian, Toothy, Oil-monster (modified; teeth by mStuff, CC0, https://blendswap.com/blend/12455)"
+  },
+  {
+    "paths": [
+      "assets/defib/"
+    ],
+    "licence": "CC-BY-4.0",
+    "author": "yellowbeebee",
+    "url": "https://sketchfab.com/3d-models/defibrillator-low-poly-54d46d07faab45778b10304fbc9debc3",
+    "title": "Defibrillator (Low Poly) (scaled, re-pivoted)"
+  },
+  {
+    "paths": [
+      "assets/low-poly-guns/"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Quaternius",
+    "url": "https://opengameart.org/content/low-poly-guns-pack",
+    "title": "Ultimate Low Poly Guns Pack (parts kitbashed)"
+  },
+  {
+    "paths": [
+      "assets/arms/arms-rigged.glb"
+    ],
+    "licence": "CC0-1.0",
+    "author": "para",
+    "url": "https://opengameart.org/content/fps-arms-rigged-only",
+    "title": "fps arms (rigged only), modified"
+  },
+  {
+    "paths": [
+      "assets/kenney/",
+      "assets/arms/character-a",
+      "assets/arms/Textures",
+      "assets/blaster-kit/",
+      "assets/ammo/",
+      "assets/melee/",
+      "assets/props/",
+      "sounds/LICENSE-kenney.txt"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Kenney",
+    "url": "https://kenney.nl",
+    "title": "Kenney kits (Car, Retro Urban, City Roads, Survival, Graveyard, Nature, Furniture, Mini Market, Blocky Characters, Blaster, Weapon Pack, Prototype Textures)"
+  },
+  {
+    "paths": [
+      "assets/surfaces/",
+      "assets/surfaces_soft/"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Lennart Demes and contributors (ambientCG)",
+    "url": "https://ambientcg.com",
+    "title": "ambientCG photographic materials (Concrete047A, Concrete034, PaintedPlaster017, Bricks097, Tiles107, Tiles074, WoodFloor041, Planks039, Asphalt012, Metal063, CorrugatedSteel009, Grass004, Ground037)"
+  },
+  {
+    "paths": [
+      "assets/sky/"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Greg Zaal (Poly Haven)",
+    "url": "https://polyhaven.com",
+    "title": "Sky panoramas (kloofendal clear, partly cloudy, overcast; qwantani dusk)"
+  },
+  {
+    "paths": [
+      "sounds/real/hurt_1"
+    ],
+    "licence": "CC-BY-3.0",
+    "author": "Vinrax",
+    "url": "https://opengameart.org/content/zombie-pain",
+    "title": "Zombie Pain"
+  },
+  {
+    "paths": [
+      "sounds/real/",
+      "sounds/"
+    ],
+    "licence": "CC0-1.0",
+    "author": "Kenney, Darsycho, ianzazz and the OpenGameArt and Freesound authors listed in sounds/CREDITS.md and sounds/real/CREDITS.md",
+    "url": "https://opengameart.org/content/zombie-moans",
+    "title": "Zombie, special and gore sounds and music (every file listed with URL and author in sounds/CREDITS.md and sounds/real/CREDITS.md)"
+  },
+  {
+    "paths": [
+      "assets/zombies/atlas_worker",
+      "assets/zombies/zombie_worker.glb"
+    ],
+    "licence": "MIT",
+    "author": "TMC",
+    "url": "https://github.com/zees-games/game-zombie-zone",
+    "title": "Construction-worker zombie gear (modelled here on the Quaternius rig)"
+  }
+]
