@@ -39,9 +39,9 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 55
+const SECTIONS := 56
 
-const CHECKS := 429
+const CHECKS := 435
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -126,6 +126,7 @@ func _run() -> void:
 	await _test_solid_props_from_document()
 	await _test_common_speed()
 	await _test_the_flashlight()
+	await _test_spectate_tap()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -2869,6 +2870,58 @@ func _test_the_client_platform() -> void:
 	remove_child(client)
 	client.free()
 	await get_tree().process_frame
+	_finished()
+
+
+func _test_spectate_tap() -> void:
+	_section("out, one tap or left click steps once, whether or not the engine emulates the mouse")
+	var game := await _world()
+	var a := game.add_player(&"u1", "Ada")
+	var others: Array[StringName] = []
+	for n in 3:
+		others.append(game.add_player(StringName("v%d" % n), "V%d" % n).player_id)
+	var id := a.player_id
+	a.watching = true
+	game.spectate.on_died(id, others[0], false, Vector3(0, 2, 0), 0.0, 0)
+	game.spectate.manager.set_mode(String(id), DotSpectatorView.Mode.CHASE)
+	var client := ZzClient.new()
+	client.game = game
+	client._adopt(a)
+	_check(client.is_spectating(), "the client is out and spectating")
+
+	# Three live targets, so a double step lands on a different one from a single step.
+	var start: Variant = game.spectate.watching(id)
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	client._unhandled_input(touch)
+	var after_touch: Variant = game.spectate.watching(id)
+	_check(after_touch != start, "a real touch steps to the next target", "%s -> %s of %s" % [start, after_touch, game.spectate.manager.targets_for(String(id))])
+
+	var emulated := InputEventMouseButton.new()
+	emulated.button_index = MOUSE_BUTTON_LEFT
+	emulated.pressed = true
+	emulated.device = InputEvent.DEVICE_ID_EMULATION
+	client._unhandled_input(emulated)
+	_check(game.spectate.watching(id) == after_touch, "the mouse press the engine emulates from it steps nothing more")
+
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	client._unhandled_input(click)
+	var after_click: Variant = game.spectate.watching(id)
+	_check(after_click != after_touch and after_click != start, "a real left click steps once", "%s %s %s" % [start, after_touch, after_click])
+
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	client._unhandled_input(release)
+	_check(game.spectate.watching(id) == after_click, "and a release steps nothing")
+
+	var right := InputEventMouseButton.new()
+	right.button_index = MOUSE_BUTTON_RIGHT
+	right.pressed = true
+	client._unhandled_input(right)
+	_check(game.spectate.watching(id) == after_touch, "the right button still steps back")
+	client.free()
 	_finished()
 
 
