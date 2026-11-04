@@ -338,6 +338,8 @@ var _climb: float = 0.0
 ## The body's ground velocity, smoothed like [member _speed], and the rate the clip last played at.
 var _velocity := Vector3.ZERO
 var _rate := 1.0
+var _want_clip: StringName = &"idle"
+var _want_rate := 1.0
 ## Each foot planted on the floor through the shamble ([method _plant_feet]).
 var _plant := DotFootPlant.new()
 ## Per side: [upper, lower, ankle in the lower bone's frame, rest ankle, leg length], skeleton space.

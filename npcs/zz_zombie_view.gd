@@ -410,7 +410,59 @@ func present(delta: float, anim: int, flags: int) -> void:
 
 	_frame += 1
 	var at := global_position
+	_track_motion(at, delta)
 
+	if anim == ZzZombieBody.Anim.DEAD and _death.is_empty():
+		die(&"limp", Vector3.ZERO, variant)
+
+	var striking := anim == ZzZombieBody.Anim.ATTACK or anim == ZzZombieBody.Anim.STRIKE_DOWN
+	var prior := _strike_phase
+	_pick_base_clip(anim)
+	_advance_strike(striking, delta)
+
+	var overrides: Dictionary = _look.get("clips", {})
+	_want_clip = overrides.get(_want_clip, _want_clip)
+
+	# No legs: it drags itself on its arms and leaves a trail.
+	if _legs_gone >= 2 and anim != ZzZombieBody.Anim.DEAD and (_want_clip == &"walk" or _want_clip == &"run" or _want_clip == &"run_arms" or _want_clip == &"idle"):
+		_want_clip = &"crawl"
+		_trail(at)
+
+	# A new swing starts its clip over, so the swing's frames follow the brain's swing.
+	if striking and _strike_phase < prior and _anim != null and _anim.has_animation(_qualified(_want_clip)):
+		_clip = &""
+
+	_pace_to_ground()
+	_shamble = move_toward(_shamble, 1.0 if _want_clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
+	_swap_for_real_clip(anim, striking, overrides)
+	_pick_reaction_clip(delta, anim, striking)
+	_prior_anim = anim
+
+	var clip := _want_clip
+	var rate := _want_rate
+	_rate = rate
+	_play(clip, rate)
+
+	var every := _lod_every(at)
+	_owed += delta
+	_flinch = maxf(_flinch - delta * 4.0, 0.0)
+
+	# The bones are written only on a frame the clip was evaluated: the overrides go on top of
+	# the clip's pose, so writing them again over last frame's result would stack them.
+	if (_frame + (variant & 3)) % every == 0:
+		_advance_clip(clip, rate)
+		_owed = 0.0
+		_pose(anim)
+
+	_draw_flags(flags)
+
+	if anim == ZzZombieBody.Anim.DEAD:
+		_dead_for = maxf(_dead_for, 0.0) + delta
+		_present_death(delta)
+
+
+## Speed, velocity and climb rate of the body, smoothed, from where it stood last frame.
+func _track_motion(at: Vector3, delta: float) -> void:
 	if _last_at != Vector3.INF and delta > 0.0:
 		var moved := Vector2(at.x - _last_at.x, at.z - _last_at.z).length() / delta
 		_speed = lerpf(_speed, moved, clampf(delta * 8.0, 0.0, 1.0))
@@ -419,18 +471,18 @@ func present(delta: float, anim: int, flags: int) -> void:
 	_last_at = at
 	_last_y = at.y
 
-	if anim == ZzZombieBody.Anim.DEAD and _death.is_empty():
-		die(&"limp", Vector3.ZERO, variant)
 
+## The clip and rate the brain's state asks for, adjusted by how the body really moves.
+func _pick_base_clip(anim: int) -> void:
 	var wanted: Array = CLIPS.get(anim, CLIPS[ZzZombieBody.Anim.IDLE])
-	var clip: StringName = wanted[0]
-	var rate := float(wanted[1])
+	_want_clip = wanted[0]
+	_want_rate = float(wanted[1])
 	var moving := false
 
 	# A moving zombie whose state says idle (a mirror between states) walks rather than slides.
 	if (anim == ZzZombieBody.Anim.IDLE or anim == ZzZombieBody.Anim.RAGE) and _speed > 0.6:
-		clip = &"walk"
-		rate = 1.0
+		_want_clip = &"walk"
+		_want_rate = 1.0
 		moving = true
 
 	# Walking, shambling and running are told apart by how fast the body really moves, not by the
@@ -439,49 +491,41 @@ func present(delta: float, anim: int, flags: int) -> void:
 	if moving or anim == ZzZombieBody.Anim.WALK or anim == ZzZombieBody.Anim.RUN or anim == ZzZombieBody.Anim.SHAMBLE:
 		if _speed > 0.2:
 			_gait = gait_for(_speed, _gait, _look.get("gait", {}))
-			clip = &"walk" if _gait == GAIT_SHAMBLE else &"run_arms"
+			_want_clip = &"walk" if _gait == GAIT_SHAMBLE else &"run_arms"
 		elif anim == ZzZombieBody.Anim.RUN:
-			clip = &"walk"
+			_want_clip = &"walk"
 			_gait = GAIT_SHAMBLE
 
 	# Off the ground and going up or falling fast: a climb, a leap, a drop from a ledge.
 	if anim != ZzZombieBody.Anim.DEAD and anim != ZzZombieBody.Anim.LEAP and absf(_climb) > 2.5:
-		clip = &"jump_idle"
+		_want_clip = &"jump_idle"
 
 	# A common lunging while it runs swings on the move.
 	if anim == ZzZombieBody.Anim.ATTACK and _speed > 1.5:
-		clip = &"attack_run"
+		_want_clip = &"attack_run"
 	elif anim == ZzZombieBody.Anim.ATTACK and kind == &"common" and (variant & 8) != 0:
-		clip = &"attack_idle"
+		_want_clip = &"attack_idle"
 
-	var striking := anim == ZzZombieBody.Anim.ATTACK or anim == ZzZombieBody.Anim.STRIKE_DOWN
-	var prior := _strike_phase
 
+## Runs the swing's clock while striking and gives each body its own tempo.
+func _advance_strike(striking: bool, delta: float) -> void:
 	if striking:
 		_strike_t += delta
 		_strike_phase = fposmod(_strike_t / SWING_PERIOD, 1.0)
 		# Attack variety: a body's own tempo, so a crowd does not swing in step.
-		rate *= 0.9 + 0.1 * float(variant & 7) / 3.5
+		_want_rate *= 0.9 + 0.1 * float(variant & 7) / 3.5
 	else:
 		_strike_t = 0.0
 		_strike_phase = 0.0
 
-	var overrides: Dictionary = _look.get("clips", {})
-	clip = overrides.get(clip, clip)
 
-	# No legs: it drags itself on its arms and leaves a trail.
-	if _legs_gone >= 2 and anim != ZzZombieBody.Anim.DEAD and (clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"idle"):
-		clip = &"crawl"
-		_trail(at)
-
-	# A new swing starts its clip over, so the swing's frames follow the brain's swing.
-	if striking and _strike_phase < prior and _anim != null and _anim.has_animation(_qualified(clip)):
-		_clip = &""
-
+## Sets the playback rate of a walk or run from the ground speed, so a planted foot stands still.
+func _pace_to_ground() -> void:
+	var clip := _want_clip
 	if clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"crawl":
 		var natural := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}[clip] as float
 		natural *= float(_look["height"]) / 1.75
-		if _speed > 0.2 and rate > 0.0:
+		if _speed > 0.2 and _want_rate > 0.0:
 			if clip == &"walk" and _gait == GAIT_SHAMBLE:
 				var sh := shamble_numbers(_look)
 				# A planted foot must stand still on the ground, so stride times rate equals the ground speed:
@@ -491,58 +535,59 @@ func present(delta: float, anim: int, flags: int) -> void:
 				# The real walk reads small below a 0.6 stride, so it takes a lower floor and a lower rate cap.
 				var cap := float(sh["cadence"]) * (1.3 if real else (1.6 if kind == &"common" else 1.0))
 				_stride = 1.0 if real else clampf(_speed / (natural * cap), float(sh["swing"]), 1.0)
-				rate = clampf(_speed / (natural * _stride), 0.35, cap)
+				_want_rate = clampf(_speed / (natural * _stride), 0.35, cap)
 			else:
-				rate = clampf(_speed / natural, 0.7, 1.8)
+				_want_rate = clampf(_speed / natural, 0.7, 1.8)
 
-	_shamble = move_toward(_shamble, 1.0 if clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
 
+## Swaps a generic clip for the real animation-library one when the body has it.
+func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> void:
 	# Each common keeps its own tempo (plus or minus 15%) so a crowd does not step together.
 	_ual = false
 
-	if UAL_FOR.has(clip) and _has(UAL_FOR[clip]):
-		clip = UAL_FOR[clip]
-		rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
+	if UAL_FOR.has(_want_clip) and _has(UAL_FOR[_want_clip]):
+		_want_clip = UAL_FOR[_want_clip]
+		_want_rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
 		_ual = true
 
-		if striking and clip == &"ual_zombie_scratch":
+		if striking and _want_clip == &"ual_zombie_scratch":
 			# The free scratch clip is 1.8 s: played at this rate one swing is one whole windup, strike and recovery.
-			rate = 1.8 / SWING_PERIOD
+			_want_rate = 1.8 / SWING_PERIOD
 
 		# A slow run is the jog: the sprint clip's stride at 3 m/s is a skid.
-		if clip == &"ual_sprint" and _speed > 0.2 and _speed < JOG_BELOW and _has(&"ual_jog"):
-			clip = &"ual_jog"
-			rate = clampf(_speed / (JOG_NATURAL * float(_look["height"]) / 1.75), 0.7, 1.5)
+		if _want_clip == &"ual_sprint" and _speed > 0.2 and _speed < JOG_BELOW and _has(&"ual_jog"):
+			_want_clip = &"ual_jog"
+			_want_rate = clampf(_speed / (JOG_NATURAL * float(_look["height"]) / 1.75), 0.7, 1.5)
 
 	# A stalking crouch (not a crawler's or a leaper's, which crawl all the time) is the real squat walk.
-	if anim == ZzZombieBody.Anim.CROUCH and clip == &"crawl" and overrides.get(&"walk", &"") != &"crawl" and _has(&"ual_crouch_walk"):
-		clip = &"ual_crouch_walk"
-		rate = clampf(_speed / (CROUCH_NATURAL * float(_look["height"]) / 1.75), 0.5, 1.6) if _speed > 0.2 else 1.0
+	if anim == ZzZombieBody.Anim.CROUCH and _want_clip == &"crawl" and overrides.get(&"walk", &"") != &"crawl" and _has(&"ual_crouch_walk"):
+		_want_clip = &"ual_crouch_walk"
+		_want_rate = clampf(_speed / (CROUCH_NATURAL * float(_look["height"]) / 1.75), 0.5, 1.6) if _speed > 0.2 else 1.0
 
+
+## A bullet's flinch and a rise from the ground take over the clip for a moment.
+func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	_rise_left = maxf(_rise_left - delta, 0.0)
 
 	# A bullet's flinch on a standing body is a short hit clip.
 	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
 			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
-		clip = &"ual_hit_head" if _hit_head else &"ual_hit_chest"
-		rate = 1.0
+		_want_clip = &"ual_hit_head" if _hit_head else &"ual_hit_chest"
+		_want_rate = 1.0
 
 	# Getting up from sitting, feeding or lying: the lay-to-idle clip, if it stands still while it plays.
 	if _rise_left > 0.0 and _speed < 0.6 and _has(&"ual_lay_to_idle") and not striking and anim != ZzZombieBody.Anim.DEAD:
-		clip = &"ual_lay_to_idle"
-		rate = 1.0
+		_want_clip = &"ual_lay_to_idle"
+		_want_rate = 1.0
 
 	if (_prior_anim == ZzZombieBody.Anim.SIT or _prior_anim == ZzZombieBody.Anim.FEED or _prior_anim == ZzZombieBody.Anim.CRY) \
 			and anim != _prior_anim and _has(&"ual_lay_to_idle"):
 		_rise_left = _anim.get_animation(_qualified(&"ual_lay_to_idle")).length
 
-	_prior_anim = anim
 
-	_rate = rate
-	_play(clip, rate)
-
-	# Level of detail: how often this one is advanced, by where it is from the camera.
+## Level of detail: how often this one is advanced, by where it is from the camera.
+func _lod_every(at: Vector3) -> int:
 	var every := 1
 
 	if _death.is_empty():
@@ -557,32 +602,23 @@ func present(delta: float, anim: int, flags: int) -> void:
 				_shadowed = shadowed
 				_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadowed \
 						else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return every
 
-	_owed += delta
-	_flinch = maxf(_flinch - delta * 4.0, 0.0)
 
-	# The bones are written only on a frame the clip was evaluated: the overrides go on top of
-	# the clip's pose, so writing them again over last frame's result would stack them.
-	if (_frame + (variant & 3)) % every == 0:
-		if _anim != null and _anim.has_animation(_qualified(clip)):
-			var length := _anim.current_animation_length
-			var looping := LOOPING.has(clip)
+## Steps the clip by the time owed, holding a one-shot clip's last frame.
+func _advance_clip(clip: StringName, rate: float) -> void:
+	if _anim == null or not _anim.has_animation(_qualified(clip)):
+		return
 
-			if not looping and _anim.current_animation_position + _owed * rate >= length - 0.01:
-				# A one-shot clip holds its last frame; evaluated there rather than stepped past
-				# the end, where the player stops and nothing writes the pose again.
-				_anim.seek(maxf(length - 0.01, 0.0), true)
-			else:
-				_anim.advance(_owed * rate)
+	var length := _anim.current_animation_length
+	var looping := LOOPING.has(clip)
 
-		_owed = 0.0
-		_pose(anim)
-
-	_draw_flags(flags)
-
-	if anim == ZzZombieBody.Anim.DEAD:
-		_dead_for = maxf(_dead_for, 0.0) + delta
-		_present_death(delta)
+	if not looping and _anim.current_animation_position + _owed * rate >= length - 0.01:
+		# A one-shot clip holds its last frame; evaluated there rather than stepped past
+		# the end, where the player stops and nothing writes the pose again.
+		_anim.seek(maxf(length - 0.01, 0.0), true)
+	else:
+		_anim.advance(_owed * rate)
 
 
 ## True when this body has the real clip [param clip] (the file is missing or the body is a capsule otherwise).
