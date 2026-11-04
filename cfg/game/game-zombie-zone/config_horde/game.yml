@@ -56,6 +56,8 @@
 # body_stride_far: 45.0
 # Metres past which a zombie in the open moves by three rays instead of a capsule sweep, which costs a tenth;... [0.0..500.0]
 # body_cheap_from: 12.0
+# Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at ... [0..256]
+# bot_max: 0
 # A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many ticks (st... [1..16]
 # bot_weapon_idle_every: 1
 # A stand-in standing still (grounded, no velocity, nothing pressed, every motor timer at rest) runs its moto... [1..16]

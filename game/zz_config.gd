@@ -293,6 +293,10 @@ func setup_seconds() -> float:
 ## costs a tenth; any wall ahead or a missing floor still sweeps. 0 always sweeps.
 @export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
 
+## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
+## team on a small box is people plus this many. `zz_bot_max`.
+@export_range(0, 256, 1) var bot_max: int = 0
+
 ## A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many
 ## ticks (staggered per stand-in). 1 ticks every tick; the idle path is cheap since dot-weapon 0.1.39.
 ## `zz_bot_weapon_idle_every`.

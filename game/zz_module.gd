@@ -1021,6 +1021,9 @@ func _keep_the_round_full() -> void:
 			wanted = DotBotQuota.compute(DotBotQuota.Mode.FILL, world.team_size(), humans, slots,
 				_quota.empty_cvar == null or _quota.empty_cvar.get_bool())
 
+	if world.config.bot_max > 0:
+		wanted = mini(wanted, world.config.bot_max)
+
 	for _i in range(maxi(wanted - _bot_ids.size(), 0)):
 		var bot: ZzPlayer = bridge.call("add_bot", _bot_name(world))
 
