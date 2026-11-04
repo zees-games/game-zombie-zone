@@ -625,6 +625,8 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.retries = clampi(int(value), 0, 20))
 	_tunable("zz_commons", float(config.commons_base), "Commons alive at once for one survivor",
 		func(value: float) -> void: config.commons_base = clampi(int(value), 0, 400))
+	_tunable("zz_commons_far_divisor", float(config.commons_far_divisor), "Past sixteen survivors each adds 1 over this of the per-survivor share",
+		func(value: float) -> void: config.commons_far_divisor = clampi(int(value), 1, 60))
 	_tunable("zz_commons_per_survivor", float(config.commons_per_survivor), "And for each survivor more",
 		func(value: float) -> void: config.commons_per_survivor = clampi(int(value), 0, 50))
 	_tunable("zz_wanderers", config.wanderer_density, "Commons standing about a map, per 100 square metres",
@@ -1688,6 +1690,7 @@ const HAND_FIELDS := {
 	"zz_survival_warmup": "survival_warmup_seconds", "zz_trader": "trader_enabled",
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
+	"zz_commons_far_divisor": "commons_far_divisor",
 }
 
 ## The admin web page and F9 panel over the config; HTTP only with `workbench.enabled` in cfg/server.yml.

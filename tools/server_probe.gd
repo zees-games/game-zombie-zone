@@ -442,14 +442,14 @@ func _one_tick(tick: int) -> void:
 			_lod = DotGameNpcLod.attach(self, console, sp)
 		if _lod != null:
 			_lod.follow(delta)
-		sp._perceive()
+		sp._perception.perceive()
 		at = _add("senses", at)
 		if _detail:
 			_think_detail(sp, delta)
 		else:
 			sp._think(delta)
 		at = _add("brains", at)
-		sp._reclaim()
+		sp._perception.reclaim()
 		var speed: float = h.zombie_speed_scale * h.wave_speed_scale
 		at = _add("horde_other", at)
 		for npc: DotNpcInstance in sp.all_npcs():

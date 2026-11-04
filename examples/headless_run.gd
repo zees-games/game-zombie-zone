@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 428
+const CHECKS := 429
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -149,6 +149,8 @@ func _test_config() -> void:
 	config.difficulty = 1
 	_check(config.commons_cap(4) == config.commons_base + 3 * config.commons_per_survivor and config.commons_cap(1) == config.commons_base,
 		"the crowd grows with the team")
+	_check(config.commons_cap(16) == 82 and config.commons_cap(64) < config.commons_cap(16) + 40 and config.commons_cap(100) > config.commons_cap(64),
+		"past sixteen survivors the crowd grows slower, and still grows", "%d, %d, %d" % [config.commons_cap(16), config.commons_cap(64), config.commons_cap(100)])
 	var settings := ZzConfig.new()
 	_check(is_equal_approx(settings.box_deploy_seconds, 1.0), "a box deploys in a second by default (was 3.5)", str(settings.box_deploy_seconds))
 	_check(not settings.box_labels, "boxes do not say what they are by default: the contents are a surprise")

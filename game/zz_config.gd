@@ -519,6 +519,8 @@ func setup_seconds() -> float:
 @export_range(0, 50, 1) var commons_per_survivor: int = 6
 ## Most commons alive at once whatever the survivor count; 0 leaves [method commons_cap] uncapped.
 @export_range(0, 2000, 1) var commons_max: int = 0
+## Past sixteen survivors each adds 1 over this of [member commons_per_survivor]: the team, not the horde, sets the server tick there, and a big team is spread over a big map. `zz_commons_far_divisor`.
+@export_range(1, 60, 1) var commons_far_divisor: int = 9
 
 ## Commons standing about a map at its start, per hundred square metres of walkable floor.
 @export_range(0.0, 10.0, 0.05) var wanderer_density: float = 0.55
@@ -896,14 +898,15 @@ func friendly_fire_scale() -> float:
 
 
 ## Commons alive at once, for [param survivors]: [member commons_per_survivor] more for each of
-## the first eight, a third of that for each past them. A dozen survivors meet 74 at once and
-## sixteen 82, which is what a server's 64 Hz tick carries at wave 10 with the stand-ins (half
-## past eight, 78 and 90, measured 16 and 18 ms a tick at the cap; see docs/survival.md); a
-## wave's total is not capped, only how many are up at once.
+## the first eight, a third of that up to sixteen (82, what a 64 Hz tick carries at wave 10 with
+## the stand-ins), and 1 over [member commons_far_divisor] of it for each past sixteen. A wave's
+## total is not capped, only how many are up at once.
 func commons_cap(survivors: int) -> int:
 	var first := mini(maxi(survivors - 1, 0), 7)
-	var past := maxi(survivors - 8, 0)
-	var cap := commons_base + commons_per_survivor * first + (commons_per_survivor * past) / 3
+	var mid := clampi(survivors - 8, 0, 8)
+	var past := maxi(survivors - 16, 0)
+	var cap := commons_base + commons_per_survivor * first + (commons_per_survivor * mid) / 3 \
+		+ (commons_per_survivor * past) / maxi(commons_far_divisor, 1)
 	return mini(cap, commons_max) if commons_max > 0 else cap
 
 

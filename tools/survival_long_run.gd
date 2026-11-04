@@ -442,11 +442,11 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	var sp: DotNpcSpawner = h.spawner
 	sp._now += delta
 	sp._ticks += 1
-	sp._perceive()
+	sp._perception.perceive()
 	at = _part("h.senses", at)
 	sp._think(delta)
 	at = _part("h.brains", at)
-	sp._reclaim()
+	sp._perception.reclaim()
 	at = _part("h.reclaim", at)
 	var speed: float = h.zombie_speed_scale * h.wave_speed_scale
 	for npc: DotNpcInstance in h.spawner.all_npcs():
