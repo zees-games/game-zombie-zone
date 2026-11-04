@@ -1,9 +1,8 @@
 extends "zz_zombie_view.gd"
 
-## The mutant as drawn: its own rigid-skinned model with idle, walk, run, attack, hit and death
-## clips (`assets/zombies/mutant_clips.tres`, `tools/build_mutant_clips.gd`); the jetpack and gun
-## moves are posed by code. A jetpack exhaust and sparks and smoke show where a part is shot off. It keeps the zombie view's seams
-## (build, present, flinch, die, the limb cuts) so the world view and the limbs treat it alike.
+## The mutant as drawn: its own rigid-skinned model with idle, walk, run, attack, hit and death clips
+## (`assets/zombies/mutant_clips.tres`); jetpack and gun moves are posed by code, with exhaust and sparks where a part is shot off.
+## It keeps the zombie view's seams (build, present, flinch, die, the limb cuts) so the world view treats it alike.
 
 const MODEL := "res://assets/zombies/zombie_mutant.glb"
 const MUTANT_CREDITS := "Buff Mutant 2.0 by Zeldrix (CC-BY 4.0), modified"

@@ -1,12 +1,7 @@
 extends Node
-## Fixed-seed, physics-free-of-randomness check of the zombie nav around known snag spots: every nav edge
-## near a spot is swept with a zombie-sized capsule against the world; an edge the body cannot walk is a snag.
-##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [map x,y,z]
-## --survival: every survival map, SURVEY_SPOTS evenly spaced nav points each.
-## --reach (with --survival): from every survivor spawn to every post (stand-in filter: stairs walked) and from every
-## zombie spawn to every post and survivor spawn (zombie filter: drops down only) a full path must exist; prints the
-## unreachable pairs and, per endpoint group, off-graph versus islanded counts. Exits 1 on any.
-## Prints blocked edges per spot; exits 1 when any is blocked. No zombie, no timing: the same numbers every run.
+## Fixed-seed check of the zombie nav around known snag spots: each nearby edge is swept with a capsule; a blocked one is a snag.
+##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [--reach] [map x,y,z]
+## --reach: every spawn to every post must have a full path (stand-in and zombie filters); exits 1 on any unreachable pair or blocked edge.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")

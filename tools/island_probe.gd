@@ -1,7 +1,6 @@
 extends Node
-## Why each nav piece holding a spawn or post is apart from the main one: built raw versus pruned, the raw
-## edges the prune cut on the way to the main piece, the first physics hit along each at both body radii,
-## and for a level change the hit on each leg of a drop at either end. Pair with spot_probe --reach.
+## Why each nav piece holding a spawn or post is apart from the main one: raw versus pruned edges, the first
+## physics hit along each at both body radii, and the hit on each leg of a drop. Pair with spot_probe --reach.
 ##   godot --headless --path . res://tools/island_probe.tscn -- --maps=a,b
 
 const ZzConfig := preload("../game/zz_config.gd")

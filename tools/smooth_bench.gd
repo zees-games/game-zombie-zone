@@ -1,6 +1,5 @@
 extends Node
-## Frame-time cost of straight_width_ratio for a horde: HORDE zombies each plan a path to a shared survivor
-## spot, then repath after the survivor moved. Prints find_path alone, then plan + smooth_path for each ratio,
+## Frame-time cost of straight_width_ratio for a horde: find_path alone, then plan + smooth_path per ratio,
 ## cold (memo off) and warm (memo on, as in play).
 ##   godot --headless --path . res://tools/smooth_bench.tscn -- --maps=a,b [--horde=120]
 

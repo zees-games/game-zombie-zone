@@ -1,14 +1,8 @@
 extends SceneTree
 
 ## Frame strips of a common walking past a side-on camera at set speeds, through the real view.
-## [codeblock]
-## xvfb-run -a godot --path . --script tools/gait_strip.gd -- --speeds=1.1,2.2,6.3 --out=res://screenshots/gait.png
-## [/codeblock]
-## One row per speed, one column per 0.2 s of walking, so a run cycle played slow or a shamble
-## that is not one shows at a glance. `--variant=N` picks the body, `--kind=` the kind,
-## `--anim=ATTACK|STRIKE_DOWN|PIN|LEAP|TONGUE|GRAB` shows that pose instead (use `--speeds=0`).
-## `--hit=head|chest` flinches once at the start, `--rise` sits first and then plays `--anim`.
-## The cell grows with the kind's height, so a brute is not cropped.
+## `godot --path . --script tools/gait_strip.gd -- --speeds=1.1,2.2,6.3 --out=res://screenshots/gait.png`: one row per speed,
+## one column per 0.2 s. `--variant=N`, `--kind=`, `--anim=ATTACK|...` (with `--speeds=0`), `--hit=head|chest`, `--rise`.
 
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
