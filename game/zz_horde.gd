@@ -1034,11 +1034,24 @@ func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 		(brain.get(&"path") as DotNpcPath).clear()
 
 
-## A push volume's throw: [param velocity] (m/s) as a leap, unless it is already moving that way at least as fast.
+## Upward speed (m/s) past which a volume's throw lifts a zombie off the floor as a leap.
+const THROW_LIFT := 0.5
+
+
+## A push volume's throw: [param velocity] (m/s) as a shove along the floor, else a leap unless it is already moving that way
+## at least as fast.
 func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or not is_instance_valid(b) or b.anchored:
+		return
+
+	# Along the floor it is a shove on top of its own walk, so it slides off what it is pushed against: a leap
+	# drops the wish, and a volume pushing every step pinned a common to a wall for the whole round.
+	if not b.flying and b.is_on_floor() and absf(velocity.y) < THROW_LIFT:
+		var flat := Vector3(velocity.x, 0.0, velocity.z)
+		var way := flat.normalized()
+		b.push += way * maxf(0.0, flat.length() - b.push.dot(way))
 		return
 
 	var along := b.velocity.dot(velocity.normalized())
