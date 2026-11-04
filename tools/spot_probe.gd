@@ -3,6 +3,8 @@ extends Node
 ## near a spot is swept with a zombie-sized capsule against the world; an edge the body cannot walk is a snag.
 ##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [map x,y,z]
 ## --survival: every survival map, SURVEY_SPOTS evenly spaced nav points each.
+## --reach (with --survival): from every survivor spawn to every post and from every zombie spawn to every post and
+## survivor spawn, the zombies' own path query must find a full path; prints the unreachable pairs, exits 1 on any.
 ## Prints blocked edges per spot; exits 1 when any is blocked. No zombie, no timing: the same numbers every run.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -15,6 +17,8 @@ const STEP := 0.25
 const PAIRS := 60
 const NEAR := 10.0
 const SURVEY_SPOTS := 4
+## Snap radius the horde planner uses when it routes spawns to posts.
+const REACH_SNAP := 2.5
 const SPOTS := [
 	["zm_chaos_city", Vector3(-40.0, 0.0, -31.3)],
 	["ze_biohazard_manor", Vector3(-5.6, 1.8, 28.5)],
@@ -51,18 +55,21 @@ func _run() -> void:
 		for s: Array in spots:
 			(by_map.get_or_add(s[0], []) as Array).append(s[1])
 	for id: String in by_map:
-		var blocked := await _probe_map(id, by_map[id])
+		var blocked: PackedStringArray
+		if args.has("--reach"):
+			blocked = await _reach_map(id)
+		else:
+			blocked = await _probe_map(id, by_map[id])
 		for line: String in blocked:
 			print(line)
-			if line.contains(" blocked") and not line.ends_with(" 0 blocked"):
+			if (line.contains(" blocked") and not line.ends_with(" 0 blocked")) or (line.begins_with("MAP ") and line.contains(" unreachable") and not line.ends_with(" 0 unreachable")):
 				code = 1
 	if _verbose:
 		print("  done %d ms" % Time.get_ticks_msec())
 	get_tree().quit(code)
 
 
-func _probe_map(id: String, at: Array) -> PackedStringArray:
-	var t0 := Time.get_ticks_msec()
+func _boot(id: String) -> void:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -80,6 +87,11 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	for i in 10:
 		_game.simulate(0.05)
 		await get_tree().physics_frame
+
+
+func _probe_map(id: String, at: Array) -> PackedStringArray:
+	var t0 := Time.get_ticks_msec()
+	await _boot(id)
 	var t1 := Time.get_ticks_msec()
 	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
 	for a in OS.get_cmdline_user_args():
@@ -144,6 +156,61 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 		print("  freed %d ms" % (Time.get_ticks_msec() - t3))
 	await get_tree().process_frame
 	return out
+
+
+func _reach_map(id: String) -> PackedStringArray:
+	await _boot(id)
+	var out := PackedStringArray()
+	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
+	if graph == null or not graph.is_ready():
+		out.append("MAP %s: no nav graph, 1 unreachable" % id)
+		_free_game()
+		return out
+	var doc: Dictionary = _game.map_doc
+	var survivors: Array[Vector3] = []
+	for s: Variant in (doc.get("spawns", {}) as Dictionary).get("survivors", []):
+		survivors.append(_vec3(s["at"] if s is Dictionary else s))
+	var zombies: Array[Vector3] = []
+	for z: Variant in doc.get("zombie_spawns", []):
+		zombies.append(_vec3(z))
+	var posts: Array[Vector3] = []
+	for q: Variant in doc.get("posts", []):
+		posts.append(_vec3(q))
+	var saved_filter = graph.filter
+	graph.filter = null
+	var jobs: Array = []
+	for a in survivors:
+		for b in posts:
+			jobs.append(["survivor spawn", a, "post", b])
+	for a in zombies:
+		for b in posts:
+			jobs.append(["zombie spawn", a, "post", b])
+		for b in survivors:
+			jobs.append(["zombie spawn", a, "survivor spawn", b])
+	var bad := PackedStringArray()
+	for j: Array in jobs:
+		var path := graph.find_path(j[1], j[3], REACH_SNAP, false)
+		if path.size() < 2 or graph.last_partial:
+			bad.append("    %s %s -> %s %s unreachable" % [j[0], _f(j[1]), j[2], _f(j[3])])
+	graph.filter = saved_filter
+	out.append("%s: %d pairs (%d survivor spawns, %d zombie spawns, %d posts), %d unreachable" % [id, jobs.size(), survivors.size(), zombies.size(), posts.size(), bad.size()])
+	out.append_array(bad.slice(0, 12))
+	out.append("MAP %s: %d unreachable" % [id, bad.size()])
+	_free_game()
+	await get_tree().process_frame
+	return out
+
+
+func _free_game() -> void:
+	remove_child(_game)
+	_game.free()
+
+
+static func _vec3(v: Variant) -> Vector3:
+	if v is Vector3:
+		return v
+	var a: Array = v
+	return Vector3(float(a[0]), float(a[1]), float(a[2]))
 
 
 func _edge_hit(space: PhysicsDirectSpaceState3D, query: PhysicsShapeQueryParameters3D, a: Vector3, b: Vector3) -> Vector3:
