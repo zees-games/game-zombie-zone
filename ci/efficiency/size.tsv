@@ -86,10 +86,7 @@ game/zz_shop_menu.gd::_init	106
 game/zz_vote.gd::setup	84
 game/zz_world_view.gd	1176
 npcs/zz_common_brain.gd::_decide	81
-npcs/zz_mutant_view.gd::present	84
 npcs/zz_zombie_view.gd	1558
-npcs/zz_zombie_view.gd::_material_for	82
-npcs/zz_zombie_view.gd::present	109
 tools/bench.gd::_run	127
 tools/collide_probe.gd::probe	96
 tools/fall_probe.gd::_nav_check	113
@@ -99,7 +96,6 @@ tools/measure_props.gd::_initialize	124
 tools/nav_render.gd::_run	127
 tools/server_probe.gd::_one_tick	151
 tools/server_probe.gd::_run	208
-tools/shot.gd	1081
 tools/shot.gd::_ready	83
 tools/shot.gd::_run	492
 tools/soak.gd::_run	88
