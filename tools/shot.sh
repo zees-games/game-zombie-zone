@@ -71,5 +71,6 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
-exec xvfb-run -a -s "-screen 0 1280x720x24" "${GODOT:-godot}" --path . --resolution 1280x720 \
+res="${SHOT_RES:-1280x720}"
+exec xvfb-run -a -s "-screen 0 ${res}x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"

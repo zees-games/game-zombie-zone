@@ -1,5 +1,7 @@
 extends "zz_player_state.gd"
 
+const ZzTouch := preload("zz_touch.gd")
+
 func _ready() -> void:
 	controller = ZzController.new()
 	controller.name = "Controller"
@@ -15,7 +17,7 @@ func _ready() -> void:
 	controller.before_fn = _before_tick
 
 	if samples_input:
-		sampler = DotFpsSampler.new(controller.tunables)
+		sampler = ZzTouch.new_sampler(controller.tunables)
 		register_actions(sampler)
 
 
