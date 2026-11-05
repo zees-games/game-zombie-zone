@@ -10,6 +10,7 @@
 #   ./game.sh server check         start the server, load the game, stop; exit 0 if it worked
 #   ./game.sh server -- ARGS       ARGS go to dot-server-deploy's ./server (e.g. -- --port 7000)
 #   ./game.sh test                 parse every script, then run every test suite
+#   ./game.sh test SUITE -- ARGS   one suite; ARGS go to it as user args (headless_maps -- --map=ID)
 #   ./game.sh test NAME...         run only these suites (e.g. ./game.sh test headless_net)
 #   ./game.sh suites               list the test suites
 #   ./game.sh soak [MAP] [MIN]     bot soak on tools/soak.tscn (report in .godot/test-logs/soak-MAP.json)
@@ -132,7 +133,7 @@ run_suite() {
     mkdir -p .godot/test-logs
     log=".godot/test-logs/$scene.log"
     [ -t 1 ] && printf '  ..   %s' "$scene"
-    timeout "$TIMEOUT" "$GODOT" --headless --path . "res://examples/$scene.tscn" >"$log" 2>&1
+    timeout "$TIMEOUT" "$GODOT" --headless --path . "res://examples/$scene.tscn" ${SUITE_ARGS[@]:+-- "${SUITE_ARGS[@]}"} >"$log" 2>&1
     status=$?
     summary="$(grep -Eo '[0-9]+ (passed|checks), [0-9]+ failed' "$log" | tail -1)"
     # Section accounting: "N sections entered, M finished" from DotGameCheckSuite._report_sections.
@@ -252,11 +253,16 @@ do_test() {
     check_weapon_art || fails=$((fails + 1))
 
     echo "running the suites"
-    local scene
-    for scene in ${*:-$SUITES}; do
+    local scene suites=()
+    SUITE_ARGS=()
+    while [ $# -gt 0 ]; do
+        [ "$1" = "--" ] && { shift; SUITE_ARGS=("$@"); break; }
+        suites+=("$1"); shift
+    done
+    for scene in ${suites[*]:-$SUITES}; do
         run_suite "${scene%.tscn}" || fails=$((fails + 1))
     done
-    if [ $# -eq 0 ] && command -v xvfb-run >/dev/null 2>&1; then
+    if [ ${#suites[@]} -eq 0 ] && command -v xvfb-run >/dev/null 2>&1; then
         for scene in $UI_CHECKS; do
             run_ui_check "$scene" || fails=$((fails + 1))
         done

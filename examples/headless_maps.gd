@@ -38,6 +38,8 @@ const LAMP_CHECKS := 8
 ## that has run dot-bootstrap. Sections and checks are counted against this list.
 var _maps: Array = []
 var _worlds_read := 0
+## `-- --map=ID` (./game.sh test headless_maps -- --map=ID): that one map's sections and world only.
+var _only := ""
 
 ## A person's capsule, for "is this spawn clear".
 const RADIUS := 0.4
@@ -70,6 +72,10 @@ func _run() -> void:
 	print("zombiezone maps")
 	print("")
 
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--map="):
+			_only = arg.substr(6)
+
 	await _test_the_catalogue()
 	await _test_baked_light()
 	await _test_lamp_budget()
@@ -78,15 +84,8 @@ func _run() -> void:
 	await _test_footing()
 	_test_library_indices()
 
-	var only := ""
-
-	for arg: String in OS.get_cmdline_user_args():
-		if arg.begins_with("--map="):
-			only = arg.substr(6)
-
 	for id: String in _maps:
-		if only.is_empty() or only == id:
-			await _test_map(StringName(id))
+		await _test_map(StringName(id))
 
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
@@ -133,6 +132,8 @@ func _test_the_catalogue() -> void:
 
 	if not linked:
 		print("(no map directory: the built-in practice street only)")
+	elif not _only.is_empty() and MAPS.has(_only):
+		_maps = [_only]
 
 	var missing: Array = []
 
@@ -383,7 +384,7 @@ func _test_worlds() -> void:
 		return
 
 	for file in DirAccess.get_files_at(ZzPaths.rebase("res://maps")):
-		if not file.ends_with(".json"):
+		if not file.ends_with(".json") or (not _only.is_empty() and file.get_basename() != _only):
 			continue
 
 		var doc: Variant = JSON.parse_string(FileAccess.get_file_as_string(ZzPaths.rebase("res://maps/" + file)))
