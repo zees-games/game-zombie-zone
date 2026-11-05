@@ -167,6 +167,21 @@ func bind(p_game: ZzGame, p_player: ZzPlayer) -> void:
 
 	if _root == null:
 		_build()
+		_shift_right(right_inset)
+
+
+## Pixels the bottom-right readouts and the box list stand left of the edge, for a touch cluster; set before [method bind].
+var right_inset: float = 0.0
+
+
+## Moves everything anchored to the right edge left by [param px].
+func _shift_right(px: float) -> void:
+	if px <= 0.0:
+		return
+
+	for c: Control in [ammo, _weapon_icon, fire_mode, _nav_meter, _effects, _weight, _weight_back, _weight_fill]:
+		c.offset_left -= px
+		c.offset_right -= px
 
 
 func _build() -> void:

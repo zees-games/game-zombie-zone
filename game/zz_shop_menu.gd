@@ -141,7 +141,7 @@ func _init() -> void:
 	detail.add_child(_buy)
 
 	var foot := Label.new()
-	foot.text = "Click a card, then Buy (or click it again). Esc closes. Walk away and it closes itself."
+	foot.text = "Tap a card, then Buy. Walk away and it closes itself." if DotPlatform.has_touch() else "Click a card, then Buy (or click it again). Esc closes. Walk away and it closes itself."
 	foot.add_theme_font_size_override("font_size", 13)
 	foot.modulate = Color(1, 1, 1, 0.5)
 	column.add_child(foot)

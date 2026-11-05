@@ -31,6 +31,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorldView := preload("zz_world_view.gd")
 const ZzShopMenu := preload("zz_shop_menu.gd")
+const ZzTouch := preload("zz_touch.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
@@ -138,6 +139,7 @@ var _map_why: String = ""
 var _board_opened: bool = false
 var _covered_by_reveal: Dictionary = {}
 var _sampler: DotFpsSampler = null
+var _touch: ZzTouch = null
 var _watch_id: int = -1
 var _arm: DotCameraBoom = null
 ## The local survivor's crawling arms in first person while down, under a yaw-only pivot at the eye.

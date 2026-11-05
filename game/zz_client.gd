@@ -56,7 +56,7 @@ func _ready() -> void:
 	_hold_for_maps()
 	add_child(game)
 
-	_sampler = DotFpsSampler.new(ZzPlayer.tunables_for(config))
+	_sampler = ZzTouch.new_sampler(ZzPlayer.tunables_for(config))
 	ZzPlayer.register_actions(_sampler)
 	game.combat_feel.track_tunables(_sampler.tunables)
 
@@ -1351,6 +1351,13 @@ func _build_hud() -> void:
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
 
+	if DotPlatform.has_touch():
+		_touch = ZzTouch.new()
+		hud.add_child(_touch)
+		hud.right_inset = ZzTouch.HUD_INSET
+		platform.fit_touch_buttons(_touch, ZzTouch.LAYOUT)
+		hud.right_inset = ZzTouch.HUD_INSET * _touch.button_scale
+
 
 ## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
 ## every change. An older shell's link cannot say, and the config's default (off) stands.
@@ -1788,6 +1795,10 @@ func _suspend_input(suspended: bool) -> void:
 
 	if player != null and player.sampler != null:
 		player.sampler.suspended = suspended
+
+	if _touch != null:
+		_touch.visible = not suspended
+		_touch.release_all()
 
 
 ## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
@@ -2475,6 +2486,11 @@ static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
 	return body.controller.render_state().position
 
 
+func _input(event: InputEvent) -> void:
+	if _touch != null and not _covered() and (event is InputEventScreenTouch or event is InputEventScreenDrag):
+		_touch.feed(event, player.sampler if _offline and player != null else _sampler)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
 	if event.is_action_pressed("ui_cancel") and is_shop_open():
@@ -2498,7 +2514,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventKey and not event.is_echo():
+	if (event is InputEventKey or event is InputEventAction) and not event.is_echo():
 		if _key_event(event):
 			get_viewport().set_input_as_handled()
 			return

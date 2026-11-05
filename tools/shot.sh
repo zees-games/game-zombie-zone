@@ -52,9 +52,10 @@ for arg in "$@"; do
     case "$arg" in
         --view=*)    view="${arg#*=}" ;;
         --seconds=*) seconds="${arg#*=}" ;;
+        --touch)     extra+=("--touch=1") ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--touch=1|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -72,5 +73,6 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
-exec xvfb-run -a -s "-screen 0 1280x720x24" "${GODOT:-godot}" --path . --resolution 1280x720 \
+res="${SHOT_RES:-1280x720}"
+exec xvfb-run -a -s "-screen 0 ${res}x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"
