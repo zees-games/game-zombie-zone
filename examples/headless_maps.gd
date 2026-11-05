@@ -26,8 +26,8 @@ const ZzPaths := preload("../game/zz_paths.gd")
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
-const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
-const CHECKS_PER_MAP := 18
+const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_biohazard_manor", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
+const CHECKS_PER_MAP := 20
 const BAKE_CHECKS := 9
 const WORLD_CHECKS := 4
 const LAMP_CHECKS := 8
@@ -614,7 +614,9 @@ func _test_map(id: StringName) -> void:
 	var props_size := func(pid: StringName) -> Vector3:
 		return game.props_catalogue.size_of(pid) if game.props_catalogue.has(pid) else Vector3.ZERO
 	var nav_doc := ZzNpcs.with_nav_extra(doc, game.map.read_nav_extra(str(game.catalogue.roots.get(StringName(str(doc.get("id", ""))), ""))))
-	var open := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size, gates))
+	var open_job := ZzNpcs.nav_job(nav_doc, props_size, gates, [], false, false)
+	var open := DotNpcNavGraph.new(open_job.run_blocking())
+	var link_report := open_job.link_report()
 	var shut := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size))
 	var from: Vector3 = game.map.spawn("survivors", 0)[0]
 	var unreached: Array = []
@@ -640,6 +642,23 @@ func _test_map(id: StringName) -> void:
 
 	_check(unreached.is_empty() and open.data.points.size() > 50, "the zombies' ground joins everything to the start",
 		"%d points; %s" % [open.data.points.size(), "; ".join(unreached.slice(0, 40))])
+
+	# A link whose ends snap to no point, or both to one, is dead weight the build counts as a miss.
+	var linked_of := int(link_report.get("of", 0))
+	var link_misses := int(link_report.get("links", 0))
+	_check(link_misses * 20 <= maxi(linked_of, 1), "at most 5% of its navigation links miss a point", "%d of %d" % [link_misses, linked_of])
+
+	# A zombie spawn hint over a gap drops its zombie out of the map.
+	var stray: Array = []
+
+	for h: Array in doc.get("zombie_spawns", []):
+		var at := ZzMapDoc.v3(h)
+		var near := open.data.nearest_point(at, 3.0)
+
+		if near < 0:
+			stray.append(str(at))
+
+	_check(stray.is_empty(), "every zombie spawn sits within 3 m of the zombies' ground", ", ".join(stray.slice(0, 10)))
 
 	# A map whose wire budget cut boxes walks on the whole map's floor, not the document's.
 	if (nav_doc["boxes"] as Array).size() > (doc["boxes"] as Array).size():
