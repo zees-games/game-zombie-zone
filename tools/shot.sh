@@ -52,6 +52,7 @@ for arg in "$@"; do
     case "$arg" in
         --view=*)    view="${arg#*=}" ;;
         --seconds=*) seconds="${arg#*=}" ;;
+        --touch)     extra+=("--touch=1") ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
         --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--touch=1|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
