@@ -263,6 +263,11 @@ func _do_save() -> void:
 		_save_error = FileAccess.get_open_error()
 
 
+## The built graph's link report ({map, links, of, first}; empty when every link found both ends).
+func link_report() -> Dictionary:
+	return {} if nav == null else _reports.get(nav.get_instance_id(), {})
+
+
 ## Main thread, once after the end: the one warning about links with no point, and the cache write failure.
 func flush_log() -> void:
 	if nav == null:
