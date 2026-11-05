@@ -8,8 +8,8 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## How a zombie moves: the locomotion style is chosen from the speed it really has, so a
 ## zombie at a walking or slow chasing pace shambles and only one at running pace runs.
 
-const SECTIONS := 5
-const CHECKS := 31
+const SECTIONS := 6
+const CHECKS := 35
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -26,6 +26,7 @@ func _run() -> void:
 	print("")
 	_test_bands()
 	_test_view()
+	_test_feet()
 	_test_speeds()
 	_test_looks()
 	_test_poses()
@@ -76,6 +77,45 @@ func _test_view() -> void:
 	for view: ZzZombieView in [slow, chase, fast]:
 		view.queue_free()
 
+	_sections_finished += 1
+
+
+## The lowest of the two feet's bone heights (view space, floor 0) over a walk, as [min, max].
+func _foot_band(kind: StringName, speed: float) -> Vector2:
+	var view := ZzZombieView.new()
+	add_child(view)
+	view.build(kind, 1)
+	var skeleton: Skeleton3D = view._skeleton
+	var feet: Array[int] = [view._limbs.get("Foot.L", -1), view._limbs.get("Foot.R", -1)]
+	var band := Vector2(99.0, -99.0)
+
+	for i in 150:
+		view.global_position = Vector3(speed * STEP * float(i), 0.0, 0.0)
+		view.present(STEP, ZzZombieBody.Anim.RUN, 0)
+
+		if i < 45:
+			continue
+
+		var low := 99.0
+
+		for f in feet:
+			low = minf(low, (skeleton.global_transform * skeleton.get_bone_global_pose(f)).origin.y)
+
+		band = Vector2(minf(band.x, low), maxf(band.y, low))
+
+	view.queue_free()
+	return band
+
+
+func _test_feet() -> void:
+	_sections_entered += 1
+	print("a walking zombie's planted foot stays on the floor, and none sinks through it")
+	for kind: StringName in [ZzNpcs.COMMON, ZzNpcs.BRUTE]:
+		var slow := _foot_band(kind, 1.1)
+		var chase := _foot_band(kind, 2.2)
+		var detail := "1.1 m/s %s, 2.2 m/s %s" % [slow, chase]
+		_check(maxf(slow.y, chase.y) < 0.08, "%s: a foot is always within 8 cm of the floor while walking (none floats)" % kind, detail)
+		_check(minf(slow.x, chase.x) > -0.1, "%s: no foot sinks more than 10 cm under the floor while walking" % kind, detail)
 	_sections_finished += 1
 
 

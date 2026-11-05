@@ -3,34 +3,9 @@ extends Node3D
 const ZzPaths := preload("../game/zz_paths.gd")
 const ZzZombieBody := preload("zz_zombie_body.gd")
 
-## What a zombie looks like: one of seven animated bodies from Quaternius' CC0 Zombie Apocalypse
-## Kit, dressed by a palette shader, reshaped by its bones, and carrying whatever its kind wears
-## (pustules, a helmet and shield, a tongue), playing the clip its body's [member ZzZombieBody.anim]
-## asks for. The bodies are built by `tools/build_zombie_models.py`; the README credits the kit.
-##
-## [b]Client only.[/b] A server never builds one; it draws nothing. The body this hangs off is a
-## client's mirror of the server's zombie, or (offline) the zombie itself.
-##
-## [b]A crowd is not one person.[/b] A common's 16-bit variant picks its body (five: the kit's
-## zombie and its four survivors, turned), its skin from [constant SKINS], its clothes from
-## [constant CLOTHES], its height, and where its blood and dirt are (the vertex-colour noise the
-## build painted, cut at a threshold each zombie picks). That is 5 x 8 x 12 combinations before
-## height, and a horde of forty has no two alike side by side. The previous model was one Kenney
-## body in three shirts, and a play test called it out at once.
-##
-## [b]A special is read by its outline before its colour.[/b] Each kind is a different body or a
-## different shape of one (bone scales: the brute's arms, the strangler's neck, the crawler's
-## missing legs), stands differently (the leaper on all fours), and wears something nobody else
-## does. The old ones were the same body in a tint, and a leaper that drew as two black polygons
-## at the lens was a pin nobody could see coming.
-##
-## [b]The pose is written after the clip, every frame.[/b] The AnimationPlayer is advanced by
-## hand ([method present]) and the bone shapes and the flinch applied after it, because left to
-## the engine the clip and the override run in an order nothing controls and the clip wins.
-##
-## [b]Far and unseen zombies animate less often[/b] ([member lod], `zz_zombie_lod.gd`): past its
-## `near` every second frame, past `far` every fourth, outside the view every eighth, with the
-## time skipped, so its feet stay where its walk puts them. Past `shadow_until` it casts none.
+## What a zombie looks like: one of seven animated bodies (Quaternius' CC0 Zombie Apocalypse Kit, built by `tools/build_zombie_models.py`) dressed by a palette shader, reshaped by its bones, wearing what its kind wears. Client only.
+## A common's variant picks body, skin ([constant SKINS]), clothes ([constant CLOTHES]), height and blood/dirt, so a horde has no two alike; a special reads by outline (bone scales, stance, wear) before colour.
+## The pose is written after the clip every frame ([method present]), or the clip wins; far and unseen zombies animate less often ([member lod], `zz_zombie_lod.gd`).
 
 const CHANNEL := "zz.zombie_view"
 const ZzZombieLod := preload("zz_zombie_lod.gd")
@@ -179,10 +154,8 @@ const GAIT_RUN := &"run"
 ## A look's `gait` key overrides these: below `shamble_below` m/s the body shambles (the walk clip
 ## at its real speed, stiff and dragging), from `run_from` it runs; between, it keeps what it did.
 const GAIT := {"shamble_below": 2.7, "run_from": 3.1}
-## The shamble's numbers, radians unless said; a look's `shamble` key overrides any. stoop: back bend;
-## head: neck hang; arms/hang: upper arm pitch over the clip's forward-held arms, reaching or hanging; swing: share of the clip's leg
-## swing kept (stride length); drag: share of that kept by the dragged leg; trail: its shin's trail;
-## sway/hip: torso and hip roll; cadence: top clip rate; lurch: uneven step timing, 0 even.
+## The shamble's numbers, radians unless said; a look's `shamble` key overrides any (stoop, head, arms/hang,
+## swing, drag, trail, sway/hip, cadence, lurch).
 ## The anims played on both feet, whose ankles [method _ground_feet] keeps out of the floor.
 const STANDING_ANIMS: Array[int] = [ZzZombieBody.Anim.IDLE, ZzZombieBody.Anim.WALK, ZzZombieBody.Anim.RUN,
 	ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.STAGGER, ZzZombieBody.Anim.VOMIT, ZzZombieBody.Anim.SPIT,
@@ -241,10 +214,9 @@ const CROUCH_NATURAL := 1.4
 const UAL_LIBRARY := "res://addons/dot_player_char/people/people_ual.res"
 const UAL_FROM := "res://addons/dot_player_char/people/people_matt.glb"
 
-## The palette shader. Up to [constant SWAPS] atlas colours swapped for others (matched within a
-## tolerance, so the gradient swatches keep their shading), then dirt and blood from the
-## vertex-colour noise, then the kind's glow. Written for the compatibility renderer: no
-## per-instance uniforms (a material per look instead), no arrays with hints.
+## The palette shader: up to [constant SWAPS] atlas colours swapped within a tolerance, then dirt and blood
+## from the vertex-colour noise, then the kind's glow. Compatibility renderer: no per-instance
+## uniforms (a material per look) and no arrays with hints.
 const SWAPS := 6
 ## How much of a kind's `glow` the whole body gives off (the throat is its own mesh): at full
 ## strength the spitter was a flat green silhouette with no face. And the share of its own
@@ -401,15 +373,9 @@ static func look_for(p_kind: StringName, p_variant: int) -> Dictionary:
 	return look
 
 
-## The pose scale each bone needs for [param shapes], a look's `bones`: bone name -> the size that
-## bone's own stretch of the body should be drawn at (a number, or a Vector3 in the bone's axes, Y
-## along the bone, for thicker without longer). A name ending in `*` sizes the bone and everything
-## below it (a whole arm).
-##
-## [b]Sizes are the bone's own, not inherited.[/b] A pose scale carries down to every child, so
-## the strangler's long neck would give it a giant head and the screamer's thin waist a doll's
-## arms. Each bone is drawn at its wanted size divided by its parent's, so a neck can be long and
-## the head on it ordinary.
+## The pose scale each bone needs for [param shapes], a look's `bones`: bone name -> drawn size (a number, or a Vector3 in the bone's axes). A name ending in `*` sizes the bone and everything below it.
+## Sizes are the bone's own, not inherited: each is divided by its parent's, since a pose scale carries down
+## to every child and a long neck would give a giant head.
 static func shape_scales(skeleton: Skeleton3D, shapes: Dictionary) -> Dictionary:
 	var out := {}
 

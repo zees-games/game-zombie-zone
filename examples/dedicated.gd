@@ -19,8 +19,6 @@ const SECTIONS := 13
 const CHECKS := 108
 
 const SERVER_DIR := "user://zz_dedicated"
-const PORT := 28931
-const QUERY_PORT := 28932
 const TICK_RATE := 60
 
 ## The practice street's end room.
@@ -29,6 +27,8 @@ const END_ROOM := Vector3(0.0, 0.05, 85.0)
 var _sections_entered := 0
 var _sections_finished := 0
 
+## Picked per run so two suites never collide; the query port is the next one.
+var _port := ZZTestPorts.free_port(2)
 var server: DotServer = null
 var game: ZzGame = null
 
@@ -124,8 +124,8 @@ func _boot() -> void:
 	config.max_players = 24
 	config.hibernate_when_empty = false
 	config.rcon_password = ""
-	config.port = PORT
-	config.query_port = QUERY_PORT
+	config.port = _port
+	config.query_port = _port + 1
 	config.admins_path = "%s/admins.json" % SERVER_DIR
 	config.bans_path = "%s/bans.json" % SERVER_DIR
 	config.audit_log_path = "%s/audit.jsonl" % SERVER_DIR
@@ -824,7 +824,7 @@ func _test_a_covered_seat_is_not_harmed() -> void:
 	link.name = "Server"
 	link.player_name = "Covered"
 	link.transport_preference = "udp"
-	link.udp_address = "127.0.0.1:%d" % PORT
+	link.udp_address = "127.0.0.1:%d" % _port
 	# RPC paths are relative to the multiplayer root, so the link must sit at the path the
 	# server's does: "Dedicated/Server" under the root.
 	var mirror := Node.new()
@@ -841,7 +841,7 @@ func _test_a_covered_seat_is_not_harmed() -> void:
 	link.phase_changed.connect(attach)
 	var spawned := [false]
 	link.spawned.connect(func() -> void: spawned[0] = true)
-	link.connect_to_server("127.0.0.1:%d" % PORT)
+	link.connect_to_server("127.0.0.1:%d" % _port)
 	var joined := await _until(func() -> bool:
 		return spawned[0] or link.phase == DotClientLink.Phase.FAILED, 30.0)
 	joined = joined and spawned[0]
@@ -955,7 +955,7 @@ func _test_a_module_reload() -> void:
 	link.name = "Server"
 	link.player_name = "Reloaded"
 	link.transport_preference = "udp"
-	link.udp_address = "127.0.0.1:%d" % PORT
+	link.udp_address = "127.0.0.1:%d" % _port
 	var mirror := Node.new()
 	mirror.name = "Dedicated"
 	side.add_child(mirror)
@@ -968,7 +968,7 @@ func _test_a_module_reload() -> void:
 	link.phase_changed.connect(attach)
 	var spawned := [false]
 	link.spawned.connect(func() -> void: spawned[0] = true)
-	link.connect_to_server("127.0.0.1:%d" % PORT)
+	link.connect_to_server("127.0.0.1:%d" % _port)
 	var joined := await _until(func() -> bool:
 		return spawned[0] or link.phase == DotClientLink.Phase.FAILED, 30.0)
 	_check(joined and spawned[0], "a real client still hears the server's events after two reloads")

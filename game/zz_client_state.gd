@@ -38,18 +38,9 @@ const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
 const ZzOilMonsterModel := preload("../npcs/zz_oil_monster_model.gd")
 const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
-## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame] —
-## offline, or against a server.
-##
-## [b]One client for both, and the offline half is not a demo mode.[/b] It is the same world
-## class with `authoritative` true, stand-ins for a team, and nothing else different. What
-## changes is where the answers come from, and the whole of that difference is [ZzNetBridge]:
-## offline the world's own signals reach [method _hear_the_world], connected the bridge's reach
-## [method _build_netcode], and both call the same handlers with the same arguments.
-##
-## [b]First person, because this is a game about not seeing what is behind you.[/b] F5 is a
-## third-person view for those who want it; down, the camera drops to the floor; dead, it
-## watches the others.
+## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame], offline or on a server.
+## Offline is the same world class with `authoritative` true and stand-ins for a team; only [ZzNetBridge] changes where answers come from.
+## First person (F5 for third); down, the camera drops to the floor; dead, it watches the others.
 
 const CHANNEL := "zz.client"
 
