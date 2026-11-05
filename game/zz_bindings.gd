@@ -80,6 +80,8 @@ static func make() -> DotMenuBindings:
 	keys.add_wheel_weapons()
 	keys.add(CHAT, &"bind_chat", "Chat", "Y", "Communication")
 	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
+	# dot-game's gag candidates (G, Y, U) are all ours, and its fallback would share U with team chat.
+	keys.add(&"voice_gag", &"bind_voice_gag", "Look at a player: stop (or resume) hearing them", "L", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# Defaults that moved under saved documents: the medkit left H for help, the shove left V
