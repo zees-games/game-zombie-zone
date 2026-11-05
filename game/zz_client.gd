@@ -116,6 +116,8 @@ func _draw_world() -> void:
 	_world_ticket += 1
 	var ticket := _world_ticket
 	if gate != null:
+		# The world's art slices download under this hold, so it waits as long as the content hold does.
+		gate.timeout_sec = maxf(gate.timeout_sec, DotGameStandaloneContent.max_wait_sec())
 		gate.hold(&"world", "Loading the world")
 	# A world opened offline builds its map twice in one frame (ZzGame.start rebuilds for listeners that came late): only the last draws.
 	await get_tree().process_frame
