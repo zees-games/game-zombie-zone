@@ -73,6 +73,11 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
+# A fresh worktree has no .godot class cache: every script then fails to parse (a wall of
+# "Identifier Dot... not declared") and the run looks like a hang. Import once first, and put
+# `timeout` inside `heavy -- `, not round it: a queued job waiting for a slot is killed (143) by an outer one.
+[ -d .godot ] || { echo "no .godot here: run \`heavy -- ${GODOT:-godot} --headless --path . --import\` once (fresh worktree)" >&2; exit 2; }
+
 res="${SHOT_RES:-1280x720}"
 exec xvfb-run -a -s "-screen 0 ${res}x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"
