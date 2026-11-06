@@ -649,6 +649,17 @@ func _test_map(id: StringName) -> void:
 	var link_misses := int(link_report.get("links", 0))
 	_check(link_misses * 20 <= maxi(linked_of, 1), "at most 5% of its navigation links miss a point", "%d of %d" % [link_misses, linked_of])
 
+	if link_misses * 20 > maxi(linked_of, 1):
+		# The builder names three; the importer's fix needs every link whose end finds no point, or both find one.
+		var reach: float = float((nav_doc["nav"] as Dictionary).get("spacing", 1.0)) * 2.0
+		for l: Variant in (nav_doc["nav"] as Dictionary).get("links", []):
+			var f := ZzMapDoc._floats(l, 6)
+			var a := open.data.nearest_point(Vector3(f[0], f[1], f[2]), reach)
+			var b := open.data.nearest_point(Vector3(f[3], f[4], f[5]), reach)
+			var kind := "noend" if a < 0 or b < 0 else "same" if a == b else "" if _joined(open.data, a, b) else "obstacle"
+			if kind != "":
+				print("DEADLINK %s %s %s" % [doc.get("id", "?"), kind, JSON.stringify(l)])
+
 	# A zombie spawn hint over a gap drops its zombie out of the map.
 	var stray: Array = []
 
@@ -892,3 +903,14 @@ func _finished() -> void:
 ## The `game:` block of the spawner config the map resolved to (its traders and spawners).
 func lay_block(game: ZzGame, _doc: Dictionary) -> Dictionary:
 	return game.spawners.spawner.game_block()
+
+
+## Whether the graph has the edge a-b (a link through an obstacle that the floors already join round is dropped, so it has none).
+func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
+	var edges := data.edges
+
+	for k in range(0, edges.size(), 2):
+		if (edges[k] == a and edges[k + 1] == b) or (edges[k] == b and edges[k + 1] == a):
+			return true
+
+	return false
