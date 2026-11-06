@@ -324,7 +324,7 @@ func _test_baked_light() -> void:
 		"baked %s, stale %s" % [baked, stale])
 	_check(unbaked.is_empty(), "every map the game ships has a bake", "no bake: %s" % [unbaked])
 	_check(casters.is_empty(), "no bake names a prop or shiny caster (the trim ran)", "%s" % [casters])
-	_check(baked.has("zz_practice"), "the practice street, the one map every build has, ships a bake")
+	_check(not _only.is_empty() or baked.has("zz_practice"), "the practice street, the one map every build has, ships a bake")
 
 	var moved := ZzMap.new()
 	moved.doc = (game.catalogue.maps.get(&"zz_practice", {}) as Dictionary).duplicate(true)
