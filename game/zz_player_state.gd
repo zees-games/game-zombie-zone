@@ -10,26 +10,9 @@ const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzFigure := preload("zz_figure.gd")
 const ZzAvatars := preload("zz_avatars.gd")
 
-## One survivor: how they move, how hurt they are, whether they are up, down, held or dead, and
-## what they are carrying.
-##
-## [b]Down is not dead, and the third time is.[/b] At zero health a survivor goes down instead of
-## dying: the same [DotHealth] is revived at once with a bleed-out pool for a maximum, the DOWN
-## modifier holds them where they fell, and they can still shoot what they hold. Damage while
-## down comes off the pool; the pool running out is death. Somebody holding E over them for
-## [member ZzConfig.revive_seconds] stands them up with a little temporary health. After
-## [member ZzConfig.max_incaps] downs the next zero is death, and the screen has been saying so
-## since the last one.
-##
-## [b]Temporary health is part of the health, and comes off first.[/b] What a bottle of pills or
-## a revive gives is added to [member DotHealth.health] and remembered in [member temp_health];
-## it drains by itself, and any damage taken comes off it before the real thing. One number for
-## dot-combat to subtract from, and one for this file to know how much of it is borrowed.
-##
-## [b]Pinned is a person, not a flag.[/b] [member pinned_by] is the entity id of the special
-## holding them and [member pin_kind] what it is doing (pounce, choke, carry, ride). The PINNED
-## modifier holds them on both ends; what frees them is the special dying, a teammate's shove,
-## or — for the ones that let go — the special deciding to.
+## One survivor: how they move, how hurt they are, whether they are up, down, held or dead, and what they carry.
+## At zero health a survivor goes down (bleed-out pool, DOWN modifier); [member ZzConfig.max_incaps] downs make the next zero death. Temporary health comes off first and drains by itself.
+## [member pinned_by] is the special holding them and [member pin_kind] what it does; the PINNED modifier holds them on both ends.
 
 const EYE_HEIGHT := 1.6
 const EYE_DOWN := 0.45
@@ -250,14 +233,10 @@ var _view_rig_quiet: float = 0.0
 const VIEW_RIG_SETTLE_SEC := 0.6
 
 ## Offline only: puts the client's buttons on the command [member sampler] has just made.
-##
-## [b]Stamped after sampling, inside [method simulate], never on the command before it.[/b] The
-## client used to stamp `controller.current_command` from its own physics frame, and then this
-## file's [method simulate] replaced that command with a fresh sample: fire and reload never
-## reached the world's rig, so offline the HUD's 15 / 60 never moved and nothing you shot was hit.
+## Stamped after sampling inside [method simulate], never on the command before it, or simulate's fresh
+## sample replaces it and fire and reload never reach the world's rig.
 var command_stamp: Callable = Callable()
 
-# --- Water --------------------------------------------------------------------
 
 ## How deep in water: none, the feet (below the waist: wading), the waist (swimming) or the eyes
 ## (under: the breath runs out). Source's four levels, and the same names here.

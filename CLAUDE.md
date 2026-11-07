@@ -70,7 +70,7 @@ Publishing: `tools/publish.sh [--version V | --bump patch] [--site URL --token-f
 - A brain checks its body still exists after its kind's decision (a bloater that bursts is gone by then).
 - Zombies and stand-ins ask `ZzHorde.zombies_near` (a grid built once a tick), never the spawner's `npcs_near`.
 - A wave's speed is `ZzZombieBody.speed_scale`, never written onto the wish (it compounded between thoughts). [history](docs/history.md)
-- A zombie below `kill_y` is removed and a wave's owed again (`ZzHorde._fell_out`, which records where it left the floor). [history](docs/history.md)
+- A zombie below `kill_y` is removed and a wave's owed again (dot-spawn's watch and cull, wired in `game/zz_watch_cull.gd`; `ZzHorde.note_fallen` records where it left the floor). [history](docs/history.md)
 - A ground slab collides `ZzMap.GROUND_DEPTH` deeper than drawn, a prop's flat floor plates are not collided, a leap ends after `LEAP_LONGEST` ticks and a fall is capped at `FALL_FASTEST`: each was a way through the floor. [history](docs/history.md)
 - A special breaks off hurt only when hurt further than at its last retreat. [survival](docs/survival.md#ten-waves-played-zz-survival-long-run-1-2026-10-12)
 

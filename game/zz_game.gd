@@ -599,7 +599,8 @@ func _feed_map_uis() -> void:
 		held["back"] = c.move.y < -0.3
 		held["right"] = c.move.x > 0.3
 		held["left"] = c.move.x < -0.3
-		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE)
+		# The attack key throws a held prop, it does not fire the gun.
+		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE) and not prop_carry.carrying(player.player_id)
 		held["attack2"] = (player.actions & ZzNetCommand.ACT_AIM) != 0
 		held["jump"] = c.is_pressed(DotFpsCommand.BUTTON_JUMP)
 		held["use"] = (player.actions & ZzNetCommand.ACT_USE) != 0
@@ -2337,6 +2338,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 	_sync_carry(player)
 
+	if fire_pressed and prop_carry.carrying(player.player_id) and map != null:
+		var _thrown: int = prop_carry.throw_held(map.toys, player.player_id, player.aim_direction(), _prop_force().multiplier(&"throw", &"default"))
+
 	if player.is_down() or not player.is_alive() or player.watching or player.is_pinned():
 		cancel_use(player)
 		return
@@ -2397,6 +2401,11 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 
 func _begin_use(player: ZzPlayer) -> void:
+	# A prop in hand is put down first: the key that picked it up.
+	if prop_carry.carrying(player.player_id):
+		var _put: int = prop_carry.put_down(map.toys if map != null else null, player.player_id)
+		return
+
 	# Somebody down in front of you comes first: it is the one thing that cannot wait.
 	var downed := _looked_at_survivor(player, config.revive_range + 0.4, true)
 
@@ -2422,6 +2431,10 @@ func _begin_use(player: ZzPlayer) -> void:
 			loot.use(thing, player)
 		else:
 			_start(player, &"loot", thing, needs)
+		return
+
+	if map != null and map.toys != null \
+			and prop_carry.pick_up(map.toys, player.player_id, player.eye_position(), player.aim_direction(), world_mask()) >= 0:
 		return
 
 	var index := current_objective()
@@ -3803,8 +3816,36 @@ func _advance_toys(delta: float) -> void:
 		var radius := tunables.radius if tunables != null else 0.35
 		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
 		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
+	prop_carry.advance(map.toys, _carrier_of, world_mask())
 	map.toys.advance(delta)
 	_roll_into_survivors(delta)
+
+
+## The survivor who may still carry: alive, up and playing; null otherwise.
+func _carrier_of(player_id: StringName) -> Variant:
+	var player := player_by_id(player_id)
+	return player if player != null and player.is_alive() and not player.is_down() and not player.watching else null
+
+
+## Lays a JSON text's rows over the shipped force table (the `zz_prop_force` cvar: {"weapon id": {"barrel": 2.0}}); empty restores the file.
+## False when the text is not a JSON object.
+func set_prop_force_override(text: String) -> bool:
+	var table := ZzPropForce.load_file()
+	var trimmed := text.strip_edges()
+	if not trimmed.is_empty():
+		var json := JSON.new()
+		if json.parse(trimmed) != OK or not json.data is Dictionary:
+			return false
+		var parsed: Dictionary = json.data
+		var merged: Dictionary = table.table.duplicate(true)
+		for weapon: Variant in parsed:
+			if parsed[weapon] is Dictionary:
+				var row: Dictionary = (merged.get(String(weapon), {}) as Dictionary).duplicate()
+				row.merge(parsed[weapon], true)
+				merged[String(weapon)] = row
+		table.set_table(merged)
+	prop_force = table
+	return true
 
 
 ## A loose barrel going fast hurts the survivor it runs into (once per cooldown), as the original supports' barrels did.
@@ -3878,17 +3919,48 @@ func _shoot_toys(shot: DotShot) -> void:
 		if crates != null:
 			var _crate := crates.shoot(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage)
 		if map.toys != null and map.toys.count() > 0:
-			var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
+			var _pushed := push_toy(shot, raw as Vector3)
 		if not map.supports.is_empty():
 			var wall := _wall_distance(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0))
 			var _broke := DotMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
 
 
-func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
+## The first toy on a shot's ray, nearer than a wall, pushed as dot-props pushes it from the shot's damage times the weapon's
+## `props/forces.json` multiplier for that kind of toy. The toy's index, or -1.
+func push_toy(shot: DotShot, direction: Vector3) -> int:
+	var box := map.toys
+	if prop_force == null:
+		prop_force = ZzPropForce.load_file()
+	if not box.authoritative or not box.rules.enabled or not box.is_inside_tree():
+		return -1
+	var reach := maxf(shot.max_range, 1.0)
+	var query := PhysicsRayQueryParameters3D.create(shot.origin, shot.origin + direction.normalized() * reach, world_mask() | box.loose_layer | box.solid_layer)
+	query.collide_with_areas = false
+	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
+	if found.is_empty():
+		return -1
+	var toy := DotPropToyBox.toy_of(found.get("collider"))
+	if toy == null or shot.damage <= 0.0:
+		return -1
+	var scale: float = prop_force.multiplier(shot.weapon_id, toy.kind)
+	var speed := clampf(shot.damage * DotPropToyBox.SHOT_SPEED_PER_DAMAGE, DotPropToyBox.SHOT_SPEED_MIN, DotPropToyBox.SHOT_SPEED_MAX)
+	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropToyBox._shot_mass(toy) * scale)
+
+
+## The force table, loaded on first use.
+func _prop_force() -> RefCounted:
+	if prop_force == null:
+		prop_force = ZzPropForce.load_file()
+	return prop_force
+
+
+## A blast moves toys at TOY_BLAST_SPEED times the force table's row for the explosion's kind (grenade, bile...), column `default`.
+func _on_exploded_near_toys(at: Vector3, radius: float, kind: StringName) -> void:
+	var speed: float = TOY_BLAST_SPEED * float(_prop_force().multiplier(kind, &"default"))
 	if authoritative and crates != null:
-		var _flung := crates.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
+		var _flung := crates.blast(at, maxf(radius, 2.0), speed)
 	if authoritative and map != null and map.toys != null:
-		var _thrown := map.toys.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
+		var _thrown := map.toys.blast(at, maxf(radius, 2.0), speed)
 
 
 func delta_for_tick() -> float:

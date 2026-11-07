@@ -2315,6 +2315,11 @@ func _prompt() -> String:
 			return "%s — %s %s (%d%%)" % [_key(ZzBindings.USE), "mend" if bool(held["intact"]) else "rebuild",
 				str(entry.get("label", "the barricade")), share]
 
+	if game.map != null and game.map.toys != null:
+		var act: String = game.prop_carry.hint(game.map.toys, eye, aim, game.world_mask(), game.prop_carry.max_mass)
+		if act != "":
+			return "%s — %s" % [_key(ZzBindings.USE), act]
+
 	return ""
 
 

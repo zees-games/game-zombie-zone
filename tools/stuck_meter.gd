@@ -38,6 +38,9 @@ const GRACE := 1.5
 const CAPTURE_AT := [15.0, 28.0]
 
 var game = null
+var _frozen := false
+var _frozen_line := "-"
+var _frozen_ratio: Dictionary = {}
 ## Zombie goal-seconds spent still for REPORT_AFTER or more (a stretch counts from its first second).
 var zombie_over: float = 0.0
 ## The horde's rescue counters at the end of the run (its describe()).
@@ -183,6 +186,9 @@ func _capture(key: String, kind: StringName, who: Variant, still: float) -> Stri
 		out.append("%s %s at %s" % [head, npc.def.id, npc.position().snappedf(0.01)])
 		out.append("  body vel %s wish %s push %s flying %s floor %s stride %s" % [body.velocity.snappedf(0.01), (body.get(&"wish") as Vector3).snappedf(0.01),
 			(body.get(&"push") as Vector3).snappedf(0.01), body.get(&"flying"), body.is_on_floor(), body.get(&"stride")])
+		out.append("  move speed_scale %s limbs %s water %s waited %s anchored %s hovering %s cheap %s mirror %s" % [body.get(&"speed_scale"),
+			body.call(&"limb_speed_scale"), game.water_pace_at(body.global_position), body.get(&"_waited"), body.get(&"anchored"),
+			body.get(&"hovering"), body.get(&"cheap_step"), body.get(&"mirror")])
 		out.append("  brain state %s target '%s' quarry '%s' bashing %s swinging %s staggered %s watch %.1f s stage %s hops %s" % [
 			brain.get(&"state"), npc.target_id, brain.quarry(), brain.get(&"bashing"), brain.swinging(), brain.staggered(),
 			float(brain.get(&"_watch_for")), brain.get(&"_watch_stage"), brain.get(&"_hops")])
@@ -369,46 +375,9 @@ func _standin_walks(player) -> bool:
 	return true
 
 
+## The horde's own rule (game/zz_watch_cull.gd), so the meter and the cull agree on who has a goal.
 func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
-	var brain = npc.brain
-
-	if brain == null:
-		return false
-
-	var state: StringName = brain.get(&"state")
-
-	# A special's brain names its walking states approach and retreat, never chase.
-	if state != &"chase" and state != &"investigate" and state != &"lure" and state != &"approach" and state != &"retreat":
-		return false
-
-	# At its place round a lure it stands by design.
-	if state == &"lure" and brain.has_method(&"at_lure") and brain.at_lure():
-		return false
-
-	# With no way to go (a shut gate between it and who it chases) it waits, which is the rule's
-	# doing and not a snag: only a mover with a path it does not follow is stuck.
-	var path: DotNpcPath = brain.get(&"path")
-
-	if path == null or path.partial or path.points.is_empty() or path.current(Vector3.INF) == Vector3.INF:
-		return false
-
-	# At the boards, even between two blows or in the hop the body takes there.
-	var b := npc.node
-	if game.horde.has_method(&"barricade_in_way") and b != null and game.horde.barricade_in_way(npc.position(), b.get(&"wish")) != "":
-		return false
-
-	if bool(brain.get(&"bashing")) or brain.has_method(&"staggered") and brain.staggered() \
-			or brain.has_method(&"swinging") and brain.swinging():
-		return false
-
-	var at := npc.position()
-
-	for spot: Vector3 in survivors:
-		if spot.distance_to(at) < FIGHT:
-			return false
-
-	return true
-
+	return game.horde.wcull != null and game.horde.wcull.walks(npc, survivors)
 
 ## Stuck seconds over seconds with a goal, 0 to 1. [param at_least] floors the denominator: stand-ins
 ## that mostly hold a post have 40 to 140 s of goal time, where one 14 s wait in a doorway reads 25%.
@@ -447,3 +416,44 @@ func worst_cells(kind: StringName, count: int = 3) -> String:
 		out.append("%d,%d=%.0f" % [int(cells[i].x), int(cells[i].z), float(tally[cells[i]])])
 
 	return ", ".join(out)
+
+
+## Keeps the shared watch's tally (the game may be freed before it is read).
+func freeze() -> void:
+	_frozen_line = watch_line()
+	_frozen_ratio = {&"common": watch_ratio(&"common"), &"special": watch_ratio(&"special")}
+	_frozen = true
+
+
+## The shared mover watch's own tally for the zombies (what the cull acts on), next to this meter's.
+func watch_line() -> String:
+	if _frozen:
+		return _frozen_line
+
+	var wc = game.horde.wcull if game.horde != null else null
+
+	if wc == null:
+		return "-"
+
+	var parts := PackedStringArray()
+	var stats: Dictionary = wc.watch.kind_stats()
+
+	for kind: StringName in [&"common", &"special"]:
+		var k: Dictionary = stats.get(kind, {"goal_sec": 0.0, "stuck_sec": 0.0, "longest": 0.0})
+		parts.append("%s %.1f%% of %.0f s goal (worst %.0f s)" % [kind, 100.0 * float(k["stuck_sec"]) / maxf(float(k["goal_sec"]), 1.0), float(k["goal_sec"]), float(k["longest"])])
+
+	return "%s | %d ever stuck | %s" % [" | ".join(parts), wc.watch.ever_stuck_count(), wc.describe()]
+
+
+## The shared watch's stuck seconds over goal seconds for [param kind], 0 to 1.
+func watch_ratio(kind: StringName) -> float:
+	if _frozen:
+		return float(_frozen_ratio.get(kind, 0.0))
+
+	var wc = game.horde.wcull if game.horde != null else null
+
+	if wc == null:
+		return 0.0
+
+	var k: Dictionary = wc.watch.kind_stats().get(kind, {})
+	return float(k.get("stuck_sec", 0.0)) / maxf(float(k.get("goal_sec", 0.0)), 1.0)

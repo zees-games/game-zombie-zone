@@ -54,10 +54,9 @@ var _weapons: PackedStringArray = PackedStringArray()
 var _day := -1.0
 
 
-## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A dot-cloud client reads packs published
-## into <dir> (<id>/<version>/manifest.json), trusting that key, and the map's world is fetched as <id>@<version>
-## (its shared art slice follows as a dependency) instead of being read from the checkout. A <dir> that is a URL
-## (`https://dotgames.org/content`) fetches from that origin, over the network, which is what a player's client does.
+## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A dot-cloud client reads packs
+## published into <dir> (a URL fetches over the network, as a player's client does), trusting that key,
+## and the map's world is fetched as <id>@<version> instead of read from the checkout.
 var _world_key := ""
 
 
@@ -66,11 +65,7 @@ const _AimHolder := preload("shot_aim_holder.gd")
 const _ShotCamera := preload("shot_camera.gd")
 
 
-## One contact sheet per weapon, through the real client and the real buttons: at the hip, two
-## and six frames into a shot, and the reload at 15/25/40/50/57/75/88% by the drawn rig's own fraction,
-## each tile labelled with the HUD's count. `_out` is the directory (`sheet_<id>.png` in it).
-## What `--view=weapons --weapons=all` is for: a counter that never moves and a reload that is
-## a single tilt are both things only a picture says.
+## One contact sheet per weapon through the real client and buttons: hip, shot frames, reload stages, each tile labelled with the HUD count; `_out` is the directory.
 ## Arms [param id] and brings it into hand. Weapons share slots (the SMG and pistol are both 2), so
 ## the slot key alone shows whichever is on top: cycle the slot until [param id] is the one held.
 func _hold_exact(game: ZzGame, local, id: StringName) -> bool:
@@ -184,10 +179,9 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 		print("saved %s: %s" % [path, error_string(sheet.save_png(path))])
 
 
-## Down the sights, through the real client and its Aim key: per gun the hip, the gun coming up
-## and fully aimed (`ads_<id>_<stage>.png` in the `_out` directory), with a line per frame of the
-## crosshair's alpha, the scope's fraction and the lens. Defaults to one iron-sighted gun and one
-## scoped one; `--weapons=` names others.
+## Down the sights through the real client and its Aim key: per gun the hip, the rise and fully aimed
+## (`ads_<id>_<stage>.png` in `_out`), with a line per frame of crosshair alpha, scope fraction and lens.
+## Defaults to one iron-sighted and one scoped gun; `--weapons=` names others.
 func _ads_frames(game: ZzGame, local) -> void:
 	# Seated beside the camera, a team-mate's body fills the frame; a player never sees that from a seat's own eyes with a gun, so stand them behind.
 	var yaw := deg_to_rad(float(local.controller.state.yaw))

@@ -7,8 +7,8 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
-## Bumped when the prune records more (2: the cut edges smoothing must not cross), so older caches prune again.
-const PRUNE_VERSION := 5
+## Bumped when the prune records or tests more (6: the prop and clip layers too), so older caches prune again.
+const PRUNE_VERSION := 6
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
@@ -16,35 +16,9 @@ const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 
-## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the
-## five clocks the genre runs on top of a director.
-##
-## [b]The director is the background; the clocks are the events.[/b] [DotNpcDirector] keeps a
-## population of commons ahead of the team that rises while they are calm and falls away once
-## they are hurting — the build-up, peak and relax that makes a quiet street feel like it is
-## waiting. On top of it, this file runs what a director deliberately does not:
-##
-## [codeblock]
-## mobs       every mob_interval, a crowd spawned out of sight that KNOWS where you are
-## specials   one at a time up to a cap, each from where it is most dangerous
-## the brute  on its own long clock, with a warning
-## panic      while an objective is held: mobs back to back until it is done
-## survival   held by nights or a clock: everything above, faster and bigger by `intensity`
-## waves      held by waves: the director and the clocks are off, and the survival runtime
-##            (`zz_survival.gd`) releases each wave through [method spawn_wave]
-## [/codeblock]
-##
-## [b]Barricades are on the zombies' ground on purpose.[/b] A shut gate is cut out of the graph
-## so the horde goes round; a barricade is left in, so the horde paths straight at it, is
-## stopped by its boxes, and breaks it down ([method barricade_in_way], [method bash]). A
-## barricade cut out of the graph would leave a school with no way in, every wave spawned
-## "where it cannot reach anybody", and nothing at the windows.
-##
-## [b]Server only.[/b] A client never builds one; it draws what the bridge tells it about.
-##
-## [b]A zombie's combat id comes from the game's [DotEntityTable] and carries its kind[/b], as
-## game-arena's monsters do, so a survivor's session id and a zombie's id cannot collide and
-## [method is_npc_entity] asks the id rather than comparing it with a constant.
+## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the clocks the genre runs on top of a director. Server only.
+## The director keeps a calm-rising population of commons; this file adds mobs, specials, the brute, panic while an objective is held, survival intensity and waves.
+## Barricades stay on the zombies' ground so the horde paths at them and bashes ([method barricade_in_way], [method bash]); a combat id comes from the game's [DotEntityTable] and carries its kind.
 
 const CHANNEL := "zz.horde"
 
@@ -112,10 +86,8 @@ var intensity: float = 1.0
 ## Whether the waves drive the spawning (the director, mobs, specials and brute clocks off).
 var waves_mode: bool = false
 
-## The most commons a survival wave lets be up at once (`ZzSurvival._release` sets it each
-## tick; -1 none). A mob (a scream, bile, a box) fits under it: uncapped, one bile mob of
-## forty on a third wave filled the server's whole cap and was where most holds ended
-## (zz-survival-retune-1).
+## The most commons a survival wave lets be up at once (`ZzSurvival._release` sets it each tick; -1 none).
+## A mob fits under it: uncapped, one bile mob filled the whole cap and ended most holds.
 var wave_room: int = -1
 
 ## What the wave in play does to everything spawned in it: its twist.
@@ -128,11 +100,8 @@ var wave_index: int = 0
 ## Barricades this map has: id -> {bounds: AABB, centre: Vector3}. Filled by the game.
 var barricades: Dictionary = {}
 
-## Every living zombie by four-metre cell, and where it was, built once a tick before anything
-## thinks ([method _rebuild_grid]). What a zombie's crowd spacing and a stand-in's threat scan
-## ask instead of the spawner's `npcs_near`, which walks every zombie: ninety commons each
-## asking it for their neighbours every tick was eight thousand position reads, and most of a
-## big map's tick.
+## Every living zombie by four-metre cell, built once a tick before anything thinks ([method _rebuild_grid]).
+## Crowd spacing and threat scans ask it instead of the spawner's `npcs_near`, which walks every zombie.
 ## By path, like every brain: a pack shell older than the class would not know its name.
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 var crowd: CrowdGrid = CrowdGrid.new(GRID)
@@ -210,4 +179,3 @@ var _bile: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 
 
-# --- Setting up ------------------------------------------------------------------------------

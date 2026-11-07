@@ -19,7 +19,7 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 
 ## Without the per-map wave-origin sections (one section, two checks each).
 const SECTIONS := 21
-const CHECKS := 94
+const CHECKS := 97
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -109,6 +109,7 @@ func _run() -> void:
 			var meter: StuckMeter = await _stuck(StringName(id))
 			print("STUCK %-24s %s" % [id, meter.line()])
 			print("      rescue: %s" % meter.rescue)
+			print("      watch: %s" % meter.watch_line())
 			for kind: StringName in StuckMeter.KINDS:
 				print("      %s worst cells %s" % [kind, meter.worst_cells(kind)])
 			for line in meter.cases.slice(0, 8):
@@ -484,6 +485,7 @@ func _stuck(id: StringName) -> StuckMeter:
 			await get_tree().physics_frame
 
 	meter.rescue = str(game.horde.describe().get("stuck", "-")) if game.horde != null else "-"
+	meter.freeze()
 	await _dispose(game)
 	return meter
 
@@ -496,6 +498,7 @@ func _test_stuck(id: StringName) -> void:
 		print(block)
 	_check(meter.ratio(&"standin", STANDIN_MIN_GOAL) <= STANDIN_BAND, "stand-ins are stuck under %d%% of their goal time" % int(STANDIN_BAND * 100.0), detail)
 	_check(meter.ratio(&"common") <= COMMON_BAND, "commons are stuck under %d%% of their goal time" % int(COMMON_BAND * 100.0), detail)
+	_check(meter.watch_ratio(&"common") <= COMMON_BAND, "the shared watch agrees: commons are stuck under %d%% of their goal time" % int(COMMON_BAND * 100.0), detail)
 	_check(maxf(meter.longest[&"standin"], meter.longest[&"common"]) <= LONGEST_BAND, "no mover is stuck longer than %.0f s" % LONGEST_BAND, detail)
 	_finished()
 

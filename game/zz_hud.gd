@@ -110,6 +110,9 @@ var kits: DotKeyHints = null
 var stamina_bar: DotStatBar = null
 var _stamina_pct: float = 100.0
 ## Four ticks round the crosshair on a hit the server confirmed.
+## The marker and numbers layer ([DotHitFeedback]); [member hit_marker] and
+## [member damage_numbers] are its two pieces.
+var hit_fx: DotHitFeedback = null
 var hit_marker: DotHitMarker = null
 ## The confirmed hits' numbers, on the bodies they landed on.
 var damage_numbers: DotDamageNumbers = null
@@ -407,15 +410,9 @@ func _build() -> void:
 	_held.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 
 	# Full rect, centred on the crosshair; both draw only what the server confirmed.
-	damage_numbers = DotDamageNumbers.new()
-	damage_numbers.name = "DamageNumbers"
-	damage_numbers.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(damage_numbers)
-
-	hit_marker = DotHitMarker.new()
-	hit_marker.name = "HitMarker"
-	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_root.add_child(hit_marker)
+	hit_fx = DotHitFeedback.mount(_root)
+	hit_marker = hit_fx.marker
+	damage_numbers = hit_fx.numbers
 
 	watching_label = _label(20)
 	watching_label.name = "Watching"
@@ -512,11 +509,8 @@ func set_prompt(text: String) -> void:
 ## A hit of this survivor's that the server confirmed: the marker round the crosshair, and
 ## the number rising off the body. Never called from the local prediction.
 func confirm_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
-	if hit_marker == null:
-		return
-
-	hit_marker.flash(killed, headshot)
-	damage_numbers.add(victim, amount, point, headshot)
+	if hit_fx != null:
+		hit_fx.confirm_hit(victim, amount, point, killed, headshot)
 
 
 ## A hit from [param from]: a red mark on that side of the crosshair.

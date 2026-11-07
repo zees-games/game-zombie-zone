@@ -11,6 +11,8 @@ extends RefCounted
 
 ## How far one nudge goes, in metres.
 const REACH := 0.7
+## How far a spot is lifted off its floor before the shape is tested there; less under a low ceiling.
+const LIFT := 0.08
 
 ## Moves [param body] [constant REACH] metres along [param direction] (flattened) when the shape
 ## fits there and the floor is under it. Returns whether it moved.
@@ -24,8 +26,9 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	to.origin += flat.normalized() * REACH
 
 	# Lifted a little so the floor under it is not a collision, and the shape must be free there.
+	var lift := _lift(body, to)
 	var lifted := to
-	lifted.origin.y += 0.08
+	lifted.origin.y += lift
 
 	if body.test_move(lifted, Vector3.ZERO):
 		return false
@@ -33,7 +36,7 @@ static func nudge(body: CharacterBody3D, direction: Vector3) -> bool:
 	# `test_move` at the destination only asks whether the body fits THERE, so a wedged zombie
 	# tearing at a 0.14 m barricade was once nudged clean through the boards. Rays at knee and chest
 	# height catch a thin wall without refusing the sill or chamfer a swept shape clips.
-	if walled_off(body, body.global_transform.origin, lifted.origin - Vector3(0.0, 0.08, 0.0)):
+	if walled_off(body, body.global_transform.origin, lifted.origin - Vector3(0.0, lift, 0.0)):
 		return false
 
 	# And ground within a step below, so a nudge is never off a ledge.
@@ -61,6 +64,17 @@ static func relocate_player(player: CharacterBody3D, goal: Vector3, yaw_degrees:
 
 	player.call(&"place_at", player.global_position, yaw_degrees)
 	return true
+
+
+## [constant LIFT], or half the room up to a ceiling nearer than that: a clip slab a centimetre over a
+## head refused every fixed lift, so a body wedged under one was never stepped out.
+static func _lift(body: CharacterBody3D, at: Transform3D) -> float:
+	var hit := KinematicCollision3D.new()
+
+	if not body.test_move(at, Vector3(0.0, LIFT, 0.0), hit):
+		return LIFT
+
+	return hit.get_travel().length() * 0.5
 
 
 ## Whether something solid lies between [param from] and [param to] at knee or chest height.
@@ -105,12 +119,14 @@ static func relocate(body: CharacterBody3D, goal: Vector3, wedged := false) -> b
 	var out_d := INF
 
 	# The second lift is for a body sunk into the floor, whose own height collides at every spot.
-	for lift: float in [0.08, 0.45]:
+	for raise: float in [LIFT, 0.45]:
 		for radius: float in [1.5, 2.5, 3.5]:
 			for i in 12:
 				var a := TAU * float(i) / 12.0
 				var to := body.global_transform
-				to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius + Vector3(0.0, lift, 0.0)
+				to.origin = here + Vector3(cos(a), 0.0, sin(a)) * radius
+				var lift := _lift(body, to) if raise == LIFT else raise
+				to.origin.y += lift
 
 				if body.test_move(to, Vector3.ZERO) or not body.test_move(to, Vector3(0.0, -0.6, 0.0)):
 					continue

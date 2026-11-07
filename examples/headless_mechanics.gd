@@ -25,7 +25,8 @@ const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 17
-const CHECKS := 148
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const CHECKS := 150
 
 var _entered := 0
 var _finished := 0
@@ -704,6 +705,17 @@ func _test_volumes() -> void:
 	print("    teleport: zombie moved %.1f m, path left %d" % [zmoved, zombie.brain.path.points.size()])
 	var stale: bool = zombie.brain.path.points.size() > 0 and zombie.brain.path.points[0].distance_to(zfrom + Vector3.RIGHT) < 0.01
 	_check((zmoved > 5.0 or not zombie.is_alive()) and not stale, "and a zombie, which must find its way again from there", "%.1f m, stale path %s" % [zmoved, str(stale)])
+
+	# A throw along the floor adds to push and keeps the wish; one with lift still leaps.
+	var tb: ZzZombieBody = zombie.node
+	game.horde.warp(zombie, game.horde.snap_to_nav(bystander.feet()), 0.0)
+	await _sim(game, 30)
+	tb.wish = Vector3(1.0, 0.0, 0.0)
+	tb.push = Vector3.ZERO
+	game.horde.throw_zombie(zombie, Vector3(0.0, 0.0, 4.0))
+	_check(tb.is_on_floor() and tb.push.z > 3.9 and tb.wish.x == 1.0 and not tb.flying, "a floor throw is a shove on the walk, the wish kept", "push %s wish %s floor %s" % [str(tb.push), str(tb.wish), str(tb.is_on_floor())])
+	game.horde.throw_zombie(zombie, Vector3(0.0, 6.0, 0.0))
+	_check(tb.flying and tb.wish == Vector3.ZERO, "and a throw upward still leaps", "flying %s wish %s" % [str(tb.flying), str(tb.wish)])
 
 	var push := _first_volume(mech, "push", false)
 	if push.is_empty():

@@ -21,55 +21,21 @@ const ZzZombieLimbs := preload("../../npcs/zz_zombie_limbs.gd")
 const ZzPaths := preload("../zz_paths.gd")
 const ZzNpcs := preload("../zz_npcs.gd")
 
-## Joins an [ZzGame] to a [DotNetManager]. The netcode seam, and the only file in this
-## project that names both.
-##
-## [codeblock]
-## # server
-## bridge.attach(game, net)          # dot-game's DotGameNetcode does this
-## bridge.open_link(server)          # and this
-## bridge.add_player(peer_id, userid, "Ada")
-## bridge.server_tick(tick)          # instead of the game's own loop
-##
-## # client
-## bridge.attach(game, net)
-## bridge.open_link(client_link)
-## bridge.ask_ready()
-## bridge.client_tick(tick, command, slot)
-## [/codeblock]
-##
-## [b]What crosses.[/b] A survivor's own movement is predicted, like every first-person game in
-## this family. Zombies are entities too, server-owned and never predicted (dot-npc's reason):
-## announced once with their kind (`NPC`), then moved by snapshots, then let go (`NPC_GONE`).
-## The map arrives ONCE, as a document in `MAP`. Everything that happens rather than moves —
-## a down, a pin, a box, a pool of acid, a thrown rock, an explosion — is one reliable event,
-## and anything a joiner needs to know about the world as it already is (who is held, what is
-## lying on the ground, which pools are burning) is told to them on READY.
-##
-## [b]The ordering is the other half of the file.[/b] dot-net drives simulation per entity;
-## this game's tick is a whole-world property — every player moves, then the shots, the horde
-## and the round are decided. [method ensure_game_ticked] reconciles the two: the first
-## behaviour through on a tick runs the whole world and the rest find it done.
+## Joins a [ZzGame] to a [DotNetManager]: the netcode seam, and the only file that names both.
+## Survivors are predicted; zombies are server-owned entities (`NPC`, snapshots, `NPC_GONE`); the map arrives once as `MAP`; a joiner learns the current world on READY.
+## dot-net ticks per entity but this game's tick is the whole world, so [method ensure_game_ticked] runs it on the first behaviour through.
 
 const CHANNEL := "zz.net"
 
 ## Bytes of acknowledgement in front of every input packet. [method DotNetManager.encode_ack].
 const ACK_BYTES := 4
 
-## Commands in every input packet: this tick's and the four before it, so a lost packet
-## costs the server no tick unless the next four are lost too. Over WebSocket nothing is
-## ever lost; over ENet (the desktop client, since servers went dual-stack) one command a
-## packet was a tick the server ran on the previous command for every packet dropped.
-## game-arena measured it first: 80% of ticks with the right command at 20% loss with one
-## copy, 99-100% with three, and five closed the rest (2026-10-09).
+## Commands per input packet: this tick's and the four before, so a lost packet costs no tick unless five go missing.
+## Measured at 20% loss: one copy gave 80% of ticks the right command, three 99-100%, five closed the rest.
 const INPUT_COPIES := 5
 
-## How often the round clock and the numbers behind it go out, in ticks.
-##
-## [b]Twice a second, not per tick and not per snapshot.[/b] What it carries changes when
-## somebody is found or a second passes, and a client told sixty-four times a second would be
-## paying for sixty-two copies of the same numbers. The clock itself is advanced on the
-## client between messages — see [method _apply_clock].
+## Ticks between round-clock updates (twice a second, not per tick or snapshot);
+## the client advances the clock between messages, see [method _apply_clock].
 const CLOCK_EVERY := 32
 
 ## The client has been told who it is. [param player_id] is the session id.
@@ -146,11 +112,7 @@ signal splat_received(point: Vector3, normal: Vector3)
 signal npc_added(net_id: int, kind: StringName, variant: int, body: Node3D)
 signal npc_removed(net_id: int, killed: bool, body: Node3D)
 
-## Somebody pressed Enter. Server side, and the only thing this bridge does with chat.
-##
-## [b]The bridge carries chat and decides nothing about it.[/b] Who may say what, on which
-## channel, how often and who hears it are [DotChatRouter]'s, and the router is the services
-## layer's.
+## Somebody pressed Enter. Server side; the bridge carries chat and decides nothing, [DotChatRouter] does.
 signal say_requested(peer_id: int, channel_id: StringName, text: String)
 
 ## A voice frame arrived. Server side; the payload is unparsed and must not be trusted —
@@ -168,13 +130,9 @@ var link: ZzNetLink = null
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
 
-## Where the clock learns how long the link is, in milliseconds.
-##
-## dot-net never touches a transport and cannot measure it; dot-server's heartbeat already
-## does ([method DotClientLink.ping_ms]). A client that feeds nothing has a clock that
-## assumes an instant connection and stamps every command for a tick the server has already
-## simulated — and the symptom is every command being discarded as late. Two games in this
-## family shipped without a sample and read a median of an empty set.
+## Where the clock learns the link latency in ms ([method DotClientLink.ping_ms]).
+## With no sample the clock assumes zero and stamps commands for ticks the server has already run,
+## so every command is discarded as late.
 var rtt_source: Callable = Callable()
 
 ## Where a voice frame goes on the server. Assigned by [DotGameModule] to the services
@@ -191,12 +149,9 @@ var _entities: Node = null
 ## session id -> [ZzPlayerNet].
 var _behaviours: Dictionary = {}
 
-## The next session id handed to somebody the world made itself.
-##
-## [b]Well above anything dot-server will issue, and a bot needs one at all because of how a
-## player id is written.[/b] Every id on the wire is `u<session>`, and a player called `bot`
-## parses back to session ZERO — so two bots are one entry in [member _behaviours], and
-## their JOIN carries a player id that is also dot-net's broadcast address.
+## The next session id for somebody the world made itself, well above anything dot-server issues.
+## A player named `bot` parses back to session zero, so two bots would share one behaviour entry
+## and a JOIN carrying the broadcast address.
 const FIRST_BOT_SESSION := 900000
 
 var _next_bot_session: int = FIRST_BOT_SESSION
@@ -204,25 +159,16 @@ var _next_bot_session: int = FIRST_BOT_SESSION
 var _player_of_peer: Dictionary = {}
 var _peer_of_player: Dictionary = {}
 var _ready_peers: Dictionary = {}
-## Server: peers whose READY came before their seat ([method add_player]). A client sends READY
-## when its link says PLAYING, which the link decides itself after sending `loaded` on another
-## channel; over ENet with loss the READY can overtake `loaded`, and a READY dropped here left
-## that client waiting for a world for ever. Admitted when seated.
+## Server: peers whose READY came before their seat ([method add_player]); over lossy ENet READY can
+## overtake `loaded`, and a dropped one left the client waiting for ever. Admitted when seated.
 var _ready_unseated: Dictionary = {}
 
 var _tick: int = 0
 var _game_ticked_for: int = -1
 
-## Server only: whether [method DotNetManager.server_tick] is on the stack, and the net ids
-## let go of while it was.
-##
-## [b]An entity let go of mid-tick leaks a lag-compensation track, for ever.[/b]
-## mg-smash-copter's finding: the world ticks inside the first player behaviour's
-## `_net_simulate`, so a player removed there is unregistered while `server_tick` is still
-## holding the identity list it took before simulating — and then records history for it. The registry has
-## already told the history to forget each id; the record makes a fresh track for it again,
-## and nothing ever forgets it a second time.
-## Forgotten again here once the manager has let go of its list.
+## Server only: whether [method DotNetManager.server_tick] is on the stack, and the net ids let go of meanwhile.
+## A removal inside the first player behaviour's tick would let the history record recreate a
+## lag-compensation track for it, so the ids are forgotten again once the manager has dropped its list.
 var _in_server_tick := false
 var _unregistered_in_tick: Array[int] = []
 var _client_ticked_for: int = -1

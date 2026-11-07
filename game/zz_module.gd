@@ -787,6 +787,14 @@ func _add_tunables(world: ZzGame) -> void:
 		wave_set_cvar.changed.connect(func(_old: String, now: String) -> void:
 			config.waves_set = now.strip_edges()
 			log_info("wave set", {"now": config.waves_set}))
+	var force_cvar := add_cvar("zz_prop_force", "",
+		"JSON over props/forces.json: {\"weapon id\": {\"barrel\": 2.0}} sets that weapon's push on a kind of loose prop; empty keeps the file")
+	if force_cvar != null:
+		force_cvar.changed.connect(func(_old: String, now: String) -> void:
+			if not world.set_prop_force_override(now):
+				log_info("zz_prop_force is not a JSON object, ignored", {"value": now}))
+	_tunable("zz_prop_carry_mass", world.prop_carry.max_mass, "Heaviest loose prop (kg) a survivor can pick up with the use key",
+		func(value: float) -> void: world.prop_carry.max_mass = clampf(value, 0.0, 500.0))
 	_tunable("zz_waves", float(config.waves), "Waves a survival map is held for (zz_survival waves)",
 		func(value: float) -> void: config.waves = clampi(int(value), 1, 50))
 	_tunable("zz_nights", float(config.nights), "Nights a survival map is held for (zz_survival nights)",
