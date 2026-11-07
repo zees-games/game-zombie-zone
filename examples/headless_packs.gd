@@ -29,7 +29,7 @@ const ALONE_CHECKS := 12
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 51
+const REAL_CHECKS := 72
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79", "zz_ak", "zz_scar", "zz_bren", "zz_glock", "zz_deagle", "zz_p90", "zz_aa12", "zz_rpg", "zz_machete", "zz_bat", "zz_crowbar", "zz_axe", "zz_sledge", "zz_hunting"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
@@ -441,6 +441,133 @@ func _pack_brain(game: ZzGame, player: Object) -> void:
 	_check(body != null and body.get_children().any(func(c: Node) -> bool: return c.has_method(&"apply_gait")), "the brain's view of the body hangs off it")
 
 
+## The collider is the pack's declared body (radius capped for the doorways, height stooped like the brute's).
+func _pack_colliders(game: ZzGame) -> void:
+	var tiger: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
+	var bear: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_bear")
+	var trex: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_trex")
+	_check(is_equal_approx(float(tiger.meta["radius"]), 0.55) and is_equal_approx(float(tiger.meta["height"]), 1.7),
+		"the tiger's collider is the pack's 0.55 by 1.7", "%s x %s" % [tiger.meta["radius"], tiger.meta["height"]])
+	_check(is_equal_approx(float(bear.meta["radius"]), 0.8) and is_equal_approx(float(bear.meta["height"]), 2.0),
+		"the bear's is the pack's 0.8 by 2.0", "%s x %s" % [bear.meta["radius"], bear.meta["height"]])
+	_check(is_equal_approx(float(trex.meta["radius"]), ZzNpcs.PACK_MAX_RADIUS) and is_equal_approx(float(trex.meta["height"]), 5.0),
+		"the T-Rex's radius is held to what the doorways take, its height kept", "%s x %s" % [trex.meta["radius"], trex.meta["height"]])
+	_check(is_equal_approx(float(trex.meta["fit_height"]), ZzNpcs.PACK_FIT_HEIGHT)
+		and float(bear.meta["fit_height"]) == 0.0 and float(tiger.meta["fit_height"]) == 0.0, "the T-Rex stoops to a brute's 2.1 m, the shorter ones do not")
+	_check(is_equal_approx(trex.eye_height, 4.5), "and the eyes keep the full height", "%.2f" % trex.eye_height)
+	var spot: Vector3 = game.horde.survivor_position(&"u100") + Vector3(3.0, 0.0, 0.0)
+	var npc := game.horde.spawn_special(&"zhm_trex", spot)
+	var body := npc.node as ZzZombieBody if npc != null else null
+	_check(body != null and is_equal_approx(body.radius, 0.9) and is_equal_approx(body.height, 5.0) and is_equal_approx(body.fit_height, 2.1),
+		"the spawned body carries them", "%s" % [str([body.radius, body.height, body.fit_height]) if body != null else "none"])
+	var shaped := false
+	if body != null:
+		for c in body.get_children():
+			if c is CollisionShape3D and (c.shape as CapsuleShape3D) != null:
+				shaped = is_equal_approx((c.shape as CapsuleShape3D).radius, 0.9) and is_equal_approx((c.shape as CapsuleShape3D).height, 2.1)
+	_check(shaped, "and its collision capsule is that radius at the stooped height")
+	game.horde.spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+
+
+## The game's handles on a brain, answered by a pack monster: told to hunt, lured, and tearing at a barricade.
+func _pack_handles(game: ZzGame, player: Object) -> void:
+	# The first rounds of a test game come and go in seconds, each laying the map out again and sweeping the horde:
+	# begin once one is in play.
+	var guard := 0
+	while game.phase != ZzGame.Phase.PLAY and guard < 64 * 60:
+		game.simulate(1.0 / 64.0)
+		guard += 1
+	player.health.invulnerable = true
+	for n: DotNpcInstance in game.horde.spawner.npcs_near(Vector3.ZERO, 10000.0):
+		game.horde.spawner.remove(n.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	var prey: Vector3 = game.horde.survivor_position(&"u100")
+	# Far from the survivor, out of every pounce and charge range, so only the handle moves it.
+	var tiger := _spawn_far(game, &"zhm_tiger", prey, 24.0)
+	_check(tiger != null, "a tiger far from the survivor")
+	if tiger == null:
+		return
+	var apart := tiger.position().distance_to(prey)
+	_check(apart > 20.0, "farther than any of its leaps", "%.1f m" % apart)
+	tiger.brain.call(&"force_target", &"u100")
+	_check(tiger.target_id == &"u100", "force_target makes the survivor its target")
+	for i in 64:
+		game.simulate(1.0 / 64.0)
+	_check(tiger.target_id == &"u100" and tiger.position().distance_to(prey) < apart - 1.0, "and it comes for them from beyond its sight",
+		"%.1f -> %.1f m" % [apart, tiger.position().distance_to(prey)])
+
+	# A barricade across its way: it stops and tears at it through the horde.
+	var heading := Vector3(prey.x - tiger.position().x, 0.0, prey.z - tiger.position().z).normalized()
+	var at := tiger.position() + heading * 3.0
+	var box := AABB(Vector3(at.x - 3.0, -0.5, at.z - 0.3), Vector3(6.0, 3.5, 0.6))
+	game.barricades["fx_pack"] = {"intact": true, "health": 1.0e6, "max": 1.0e6, "label": "test boards", "torn_at": -1.0}
+	game.horde.set_barricades({"fx_pack": box})
+	var torn_before := 1.0e6
+	for i in 64 * 3:
+		game.simulate(1.0 / 64.0)
+	var bashing: bool = tiger.brain.get(&"bashing")
+	_check(bashing, "pressed against boards on its way, it bashes")
+	_check(float(game.barricades["fx_pack"]["health"]) < torn_before, "and the barricade loses health to it", "%.0f" % float(game.barricades["fx_pack"]["health"]))
+	_check((tiger.node as ZzZombieBody).anim == ZzZombieBody.Anim.ATTACK, "swinging at it")
+	var held := tiger.position()
+	for i in 32:
+		game.simulate(1.0 / 64.0)
+	_check(tiger.position().distance_to(held) < 1.0, "and it stays at the boards while they stand", "%.2f m, bashing %s, wish %s" % [tiger.position().distance_to(held), tiger.brain.get(&"bashing"), (tiger.node as ZzZombieBody).wish])
+	game.barricades["fx_pack"]["intact"] = false
+	game.horde.set_barricades({})
+	for i in 64:
+		game.simulate(1.0 / 64.0)
+	_check(not bool(tiger.brain.get(&"bashing")) and tiger.position().distance_to(held) > 1.0, "gone, it walks on")
+	game.barricades.erase("fx_pack")
+
+	# A lure: nobody to hunt, it goes to the point and stands there.
+	game.horde.spawner.remove(tiger.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	var lured := _spawn_far(game, &"zhm_bear", player.global_position, 24.0)
+	var plain := _spawn_far(game, &"zhm_tiger", player.global_position, 24.0)
+	# Blind, so only the lure moves them; the point is ten metres down the street toward the survivor.
+	lured.blind_until = 1.0e9
+	plain.blind_until = 1.0e9
+	var point := game.horde.snap_to_nav(lured.position() + (player.global_position - lured.position()).normalized() * 10.0)
+	for i in 32:
+		game.simulate(1.0 / 64.0)
+	game.horde.lure(point, 30.0, 60.0)
+	var before := lured.position().distance_to(point)
+	var plain_before := plain.position().distance_to(point)
+	for i in 64 * 4:
+		game.simulate(1.0 / 64.0)
+	_check(lured.position().distance_to(point) < before - 3.0, "a lure draws a pack monster toward it", "%.1f -> %.1f m, target %s, state %s, lure %s, at %s, point %s" % [before, lured.position().distance_to(point), lured.target_id, lured.brain.get(&"state"), lured.brain.get(&"lure"), lured.position(), point])
+	_check(plain.position().distance_to(point) < plain_before - 3.0, "every pack monster in range, not one", "%.1f -> %.1f m" % [plain_before, plain.position().distance_to(point)])
+	for i in 64 * 10:
+		game.simulate(1.0 / 64.0)
+	_check(lured.position().distance_to(point) <= 4.5, "and it stays at the lure", "%.1f m" % lured.position().distance_to(point))
+	var it_moved := lured.position()
+	for i in 64:
+		game.simulate(1.0 / 64.0)
+	_check(lured.position().distance_to(it_moved) < 0.5, "standing")
+	# Told to hunt a survivor, it leaves the lure for them.
+	lured.blind_until = -1.0
+	lured.brain.call(&"force_target", &"u100")
+	var gap := lured.position().distance_to(player.global_position)
+	for i in 64:
+		game.simulate(1.0 / 64.0)
+	_check(lured.brain.get(&"state") != &"lure" and lured.position().distance_to(player.global_position) < gap - 1.0,
+		"though a survivor it is told to hunt outranks it", "state %s, %.1f -> %.1f m" % [lured.brain.get(&"state"), gap, lured.position().distance_to(player.global_position)])
+	for n: DotNpcInstance in [lured, plain]:
+		game.horde.spawner.remove(n.instance_id, DotNpcSpawner.REASON_CLEANUP)
+
+
+## A monster of [param kind] at least [param min_apart] metres from [param from], on the first spot the map lets one stand.
+func _spawn_far(game: ZzGame, kind: StringName, from: Vector3, min_apart: float) -> DotNpcInstance:
+	for d: float in [40.0, 34.0, 28.0, min_apart + 1.0]:
+		for dir: Vector3 in [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0.7, 0, -0.7), Vector3(-0.7, 0, 0.7)]:
+			var npc := game.horde.spawn_special(kind, from + dir * d)
+			if npc == null:
+				continue
+			if npc.position().distance_to(from) >= min_apart:
+				return npc
+			game.horde.spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	return null
+
+
 func _damage_of(id: StringName) -> float:
 	var def := ZzWeapons.def_of(id)
 	return -1.0 if def == null or def.tuning == null else float(def.tuning.get("damage"))
@@ -585,5 +712,7 @@ func _real_packs() -> void:
 	_check(game.arm(player, &"zz_m4") and game.arm(player, &"dagger"), "a survivor can be armed from each weapon pack")
 	_monster_host(game, player, spawned[&"zhm_tiger"])
 	_pack_brain(game, player)
+	_pack_colliders(game)
+	_pack_handles(game, player)
 	game.queue_free()
 	_finished += 1

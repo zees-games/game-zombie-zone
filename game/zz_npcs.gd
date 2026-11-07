@@ -213,9 +213,39 @@ static func _pack_defs(c: ZzConfig) -> Array:
 			"body": str(s.get("body", "common")), "radius": 0.34, "height": 1.8, "pack": m.pack,
 		}
 		def.meta.merge(s.get("meta", {}), true)
+		_fit_collider(def.meta)
 		out.append(def)
 
 	return out
+
+
+## The widest a pack monster's collider is made, whatever its data says: the nav graph and the maps' doorways are
+## laid for a brute (0.7), and a T-Rex of 1.1 would jam in every one.
+const PACK_MAX_RADIUS := 0.9
+## The tallest a pack monster's collider stands (a brute stoops under a 2.4 m lintel the same way); its hitboxes and
+## eyes keep the full height.
+const PACK_FIT_HEIGHT := 2.1
+
+
+## A pack monster's collider from the body the pack declares (`meta.cfg.body`: radius and height), if it declares one;
+## otherwise the common's 0.34 by 1.8 stays.
+static func _fit_collider(meta: Dictionary) -> void:
+	var cfg: Variant = meta.get("cfg", null)
+	var declared: Variant = (cfg as Dictionary).get("body", null) if cfg is Dictionary else null
+
+	if not declared is Dictionary:
+		return
+
+	var d: Dictionary = declared
+	var r := float(d.get("radius", 0.0))
+	var h := float(d.get("height", 0.0))
+
+	if r > 0.0:
+		meta["radius"] = minf(r, PACK_MAX_RADIUS)
+
+	if h > 0.0:
+		meta["height"] = h
+		meta["fit_height"] = minf(h, PACK_FIT_HEIGHT) if h > PACK_FIT_HEIGHT else 0.0
 
 
 ## The population a map runs under. Commons are cheap; a special costs what it is worth, so the
