@@ -267,15 +267,16 @@ func _measure() -> void:
 		if _prev_covered != null:
 			_save(_prev_covered, "last_covered")
 		label = "lift_0"
-		_prev_pos = pos
+		# The lift frame still draws the cover: the first frame to compare against is the next one.
+		_prev_pos = Vector3.INF
 	elif not open and _was_open:
 		label = "cover_up"
 		print("render_cover: cover back at frame %d (%d open frames) for %s, survivor placed: %s" % [_frame, _open_frames, _gate.reasons(), _client.call(&"_is_placed")])
-	elif not open and _frame <= 3:
+	elif not open and _frame == 1:
 		label = "first_frames"
 	if open:
 		_open_frames += 1
-		if label == "" and _open_frames in [2, 3, 6, 30]:
+		if label == "" and _open_frames in [2, 6, 30]:
 			label = "open_%d" % (_open_frames - 1)
 		var why := _gap(game, cam, player, pos, luma)
 		if player != null and _prev_pos.is_finite() and pos.is_finite() and pos.distance_to(_prev_pos) > 1.5:
@@ -284,7 +285,8 @@ func _measure() -> void:
 			_fails.append("frame %d (open %d): %s luma %.3f cam %s" % [_frame, _open_frames, why, luma, pos])
 			if label == "" and _fails.size() <= 6:
 				label = "FAIL"
-		_prev_pos = pos
+		if _open_frames > 1:
+			_prev_pos = pos
 	else:
 		_prev_covered = image
 	if label != "":
