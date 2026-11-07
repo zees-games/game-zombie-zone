@@ -27,7 +27,7 @@ const ALONE_CHECKS := 12
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 32
+const REAL_CHECKS := 38
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79", "zz_ak", "zz_scar", "zz_bren", "zz_glock", "zz_deagle", "zz_p90", "zz_aa12", "zz_rpg", "zz_machete", "zz_bat", "zz_crowbar", "zz_axe", "zz_sledge", "zz_hunting"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
@@ -378,6 +378,25 @@ func _each_pack_alone() -> void:
 	_finished += 1
 
 
+## The monsters' host seam in a running game: targets, blows and afflictions go through the game.
+func _monster_host(game: ZzGame, player: Object, npc: DotNpcInstance) -> void:
+	var host: Object = game.horde.spawner.get_meta(&"zhm_host", null)
+	_check(host != null and host == game.horde.monster_host, "the spawner carries the game's monster host")
+	var targets: Array = host.call(&"zhm_targets")
+	_check(targets.size() == 1 and targets[0]["id"] == &"u100" and targets[0]["position"].is_equal_approx(game.horde.survivor_position(&"u100")),
+		"the host offers the living survivor as a target", str(targets))
+	var before: float = player.real_health()
+	host.call(&"zhm_hit", npc, &"u100", 10.0, &"claw", {"source": npc.position()})
+	_check(player.real_health() < before, "a claw lands through the game's zombie hit", "%.1f -> %.1f" % [before, player.real_health()])
+	before = player.real_health()
+	host.call(&"zhm_hit", npc, &"u100", 10.0, &"pounce", {"source": npc.position() + Vector3(2, 0, 0)})
+	_check(player.real_health() < before, "a knocking blow hurts too", "%.1f -> %.1f" % [before, player.real_health()])
+	host.call(&"zhm_status", &"u100", &"stun", 2.0, {})
+	_check(host.call(&"slowed", &"u100"), "a stun is held against the survivor")
+	game.simulate(1.0 / 64.0)
+	_check(player.controller.motor.has_modifier(player.controller.state, &"zz_tagged"), "and slows them while it lasts")
+
+
 func _damage_of(id: StringName) -> float:
 	var def := ZzWeapons.def_of(id)
 	return -1.0 if def == null or def.tuning == null else float(def.tuning.get("damage"))
@@ -520,5 +539,6 @@ func _real_packs() -> void:
 
 	_check(spawned.values().all(func(n: DotNpcInstance) -> bool: return n != null and n.alive), "all three are alive after two seconds")
 	_check(game.arm(player, &"zz_m4") and game.arm(player, &"dagger"), "a survivor can be armed from each weapon pack")
+	_monster_host(game, player, spawned[&"zhm_tiger"])
 	game.queue_free()
 	_finished += 1
