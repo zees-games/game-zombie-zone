@@ -976,6 +976,8 @@ func _build_horde() -> void:
 	horde.name = "Horde"
 	horde.nav_async = nav_async
 	add_child(horde)
+	# The classes stand-ins are dealt come from the config's seed, as the horde's rolls do: an unseeded generator gave every run (and every box under test) a different team and a different minute.
+	_class_rng.seed = int(config.seed_value) ^ hash("stand-in classes")
 	var ready_now := horde.setup(self, config)
 
 	if not ready_now.ok:
