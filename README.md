@@ -56,7 +56,7 @@ Anybody pinned needs a friend: shoot what holds them or shove it off. Every spec
 | Ram | idle, rage | run, charge | swing | - | carry (run), then fists slamming the floor | hit | death | - |
 | Spitter | idle | run | swing, spit (open jaw) | - | - | hit | death | - |
 | Rider | idle | run (arms), crouch | swing | leap pose | ride: legs wrapped round the head, arms gripping, rocking | hit | death | crouch |
-| Brute | idle | run | swing, throw | - | - | hit | death | - |
+| Brute | idle | run | swing, ground strike on a downed survivor, throw | - | - | hit | death | - |
 | Sleeper | sitting, crying (still on purpose) | run | swing, rage | - | - | hit | death | sitting |
 | Screamer | idle | run | swing, scream (open jaw) | - | - | hit | death | - |
 | Crawler | crawl | crawl | lunge on the crawl clip, ground strike | - | grab: one arm hooked to the ankle, the other clawing | crawl | death | crawl |
