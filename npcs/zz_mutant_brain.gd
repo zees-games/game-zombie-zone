@@ -168,7 +168,7 @@ func _walk(b: ZzZombieBody, at: Vector3, _delta: float) -> void:
 	if gap <= tune(&"reach", 1.8) and absf(npc.position().y - at.y) < 1.6:
 		halt()
 		face(at - npc.position())
-		b.anim = ZzZombieBody.Anim.ATTACK if swinging() else ZzZombieBody.Anim.IDLE
+		b.anim = swing_anim() if swinging() else ZzZombieBody.Anim.IDLE
 		var _swung := swing_at(victim)
 	elif not swinging():
 		chase_to(at, npc.def.move_speed)
