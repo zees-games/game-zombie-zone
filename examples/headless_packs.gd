@@ -7,6 +7,7 @@ const ZzNpcProfiles := preload("../game/zz_npc_profiles.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzBoxProfiles := preload("../game/zz_box_profiles.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
+const ZzPackBrains := preload("../game/zz_pack_brains.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -22,7 +23,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
 const SECTIONS := 6
-const CHECKS := 51
+const CHECKS := 54
 ## Each real pack scanned alone from a directory holding only a link to it.
 const ALONE_CHECKS := 12
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
@@ -406,6 +407,16 @@ func _pack_brain(game: ZzGame, player: Object) -> void:
 		_check(def != null and def.brain_script_path.begins_with("user://zz_pack_brains/") and FileAccess.file_exists(def.brain_script_path),
 			"%s runs a generated brain, not the common's" % id, str(def.brain_script_path if def != null else "-"))
 		_check(def != null and def.meta.has("cfg") and def.meta.get("species", "") != "", "%s carries its species and numbers" % id)
+
+	# The generated script is named by its own text, so a build with another template (another checkout, sharing user://) never
+	# swaps the file under a running monster: that was a tiger without force_target, once in a dozen loaded runs.
+	var tiger_def: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
+	var brain_path: String = tiger_def.brain_script_path if tiger_def != null else ""
+	var brain_text := FileAccess.get_file_as_string(brain_path)
+	_check(brain_text.contains("func force_target") and brain_text.contains("var _forced"), "the generated brain answers force_target", brain_path)
+	var again: String = ZzPackBrains.wrapper_for(brain_text.get_slice("\"", 1))
+	_check(again == brain_path, "and asking again for the same brain gives the same file", again)
+	_check(ZzPackBrains.wrapper_for("res://other_brain.gd") != brain_path, "while another parent, or another template, is another file")
 
 	# Drawn as the body each names (a client has no scene of the pack's): the bear and T-Rex as the brute, the cat as the leaper.
 	var brute: Dictionary = ZzZombieView.look_for(&"brute", 0)
