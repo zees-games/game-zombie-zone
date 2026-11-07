@@ -92,6 +92,64 @@ static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
 static var OIL_MONSTER_BRAIN := ZzPaths.rebase("res://npcs/zz_oil_monster_brain.gd")
 
 
+## The points of [param nav] that pass [param filter], thinned so no two are closer than [param spacing]:
+## what `DotNpcDirector.set_spawn_points_from_nav` returns, the same points in the same order (the first
+## of two close ones wins), but through a grid of cells one spacing wide. The director's own loop
+## compares every point with every kept one, which was 0.6 s a round on a big map.
+static func thinned_points(nav: DotNpcNavData, spacing: float, filter: DotNpcNavFilter) -> PackedVector3Array:
+	var kept := PackedVector3Array()
+
+	if nav == null or nav.points.is_empty():
+		return kept
+
+	var spacing_sq := spacing * spacing
+	var size := maxf(spacing, 0.001)
+	var cells: Dictionary = {}
+
+	for i in nav.points.size():
+		if filter != null and not filter.passes(nav.area_of(i), nav.flags_of(i)):
+			continue
+
+		var point := nav.points[i]
+		var cx := floori(point.x / size)
+		var cy := floori(point.y / size)
+		var cz := floori(point.z / size)
+		var too_close := false
+
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				for dz in range(-1, 2):
+					var bucket: Variant = cells.get(Vector3i(cx + dx, cy + dy, cz + dz))
+
+					if bucket == null:
+						continue
+
+					for other: Vector3 in bucket:
+						if other.distance_squared_to(point) < spacing_sq:
+							too_close = true
+							break
+
+					if too_close:
+						break
+				if too_close:
+					break
+			if too_close:
+				break
+
+		if too_close:
+			continue
+
+		kept.append(point)
+		var key := Vector3i(cx, cy, cz)
+
+		if cells.has(key):
+			(cells[key] as PackedVector3Array).append(point)
+		else:
+			cells[key] = PackedVector3Array([point])
+
+	return kept
+
+
 static func is_special(kind: StringName) -> bool:
 	return kind != COMMON and kind != &""
 

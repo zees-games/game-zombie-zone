@@ -20,6 +20,13 @@ const PRACTICE := &"zz_practice"
 ## id -> normalised document.
 var maps: Dictionary = {}
 
+## Where a parsed document is kept between runs ("" keeps none). Reading and normalising the ~40
+## documents was 1.5 s at start; a binary copy keyed on the file's size and time and on the
+## normaliser's own source loads in a fraction of it, and a changed file or a changed [ZzMapDoc]
+## parses again by itself.
+var doc_cache_dir: String = "user://map_docs"
+var _validator_key: String = ""
+
 ## Files that were refused, with why. What `zz_maps` prints, so a mapper can see it.
 var refused: Dictionary = {}
 
@@ -92,6 +99,13 @@ func _read_directory(root: String) -> int:
 	var loaded := 0
 
 	for file in files:
+		var cached := _cache_read(root, file)
+
+		if not cached.is_empty() and _add(cached, file):
+			roots[StringName(str(cached["id"]))] = root
+			loaded += 1
+			continue
+
 		var text := FileAccess.get_file_as_string(root.path_join(file))
 
 		if text.is_empty():
@@ -110,8 +124,66 @@ func _read_directory(root: String) -> int:
 		if _add(parsed.value, file):
 			roots[StringName(str(parsed.value["id"]))] = root
 			loaded += 1
+			_cache_write(root, file, parsed.value)
 
 	return loaded
+
+
+## What the cache holds for [param file] under [param root], or {} when it holds nothing current.
+func _cache_read(root: String, file: String) -> Dictionary:
+	var path := _cache_path(root, file)
+
+	if path == "" or not FileAccess.file_exists(path):
+		return {}
+
+	var f := FileAccess.open(path, FileAccess.READ)
+
+	if f == null:
+		return {}
+
+	var head: Variant = f.get_var()
+
+	if typeof(head) != TYPE_STRING or head != _cache_key(root, file):
+		return {}
+
+	var doc: Variant = f.get_var()
+	return doc if typeof(doc) == TYPE_DICTIONARY else {}
+
+
+func _cache_write(root: String, file: String, doc: Dictionary) -> void:
+	var path := _cache_path(root, file)
+
+	if path == "":
+		return
+
+	DirAccess.make_dir_recursive_absolute(doc_cache_dir)
+	var f := FileAccess.open(path + ".tmp", FileAccess.WRITE)
+
+	if f == null:
+		return
+
+	f.store_var(_cache_key(root, file))
+	f.store_var(doc)
+	f.close()
+	var _renamed := DirAccess.rename_absolute(path + ".tmp", path)
+
+
+func _cache_path(root: String, file: String) -> String:
+	if doc_cache_dir == "":
+		return ""
+
+	return doc_cache_dir.path_join("%s_%s.bin" % [root.md5_text().substr(0, 8), file])
+
+
+## The file's size and time, with the normaliser's source: either changing makes the copy stale.
+func _cache_key(root: String, file: String) -> String:
+	if _validator_key == "":
+		_validator_key = FileAccess.get_md5((ZzMapDoc as Script).resource_path) + FileAccess.get_md5(get_script().resource_path)
+
+	var src := root.path_join(file)
+	var f := FileAccess.open(src, FileAccess.READ)
+	var size := f.get_length() if f != null else -1
+	return "%d:%d:%s" % [size, FileAccess.get_modified_time(src), _validator_key]
 
 
 ## Follows [param index]: subscribed (solo) map entries of an accepted kind become maps here, for

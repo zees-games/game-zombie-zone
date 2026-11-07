@@ -114,7 +114,9 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 		nav = null
 		spawner.nav = null
 
+	var lap := Time.get_ticks_usec()
 	var built := rebuild_navigation()
+	lap = ZzLaps.lap(sections, &"rebuild_nav", lap)
 
 	if not built.ok:
 		return built
@@ -127,6 +129,7 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 
 ## What waits on the first graph of a map: its route, its sleepers and wanderers, and the bake.
 func _finish_map_build() -> void:
+	var lap := Time.get_ticks_usec()
 	_map_nav_pending = false
 	var route := PackedVector3Array()
 	for p: Array in _doc.get("route", []):
@@ -139,7 +142,9 @@ func _finish_map_build() -> void:
 	if str(_doc.get("mode", "")) != "survival":
 		populate_map()
 
+	lap = ZzLaps.lap(sections, &"populate", lap)
 	_begin_notes()
+	lap = ZzLaps.lap(sections, &"begin_notes", lap)
 
 
 ## Places the map's sleepers and wanderers, once per build.
@@ -159,6 +164,7 @@ func _begin_notes() -> void:
 	notes.clear()
 	_plan_due = false
 	notes.bake_id = str(_doc.get("id", ""))
+	notes.background = nav_async
 
 	if game == null or game.map == null or game.physics == null:
 		return
@@ -337,24 +343,31 @@ func _poll_nav() -> void:
 
 func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	nav = graph
+	var lap := Time.get_ticks_usec()
 	_prune_blocked(nav, job)
+	lap = ZzLaps.lap(sections, &"nav_prune", lap)
 	var valid := nav.validate()
+	lap = ZzLaps.lap(sections, &"nav_validate", lap)
 
 	if not valid.ok:
 		return valid.wrap("The map's navigation is not usable")
 
 	var applied := spawner.set_nav_data(nav)
+	lap = ZzLaps.lap(sections, &"nav_set", lap)
 
 	if not applied.ok:
 		return applied
 
 	_adopt_links()
+	lap = ZzLaps.lap(sections, &"nav_links", lap)
 	_usable_posts = ZzNpcs.reachable_posts(nav, _doc)
 	_usable_posts_for = nav
+	lap = ZzLaps.lap(sections, &"nav_posts", lap)
 
-	var _from_nav := director.set_spawn_points_from_nav(nav, 6.0, DotNpcNavFilter.walking_only())
+	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, DotNpcNavFilter.walking_only())
 	_add_hinted_spawns()
 	var kept := _keep_out_of_safe_rooms()
+	lap = ZzLaps.lap(sections, &"nav_spawns", lap)
 
 	DotLog.info(CHANNEL, "navigation built", {
 		"map": str(_doc.get("id", "")), "points": nav.point_count(), "edges": nav.edge_count(),
@@ -633,7 +646,9 @@ func tick(delta: float, ticks: int = 1) -> void:
 	if spawner == null:
 		return
 
+	var lap := Time.get_ticks_usec()
 	_poll_nav()
+	lap = ZzLaps.lap(sections, &"poll_nav", lap)
 
 	if _map_nav_pending:
 		return
@@ -647,9 +662,12 @@ func tick(delta: float, ticks: int = 1) -> void:
 	if _plan_due:
 		_plan_due = false
 		_plan_notes()
+		lap = ZzLaps.lap(sections, &"plan_notes", lap)
 
 	if notes.tick():
 		_plan_due = true
+
+	lap = ZzLaps.lap(sections, &"notes_tick", lap)
 
 	notes.update(delta, self)
 	_rebuild_candidates()
