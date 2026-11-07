@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 435
+const CHECKS := 437
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2779,6 +2779,23 @@ func _test_the_client_platform() -> void:
 	_check(covered, "the loading cover is up at the start and blocks input")
 	_check(platform.is_shown() and not platform.is_input_blocked() and platform.console != null,
 		"and lifts once the player is in, with the console built", str(platform.describe()))
+	# Connected, a survivor the server moved to the next map's start before that map arrived stands in
+	# the old map's void: the cover comes back, and goes once they are inside the built map again.
+	client._offline = false
+	var home: Vector3 = client.player.global_position
+	client.player.global_position = home + Vector3(5000.0, 0.0, 0.0)
+	for _i in 3:
+		await get_tree().process_frame
+	_check(not platform.gate.is_open() and platform.gate.is_holding(&"placed"),
+		"a survivor outside the built map puts the cover back (never a frame of the void)", str(platform.gate.describe()))
+	client.player.global_position = home
+	for _i in 600:
+		await get_tree().process_frame
+		if platform.gate.is_open():
+			break
+	_check(platform.gate.is_open() and not platform.gate.is_holding(&"placed"),
+		"and it lifts once the survivor is inside the map again", str(platform.gate.describe()))
+	client._offline = true
 	var tab := InputEventKey.new()
 	tab.physical_keycode = KEY_TAB
 	tab.pressed = true
