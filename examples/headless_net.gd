@@ -842,7 +842,7 @@ func _test_a_pack_monster_replicates() -> void:
 			posed = true
 		if i == SERVER_TICK_RATE:
 			apart = mirror.global_position.distance_to(tiger.position()) if mirror != null else INF
-	_check(tiger.position().distance_to(from) > 2.0, "it comes for the survivor on the server", "%.1f m" % tiger.position().distance_to(from))
+	_check(tiger.position().distance_to(from) > 2.0, "it comes for the survivor on the server", "%.1f m, state %s, target %s, alive %s, phase %s, wish %s, from %s now %s" % [tiger.position().distance_to(from), tiger.brain.get(&"state"), tiger.target_id, tiger.is_alive(), _server_game.phase, (tiger.node as ZzZombieBody).wish, from, tiger.position()])
 	_check(mirror != null and mirror.global_position.distance_to(mirror_from) > 2.0 and apart < 1.5, "and the client's copy moves with it",
 		"%.1f m, %.2f m apart" % [mirror.global_position.distance_to(mirror_from) if mirror != null else -1.0, apart])
 	var started: Dictionary = tiger.brain.get(&"started")
