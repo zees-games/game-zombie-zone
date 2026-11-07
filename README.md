@@ -100,6 +100,8 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 | `defib_cooldown_seconds` | 8.0 | Recharge between shocks |
 | `defib_max_body_age` | 60.0 | Seconds after death a body can be saved (0 never expires) |
 | `defib_move_tolerance` | 0.6 | Metres the user may drift while charging |
+| `defib_price` | 400 | Trader price (also a shelf defibrillator with no site price); 0 not sold |
+| `defib_hear_range` | 25.0 | Metres from which others hear it charging (0 only the user) |
 
 Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `DotDefib`; `tests: ./game.sh test headless_defib`.
 
