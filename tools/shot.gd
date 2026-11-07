@@ -52,6 +52,8 @@ func _ready() -> void:
 			_pin_me = true
 		elif arg.begins_with("--reaction="):
 			_reaction = StringName(arg.trim_prefix("--reaction="))
+		elif arg == "--as-spawned":
+			_as_spawned = true
 		elif arg == "--alone":
 			_alone = true
 		elif arg.begins_with("--door="):
@@ -245,18 +247,20 @@ func _run() -> void:
 		return
 
 	# Out of the start room, so the horde is running, and the stand-ins held where they are put.
-	for player in game.survivors():
-		player.is_bot = false
-		player.health.invulnerable = true
+	if not _as_spawned:
+		for player in game.survivors():
+			player.is_bot = false
+			player.health.invulnerable = true
 
 	var stand := _at if _at != Vector3.INF else _default_stand(game)
 	# Facing the way the map's first seat faces (a frame that ignores it stares at whatever is
 	# behind that seat's back, which once read as a map that starts you against a wall).
-	local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
+	if not _as_spawned:
+		local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
 
 	var i := 0
 	for player in game.survivors():
-		if player != local:
+		if player != local and not _as_spawned:
 			i += 1
 			# Off the practice street's open ground the offset spot is as likely a void as not (the seat
 			# fallback above), so each stand-in takes its own seat.

@@ -470,7 +470,7 @@ func _hold_choke(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	if game.horde.infected_left() <= game.config.stuck_low_count:
 		return false
 
-	var post := _hold_of(player)
+	var post := _clear_of_humans(player, _hold_of(player))
 
 	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > 2.0:
 		_walk_to(player, command, post, memory)
@@ -608,10 +608,36 @@ func _seat(player) -> int:
 
 
 func _hold_post(player, command: DotFpsCommand, memory: Dictionary) -> void:
-	var post := _hold_of(player)
+	var post := _clear_of_humans(player, _hold_of(player))
+	# Close enough to the post to stand still, unless that is a person's elbow: then on to the cleared spot.
+	var slack := 2.0 if _clear_of_humans(player, player.feet()) == player.feet() else 0.5
 
-	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > 2.0:
+	if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() > slack:
 		_walk_to(player, command, post, memory)
+
+
+## Personal space round a person at the keyboard: a post (or a start seat standing in for one) on
+## top of them put a stand-in's head in their first-person camera (zz-look-model-survivors).
+const PERSONAL_SPACE := 3.0
+
+
+## [param post] moved out to [constant PERSONAL_SPACE] from any human survivor it is closer than, along the way
+## from them to it (spread by seat when it is on them, so two stand-ins do not take the same spot).
+func _clear_of_humans(player, post: Vector3) -> Vector3:
+	for other in _team():
+		if other.is_bot or not other.is_up() or other.watching:
+			continue
+
+		var off := Vector3(post.x - other.feet().x, 0.0, post.z - other.feet().z)
+
+		if off.length() >= PERSONAL_SPACE:
+			continue
+
+		var seat := float(_seat(player))
+		var dir := off.normalized() if off.length() > 0.1 else Vector3(cos(seat * 2.39996), 0.0, sin(seat * 2.39996))
+		post = Vector3(other.feet().x, post.y, other.feet().z) + dir * PERSONAL_SPACE
+
+	return post
 
 
 ## Mends the weakest barricade near its post when nothing is in sight: walks to its inside face
@@ -1384,6 +1410,11 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 			continue
 
 		if gap > best_gap and id != kept:
+			continue
+
+		# Whatever lies at a person's feet is theirs to take: a team of stand-ins crowding the start seat for it put a head in
+		# their first-person camera (zz-look-model-survivors).
+		if _clear_of_humans(player, e["at"] as Vector3).distance_squared_to(e["at"] as Vector3) > 0.0:
 			continue
 
 		# Shelf goods cost points: a stand-in that cannot pay would stand pressing use on it.
