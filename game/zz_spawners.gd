@@ -166,7 +166,10 @@ func _stock(id: StringName, slot: int) -> void:
 	merged.merge(data, true)
 	var kind: StringName = rolled.get("kind", &"weapon")
 	var loot_kind: StringName = kind if KINDS.has(kind) else ZzLoot.WEAPON
-	var lid: int = game.loot.add(loot_kind, rolled["id"], at, -1.0, _price_for(rolled["id"], merged))
+	var shelf_price := _price_for(rolled["id"], merged)
+	if loot_kind == ZzLoot.DEFIB and not data.has("price"):
+		shelf_price = maxi(game.config.defib_price, 0)
+	var lid: int = game.loot.add(loot_kind, rolled["id"], at, -1.0, shelf_price)
 	_price_of[lid] = game.loot.price_of(lid)
 	_shelf[lid] = {"site": id, "slot": slot}
 
