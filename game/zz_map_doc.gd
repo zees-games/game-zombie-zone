@@ -285,6 +285,9 @@ static func validate(source: Dictionary) -> DotResult:
 	doc["mode"] = mode
 	# 0: the map does not say, and the server's own number stands.
 	doc["survivors"] = clampi(int(source.get("survivors", 0)), 0, MAX_TEAM)
+	# Optional: this map's own visibility floor for a drawn world's lit surfaces (see ZzMap.set_light_floor). It only ever lowers the player's setting.
+	if source.has("light_floor") and (source["light_floor"] is float or source["light_floor"] is int):
+		doc["light_floor"] = clampf(float(source["light_floor"]), 0.0, 2.0)
 
 	var env := DEFAULT_ENV.duplicate(true)
 	var given: Variant = source.get("environment", {})
