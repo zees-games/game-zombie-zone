@@ -96,6 +96,10 @@
 # bot_open_boxes: true
 # Whether a stand-in lets go of E every few ticks while going for a box, so a press that missed is made again...
 # bot_repress_use: true
+# Whether stand-ins pick up a defibrillator and shock a dead friend back with it. `zz_bot_defib`.
+# bot_defib: true
+# Metres a stand-in holding a defibrillator will walk to a dead friend's body. `zz_bot_defib_reach`. [1.0..200.0]
+# bot_defib_reach: 40.0
 # Seconds a stand-in that wants an item or a place may stay put, not firing or using anything, before it give... [0.0..120.0]
 # bot_idle_seconds: 12.0
 # How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing ones. The rest ... [0..16]

@@ -366,6 +366,12 @@ func setup_seconds() -> float:
 ## Whether a stand-in lets go of E every few ticks while going for a box, so a press that missed is made again. Off holds it as before, and a box may stand untouched. `zz_bot_repress_use`.
 @export var bot_repress_use: bool = true
 
+## Whether stand-ins pick up a defibrillator and shock a dead friend back with it. `zz_bot_defib`.
+@export var bot_defib: bool = true
+
+## Metres a stand-in holding a defibrillator will walk to a dead friend's body. `zz_bot_defib_reach`.
+@export_range(1.0, 200.0, 1.0) var bot_defib_reach: float = 40.0
+
 ## Seconds a stand-in that wants an item or a place may stay put, not firing or using anything, before it gives that goal up (and, with none, is put at its post). 0 off. `zz_bot_idle_seconds`.
 @export_range(0.0, 120.0, 1.0) var bot_idle_seconds: float = 12.0
 
