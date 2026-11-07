@@ -1329,8 +1329,13 @@ func lure(at: Vector3, seconds: float, radius: float = 40.0) -> void:
 	_lures.append({"at": at, "until": _time + seconds, "radius": radius})
 
 	for npc in spawner.npcs_near(at, radius):
-		if npc.def.id == ZzNpcs.COMMON and npc.brain != null:
+		if _heeds_lures(npc.def.id) and npc.brain != null:
 			npc.brain.call(&"lure_to", at)
+
+
+## Commons, and the pack monsters (their generated brain answers `lure_to` and `force_target`).
+func _heeds_lures(kind: StringName) -> bool:
+	return kind == ZzNpcs.COMMON or ZzPackList.is_pack_kind(kind)
 
 
 func _advance_lures() -> void:
@@ -1374,9 +1379,10 @@ func bile_on(victim: StringName, seconds: float) -> void:
 	_bile[victim] = maxf(float(_bile.get(victim, 0.0)), _time + seconds)
 
 	for npc in spawner.npcs_near(at, config.bile_radius):
-		if npc.def.id == ZzNpcs.COMMON and npc.brain != null:
+		if _heeds_lures(npc.def.id) and npc.brain != null:
 			npc.brain.call(&"force_target", victim)
-			(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_MOB, true)
+			if npc.def.id == ZzNpcs.COMMON:
+				(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_MOB, true)
 
 	if fresh:
 		spawn_mob(int(round(float(_mob_size()) * 0.8)), victim)
@@ -1804,7 +1810,8 @@ func bash(id: String, npc: DotNpcInstance, delta: float) -> void:
 	if game == null or npc == null or not npc.is_alive():
 		return
 
-	var arms := 10.0 if npc.def.id == ZzNpcs.BRUTE else 2.0 if ZzNpcs.is_special(npc.def.id) else 1.0
+	var arms := 10.0 if npc.def.id == ZzNpcs.BRUTE or (ZzPackList.is_pack_kind(npc.def.id) and npc.def.weight == DotNpcDef.Weight.HEAVY) \
+		else 4.0 if ZzPackList.is_pack_kind(npc.def.id) else 2.0 if ZzNpcs.is_special(npc.def.id) else 1.0
 	game.bash_barricade(id, config.barricade_bash * arms * delta)
 
 
