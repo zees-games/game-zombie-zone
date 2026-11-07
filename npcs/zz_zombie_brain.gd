@@ -276,6 +276,13 @@ func swinging() -> bool:
 	return _swing_at != INF
 
 
+## The anim to show while a swing runs: the ground strike when it started on a downed survivor,
+## the standing swing otherwise. For the brains that set their own anim every tick (brute, oil
+## monster, mutant), which would otherwise overwrite the strike [method swing_at] chose.
+func swing_anim() -> int:
+	return ZzZombieBody.Anim.STRIKE_DOWN if _swing_down else ZzZombieBody.Anim.ATTACK
+
+
 ## Advances a swing in progress. Called every think by every brain.
 func _advance_swing() -> void:
 	if _swing_at == INF:
