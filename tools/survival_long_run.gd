@@ -258,6 +258,7 @@ func _run() -> void:
 			print("  spike %.1f ms at %.0f s:%s" % [float(spike[0]) / 1000.0, spike[1], line])
 	if _watch > 0.0 and _stuck != null:
 		print("stuck: %s" % _stuck.line())
+		print("watch: %s" % _stuck.watch_line())
 		for kind: StringName in StuckMeter.KINDS:
 			print("  %s worst cells %s" % [kind, _stuck.worst_cells(kind)])
 	print("RESULT %s" % JSON.stringify({"map": String(_map), "team": team, "seed": _seed, "difficulty": _difficulty,
