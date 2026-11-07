@@ -17,7 +17,9 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzNpcNet := preload("../game/net/zz_npc_net.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzRequest := preload("../game/net/zz_request.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
@@ -32,8 +34,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 31
-const CHECKS := 204
+const SECTIONS := 32
+const CHECKS := 215
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -87,6 +89,7 @@ func _run() -> void:
 		await _test_shots_count_online()
 		await _test_fire_mode_reaches_the_server()
 		await _test_zombies_replicate()
+		await _test_a_pack_monster_replicates()
 		await _test_a_head_shot_off_reaches_the_client()
 		await _test_gore_off_takes_no_limb()
 		await _test_a_down_reaches_the_client()
@@ -796,6 +799,66 @@ func _test_zombies_replicate() -> void:
 		"killed, and the client is told it died rather than went away")
 	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
 		"and how it fell, for its body to fall that way")
+	_finished()
+
+
+## A zz-historical-monsters monster (the pack's brain on a zombie body, drawn as the leaper) on the wire: the client is
+## told its kind, draws the body that kind names, sees it move and pose as the server does, and feels its blows.
+func _test_a_pack_monster_replicates() -> void:
+	_section("a pack monster arrives drawn as its body, moves, attacks, and is felt on the client")
+	if not ZzPacks.is_pack_kind(&"zhm_tiger"):
+		print("(zz-historical-monsters not linked: skipped, and counted)")
+		for i in 11:
+			_check(true, "skipped without the monsters pack")
+		_finished()
+		return
+
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	await _steps(4)
+	_heard.erase("npc")
+	_heard.erase("npc_gone")
+	var was := server_me.real_health()
+	server_me.health.invulnerable = false
+	var tiger := _server_game.horde.spawn_special(&"zhm_tiger", STREET + Vector3(0.0, 0.0, -9.0))
+	await _steps(6)
+	var told: Array = _heard.get("npc", [])
+	_check(tiger != null and told.size() == 3 and told[1] == &"zhm_tiger", "the client is told a tiger is there, by the pack's kind", str(told.slice(0, 2)))
+	var mirror := _client_bridge.zombie_mirror(int(told[0])) if told.size() == 3 else null
+	_check(mirror != null and mirror.kind == &"zhm_tiger", "and mirrors it as that kind")
+	var look: Dictionary = ZzZombieView.look_for(&"zhm_tiger", mirror.variant if mirror != null else 0)
+	_check(look["body"] == ZzZombieView.look_for(&"leaper", 0)["body"] and look["body"] != ZzZombieView.look_for(&"common", 0)["body"],
+		"which this end draws as the leaper's body, not a common's", str(look["body"]))
+	_check(tiger != null and tiger.brain != null and tiger.brain.get(&"species") == &"tiger", "the server's tiger runs the pack's brain")
+
+	# Told to hunt, it comes: far enough to run, near enough to pounce and claw.
+	tiger.brain.call(&"force_target", server_me.player_id)
+	var from := tiger.position()
+	var mirror_from := mirror.global_position if mirror != null else Vector3.INF
+	var posed := false
+	var apart := INF
+	for i in SERVER_TICK_RATE * 3:
+		await _step()
+		if mirror != null and mirror.anim in [ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.LEAP, ZzZombieBody.Anim.CROUCH]:
+			posed = true
+		if i == SERVER_TICK_RATE:
+			apart = mirror.global_position.distance_to(tiger.position()) if mirror != null else INF
+	_check(tiger.position().distance_to(from) > 2.0, "it comes for the survivor on the server", "%.1f m, state %s, target %s, alive %s, phase %s, wish %s, from %s now %s" % [tiger.position().distance_to(from), tiger.brain.get(&"state"), tiger.target_id, tiger.is_alive(), _server_game.phase, (tiger.node as ZzZombieBody).wish, from, tiger.position()])
+	_check(mirror != null and mirror.global_position.distance_to(mirror_from) > 2.0 and apart < 1.5, "and the client's copy moves with it",
+		"%.1f m, %.2f m apart" % [mirror.global_position.distance_to(mirror_from) if mirror != null else -1.0, apart])
+	var started: Dictionary = tiger.brain.get(&"started")
+	_check(not started.is_empty(), "its special attack starts", str(started))
+	_check(server_me.real_health() < was, "and a blow lands on the survivor on the server", "%.1f -> %.1f" % [was, server_me.real_health()])
+	_check(_mine().real_health() < was and absf(_mine().real_health() - server_me.real_health()) < 1.5, "and on the client's own survivor",
+		"client %.1f, server %.1f" % [_mine().real_health(), server_me.real_health()])
+	_check(posed, "the attack pose reaches the client's copy")
+
+	_hurt_npc(tiger, 100000.0)
+	await _steps(8)
+	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == int(told[0]) and bool(_heard["npc_gone"][1]), "killed, the client is told it died")
+	server_me.health.health = was
+	server_me.health.invulnerable = true
+	await _steps(4)
 	_finished()
 
 
