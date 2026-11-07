@@ -867,6 +867,9 @@ func _test_unstick_steps() -> void:
 		if ticks % 8 == 0:
 			await get_tree().physics_frame
 
+	# The plan (routes, chokes, narrow points) runs the tick after the annotations arrive.
+	game.simulate(TICK)
+
 	var graph_size: int = game.horde.spawner.nav.data.points.size()
 	_check(game.horde.narrow_points > 0 and game.horde.narrow_points < graph_size / 4, "the points a brute does not fit at are flagged, not the whole map",
 		"%d of %d" % [game.horde.narrow_points, graph_size])
@@ -1014,6 +1017,9 @@ func _test_fallback() -> void:
 
 		if ticks % 8 == 0:
 			await get_tree().physics_frame
+
+	# The plan (routes, chokes, narrow points) runs the tick after the annotations arrive.
+	game.simulate(TICK)
 
 	var notes: ZzNavNotes = game.horde.notes
 	var seat := -1
