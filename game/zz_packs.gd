@@ -3,6 +3,8 @@ extends RefCounted
 ## Optional content packs: weapons and monsters that an installed addon adds to the game.
 ##
 const ZzClasses := preload("zz_classes.gd")
+const ZzPackBrains := preload("zz_pack_brains.gd")
+const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## [b]The game ships without them and nothing here is needed to run.[/b] At start every
 ## directory under `res://addons` is looked at for one file, `spawn_provider.gd` (the contract
 ## game-playground's spawn menu reads too). An addon without it is never loaded. One with it is
@@ -22,7 +24,8 @@ const ZzClasses := preload("zz_classes.gd")
 ## An `npc` row's `spawn` is `{npc?, health?, speed?, damage?, reach?, body?, brain?, boss?}`:
 ## `body` names one of this game's zombie bodies (default `common`; the client draws it, so a
 ## monster is a re-skinned body, not a scene of its own), `brain` a script path (default: the
-## common's chase and bite). Both ends scan, so both end up with the same catalogue.
+## common's chase and bite; a brain written for the pack's own body is seated on ours by [ZzPackBrains],
+## which also takes `meta`, merged into the definition's, and knows zz-historical-monsters' layout). Both ends scan, so both end up with the same catalogue.
 ##
 ## [b]Tuning is `cfg/addon/zombie_zone/*.yml`[/b], every file read by dot-core's
 ## `DotAddonConfig` (see its docs/addon-config.md); the defaults are [constant DEFAULTS].
@@ -123,7 +126,7 @@ static func scan(from: String = "") -> int:
 		var provider: Object = script.new()
 		providers[dir_name] = provider
 		found += 1
-		_take(dir_name, provider)
+		_take(dir_name, provider, "%s/%s" % [base, dir_name])
 
 	_collect_class_roots()
 
@@ -160,6 +163,7 @@ static func clear() -> void:
 	weapon_rows.clear()
 	pack_of.clear()
 	monsters.clear()
+	ZzZombieViewBase.aliases.clear()
 	_notes = PackedStringArray()
 
 
@@ -207,7 +211,7 @@ static func cfg(path: String, fallback: Variant) -> Variant:
 	return DotAddonConfig.get_value(config, path, fallback)
 
 
-static func _take(pack: String, provider: Object) -> void:
+static func _take(pack: String, provider: Object, dir: String = "") -> void:
 	if not provider.has_method(&"spawn_entries"):
 		DotLog.warn(CHANNEL, "a provider has no spawn_entries", {"pack": pack})
 		return
@@ -260,16 +264,24 @@ static func _take(pack: String, provider: Object) -> void:
 				DotLog.warn(CHANNEL, "a weapon row has no definition here (provider lacks weapon_defs or the weapon is excluded)",
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
-			_add_monster(pack, row)
+			_add_monster(pack, row, dir)
 
 
-static func _add_monster(pack: String, row: Dictionary) -> void:
+static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> void:
 	var spawn: Dictionary = row.get("spawn", {})
 	var m := Monster.new()
 	m.pack = pack
 	m.id = StringName(str(spawn.get("npc", row["id"])))
 	m.title = str(row.get("name", m.id))
 	m.spawn = spawn
+	# The pack's own brain, on this game's body, where the pack has one we know how to seat (see ZzPackBrains).
+	var own: Dictionary = ZzPackBrains.adapt(dir, m.id, spawn) if dir != "" else {}
+
+	if not own.is_empty():
+		m.spawn = spawn.duplicate()
+		m.spawn["brain"] = own["brain"]
+		m.spawn["meta"] = own["meta"]
+
 	m.boss = bool(spawn.get("boss", false)) or (cfg("monsters.boss", []) as Array).has(String(m.id))
 	var weights: Dictionary = cfg("monsters.weights", {})
 	m.weight = maxf(float(weights.get(String(m.id), cfg("monsters.weight", 1.0))), 0.0)
@@ -281,6 +293,11 @@ static func _add_monster(pack: String, row: Dictionary) -> void:
 	if m.weight <= 0.0:
 		_notes.append("%s switched off by weight 0" % m.id)
 		return
+
+	# Both ends draw it as the zombie body it names (the client has no scene of the pack's).
+	var body := StringName(str(spawn.get("body", "common")))
+	if ZzZombieViewBase.LOOKS.has(body):
+		ZzZombieViewBase.aliases[m.id] = body
 
 	monsters.append(m)
 
