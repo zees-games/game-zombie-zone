@@ -15,6 +15,7 @@ const ZzLaps := preload("zz_laps.gd")
 ## Milliseconds by section for the cold-start tool (tools/cold_start.gd).
 var sections: Dictionary = {}
 const ZzNpcs := preload("zz_npcs.gd")
+const MonsterHost := preload("zz_monster_host.gd")
 const ZzPackList := preload("zz_packs.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -43,6 +44,8 @@ var game = null
 var config: ZzConfig = null
 
 var spawner: DotNpcSpawner = null
+## The game's end of the monsters' host seam (also the spawner's meta `zhm_host`).
+var monster_host: MonsterHost = null
 var director: DotNpcDirector = null
 var senses: DotNpcSenses = null
 var squads: DotNpcAiSquads = DotNpcAiSquads.new()

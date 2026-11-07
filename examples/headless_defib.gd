@@ -9,8 +9,8 @@ const ZzPlayerNet := preload("../game/net/zz_player_net.gd")
 ## The defibrillator: charge, charges, cooldown, interruption, the time limit, the shield and the wire.
 ## Counts sections AND checks, like headless_run, because a script error aborts a section silently.
 
-const SECTIONS := 2
-const CHECKS := 23
+const SECTIONS := 3
+const CHECKS := 28
 
 const STREET := Vector3(0.0, 0.05, 14.0)
 
@@ -26,6 +26,7 @@ func _run() -> void:
 	print("")
 	await _test_defibrillator()
 	await _test_items()
+	await _test_stand_ins()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -145,6 +146,41 @@ func _test_items() -> void:
 	var pair := ZzEvents.read_pair(DotNetReader.new(ZzEvents.write_pair(5, 9)))
 	_check(pair["player_id"] == 5 and pair["other"] == 9 and int(ZzEvents.Kind.DEFIB) < 256, "the event carries who and by whom")
 	_check(game.drops.item_weights(&"brute").has(&"defib") or game.drops.rolls_for(&"brute") >= 0.0, "the drop table knows the item")
+	_finished()
+
+
+func _test_stand_ins() -> void:
+	_section("a stand-in with a defibrillator walks to a dead friend and shocks them back; a dead body's respawn timer is cleared")
+	var setup := func(c: ZzConfig) -> void:
+		_quiet(c)
+		c.defib_charge_seconds = 1.0
+		c.defib_max_body_age = 30.0
+		c.timed_respawn = true
+		c.respawn_base_seconds = 40.0
+		c.intermission_seconds = 60.0
+	var game := await _team(2, setup, true)
+	var medic := game.survivors()[0]
+	var body := game.survivors()[1]
+	medic.place_at(STREET, 0.0)
+	body.place_at(STREET + Vector3(6.0, 0, 0), 270.0)
+	body.incaps = game.config.max_incaps
+	_hurt(game, body, 500.0)
+	_check(body.life == ZzPlayer.Life.DEAD and body.respawn_at > 0.0, "the one too many is death, with a respawn due")
+	medic.defibs = 0
+	await _sim(game, 2.0)
+	_check(body.life == ZzPlayer.Life.DEAD, "a stand-in with no defibrillator leaves the body")
+	medic.defibs = 1
+	await _sim(game, 8.0)
+	_check(body.is_up() and body.is_alive() and medic.defibs == 0, "with one it walks over and shocks them back", "life %d" % body.life)
+	_check(body.respawn_at < 0.0, "and the respawn timer is cleared so they are not respawned over their own revive")
+	game.config.bot_defib = false
+	medic.defibs = 1
+	medic.defib_ready_at = 0.0
+	body.incaps = game.config.max_incaps
+	await _sim(game, game.config.defib_invulnerable_seconds + 0.2)
+	_hurt(game, body, 500.0)
+	await _sim(game, 3.0)
+	_check(body.life == ZzPlayer.Life.DEAD and medic.defibs == 1, "zz_bot_defib 0 keeps it in the pocket")
 	_finished()
 
 

@@ -282,6 +282,10 @@ func _decide(player, command: DotFpsCommand) -> void:
 			_walk_to(player, command, downed.feet(), memory)
 		return
 
+	# 2b. A dead friend and a defibrillator in the hands: walk to the body and hold E.
+	if not close_danger and _defib_body(player, command, memory):
+		return
+
 	# 3. Threats.
 	if danger != null:
 		_aim_at(player, command, danger)
@@ -339,6 +343,38 @@ func _decide(player, command: DotFpsCommand) -> void:
 		return
 
 	_follow(player, command, memory)
+
+
+## Shocks the nearest dead friend back when [param player] holds a defibrillator and the body is still good
+## (inside the defibrillator's age limit and [member ZzConfig.bot_defib_reach]). Walks up, looks at the body and
+## holds E, as a human would. True when it spent the tick on that.
+func _defib_body(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+	if not game.config.bot_defib or player.defibs <= 0 or game.now() < player.defib_ready_at:
+		return false
+
+	var body = null
+	var best: float = game.config.bot_defib_reach
+
+	for other in _team():
+		if other == player or not game.defib_body_ok(other):
+			continue
+
+		var gap: float = other.feet().distance_to(player.feet())
+
+		if gap < best:
+			best = gap
+			body = other
+
+	if body == null or not _answers(player, body):
+		return false
+
+	if best <= game.config.defib_range * 0.7:
+		_aim(player, command, body.feet() + Vector3(0.0, 0.3, 0.0))
+		player.actions |= ZzNetCommand.ACT_USE
+	else:
+		_walk_to(player, command, body.feet(), memory)
+
+	return true
 
 
 # --- Acting by persona -----------------------------------------------------------------------
@@ -1388,6 +1424,8 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 				wanted = player.medkits == 0
 			ZzLoot.PILLS:
 				wanted = player.pills == 0
+			ZzLoot.DEFIB:
+				wanted = game.config.bot_defib and player.defibs == 0
 			ZzLoot.AMMO:
 				wanted = _low_on_ammo(player)
 			ZzLoot.BOX:
