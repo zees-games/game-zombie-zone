@@ -13,6 +13,7 @@
 #   ./game.sh test NAME...         run only these suites (e.g. ./game.sh test headless_net)
 #   ./game.sh suites               list the test suites
 #   ./game.sh soak [MAP] [MIN]     bot soak on tools/soak.tscn (report in .godot/test-logs/soak-MAP.json)
+#   ./game.sh coldstart [MAP] [ARGS]  cold start (tools/cold_start.tscn): fails on a tick over 1000 ms or open over 6 s; --cold wipes the caches
 #   ./game.sh shot [ARGS]          save a screenshot to screenshots/ (tools/shot.sh or tools/screenshot.sh)
 #
 # Options (before the command):
@@ -304,6 +305,15 @@ case "$cmd" in
         mkdir -p .godot/test-logs
         timeout "$TIMEOUT" "$GODOT" --headless --path . res://tools/soak.tscn -- "${soak_args[@]}" "$@" \
             2>&1 | tee .godot/test-logs/soak.log | grep -E '^SOAK|^soak|SCRIPT ERROR|Parse Error|ERROR|FAIL'
+        exit "${PIPESTATUS[0]}"
+        ;;
+    coldstart)
+        [ -f tools/cold_start.tscn ] || die "$GAME_NAME has no tools/cold_start.tscn." 2
+        check_addons
+        cold_args=()
+        [ -n "${1:-}" ] && { cold_args+=(--map "$1"); shift; }
+        timeout "$TIMEOUT" "$GODOT" --headless --path . res://tools/cold_start.tscn -- "${cold_args[@]}" "$@" \
+            2>&1 | grep -E '^COLD|SCRIPT ERROR|Parse Error|ERROR'
         exit "${PIPESTATUS[0]}"
         ;;
     suites)
