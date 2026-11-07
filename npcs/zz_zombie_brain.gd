@@ -88,6 +88,8 @@ const THINK_DISTANT := 60.0
 ## `BODY_STRIDE_FAR_FROM` (`ZzZombieBody.stride`). Fallbacks for `ZzConfig.body_stride_*`.
 const BODY_STRIDE_FROM := 20.0
 const BODY_STRIDE_FAR_FROM := 45.0
+## Dormant tier (off by default, `ZzConfig.dormant_from`): a body that far moves every `DORMANT_BODY_STRIDE` ticks.
+const DORMANT_BODY_STRIDE := 8
 
 
 func _npc_ready() -> void:
@@ -514,7 +516,9 @@ func _think_every() -> int:
 		if b != null:
 			var near := float(config.body_stride_near) if config != null else BODY_STRIDE_FROM
 			var far := float(config.body_stride_far) if config != null else BODY_STRIDE_FAR_FROM
-			b.set_stride(1 if _nearest < near else (2 if _nearest < far else 4))
+			var dormant := float(config.dormant_from) if config != null else 0.0
+			var far_stride := DORMANT_BODY_STRIDE if dormant > 0.0 and _nearest >= dormant else 4
+			b.set_stride(1 if _nearest < near else (2 if _nearest < far else far_stride))
 			var cheap := float(config.body_cheap_from) if config != null else 0.0
 			b.cheap_step = cheap > 0.0 and _nearest >= cheap
 
@@ -531,7 +535,15 @@ func _think_every() -> int:
 
 	if _nearest < THINK_FAR:
 		return 3
-	return 4 if _nearest < THINK_DISTANT else 8
+	if _nearest < THINK_DISTANT:
+		return 4
+
+	var config: Variant = h.get(&"config")
+	var dormant := float(config.dormant_from) if config != null else 0.0
+
+	if dormant > 0.0 and _nearest >= dormant:
+		return maxi(int(config.dormant_think_every), 8)
+	return 8
 
 
 ## A kind's own machine. Called every think after sensing, unless staggered.
