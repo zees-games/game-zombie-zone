@@ -68,6 +68,8 @@ var _pack: Node3D = null
 var _crate: Dictionary = {}
 ## Whether a box is in the hands: the weapon is not drawn while it is.
 var box_in_hands: bool = false
+## Whether the defibrillator is in the hands: the weapon is not drawn while it is.
+var defib_in_hands: bool = false
 var _ring: MeshInstance3D = null
 
 ## The clip playing, for the suite and for `describe()`.
@@ -257,7 +259,7 @@ func hold(id: StringName, switching: bool) -> void:
 		else:
 			held.clear()
 
-	held.visible = not box_in_hands
+	held.visible = not box_in_hands and not defib_in_hands
 	held.on_switching(switching)
 	_set_hold_kind()
 
@@ -352,7 +354,15 @@ func show_box(carrying: int, deploying: float, out: bool = false, colour: Color 
 	_ring.scale = Vector3.ONE * lerpf(1.6, 0.5, clampf(deploying, 0.0, 1.0))
 
 
-## The defibrillator in the hands while it charges at a body, for whoever is watching.
+## Where the defibrillator sits in the hand, in the hand mount's frame (-Z the way the figure faces, +Y up,
+## at metre scale), tuned by `tools/shot.sh --view=defib_third` from behind and the side.
+const DEFIB_IN_HAND := Vector3(0.0, 0.05, -0.14)
+const DEFIB_IN_HAND_TURN := Vector3(-20.0, 0.0, 0.0)
+const DEFIB_IN_HAND_SCALE := 1.3
+
+## The defibrillator in the hands while it charges at a body, for whoever is watching. It hangs from the
+## person's gun hand, like a held weapon (the weapon is put away while it is out), so it is seen from
+## behind and from the side; a figure without a hand bone carries it in front of the chest.
 func show_defib(active: bool) -> void:
 	if not active and _defib == null:
 		return
@@ -364,12 +374,33 @@ func show_defib(active: bool) -> void:
 			return
 
 		_defib.name = "Defib"
+
+	var hand := attachment(&"right_hand") if active else null
+
+	if hand != null:
+		if _defib.get_parent() != hand:
+			if _defib.get_parent() != null:
+				_defib.get_parent().remove_child(_defib)
+
+			hand.add_child(_defib)
+
+		_defib.scale = Vector3.ONE * DEFIB_IN_HAND_SCALE / maxf(hand.global_basis.get_scale().x / maxf(global_basis.get_scale().x, 0.001), 0.001)
+		_defib.position = DEFIB_IN_HAND
+		_defib.rotation_degrees = DEFIB_IN_HAND_TURN
+	elif _defib.get_parent() != self:
+		if _defib.get_parent() != null:
+			_defib.get_parent().remove_child(_defib)
+
 		_defib.scale = Vector3.ONE * 0.9
 		_defib.position = Vector3(0.0, 0.95, -0.42)
 		_defib.rotation_degrees = Vector3(0.0, 180.0, 0.0)
 		add_child(_defib)
 
 	_defib.visible = active
+	defib_in_hands = active
+
+	if held != null and active:
+		held.visible = false
 
 
 ## The node a held weapon hangs from, by the name [ZeeWorldModel] asks for: the person's hand.

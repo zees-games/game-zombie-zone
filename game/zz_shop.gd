@@ -76,6 +76,8 @@ func items() -> Array:
 	out.append({"id": "medkit", "name": "Medkit", "cat": "supplies", "price": _price(supplies.get("medkit", 150)), "desc": "A medkit for you or a friend (one at a time)."})
 	out.append({"id": "pills", "name": "Pills", "cat": "supplies", "price": _price(supplies.get("pills", 50)), "desc": "Borrowed health, quickly."})
 	out.append({"id": "heal", "name": "Patch up", "cat": "supplies", "price": _price(supplies.get("heal", 100)), "desc": "Back to full health."})
+	if game.config.defib_price > 0:
+		out.append({"id": "defib", "name": "Defibrillator", "cat": "supplies", "price": game.config.defib_price, "desc": "Shocks a dead teammate back (hold E at the body)."})
 	out.append({"id": "armour", "name": "Armour", "cat": "supplies", "price": _price(supplies.get("armour", 200)), "desc": "+%d armour." % int(supplies.get("armour_amount", 50))})
 
 	if game.carry.carry.enabled:
@@ -202,6 +204,11 @@ func _give(player, item_id: String, found: Dictionary) -> String:
 			return "Your armour is full."
 		player.health.armour = minf(player.health.armour + float(supplies.get("armour_amount", 50)), player.health.max_armour)
 		player.health.armour_changed.emit(player.health.armour)
+		return ""
+	if item_id == "defib":
+		if player.defibs >= 1:
+			return "You already have a defibrillator."
+		player.defibs = game.config.defib_charges
 		return ""
 	if item_id == "refill_all":
 		var added: int = 0 if arsenal == null else int(game.loot.give_ammo(player, 1.0))

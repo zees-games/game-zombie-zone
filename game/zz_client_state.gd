@@ -99,6 +99,8 @@ var weapons: ZeeWeaponRig = null
 var view_model: ZeeViewModel = null
 var defib_hands: Node3D = null
 var _defib_sound: bool = false
+## Survivors other than this one heard charging a defibrillator now, by player key.
+var _defib_heard: Dictionary = {}
 ## The crate in the hands while a box is out, a sibling of the gun under the camera.
 var box_hands: Node3D = null
 

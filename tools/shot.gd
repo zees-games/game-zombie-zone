@@ -661,6 +661,29 @@ func _run() -> void:
 			var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
 			for body: DotPlayerRagdoll in yard.live():
 				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
+		"defib_other":
+			await _until_uncovered()
+			# A stand-in charging a defibrillator as a team-mate sees it: from the front (the frame),
+			# from behind (_b) and from the side (_c).
+			var holder = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+			var spot: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+			holder.place_at(spot, 180.0)
+			await _settle(holder)
+			spot = holder.feet()
+			local.place_at(spot + Vector3(0.0, 0.0, 9.0), 0.0)
+			var cam := _free_camera()
+			cam.look_at_from_position(spot + Vector3(0.0, 1.5, 2.2), spot + Vector3(0.0, 1.0, 0.0))
+			# The holder turned away (_b), side on (_c) and facing the camera, each held a moment: the
+			# server's tick clears `using`, so it is set again each frame after the physics step.
+			for view: Array in [["_b", 0.0], ["_c", 90.0], ["", 180.0]]:
+				holder.place_at(spot, view[1])
+				for _i in 20:
+					await get_tree().process_frame
+					holder.using = &"defib"
+				if view[0] == "":
+					await _seconds_of(0.1)
+				else:
+					await _save_extra(view[0])
 		"action":
 			await _until_uncovered()
 			# A stand-in playing an avatar action, from the front, early in the clip.
