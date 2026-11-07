@@ -71,6 +71,8 @@ func _ready() -> void:
 	# Optional packs first: a rig reads its catalogue once, and zee's sources are what it reads.
 	var _packs := ZzPacks.scan()
 	ZzWeapons.use_packs()
+	# The art table builds on first use, which was the first shot of the round (0.8 s in one tick).
+	var _art := ZeeWeaponArtTable.table()
 
 	_build_physics()
 	pass_rules.humans_pass = config.humans_pass_barricades
