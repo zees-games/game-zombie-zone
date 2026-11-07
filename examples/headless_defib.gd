@@ -4,13 +4,13 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzDrops := preload("../game/zz_drops.gd")
-const ZzPlayerNet := preload("../game/net/zz_player_net.gd")
+const ZzPlayerNet := _BridgeFirst.ZzPlayerNet
 
 ## The defibrillator: charge, charges, cooldown, interruption, the time limit, the shield and the wire.
 ## Counts sections AND checks, like headless_run, because a script error aborts a section silently.
 
 const SECTIONS := 3
-const CHECKS := 28
+const CHECKS := 31
 
 const STREET := Vector3(0.0, 0.05, 14.0)
 
@@ -146,6 +146,13 @@ func _test_items() -> void:
 	var pair := ZzEvents.read_pair(DotNetReader.new(ZzEvents.write_pair(5, 9)))
 	_check(pair["player_id"] == 5 and pair["other"] == 9 and int(ZzEvents.Kind.DEFIB) < 256, "the event carries who and by whom")
 	_check(game.drops.item_weights(&"brute").has(&"defib") or game.drops.rolls_for(&"brute") >= 0.0, "the drop table knows the item")
+
+	me.defibs = 0
+	var offers: Array = game.shop.items().filter(func(it: Dictionary) -> bool: return str(it["id"]) == "defib")
+	_check(offers.size() == 1 and int(offers[0]["price"]) == int(round(game.config.defib_price * game.shop.multiplier())), "the trader sells one at zz_defib_price", str(offers))
+	_check(game.shop._give(me, "defib", offers[0]) == "" and me.defibs == game.config.defib_charges and game.shop._give(me, "defib", offers[0]) != "", "buying gives the charges once, and a second is refused")
+	game.config.defib_price = 0
+	_check(game.shop.items().filter(func(it: Dictionary) -> bool: return str(it["id"]) == "defib").is_empty(), "zz_defib_price 0 takes it off the shelf")
 	_finished()
 
 

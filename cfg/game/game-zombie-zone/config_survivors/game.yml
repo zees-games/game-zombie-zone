@@ -109,6 +109,10 @@
 # defib_max_body_age: 60.0
 # Metres the user may drift while charging before it is interrupted. [0.1..3.0]
 # defib_move_tolerance: 0.6
+# Points the trader asks for a defibrillator, and a trader shelf's defibrillator unless its site names a pric... [0..100000]
+# defib_price: 400
+# Metres from which another survivor hears a defibrillator charging (0: only the user hears it). `zz_defib_he... [0.0..100.0]
+# defib_hear_range: 25.0
 # Metres from the eye an item may be picked up or a box opened. [0.5..5.0]
 # use_reach: 2.2
 
