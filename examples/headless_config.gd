@@ -16,7 +16,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 45
+const CHECKS := 51
 
 
 func _ready() -> void:
@@ -84,6 +84,8 @@ func _run() -> void:
 
 	_turrets(binder, console, config)
 	_hazards(binder, console, config)
+	_standins(binder, console, config)
+	_batch4(binder, console, config)
 	_layers()
 	_templates(binder)
 
@@ -227,3 +229,41 @@ func _hazards(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig
 	hazards.game.config = config
 	console.set_cvar("zz_hazard_afterburn_seconds", "9")
 	_check(is_equal_approx(hazards._cfg().hazard_afterburn_seconds, 9.0), "zz_hazard_afterburn_seconds changes what the hazard rules read")
+
+
+## The stand-in rules moved out of zz_bots.gd keep the old constants as defaults, and a cvar changes the live config the bots read.
+func _standins(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+	var fresh := ZzConfig.new()
+	var old := {"sight": 32.0, "upgrade_ratio": 1.35, "blast_safe": 9.0, "launcher_bonus": 10000.0, "friend_clearance": 0.7,
+		"friend_cone_degrees": 14.0, "muzzle_margin": 0.08, "penetration_reach": 8.0, "shove_range": 1.7, "follow_near": 3.5,
+		"follow_far": 6.0, "behave_min": 10.0, "behave_max": 22.0, "loot_reach": 90.0, "pick_up_reach": 7.0, "pick_up_give_up": 15.0,
+		"pick_blocked_give_up": 3.0, "hops_before_nudge": 2, "stuck_before_relocate": 8.0, "stuck_area": 2.5, "stuck_radius": 0.8,
+		"smooth_horizon": 16}
+	var same := true
+	var cvars_ok := true
+	for k: String in old:
+		same = same and fresh.get("bot_" + k) == old[k]
+		cvars_ok = cvars_ok and console.find_cvar("zz_bot_" + k) != null and binder.source_of("bot_" + k) == "default"
+	_check(same, "the stand-in defaults equal the old zz_bots.gd constants (%d of them)" % old.size())
+	_check(cvars_ok, "every stand-in rule is a zz_bot_* cvar")
+	console.set_cvar("zz_bot_shove_range", "2.5")
+	console.set_cvar("zz_bot_smooth_horizon", "24")
+	_check(is_equal_approx(config.bot_shove_range, 2.5) and config.bot_smooth_horizon == 24, "zz_bot_shove_range and zz_bot_smooth_horizon change the live config")
+
+
+## Horde, footing and medkit-aim numbers moved out of their files keep the old constants as defaults, and a cvar changes the live config.
+func _batch4(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+	var fresh := ZzConfig.new()
+	var old := {"alert_radius": 9.0, "bile_radius": 45.0, "bile_splash": 4.0, "mob_burst": 6, "mob_burst_seconds": 0.4,
+		"wanderer_clearance": 28.0, "bash_reach": 0.75, "footing_sample_every": 1.5, "footing_sample_move": 1.5,
+		"footing_keep": 5, "footing_progress": 0.6, "heal_aim_dot": 0.82, "heal_hold_dot": 0.6}
+	var same := true
+	var cvars_ok := true
+	for k: String in old:
+		same = same and fresh.get(k) == old[k]
+		cvars_ok = cvars_ok and console.find_cvar("zz_" + k) != null and binder.source_of(k) == "default"
+	_check(same, "the horde, footing and heal-aim defaults equal the old constants (%d of them)" % old.size())
+	_check(cvars_ok, "each of them is a zz_* cvar")
+	console.set_cvar("zz_mob_burst", "9")
+	console.set_cvar("zz_footing_keep", "7")
+	_check(config.mob_burst == 9 and config.footing_keep == 7, "zz_mob_burst and zz_footing_keep change the live config")

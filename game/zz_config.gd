@@ -445,6 +445,24 @@ func setup_seconds() -> float:
 ## Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off).
 @export_range(0.0, 600.0, 1.0) var stuck_rescue_seconds: float = 12.0
 
+## Seconds between the samples of safe ground the rescue keeps for a survivor (`zz_footing_sample_every`).
+@export_range(0.2, 30.0, 0.1) var footing_sample_every: float = 1.5
+
+## Metres a survivor must have moved since the last sample before another is kept (`zz_footing_sample_move`).
+@export_range(0.0, 30.0, 0.1) var footing_sample_move: float = 1.5
+
+## How many safe samples are kept; the rescue puts a survivor back on the oldest (`zz_footing_keep`).
+@export_range(1, 30, 1) var footing_keep: int = 5
+
+## Metres of flat travel under which a survivor pushing on the world counts as not moving (`zz_footing_progress`).
+@export_range(0.05, 5.0, 0.05) var footing_progress: float = 0.6
+
+## Cosine of the angle off the crosshair within which a friend counts as aimed at by a medkit (`zz_heal_aim_dot`).
+@export_range(0.0, 1.0, 0.01) var heal_aim_dot: float = 0.82
+
+## Looser cosine that keeps a heal going while the friend moves a little (`zz_heal_hold_dot`).
+@export_range(0.0, 1.0, 0.01) var heal_hold_dot: float = 0.6
+
 ## What everybody starts a map holding, by weapon id. The first is drawn.
 @export var start_weapons: PackedStringArray = PackedStringArray(["zz_pistol", "zz_knife"])
 
@@ -583,6 +601,27 @@ func setup_seconds() -> float:
 
 ## Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
 @export var director_enabled: bool = true
+
+## Metres a zombie's scream wakes idle commons within, one at a time a beat apart (`zz_alert_radius`).
+@export_range(1.0, 100.0, 0.5) var alert_radius: float = 9.0
+
+## Metres within which bile calls every common (`zz_bile_radius`).
+@export_range(1.0, 200.0, 1.0) var bile_radius: float = 45.0
+
+## Metres a broken bile jar splashes (`zz_bile_splash`).
+@export_range(0.5, 30.0, 0.5) var bile_splash: float = 4.0
+
+## Most zombies of a mob spawned at a time, so a crowd pours out of a doorway (`zz_mob_burst`).
+@export_range(1, 50, 1) var mob_burst: int = 6
+
+## Seconds between those bursts (`zz_mob_burst_seconds`).
+@export_range(0.05, 10.0, 0.05) var mob_burst_seconds: float = 0.4
+
+## Metres commons standing about a map keep from where the team starts (`zz_wanderer_clearance`).
+@export_range(0.0, 200.0, 1.0) var wanderer_clearance: float = 28.0
+
+## Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`).
+@export_range(0.1, 5.0, 0.05) var bash_reach: float = 0.75
 
 # --- The specials ----------------------------------------------------------
 
@@ -925,6 +964,76 @@ func setup_seconds() -> float:
 # How a stand-in aims and how quickly it reacts are dot-bot's `bot_*` settings, shared by every
 # game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...), not numbers of this file.
 
+# --- Stand-in rules --------------------------------------------------------
+
+@export_group("Stand-in rules")
+
+## Metres a stand-in sees a zombie from, and the reach it counts a crowd for the calm check (`zz_bot_sight`).
+@export_range(1.0, 200.0, 1.0) var bot_sight: float = 32.0
+
+## How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_ratio`).
+@export_range(1.0, 10.0, 0.05) var bot_upgrade_ratio: float = 1.35
+
+## Metres inside which a stand-in does not fire a launcher: the blast reaches its owner (`zz_bot_blast_safe`).
+@export_range(0.0, 50.0, 0.5) var bot_blast_safe: float = 9.0
+
+## Score added to a launcher when a stand-in ranks the guns it could take (`zz_bot_launcher_bonus`).
+@export_range(0.0, 100000.0, 100.0) var bot_launcher_bonus: float = 10000.0
+
+## Metres from the line of fire a friend's middle may be before a stand-in holds its fire (`zz_bot_friend_clearance`).
+@export_range(0.1, 3.0, 0.05) var bot_friend_clearance: float = 0.7
+
+## Degrees of cone around its aim in which a friend's hitbox counts as in the line of fire (`zz_bot_friend_cone_degrees`).
+@export_range(0.0, 60.0, 0.5) var bot_friend_cone_degrees: float = 14.0
+
+## Metres inside a friend's hitbox the eye must be for the shot to count as passing through them (`zz_bot_muzzle_margin`).
+@export_range(0.0, 1.0, 0.01) var bot_muzzle_margin: float = 0.08
+
+## Metres past its target a round that passes bodies is judged for friends behind it (`zz_bot_penetration_reach`).
+@export_range(0.0, 100.0, 0.5) var bot_penetration_reach: float = 8.0
+
+## Metres within which a crowd makes a stand-in shove (`zz_bot_shove_range`).
+@export_range(0.5, 5.0, 0.1) var bot_shove_range: float = 1.7
+
+## Metres a stand-in lets its leader get before it walks after them (nearer it stays put) (`zz_bot_follow_near`).
+@export_range(0.5, 50.0, 0.5) var bot_follow_near: float = 3.5
+
+## Metres past which a stand-in always walks after its leader (`zz_bot_follow_far`).
+@export_range(0.5, 100.0, 0.5) var bot_follow_far: float = 6.0
+
+## Least seconds a picked behaviour lasts before the next is drawn from the persona's mix (`zz_bot_behave_min`).
+@export_range(1.0, 300.0, 1.0) var bot_behave_min: float = 10.0
+
+## Most seconds a picked behaviour lasts (`zz_bot_behave_max`).
+@export_range(1.0, 300.0, 1.0) var bot_behave_max: float = 22.0
+
+## Metres a looting stand-in looks for something it wants (`zz_bot_loot_reach`).
+@export_range(1.0, 500.0, 1.0) var bot_loot_reach: float = 90.0
+
+## Metres off an item a stand-in takes on (`zz_bot_pick_up_reach`).
+@export_range(0.5, 100.0, 0.5) var bot_pick_up_reach: float = 7.0
+
+## Seconds a stand-in tries for an item before it leaves it be (`zz_bot_pick_up_give_up`).
+@export_range(1.0, 300.0, 1.0) var bot_pick_up_give_up: float = 15.0
+
+## Seconds a stand-in tries for a clear line to an item that is within reach but behind something (`zz_bot_pick_blocked_give_up`).
+@export_range(0.5, 60.0, 0.5) var bot_pick_blocked_give_up: float = 3.0
+
+## Hops that have not freed a stand-in before the game steps it along (`zz_bot_hops_before_nudge`).
+@export_range(0, 20, 1) var bot_hops_before_nudge: int = 2
+
+## Seconds a stand-in stays put, hopping and stepping, before it is put on clear ground (`zz_bot_stuck_before_relocate`).
+@export_range(1.0, 120.0, 1.0) var bot_stuck_before_relocate: float = 8.0
+
+## Metres from where it began that count as having got away (`zz_bot_stuck_area`).
+@export_range(0.5, 20.0, 0.5) var bot_stuck_area: float = 2.5
+
+## Metres a stand-in may jitter and still be stuck (`zz_bot_stuck_radius`).
+@export_range(0.1, 5.0, 0.1) var bot_stuck_radius: float = 0.8
+
+## Path points ahead of it a stand-in smooths its route over (`zz_bot_smooth_horizon`).
+@export_range(2, 64, 1) var bot_smooth_horizon: int = 16
+
 # --- Watching --------------------------------------------------------------
 
 @export_group("Watching")
@@ -1026,7 +1135,7 @@ func validate() -> DotResult:
 ## `@export_group` -> the cfg file it lives in: `cfg/game/game-zombie-zone/config_<file>/game.yml`.
 const CFG_FILES := {
 	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
-	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
+	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde", "Stand-in rules": "horde",
 	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors", "Turrets": "survivors", "Hazards": "survivors",
 	"Carry weight": "carry", "Gore": "world", "The maps": "world", "Netcode": "world",
 }

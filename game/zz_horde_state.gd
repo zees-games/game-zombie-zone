@@ -25,23 +25,6 @@ const CHANNEL := "zz.horde"
 ## Where brains find this. See `zz_zombie_brain.gd`.
 const HORDE_META := &"zz_horde"
 
-## A zombie's scream wakes idle commons this far away, one at a time a beat apart.
-const ALERT_RADIUS := 9.0
-
-## Bile calls every common this far away.
-const BILE_RADIUS := 45.0
-
-## How far a broken bile jar splashes.
-const BILE_SPLASH := 4.0
-
-## A mob is spawned at most this many at a time, a few ticks apart, so a crowd pours out of a
-## doorway rather than appearing in it.
-const MOB_BURST := 6
-const MOB_BURST_SECONDS := 0.4
-
-## Commons standing about a map are at least this far from where the team starts.
-const WANDERER_CLEARANCE := 28.0
-
 signal zombie_spawned(npc: DotNpcInstance)
 signal zombie_removed(npc: DotNpcInstance)
 signal zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
@@ -112,8 +95,6 @@ const GRID := 4.0
 ## Grid cell -> barricade ids near it, so a zombie asks only about the ones beside it.
 var _barricade_cells: Dictionary = {}
 const BARRICADE_CELL := 4.0
-## How far past a barricade's face a zombie bashes it from: its radius and an arm.
-const BASH_REACH := 0.75
 
 ## Multipliers boxes stack: how often mobs come, how hard specials are, how big mobs are.
 var mob_rate_scale: float = 1.0

@@ -10,11 +10,6 @@ const CHANNEL := "zz.consumables"
 const MEDKIT_CEILING := 7
 const PILLS_CEILING := 15
 
-## Cosine of the angle off the crosshair within which a friend counts as aimed at.
-const AIM_DOT := 0.82
-## Looser, to keep a heal going while the friend moves a little.
-const HOLD_DOT := 0.6
-
 var medkit_max: int = 3
 var pills_max: int = 4
 ## `zz_pills_seconds`: how long the key is held to take a pill (0 is instant).
@@ -143,7 +138,7 @@ func heal_ok(player, who) -> bool:
 	if eye.distance_to(middle) > heal_range + 0.8:
 		return false
 
-	return player.aim_direction().dot((middle - eye).normalized()) >= HOLD_DOT and game.clear_between(eye, middle)
+	return player.aim_direction().dot((middle - eye).normalized()) >= game.config.heal_hold_dot and game.clear_between(eye, middle)
 
 
 ## The friend [param player] aims at: {"who": ZzPlayer or null, "why": refusal text}.
@@ -151,7 +146,7 @@ func aimed_friend(player, reach: float) -> Dictionary:
 	var eye: Vector3 = player.eye_position()
 	var aim: Vector3 = player.aim_direction()
 	var best = null
-	var best_dot := AIM_DOT
+	var best_dot: float = game.config.heal_aim_dot
 	var seen_far := false
 	var blocked := false
 

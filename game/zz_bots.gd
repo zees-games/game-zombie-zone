@@ -47,33 +47,6 @@ const BOT_NAMES := ["Rook", "Marlow", "Juno", "Hask", "Petra", "Odell", "Sable",
 	"Cass", "Dmitri", "Ines", "Booker", "Tamsin", "Okafor", "Lupe", "Gideon",
 	"Mireille", "Shaw", "Noor", "Vance", "Ottilie", "Rafferty", "Keiko", "Bram"]
 
-## How far a bot sees a zombie, and how close a crowd has to be to be shoved.
-const SIGHT := 32.0
-## A stand-in swaps a gun in the same slot for one rated this many times higher.
-const UPGRADE_RATIO := 1.35
-## Closer than this a launcher is not fired: the blast reaches its owner (the rocket's 7.5 m splash falls off).
-const BLAST_SAFE := 9.0
-const LAUNCHER_BONUS := 10000.0
-
-## How near the line of fire a friend's middle may be before a stand-in holds its fire: a
-## body's half-width and a little more for a shotgun's spread.
-const FRIEND_CLEARANCE := 0.7
-
-## The cone a stand-in's shot may land in around its aim: its own aim wobble plus a moving
-## shotgun's spread. A friend's hitbox inside it is a friend in the line.
-const FRIEND_CONE_DEGREES := 14.0
-
-## How far inside a friend's hitbox the eye must be (metres, each way) for the shot to count as
-## passing through them; see [method _holds_muzzle]. A stand-in moves about 4 cm per tick.
-const MUZZLE_MARGIN := 0.08
-
-## How far past its target a round that passes bodies is judged for friends behind it.
-const PENETRATION_REACH := 8.0
-const SHOVE_RANGE := 1.7
-
-## How far a bot lets its leader get before it walks after them.
-const FOLLOW_NEAR := 3.5
-const FOLLOW_FAR := 6.0
 
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
@@ -313,7 +286,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 	if danger != null:
 		_aim_at(player, command, danger)
 		_choose_slot(player, danger)
-		var crowd := _crowd_within(player, SHOVE_RANGE)
+		var crowd := _crowd_within(player, game.config.bot_shove_range)
 
 		if crowd >= 2 or (danger.def.id == ZzNpcs.COMMON and danger.position().distance_to(player.feet()) < 1.3):
 			player.shove_held = (game.current_tick() % 10) < 2
@@ -370,13 +343,6 @@ func _decide(player, command: DotFpsCommand) -> void:
 
 # --- Acting by persona -----------------------------------------------------------------------
 
-## Seconds a picked behaviour lasts before the next is drawn from the persona's mix.
-const BEHAVE_MIN := 10.0
-const BEHAVE_MAX := 22.0
-
-## How far a looting stand-in looks for something it wants, metres.
-const LOOT_REACH := 90.0
-
 
 ## With infected left and nothing in sight, acts by the persona's mix: hunt the rest, loot, hold a choke, support a
 ## teammate, scout. Never stands: a pick with nothing to do hands on to the next, and scouting always has somewhere
@@ -392,7 +358,7 @@ func persona_act(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	if behave == &"" or now >= float(memory.get("behave_until", 0.0)):
 		behave = persona.pick(_rng.randf(), behave)
 		memory["behave"] = behave
-		memory["behave_until"] = now + _rng.randf_range(BEHAVE_MIN, BEHAVE_MAX)
+		memory["behave_until"] = now + _rng.randf_range(game.config.bot_behave_min, game.config.bot_behave_max)
 		memory.erase("scout_goal")
 		DotLog.debug(CHANNEL, "a stand-in picked a behaviour", {"player": String(player.player_id), "persona": String(persona.id),
 			"behaviour": String(behave), "infected_left": game.horde.infected_left()})
@@ -443,9 +409,9 @@ func _hunt(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 
-## Anything it wants within [constant LOOT_REACH], else a stocked cache it is not already standing at.
+## Anything it wants within `zz_bot_loot_reach`, else a stocked cache it is not already standing at.
 func _loot(player, command: DotFpsCommand, memory: Dictionary) -> bool:
-	if _pick_up(player, command, memory, LOOT_REACH):
+	if _pick_up(player, command, memory, game.config.bot_loot_reach):
 		return true
 
 	var best := Vector3.INF
@@ -493,7 +459,7 @@ func _support(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 			best = other
 			best_health = h
 
-	if best == null or best.feet().distance_to(player.feet()) <= FOLLOW_NEAR:
+	if best == null or best.feet().distance_to(player.feet()) <= game.config.bot_follow_near:
 		return false
 
 	_walk_to(player, command, best.feet(), memory)
@@ -854,7 +820,7 @@ func _threat(player) -> DotNpcInstance:
 		return held
 
 	var eye: Vector3 = player.eye_position()
-	var near: Array = game.horde.zombies_near(player.feet(), SIGHT)
+	var near: Array = game.horde.zombies_near(player.feet(), game.config.bot_sight)
 	# Sorted as one packed key (millimetres above, the index below) rather than with a lambda,
 	# which was a script call per comparison: six thousand a frame at wave 7.
 	var keys := PackedInt64Array()
@@ -957,7 +923,7 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 	if player.flashed or aim.target_id != npc.instance_id:
 		return false
 	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
-	if held != null and ZzWeapons.explosive(held.id) and npc.position().distance_to(player.feet()) < BLAST_SAFE:
+	if held != null and ZzWeapons.explosive(held.id) and npc.position().distance_to(player.feet()) < game.config.bot_blast_safe:
 		return false
 	var at: Vector3 = memory["target_at"] if memory.get("target_at", Vector3.INF) != Vector3.INF else _aim_point(npc)
 	if not aim.trigger(game.now(), player.eye_position().distance_to(at)):
@@ -994,10 +960,10 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 	var eye: Vector3 = player.eye_position()
 
 	if _round_passes_bodies(player):
-		at = eye + (at - eye).normalized() * (eye.distance_to(at) + PENETRATION_REACH)
+		at = eye + (at - eye).normalized() * (eye.distance_to(at) + game.config.bot_penetration_reach)
 
 	var reach := eye.distance_to(at)
-	var cone := tan(deg_to_rad(FRIEND_CONE_DEGREES))
+	var cone := tan(deg_to_rad(game.config.bot_friend_cone_degrees))
 
 	for other in _team():
 		if other == player or not other.is_alive() or other.watching:
@@ -1007,7 +973,7 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		var off := Geometry3D.get_closest_point_to_segment(middle, eye, at).distance_to(middle)
 
 		# Only somebody between the gun and the target, not behind either.
-		if (middle - eye).dot(at - eye) > 0.0 and middle.distance_to(eye) <= reach and off < FRIEND_CLEARANCE:
+		if (middle - eye).dot(at - eye) > 0.0 and middle.distance_to(eye) <= reach and off < game.config.bot_friend_clearance:
 			return true
 
 		# Nowhere near the line: no hitbox of theirs can be on it. A dozen stand-ins each
@@ -1049,8 +1015,8 @@ func _holds_muzzle(set_node: DotHitboxSet, eye: Vector3) -> bool:
 	if not set_node.contains_point(eye):
 		return false
 
-	for offset in [Vector3(MUZZLE_MARGIN, 0.0, 0.0), Vector3(-MUZZLE_MARGIN, 0.0, 0.0),
-			Vector3(0.0, 0.0, MUZZLE_MARGIN), Vector3(0.0, 0.0, -MUZZLE_MARGIN)]:
+	for offset in [Vector3(game.config.bot_muzzle_margin, 0.0, 0.0), Vector3(-game.config.bot_muzzle_margin, 0.0, 0.0),
+			Vector3(0.0, 0.0, game.config.bot_muzzle_margin), Vector3(0.0, 0.0, -game.config.bot_muzzle_margin)]:
 		if not set_node.contains_point(eye + offset):
 			return false
 
@@ -1195,10 +1161,6 @@ func _move_world(_player, command: DotFpsCommand, direction: Vector3) -> void:
 	command.move = Vector2(flat.dot(right), flat.dot(forward)).limit_length(1.0)
 
 
-## Path points a stand-in smooths per repath (the spawner's `smooth_horizon` for the zombies).
-const SMOOTH_HORIZON := 16
-
-
 func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
@@ -1217,7 +1179,7 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 			nav.filter = nav.bot_filter
 		# Smoothed only at its head, like the zombies': it repaths every second, so the rest of a
 		# forty-point path was smoothed and thrown away.
-		path = nav.find_smooth_path(here, goal, 2.5, true, SMOOTH_HORIZON)
+		path = nav.find_smooth_path(here, goal, 2.5, true, game.config.bot_smooth_horizon)
 		nav.filter = kept
 		memory["path"] = path
 		memory["path_at"] = game.now()
@@ -1270,7 +1232,7 @@ func _follow(player, command: DotFpsCommand, memory: Dictionary) -> void:
 
 	var gap: float = leader.feet().distance_to(player.feet())
 
-	if gap > FOLLOW_FAR or (gap > FOLLOW_NEAR and leader.controller.state.horizontal_speed() > 1.0):
+	if gap > game.config.bot_follow_far or (gap > game.config.bot_follow_near and leader.controller.state.horizontal_speed() > 1.0):
 		_walk_to(player, command, leader.feet(), memory)
 
 
@@ -1348,14 +1310,6 @@ func _objective(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 
-## How far off an item is taken on, and how long a stand-in tries for one before leaving it be.
-const PICK_UP_REACH := 7.0
-const PICK_UP_GIVE_UP := 15.0
-
-## Seconds a stand-in tries to get a clear line to an item that is within reach but behind something.
-const PICK_BLOCKED_GIVE_UP := 3.0
-
-
 ## Lets go of item [param id] for 30 s, and of its neighbours (a shelf behind boards holds several goods: giving up one gives up the rest too, or each costs a full give-up in turn).
 func _give_up_pick(memory: Dictionary, loot, id: int) -> void:
 	memory["pick"] = -1
@@ -1382,7 +1336,9 @@ func _can_walk_to(player, at: Vector3) -> bool:
 
 
 ## Picks up what it needs within a few metres: a medkit without one, pills, ammo when low, a box.
-func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float = PICK_UP_REACH) -> bool:
+func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float = -1.0) -> bool:
+	if reach < 0.0:
+		reach = game.config.bot_pick_up_reach
 	var loot = game.loot
 
 	if loot == null:
@@ -1392,7 +1348,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 	var best_gap := reach
 	var kept := int(memory.get("pick", -1))
 
-	# An item taken on is kept until it is had, gone or PICK_UP_GIVE_UP seconds old: the path to
+	# An item taken on is kept until it is had, gone or `zz_bot_pick_up_give_up` seconds old: the path to
 	# one 7 m away can lead off the other way, and re-judging by straight distance each tick
 	# made the stand-in alternate between it and its post, standing still.
 	if kept >= 0 and (not loot.entries.has(kept) or game.now() > float(memory.get("pick_until", 0.0))):
@@ -1454,7 +1410,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 	if best != kept:
 		memory["pick"] = best
 		memory.erase("pick_blocked")
-		memory["pick_until"] = game.now() + PICK_UP_GIVE_UP + maxf(reach - PICK_UP_REACH, 0.0) / 3.0
+		memory["pick_until"] = game.now() + game.config.bot_pick_up_give_up + maxf(reach - game.config.bot_pick_up_reach, 0.0) / 3.0
 
 		# Nowhere to walk to it (a rail, a ledge, another level): leave it be at once, not after fifteen seconds of pushing at the nearest point.
 		if not _can_walk_to(player, loot.position_of(best)):
@@ -1482,7 +1438,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 			var since: float = memory.get("pick_blocked", game.now())
 			memory["pick_blocked"] = since
 
-			if game.now() - since > PICK_BLOCKED_GIVE_UP:
+			if game.now() - since > game.config.bot_pick_blocked_give_up:
 				_give_up_pick(memory, loot, best)
 				return false
 
@@ -1518,7 +1474,7 @@ func _wants_weapon(player, id: StringName) -> bool:
 		return true
 
 	# Same slot: only a clearly better gun, and never a launcher over a gun that can be fired at close range.
-	return not ZzWeapons.explosive(id) and ZzWeapons.rating(id) > ZzWeapons.rating(arsenal.slot_at(def.slot).def.id) * UPGRADE_RATIO
+	return not ZzWeapons.explosive(id) and ZzWeapons.rating(id) > ZzWeapons.rating(arsenal.slot_at(def.slot).def.id) * game.config.bot_upgrade_ratio
 
 
 ## Which carried gun to hold against [param danger]: the best-rated that has rounds, a launcher only against a special
@@ -1541,11 +1497,11 @@ func _choose_slot(player, danger: DotNpcInstance) -> void:
 		if def.tags.has(&"melee") or def.tags.has(&"thrown") or not _loaded(arsenal, slot):
 			continue
 
-		if ZzWeapons.explosive(def.id) and (gap < BLAST_SAFE or not big):
+		if ZzWeapons.explosive(def.id) and (gap < game.config.bot_blast_safe or not big):
 			continue
 
 		# One rocket is worth a long reload only against something big: a launcher in reach is the pick, whatever its rate says.
-		var score := ZzWeapons.rating(def.id) * (UPGRADE_RATIO if slot == held else 1.0) + (LAUNCHER_BONUS if ZzWeapons.explosive(def.id) else 0.0)
+		var score: float = ZzWeapons.rating(def.id) * (game.config.bot_upgrade_ratio if slot == held else 1.0) + (game.config.bot_launcher_bonus if ZzWeapons.explosive(def.id) else 0.0)
 
 		if score > best_score:
 			best = slot_no
@@ -1591,30 +1547,17 @@ func _get_out_of_hazards(player, command: DotFpsCommand) -> void:
 			return
 
 
-## Hops that have not freed a stand-in before the game steps it along (`ZzUnstick`).
-const HOPS_BEFORE_NUDGE := 2
-
-## Seconds a stand-in stays put, hopping and stepping, before it is put on clear ground.
-const STUCK_BEFORE_RELOCATE := 8.0
-
-## Metres from where it began that count as having got away.
-const STUCK_AREA := 2.5
-
-## Metres a stand-in may jitter and still be stuck (the stuck meter's own 0.75, with a little over).
-const STUCK_RADIUS := 0.8
-
-
 func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var mark: Vector3 = memory["stuck_at"]
 
-	if mark == Vector3.INF or here.distance_to(mark) > STUCK_RADIUS:
+	if mark == Vector3.INF or here.distance_to(mark) > game.config.bot_stuck_radius:
 		memory["stuck_at"] = here
 		memory["stuck_time"] = game.now()
 		memory["hops"] = 0
 
 		# A step does not end the spell: only getting away from where it began does.
-		if not memory.has("first_at") or here.distance_to(memory["first_at"]) > STUCK_AREA:
+		if not memory.has("first_at") or here.distance_to(memory["first_at"]) > game.config.bot_stuck_area:
 			memory["first_at"] = here
 			memory["stuck_first"] = game.now()
 
@@ -1627,7 +1570,7 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 		memory["hops"] = int(memory.get("hops", 0)) + 1
 
 		# A hop that has not freed it twice will not: a step along where it was going, if it fits.
-		if int(memory["hops"]) > HOPS_BEFORE_NUDGE:
+		if int(memory["hops"]) > game.config.bot_hops_before_nudge:
 			var yaw := deg_to_rad(command.yaw)
 			var heading := Vector3(cos(yaw), 0.0, -sin(yaw)) * command.move.x + Vector3(-sin(yaw), 0.0, -cos(yaw)) * command.move.y
 			var moved := ZzUnstick.nudge_player(player, heading, command.yaw)
@@ -1635,7 +1578,7 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 			memory["nudges"] = int(memory.get("nudges", 0)) + (1 if moved else 0)
 
 		# Steps have not freed it either (inside a barricade, in the lee of a prop): onto clear ground.
-		if game.now() - float(memory.get("stuck_first", game.now())) > STUCK_BEFORE_RELOCATE:
+		if game.now() - float(memory.get("stuck_first", game.now())) > game.config.bot_stuck_before_relocate:
 			var aim: Vector3 = memory["goal"] if (memory["goal"] as Vector3) != Vector3.INF else here
 			memory["stuck_first"] = game.now()
 
@@ -1652,7 +1595,7 @@ func _watch_idle(player, command: DotFpsCommand, memory: Dictionary) -> void:
 		or not player.is_up() or player.is_pinned() or not player.carried.is_empty()
 	var wants: bool = int(memory.get("pick", -1)) >= 0 or command.move.length() > 0.3
 
-	if limit <= 0.0 or acting or not wants or anchor == Vector3.INF or here.distance_to(anchor) > STUCK_RADIUS:
+	if limit <= 0.0 or acting or not wants or anchor == Vector3.INF or here.distance_to(anchor) > game.config.bot_stuck_radius:
 		memory["idle_at"] = here
 		memory["idle_since"] = game.now()
 		return

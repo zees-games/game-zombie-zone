@@ -8,12 +8,6 @@ extends RefCounted
 const ZzMap := preload("zz_map.gd")
 
 const CHANNEL := "zz.footing"
-## A sample of safe ground is kept at most this often, and only after this much movement.
-const SAMPLE_EVERY := 1.5
-const SAMPLE_MOVE := 1.5
-const KEEP := 5
-## Progress under this many metres of flat travel counts as not moving.
-const PROGRESS := 0.6
 ## Metres below the lowest floor that count as out of the map, when the kill height is deeper.
 const FALL_DEPTH := 4.0
 
@@ -49,10 +43,10 @@ func advance(game: Node, player: Object, delta: float) -> bool:
 	var grounded: bool = state != null and int(state.get("ground_ticks")) > 0
 	rec["since"] += delta
 	var safe: Array = rec["safe"]
-	if grounded and rec["since"] >= SAMPLE_EVERY and (safe.is_empty() or (safe[-1] as Vector3).distance_to(feet) >= SAMPLE_MOVE):
+	if grounded and rec["since"] >= float(config.get("footing_sample_every")) and (safe.is_empty() or (safe[-1] as Vector3).distance_to(feet) >= float(config.get("footing_sample_move"))):
 		rec["since"] = 0.0
 		safe.append(feet)
-		if safe.size() > KEEP:
+		if safe.size() > int(config.get("footing_keep")):
 			safe.pop_front()
 
 	if stuck_seconds <= 0.0 or not bool(player.call(&"is_up")) or bool(player.call(&"is_pinned")):
@@ -62,7 +56,7 @@ func advance(game: Node, player: Object, delta: float) -> bool:
 	var command: Variant = player.get("controller").get("current_command")
 	var pushing: bool = command != null and (command.get("move") as Vector2).length() > 0.5
 	var flat := Vector2(feet.x - (rec["anchor"] as Vector3).x, feet.z - (rec["anchor"] as Vector3).z)
-	if flat.length() > PROGRESS or not pushing:
+	if flat.length() > float(config.get("footing_progress")) or not pushing:
 		rec["anchor"] = feet
 		rec["stuck"] = 0.0
 		return false
