@@ -157,6 +157,8 @@ func populate_map() -> void:
 ## hold the chokes.
 func _begin_notes() -> void:
 	notes.clear()
+	_plan_due = false
+	notes.bake_id = str(_doc.get("id", ""))
 
 	if game == null or game.map == null or game.physics == null:
 		return
@@ -466,6 +468,7 @@ func clear() -> void:
 	_drop_nav_job()
 	_map_nav_pending = false
 	notes.clear()
+	_plan_due = false
 	wcull = null
 
 	if spawner != null:
@@ -620,6 +623,10 @@ func _start_points() -> Array[Vector3]:
 
 # --- The tick --------------------------------------------------------------------------------
 
+## Set the tick the navigation annotations arrive; the plan runs on the next one.
+var _plan_due := false
+
+
 ## One tick, or [param ticks] ticks of [param delta] at once. After the survivors moved and shot,
 ## before anything reads where a zombie is.
 func tick(delta: float, ticks: int = 1) -> void:
@@ -635,8 +642,14 @@ func tick(delta: float, ticks: int = 1) -> void:
 	delta *= ticks
 	_time += delta
 
-	if notes.tick():
+	# The plan (routes, chokes) runs the tick after the annotations arrive, not in it: the two
+	# together were one 1.1 s tick at round start.
+	if _plan_due:
+		_plan_due = false
 		_plan_notes()
+
+	if notes.tick():
+		_plan_due = true
 
 	notes.update(delta, self)
 	_rebuild_candidates()
