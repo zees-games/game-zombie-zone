@@ -2397,6 +2397,11 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 
 func _begin_use(player: ZzPlayer) -> void:
+	# A prop in hand is put down first: the key that picked it up.
+	if prop_carry.carrying(player.player_id):
+		var _put: int = prop_carry.put_down(map.toys if map != null else null, player.player_id)
+		return
+
 	# Somebody down in front of you comes first: it is the one thing that cannot wait.
 	var downed := _looked_at_survivor(player, config.revive_range + 0.4, true)
 
@@ -2422,6 +2427,10 @@ func _begin_use(player: ZzPlayer) -> void:
 			loot.use(thing, player)
 		else:
 			_start(player, &"loot", thing, needs)
+		return
+
+	if map != null and map.toys != null \
+			and prop_carry.pick_up(map.toys, player.player_id, player.eye_position(), player.aim_direction(), world_mask()) >= 0:
 		return
 
 	var index := current_objective()
@@ -3803,8 +3812,36 @@ func _advance_toys(delta: float) -> void:
 		var radius := tunables.radius if tunables != null else 0.35
 		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
 		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
+	prop_carry.advance(map.toys, _carrier_of, world_mask())
 	map.toys.advance(delta)
 	_roll_into_survivors(delta)
+
+
+## The survivor who may still carry: alive, up and playing; null otherwise.
+func _carrier_of(player_id: StringName) -> Variant:
+	var player := player_by_id(player_id)
+	return player if player != null and player.is_alive() and not player.is_down() and not player.watching else null
+
+
+## Lays a JSON text's rows over the shipped force table (the `zz_prop_force` cvar: {"weapon id": {"barrel": 2.0}}); empty restores the file.
+## False when the text is not a JSON object.
+func set_prop_force_override(text: String) -> bool:
+	var table := ZzPropForce.load_file()
+	var trimmed := text.strip_edges()
+	if not trimmed.is_empty():
+		var json := JSON.new()
+		if json.parse(trimmed) != OK or not json.data is Dictionary:
+			return false
+		var parsed: Dictionary = json.data
+		var merged: Dictionary = table.table.duplicate(true)
+		for weapon: Variant in parsed:
+			if parsed[weapon] is Dictionary:
+				var row: Dictionary = (merged.get(String(weapon), {}) as Dictionary).duplicate()
+				row.merge(parsed[weapon], true)
+				merged[String(weapon)] = row
+		table.set_table(merged)
+	prop_force = table
+	return true
 
 
 ## A loose barrel going fast hurts the survivor it runs into (once per cooldown), as the original supports' barrels did.

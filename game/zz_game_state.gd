@@ -4,6 +4,7 @@ extends Node3D
 
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzPropForce := preload("zz_prop_force.gd")
+const ZzPropCarry := preload("zz_prop_carry.gd")
 const ZzCarry := preload("zz_carry.gd")
 const ZzClasses := preload("zz_classes.gd")
 const ZzBots := preload("zz_bots.gd")
@@ -254,6 +255,9 @@ var crates: ZzCrates = null
 
 ## Per-weapon force on each kind of loose prop (`props/forces.json`), loaded on the first shot.
 var prop_force: RefCounted = null
+
+## Who carries which loose prop (server side).
+var prop_carry: ZzPropCarry = ZzPropCarry.new()
 ## What a dead zombie leaves (ammunition, health); server only.
 var drops: ZzDrops = null
 ## What a map's breakables leave when they break (`spawn_object`), whitelisted and capped.
