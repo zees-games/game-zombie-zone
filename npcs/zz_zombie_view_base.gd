@@ -335,6 +335,8 @@ static var _scenes: Dictionary = {}
 static var _libraries: Dictionary = {}
 ## Per-kind bruises and sores on the specials' flat skin (`zz_zombie_detail`; 0 draws the plain look).
 static var detail := true
+## Which standing swing the commons use (`zz_attack_anim`): 0 a mix by body, 1 always the swipe, 2 always the grapple.
+static var attack_anim := 0
 static var _materials: Dictionary = {}
 static var _shader: Shader = null
 static var _shader_normal: Shader = null

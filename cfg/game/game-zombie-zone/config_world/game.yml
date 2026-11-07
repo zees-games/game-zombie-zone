@@ -8,6 +8,8 @@
 # gore_max_gibs: 24
 # Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; ... [0..400]
 # gore_max_wounds: 48
+# Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 ... [0..2]
+# attack_anim: 0
 
 # --- The maps
 # Which maps this server may play, by id. Empty means every one it has.
