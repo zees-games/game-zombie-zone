@@ -812,7 +812,10 @@ func _build_terrain() -> void:
 	# Decoding the heightfield, its triangles and its bounds is GDScript over every sample (1.1 s on
 	# ze_biohazard_manor), so the result is kept in `user://terrain_cache`, keyed on the document's data.
 	var key := "%d_%d" % [hash(doc["terrain"]), str(doc["terrain"].get("data", "")).length()] if terrain_cache else ""
+	var t_read := Time.get_ticks_usec()
 	var kept := _terrain_cache_read(key)
+	sections[&"terrain_cache_read"] = snappedf(float(Time.get_ticks_usec() - t_read) / 1000.0, 0.1)
+	sections[&"terrain_hit"] = 0.0 if kept.is_empty() else 1.0
 	var faces := PackedVector3Array()
 	var box := AABB()
 	if kept.is_empty():
