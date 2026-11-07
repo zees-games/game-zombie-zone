@@ -7,6 +7,8 @@ const ZzNpcProfiles := preload("../game/zz_npc_profiles.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzBoxProfiles := preload("../game/zz_box_profiles.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
+const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## Optional content packs (game/zz_packs.gd), against a fixture provider because the real packs
@@ -27,7 +29,7 @@ const ALONE_CHECKS := 12
 ## addons/ as docs/development-setup.md says. The section runs only when all three are linked;
 ## otherwise it prints SKIP and the expected counts stay those of the fixture sections.
 const REAL_PACKS := ["zz_modern_weapons", "zz_medieval_weapons", "zz_historical_monsters"]
-const REAL_CHECKS := 38
+const REAL_CHECKS := 51
 const MODERN_IDS := ["zz_m4", "zz_sniper", "zz_knife", "zz_pistol", "zz_shotgun", "zz_smg", "zz_frag", "zz_vss", "zz_revolver", "zz_mp5", "zz_spas", "zz_lmg", "zz_dmr", "zz_m79", "zz_ak", "zz_scar", "zz_bren", "zz_glock", "zz_deagle", "zz_p90", "zz_aa12", "zz_rpg", "zz_machete", "zz_bat", "zz_crowbar", "zz_axe", "zz_sledge", "zz_hunting"]
 const MEDIEVAL_IDS := ["longsword", "bow", "round_shield", "battle_axe", "war_axe", "double_axe", "mace", "spear", "crossbow", "dagger"]
 
@@ -397,6 +399,48 @@ func _monster_host(game: ZzGame, player: Object, npc: DotNpcInstance) -> void:
 	_check(player.controller.motor.has_modifier(player.controller.state, &"zz_tagged"), "and slows them while it lasts")
 
 
+## A pack monster runs its own brain on the game's body: it hunts, its attacks start and land through the host.
+func _pack_brain(game: ZzGame, player: Object) -> void:
+	for id: StringName in [&"zhm_tiger", &"zhm_bear", &"zhm_trex"]:
+		var def: DotNpcDef = game.horde.catalogue.get_npc(id)
+		_check(def != null and def.brain_script_path.begins_with("user://zz_pack_brains/") and FileAccess.file_exists(def.brain_script_path),
+			"%s runs a generated brain, not the common's" % id, str(def.brain_script_path if def != null else "-"))
+		_check(def != null and def.meta.has("cfg") and def.meta.get("species", "") != "", "%s carries its species and numbers" % id)
+
+	# Drawn as the body each names (a client has no scene of the pack's): the bear and T-Rex as the brute, the cat as the leaper.
+	var brute: Dictionary = ZzZombieView.look_for(&"brute", 0)
+	var common: Dictionary = ZzZombieView.look_for(&"common", 0)
+	_check(ZzZombieView.look_for(&"zhm_bear", 0)["body"] == brute["body"] and is_equal_approx(ZzZombieView.look_for(&"zhm_trex", 0)["height"], brute["height"]),
+		"the bear and the T-Rex are drawn as the brute")
+	_check(ZzZombieView.look_for(&"zhm_tiger", 0)["body"] == ZzZombieView.look_for(&"leaper", 0)["body"] and ZzZombieView.look_for(&"zhm_tiger", 0)["body"] != common["body"],
+		"the tiger is drawn as the leaper")
+
+	var at: Vector3 = game.horde.survivor_position(&"u100") + Vector3(5.0, 0.0, 0.0)
+	var npc := game.horde.spawn_special(&"zhm_tiger", at)
+	_check(npc != null and npc.brain != null and npc.brain.get(&"species") == &"tiger", "a tiger is made with the pack's brain", str(npc.brain.get(&"species")) if npc != null and npc.brain != null else "no brain")
+
+	if npc == null or npc.brain == null:
+		return
+
+	var body := npc.node as ZzZombieBody
+	var health: float = player.real_health()
+	var moved := false
+	var posed := false
+	var start := npc.position()
+
+	for i in 64 * 8:
+		game.simulate(1.0 / 64.0)
+		moved = moved or npc.position().distance_to(start) > 1.0
+		posed = posed or (body != null and body.anim != ZzZombieBody.Anim.IDLE)
+
+	var started: Dictionary = npc.brain.get(&"started")
+	_check(moved, "the pack brain walks the zombie body to its prey")
+	_check(posed, "and its pose reaches the body's anim")
+	_check(not started.is_empty() or player.real_health() < health, "its attacks start or land",
+		"%s %.1f -> %.1f" % [str(started), health, player.real_health()])
+	_check(body != null and body.get_children().any(func(c: Node) -> bool: return c.has_method(&"apply_gait")), "the brain's view of the body hangs off it")
+
+
 func _damage_of(id: StringName) -> float:
 	var def := ZzWeapons.def_of(id)
 	return -1.0 if def == null or def.tuning == null else float(def.tuning.get("damage"))
@@ -540,5 +584,6 @@ func _real_packs() -> void:
 	_check(spawned.values().all(func(n: DotNpcInstance) -> bool: return n != null and n.alive), "all three are alive after two seconds")
 	_check(game.arm(player, &"zz_m4") and game.arm(player, &"dagger"), "a survivor can be armed from each weapon pack")
 	_monster_host(game, player, spawned[&"zhm_tiger"])
+	_pack_brain(game, player)
 	game.queue_free()
 	_finished += 1

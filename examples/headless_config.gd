@@ -16,7 +16,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 51
+const CHECKS := 53
 
 
 func _ready() -> void:
@@ -37,7 +37,7 @@ func _run() -> void:
 	var keys := PackedStringArray()
 	for e: Dictionary in binder.schema():
 		keys.append(e["key"])
-	for k in ["waves", "wave_size", "respawn_base_seconds", "box_drop_common", "defib_range", "down_attack", "start_points", "difficulty"]:
+	for k in ["waves", "wave_size", "respawn_base_seconds", "box_drop_common", "defib_range", "defib_price", "defib_hear_range", "down_attack", "start_points", "difficulty"]:
 		_check(keys.has(k), "%s is exposed" % k)
 
 	for k in ["trader_setup", "trader_grace", "trader_breather", "trader_round", "trader_closed_message", "grace_maps", "escape_grace_seconds", "grace_hud"]:
@@ -51,7 +51,7 @@ func _run() -> void:
 	console.set_cvar("zz_waves", "7")
 	_check(config.waves == 7 and binder.source_of("waves") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("waves: 7"), "the diff names the edit")
-	_check(config.gore_level == 2 and config.gore_max_gibs == 24 and config.gore_max_wounds == 48, "gore defaults to flying limbs, 24 gibs, 48 wound marks")
+	_check(config.gore_level == 2 and config.gore_max_gibs == 24 and config.gore_max_wounds == 48 and config.attack_anim == 0 and keys.has("attack_anim"), "gore and attack_anim defaults to flying limbs, 24 gibs, 48 wound marks")
 	console.set_cvar("zz_gore_level", "0")
 	_check(config.gore_level == 0 and keys.has("gore_max_gibs"), "zz_gore_level is a cvar on the config and gore_max_gibs is exposed")
 	var schema_path := "user://zz_config_schema.json"

@@ -985,6 +985,30 @@ func _present_defib_hands(delta: float) -> void:
 		var _charge := audio.play(ZzAudio.DEFIB_CHARGE)
 
 	_defib_sound = out
+	_hear_defib_charges()
+
+
+## The charge of a defibrillator in somebody else's hands, once as they start, from where they stand,
+## for whoever is within `defib_hear_range` of them. They are the ones whose `using` the net carries.
+func _hear_defib_charges() -> void:
+	var reach: float = game.config.defib_hear_range
+	var now := {}
+
+	for key: Variant in game.players:
+		var other: ZzPlayer = game.players[key]
+
+		if other == null or other == player or other.using != &"defib" or not other.is_alive():
+			continue
+
+		now[key] = true
+
+		if _defib_heard.has(key) or audio == null or reach <= 0.0:
+			continue
+
+		if other.feet().distance_to(player.feet()) <= reach:
+			var _charge := audio.at(ZzAudio.DEFIB_CHARGE, other.feet() + Vector3(0.0, 1.0, 0.0))
+
+	_defib_heard = now
 
 
 func _on_rescue(session_id: int) -> void:

@@ -742,6 +742,10 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.defib_max_body_age = clampf(value, 0.0, 600.0))
 	_tunable("zz_defib_move_tolerance", config.defib_move_tolerance, "Metres the user may drift while charging before it is interrupted (0.1 to 3)",
 		func(value: float) -> void: config.defib_move_tolerance = clampf(value, 0.1, 3.0))
+	_tunable("zz_defib_price", float(config.defib_price), "Points the trader asks for a defibrillator, also on trader shelves without a site price (0: not sold)",
+		func(value: float) -> void: config.defib_price = clampi(int(value), 0, 100000))
+	_tunable("zz_defib_hear_range", config.defib_hear_range, "Metres from which other survivors hear a defibrillator charging (0: only its user)",
+		func(value: float) -> void: config.defib_hear_range = clampf(value, 0.0, 100.0))
 	_tunable("zz_common_speed_scaling", 1.0 if config.common_speed_scaling else 0.0, "Commons chase slowly and speed up with Hard Box stacks (1), or all run at zz_common_run_speed as before (0)",
 		func(value: float) -> void: config.common_speed_scaling = value > 0.5)
 	_tunable("zz_common_speed_base", config.common_speed_base, "A common's chase speed in m/s with no Hard Box stack (0.5 to 15)",
@@ -1751,6 +1755,7 @@ func _apply_gore(config: DotConfig) -> void:
 	DotNpcGore.level = int(config.get(&"gore_level"))
 	DotNpcGore.max_gibs = int(config.get(&"gore_max_gibs"))
 	DotNpcGore.max_wounds = int(config.get(&"gore_max_wounds"))
+	ZzZombieView.attack_anim = int(config.get(&"attack_anim"))
 
 
 func _noblock_side(id: Variant) -> Variant:
