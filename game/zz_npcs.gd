@@ -142,10 +142,10 @@ static func thinned_points(nav: DotNpcNavData, spacing: float, filter: DotNpcNav
 		kept.append(point)
 		var key := Vector3i(cx, cy, cz)
 
-		if cells.has(key):
-			(cells[key] as PackedVector3Array).append(point)
-		else:
-			cells[key] = PackedVector3Array([point])
+		# A packed array is a value: it goes back into the dictionary after the append.
+		var bucket_in: PackedVector3Array = cells.get(key, PackedVector3Array())
+		bucket_in.append(point)
+		cells[key] = bucket_in
 
 	return kept
 
