@@ -16,7 +16,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 51
+const CHECKS := 53
 
 
 func _ready() -> void:
@@ -37,7 +37,7 @@ func _run() -> void:
 	var keys := PackedStringArray()
 	for e: Dictionary in binder.schema():
 		keys.append(e["key"])
-	for k in ["waves", "wave_size", "respawn_base_seconds", "box_drop_common", "defib_range", "down_attack", "start_points", "difficulty"]:
+	for k in ["waves", "wave_size", "respawn_base_seconds", "box_drop_common", "defib_range", "defib_price", "defib_hear_range", "down_attack", "start_points", "difficulty"]:
 		_check(keys.has(k), "%s is exposed" % k)
 
 	for k in ["trader_setup", "trader_grace", "trader_breather", "trader_round", "trader_closed_message", "grace_maps", "escape_grace_seconds", "grace_hud"]:

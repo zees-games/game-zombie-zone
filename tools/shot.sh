@@ -15,6 +15,7 @@
 #   tools/shot.sh --view=strike_down --zombie=common --seconds=1.2     # a zombie kneeling over a downed survivor (strike: standing)
 #   tools/shot.sh --view=ragdoll --seconds=0.6 --reaction=face_plant  # a stand-in killed, its body 0.6 s into the fall
 #   tools/shot.sh --view=action --action=emote:dance --seconds=0.5   # a stand-in playing an avatar action (pose:sit)
+#   tools/shot.sh --view=defib_other                                 # a stand-in charging a defibrillator, from the front (_b behind, _c the side)
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --spawn=ram:2 --hard=5          # five Hard Box stacks: mutants drawn faded
