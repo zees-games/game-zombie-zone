@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 430
+const CHECKS := 437
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2610,6 +2610,21 @@ func _test_help_and_menu() -> void:
 	_check(help_button != null and leave_button != null and leave_button.visible,
 		"the Escape menu has Help & commands and Leave")
 	settings.close()
+	# The document and the extra rows the game's spec declares, in the order they always had.
+	var sk := settings.schema.keys()
+	var want_keys: Array[StringName] = [&"field_of_view", &"reduce_motion", &"gore", &"crowd_detail", &"vis_mode", &"ambient", &"ambient_volume", &"ambient_frequency"]
+	_check(sk.slice(0, 8) == want_keys, "the document starts with the game's own settings, in order", str(sk.slice(0, 8)))
+	_check(settings.settings.get_int(&"crowd_detail", -1) == 1 and settings.settings.get_int(&"vis_mode", -1) == 3
+		and settings.schema.find(&"field_of_view").default_value == ZzSettings.DEFAULT_FOV and not settings.schema.has(&"shake_scale"),
+		"with the defaults and the stock keys it leaves out")
+	var img := settings.menu.page(&"video").find_section(&"image")
+	var amb := settings.menu.page(&"audio").find_section(&"ambience")
+	var comfort := settings.menu.page(&"general").find_section(&"comfort")
+	_check(img != null and img.find_row(&"crowd_detail") != null and img.find_row(&"vis_mode") != null
+		and amb != null and amb.find_row(&"ambient") != null and amb.find_row(&"ambient_volume") != null and amb.find_row(&"ambient_frequency") != null
+		and comfort != null and comfort.find_row(&"reduce_motion") != null,
+		"and its crowd detail, culling, ambience and reduce motion rows")
+	_check(settings.applier.fov_transform.is_valid(), "and the camera takes the horizontal field of view converted")
 	settings.queue_free()
 	await get_tree().process_frame
 
@@ -2618,6 +2633,7 @@ func _test_help_and_menu() -> void:
 	var old_doc := DotSettingsStoreMemory.new()
 	var _saved := old_doc.save_document(ZzSettings.APP_NAMESPACE, &"local", {"version": 1, "values": {
 		"bind_heal": "H", "bind_help": "H", "bind_shove": "V", "bind_use": "J", "field_of_view": 92,
+		"crowd_detail": 2, "vis_mode": 1, "ambient_frequency": 0.5, "gore": false, "reduce_motion": true, "sfx_volume": 0.3,
 	}})
 	var returning := ZzSettings.new()
 	add_child(returning)
@@ -2629,6 +2645,11 @@ func _test_help_and_menu() -> void:
 	_check(rk.key_for(ZzBindings.SHOVE) == "T" and rk.key_for(ZzBindings.USE) == "J",
 		"the shove leaves V for push to talk (it moves to T), and a key the player chose is kept",
 		"%s %s" % [rk.key_for(ZzBindings.SHOVE), rk.key_for(ZzBindings.USE)])
+	# The rest of a v1 file loads as it was saved: only the field of view is dropped.
+	var rs := returning.settings
+	_check(rs.get_int(&"crowd_detail", -1) == 2 and rs.get_int(&"vis_mode", -1) == 1 and absf(rs.get_float(&"ambient_frequency", -1.0) - 0.5) < 0.001
+		and not rs.get_bool(&"gore", true) and rs.get_bool(&"reduce_motion", false) and absf(rs.get_float(&"sfx_volume", -1.0) - 0.3) < 0.001,
+		"a v1 settings file keeps its other values (crowd detail, culling, ambience, gore, reduce motion, volume)")
 	var fov_cam := Camera3D.new()
 	returning.add_child(fov_cam)
 	returning.bind_camera(fov_cam)
@@ -2758,6 +2779,23 @@ func _test_the_client_platform() -> void:
 	_check(covered, "the loading cover is up at the start and blocks input")
 	_check(platform.is_shown() and not platform.is_input_blocked() and platform.console != null,
 		"and lifts once the player is in, with the console built", str(platform.describe()))
+	# Connected, a survivor the server moved to the next map's start before that map arrived stands in
+	# the old map's void: the cover comes back, and goes once they are inside the built map again.
+	client._offline = false
+	var home: Vector3 = client.player.global_position
+	client.player.global_position = home + Vector3(5000.0, 0.0, 0.0)
+	for _i in 3:
+		await get_tree().process_frame
+	_check(not platform.gate.is_open() and platform.gate.is_holding(&"placed"),
+		"a survivor outside the built map puts the cover back (never a frame of the void)", str(platform.gate.describe()))
+	client.player.global_position = home
+	for _i in 600:
+		await get_tree().process_frame
+		if platform.gate.is_open():
+			break
+	_check(platform.gate.is_open() and not platform.gate.is_holding(&"placed"),
+		"and it lifts once the survivor is inside the map again", str(platform.gate.describe()))
+	client._offline = true
 	var tab := InputEventKey.new()
 	tab.physical_keycode = KEY_TAB
 	tab.pressed = true
