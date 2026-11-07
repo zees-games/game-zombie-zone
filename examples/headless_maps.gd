@@ -710,7 +710,7 @@ func _test_map(id: StringName) -> void:
 	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
 	# seconds of physics later every one still where the map put it, not through a floor.
 	var box := game.map.toys
-	var placed := (doc.get("toys", []) as Array).size()
+	var placed := (doc.get("toys", []) as Array).size() + (doc.get("loose_toys", []) as Array).size()    # the world's loose props are built into the same box
 	var stuck: Array = []
 	var own: Array[RID] = []
 	for toy in box.toys:
