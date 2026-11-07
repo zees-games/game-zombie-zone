@@ -110,7 +110,7 @@ func _special(_delta: float) -> void:
 	if gap <= reach + 0.3 and absf(at.y - npc.position().y) < 2.0:
 		halt()
 		face(at - npc.position())
-		b.anim = ZzZombieBody.Anim.ATTACK if swinging() else ZzZombieBody.Anim.IDLE
+		b.anim = swing_anim() if swinging() else ZzZombieBody.Anim.IDLE
 
 		if not swinging() and swing_at(victim):
 			_last_hit_survivor = now()

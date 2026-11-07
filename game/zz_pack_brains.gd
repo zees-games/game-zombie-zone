@@ -14,6 +14,11 @@ extends RefCounted
 ## state          `hunt` read as the game's `chase`
 ## [/codeblock]
 ##
+## The game's own handles on a brain are answered too: [code]force_target[/code] (bile, the director, a rescue
+## repath: it hunts that survivor whatever it sees), [code]lure_to[/code] (a lure: it goes there and stays while
+## nobody is in its face) and barricade bashing (pressed against boards on the way, it tears at them through the
+## horde, like any zombie).
+##
 ## The script is written to `user://zz_pack_brains/` (a real file the spawner can load by path). Server only:
 ## clients never run a brain.
 
@@ -31,11 +36,19 @@ const SOURCE := """extends "%s"
 
 var _pack_body: Node = null
 var _stagger_until: float = 0.0
-## A pack monster does not bash barricades (the game's stuck watch asks).
+## Whether its last thought ended tearing at a barricade (the game's stuck watch asks).
 var bashing: bool = false
-## What the game reads of any brain (the stuck watch): hunting is chasing.
+## Told to hunt this survivor (force_target), and where to go (lure_to).
+var _forced: StringName = &""
+var lure: Vector3 = Vector3.INF
+## A lured monster stops this far from the lure's point.
+const LURE_RING := 3.0
+## What the game reads of any brain (the stuck watch): hunting is chasing, and going to a lure is `lure` (the
+## rescue leaves a lured monster alone: it is drawn away from the survivors on purpose).
 var state: StringName:
 	get:
+		if _luring():
+			return &"lure"
 		var s: StringName = machine.current() if machine != null else &""
 		return &"chase" if s == &"hunt" else s
 
@@ -75,10 +88,68 @@ func _npc_think(delta: float) -> void:
 	if context != null and context.now < _stagger_until:
 		halt()
 		return
-	super(delta)
+	_keep_forced()
+	if _luring():
+		_ticklure(delta)
+	else:
+		super(delta)
 	var b := _body()
 	if b != null:
 		b.call(&"apply_gait")
+	_bash_if_barred(delta)
+
+
+## The survivor it was told to hunt stays its target while they live; once they are gone it forgets.
+func _keep_forced() -> void:
+	if _forced == &"":
+		return
+	var h: Object = _horde()
+	if h == null or not bool(h.call(&"survivor_alive", _forced)):
+		_forced = &""
+		return
+	npc.target_id = _forced
+
+
+## The game's horde, through the host (null for a host that is not the game's).
+func _horde() -> Object:
+	var h := _host()
+	var horde: Variant = h.get(&"horde") if h != null else null
+	return horde if horde is Object and (horde as Object).has_method(&"barricade_in_way") else null
+
+
+## Drawn to a lure: told of one, and no survivor to hunt.
+func _luring() -> bool:
+	return lure != Vector3.INF and _forced == &"" and npc != null and not npc.has_target()
+
+
+## Goes to the lure and stands there, nobody in sight.
+func _ticklure(delta: float) -> void:
+	var here := npc.position()
+	if Vector2(lure.x - here.x, lure.z - here.z).length() > LURE_RING:
+		steer_along_path(lure, _f(cfg, "walk_speed", 3.0) * _scale(&"speed_scale"), delta)
+	else:
+		halt()
+
+
+## Pressed against a barricade it was walking into on the hunt (or to a lure): stops, faces it and tears at it.
+func _bash_if_barred(delta: float) -> void:
+	bashing = false
+	var h: Object = _horde()
+	var real: Node = npc.node if npc != null else null
+	if h == null or real == null or not npc.is_alive() or bool(real.get(&"flying")):
+		return
+	var s: StringName = machine.current() if machine != null else &""
+	var wish: Vector3 = real.get(&"wish")
+	if (s != &"hunt" and s != &"idle") or wish.length() < 0.5:
+		return
+	var barred: String = h.call(&"barricade_in_way", npc.position(), wish)
+	if barred == "":
+		return
+	bashing = true
+	halt()
+	face(h.call(&"barricade_centre", barred) - npc.position())
+	_body().call(&"bash_pose")
+	h.call(&"bash", barred, npc, delta)
 
 
 ## The horde's shove or blast: knocked back, and it does not act for the length.
@@ -90,12 +161,16 @@ func stagger(direction: Vector3, seconds: float, strength: float = 4.0) -> void:
 	npc.node.set(&"anim", 4)
 
 
-func force_target(_id: StringName) -> void:
-	pass
+func force_target(id: StringName) -> void:
+	if id == &"" or npc == null:
+		return
+	_forced = id
+	lure = Vector3.INF
+	npc.target_id = id
 
 
-func lure_to(_at: Vector3) -> void:
-	pass
+func lure_to(at: Vector3) -> void:
+	lure = at
 
 
 func _enter_leap(_c: DotNpcAiContext) -> void:
