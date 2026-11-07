@@ -34,6 +34,18 @@
 # fall_rescue: true
 # Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off). [0.0..600.0]
 # stuck_rescue_seconds: 12.0
+# Seconds between the samples of safe ground the rescue keeps for a survivor (`zz_footing_sample_every`). [0.2..30.0]
+# footing_sample_every: 1.5
+# Metres a survivor must have moved since the last sample before another is kept (`zz_footing_sample_move`). [0.0..30.0]
+# footing_sample_move: 1.5
+# How many safe samples are kept; the rescue puts a survivor back on the oldest (`zz_footing_keep`). [1..30]
+# footing_keep: 5
+# Metres of flat travel under which a survivor pushing on the world counts as not moving (`zz_footing_progres... [0.05..5.0]
+# footing_progress: 0.6
+# Cosine of the angle off the crosshair within which a friend counts as aimed at by a medkit (`zz_heal_aim_do... [0.0..1.0]
+# heal_aim_dot: 0.82
+# Looser cosine that keeps a heal going while the friend moves a little (`zz_heal_hold_dot`). [0.0..1.0]
+# heal_hold_dot: 0.6
 # What everybody starts a map holding, by weapon id. The first is drawn.
 # start_weapons: ["zz_pistol", "zz_knife"]
 # How many medkits and pills each survivor starts a map with. [0..7]

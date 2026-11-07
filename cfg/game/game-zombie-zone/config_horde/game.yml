@@ -162,6 +162,20 @@
 # gunfire_radius: 30.0
 # Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
 # director_enabled: true
+# Metres a zombie's scream wakes idle commons within, one at a time a beat apart (`zz_alert_radius`). [1.0..100.0]
+# alert_radius: 9.0
+# Metres within which bile calls every common (`zz_bile_radius`). [1.0..200.0]
+# bile_radius: 45.0
+# Metres a broken bile jar splashes (`zz_bile_splash`). [0.5..30.0]
+# bile_splash: 4.0
+# Most zombies of a mob spawned at a time, so a crowd pours out of a doorway (`zz_mob_burst`). [1..50]
+# mob_burst: 6
+# Seconds between those bursts (`zz_mob_burst_seconds`). [0.05..10.0]
+# mob_burst_seconds: 0.4
+# Metres commons standing about a map keep from where the team starts (`zz_wanderer_clearance`). [0.0..200.0]
+# wanderer_clearance: 28.0
+# Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`). [0.1..5.0]
+# bash_reach: 0.75
 
 # --- The specials
 # Special infected alive at once, for one survivor and one more for each this many survivors. [0..32]
@@ -210,3 +224,49 @@
 # minimum_players: 4
 # Whether a map that says how big a team it is built for (its `survivors`) raises that number to it: a high s...
 # team_from_map: true
+
+# --- Stand-in rules
+# Metres a stand-in sees a zombie from, and the reach it counts a crowd for the calm check (`zz_bot_sight`). [1.0..200.0]
+# bot_sight: 32.0
+# How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_r... [1.0..10.0]
+# bot_upgrade_ratio: 1.35
+# Metres inside which a stand-in does not fire a launcher: the blast reaches its owner (`zz_bot_blast_safe`). [0.0..50.0]
+# bot_blast_safe: 9.0
+# Score added to a launcher when a stand-in ranks the guns it could take (`zz_bot_launcher_bonus`). [0.0..100000.0]
+# bot_launcher_bonus: 10000.0
+# Metres from the line of fire a friend's middle may be before a stand-in holds its fire (`zz_bot_friend_clea... [0.1..3.0]
+# bot_friend_clearance: 0.7
+# Degrees of cone around its aim in which a friend's hitbox counts as in the line of fire (`zz_bot_friend_con... [0.0..60.0]
+# bot_friend_cone_degrees: 14.0
+# Metres inside a friend's hitbox the eye must be for the shot to count as passing through them (`zz_bot_muzz... [0.0..1.0]
+# bot_muzzle_margin: 0.08
+# Metres past its target a round that passes bodies is judged for friends behind it (`zz_bot_penetration_reac... [0.0..100.0]
+# bot_penetration_reach: 8.0
+# Metres within which a crowd makes a stand-in shove (`zz_bot_shove_range`). [0.5..5.0]
+# bot_shove_range: 1.7
+# Metres a stand-in lets its leader get before it walks after them (nearer it stays put) (`zz_bot_follow_near`). [0.5..50.0]
+# bot_follow_near: 3.5
+# Metres past which a stand-in always walks after its leader (`zz_bot_follow_far`). [0.5..100.0]
+# bot_follow_far: 6.0
+# Least seconds a picked behaviour lasts before the next is drawn from the persona's mix (`zz_bot_behave_min`). [1.0..300.0]
+# bot_behave_min: 10.0
+# Most seconds a picked behaviour lasts (`zz_bot_behave_max`). [1.0..300.0]
+# bot_behave_max: 22.0
+# Metres a looting stand-in looks for something it wants (`zz_bot_loot_reach`). [1.0..500.0]
+# bot_loot_reach: 90.0
+# Metres off an item a stand-in takes on (`zz_bot_pick_up_reach`). [0.5..100.0]
+# bot_pick_up_reach: 7.0
+# Seconds a stand-in tries for an item before it leaves it be (`zz_bot_pick_up_give_up`). [1.0..300.0]
+# bot_pick_up_give_up: 15.0
+# Seconds a stand-in tries for a clear line to an item that is within reach but behind something (`zz_bot_pic... [0.5..60.0]
+# bot_pick_blocked_give_up: 3.0
+# Hops that have not freed a stand-in before the game steps it along (`zz_bot_hops_before_nudge`). [0..20]
+# bot_hops_before_nudge: 2
+# Seconds a stand-in stays put, hopping and stepping, before it is put on clear ground (`zz_bot_stuck_before_... [1.0..120.0]
+# bot_stuck_before_relocate: 8.0
+# Metres from where it began that count as having got away (`zz_bot_stuck_area`). [0.5..20.0]
+# bot_stuck_area: 2.5
+# Metres a stand-in may jitter and still be stuck (`zz_bot_stuck_radius`). [0.1..5.0]
+# bot_stuck_radius: 0.8
+# Path points ahead of it a stand-in smooths its route over (`zz_bot_smooth_horizon`). [2..64]
+# bot_smooth_horizon: 16
