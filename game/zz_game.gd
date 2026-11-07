@@ -2585,6 +2585,11 @@ func _defib_of(player: ZzPlayer) -> DotDefib:
 	return d
 
 
+## Whether the dead [param body] could still be shocked back, by age alone (a stand-in decides whether to walk).
+func defib_body_ok(body: ZzPlayer) -> bool:
+	return body.life == ZzPlayer.Life.DEAD and body.died_at >= 0.0 and now() - body.died_at <= config.defib_max_body_age
+
+
 func _defib_check(user: ZzPlayer, body: ZzPlayer) -> DotResult:
 	var age := now() - body.died_at if body.died_at >= 0.0 else 0.0
 	return _defib_of(user).check(now(), age, body.feet().distance_to(user.feet()))
@@ -3091,6 +3096,7 @@ func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
 	body.watching = false
 	body.incaps = maxi(config.max_incaps - 1, 0)
 	body.died_at = -1.0
+	body.respawn_at = -1.0
 	body.temp_health = 0.0
 	body.health.max_health = class_health(body)
 	body.health.revive(d.revive_fraction)
