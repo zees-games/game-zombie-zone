@@ -60,7 +60,7 @@ func _run() -> void:
 	var notes: ZzNavNotes = game.horde.notes
 	var ticks := 0
 
-	while notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 

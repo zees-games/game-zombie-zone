@@ -400,7 +400,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -704,7 +704,7 @@ func _test_hop_wedge() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -774,7 +774,7 @@ func _test_unstick_steps() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -866,7 +866,7 @@ func _test_lure_crowd() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -919,7 +919,7 @@ func _test_fallback() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -995,7 +995,7 @@ func _horde(id: StringName, spread: bool) -> Dictionary:
 	var ticks := 0
 
 	# Notes first: the wave is two seconds off, and its planning must not race the first zombies.
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
