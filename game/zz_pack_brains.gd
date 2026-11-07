@@ -205,17 +205,25 @@ func _tick_leap(_c: DotNpcAiContext) -> void:
 
 
 ## The path of a script that is [param parent] (a pack brain's path) on this game's body; written once per parent.
+## The file is named by its own text: `user://` is shared by every process (and checkout) of this game on a machine, so a
+## name by parent alone let a build with an older template rewrite the file under a newer one's running monster (a tiger
+## that had no `force_target`), and a plain truncate-then-write could be read half written. Equal text is the same file,
+## written whole to a temporary name and renamed into place.
 static func wrapper_for(parent: String) -> String:
-	var path := "%s/%s.gd" % [DIR, parent.md5_text()]
 	var text := SOURCE % [parent, (ADAPTER as Resource).resource_path]
+	var path := "%s/%s.gd" % [DIR, (parent + "\n" + text).md5_text()]
 	if FileAccess.file_exists(path) and FileAccess.get_file_as_string(path) == text:
 		return path
 	DirAccess.make_dir_recursive_absolute(DIR)
-	var file := FileAccess.open(path, FileAccess.WRITE)
+	var temporary := "%s.%d.tmp" % [path, OS.get_process_id()]
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return ""
 	file.store_string(text)
 	file.close()
+	if DirAccess.rename_absolute(temporary, path) != OK:
+		DirAccess.remove_absolute(temporary)
+		return path if FileAccess.file_exists(path) and FileAccess.get_file_as_string(path) == text else ""
 	return path
 
 
