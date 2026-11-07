@@ -503,7 +503,7 @@ func _pick_base_clip(anim: int) -> void:
 	# A common lunging while it runs swings on the move.
 	if anim == ZzZombieBody.Anim.ATTACK and _speed > 1.5:
 		_want_clip = &"attack_run"
-	elif anim == ZzZombieBody.Anim.ATTACK and kind == &"common" and (variant & 8) != 0:
+	elif anim == ZzZombieBody.Anim.ATTACK and kind == &"common" and (attack_anim == 2 or (attack_anim == 0 and (variant & 8) != 0)):
 		_want_clip = &"attack_idle"
 
 

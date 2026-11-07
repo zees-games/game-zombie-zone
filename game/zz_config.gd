@@ -873,6 +873,9 @@ func setup_seconds() -> float:
 ## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
 @export_range(0, 400, 1) var gore_max_wounds: int = 48
 
+## Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 every one the scratching swipe, 2 every one the grapple on the spot. A zombie that strikes on the run keeps its running swing. `zz_attack_anim`.
+@export_range(0, 2, 1) var attack_anim: int = 0
+
 @export_group("The maps")
 
 ## Which maps this server may play, by id. Empty means every one it has.

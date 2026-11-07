@@ -1751,6 +1751,7 @@ func _apply_gore(config: DotConfig) -> void:
 	DotNpcGore.level = int(config.get(&"gore_level"))
 	DotNpcGore.max_gibs = int(config.get(&"gore_max_gibs"))
 	DotNpcGore.max_wounds = int(config.get(&"gore_max_wounds"))
+	ZzZombieView.attack_anim = int(config.get(&"attack_anim"))
 
 
 func _noblock_side(id: Variant) -> Variant:
