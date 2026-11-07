@@ -399,11 +399,14 @@ func _test_spawner() -> void:
 	# A stand-in with the points does not walk to a shelf the trader has closed: the press is refused for good.
 	me.points = 1000
 	me.place_at(game.loot.position_of(shelf[0]), 0.0)
+	# The suite's player stands in as the stand-in; a human at the shelf would own it (personal space).
+	me.is_bot = true
 	var wants_open: bool = game.bots._pick_up(me, DotFpsCommand.new(), {"pick": -1})
 	game.spawners.set("_open", false)
 	var memory := {"pick": -1}
 	var wants_closed: bool = game.bots._pick_up(me, DotFpsCommand.new(), memory)
 	game.spawners.set("_open", true)
+	me.is_bot = false
 	_check(wants_open and not wants_closed and int(memory["pick"]) == -1, "a stand-in goes for a shelf item while the trader is open and not while it is closed", "open %s, closed %s" % [wants_open, wants_closed])
 	var bought: int = shelf[0]
 	var price: int = game.loot.price_of(bought)
