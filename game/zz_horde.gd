@@ -46,6 +46,9 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	sounds.attach(spawner)
 	skill.attach(spawner)
 	spawner.set_meta(HORDE_META, self)
+	# The host seam of zz-historical-monsters: a monster brain run here hunts and hurts through the game.
+	monster_host = MonsterHost.new(self)
+	spawner.set_meta(&"zhm_host", monster_host)
 	add_child(spawner)
 	# Every kind's brain compiled now, while the map loads, rather than as a 30 ms hitch the
 	# first time each special comes (an older dot-npc has no warm()).
@@ -663,6 +666,7 @@ func tick(delta: float, ticks: int = 1) -> void:
 	_land_alerts()
 	_advance_lures()
 	_advance_bile()
+	monster_host.tick()
 	spawner.tick(delta)
 
 	var speed := zombie_speed_scale * wave_speed_scale
