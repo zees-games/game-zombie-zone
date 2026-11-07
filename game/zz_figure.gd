@@ -47,8 +47,14 @@ static var ATLASES: Array[String] = [
 	ZzPaths.rebase("res://assets/kenney/characters/Textures/texture-k.png"),
 ]
 
+## The head's size against the kit's own (its survivors are chibi).
+const HEAD_SCALE := 0.82
+
 ## How much of the side's colour goes on the top.
 const TEAM_TINT := 0.62
+
+## Seeds the skin, hair and clothes (a hash of the player's id; 0: the atlas's). Set before [method build].
+var look_seed: int = 0
 
 ## Which atlas this figure wears, and the side colour on it. Read by the suite.
 var atlas: String = ""
@@ -90,7 +96,7 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	# The gun hung off the old person's hand and goes with it; [method hold] builds it again on
 	# the next frame, from [member holding], which outlives a rebuild.
 	held = null
-	var look := look_for(atlas_path, colour)
+	var look := look_for(atlas_path, colour, look_seed)
 	if person != null:
 		remove_child(person)
 		person.queue_free()
@@ -98,17 +104,34 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	person.name = "Person"
 	add_child(person)
 	person.build(look, height)
+	ZzHeadScale.attach(person, HEAD_SCALE)
 	from_art = person.from_art
 
 
 ## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same.
-static func look_for(atlas_path: String, colour: Color) -> DotHumanoidLook:
+## The atlas letter picks the body; skin, hair and clothes are drawn from the natural palettes by [param seed]
+## (a hash of the player's id; 0 takes the atlas's), so two survivors on one body are not twins and nobody is
+## yellow, green or white skinned with near-black hair (the blob under a dim map light).
+static func look_for(atlas_path: String, colour: Color, seed: int = 0) -> DotHumanoidLook:
 	var look := DotHumanoidLook.from_letter(atlas_path)
 	if look == null:
 		look = DotHumanoidLook.stock(hash(atlas_path))
+	else:
+		look = _natural(look, seed if seed != 0 else hash(atlas_path))
 	if colour != Color.WHITE:
 		look = look.with_side(colour, TEAM_TINT)
 	return look
+
+
+## [param look] with a natural skin, hair and clothes picked by [param seed], keeping its body.
+static func _natural(look: DotHumanoidLook, seed: int) -> DotHumanoidLook:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var tone := Color(DotHumanoidLook.SKIN_TONES[rng.randi_range(0, DotHumanoidLook.SKIN_TONES.size() - 1)])
+	var hair := Color(DotHumanoidLook.HAIR[rng.randi_range(0, DotHumanoidLook.HAIR.size() - 1)])
+	var top := Color(DotHumanoidLook.TOPS[rng.randi_range(0, DotHumanoidLook.TOPS.size() - 1)])
+	var bottom := Color(DotHumanoidLook.BOTTOMS[rng.randi_range(0, DotHumanoidLook.BOTTOMS.size() - 1)])
+	return DotHumanoidLook.make(look.body, tone, hair, top, bottom)
 
 
 ## The drawn model, for a death that breaks it apart or falls. Null before [method build].
