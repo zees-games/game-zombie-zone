@@ -26,6 +26,11 @@ func _ready() -> void:
 	# The survivor is on the map (its first server position applied), not at a mirror's default in the void.
 	gate.require(&"placed", _is_placed, "Placing you")
 	gate.require(&"weapon", func() -> bool: return _offline or _armed_told, "Arming")
+	# And for the server's map: until it is built from the server's document the world is this end's own
+	# default map, which the survivor (placed on the server's) is not standing in.
+	gate.require(&"server_map", func() -> bool: return _offline or _server_map_told, "Loading the map")
+	# Judged again right before each draw, after everything that moves the survivor this frame.
+	RenderingServer.frame_pre_draw.connect(_guard_placed)
 	ZeeModelCache.set_asset_root(ZzPaths.root())
 
 	var config := ZzConfig.new()
@@ -139,6 +144,8 @@ func _vis_mode() -> String:
 	return names[clampi(settings.settings.get_int(&"vis_mode", 3), 0, 3)]
 ## The server has said what this survivor holds (a weapon or nothing); the load gate's `weapon` requirement.
 var _armed_told: bool = false
+## The server's map has been built here (a map the server sent), the load gate's `server_map` requirement.
+var _server_map_told: bool = false
 
 
 ## The local survivor stands inside the built map's bounds and above its kill height.
@@ -152,6 +159,23 @@ func _is_placed() -> bool:
 	var at := player.global_position
 	var bounds := game.map.bounds()
 	return at.y > game.map.kill_height() and (bounds.size == Vector3.ZERO or bounds.grow(8.0).has_point(at))
+
+
+## Connected, the survivor standing outside the built map (the server moved them to the next map's
+## start before that map's document arrived, so the old map shows an empty void) puts the cover
+## back until [method _is_placed] holds again.
+func _guard_placed() -> void:
+	if not is_inside_tree():
+		return
+
+	if _offline or gate == null or not gate.is_open() or player == null or game == null or game.map == null:
+		return
+
+	if not player.is_alive() or _is_placed():
+		return
+
+	DotLog.info(CHANNEL, "the survivor is outside the built map; covering until placed", {"at": player.global_position})
+	gate.require(&"placed", _is_placed, "Placing you")
 
 
 ## True while the load gate covers the screen: no input, no sampling, no horde.
@@ -440,6 +464,11 @@ func _build_netcode() -> DotResult:
 	bridge.armed_received.connect(_on_armed)
 	bridge.ammo_received.connect(_on_ammo)
 	bridge.map_received.connect(_on_map)
+	bridge.map_received.connect(func(_id: StringName) -> void: _server_map_told = true)
+	# A map on its way is a cover up already: the survivor's first position on it arrives before it is built.
+	bridge.map_incoming.connect(func() -> void:
+		if gate != null:
+			gate.hold(&"map", "Loading the map"))
 	bridge.pin_received.connect(func(session_id: int, npc_net_id: int, kind: StringName) -> void:
 		_on_pin(session_id, bridge.zombie_mirror(npc_net_id), kind))
 	bridge.unpin_received.connect(_on_unpin)
@@ -1954,6 +1983,8 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 
 func _process(delta: float) -> void:
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
+	# After the frame's poses, so the position the server just applied is the one judged and no frame of the void is drawn.
+	_guard_placed()
 
 	if killcam != null and game != null:
 		killcam.frame()
