@@ -685,6 +685,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	var atlas := _atlas()
 
 	if figure.atlas != atlas or not figure.team_colour.is_equal_approx(team_colour):
+		figure.look_seed = hash(player_id)
 		figure.build(BODY_HEIGHT, atlas, team_colour)
 
 	figure.visible = shown
@@ -791,7 +792,7 @@ func _rig() -> ZeeWeaponRig:
 
 ## The drawn person's look, for the first-person arms (the figure is never built for your own eyes).
 func view_look(team_colour: Color) -> DotHumanoidLook:
-	return ZzFigure.look_for(_atlas(), team_colour)
+	return ZzFigure.look_for(_atlas(), team_colour, hash(player_id))
 
 
 func _atlas() -> String:
