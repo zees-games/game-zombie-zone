@@ -293,6 +293,11 @@ func setup_seconds() -> float:
 ## costs a tenth; any wall ahead or a missing floor still sweeps. 0 always sweeps.
 @export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
 
+## Metres to the nearest survivor past which a zombie is dormant: it thinks every `dormant_think_every` ticks and its body moves every eighth (`think_range` scales it). Meant for 100+ survivors on big maps, where most of the horde is far from everybody. 0 is off. `zz_dormant_from`.
+@export_range(0.0, 1000.0, 1.0) var dormant_from: float = 0.0
+## Ticks a dormant zombie's thought spans (at least 8). `zz_dormant_think_every`.
+@export_range(8, 64, 1) var dormant_think_every: int = 16
+
 ## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
 ## team on a small box is people plus this many. `zz_bot_max`.
 @export_range(0, 256, 1) var bot_max: int = 0
