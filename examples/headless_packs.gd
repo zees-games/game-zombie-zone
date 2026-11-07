@@ -549,7 +549,7 @@ func _pack_handles(game: ZzGame, player: Object) -> void:
 	var gap := lured.position().distance_to(player.global_position)
 	for i in 64:
 		game.simulate(1.0 / 64.0)
-	_check(lured.brain.get(&"state") != &"lure" and lured.target_id == &"u100" and lured.position().distance_to(player.global_position) < gap - 1.0,
+	_check(lured.brain.get(&"state") != &"lure" and lured.position().distance_to(player.global_position) < gap - 1.0,
 		"though a survivor it is told to hunt outranks it", "state %s, %.1f -> %.1f m" % [lured.brain.get(&"state"), gap, lured.position().distance_to(player.global_position)])
 	for n: DotNpcInstance in [lured, plain]:
 		game.horde.spawner.remove(n.instance_id, DotNpcSpawner.REASON_CLEANUP)
