@@ -10,6 +10,10 @@ const ZzNavPrune := preload("zz_nav_prune.gd")
 ## Bumped when the prune records or tests more (6: the prop and clip layers too), so older caches prune again.
 const PRUNE_VERSION := 6
 const ZzNavNotes := preload("zz_nav_notes.gd")
+const ZzLaps := preload("zz_laps.gd")
+
+## Milliseconds by section for the cold-start tool (tools/cold_start.gd).
+var sections: Dictionary = {}
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPackList := preload("zz_packs.gd")
 const ZzWeapons := preload("zz_weapons.gd")
