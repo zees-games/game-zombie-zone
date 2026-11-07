@@ -758,6 +758,34 @@ func setup_seconds() -> float:
 ## Metres down from the eyes the fallback spot is looked for (`zz_turret_foot_reach`).
 @export_range(0.1, 5.0, 0.1) var turret_foot_reach: float = 0.4
 
+# --- Thrown things ---------------------------------------------------------
+
+@export_group("Hazards")
+
+## Metres from a goo glob's path within which it hits a survivor's middle (`zz_hazard_goo_hit_radius`).
+@export_range(0.1, 5.0, 0.05) var hazard_goo_hit_radius: float = 1.1
+
+## The same for a thrown rock (`zz_hazard_rock_hit_radius`).
+@export_range(0.1, 5.0, 0.05) var hazard_rock_hit_radius: float = 1.3
+
+## Metres a bile jar draws the horde from (`zz_hazard_bile_lure`).
+@export_range(1.0, 200.0, 1.0) var hazard_bile_lure: float = 35.0
+
+## Seconds a bile jar keeps the horde drawn (`zz_hazard_bile_seconds`).
+@export_range(1.0, 120.0, 1.0) var hazard_bile_seconds: float = 15.0
+
+## Seconds a pipe charge beeps before it goes off (`zz_hazard_pipe_fuse`).
+@export_range(0.5, 60.0, 0.5) var hazard_pipe_fuse: float = 6.0
+
+## Metres a pipe charge lures the horde from (`zz_hazard_pipe_lure`).
+@export_range(1.0, 200.0, 1.0) var hazard_pipe_lure: float = 40.0
+
+## Seconds a zombie keeps burning once it has left the fire (`zz_hazard_afterburn_seconds`).
+@export_range(0.0, 60.0, 0.5) var hazard_afterburn_seconds: float = 4.0
+
+## Damage per second of a burning zombie; a brute takes half (`zz_hazard_burn_dps`).
+@export_range(0.0, 500.0, 1.0) var hazard_burn_dps: float = 18.0
+
 # --- The maps --------------------------------------------------------------
 
 @export_group("Carry weight")
@@ -999,7 +1027,7 @@ func validate() -> DotResult:
 const CFG_FILES := {
 	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
 	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
-	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors", "Turrets": "survivors",
+	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors", "Turrets": "survivors", "Hazards": "survivors",
 	"Carry weight": "carry", "Gore": "world", "The maps": "world", "Netcode": "world",
 }
 

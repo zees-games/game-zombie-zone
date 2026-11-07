@@ -10,12 +10,13 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ROOT := "user://zz_cfgtest"
 const GAME := "game-zombie-zone"
 const ZzTurrets := preload("../game/zz_turrets.gd")
+const ZzHazards := preload("../game/zz_hazards.gd")
 
 
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 42
+const CHECKS := 45
 
 
 func _ready() -> void:
@@ -82,6 +83,7 @@ func _run() -> void:
 	yml.close()
 
 	_turrets(binder, console, config)
+	_hazards(binder, console, config)
 	_layers()
 	_templates(binder)
 
@@ -207,3 +209,21 @@ func _turrets(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig
 	turrets.turrets = {1: {"owner": 5}, 2: {"owner": 5}}
 	turrets._make_room(5)
 	_check(at_default == 1 and turrets.count_for(5) == 2 and turrets.defaults()["ammo"] == 99, "zz_turret_max_per_owner and zz_turret_ammo change what the turret rules do")
+
+
+## The thrown-thing rules moved out of zz_hazards.gd keep the old constants as defaults, and a cvar changes what the rules read.
+func _hazards(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+	var fresh := ZzConfig.new()
+	_check(fresh.hazard_goo_hit_radius == 1.1 and fresh.hazard_rock_hit_radius == 1.3 and fresh.hazard_bile_lure == 35.0
+		and fresh.hazard_bile_seconds == 15.0 and fresh.hazard_pipe_fuse == 6.0 and fresh.hazard_pipe_lure == 40.0
+		and fresh.hazard_afterburn_seconds == 4.0 and fresh.hazard_burn_dps == 18.0,
+		"the hazard defaults equal the old constants (goo 1.1, rock 1.3; bile 35 m 15 s; pipe 6 s 40 m; afterburn 4 s, 18 dps)")
+	var cvars_ok := true
+	for k in ["goo_hit_radius", "rock_hit_radius", "bile_lure", "bile_seconds", "pipe_fuse", "pipe_lure", "afterburn_seconds", "burn_dps"]:
+		cvars_ok = cvars_ok and console.find_cvar("zz_hazard_" + k) != null and binder.source_of("hazard_" + k) == "default"
+	_check(cvars_ok, "every hazard field is a zz_hazard_* cvar")
+	var hazards := ZzHazards.new(null)
+	hazards.game = FakeGame.new()
+	hazards.game.config = config
+	console.set_cvar("zz_hazard_afterburn_seconds", "9")
+	_check(is_equal_approx(hazards._cfg().hazard_afterburn_seconds, 9.0), "zz_hazard_afterburn_seconds changes what the hazard rules read")
