@@ -643,6 +643,11 @@ func _start_points() -> Array[Vector3]:
 var _plan_due := false
 
 
+## Whether the annotations arrived and the plan (routes, chokes) runs on the next tick.
+func plan_pending() -> bool:
+	return _plan_due
+
+
 ## One tick, or [param ticks] ticks of [param delta] at once. After the survivors moved and shot,
 ## before anything reads where a zombie is.
 func tick(delta: float, ticks: int = 1) -> void:
