@@ -335,6 +335,8 @@ static var _scenes: Dictionary = {}
 static var _libraries: Dictionary = {}
 ## Per-kind bruises and sores on the specials' flat skin (`zz_zombie_detail`; 0 draws the plain look).
 static var detail := true
+## Which standing swing the commons use (`zz_attack_anim`): 0 a mix by body, 1 always the swipe, 2 always the grapple.
+static var attack_anim := 0
 static var _materials: Dictionary = {}
 static var _shader: Shader = null
 static var _shader_normal: Shader = null
@@ -343,8 +345,12 @@ static var _atlases: Dictionary = {}
 
 ## The look of [param p_kind] (and, for a common, of [param p_variant]): a dictionary in the
 ## shape of [constant LOOKS], with the common's body and colours filled in.
+## A pack monster's kind -> the built-in kind whose body it wears (`ZzPacks` fills it, both ends scan).
+static var aliases: Dictionary = {}
+
+
 static func look_for(p_kind: StringName, p_variant: int) -> Dictionary:
-	var look: Dictionary = (LOOKS.get(p_kind, LOOKS[&"common"]) as Dictionary).duplicate()
+	var look: Dictionary = (LOOKS.get(aliases.get(p_kind, p_kind), LOOKS[&"common"]) as Dictionary).duplicate()
 
 	if look["body"] != &"":
 		return look
