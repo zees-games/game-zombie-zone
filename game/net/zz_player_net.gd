@@ -164,22 +164,23 @@ func _register_net_vars() -> void:
 	for spec in DotFpsNetSync.stamina_specs():
 		var _stamina := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
-	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(14)
-	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(12)
-	replicate(&"net_life", DotNetVar.Type.UINT).bits(2)
-	replicate(&"net_incaps", DotNetVar.Type.UINT).bits(4)
-	replicate(&"net_temp", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 400.0).bits(10)
-	replicate(&"net_pin", DotNetVar.Type.UINT).bits(3)
-	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7)
-	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7)
-	replicate(&"net_using", DotNetVar.Type.UINT).bits(4)
-	replicate(&"net_kits", DotNetVar.Type.UINT).bits(10)
-	replicate(&"net_status", DotNetVar.Type.UINT).bits(6)
-	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5)
-	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10)
-	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
-	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
-	replicate(&"net_watching", DotNetVar.Type.BOOL)
+	# Server-driven: only pull() writes these, never the owner's prediction, so a change is not a misprediction.
+	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(14).server_driven()
+	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(12).server_driven()
+	replicate(&"net_life", DotNetVar.Type.UINT).bits(2).server_driven()
+	replicate(&"net_incaps", DotNetVar.Type.UINT).bits(4).server_driven()
+	replicate(&"net_temp", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 400.0).bits(10).server_driven()
+	replicate(&"net_pin", DotNetVar.Type.UINT).bits(3).server_driven()
+	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
+	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
+	replicate(&"net_using", DotNetVar.Type.UINT).bits(4).server_driven()
+	replicate(&"net_kits", DotNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_status", DotNetVar.Type.UINT).bits(6).server_driven()
+	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5).server_driven()
+	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_points", DotNetVar.Type.UINT).bits(16).server_driven()
+	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_watching", DotNetVar.Type.BOOL).server_driven()
 
 	var weapon_specs := ZeeWeaponNet.all_specs()
 	weapon_specs.append_array(DotWeaponNetSync.fire_mode_specs())
@@ -209,10 +210,10 @@ func _register_net_vars() -> void:
 	# is already always relevant (`ZzNetBridge`: a map is a few rooms), so a beacon reaches
 	# every client however far away they are without asking — and a beacon turned OFF that
 	# set `always_relevant` back to false would take the player out of everybody's snapshot.
-	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only()
-	replicate(&"net_beacon", DotNetVar.Type.BOOL)
-	replicate(&"net_flashlight", DotNetVar.Type.BOOL)
-	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4)
+	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only().server_driven()
+	replicate(&"net_beacon", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_flashlight", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4).server_driven()
 
 
 func _net_apply_input(input: DotNetInput, _tick: int) -> void:
