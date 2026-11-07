@@ -70,5 +70,11 @@ func apply_gait() -> void:
 	body.anim = ZzZombieBody.Anim.IDLE if speed < 0.4 else (ZzZombieBody.Anim.RUN if speed > 5.0 else ZzZombieBody.Anim.WALK)
 
 
+## Tearing at a barricade: the swing, whatever the brain is posed at.
+func bash_pose() -> void:
+	if body != null:
+		body.anim = ZzZombieBody.Anim.ATTACK
+
+
 func _on_severed(limb: StringName, info: Dictionary) -> void:
 	limb_severed.emit(limb, info)
