@@ -99,7 +99,11 @@ func _run() -> void:
 	soak.stats_fn = func() -> Dictionary: return {"kills": _kills, "deaths": _deaths, "damage": _damage}
 	soak.object_count_fn = func() -> int: return int(Performance.get_monitor(Performance.OBJECT_COUNT))
 	soak.step_fn = func(delta: float) -> void:
+		var began := Time.get_ticks_usec()
 		_game.simulate(delta)
+		var spent := float(Time.get_ticks_usec() - began) / 1000.0
+		if spent > 100.0:
+			print("SLOWTICK %d %.0f ms" % [soak.ticks, spent])
 		_goals.sample()
 		if _game.horde != null and _game.horde.spawner != null:
 			_peak_alive = maxi(_peak_alive, _game.horde.spawner.all_npcs().size())
