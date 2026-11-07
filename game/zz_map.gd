@@ -1546,6 +1546,7 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 
 	var lap := Time.get_ticks_msec()
 	var stages := {}
+	_apply_light_floor()
 	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
 	var mats: Dictionary = zz.get("materials", {})
 	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
@@ -1769,10 +1770,27 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	_bind_support_visuals()
 
 
+## The player's `light_floor` cvar; a map's own `light_floor` (document top level) can only lower it.
+var _light_floor_setting := -1.0
+
+
 ## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.
+## A map document's own `light_floor` lowers it for that map: a lightmapped mall or tunnel the
+## author lit with real shadows reads flat at the family's 0.6, which every shadow is lifted to.
 func set_light_floor(value: float) -> void:
-	if can_draw_world():
-		(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
+	_light_floor_setting = value
+	_apply_light_floor()
+
+
+func _apply_light_floor() -> void:
+	if not can_draw_world():
+		return
+	var value := _light_floor_setting
+	if doc.has("light_floor"):
+		value = float(doc["light_floor"]) if value < 0.0 else minf(value, float(doc["light_floor"]))
+	if value < 0.0:
+		return    # neither the player's setting nor the map's: dot-map's own default stands
+	(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
 
 
 ## Sets dot-map's world shadow cost (before the world is built); the `shadow_proxy`, `shadow_range` and `shadow_translucent` cvars.
