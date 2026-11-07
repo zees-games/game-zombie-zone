@@ -65,6 +65,10 @@ var _world_key := ""
 ## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.
 const _AimHolder := preload("shot_aim_holder.gd")
 const _ShotCamera := preload("shot_camera.gd")
+const _ShotOrbit := preload("shot_orbit.gd")
+## `--cam=orbit ...`: the orbit camera (shot_orbit.gd lists the flags).
+var _orbit := _ShotOrbit.new()
+var _camera: Camera3D = null
 
 
 ## One contact sheet per weapon through the real client and buttons: hip, shot frames, reload stages, each tile labelled with the HUD count; `_out` is the directory.
@@ -479,7 +483,13 @@ func _grab(tag: String) -> void:
 
 
 func _free_camera() -> Camera3D:
+	# One of them: two cameras each making themselves current every frame would fight, and the
+	# loser is the survivor's view in the frame.
+	if _camera != null and is_instance_valid(_camera):
+		_camera.track = Callable()
+		return _camera
 	var camera := Camera3D.new()
+	_camera = camera
 	camera.set_script(_ShotCamera)
 	camera.set(&"client", _client)
 	camera.fov = 75.0
@@ -515,6 +525,25 @@ func _seconds_of(seconds: float) -> void:
 		for g in kept:
 			sum += g
 		print("FRAME_MS mean=%.2f p95=%.2f n=%d" % [sum / kept.size(), kept[int(kept.size() * 0.95)], kept.size()])
+
+
+## --cam=orbit: for each --times moment, a frame from each --yaw round the target.
+func _orbit_frames() -> void:
+	var camera := _free_camera()
+	# The chat log and prompts are canvas layers of their own: out of the frame.
+	for layer in _client.find_children("*", "CanvasLayer", true, false):
+		(layer as CanvasLayer).visible = false
+	camera.track = func() -> Variant:
+		camera.track_offset = _orbit.offset()
+		return _orbit.focus()
+	var done := 0.0
+	for moment in _orbit.times:
+		await _seconds_of(maxf(moment - done, 0.0))
+		done = maxf(moment, done)
+		for yaw in _orbit.yaws:
+			_orbit.set_yaw(yaw)
+			await _frames(3)
+			await _save_extra("_t%.2f_y%d" % [moment, int(round(yaw))])
 
 
 func _save_extra(suffix: String) -> void:
