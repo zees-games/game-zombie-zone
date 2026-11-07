@@ -32,8 +32,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 30
-const CHECKS := 200
+const SECTIONS := 31
+const CHECKS := 204
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -101,6 +101,7 @@ func _run() -> void:
 		await _test_a_gate_reaches_the_client()
 		await _test_a_door_reaches_the_client()
 		await _test_map_cues_reach_the_client()
+		await _test_a_map_drop_reaches_the_client()
 		await _test_the_map_ends()
 		await _test_a_hold_reaches_the_client()
 		# Late: it runs eighty ticks, and the hold's clock above reads a time of day.
@@ -1278,6 +1279,28 @@ func _test_map_cues_reach_the_client() -> void:
 	_client_game.map_sound_fade.disconnect(on_fade)
 	_client_game.map_sound_spin.disconnect(on_spin)
 	_client_game.map_beat.disconnect(on_beat)
+	_finished()
+
+
+func _test_a_map_drop_reaches_the_client() -> void:
+	_section("a breakable's spawn_object lays a piece the client is told of")
+	var at := STREET + Vector3(-1.0, 0.2, -2.0)
+	_heard.erase("loot")
+	var before: int = _server_game.loot.entries.size()
+	_server_game._on_map_logic_event("spawn_object", {"entity": 3, "name": "", "object": 2, "at": at})
+	await _steps(4)
+	_check(_server_game.loot.entries.size() == before + 1, "the server lays one piece", str(_server_game.loot.entries.size()))
+	_check(_heard.has("loot") and _heard["loot"][1] == ZzLoot.MEDKIT, "the client is told of a medkit", str(_heard.get("loot")))
+	_check(_heard.has("loot") and absf((_heard["loot"][2] as Vector3).x - at.x) < 0.5 and absf((_heard["loot"][2] as Vector3).z - at.z) < 0.5,
+		"where the break was", str(_heard.get("loot")))
+	var made: int = int(_heard["loot"][0]) if _heard.has("loot") else -1
+	_heard.erase("loot")
+	_server_game._on_map_logic_event("spawn_object", {"entity": 3, "name": "", "object": 99, "at": at})
+	await _steps(4)
+	_check(not _heard.has("loot"), "an object number off the list tells the client nothing")
+	if made > 0:
+		_server_game.loot.remove(made, _server_me().player_id)
+		await _steps(3)
 	_finished()
 
 
