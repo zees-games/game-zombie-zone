@@ -186,6 +186,9 @@ func _capture(key: String, kind: StringName, who: Variant, still: float) -> Stri
 		out.append("%s %s at %s" % [head, npc.def.id, npc.position().snappedf(0.01)])
 		out.append("  body vel %s wish %s push %s flying %s floor %s stride %s" % [body.velocity.snappedf(0.01), (body.get(&"wish") as Vector3).snappedf(0.01),
 			(body.get(&"push") as Vector3).snappedf(0.01), body.get(&"flying"), body.is_on_floor(), body.get(&"stride")])
+		out.append("  move speed_scale %s limbs %s water %s waited %s anchored %s hovering %s cheap %s mirror %s" % [body.get(&"speed_scale"),
+			body.call(&"limb_speed_scale"), game.water_pace_at(body.global_position), body.get(&"_waited"), body.get(&"anchored"),
+			body.get(&"hovering"), body.get(&"cheap_step"), body.get(&"mirror")])
 		out.append("  brain state %s target '%s' quarry '%s' bashing %s swinging %s staggered %s watch %.1f s stage %s hops %s" % [
 			brain.get(&"state"), npc.target_id, brain.quarry(), brain.get(&"bashing"), brain.swinging(), brain.staggered(),
 			float(brain.get(&"_watch_for")), brain.get(&"_watch_stage"), brain.get(&"_hops")])
