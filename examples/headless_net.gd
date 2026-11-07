@@ -35,7 +35,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 32
-const CHECKS := 215
+const CHECKS := 217
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -1425,6 +1425,27 @@ func _test_a_hold_reaches_the_client() -> void:
 		await _step()
 	_check(changed.ok and _client_game.map.id() == &"zz_net_hold" and _client_game.is_survival(),
 		"the client is sent the hold and builds it", "%s %s" % [_client_game.map.id(), changed.error.message if not changed.ok else ""])
+
+	# The same map told again (a new round on it) neither tears the world down nor puts the cover back.
+	var again := {"clearing": 0, "incoming": 0, "repeated": 0}
+	var on_clearing := func() -> void: again["clearing"] += 1
+	var on_incoming := func() -> void: again["incoming"] += 1
+	var on_repeated := func(_id: StringName) -> void: again["repeated"] += 1
+	_client_game.world_clearing.connect(on_clearing)
+	_client_bridge.map_incoming.connect(on_incoming)
+	_client_bridge.map_repeated.connect(on_repeated)
+	var built_bytes: PackedByteArray = _client_bridge.get("_built_bytes")
+	_client_bridge.call("_build_told_map", built_bytes)
+	var first_piece := built_bytes.slice(0, ZzEvents.MAP_PART_BYTES)
+	var pieces := (built_bytes.size() + ZzEvents.MAP_PART_BYTES - 1) / ZzEvents.MAP_PART_BYTES
+	var same_prefix: bool = _client_bridge.call("_is_built_prefix", 0, pieces, first_piece)
+	var other_prefix: bool = _client_bridge.call("_is_built_prefix", 0, pieces + 1, first_piece)
+	_client_game.world_clearing.disconnect(on_clearing)
+	_client_bridge.map_incoming.disconnect(on_incoming)
+	_client_bridge.map_repeated.disconnect(on_repeated)
+	_check(int(again["clearing"]) == 0 and int(again["incoming"]) == 0 and int(again["repeated"]) == 1,
+		"an identical map told again is not rebuilt and holds no cover", str(again))
+	_check(same_prefix and not other_prefix, "a first piece that matches the built map is known, one of a different map is not")
 
 	# Mid warm-up: what the hold says, and the light it is at.
 	await _steps(int(SERVER_TICK_RATE * 2.0))

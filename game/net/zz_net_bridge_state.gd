@@ -74,6 +74,8 @@ signal weapon_used_by(session_id: int, times: int, kind: int)
 ## Client side: the map was rebuilt from what the server sent. The HUD names it.
 signal map_received(map_id: StringName)
 ## A map's first piece has arrived: it is being sent, and is not built yet.
+## The server told the map this end already has built (a new round on it): nothing rebuilt.
+signal map_repeated(map_id: StringName)
 signal map_incoming()
 
 ## Client side, all of them: what the server says happened. See [ZzEvents.Kind].
@@ -182,6 +184,8 @@ var _map_parts: Array[PackedByteArray] = []
 var _map_seq: int = 0
 ## A client's map arriving in pieces: {seq, count, pieces: {index: bytes}}.
 var _incoming_map: Dictionary = {}
+## Client: the encoded map this end last built from the server's word.
+var _built_bytes: PackedByteArray = PackedByteArray()
 
 ## Zombies this server replicates (instance id -> [ZzNpcNet]), and that a client draws
 ## (net id -> [ZzNpcNet]).
