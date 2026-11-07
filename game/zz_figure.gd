@@ -105,7 +105,52 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	add_child(person)
 	person.build(look, height)
 	ZzHeadScale.attach(person, HEAD_SCALE)
+	_hat_in_hair(person, look)
 	from_art = person.from_art
+
+
+## Atlas swatches the palette shader leaves as painted, by body: the survivor's beanie, mustard, which stood out as a flat yellow
+## cap on every figure of that body under a warm-lit map. Worn in the hair's colour instead.
+const HATS := {&"sam": ["ac741d"]}
+
+static var _hat_materials: Dictionary = {}
+
+
+## Swaps [param who]'s hat swatches ([constant HATS]) for the look's hair colour: the person's shared material plus
+## the swaps, one copy per look (a look's colours make the key).
+static func _hat_in_hair(who: DotHumanoidFigure, look: DotHumanoidLook) -> void:
+	var hats: Array = HATS.get(look.body, [])
+	if hats.is_empty():
+		return
+	var key := look.key()
+	if not _hat_materials.has(key):
+		var base := DotHumanoidFigure.material_for(look)
+		var made := base.duplicate() as ShaderMaterial
+		var used: int = made.get_shader_parameter(&"swaps")
+		var from: PackedVector4Array = made.get_shader_parameter(&"from_colour")
+		var to: PackedVector4Array = made.get_shader_parameter(&"to_colour")
+		var from_lin: PackedVector4Array = made.get_shader_parameter(&"from_linear")
+		var to_lin: PackedVector4Array = made.get_shader_parameter(&"to_linear")
+		for hex: String in hats:
+			if used >= from.size():
+				break
+			var a := Color(hex)
+			var al := a.srgb_to_linear()
+			var hl := look.hair.srgb_to_linear()
+			from[used] = Vector4(a.r, a.g, a.b, 1.0)
+			to[used] = Vector4(look.hair.r, look.hair.g, look.hair.b, 1.0)
+			from_lin[used] = Vector4(al.r, al.g, al.b, 1.0)
+			to_lin[used] = Vector4(hl.r, hl.g, hl.b, 1.0)
+			used += 1
+		made.set_shader_parameter(&"from_colour", from)
+		made.set_shader_parameter(&"to_colour", to)
+		made.set_shader_parameter(&"from_linear", from_lin)
+		made.set_shader_parameter(&"to_linear", to_lin)
+		made.set_shader_parameter(&"swaps", used)
+		_hat_materials[key] = made
+	for mesh in who.find_children("*", "MeshInstance3D", true, false):
+		if (mesh as MeshInstance3D).material_override is ShaderMaterial:
+			(mesh as MeshInstance3D).material_override = _hat_materials[key]
 
 
 ## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same.
@@ -123,14 +168,31 @@ static func look_for(atlas_path: String, colour: Color, seed: int = 0) -> DotHum
 	return look
 
 
+## Hair for a figure: a muted palette: blond, ginger and auburn turn into a flat yellow, orange or red cap under a warm-lit map (the lit mesh has no strand detail to break it up).
+const HAIR := ["4a3a30", "3b2a20", "5a4636", "6b5a48", "8c8c8c", "444852", "2f3440", "7a7068"]
+
+## The least a hair colour may differ from the skin and from the top beside it, or the head and the shirt read as one
+## blob (an orange face under an orange cap, a gold top under gold hair).
+const HAIR_CONTRAST := 0.2
+
+
 ## [param look] with a natural skin, hair and clothes picked by [param seed], keeping its body.
 static func _natural(look: DotHumanoidLook, seed: int) -> DotHumanoidLook:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
 	var tone := Color(DotHumanoidLook.SKIN_TONES[rng.randi_range(0, DotHumanoidLook.SKIN_TONES.size() - 1)])
-	var hair := Color(DotHumanoidLook.HAIR[rng.randi_range(0, DotHumanoidLook.HAIR.size() - 1)])
 	var top := Color(DotHumanoidLook.TOPS[rng.randi_range(0, DotHumanoidLook.TOPS.size() - 1)])
 	var bottom := Color(DotHumanoidLook.BOTTOMS[rng.randi_range(0, DotHumanoidLook.BOTTOMS.size() - 1)])
+	var pick := rng.randi_range(0, HAIR.size() - 1)
+	var hair := Color(HAIR[pick])
+
+	for _i in HAIR.size():
+		if absf(hair.get_luminance() - tone.get_luminance()) >= HAIR_CONTRAST \
+				and absf(hair.get_luminance() - top.get_luminance()) >= HAIR_CONTRAST * 0.5:
+			break
+		pick = (pick + 1) % HAIR.size()
+		hair = Color(HAIR[pick])
+
 	return DotHumanoidLook.make(look.body, tone, hair, top, bottom)
 
 
