@@ -327,6 +327,10 @@ func _sliding(body: CharacterBody3D) -> String:
 	return ", velocity %s, slid on [%s]" % [body.velocity.snappedf(0.1), ", ".join(names)]
 
 
+func _vec(v: Variant) -> String:
+	return str((v as Vector3).snappedf(0.1)) if v is Vector3 else "-"
+
+
 func _why(who: Variant) -> String:
 	if who is DotNpcInstance:
 		var npc: DotNpcInstance = who
@@ -334,7 +338,7 @@ func _why(who: Variant) -> String:
 		var body := npc.node as CharacterBody3D
 		var path: DotNpcPath = brain.get(&"path") if brain != null else null
 		return "%s state %s lure %s (%d active) target '%s' wish %s floor %s path %s next %s ends %s" % [
-			npc.def.id, brain.get(&"state"), (brain.get(&"lure") as Vector3).snappedf(0.1), game.horde._lures.size(), npc.target_id, (body.get(&"wish") as Vector3).snappedf(0.1) if body != null else "-",
+			npc.def.id, (brain.get(&"state") if brain != null else "-"), _vec(brain.get(&"lure") if brain != null else null), game.horde._lures.size(), npc.target_id, _vec(body.get(&"wish") if body != null else null),
 			body.is_on_floor() if body != null else "-", path.points.size() if path != null else -1,
 			path.current(Vector3.INF).snappedf(0.1) if path != null else "-",
 			path.points[path.points.size() - 1].snappedf(0.1) if path != null and not path.points.is_empty() else "-"] \
