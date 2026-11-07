@@ -55,6 +55,10 @@ var choke_routes: int = 768
 var state: State = State.OFF
 var annotations: DotNpcAiNavAnnotations = null
 var bake_ms: float = 0.0
+## Names the baked mesh's file in `user://nav_bake` (the map's id); empty keeps no cache.
+var bake_id: String = ""
+## Whether the last bake came from that cache.
+var bake_cached: bool = false
 var annotate_ms: float = 0.0
 var from_cache: bool = false
 
@@ -169,6 +173,14 @@ func tick() -> bool:
 
 func _bake() -> bool:
 	var bot := DotBotNav.new()
+
+	# The bake is the round start's biggest single cost (2.4 s on ze_biohazard_manor); the baker
+	# keys its cache on a digest of the parsed geometry, so a changed map re-bakes by itself.
+	if bake_id != "" and bool(_config.nav_cache):
+		bot.cache_dir = "user://nav_bake"
+		bot.cache_id = bake_id
+		DirAccess.make_dir_recursive_absolute(bot.cache_dir)
+
 	var baked := bot.bake(_root, {"radius": 0.35, "height": 1.8, "climb": 0.4}, _mask)
 
 	if not baked.ok:
@@ -177,6 +189,7 @@ func _bake() -> bool:
 		return false
 
 	bake_ms = bot.bake_ms
+	bake_cached = bot.last_bake_cached
 	var mesh := bot.mesh
 	var annotator := DotNpcAiNavAnnotator.new(mesh, _world)
 	annotator.agent_radius = 0.35
