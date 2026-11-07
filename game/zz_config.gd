@@ -445,6 +445,24 @@ func setup_seconds() -> float:
 ## Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off).
 @export_range(0.0, 600.0, 1.0) var stuck_rescue_seconds: float = 12.0
 
+## Seconds between the samples of safe ground the rescue keeps for a survivor (`zz_footing_sample_every`).
+@export_range(0.2, 30.0, 0.1) var footing_sample_every: float = 1.5
+
+## Metres a survivor must have moved since the last sample before another is kept (`zz_footing_sample_move`).
+@export_range(0.0, 30.0, 0.1) var footing_sample_move: float = 1.5
+
+## How many safe samples are kept; the rescue puts a survivor back on the oldest (`zz_footing_keep`).
+@export_range(1, 30, 1) var footing_keep: int = 5
+
+## Metres of flat travel under which a survivor pushing on the world counts as not moving (`zz_footing_progress`).
+@export_range(0.05, 5.0, 0.05) var footing_progress: float = 0.6
+
+## Cosine of the angle off the crosshair within which a friend counts as aimed at by a medkit (`zz_heal_aim_dot`).
+@export_range(0.0, 1.0, 0.01) var heal_aim_dot: float = 0.82
+
+## Looser cosine that keeps a heal going while the friend moves a little (`zz_heal_hold_dot`).
+@export_range(0.0, 1.0, 0.01) var heal_hold_dot: float = 0.6
+
 ## What everybody starts a map holding, by weapon id. The first is drawn.
 @export var start_weapons: PackedStringArray = PackedStringArray(["zz_pistol", "zz_knife"])
 
@@ -583,6 +601,27 @@ func setup_seconds() -> float:
 
 ## Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
 @export var director_enabled: bool = true
+
+## Metres a zombie's scream wakes idle commons within, one at a time a beat apart (`zz_alert_radius`).
+@export_range(1.0, 100.0, 0.5) var alert_radius: float = 9.0
+
+## Metres within which bile calls every common (`zz_bile_radius`).
+@export_range(1.0, 200.0, 1.0) var bile_radius: float = 45.0
+
+## Metres a broken bile jar splashes (`zz_bile_splash`).
+@export_range(0.5, 30.0, 0.5) var bile_splash: float = 4.0
+
+## Most zombies of a mob spawned at a time, so a crowd pours out of a doorway (`zz_mob_burst`).
+@export_range(1, 50, 1) var mob_burst: int = 6
+
+## Seconds between those bursts (`zz_mob_burst_seconds`).
+@export_range(0.05, 10.0, 0.05) var mob_burst_seconds: float = 0.4
+
+## Metres commons standing about a map keep from where the team starts (`zz_wanderer_clearance`).
+@export_range(0.0, 200.0, 1.0) var wanderer_clearance: float = 28.0
+
+## Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`).
+@export_range(0.1, 5.0, 0.05) var bash_reach: float = 0.75
 
 # --- The specials ----------------------------------------------------------
 

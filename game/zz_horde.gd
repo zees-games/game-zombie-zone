@@ -580,7 +580,7 @@ func _place_wanderers() -> void:
 
 		var too_near := false
 		for s in starts:
-			if centre.distance_to(s) < WANDERER_CLEARANCE:
+			if centre.distance_to(s) < config.wanderer_clearance:
 				too_near = true
 				break
 
@@ -1228,12 +1228,12 @@ func now() -> float:
 
 # --- Alerts, lures, bile ---------------------------------------------------------------------
 
-## A zombie screamed: every idle common within [constant ALERT_RADIUS] wakes, one after another.
+## A zombie screamed: every idle common within `zz_alert_radius` wakes, one after another.
 func spread_alert(npc: DotNpcInstance, who: StringName, where: Vector3) -> void:
 	if spawner == null or npc == null:
 		return
 
-	for other in spawner.npcs_near(npc.position(), ALERT_RADIUS):
+	for other in spawner.npcs_near(npc.position(), config.alert_radius):
 		if other == npc or other.def.id != ZzNpcs.COMMON or other.brain == null:
 			continue
 
@@ -1250,7 +1250,7 @@ func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
 
 	screams += 1
 
-	for other in spawner.npcs_near(npc.position(), ALERT_RADIUS * 2.0):
+	for other in spawner.npcs_near(npc.position(), config.alert_radius * 2.0):
 		if other != npc and other.def.id == ZzNpcs.COMMON and other.brain != null:
 			var gap := other.position().distance_to(npc.position())
 			_alerts.append([other.instance_id, _time + 0.1 + gap * 0.03, victim, survivor_position(victim)])
@@ -1319,7 +1319,7 @@ func _advance_lures() -> void:
 func bile_at(at: Vector3, seconds: float, radius: float) -> void:
 	lure(at, seconds, radius)
 
-	for npc in spawner.npcs_near(at, BILE_SPLASH):
+	for npc in spawner.npcs_near(at, config.bile_splash):
 		if npc.def.id == ZzNpcs.COMMON and npc.node is ZzZombieBody:
 			(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_BILED, true)
 
@@ -1333,7 +1333,7 @@ func bile_on(victim: StringName, seconds: float) -> void:
 	var fresh := not _bile.has(victim)
 	_bile[victim] = maxf(float(_bile.get(victim, 0.0)), _time + seconds)
 
-	for npc in spawner.npcs_near(at, BILE_RADIUS):
+	for npc in spawner.npcs_near(at, config.bile_radius):
 		if npc.def.id == ZzNpcs.COMMON and npc.brain != null:
 			npc.brain.call(&"force_target", victim)
 			(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_MOB, true)
@@ -1424,9 +1424,9 @@ func _release_pending() -> void:
 	if _pending.is_empty() or _time < _next_pending:
 		return
 
-	_next_pending = _time + MOB_BURST_SECONDS
+	_next_pending = _time + config.mob_burst_seconds
 
-	for i in mini(MOB_BURST, _pending.size()):
+	for i in mini(config.mob_burst, _pending.size()):
 		var entry: Array = _pending.pop_front()
 		var at: Vector3 = entry[1]
 		var owner: StringName = entry[4] if entry.size() > 4 else &"mob"
@@ -1708,7 +1708,7 @@ func set_barricades(bounds: Dictionary) -> void:
 	for id: String in bounds:
 		var box: AABB = bounds[id]
 		barricades[id] = {"bounds": box, "centre": box.get_center()}
-		var grown := box.grow(BASH_REACH + 0.5)
+		var grown := box.grow(config.bash_reach + 0.5)
 		for cx in range(floori(grown.position.x / BARRICADE_CELL), floori(grown.end.x / BARRICADE_CELL) + 1):
 			for cz in range(floori(grown.position.z / BARRICADE_CELL), floori(grown.end.z / BARRICADE_CELL) + 1):
 				var key := Vector2i(cx, cz)
@@ -1718,7 +1718,7 @@ func set_barricades(bounds: Dictionary) -> void:
 
 
 ## The intact barricade a zombie at [param at] wanting to go [param wish] is pressed against,
-## or "". Against its face (within [constant BASH_REACH] of its box, horizontally) and heading
+## or "". Against its face (within `zz_bash_reach` of its box, horizontally) and heading
 ## into it, not along it or away.
 func barricade_in_way(at: Vector3, wish: Vector3) -> String:
 	if _barricade_cells.is_empty():
@@ -1735,7 +1735,7 @@ func barricade_in_way(at: Vector3, wish: Vector3) -> String:
 		var dx := maxf(maxf(box.position.x - at.x, at.x - box.end.x), 0.0)
 		var dz := maxf(maxf(box.position.z - at.z, at.z - box.end.z), 0.0)
 
-		if dx * dx + dz * dz > BASH_REACH * BASH_REACH or at.y > box.end.y or at.y + 1.8 < box.position.y:
+		if dx * dx + dz * dz > config.bash_reach * config.bash_reach or at.y > box.end.y or at.y + 1.8 < box.position.y:
 			continue
 
 		# Toward the nearest point of the boards, not their middle: a zombie in the corner of a
