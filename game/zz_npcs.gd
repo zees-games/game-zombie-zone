@@ -212,6 +212,7 @@ static func _pack_defs(c: ZzConfig) -> Array:
 			"attack_interval": float(s.get("attack_interval", 1.0)), "attackers": c.attackers_per_survivor,
 			"body": str(s.get("body", "common")), "radius": 0.34, "height": 1.8, "pack": m.pack,
 		}
+		def.meta.merge(s.get("meta", {}), true)
 		out.append(def)
 
 	return out
