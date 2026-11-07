@@ -2397,6 +2397,8 @@ func _test_winning_and_losing() -> void:
 
 func _test_stand_ins() -> void:
 	_section("stand-ins play the map")
+	# The global generator (a dropped gun's tumble) is the one unseeded source left; fixed, the minute is the same minute on every box.
+	seed(4401)
 	var game := await _team(4, func(c: ZzConfig) -> void: c.start_grace_seconds = 2.0, true)
 	for player in game.survivors():
 		player.health.invulnerable = false
@@ -2431,6 +2433,7 @@ func _test_stand_ins() -> void:
 			weapons_left -= 1 if game.loot.kind_of(lid) == ZzLoot.WEAPON and game.loot.price_of(lid) > 0 else 0
 
 	var over := "" if played >= 60.0 else ", round over by %.0f s" % played
+	print("STANDINS kills=%d z=%.2f friendly=%.2f weapons_left=%d played=%.0f" % [kills, furthest, friendly, weapons_left, played])
 	_check(kills > 0, "they shoot what comes at them", "%d kills%s" % [kills, over])
 	_check(furthest > 10.0, "and they leave the start room for the street", "z %.0f%s" % [furthest, over])
 	# The practice street's spawners put a gun back after it is taken, so the shelf is never emptier than "3 free"; what shows pickup is a primary in a stand-in's hands that nobody started with.
