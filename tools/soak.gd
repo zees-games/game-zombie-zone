@@ -3,6 +3,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const StuckMeter := preload("stuck_meter.gd")
+const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 
 ## Bot soak on the real game: the map's team of stand-in survivors holds a map for M simulated
 ## minutes through dot-bot's DotBotSoak, fed by dot-spawn's DotSpawnWatch. Kills, deaths and damage
@@ -19,6 +20,11 @@ const StuckMeter := preload("stuck_meter.gd")
 const DEFAULT_MAP := &"zz_high_school"
 const DEFAULT_MINUTES := 1.0
 const TICK_RATE := 64
+## The map's own build (laying it out, the first graph) takes the first ticks; behind a loading
+## cover in play, so not counted against the worst tick.
+const BUILD_TICKS := 4
+## No tick after that may take longer (ms). `--max-tick-ms N` overrides.
+const MAX_TICK_MS := 1000.0
 
 var _game: ZzGame
 var _goals: StuckMeter
@@ -31,6 +37,8 @@ var _last_laid := -1.0
 var _kills_with_loot := 0
 var _peak_alive := 0
 var _spawn_failed := false
+var _worst_ms := 0.0
+var _worst_tick := 0
 
 
 func _ready() -> void:
@@ -54,6 +62,7 @@ func _run() -> void:
 	cfg.apply_cli()
 	cfg.minutes = float(_arg("minutes", str(cfg.minutes)))
 
+	var max_tick_ms := float(_arg("max-tick-ms", str(MAX_TICK_MS)))
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
@@ -99,11 +108,18 @@ func _run() -> void:
 	soak.stats_fn = func() -> Dictionary: return {"kills": _kills, "deaths": _deaths, "damage": _damage}
 	soak.object_count_fn = func() -> int: return int(Performance.get_monitor(Performance.OBJECT_COUNT))
 	soak.step_fn = func(delta: float) -> void:
+		var notes: ZzNavNotes = _game.horde.notes if _game.horde != null else null
+		var baked_before := notes.bake_ms if notes != null else 0.0
 		var began := Time.get_ticks_usec()
 		_game.simulate(delta)
 		var spent := float(Time.get_ticks_usec() - began) / 1000.0
 		if spent > 100.0:
 			print("SLOWTICK %d %.0f ms" % [soak.ticks, spent])
+		# A navigation bake that missed its cache (once per map change) is not the running cost.
+		var cold_bake := notes != null and notes.bake_ms != baked_before and not notes.bake_cached
+		if soak.ticks > BUILD_TICKS and not cold_bake and spent > _worst_ms:
+			_worst_ms = spent
+			_worst_tick = soak.ticks
 		_goals.sample()
 		if _game.horde != null and _game.horde.spawner != null:
 			_peak_alive = maxi(_peak_alive, _game.horde.spawner.all_npcs().size())
@@ -116,6 +132,13 @@ func _run() -> void:
 			await get_tree().physics_frame
 
 	var report := soak.finish()
+	report["worst_tick_ms"] = snappedf(_worst_ms, 0.1)
+	if _worst_ms > max_tick_ms:
+		report["ok"] = false
+		var reasons: Array = report.get("reasons", [])
+		reasons.append("worst tick: %.0f ms at tick %d (limit %.0f ms; the map build and a cold nav bake excepted)" % [_worst_ms, _worst_tick, max_tick_ms])
+		report["reasons"] = reasons
+	print("SOAKWORST %.0f ms at tick %d" % [_worst_ms, _worst_tick])
 	report["map"] = String(map_id)
 	report["bots"] = cfg.bots
 	report["loot_laid"] = _laid
