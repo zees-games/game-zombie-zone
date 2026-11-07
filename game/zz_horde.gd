@@ -1,5 +1,10 @@
 extends "zz_horde_state.gd"
 
+const ZzWatchCull := preload("zz_watch_cull.gd")
+
+## The mover watch and cull (game/zz_watch_cull.gd), built with each map.
+var wcull: ZzWatchCull = null
+
 func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game = p_game
 	config = p_config
@@ -97,6 +102,7 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 	clear()
 	_doc = doc
 	_nav_extra = nav_extra
+	wcull = ZzWatchCull.new(self, float(doc.get("kill_y", -30.0)))
 	open_gates = PackedStringArray()
 	# Sized for the team the map is built for: a dozen survivors' cap on four survivors' budget
 	# had the spawner refuse two of every three of a wave.
@@ -457,6 +463,7 @@ func clear() -> void:
 	_drop_nav_job()
 	_map_nav_pending = false
 	notes.clear()
+	wcull = null
 
 	if spawner != null:
 		var _cleared := spawner.clear_all(DotNpcSpawner.REASON_CLEANUP)
@@ -648,6 +655,9 @@ func tick(delta: float, ticks: int = 1) -> void:
 			if config.stuck_rescue and stuck.due(npc.instance_id, _time):
 				_rescue_if_stuck(npc)
 
+	if wcull != null:
+		wcull.tick(delta)
+
 	squads.prune()
 	_release_pending()
 
@@ -781,7 +791,6 @@ func _rebuild_grid() -> void:
 	crowd.clear()
 	_crowd_npcs.clear()
 	var kill_y := float(_doc.get("kill_y", -30.0))
-	var fell: Array[DotNpcInstance] = []
 
 	for npc in spawner.all_npcs():
 		if not npc.is_alive():
@@ -789,15 +798,12 @@ func _rebuild_grid() -> void:
 
 		var p := npc.position()
 
+		# One below the map is the watch's to remove (wcull); it must not feed the grid meanwhile.
 		if p.y < kill_y or not p.is_finite():
-			fell.append(npc)
 			continue
 
 		var _i := crowd.add(npc.instance_id, p)
 		_crowd_npcs.append(npc)
-
-	for npc in fell:
-		_fell_out(npc)
 
 
 ## Where zombies that fell out of the map last stood on its floor, newest last (a few kept), for
@@ -809,11 +815,8 @@ var fallen_count: int = 0
 const FALLEN_KEPT := 16
 
 
-## A zombie below the map's kill_y (or somewhere not a number) is taken out of the world, and a
-## wave's is owed again. Nothing used to: one that fell through the mall's floor fell for the rest
-## of the hold, its brain facing it at survivors from ever further down, and a body far enough
-## out made `look_at` refuse once a think (sixty-five errors in one run, zz-mall-lookat-errors-1).
-func _fell_out(npc: DotNpcInstance) -> void:
+## Records where a zombie the watch found below the map left the floor, for a tool or console.
+func note_fallen(npc: DotNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
 	var from: Vector3 = b.last_floor_at if b != null else Vector3.INF
 	var how := "walked"
@@ -829,11 +832,6 @@ func _fell_out(npc: DotNpcInstance) -> void:
 
 	DotLog.warn(CHANNEL, "a zombie fell out of the map", {"kind": String(npc.def.id) if npc.def != null else "?",
 		"last_on_floor": str(from.snappedf(0.1)), "at": str(npc.position().snappedf(0.1)), "how": how})
-
-	if npc.owner_id == WAVE:
-		refused_wave += 1
-
-	var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
 
 
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
@@ -1643,8 +1641,8 @@ func wave_brutes() -> int:
 ## still standing leaves with the far ones wherever it is: sent at the team, it went on through
 ## the breather into the next wave (zz-survival-retune-2).
 func clear_wave_stragglers(far: float = 30.0) -> int:
-	var tidied := 0
 	var ids := survivor_ids()
+	var lost: Array[DotNpcInstance] = []
 
 	for npc in spawner.npcs_of(WAVE):
 		if not npc.is_alive():
@@ -1655,12 +1653,11 @@ func clear_wave_stragglers(far: float = 30.0) -> int:
 			nearest = minf(nearest, npc.position().distance_to(survivor_position(id)))
 
 		if nearest > far or (npc.def != null and npc.def.id == ZzNpcs.BRUTE):
-			var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
-			tidied += 1
+			lost.append(npc)
 		elif npc.brain != null and not ids.is_empty():
 			npc.brain.call(&"force_target", ids[_rng.randi_range(0, ids.size() - 1)])
 
-	return tidied
+	return wcull.tidy_far(lost) if wcull != null else 0
 
 
 ## At dawn the dark's own leave: every zombie further than [param far] from every survivor and
@@ -2367,6 +2364,7 @@ func describe() -> Dictionary:
 		"next mob": "%.0f s" % maxf(_next_mob - _time, 0.0) if pacing else "-",
 		"panic": "%.0f s" % (_panic_until - _time) if panicking() else "-",
 		"nav": "%d points" % nav.point_count() if nav != null else "-",
+		"cull": wcull.describe() if wcull != null else "-",
 		"stuck": "%d repaths, %d nudges, %d points marked, %d relocated, %d removed" % [stuck.repaths, stuck_nudges, stuck_marked, stuck.relocations, stuck.removals],
 	}
 
