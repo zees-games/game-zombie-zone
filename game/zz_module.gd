@@ -613,6 +613,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_body_stride_far", config.body_stride_far,
 		"Metres past which a zombie's body moves every fourth tick; lower is cheaper",
 		func(value: float) -> void: config.body_stride_far = clampf(value, 5.0, 500.0))
+	_tunable("zz_dormant_from", config.dormant_from,
+		"Metres to the nearest survivor past which a zombie thinks every zz_dormant_think_every ticks and moves every eighth; 0 off",
+		func(value: float) -> void: config.dormant_from = clampf(value, 0.0, 1000.0))
+	_tunable("zz_dormant_think_every", float(config.dormant_think_every),
+		"Ticks a dormant zombie's thought spans (8 to 64)",
+		func(value: float) -> void: config.dormant_think_every = clampi(int(value), 8, 64))
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
@@ -1809,6 +1815,7 @@ const HAND_FIELDS := {
 	"zz_specials": "specials_base", "zz_start_grace": "start_grace_seconds", "zz_survival": "survival_style",
 	"zz_survival_warmup": "survival_warmup_seconds", "zz_trader": "trader_enabled",
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
+	"zz_dormant_from": "dormant_from", "zz_dormant_think_every": "dormant_think_every",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
 	"zz_commons_far_divisor": "commons_far_divisor",
 }
