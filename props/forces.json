@@ -1,0 +1,6 @@
+{
+  "comment": "How hard each weapon pushes each kind of prop (ZzPropForce). A multiplier on the push dot-props already gives a shot from its damage. Rows are weapon ids, '*' is every other weapon; columns are toy kinds (barrel, ball, crate, tyre...), 'default' is any other kind. A missing row or column is 1.0, 0 leaves a prop alone. An owner edits this file.",
+  "*": {"default": 1.0},
+  "zz_shotgun": {"default": 1.5, "ball": 2.0},
+  "zz_sniper": {"default": 2.5, "barrel": 3.0}
+}
