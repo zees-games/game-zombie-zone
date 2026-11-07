@@ -552,6 +552,12 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_bot_repress_use", 1.0 if config.bot_repress_use else 0.0,
 		"Stand-ins release E every few ticks while going for a box so a missed press is repeated; 0 holds it",
 		func(value: float) -> void: config.bot_repress_use = value > 0.5)
+	_tunable("zz_bot_defib", 1.0 if config.bot_defib else 0.0,
+		"Stand-ins pick up a defibrillator and shock a dead friend back; 0 leaves it to the humans",
+		func(value: float) -> void: config.bot_defib = value > 0.5)
+	_tunable("zz_bot_defib_reach", config.bot_defib_reach,
+		"Metres a stand-in with a defibrillator walks to a dead friend's body (1 to 200)",
+		func(value: float) -> void: config.bot_defib_reach = clampf(value, 1.0, 200.0))
 	_tunable("zz_bot_idle_seconds", config.bot_idle_seconds,
 		"Seconds a stand-in that wants to move or take something may stand still before it gets another goal; 0 off",
 		func(value: float) -> void: config.bot_idle_seconds = clampf(value, 0.0, 120.0))
