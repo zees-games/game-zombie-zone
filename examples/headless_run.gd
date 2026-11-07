@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 429
+const CHECKS := 430
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2444,6 +2444,8 @@ func _test_stand_ins() -> void:
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
 	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
 	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)
+	# A round that passes bodies goes on to a friend behind its target, so the line is judged past the target too: that was the 0 to 18 left once the muzzle case was fixed.
+	_check(friendly < 5.0, "and a friend behind the target is not hit through it", "%.1f friendly damage" % friendly)
 	_finished()
 
 
