@@ -66,6 +66,9 @@ const FRIEND_CONE_DEGREES := 14.0
 ## How far inside a friend's hitbox the eye must be (metres, each way) for the shot to count as
 ## passing through them; see [method _holds_muzzle]. A stand-in moves about 4 cm per tick.
 const MUZZLE_MARGIN := 0.08
+
+## How far past its target a round that passes bodies is judged for friends behind it.
+const PENETRATION_REACH := 8.0
 const SHOVE_RANGE := 1.7
 
 ## How far a bot lets its leader get before it walks after them.
@@ -963,6 +966,10 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		return false
 
 	var eye: Vector3 = player.eye_position()
+
+	if _round_passes_bodies(player):
+		at = eye + (at - eye).normalized() * (eye.distance_to(at) + PENETRATION_REACH)
+
 	var reach := eye.distance_to(at)
 	var cone := tan(deg_to_rad(FRIEND_CONE_DEGREES))
 
@@ -1022,6 +1029,23 @@ func _holds_muzzle(set_node: DotHitboxSet, eye: Vector3) -> bool:
 			return false
 
 	return true
+
+
+## Whether the held weapon's round goes on through a body it hits (a friend behind the target is then hit too).
+func _round_passes_bodies(player) -> bool:
+	var rules: Object = game.combat if game != null else null
+
+	if rules == null or not rules.penetration_enabled or not rules.penetration_players:
+		return false
+
+	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
+	var arsenal: Object = player.weapons.arsenal if player.weapons != null else null
+
+	if held == null or arsenal == null or not arsenal.has_method("round_for"):
+		return false
+
+	var ammo := arsenal.call("round_for", held.id) as DotWeaponAmmoType
+	return ammo != null and ammo.penetration > 0.0
 
 
 ## The level the server's combat manager judges shots under (its `mp_teammate_passthrough`).
