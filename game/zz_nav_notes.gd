@@ -30,7 +30,7 @@ extends RefCounted
 const CHANNEL := "zz.nav"
 const ZzNavPrune := preload("zz_nav_prune.gd")
 
-enum State { OFF, WAITING, ANNOTATING, READY, FAILED }
+enum State { OFF, WAITING, ANNOTATING, READY, FAILED, BAKING }
 
 ## What the annotation may take of one tick, microseconds, once it has done a slice.
 const SLICE_BUDGET_US := 1500
@@ -60,6 +60,10 @@ var bake_id: String = ""
 ## Whether the last bake came from that cache.
 var bake_cached: bool = false
 var annotate_ms: float = 0.0
+## Whether a bake that missed its cache is made on a worker thread (the navigation server's) while play
+## goes on, instead of inside one tick (2.2 s on ze_biohazard_manor). The hosts set it; a suite leaves it off,
+## so a seeded round has its annotations on the same tick every run.
+var background: bool = false
 var from_cache: bool = false
 
 ## The chokes on a route, nearest the spawns first: `at`, `width`, `traffic`, `hold` (where to
@@ -89,6 +93,8 @@ var _seeds: PackedVector3Array = PackedVector3Array()
 var _frame: int = 0
 var _annotator: DotNpcAiNavAnnotator = null
 var _started_ms: int = 0
+var _bot: DotBotNav = null
+var _bot_result: DotResult = null
 
 ## npc key -> {"at": choke index or -1, "seen": time}
 var _assigned: Dictionary = {}
@@ -123,6 +129,10 @@ func begin(config, root: Node3D, mask: int, seeds: PackedVector3Array) -> void:
 ## Cancels everything and forgets the map.
 func clear() -> void:
 	state = State.OFF
+	if _bot != null:
+		_bot.clear()
+		_bot = null
+	_bot_result = null
 	annotations = null
 	chokes.clear()
 	all_chokes.clear()
@@ -156,6 +166,8 @@ func tick() -> bool:
 				return false
 
 			return _bake()
+		State.BAKING:
+			return _bake_landed()
 		State.ANNOTATING:
 			var began := Time.get_ticks_usec()
 
@@ -181,13 +193,52 @@ func _bake() -> bool:
 		bot.cache_id = bake_id
 		DirAccess.make_dir_recursive_absolute(bot.cache_dir)
 
-	var baked := bot.bake(_root, {"radius": 0.35, "height": 1.8, "climb": 0.4}, _mask)
+	var agent := {"radius": 0.35, "height": 1.8, "climb": 0.4}
+
+	if background and DotPlatform.has_threads():
+		_bot = bot
+		_bot_result = null
+		var started := bot.bake_in_background(_root, agent, _mask, [], func(res: DotResult) -> void: _bot_result = res)
+
+		if not started.ok:
+			_bot = null
+			return _bake_failed(started)
+
+		state = State.BAKING
+		return _bake_landed()
+
+	var baked := bot.bake(_root, agent, _mask)
 
 	if not baked.ok:
-		DotLog.warn(CHANNEL, "navigation notes: the bake failed", {"why": baked.error.message})
-		state = State.FAILED
+		return _bake_failed(baked)
+
+	return _baked(bot)
+
+
+## A background bake: nothing until the mesh lands, then the rest of [method _baked].
+func _bake_landed() -> bool:
+	if _bot == null or _bot.is_baking() or _bot_result == null:
 		return false
 
+	var bot := _bot
+	var res := _bot_result
+	_bot = null
+	_bot_result = null
+
+	if not res.ok:
+		return _bake_failed(res)
+
+	return _baked(bot)
+
+
+func _bake_failed(res: DotResult) -> bool:
+	DotLog.warn(CHANNEL, "navigation notes: the bake failed", {"why": res.error.message})
+	state = State.FAILED
+	return false
+
+
+## The bake is in: the annotator takes over (or the cached annotations are the answer).
+func _baked(bot: DotBotNav) -> bool:
 	bake_ms = bot.bake_ms
 	bake_cached = bot.last_bake_cached
 	var mesh := bot.mesh

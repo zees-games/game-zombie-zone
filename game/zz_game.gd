@@ -68,11 +68,14 @@ func _ready() -> void:
 		return
 
 	_round_seed = config.seed_value
+	var lap := Time.get_ticks_usec()
 	# Optional packs first: a rig reads its catalogue once, and zee's sources are what it reads.
 	var _packs := ZzPacks.scan()
 	ZzWeapons.use_packs()
 	# The art table builds on first use, which was the first shot of the round (0.8 s in one tick).
+	lap = _lap(&"packs", lap)
 	var _art := ZeeWeaponArtTable.table()
+	lap = _lap(&"art_table", lap)
 
 	_build_physics()
 	pass_rules.humans_pass = config.humans_pass_barricades
@@ -92,12 +95,14 @@ func _ready() -> void:
 	_build_random()
 	_build_props()
 	_build_map()
+	lap = _lap(&"ready_early", lap)
 	_build_combat()
 	weapon_layer.build()
 	_build_effects()
 	_build_match()
 	_build_spectate()
 	_build_progress()
+	lap = _lap(&"combat_etc", lap)
 
 	if authoritative:
 		pins = ZzPins.new(self)
@@ -121,7 +126,9 @@ func _ready() -> void:
 		var _loaded_boxes := boxes.load_file(config.box_file)
 		var _box_profiles := boxes.overlay_profiles(box_profile_set())
 		bots = ZzBots.new(self)
+		lap = _lap(&"auth_services", lap)
 		_build_horde()
+		lap = _lap(&"horde", lap)
 		catalogue = ZzCatalogue.new()
 		# Subscribed (solo) pack maps are map documents and join the catalogue; online none.
 		catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
@@ -132,9 +139,11 @@ func _ready() -> void:
 		for root in solo_map_dirs("maps"):
 			var _added := catalogue.add_directory(root)
 		var _rotation := load_rotation()
+		lap = _lap(&"catalogue", lap)
 		# Laid out now, not on the first round: a warmup on an empty world is indistinguishable
 		# from a map that failed to load.
 		_lay_out_map()
+		lap = _lap(&"lay_out_map", lap)
 
 	if register_service:
 		DotRegistry.register(SERVICE, self)
@@ -1532,7 +1541,9 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 
 	var stamp := _build_stamp(doc)
 	var kept := reuse and _built_stamp == stamp
+	var lap := Time.get_ticks_usec()
 	var built := DotResult.success(null) if kept else map.build(doc)
+	lap = _lap(&"map_build", lap)
 	map_builds += 0 if kept else 1
 	_built_stamp = stamp if built.ok else 0
 
@@ -1543,8 +1554,11 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	map_doc = map.doc
 	if authoritative and not kept:
 		var _hulls := map.build_world_collision_local(str(catalogue.roots.get(StringName(str(doc.get("id", ""))), "")) if catalogue != null else "")
+		lap = _lap(&"hulls", lap)
 		var _props := map.build_world_props_local()
+		lap = _lap(&"world_props", lap)
 		var _moving := map.build_mechanics_local()
+		lap = _lap(&"mechanics", lap)
 	_push_water()
 	_reset_barricades()
 	# The states are the map's: a map laid out between rounds (the map menu's change, a vote's)
@@ -1559,6 +1573,15 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	world_rebuilt.emit()
 	DotLog.info(CHANNEL, "map built", {"id": str(doc.get("id", "?")), "ms": Time.get_ticks_msec() - started})
 	return built
+
+
+## Where the last [method build_map] spent its time (ms by section), for the cold-start tool.
+var build_sections: Dictionary = {}
+
+
+## Adds the time since [param since] (usec) to section [param name]; returns the new lap start.
+func _lap(name: StringName, since: int) -> int:
+	return ZzLaps.lap(build_sections, name, since)
 
 
 ## Everybody to the start, up, unhurt, holding what a map starts with.

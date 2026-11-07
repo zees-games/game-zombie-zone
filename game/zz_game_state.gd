@@ -420,6 +420,8 @@ var ui_holders: Dictionary = {}
 
 ## Set by the hosts (client, server) before the world is added: a map's navigation graph is then built
 ## off the frame and a round waits in its ready phase for it. A suite leaves it off and gets the graph at once.
+const ZzLaps := preload("zz_laps.gd")
+
 var nav_async: bool = false
 
 

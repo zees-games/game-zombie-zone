@@ -1,6 +1,10 @@
 extends Node3D
 
 const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzLaps := preload("zz_laps.gd")
+
+## Milliseconds by section of the last [method build], for the cold-start tool.
+var sections: Dictionary = {}
 const ZzMaterials := preload("zz_materials.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzLampBudget := preload("zz_lamp_budget.gd")
@@ -269,22 +273,34 @@ func build(p_doc: Dictionary) -> DotResult:
 		_drawn.name = "Drawn"
 		add_child(_drawn)
 
+	sections.clear()
+	var lap := Time.get_ticks_usec()
 	_build_boxes()
+	lap = ZzLaps.lap(sections, &"boxes", lap)
 	_build_terrain()
+	lap = ZzLaps.lap(sections, &"terrain", lap)
 	_build_boundary()
+	lap = ZzLaps.lap(sections, &"boundary", lap)
 	_build_water_volumes()
+	lap = ZzLaps.lap(sections, &"water", lap)
 	_build_props()
+	lap = ZzLaps.lap(sections, &"props", lap)
 	_build_solid_props()
+	lap = ZzLaps.lap(sections, &"solid_props", lap)
 	_build_toys()
+	lap = ZzLaps.lap(sections, &"toys", lap)
 
 	if draw_world:
 		_build_water_surfaces()
 		_build_objective_props()
+		lap = ZzLaps.lap(sections, &"objective_props", lap)
 		_build_lights()
+		lap = ZzLaps.lap(sections, &"lights", lap)
 		_build_environment()
 		_keep_fog_variant_warm()
 		if use_bakes:
 			_attach_bake()
+		lap = ZzLaps.lap(sections, &"env_bake", lap)
 
 	if not _missing.is_empty():
 		DotLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
@@ -742,22 +758,86 @@ func _build_boxes() -> void:
 		_drawn.add_child(mesh)
 
 
+## Whether a map's decoded terrain is kept in `user://terrain_cache` between runs.
+static var terrain_cache: bool = true
+const TERRAIN_CACHE_VERSION := 2
+
+
+## The terrain, its faces and its bounds stored under [param key], or {} when there are none.
+func _terrain_cache_read(key: String) -> Dictionary:
+	var path := "user://terrain_cache/%s_%s.bin" % [id(), key]
+	if key == "" or not FileAccess.file_exists(path):
+		return {}
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return {}
+	var d: Variant = f.get_var()
+	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != TERRAIN_CACHE_VERSION:
+		return {}
+	var t := DotMapTerrain.new()
+	t.nx = int(d["nx"])
+	t.nz = int(d["nz"])
+	t.cell = float(d["cell"])
+	t.origin_x = float(d["ox"])
+	t.origin_z = float(d["oz"])
+	t.mat = str(d["mat"])
+	t.skirt_y = float(d["skirt"])
+	t.heights = d["heights"]
+	t.walk = d["walk"]
+	return {"terrain": t, "faces": d["faces"], "box": d["box"]}
+
+
+func _terrain_cache_write(key: String, faces: PackedVector3Array, box: AABB) -> void:
+	if key == "":
+		return
+	DirAccess.make_dir_recursive_absolute("user://terrain_cache")
+	var path := "user://terrain_cache/%s_%s.bin" % [id(), key]
+	var f := FileAccess.open(path + ".tmp", FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_var({
+		"v": TERRAIN_CACHE_VERSION, "nx": terrain.nx, "nz": terrain.nz, "cell": terrain.cell,
+		"ox": terrain.origin_x, "oz": terrain.origin_z, "mat": terrain.mat, "skirt": terrain.skirt_y,
+		"heights": terrain.heights, "walk": terrain.walk, "faces": faces, "box": box,
+	})
+	f.close()
+	var _renamed := DirAccess.rename_absolute(path + ".tmp", path)
+
+
 ## The displacement ground: one triangle shape, and drawn as a "Boxes_" mesh so a drawn world
 ## replaces it like the boxes.
 func _build_terrain() -> void:
 	if not doc.has("terrain"):
 		return
-	var res := DotMapTerrain.from_dict(doc["terrain"])
-	if not res.ok:
-		DotLog.warn(CHANNEL, "a map's terrain would not read; it has no ground there", {"map": String(id()), "error": str(res)})
-		return
-	terrain = res.value
+	# Decoding the heightfield, its triangles and its bounds is GDScript over every sample (1.1 s on
+	# ze_biohazard_manor), so the result is kept in `user://terrain_cache`, keyed on the document's data.
+	var key := "%d_%d" % [hash(doc["terrain"]), str(doc["terrain"].get("data", "")).length()] if terrain_cache else ""
+	var t_read := Time.get_ticks_usec()
+	var kept := _terrain_cache_read(key)
+	sections[&"terrain_cache_read"] = snappedf(float(Time.get_ticks_usec() - t_read) / 1000.0, 0.1)
+	sections[&"terrain_hit"] = 0.0 if kept.is_empty() else 1.0
+	var faces := PackedVector3Array()
+	var box := AABB()
+	if kept.is_empty():
+		var res := DotMapTerrain.from_dict(doc["terrain"])
+		if not res.ok:
+			DotLog.warn(CHANNEL, "a map's terrain would not read; it has no ground there", {"map": String(id()), "error": str(res)})
+			return
+		terrain = res.value
+		faces = terrain.faces()
+		box = terrain.bounds()
+		_terrain_cache_write(key, faces, box)
+	else:
+		terrain = kept["terrain"]
+		faces = kept["faces"]
+		box = kept["box"]
 	var shape := CollisionShape3D.new()
 	shape.name = "Terrain"
-	shape.shape = terrain.build_shape()
+	var concave := ConcavePolygonShape3D.new()
+	concave.set_faces(faces)
+	shape.shape = concave
 	shape.set_meta(&"surface", terrain.mat)
 	_solid.add_child(shape)
-	var box := terrain.bounds()
 	_bounds = box if _bounds == AABB() else _bounds.merge(box)
 	if not draw_world:
 		return
