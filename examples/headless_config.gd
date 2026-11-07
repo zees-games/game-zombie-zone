@@ -9,7 +9,13 @@ extends DotGameCheckSuite
 const ZzConfig := preload("../game/zz_config.gd")
 const ROOT := "user://zz_cfgtest"
 const GAME := "game-zombie-zone"
-const CHECKS := 38
+const ZzTurrets := preload("../game/zz_turrets.gd")
+
+
+## Stands in for the game: ZzTurrets reads only its `config`.
+class FakeGame:
+	var config = null
+const CHECKS := 42
 
 
 func _ready() -> void:
@@ -75,6 +81,7 @@ func _run() -> void:
 	yml.store_string(kept)
 	yml.close()
 
+	_turrets(binder, console, config)
 	_layers()
 	_templates(binder)
 
@@ -173,3 +180,30 @@ func _templates(binder: DotGameConfigBinder) -> void:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
 			stale.append(path)
 	_check(stale.is_empty(), "the shipped files match the config (run addons/dot_game/qa/dot_game_cfg_templates.gd)", ",".join(stale))
+
+
+## The turret rules moved out of zz_turrets.gd keep the old constants as defaults, and a cvar changes what the rules read.
+func _turrets(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+	var fresh := ZzConfig.new()
+	_check(fresh.turret_max_per_owner == 2 and fresh.turret_seconds == 40.0 and fresh.turret_ammo == 220 and fresh.turret_damage == 14.0
+		and fresh.turret_reach == 20.0 and fresh.turret_interval == 0.14 and fresh.turret_muzzle_height == 0.85
+		and fresh.turret_chest_height == 1.1 and fresh.turret_place_reach == 2.2 and fresh.turret_foot_reach == 0.4,
+		"the turret defaults equal the old constants (cap 2; 40 s, 220 rounds, 14 damage, 20 m, 0.14 s; muzzle 0.85, chest 1.1, place 2.2 / 0.4)")
+	var cvars_ok := true
+	for k in ["max_per_owner", "seconds", "ammo", "damage", "reach", "interval", "muzzle_height", "chest_height", "place_reach", "foot_reach"]:
+		cvars_ok = cvars_ok and console.find_cvar("zz_turret_" + k) != null and binder.source_of("turret_" + k) == "default"
+	_check(cvars_ok, "every turret field is a zz_turret_* cvar")
+	var game := FakeGame.new()
+	game.config = fresh
+	var turrets := ZzTurrets.new(game)
+	var d := turrets.defaults()
+	_check(d == {"seconds": 40.0, "ammo": 220, "damage": 14.0, "reach": 20.0, "interval": 0.14}, "the rules read the old action defaults from the config")
+	turrets.turrets = {1: {"owner": 5}, 2: {"owner": 5}}
+	turrets._make_room(5)
+	var at_default := turrets.count_for(5)
+	game.config = config
+	console.set_cvar("zz_turret_max_per_owner", "3")
+	console.set_cvar("zz_turret_ammo", "99")
+	turrets.turrets = {1: {"owner": 5}, 2: {"owner": 5}}
+	turrets._make_room(5)
+	_check(at_default == 1 and turrets.count_for(5) == 2 and turrets.defaults()["ammo"] == 99, "zz_turret_max_per_owner and zz_turret_ammo change what the turret rules do")

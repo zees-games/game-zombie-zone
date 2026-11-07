@@ -14,14 +14,21 @@ extends RefCounted
 
 const CHANNEL := "zz.turrets"
 
-## What a turret does when the box's action leaves a number out.
-const DEFAULTS := {"seconds": 40.0, "ammo": 220, "damage": 14.0, "reach": 20.0, "interval": 0.14}
+const _CONFIG := preload("zz_config.gd")
 
-## Per survivor; a third turns the oldest one off rather than refusing the box.
-const MAX_PER_OWNER := 2
 
-## Muzzle-to-chest, so a shot lands on the body and not the feet.
-const CHEST := Vector3(0.0, 1.1, 0.0)
+## What a turret does when the box's action leaves a number out: [ZzConfig]'s `turret_*` fields (`zz_turret_*` cvars).
+func defaults() -> Dictionary:
+	var c = _cfg()
+	return {"seconds": c.turret_seconds, "ammo": c.turret_ammo, "damage": c.turret_damage,
+		"reach": c.turret_reach, "interval": c.turret_interval}
+
+
+## The config in force (the game's, else the defaults).
+func _cfg():
+	var c = game.config if game != null else null
+	return c if c != null else _CONFIG.new()
+
 
 signal placed(id: int, at: Vector3, yaw: float, seconds: float)
 signal fired(id: int, target: Vector3)
@@ -43,6 +50,8 @@ func _init(p_game: Object) -> void:
 ## Puts a turret where [param player] is looking, or at their feet when that spot is no good.
 ## Returns the id, or 0 with [param why] saying what was wrong (a [DotResult] failure's detail).
 func deploy(player, params: Dictionary) -> DotResult:
+	var cfg = _cfg()
+	var defs := defaults()
 	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state if game.get_world_3d() != null else null
 
 	if space == null:
@@ -51,28 +60,28 @@ func deploy(player, params: Dictionary) -> DotResult:
 	var eye: Vector3 = player.feet() + Vector3(0.0, 1.5, 0.0)
 	var facing := Vector3(-sin(deg_to_rad(player.controller.state.yaw)), 0.0, -cos(deg_to_rad(player.controller.state.yaw)))
 	var mask: int = game.world_mask()
-	var spot := DotSentry.find_spot(space, eye, facing, mask, 2.2)
+	var spot := DotSentry.find_spot(space, eye, facing, mask, cfg.turret_place_reach)
 
 	if not spot.ok:
-		spot = DotSentry.find_spot(space, eye, Vector3.DOWN + facing * 0.01, mask, 0.4)
+		spot = DotSentry.find_spot(space, eye, Vector3.DOWN + facing * 0.01, mask, cfg.turret_foot_reach)
 
 	if not spot.ok:
 		return spot.wrap("A turret cannot stand there.")
 
 	var at: Vector3 = spot.value["position"]
-	var seconds := float(params.get("seconds", DEFAULTS["seconds"]))
+	var seconds := float(params.get("seconds", defs["seconds"]))
 	var sentry := DotSentry.new(at, game.now(), deg_to_rad(player.controller.state.yaw))
 	sentry.lifetime = seconds
-	sentry.ammo = int(params.get("ammo", DEFAULTS["ammo"]))
-	sentry.reach = float(params.get("reach", DEFAULTS["reach"]))
-	sentry.interval = float(params.get("interval", DEFAULTS["interval"]))
-	sentry.muzzle_height = 0.85
+	sentry.ammo = int(params.get("ammo", defs["ammo"]))
+	sentry.reach = float(params.get("reach", defs["reach"]))
+	sentry.interval = float(params.get("interval", defs["interval"]))
+	sentry.muzzle_height = cfg.turret_muzzle_height
 	_make_room(player.entity_id)
 
 	var id := _next_id
 	_next_id += 1
 	turrets[id] = {"sentry": sentry, "owner": player.entity_id, "owner_key": player.player_id,
-		"damage": float(params.get("damage", DEFAULTS["damage"]))}
+		"damage": float(params.get("damage", defs["damage"]))}
 	placed.emit(id, at, sentry.yaw, seconds)
 	DotLog.info(CHANNEL, "a turret was deployed", {"by": String(player.player_id), "at": at})
 	return DotResult.success(id)
@@ -125,7 +134,9 @@ func count_for(owner: int) -> int:
 
 
 func _make_room(owner: int) -> void:
-	while count_for(owner) >= MAX_PER_OWNER:
+	var cap: int = maxi(1, _cfg().turret_max_per_owner)
+
+	while count_for(owner) >= cap:
 		var oldest := 0
 
 		for id: int in turrets:
@@ -137,6 +148,7 @@ func _make_room(owner: int) -> void:
 
 func _candidates(sentry: DotSentry) -> Array:
 	var out: Array = []
+	var chest := Vector3(0.0, _cfg().turret_chest_height, 0.0)
 
 	if game.horde == null:
 		return out
@@ -145,7 +157,7 @@ func _candidates(sentry: DotSentry) -> Array:
 		var entity: int = game.horde.entity_id_for(npc)
 
 		if entity != 0:
-			out.append({"id": entity, "at": npc.position() + CHEST})
+			out.append({"id": entity, "at": npc.position() + chest})
 
 	return out
 

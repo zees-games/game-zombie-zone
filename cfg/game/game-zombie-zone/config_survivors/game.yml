@@ -171,3 +171,25 @@
 # max_boxes: 16
 # Whether boxes exist at all.
 # boxes_enabled: true
+
+# --- Turrets
+# Turrets one survivor may have out; a further one turns the oldest off rather than refusing the box (`zz_tur... [1..16]
+# turret_max_per_owner: 2
+# What a sentry does when the box outcome's `turret` action leaves the number out (the shipped Turret Box wri... [1.0..600.0]
+# turret_seconds: 40.0
+# Rounds a sentry carries (`zz_turret_ammo`). [1..5000]
+# turret_ammo: 220
+# Damage of one sentry round (`zz_turret_damage`). [0.1..500.0]
+# turret_damage: 14.0
+# Metres a sentry sees and shoots (`zz_turret_reach`). [1.0..100.0]
+# turret_reach: 20.0
+# Seconds between a sentry's rounds (`zz_turret_interval`). [0.02..5.0]
+# turret_interval: 0.14
+# Height of the sentry's muzzle above its base, metres (`zz_turret_muzzle_height`). [0.1..3.0]
+# turret_muzzle_height: 0.85
+# Height above a zombie's feet a sentry aims at, so a shot lands on the body and not the feet (`zz_turret_che... [0.1..3.0]
+# turret_chest_height: 1.1
+# Metres in front of the survivor's eyes a turret may be placed; when that spot is no good the one below the ... [0.5..10.0]
+# turret_place_reach: 2.2
+# Metres down from the eyes the fallback spot is looked for (`zz_turret_foot_reach`). [0.1..5.0]
+# turret_foot_reach: 0.4
