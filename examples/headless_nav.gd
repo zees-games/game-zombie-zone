@@ -19,7 +19,7 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 
 ## Without the per-map wave-origin sections (one section, two checks each).
 const SECTIONS := 21
-const CHECKS := 97
+const CHECKS := 98
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -287,6 +287,19 @@ func _test_graph() -> void:
 	_check(cached != null and cached.points == data.points and cached.edges == data.edges, "with its points and edges whole")
 	_check(DotNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
 
+	# The grid thinning of spawn points keeps what the director's own loop keeps, in its order.
+	var cloud := DotNpcNavData.new()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for _i in 900:
+		var _p := cloud.add_point(Vector3(rng.randf_range(0.0, 60.0), rng.randf_range(0.0, 6.0), rng.randf_range(0.0, 60.0)))
+	var director := DotNpcDirector.new()
+	var _n := director.set_spawn_points_from_nav(cloud, 6.0, null)
+	var thinned := ZzNpcs.thinned_points(cloud, 6.0, null)
+	var expected := director.spawn_points
+	director.free()
+	_check(thinned.size() > 10 and thinned == expected, "thinned spawn points equal the director's", "%d vs %d" % [thinned.size(), expected.size()])
+
 	var graph := ZzNavGraph.new()
 	var built := graph.rebuild(data)
 	_check(built.ok, "the test graph builds", "" if built.ok else built.error.message)
@@ -387,7 +400,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -691,7 +704,7 @@ func _test_hop_wedge() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -761,7 +774,7 @@ func _test_unstick_steps() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -853,7 +866,7 @@ func _test_lure_crowd() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -906,7 +919,7 @@ func _test_fallback() -> void:
 	game.start()
 	var ticks := 0
 
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
@@ -982,7 +995,7 @@ func _horde(id: StringName, spread: bool) -> Dictionary:
 	var ticks := 0
 
 	# Notes first: the wave is two seconds off, and its planning must not race the first zombies.
-	while game.horde.notes.state < ZzNavNotes.State.READY and ticks < 20000:
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
 		game.simulate(TICK)
 		ticks += 1
 
