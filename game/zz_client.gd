@@ -2423,6 +2423,10 @@ func spectate_step(direction: int) -> void:
 		chat.notice(moved.error.message)
 
 
+## How near (metres, level) another survivor may stand to your first-person eye before it is not drawn.
+const NEAR_EYE := 1.2
+
+
 ## Everything a frame draws for the survivors, in this order: the netcode's interpolation, then
 ## every survivor, then every beacon. Returns how many are shown. Static so the net suite drives
 ## exactly this and not a copy of it.
@@ -2464,6 +2468,11 @@ static func present_frame(
 		var at := drawn_position(body, networked and not mine)
 		var colour := p_game.side_colour(ZzGame.SURVIVORS)
 		var hidden := (mine and first_person) or body == watched
+
+		# A body standing in your head is not drawn: from the eye it is a wall of skin and hair (zz-look-model-survivors).
+		if first_person and own != null and not mine and own.is_inside_tree() \
+				and Vector2(at.x - own.global_position.x, at.z - own.global_position.z).length() < NEAR_EYE:
+			hidden = true
 
 		if body.present_body(hidden, at, colour):
 			shown += 1

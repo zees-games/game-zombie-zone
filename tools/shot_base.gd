@@ -38,6 +38,8 @@ var _flash := false
 var _aim := INF
 ## --alone: the stand-ins stay in the start room, out of a close-up.
 var _alone := false
+## --as-spawned: nobody is moved or held; the frame is what the round start dealt (stand-ins keep playing).
+var _as_spawned := false
 ## --door=INDEX:open|closed[:SIDE]: that door frozen in that state (side 1 or -1 is the way it swings), for a frame of it.
 var _doors: Array[String] = []
 ## --fire=TARGETNAME:Input: that map-logic input sent before the frame (a maker's ForceSpawn, to see its copies).
