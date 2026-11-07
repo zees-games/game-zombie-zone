@@ -166,6 +166,20 @@
 # gunfire_radius: 30.0
 # Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
 # director_enabled: true
+# Metres a zombie's scream wakes idle commons within, one at a time a beat apart (`zz_alert_radius`). [1.0..100.0]
+# alert_radius: 9.0
+# Metres within which bile calls every common (`zz_bile_radius`). [1.0..200.0]
+# bile_radius: 45.0
+# Metres a broken bile jar splashes (`zz_bile_splash`). [0.5..30.0]
+# bile_splash: 4.0
+# Most zombies of a mob spawned at a time, so a crowd pours out of a doorway (`zz_mob_burst`). [1..50]
+# mob_burst: 6
+# Seconds between those bursts (`zz_mob_burst_seconds`). [0.05..10.0]
+# mob_burst_seconds: 0.4
+# Metres commons standing about a map keep from where the team starts (`zz_wanderer_clearance`). [0.0..200.0]
+# wanderer_clearance: 28.0
+# Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`). [0.1..5.0]
+# bash_reach: 0.75
 
 # --- The specials
 # Special infected alive at once, for one survivor and one more for each this many survivors. [0..32]
