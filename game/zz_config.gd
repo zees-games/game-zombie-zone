@@ -526,6 +526,10 @@ func setup_seconds() -> float:
 @export_range(0.0, 600.0, 1.0) var defib_max_body_age: float = 60.0
 ## Metres the user may drift while charging before it is interrupted.
 @export_range(0.1, 3.0, 0.1) var defib_move_tolerance: float = 0.6
+## Points the trader asks for a defibrillator, and a trader shelf's defibrillator unless its site names a price (0: not sold; a site's own price wins). `zz_defib_price`.
+@export_range(0, 100000, 10) var defib_price: int = 400
+## Metres from which another survivor hears a defibrillator charging (0: only the user hears it). `zz_defib_hear_range`.
+@export_range(0.0, 100.0, 1.0) var defib_hear_range: float = 25.0
 
 ## Metres from the eye an item may be picked up or a box opened.
 @export_range(0.5, 5.0, 0.1) var use_reach: float = 2.2
