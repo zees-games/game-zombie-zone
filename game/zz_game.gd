@@ -3878,10 +3878,32 @@ func _shoot_toys(shot: DotShot) -> void:
 		if crates != null:
 			var _crate := crates.shoot(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage)
 		if map.toys != null and map.toys.count() > 0:
-			var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, world_mask())
+			var _pushed := push_toy(shot, raw as Vector3)
 		if not map.supports.is_empty():
 			var wall := _wall_distance(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0))
 			var _broke := DotMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
+
+
+## The first toy on a shot's ray, nearer than a wall, pushed as dot-props pushes it from the shot's damage times the weapon's
+## `props/forces.json` multiplier for that kind of toy. The toy's index, or -1.
+func push_toy(shot: DotShot, direction: Vector3) -> int:
+	var box := map.toys
+	if prop_force == null:
+		prop_force = ZzPropForce.load_file()
+	if not box.authoritative or not box.rules.enabled or not box.is_inside_tree():
+		return -1
+	var reach := maxf(shot.max_range, 1.0)
+	var query := PhysicsRayQueryParameters3D.create(shot.origin, shot.origin + direction.normalized() * reach, world_mask() | box.loose_layer | box.solid_layer)
+	query.collide_with_areas = false
+	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
+	if found.is_empty():
+		return -1
+	var toy := DotPropToyBox.toy_of(found.get("collider"))
+	if toy == null or shot.damage <= 0.0:
+		return -1
+	var scale: float = prop_force.multiplier(shot.weapon_id, toy.kind)
+	var speed := clampf(shot.damage * DotPropToyBox.SHOT_SPEED_PER_DAMAGE, DotPropToyBox.SHOT_SPEED_MIN, DotPropToyBox.SHOT_SPEED_MAX)
+	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropToyBox._shot_mass(toy) * scale)
 
 
 func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
