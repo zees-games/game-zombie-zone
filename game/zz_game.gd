@@ -599,7 +599,8 @@ func _feed_map_uis() -> void:
 		held["back"] = c.move.y < -0.3
 		held["right"] = c.move.x > 0.3
 		held["left"] = c.move.x < -0.3
-		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE)
+		# The attack key throws a held prop, it does not fire the gun.
+		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE) and not prop_carry.carrying(player.player_id)
 		held["attack2"] = (player.actions & ZzNetCommand.ACT_AIM) != 0
 		held["jump"] = c.is_pressed(DotFpsCommand.BUTTON_JUMP)
 		held["use"] = (player.actions & ZzNetCommand.ACT_USE) != 0
@@ -2337,6 +2338,9 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 
 	_sync_carry(player)
 
+	if fire_pressed and prop_carry.carrying(player.player_id) and map != null:
+		var _thrown: int = prop_carry.throw_held(map.toys, player.player_id, player.aim_direction(), _prop_force().multiplier(&"throw", &"default"))
+
 	if player.is_down() or not player.is_alive() or player.watching or player.is_pinned():
 		cancel_use(player)
 		return
@@ -3943,11 +3947,20 @@ func push_toy(shot: DotShot, direction: Vector3) -> int:
 	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropToyBox._shot_mass(toy) * scale)
 
 
-func _on_exploded_near_toys(at: Vector3, radius: float, _kind: StringName) -> void:
+## The force table, loaded on first use.
+func _prop_force() -> RefCounted:
+	if prop_force == null:
+		prop_force = ZzPropForce.load_file()
+	return prop_force
+
+
+## A blast moves toys at TOY_BLAST_SPEED times the force table's row for the explosion's kind (grenade, bile...), column `default`.
+func _on_exploded_near_toys(at: Vector3, radius: float, kind: StringName) -> void:
+	var speed: float = TOY_BLAST_SPEED * float(_prop_force().multiplier(kind, &"default"))
 	if authoritative and crates != null:
-		var _flung := crates.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
+		var _flung := crates.blast(at, maxf(radius, 2.0), speed)
 	if authoritative and map != null and map.toys != null:
-		var _thrown := map.toys.blast(at, maxf(radius, 2.0), TOY_BLAST_SPEED)
+		var _thrown := map.toys.blast(at, maxf(radius, 2.0), speed)
 
 
 func delta_for_tick() -> float:

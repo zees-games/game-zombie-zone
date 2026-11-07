@@ -2,8 +2,9 @@ extends "zz_suite.gd"
 
 ## A survivor picking up a loose prop, carrying it and putting it down (server side), and the zz_prop_force override.
 
-const SECTIONS := 3
-const CHECKS := 16
+const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const SECTIONS := 5
+const CHECKS := 29
 
 
 func _ready() -> void:
@@ -17,6 +18,8 @@ func _run() -> void:
 	print("")
 	await _test_carry()
 	await _test_refusals()
+	await _test_throw()
+	await _test_blast_and_hint()
 	_test_override()
 
 	for world in _worlds.duplicate():
@@ -98,4 +101,68 @@ func _test_override() -> void:
 	_check(not game.set_prop_force_override("not json") and is_equal_approx(game.prop_force.multiplier(&"zz_m4", &"barrel"), 7.0), "text that is not an object is refused and changes nothing")
 	_check(game.set_prop_force_override("") and not is_equal_approx(game.prop_force.multiplier(&"zz_m4", &"barrel"), 7.0), "empty restores the file")
 	game.free()
+	_finished()
+
+
+func _test_throw() -> void:
+	_section("throwing a held prop")
+	var game := await _start_game()
+	var me := game.survivors()[0]
+	var barrel := game.map.toys.toy(1)
+	_face(me, barrel.body.global_position)
+	game._begin_use(me)
+	_check(game.prop_carry.carrying(me.player_id), "the barrel is in hand")
+	var aim := me.aim_direction()
+	var index: int = game.prop_carry.throw_held(game.map.toys, me.player_id, aim, 1.0)
+	_check(index == barrel.index and not game.prop_carry.carrying(me.player_id) and not barrel.body.freeze, "a throw lets go of it")
+	var v := barrel.body.linear_velocity
+	var cap: float = game.prop_carry.THROW_SPEED_MAX
+	_check(v.length() > 0.5 and v.length() <= cap + 0.01, "it leaves moving, within the speed cap", "%.2f m/s" % v.length())
+	_check(v.normalized().dot(aim) > 0.9, "along the thrower's aim")
+	_check(game.prop_carry.throw_held(game.map.toys, me.player_id, aim) == -1, "an empty hand throws nothing")
+	# The attack key does it through the hands, and does not also fire the gun.
+	_face(me, barrel.body.global_position)
+	game._begin_use(me)
+	_check(game.prop_carry.carrying(me.player_id), "picked up again")
+	var cmd := DotFpsCommand.new()
+	cmd.set_button(ZzNetCommand.BUTTON_FIRE, true)
+	me.controller.current_command = cmd
+	game._advance_hands(me, 0.016)
+	_check(not game.prop_carry.carrying(me.player_id), "the attack key throws the held prop")
+	me.controller.current_command = null
+	_check(barrel.body.linear_velocity.length() > 0.5, "the barrel flies")
+	_finished()
+
+
+func _test_blast_and_hint() -> void:
+	_section("explosion force by kind, and the prompt")
+	var game := await _start_game()
+	var me := game.survivors()[0]
+	var barrel := game.map.toys.toy(1)
+	var home := barrel.body.global_position
+	var at := home + Vector3(1.0, 0.0, 0.0)
+	var force: RefCounted = game._prop_force()
+	var moved: Array[float] = []
+	for scale in [0.0, 1.0, 3.0]:
+		barrel.body.global_position = home
+		barrel.body.linear_velocity = Vector3.ZERO
+		await _sim(game, 0.3)
+		var start := barrel.body.global_position
+		force.table["grenade"] = {"default": scale}
+		game._on_exploded_near_toys(at, 4.0, &"grenade")
+		await _sim(game, 0.2)
+		moved.append(barrel.body.global_position.distance_to(start))
+	_check(moved[0] < 0.05, "a kind with force 0 moves nothing", "%.2f m" % moved[0])
+	_check(moved[1] > 0.1, "force 1 moves it", "%.2f m" % moved[1])
+	_check(moved[2] > moved[1] * 1.5, "force 3 moves it further", "%.2f vs %.2f m" % [moved[2], moved[1]])
+	barrel.body.linear_velocity = Vector3.ZERO
+	_face(me, barrel.body.global_position)
+	await _sim(game, 0.1)
+	_face(me, barrel.body.global_position)
+	var text: String = game.prop_carry.hint(game.map.toys, me.eye_position(), me.aim_direction(), game.world_mask(), 30.0)
+	_check(text == "pick up barrel", "looking at a barrel hints pick up", text)
+	game._begin_use(me)
+	await _sim(game, 0.2)
+	text = game.prop_carry.hint(game.map.toys, me.eye_position(), me.aim_direction(), game.world_mask(), 30.0)
+	_check(text == "put down", "holding it hints put down", text)
 	_finished()

@@ -9,6 +9,10 @@ const HOLD_DISTANCE := 1.3
 ## Metres kept between a held prop and a wall, so it is never pushed into one.
 const WALL_GAP := 0.15
 
+## Most impulse (kg m/s) a throw gives a prop and the speed it may leave at (m/s): a crate goes slower than a ball.
+const THROW_IMPULSE := 90.0
+const THROW_SPEED_MAX := 14.0
+
 ## Heaviest prop (kg) a survivor lifts; the zz_prop_carry_mass cvar.
 var max_mass: float = 30.0
 ## player id (StringName) -> toy index (int)
@@ -57,6 +61,39 @@ func put_down(box: DotPropToyBox, player_id: StringName) -> int:
 		toy.body.sleeping = false
 		toy.touched_at = box._now
 	return index
+
+
+## Throws the held prop along [param direction]: put down, then given [param scale] times [constant THROW_IMPULSE] (capped, so a light ball leaves at
+## THROW_SPEED_MAX and a heavy barrel slower). The toy's index, or -1 when nothing was held.
+func throw_held(box: DotPropToyBox, player_id: StringName, direction: Vector3, scale: float = 1.0) -> int:
+	var index := put_down(box, player_id)
+	var toy := box.toy(index) if index >= 0 else null
+	if toy == null or toy.body == null:
+		return index
+	var mass := maxf(float(toy.def.get("mass", 1.0)), 0.25)
+	var speed := minf(THROW_IMPULSE * maxf(scale, 0.0) / mass, THROW_SPEED_MAX)
+	toy.body.linear_velocity = (direction.normalized() + Vector3(0.0, 0.15, 0.0)).normalized() * speed
+	toy.body.sleeping = false
+	return index
+
+
+## What the use key would do now, for a prompt: "put down" when a loose prop sits at the hold point, "pick up <kind>" when one is in reach, else "".
+## Reads only bodies, so a client's mirror of the toys answers as the server does.
+static func hint(box: DotPropToyBox, eye: Vector3, direction: Vector3, mask: int, lift_mass: float) -> String:
+	if box == null or not box.is_inside_tree() or box.count() == 0:
+		return ""
+	var hold := eye + direction.normalized() * HOLD_DISTANCE
+	for i in box.count():
+		var toy := box.toy(i)
+		if toy != null and toy.body != null and KINDS.has(toy.kind) and toy.body.freeze and toy.body.global_position.distance_to(hold) < 0.6:
+			return "put down"
+	var query := PhysicsRayQueryParameters3D.create(eye, eye + direction.normalized() * REACH, mask | box.loose_layer)
+	query.collide_with_areas = false
+	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
+	var toy := DotPropToyBox.toy_of(found.get("collider")) if not found.is_empty() else null
+	if toy != null and toy.body != null and KINDS.has(toy.kind) and float(toy.def.get("mass", 1.0)) <= lift_mass:
+		return "pick up %s" % toy.kind
+	return ""
 
 
 ## Moves every held prop to its carrier's hold point; a carrier who is gone, dead or down drops it.
