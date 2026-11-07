@@ -2026,6 +2026,8 @@ func _apply_map_part(reader: DotNetReader) -> void:
 
 	if _incoming_map.is_empty() or int(_incoming_map["seq"]) != int(part["seq"]):
 		_incoming_map = {"seq": int(part["seq"]), "count": int(part["count"]), "pieces": {}}
+		# The first piece of a map: the client covers the screen now, before the map is built.
+		map_incoming.emit()
 
 	(_incoming_map["pieces"] as Dictionary)[int(part["index"])] = part["piece"]
 
