@@ -46,25 +46,10 @@ const SLAM := &"slam"
 const GOO := &"goo"
 const GOO_TRAIL := &"goo_trail"
 const GOO_SPIT := &"goo_spit"
-## A goo glob hits a survivor whose middle passes this close to it.
-const GOO_HIT_RADIUS := 1.1
-
-## A bile jar draws the horde this far, for this long.
-const BILE_LURE := 35.0
-const BILE_SECONDS := 15.0
-
 const GRAVITY := 18.0
 
-## A rock hits a survivor whose middle passes this close to it.
-const ROCK_HIT_RADIUS := 1.3
-
-## A pipe charge beeps this long, and lures this far, before it goes off.
-const PIPE_FUSE := 6.0
-const PIPE_LURE := 40.0
-
-## Seconds a zombie keeps burning once it has left the fire.
-const AFTERBURN := 4.0
-const BURN_DPS := 18.0
+## The thrown-thing rules (goo and rock hit radii, bile and pipe lure and time, burn) are [ZzConfig]'s `hazard_*` fields (`zz_hazard_*` cvars).
+const _CONFIG := preload("zz_config.gd")
 
 signal area_added(id: int, kind: StringName, at: Vector3, radius: float, seconds: float)
 signal area_ended(id: int)
@@ -95,6 +80,12 @@ var profiles: Dictionary = {ACID: DotHazardProfile.acid(), GOO: goo_profile(), G
 ## The slow of the puddles a survivor stood in at the last tick, by player id (1 is none).
 func slow_of(player_id: StringName) -> float:
 	return pool.slow_of(player_id)
+
+
+## The config in force (the game's, else the defaults).
+func _cfg():
+	var c = game.config if game != null else null
+	return c if c != null else _CONFIG.new()
 
 
 func _init(p_game: Object) -> void:
@@ -278,7 +269,7 @@ func _advance_flying(delta: float) -> void:
 		p["velocity"] = velocity
 
 		if p["kind"] == ROCK:
-			var victim: StringName = game.survivor_near_segment(from, to, ROCK_HIT_RADIUS)
+			var victim: StringName = game.survivor_near_segment(from, to, _cfg().hazard_rock_hit_radius)
 
 			if victim != &"":
 				flying.erase(id)
@@ -287,7 +278,7 @@ func _advance_flying(delta: float) -> void:
 				continue
 
 		if p["kind"] == GOO_SPIT:
-			var struck: StringName = game.survivor_near_segment(from, to, GOO_HIT_RADIUS)
+			var struck: StringName = game.survivor_near_segment(from, to, _cfg().hazard_goo_hit_radius)
 
 			if struck != &"":
 				flying.erase(id)
@@ -341,12 +332,12 @@ func _land(id: int, p: Dictionary, at: Vector3) -> void:
 				game.explode(at, float(p["radius"]), float(p["amount"]), int(p["owner"]), p["kind"], 0.5)
 		BILE:
 			flying.erase(id)
-			game.horde.bile_at(at, BILE_SECONDS, BILE_LURE)
+			game.horde.bile_at(at, _cfg().hazard_bile_seconds, _cfg().hazard_bile_lure)
 		PIPE:
 			p["at"] = at + Vector3(0.0, 0.1, 0.0)
 			p["velocity"] = Vector3.ZERO
-			p["fuse"] = PIPE_FUSE
-			game.horde.lure(at, PIPE_FUSE, PIPE_LURE)
+			p["fuse"] = _cfg().hazard_pipe_fuse
+			game.horde.lure(at, _cfg().hazard_pipe_fuse, _cfg().hazard_pipe_lure)
 		_:
 			flying.erase(id)
 
@@ -376,7 +367,7 @@ func _advance_areas(delta: float) -> void:
 					player.burning_until = maxf(player.burning_until, now + 0.6)
 
 				for npc in game.horde.spawner.npcs_near(at, radius + 0.4):
-					_burning[npc.instance_id] = now + AFTERBURN
+					_burning[npc.instance_id] = now + _cfg().hazard_afterburn_seconds
 			HEAL:
 				for player in game.survivors_within(at, radius, 1.0):
 					var _healed: float = player.heal_real(float(a["amount"]) * delta)
@@ -405,12 +396,15 @@ func _advance_burning(delta: float) -> void:
 			continue
 
 		# The brute burns slower: it is meant to be lit and then run from.
-		var rate := BURN_DPS * (0.5 if npc.def.id == &"brute" else 1.0)
+		var rate: float = _cfg().hazard_burn_dps * (0.5 if npc.def.id == &"brute" else 1.0)
 		game.burn_zombie(npc, rate * delta)
 
 
 ## Sets [param npc] alight for [param seconds].
-func ignite(npc: DotNpcInstance, seconds: float = AFTERBURN) -> void:
+func ignite(npc: DotNpcInstance, seconds: float = -1.0) -> void:
+	if seconds < 0.0:
+		seconds = _cfg().hazard_afterburn_seconds
+
 	if npc != null and npc.is_alive():
 		_burning[npc.instance_id] = maxf(float(_burning.get(npc.instance_id, 0.0)), game.now() + seconds)
 

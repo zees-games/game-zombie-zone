@@ -724,6 +724,68 @@ func setup_seconds() -> float:
 ## Whether boxes exist at all.
 @export var boxes_enabled: bool = true
 
+# --- Turrets ---------------------------------------------------------------
+
+@export_group("Turrets")
+
+## Turrets one survivor may have out; a further one turns the oldest off rather than refusing the box (`zz_turret_max_per_owner`).
+@export_range(1, 16, 1) var turret_max_per_owner: int = 2
+
+## What a sentry does when the box outcome's `turret` action leaves the number out (the shipped Turret Box writes its own, so these only matter for a box an owner edits): seconds it stands (`zz_turret_seconds`).
+@export_range(1.0, 600.0, 1.0) var turret_seconds: float = 40.0
+
+## Rounds a sentry carries (`zz_turret_ammo`).
+@export_range(1, 5000, 1) var turret_ammo: int = 220
+
+## Damage of one sentry round (`zz_turret_damage`).
+@export_range(0.1, 500.0, 0.1) var turret_damage: float = 14.0
+
+## Metres a sentry sees and shoots (`zz_turret_reach`).
+@export_range(1.0, 100.0, 0.5) var turret_reach: float = 20.0
+
+## Seconds between a sentry's rounds (`zz_turret_interval`).
+@export_range(0.02, 5.0, 0.01) var turret_interval: float = 0.14
+
+## Height of the sentry's muzzle above its base, metres (`zz_turret_muzzle_height`).
+@export_range(0.1, 3.0, 0.05) var turret_muzzle_height: float = 0.85
+
+## Height above a zombie's feet a sentry aims at, so a shot lands on the body and not the feet (`zz_turret_chest_height`).
+@export_range(0.1, 3.0, 0.05) var turret_chest_height: float = 1.1
+
+## Metres in front of the survivor's eyes a turret may be placed; when that spot is no good the one below the eyes is tried (`zz_turret_place_reach`).
+@export_range(0.5, 10.0, 0.1) var turret_place_reach: float = 2.2
+
+## Metres down from the eyes the fallback spot is looked for (`zz_turret_foot_reach`).
+@export_range(0.1, 5.0, 0.1) var turret_foot_reach: float = 0.4
+
+# --- Thrown things ---------------------------------------------------------
+
+@export_group("Hazards")
+
+## Metres from a goo glob's path within which it hits a survivor's middle (`zz_hazard_goo_hit_radius`).
+@export_range(0.1, 5.0, 0.05) var hazard_goo_hit_radius: float = 1.1
+
+## The same for a thrown rock (`zz_hazard_rock_hit_radius`).
+@export_range(0.1, 5.0, 0.05) var hazard_rock_hit_radius: float = 1.3
+
+## Metres a bile jar draws the horde from (`zz_hazard_bile_lure`).
+@export_range(1.0, 200.0, 1.0) var hazard_bile_lure: float = 35.0
+
+## Seconds a bile jar keeps the horde drawn (`zz_hazard_bile_seconds`).
+@export_range(1.0, 120.0, 1.0) var hazard_bile_seconds: float = 15.0
+
+## Seconds a pipe charge beeps before it goes off (`zz_hazard_pipe_fuse`).
+@export_range(0.5, 60.0, 0.5) var hazard_pipe_fuse: float = 6.0
+
+## Metres a pipe charge lures the horde from (`zz_hazard_pipe_lure`).
+@export_range(1.0, 200.0, 1.0) var hazard_pipe_lure: float = 40.0
+
+## Seconds a zombie keeps burning once it has left the fire (`zz_hazard_afterburn_seconds`).
+@export_range(0.0, 60.0, 0.5) var hazard_afterburn_seconds: float = 4.0
+
+## Damage per second of a burning zombie; a brute takes half (`zz_hazard_burn_dps`).
+@export_range(0.0, 500.0, 1.0) var hazard_burn_dps: float = 18.0
+
 # --- The maps --------------------------------------------------------------
 
 @export_group("Carry weight")
@@ -965,7 +1027,7 @@ func validate() -> DotResult:
 const CFG_FILES := {
 	"The HUD": "round", "The round": "round", "Survival": "round", "Trader": "round", "Watching": "round", "Progress": "round",
 	"Difficulty": "horde", "The horde": "horde", "The specials": "horde", "Bots": "horde",
-	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors",
+	"The survivors": "survivors", "Items": "survivors", "The shove": "survivors", "Boxes": "survivors", "Turrets": "survivors", "Hazards": "survivors",
 	"Carry weight": "carry", "Gore": "world", "The maps": "world", "Netcode": "world",
 }
 

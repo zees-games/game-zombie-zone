@@ -1674,7 +1674,10 @@ func _draw(player: ZzPlayer, weapon_id: StringName) -> void:
 	var def := player.weapons.arsenal.catalogue.get_def(weapon_id)
 
 	if def != null:
-		var _selected := player.weapons.arsenal.select(def.slot, _tick)
+		# equip, not select: select refuses while the arsenal is disabled (a spawn freeze).
+		if not player.weapons.arsenal.equip(def.slot):
+			var _selected := player.weapons.arsenal.select(def.slot, _tick)
+
 		player.wanted_slot = def.slot
 
 
