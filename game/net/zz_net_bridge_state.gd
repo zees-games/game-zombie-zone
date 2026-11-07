@@ -73,6 +73,8 @@ signal weapon_used_by(session_id: int, times: int, kind: int)
 
 ## Client side: the map was rebuilt from what the server sent. The HUD names it.
 signal map_received(map_id: StringName)
+## A map's first piece has arrived: it is being sent, and is not built yet.
+signal map_incoming()
 
 ## Client side, all of them: what the server says happened. See [ZzEvents.Kind].
 signal downed_received(player_id: int, by: int, why: StringName, by_kind: StringName)
