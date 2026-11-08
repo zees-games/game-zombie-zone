@@ -485,6 +485,10 @@ func describe_lines() -> PackedStringArray:
 
 # --- The one built in -------------------------------------------------------
 
+## Tests only: loose physics props (dot-props' toys) to put on the practice street; empty in play.
+static var practice_toys: Array = []
+
+
 ## One street at night, from a safe room to a safe room.
 ##
 ## [b]Written here rather than shipped as a file,[/b] so a server with no map directory at all
@@ -591,15 +595,9 @@ static func practice() -> Dictionary:
 		},
 		"boxes": boxes,
 		"props": props,
-		# dot-props' toys, loose only (see zombie-zone-maps' builder): barrels and a tyre on the
-		# street, a football by the start. The suites lean on these: headless_run walks into the
-		# football, shoots the first barrel and blasts the tyre; headless_net watches a kick.
-		"toys": [
-			{"toy": "football", "at": [2.0, 0.0, -2.0]},
-			{"toy": "barrel", "at": [-4.0, 0.0, 12.0]},
-			{"toy": "barrel", "at": [-4.8, 0.0, 12.6], "yaw": 40.0},
-			{"toy": "tyre", "at": [4.5, 0.0, 33.0], "yaw": 30.0},
-		],
+		# No physics props (toys) of its own: only prop hunt, murder mystery, hide n seek and
+		# the playground keep them. Tests set [member practice_toys].
+		"toys": practice_toys.duplicate(true),
 		"lights": lights,
 		"spawns": {"survivors": [
 			{"at": [-2.0, 0.1, -10.5], "yaw": 180.0}, {"at": [2.0, 0.1, -10.5], "yaw": 180.0},
