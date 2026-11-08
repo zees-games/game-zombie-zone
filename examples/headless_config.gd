@@ -16,7 +16,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 53
+const CHECKS := 56
 
 
 func _ready() -> void:
@@ -112,6 +112,17 @@ func _run() -> void:
 	var files: Dictionary = wb.exporter.call("collect")
 	var text: String = files.get("cfg/game/%s/config_round/game.yml" % GAME, "")
 	_check(text.contains("start_points: 90"), "the export holds the edit in the cfg layout")
+
+	# The shared movement names map onto the config (units/s <-> m/s) and a write is clamped.
+	var mv := ZzMovementCvars.new(null)
+	var cfg := ZzConfig.new()
+	var stub := _MoveStub.new()
+	stub.config = cfg
+	mv.game = stub
+	var specs := mv.cvar_specs()
+	_check(specs.size() == 4 and str(specs[0]["name"]) == "sv_runspeed", "movement adapter offers four shared names")
+	_check(mv.set_cvar("sv_runspeed", str(6.0 / ZzMovementCvars.SOURCE_UNIT)) and is_equal_approx(cfg.run_speed, 6.0), "sv_runspeed writes run_speed in m/s")
+	_check(mv.set_cvar("sv_walkspeed", "5") and cfg.walk_speed_scale == 1.0 and not mv.set_cvar("sv_nonsense", "1"), "clamped; unknown refused")
 
 	wb.free()
 	console.free()
@@ -267,3 +278,9 @@ func _batch4(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig)
 	console.set_cvar("zz_mob_burst", "9")
 	console.set_cvar("zz_footing_keep", "7")
 	_check(config.mob_burst == 9 and config.footing_keep == 7, "zz_mob_burst and zz_footing_keep change the live config")
+
+
+class _MoveStub:
+	extends RefCounted
+	var config: ZzConfig = null
+	var players: Dictionary = {}
