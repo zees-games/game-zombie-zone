@@ -235,6 +235,10 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 	var ids: Array[StringName] = horde.survivor_ids()
 
 	if ids.is_empty():
+		if _diag:
+			var p0 = game.survivors()[0] if game.survivors().size() > 0 else null
+			print("   miss %s: no living survivor, %d seats, alive %s watching %s harmed %s grace %s health %s" % [kind, game.survivors().size(), p0.is_alive() if p0 else "-", p0.watching if p0 else "-", game.can_be_harmed(p0.player_id) if p0 else "-", game.grace.is_active(), p0.health_fraction() if p0 else "-"])
+
 		horde.spawner.remove(npc.instance_id)
 		return -1.0
 
