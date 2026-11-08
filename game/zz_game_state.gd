@@ -337,7 +337,7 @@ var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
-var toy_rules: DotPropToyRules = DotPropToyRules.new()
+var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
 ## The harm a barrel does by rolling into a survivor (dot-props); server only.
 var rolling := DotPropRolling.new()
 ## The zombies' own scan: a separate cooldown clock from the survivors'.
