@@ -276,6 +276,11 @@ func _game_load() -> DotResult:
 			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
 			world.apply_intermission())
 
+	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
+	var _camera := add_cvar("mp_killview_camera", "0",
+		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay DotKillcamFraming)",
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+
 	# dot-player-controller's mp_forceview (first or third person: the player's choice, or one
 	# held) and mp_solidplayers (survivors and stand-ins block each other, 1 by default).
 	# REPLICATED: the client places its own camera under the first and predicts its own
