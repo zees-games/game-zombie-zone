@@ -29,6 +29,8 @@ var _steep := 1.2
 var _trace := false
 ## `--diag`: say what the world held (survivors, horde size) for each miss.
 var _diag := false
+## Seconds into the last _sim at which the body died (shot by a stand-in, say), -1 if it lived.
+var _died := -1.0
 ## `--edges=x,y,z`: the graph points around that place and whether a ray between neighbours meets something.
 var _edges := Vector3.INF
 ## Only these kinds (comma separated), the common always first.
@@ -247,6 +249,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 	var ticks := int(_seconds / TICK)
 	var earlier := npc.position()
 	_last = {}
+	_died = -1.0
 
 	for tick in ticks:
 		if npc.brain != null and tick % 64 == 0:
@@ -291,6 +294,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 		game.simulate(TICK)
 
 		if not npc.is_alive():
+			_died = tick * TICK
 			break
 
 		var close := INF
@@ -312,7 +316,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 		_last = {"unstick": str(npc.brain.get(&"unstick_log")) if npc.brain != null else "", "blockers": _blockers(npc), "pos": npc.position(), "barricade": _barricade_near(game, npc.position()), "state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
 
 	if best < 0.0 and _diag:
-		print("   miss %s: survivors %d, horde %d, npc alive %s" % [kind, ids.size(), horde.count(), npc.is_alive()])
+		print("   miss %s: survivors %d, horde %d, npc alive %s, died at %.1f s, %.0f m from the nearest" % [kind, ids.size(), horde.count(), npc.is_alive(), _died, npc.position().distance_to(horde.survivor_position(ids[0]))])
 
 	horde.spawner.remove(npc.instance_id)
 	return best
