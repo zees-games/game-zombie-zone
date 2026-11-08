@@ -421,7 +421,7 @@ static func _mutant(c: ZzConfig) -> DotNpcDef:
 		"fuel": 14.0, "fuel_regen": 1.4, "fly_speed": 8.0, "cruise_height": 7.0, "fly_from": 14.0, "fly_time": 9.0,
 		"angry_health": 0.4, "charge_time": 1.4, "charge_height": 12.0, "dive_speed": 26.0,
 		"slam_radius": 7.0, "slam_damage": 30.0, "slam_recover": 3.0, "dive_cooldown": 8.0,
-		"body": "mutant", "radius": 0.55, "height": 2.4,
+		"body": "mutant", "radius": 0.55, "height": 2.4, "fit_height": 2.1,
 	}
 	return def
 
@@ -444,7 +444,7 @@ static func _oil_monster(c: ZzConfig) -> DotNpcDef:
 		"trail_radius": 1.1, "trail_seconds": 6.0, "trail_dps": 5.0, "trail_dps_start": 5.0, "trail_slow_factor": 0.75,
 		"trail_tick_interval": 0.5, "trail_fade_seconds": 1.5, "trail_max_per_owner": 30, "trail_global_cap": 120,
 		"trail_spacing": 1.4, "trail_interval": 0.2,
-		"body": "oil_monster", "radius": 0.6, "height": 2.5,
+		"body": "oil_monster", "radius": 0.6, "height": 2.5, "fit_height": 2.1,
 	}
 	return def
 
