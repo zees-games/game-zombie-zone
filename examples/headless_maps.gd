@@ -1,5 +1,6 @@
 extends DotGameCheckSuite
 
+const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
@@ -62,6 +63,7 @@ var _nav_extra_maps := 0
 
 
 func _ready() -> void:
+	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
 
@@ -730,8 +732,8 @@ func _test_map(id: StringName) -> void:
 			if not space.intersect_shape(query, 1).is_empty():
 				stuck.append("%s %d at %s" % [toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1)])
 				break
-	_check(box.count() == placed and placed > 0 and box.missing.is_empty() and stuck.is_empty(),
-		"%d toys, every one dot-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
+	_check(box.count() == placed and box.missing.is_empty() and stuck.is_empty(),
+		"%d toys (maps carry none now: only the practice street's test props), every one dot-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
 	for _i in range(120):
 		await get_tree().physics_frame
 	var strayed: Array = []
