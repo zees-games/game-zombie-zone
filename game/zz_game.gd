@@ -2880,6 +2880,16 @@ func zombie_hit(npc: DotNpcInstance, entity: int, victim: StringName, amount: fl
 	player_hurt.emit(victim, scaled, npc.position() if npc != null else player.feet())
 
 
+## The oil monster finished eating [param victim]: they die on the spot ("eaten").
+func eat_victim(entity: int, victim: StringName) -> void:
+	var player := player_by_id(victim)
+
+	if player == null or not player.is_alive():
+		return
+
+	_die(player, key_for_entity(entity), &"eaten")
+
+
 ## A pin's damage over time.
 func pin_damage(npc: DotNpcInstance, entity: int, victim: StringName, amount: float, _kind: StringName) -> void:
 	var player := player_by_id(victim)
