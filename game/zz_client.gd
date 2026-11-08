@@ -396,6 +396,7 @@ func _build_netcode() -> DotResult:
 		var _view := game.view_rules.follow_cvars(link)
 		if link.has_method(&"replicated_cvar"):
 			_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
+			_on_killcam_cvar("mp_killview_camera", String(link.call(&"replicated_cvar", "mp_killview_camera", "")))
 			if link.has_signal(&"replicated_cvar_changed"):
 				link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 		var _solid := game.body_rules.follow_cvars(link)
@@ -1609,6 +1610,8 @@ func _build_killcam() -> void:
 	add_child(_killcam_icons)
 	killcam.weapon_icon_fn = func(id: String) -> Texture2D: return _killcam_icons.icon_for(StringName(id))
 	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
+	killcam.camera_mode_fn = func() -> int: return _killcam_camera
+	killcam.world_mask = game.world_mask()
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_map())
 	add_child(killcam)
 	winner_reveal = DotWinnerReveal.new()
@@ -1623,6 +1626,8 @@ func _build_killcam() -> void:
 func _on_killcam_cvar(cvar_name: String, value: String) -> void:
 	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
 		_killcam_sec = clampf(value.to_float(), 0.0, 30.0)
+	elif cvar_name == "mp_killview_camera" and value.strip_edges().is_valid_float():
+		_killcam_camera = DotKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else DotKillViewRules.Camera.EYE
 
 
 ## The HUD and the chat window: hidden while the replay or the reveal owns the screen.

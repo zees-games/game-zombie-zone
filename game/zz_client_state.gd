@@ -122,6 +122,9 @@ var _offline: bool = true
 ## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
 var _killcam_sec: float = -1.0
 
+## The server's `mp_killview_camera` ([enum DotKillViewRules.Camera]); the eye until it has said.
+var _killcam_camera: int = DotKillViewRules.Camera.EYE
+
 ## Weapon pictures for the killcam banner, drawn from the weapon models on first ask.
 var _killcam_icons: ZzShopIcons = null
 var _map_ending: bool = false
