@@ -962,16 +962,20 @@ func _pose_hold() -> void:
 			_pitch(StringName("UpperArm" + side), 1.5 + 0.1 * sin(t * 7.0))
 	elif kind == &"ram":
 		var slam := maxf(sin(t * 6.0), 0.0)
-		_pitch(&"Torso", 0.5 * slam)
+		_pitch(&"Torso", 0.7 * slam)
 
+		# Fists up over the head and down onto the survivor's shoulders (1.1 is forward and down), not
+		# down at its own sides, which the rendered hold showed as arms that never touched anybody.
 		for side in [&".L", &".R"]:
-			_pitch(StringName("UpperArm" + side), 2.6 - 2.2 * slam)
+			_pitch(StringName("UpperArm" + side), 2.4 - 1.3 * slam)
 	else:
-		_pitch(&"Torso", 0.45)
+		_pitch(&"Torso", 0.6)
 
+		# Claws raking the shoulders and neck it is clinging to: arms forward and a little down,
+		# not reaching on past the survivor to the ground (1.9 - 1.3 swung them there; the leaper's arms are long).
 		for i in 2:
 			var swipe := maxf(sin(t * 11.0 + float(i) * PI), 0.0)
-			_pitch(StringName("UpperArm" + (&".L" if i == 0 else &".R")), 1.9 - 1.3 * swipe)
+			_pitch(StringName("UpperArm" + (&".L" if i == 0 else &".R")), 1.2 - 0.6 * swipe)
 
 
 ## The strangler's tongue out: hands over hands hauling the line in.
