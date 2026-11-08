@@ -256,6 +256,21 @@ A drawn solo frame is 59 to 62 ms wall, of which PHYSICS is 28 to 30 ms because 
 
 `zz_bot_motor_idle_every` (4) skips the motor of a stand-in that is provably still (grounded, no input, rested cooldowns) on 3 of 4 ticks; `zz_bot_motor_stride_far` (default 0, off) moves stand-ins beyond that many metres from the viewer every second tick with the owed time. Measured on one box, tick time per frame 24.9 ms plain, 24.0 with the idle sleep, 22.8 with stride 30 m; phys_ms 29.7, 28.8, 27.8. The bench's stand-ins are all walking, so the idle sleep barely shows there. A cheaper idle path belongs in dot-player-controller. Not done: Jolt (about 10 percent per the docs, needs a play-test), and a solo-only physics tick split (needs interpolation and a feel test; the server rate must not change because dot-net prediction assumes it).
 
+**Where the 56-zombie tick goes now (zz-perf-56-zombies-1, 2026-11-07).** `bench.tscn --profile --zombies=56` on zm_abandoned_mall, seed 7, headless on the shared build box (the box is shared: the same build read 9.7 ms a tick in one run and 25 ms in another, so only ratios compare). Per tick, quiet run: brains 2.75 ms, bodies 2.0, senses 1.3, p.simulate 1.2, weapons 1.2, bots 0.9, grid 0.2 (about 9.7 in all, 28 of the 56 zombies thinking each tick). Brain timers added by hand to `_think_now`, `_chase` and `go_to` (not kept; microsecond sums over the run, 33k thoughts, loaded box):
+
+| part of a thought | share |
+| --- | --- |
+| `_decide` (the kind's machine) | 67% |
+| of it `chase_to` | 49% |
+| of that `waypoint_for` (the choke notes) | 3% |
+| of that `separation` (the crowd grid) | 3% |
+| of that the rest of `go_to`: `path_toward`, `steer_toward`, the avoider, `_watch_progress` | 41% |
+| `_chase`'s gap, reach and `strikes_down` tests | 9% |
+| `super._npc_think` (`_sense`, the context) | 24% |
+| swing, bash test, unstick watch | 7% |
+
+So the game's own script is already thin: the choke notes and the separation are 6% together, and every cadence lever is spent (a thought every 1, 2, 3, 4 or 8 ticks by distance, body stride, ray-step past 12 m). 41% of a thought, about a sixth of the whole tick, is the addon's steer-and-path call (`DotNpcAiBrainMotion.steer_with_spacing` over `DotNpcPathing.path_toward`), which every thought pays even when its path is still good. That is the next cut and it belongs in dot-npc / dot-npc-ai (reuse the path's next point while the goal has drifted less than a metre and the zombie has not passed it), not in this repo. Thinning the cadence further was not done: each step changes when a zombie reacts and so what the survival and kill suites count.
+
 ## Bots on the navigation notes
 
 `ZzNavNotes` bakes each map's navigation mesh (`DotBotNav.bake`), waits two physics frames for the colliders, runs `DotNpcAiNavAnnotator` seeded with the spawns and caches the result in `user://nav/`. Cold annotation takes 0.25 s (chapel) to 4.6 s (stadium) and is sliced by a time budget; bake takes 25 to 380 ms. The finder's defaults found no chokes on these maps, so the notes use choke width 4.5, traffic 0.07 and 192 random routes.
