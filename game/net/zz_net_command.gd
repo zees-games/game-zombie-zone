@@ -80,6 +80,12 @@ func _sanitise() -> void:
 	actions &= (1 << ACT_BITS) - 1
 
 
+## A silent player lets go: the default neutralises `move`, the held hands are cleared here.
+func _neutralise() -> void:
+	super()
+	actions = 0
+
+
 func _equals(other: DotNetInput) -> bool:
 	var them := other as ZzNetCommand
 	return them != null and slot == them.slot and actions == them.actions and move.equals(them.move)

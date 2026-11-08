@@ -34,8 +34,8 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 32
-const CHECKS := 217
+const SECTIONS := 33
+const CHECKS := 219
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -81,6 +81,7 @@ func _run() -> void:
 	print("")
 
 	_test_the_codec()
+	_test_neutralise()
 
 	if await _build():
 		await _test_a_client_joins()
@@ -130,6 +131,20 @@ func _run() -> void:
 
 static func _r(bytes: PackedByteArray) -> DotNetReader:
 	return DotNetReader.new(bytes)
+
+
+func _test_neutralise() -> void:
+	_section("a silent player's command lets go")
+	var command := ZzNetCommand.new()
+	command.actions = ZzNetCommand.ACT_USE | ZzNetCommand.ACT_HEAL
+	command.move.move = Vector2(0.0, 1.0)
+	command.move.yaw = 40.0
+	command.move.set_button(ZzNetCommand.BUTTON_FIRE, true)
+	command._neutralise()
+	_check(command.actions == 0 and command.move.move == Vector2.ZERO and command.move.buttons == 0,
+		"actions, move and buttons are cleared")
+	_check(is_equal_approx(command.move.yaw, 40.0), "and the view is kept")
+	_finished()
 
 
 ## Every encoder against its decoder. Nothing checks that two ends of a serialisation are
