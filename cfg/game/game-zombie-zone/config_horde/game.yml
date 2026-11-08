@@ -90,6 +90,8 @@
 # stuck_low_count: 8
 # Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 neve... [0..10]
 # stuck_remove_after: 2
+# Seconds between "stuck infected repathed" log lines; repaths in between are counted and reported on the nex... [0.0..300.0]
+# stuck_log_interval: 5.0
 # A graph edge that rises more than this many metres is taken down only (a drop seen from below is a wall). 0... [0.0..20.0]
 # nav_steep: 1.2
 # Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot...

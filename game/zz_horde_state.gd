@@ -137,6 +137,10 @@ var _time: float = 0.0
 var stuck := DotNpcStuckRescue.new()
 ## Sideways nudges given to stuck infected (a repath step), for [method describe].
 var stuck_nudges: int = 0
+
+## Time of the last "stuck infected repathed" log line, and repaths left unlogged since.
+var stuck_log_at: float = -1.0
+var stuck_log_skipped: int = 0
 ## Nav points costed up after a stall, and the last pair marked (point indexes), for the log.
 var stuck_marked: int = 0
 var _last_edge: String = "-"
