@@ -2462,7 +2462,7 @@ func _watched_through_eyes() -> ZzPlayer:
 	if mode != DotSpectatorView.Mode.FIRST_PERSON and mode != DotSpectatorView.Mode.FREEZE_CAM:
 		return null
 
-	return game.players.get(game.spectate.watching(player.player_id))
+	return game.players.get(StringName(game.spectate.watching(player.player_id)))
 
 
 func _drive_spectator_camera(delta: float) -> bool:
@@ -2507,7 +2507,7 @@ func _drive_spectator_camera(delta: float) -> bool:
 
 ## What a spectator's ending camera looks at: the player being watched, else a point in front of the spectator camera.
 func _spectator_focus(where: Transform3D) -> Vector3:
-	var target := game.spectate.watching(player.player_id)
+	var target := StringName(game.spectate.watching(player.player_id))
 	var who: Variant = game.players.get(target) if target != &"" else null
 	if who != null and is_instance_valid(who) and who.has_method("eye_position"):
 		return who.eye_position()
