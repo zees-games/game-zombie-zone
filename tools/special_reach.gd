@@ -383,7 +383,8 @@ func _built(id: String) -> Node:
 	var config := ZzConfig.new()
 	config.map_ids = PackedStringArray([id])
 	config.warmup_seconds = 0.0
-	config.survival_warmup_seconds = 600.0
+	# Never ends: a longer probe than the old 600 s would otherwise see the waves start and the survivors drop out of the horde.
+	config.survival_warmup_seconds = 1.0e9
 	config.minimum_players = 0
 	config.keep_progress = false
 	config.nav_cache = false
