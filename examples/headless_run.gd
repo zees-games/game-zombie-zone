@@ -60,6 +60,7 @@ var _worlds: Array[ZzGame] = []
 
 
 func _ready() -> void:
+	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	# The installed packs are the game's weapons (zee carries only fists), so this suite scans addons/; the stand-ins' thresholds
 	# hold with them (headless_packs covers pack rules).

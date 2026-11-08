@@ -69,6 +69,7 @@ var _heard: Dictionary = {}
 
 
 func _ready() -> void:
+	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
 
