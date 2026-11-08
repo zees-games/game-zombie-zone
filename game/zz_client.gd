@@ -2522,10 +2522,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_aiming = button.pressed
 		elif button.pressed and _pointer_ours():
 			# The wheel, on dot-menu's previous/next weapon actions (rebindable).
-			if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
-				_cycle_slot(1)
-			elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
-				_cycle_slot(-1)
+			var _stepped := _wheel_pressed(event)
 
 	if player == null:
 		return
@@ -2624,28 +2621,24 @@ func _key_event(event: InputEvent) -> bool:
 			return true
 
 	# Previous and next weapon, on the wheel by default; a row moved onto a key lands here.
-	if _pointer_ours():
-		if event.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION):
-			_cycle_slot(1)
-			return true
-		elif event.is_action_pressed(DotMenuBindings.WEAPON_PREVIOUS_ACTION):
-			_cycle_slot(-1)
-			return true
+	if _wheel_pressed(event):
+		return true
 
 	return false
 
 
-func _cycle_slot(direction: int) -> void:
-	if weapons == null or weapons.arsenal == null:
-		return
-
-	var slots := weapons.arsenal.slots()
-
-	if slots.is_empty():
-		return
-
-	var at := slots.find(_slot)
-	_slot = slots[posmod((at if at >= 0 else 0) + direction, slots.size())]
+## Steps the carried slots on the previous/next weapon actions; true when the event was one.
+func _wheel_pressed(event: InputEvent) -> bool:
+	if _wheel == null:
+		_wheel = DotWeaponWheel.new()
+		_wheel.ring_provider = func() -> Array:
+			return weapons.arsenal.slots() if weapons != null and weapons.arsenal != null else []
+		_wheel.current_provider = func() -> Variant:
+			return _slot if _slot != 0 else weapons.arsenal.current_slot()
+		_wheel.blocked = func() -> bool:
+			return not _pointer_ours()
+		_wheel.chosen.connect(func(slot: Variant) -> void: _slot = int(slot))
+	return _wheel.handle_event(event)
 
 
 func describe() -> Dictionary:

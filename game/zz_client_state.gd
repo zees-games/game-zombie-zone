@@ -173,6 +173,7 @@ var _healing: bool = false
 var _pills: bool = false
 var _box_key: bool = false
 var _slot: int = 0
+var _wheel: DotWeaponWheel
 
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
 var _box_colours: Dictionary = {}

@@ -2784,11 +2784,13 @@ func _test_the_client_platform() -> void:
 	var before: int = client._slot
 	# The press itself is gated on a captured pointer, which a headless run cannot have; the
 	# routing is the action match above, so this drives what the action calls.
-	client._cycle_slot(1)
+	client.pointer_forced = true
+	var _stepped: bool = client._wheel_pressed(wheel)
 	var after: int = client._slot
 	var expected: int = before
 	if slots.size() > 1:
-		expected = slots[posmod((maxi(slots.find(before), 0)) + 1, slots.size())]
+		var from: int = before if before != 0 else int(client.weapons.arsenal.current_slot())
+		expected = slots[posmod(slots.find(from) + 1, slots.size())] if slots.has(from) else slots[0]
 	_check(after == expected and (slots.size() < 2 or after != before),
 		"the next-weapon step moves one slot", "slots %s, %d -> %d" % [str(slots), before, after])
 	client.pointer_forced = true
