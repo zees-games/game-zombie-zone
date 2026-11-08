@@ -36,6 +36,9 @@ signal weapon_used(times: int, kind: int)
 var player: ZzPlayer = null
 var bridge: Node = null
 
+## The jump timers (coyote, jump buffer, cooldown), owner only, for the owner's rewind. Opt-in on dot-player-controller API 10; see its docs/networking.md.
+var net_timers: int = 0
+
 var net_position: Vector3 = Vector3.ZERO
 var net_velocity: Vector3 = Vector3.ZERO
 var net_yaw: float = 0.0
@@ -160,6 +163,11 @@ func _register_net_vars() -> void:
 
 		if spec["property"] == &"net_crouch":
 			declaration.range_of(0.0, 1.0)
+
+	# Owner-only jump timers; guarded, a shell without API 10 has no rewind_specs().
+	if DotAddonApi.build_level("dot_player_controller") >= 10:
+		for spec in DotFpsNetSync.rewind_specs():
+			var _timers := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
 	for spec in DotFpsNetSync.stamina_specs():
 		var _stamina := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
