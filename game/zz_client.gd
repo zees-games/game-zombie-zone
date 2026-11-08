@@ -1024,12 +1024,19 @@ func _on_pin(session_id: int, holder: Node3D, kind: StringName) -> void:
 	if who != null and world_view != null:
 		world_view.pin(who, holder, kind, session_id == _watch_id and not third_person)
 
+	# The cinematic: the view leaves the victim's eyes for the monster and what it holds.
+	if kind == &"eat" and holder != null and session_id == _watch_id:
+		begin_end_camera(holder.global_position + Vector3(0.0, 1.8, 0.0) - holder.global_transform.basis.z * 4.0, 5.0)
+
 	if session_id == _watch_id and hud != null:
 		hud.shout({&"pounce": "POUNCED — SHOVE IT OFF", &"choke": "TONGUED — HELP!", &"carry": "CARRIED — HELP!",
-			&"ride": "RIDDEN — HELP!", &"grab": "GRABBED — SHOOT IT!"}.get(kind, "HELD"), 2.0)
+			&"ride": "RIDDEN — HELP!", &"grab": "GRABBED — SHOOT IT!", &"eat": "BEING EATEN — SHOOT IT!"}.get(kind, "HELD"), 2.0)
 
 
 func _on_unpin(session_id: int, _why: StringName) -> void:
+	if session_id == _watch_id and _end_active:
+		_end_left = 0.0
+
 	var who := _player_of(session_id)
 
 	if who != null and world_view != null:

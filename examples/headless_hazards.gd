@@ -2,12 +2,14 @@ extends "zz_suite.gd"
 
 const ZzHazards := preload("../game/zz_hazards.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzPins := preload("../game/zz_pins.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
 ## The acid pool on dot-effects' shared DotHazardPool, and what it adds: caps, trail, slow. Counts sections AND checks.
 
-const SECTIONS := 6
-const CHECKS := 28
+const SECTIONS := 7
+const CHECKS := 44
 
 const SPOT := Vector3(0.0, 0.05, 14.0)
 
@@ -26,6 +28,7 @@ func _run() -> void:
 	await _test_oil_trail()
 	await _test_oil_spit()
 	await _test_oil_director()
+	await _test_oil_eat()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -92,10 +95,14 @@ func _test_caps_and_trail() -> void:
 	_finished()
 
 
-func _oil_arena(gap: float, tune: Dictionary = {}) -> Array:
-	var game := await _team(1, _quiet)
+func _oil_arena(gap: float, tune: Dictionary = {}, mates: int = 0) -> Array:
+	var game := await _team(1 + mates, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
+
+	for i in mates:
+		game.survivors()[1 + i].place_at(SPOT + Vector3(30.0 + 4.0 * float(i), 0.0, -6.0), 0.0)
+
 	var oil := game.horde.spawner.spawn(ZzNpcs.OIL_MONSTER, SPOT + Vector3(0.0, 0.0, gap), &"test")
 
 	for key: String in tune:
@@ -175,6 +182,89 @@ func _test_oil_director() -> void:
 	game.config.oil_monster_chance = 1.0
 	game.config.oil_monster_min_wave = 50
 	_check(not game.horde._allowed_specials().has(ZzNpcs.OIL_MONSTER), "and not before its first wave")
+	_finished()
+
+
+func _down_and_wait(game: ZzGame, me: ZzPlayer) -> void:
+	var hit := DotDamage.make(0, me.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	hit.tick = game.current_tick()
+	var _applied := game.combat.apply_damage(hit)
+	await _sim(game, 0.1)
+
+
+func _shoot_oil(game: ZzGame, oil: DotNpcInstance, amount: float) -> void:
+	var hit := DotDamage.make(game.survivors()[0].entity_id, game.horde.entity_id_for(oil), amount, game.combat.damage_type(&"strike"))
+	hit.tick = game.current_tick()
+	var _applied := game.combat.apply_damage(hit)
+
+
+func _test_oil_eat() -> void:
+	_section("oil monster: eats a downed survivor in phases, and damage in time breaks it off")
+	var tune := {"spit_range": 0.0, "spit_cooldown": 999.0, "trail_spacing": 999.0, "eat_health_below": 1.0,
+		"eat_grab_seconds": 0.3, "eat_lift_seconds": 0.5, "eat_bite_seconds": 1.5, "eat_swallow_seconds": 0.5,
+		"eat_interrupt_damage": 120.0, "health": 100000.0}
+	var meta := tune.duplicate()
+	_check(ZzPins.eat_phase(0.1, meta)["phase"] == &"grab" and ZzPins.eat_phase(0.5, meta)["phase"] == &"lift" \
+		and ZzPins.eat_phase(1.5, meta)["phase"] == &"bite" and ZzPins.eat_phase(2.5, meta)["phase"] == &"swallow", "phases follow the profile clock")
+	_check(is_equal_approx(ZzPins.eat_total(meta), 2.8) and ZzPins.eat_phase(2.8, meta)["done"], "and the total is their sum")
+	# 1: an uninterrupted meal.
+	var a := await _oil_arena(1.8, tune, 1)
+	var game: ZzGame = a[0]
+	var me: ZzPlayer = a[1]
+	var oil: DotNpcInstance = a[2]
+	var floor_y := me.feet().y
+	await _down_and_wait(game, me)
+	_check(me.is_down() and me.is_alive(), "the survivor is down")
+	var pinned := false
+	var lifted := 0.0
+	var deaths: Array = []
+	game.pins.released.connect(func(v: StringName, _k: StringName, why: StringName) -> void: deaths.append([v, why]))
+	game.player_died.connect(func(id: StringName, by: StringName, why: StringName) -> void: deaths.append([id, why]))
+	var seen: Dictionary = {}
+	for i in 80:
+		await _sim(game, 0.1)
+		if me.is_pinned() and me.pin_kind == &"eat":
+			pinned = true
+			lifted = maxf(lifted, me.feet().y - floor_y)
+			seen[String(oil.brain.status().get("state", ""))] = true
+		if not deaths.is_empty():
+			break
+	_check(pinned, "it took hold of the downed survivor (pin kind eat)")
+	_check(lifted > 0.4, "and lifted them", "%.2f m" % lifted)
+	_check(seen.has("eat"), "the brain was in its eat state while holding", str(seen.keys()))
+	_check(ZzZombieBody.Anim.EAT == 30, "and EAT is the 31st anim, inside the five wire bits")
+	_check(deaths.size() == 2 and deaths[0][1] == &"eaten" and deaths[1][1] == &"eaten" and not me.is_pinned(), "an uninterrupted meal ends with them eaten and the pin cleared",
+		str(deaths))
+	_check(game.pins.pins.is_empty(), "and no pin is left")
+	# 2: interrupted.
+	var b := await _oil_arena(1.8, tune, 1)
+	game = b[0]
+	me = b[1]
+	oil = b[2]
+	await _down_and_wait(game, me)
+	for i in 8:
+		await _sim(game, 0.1)
+		if me.pin_kind == &"eat":
+			break
+	_check(me.is_pinned() and me.pin_kind == &"eat", "again it takes hold")
+	_shoot_oil(game, oil, 50.0)
+	await _sim(game, 0.2)
+	_check(me.is_pinned(), "a little damage does not break it off")
+	_shoot_oil(game, oil, 90.0)
+	await _sim(game, 0.3)
+	_check(not me.is_pinned() and me.is_alive() and me.is_down(), "enough damage frees the victim, still alive and down")
+	await _sim(game, 1.0)
+	_check(me.is_alive(), "and it does not grab them again at once (cooldown)", String(me.pin_kind))
+	game.pins.shoved(me.player_id)
+	_check(game.pins.kind_of(me.player_id) == &"", "no pin remains")
+	# 3: not edible when up, or when healthy.
+	var c := await _oil_arena(1.8, tune)
+	game = c[0]
+	me = c[1]
+	await _sim(game, 2.0)
+	_check(not me.is_pinned() or me.pin_kind != &"eat", "a standing survivor is mauled, not eaten")
+	var net = load("res://game/net/zz_player_net.gd")
+	_check(net.PIN_KINDS.has(&"eat") and net.PIN_KINDS.size() <= 8, "the eat pin fits the three bits net_pin carries")
 	_finished()
 
 

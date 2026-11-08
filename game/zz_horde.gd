@@ -814,6 +814,12 @@ func survivor_alive(id: StringName) -> bool:
 	return info != null and bool((info as Dictionary)["alive"])
 
 
+## A survivor's health as a fraction (0 when unknown).
+func survivor_health(id: StringName) -> float:
+	var info: Variant = _survivors.get(id)
+	return float((info as Dictionary)["health"]) if info != null else 0.0
+
+
 func survivor_is(id: StringName, what: StringName) -> bool:
 	var info: Variant = _survivors.get(id)
 	return info != null and bool((info as Dictionary).get(what, false))
@@ -1180,6 +1186,12 @@ func melee(npc: DotNpcInstance, victim: StringName, amount: float) -> void:
 ## and hazards. These are the names a special's brain calls.
 func pin(npc: DotNpcInstance, victim: StringName, kind: StringName) -> bool:
 	return bool(game.pins.pin(entity_id_for(npc), npc, victim, kind))
+
+
+func eat_finished(npc: DotNpcInstance, victim: StringName) -> void:
+	var entity := entity_id_for(npc)
+	game.pins.release(victim, &"eaten")
+	game.eat_victim(entity, victim)
 
 
 func unpin(npc: DotNpcInstance) -> void:

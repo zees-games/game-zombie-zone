@@ -73,7 +73,7 @@ func present(delta: float, anim: int, _flags: int) -> void:
 		clip = &"flinch"
 	elif anim == ZzZombieBody.Anim.SPIT:
 		clip = &"mouth_open"
-	elif anim == ZzZombieBody.Anim.ATTACK or anim == ZzZombieBody.Anim.STRIKE_DOWN:
+	elif anim == ZzZombieBody.Anim.EAT or anim == ZzZombieBody.Anim.ATTACK or anim == ZzZombieBody.Anim.STRIKE_DOWN:
 		clip = &"bite"
 	elif _speed > 0.3:
 		clip = &"slide"
