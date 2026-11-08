@@ -502,6 +502,15 @@ func _object_place(data: Dictionary) -> Vector3:
 	return Vector3.INF if first else box.get_center()
 
 
+## Called with the rules' friendly_fire after [method apply_friendly_fire] set it, so the module can mirror `mp_friendlyfire`.
+var friendly_fire_changed: Callable = Callable()
+
+
+## What dot-game's `bind_movement_cvars` binds: the shared `sv_*` movement names over the config.
+func movement_targets() -> Array:
+	return [ZzMovementCvars.new(self)]
+
+
 ## Pushes the config's friendly-fire scale (set by difficulty or a map's cvar) onto the combat rules.
 func apply_friendly_fire() -> void:
 	if combat == null or combat.rules == null:
@@ -509,6 +518,8 @@ func apply_friendly_fire() -> void:
 
 	combat.rules.friendly_fire = config.friendly_fire_scale() > 0.0
 	combat.rules.friendly_scale = clampf(config.friendly_fire_scale(), 0.0, 2.0)
+	if friendly_fire_changed.is_valid():
+		friendly_fire_changed.call(combat.rules.friendly_fire)
 
 
 ## One setting a map asked for, translated by [ZzMapCommands]: a config key or a runtime rule.
