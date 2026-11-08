@@ -332,12 +332,12 @@ static func validate(source: Dictionary) -> DotResult:
 
 	doc["props"] = props
 
-	# Toys: dot-props' DotPropToyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# Toys: dot-props' DotPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
 	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
 	# with a toy a newer dot-props has still plays on an older server.
 	var toys: Array = []
 	for raw: Variant in source.get("toys", []):
-		var toy := DotPropToyBox.normal_placement(raw)
+		var toy := DotPropBodyBox.normal_placement(raw)
 		if toy.is_empty():
 			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
 		toys.append(toy)
@@ -350,7 +350,7 @@ static func validate(source: Dictionary) -> DotResult:
 	# Loose props of a drawn world and the supports under them (dot-map's `loose_toys()` and `supports()`).
 	var loose: Array = []
 	for raw: Variant in source.get("loose_toys", []):
-		var placed := DotPropToyBox.normal_placement(raw)
+		var placed := DotPropBodyBox.normal_placement(raw)
 		if placed.is_empty():
 			return _refuse("loose toy %d is not {toy, at}" % loose.size(), source)
 		loose.append(placed)

@@ -3922,7 +3922,7 @@ func _roll_into_survivors(delta: float) -> void:
 ## Whether any rolling kind of toy is past the speed that hurts; false is the usual tick.
 func _toy_moving_fast() -> bool:
 	var floor_speed := minf(rolling.min_speed, rolling_zombies.min_speed)
-	for toy: DotPropToy in map.toys.toys:
+	for toy: DotPropBody in map.toys.toys:
 		if is_instance_valid(toy) and toy.body != null and toy.body.linear_velocity.length_squared() >= floor_speed * floor_speed:
 			return true
 	return false
@@ -3984,12 +3984,12 @@ func push_toy(shot: DotShot, direction: Vector3) -> int:
 	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
 	if found.is_empty():
 		return -1
-	var toy := DotPropToyBox.toy_of(found.get("collider"))
+	var toy := DotPropBodyBox.toy_of(found.get("collider"))
 	if toy == null or shot.damage <= 0.0:
 		return -1
 	var scale: float = prop_force.multiplier(shot.weapon_id, toy.kind)
-	var speed := clampf(shot.damage * DotPropToyBox.SHOT_SPEED_PER_DAMAGE, DotPropToyBox.SHOT_SPEED_MIN, DotPropToyBox.SHOT_SPEED_MAX)
-	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropToyBox._shot_mass(toy) * scale)
+	var speed := clampf(shot.damage * DotPropBodyBox.SHOT_SPEED_PER_DAMAGE, DotPropBodyBox.SHOT_SPEED_MIN, DotPropBodyBox.SHOT_SPEED_MAX)
+	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropBodyBox._shot_mass(toy) * scale)
 
 
 ## The force table, loaded on first use.

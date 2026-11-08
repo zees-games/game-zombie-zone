@@ -26,13 +26,13 @@ func carrying(player_id: StringName) -> bool:
 
 
 ## Picks up the loose toy [param player_id] looks at, if it is liftable and not already held. The toy's index, or -1.
-func pick_up(box: DotPropToyBox, player_id: StringName, eye: Vector3, direction: Vector3, mask: int) -> int:
+func pick_up(box: DotPropBodyBox, player_id: StringName, eye: Vector3, direction: Vector3, mask: int) -> int:
 	if box == null or not box.authoritative or not box.rules.enabled or not box.is_inside_tree() or held.has(player_id):
 		return -1
 	var query := PhysicsRayQueryParameters3D.create(eye, eye + direction.normalized() * REACH, mask | box.loose_layer)
 	query.collide_with_areas = false
 	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
-	var toy := DotPropToyBox.toy_of(found.get("collider")) if not found.is_empty() else null
+	var toy := DotPropBodyBox.toy_of(found.get("collider")) if not found.is_empty() else null
 	if toy == null or toy.body == null or not KINDS.has(toy.kind):
 		return -1
 	if float(toy.def.get("mass", 1.0)) > max_mass or held.values().has(toy.index):
@@ -48,7 +48,7 @@ func pick_up(box: DotPropToyBox, player_id: StringName, eye: Vector3, direction:
 
 
 ## Puts the prop down where it is held, at rest. The toy's index, or -1 when nothing was held.
-func put_down(box: DotPropToyBox, player_id: StringName) -> int:
+func put_down(box: DotPropBodyBox, player_id: StringName) -> int:
 	if not held.has(player_id):
 		return -1
 	var index: int = held[player_id]
@@ -65,7 +65,7 @@ func put_down(box: DotPropToyBox, player_id: StringName) -> int:
 
 ## Throws the held prop along [param direction]: put down, then given [param scale] times [constant THROW_IMPULSE] (capped, so a light ball leaves at
 ## THROW_SPEED_MAX and a heavy barrel slower). The toy's index, or -1 when nothing was held.
-func throw_held(box: DotPropToyBox, player_id: StringName, direction: Vector3, scale: float = 1.0) -> int:
+func throw_held(box: DotPropBodyBox, player_id: StringName, direction: Vector3, scale: float = 1.0) -> int:
 	var index := put_down(box, player_id)
 	var toy := box.toy(index) if index >= 0 else null
 	if toy == null or toy.body == null:
@@ -79,7 +79,7 @@ func throw_held(box: DotPropToyBox, player_id: StringName, direction: Vector3, s
 
 ## What the use key would do now, for a prompt: "put down" when a loose prop sits at the hold point, "pick up <kind>" when one is in reach, else "".
 ## Reads only bodies, so a client's mirror of the toys answers as the server does.
-static func hint(box: DotPropToyBox, eye: Vector3, direction: Vector3, mask: int, lift_mass: float) -> String:
+static func hint(box: DotPropBodyBox, eye: Vector3, direction: Vector3, mask: int, lift_mass: float) -> String:
 	if box == null or not box.is_inside_tree() or box.count() == 0:
 		return ""
 	var hold := eye + direction.normalized() * HOLD_DISTANCE
@@ -90,7 +90,7 @@ static func hint(box: DotPropToyBox, eye: Vector3, direction: Vector3, mask: int
 	var query := PhysicsRayQueryParameters3D.create(eye, eye + direction.normalized() * REACH, mask | box.loose_layer)
 	query.collide_with_areas = false
 	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
-	var toy := DotPropToyBox.toy_of(found.get("collider")) if not found.is_empty() else null
+	var toy := DotPropBodyBox.toy_of(found.get("collider")) if not found.is_empty() else null
 	if toy != null and toy.body != null and KINDS.has(toy.kind) and float(toy.def.get("mass", 1.0)) <= lift_mass:
 		return "pick up %s" % toy.kind
 	return ""
@@ -98,7 +98,7 @@ static func hint(box: DotPropToyBox, eye: Vector3, direction: Vector3, mask: int
 
 ## Moves every held prop to its carrier's hold point; a carrier who is gone, dead or down drops it.
 ## [param carrier_of] maps a player id to its survivor, or null.
-func advance(box: DotPropToyBox, carrier_of: Callable, mask: int) -> void:
+func advance(box: DotPropBodyBox, carrier_of: Callable, mask: int) -> void:
 	if held.is_empty():
 		return
 	if box == null or not is_instance_valid(box) or box.get_instance_id() != _box_id:
