@@ -27,6 +27,8 @@ var _held := false
 var _steep := 1.2
 ## Print the first origin's walk every two seconds (position, path, wish).
 var _trace := false
+## `--diag`: say what the world held (survivors, horde size) for each miss.
+var _diag := false
 ## `--edges=x,y,z`: the graph points around that place and whether a ray between neighbours meets something.
 var _edges := Vector3.INF
 ## Only these kinds (comma separated), the common always first.
@@ -62,6 +64,8 @@ func _run() -> void:
 		elif arg.begins_with("--edges="):
 			var f := arg.substr(8).split_floats(",")
 			_edges = Vector3(f[0], f[1], f[2])
+		elif arg == "--diag":
+			_diag = true
 		elif arg == "--trace":
 			_trace = true
 		elif arg == "--held":
@@ -299,6 +303,9 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 			gap_now = minf(gap_now, npc.position().distance_to(horde.survivor_position(sid)))
 
 		_last = {"unstick": str(npc.brain.get(&"unstick_log")) if npc.brain != null else "", "blockers": _blockers(npc), "pos": npc.position(), "barricade": _barricade_near(game, npc.position()), "state": String(brain_state), "moved": npc.position().distance_to(earlier), "gap": gap_now}
+
+	if best < 0.0 and _diag:
+		print("   miss %s: survivors %d, horde %d, npc alive %s" % [kind, ids.size(), horde.count(), npc.is_alive()])
 
 	horde.spawner.remove(npc.instance_id)
 	return best
