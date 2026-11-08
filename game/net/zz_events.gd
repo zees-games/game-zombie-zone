@@ -135,6 +135,8 @@ enum Kind {
 	WEAPON_SETTLED,
 	## A dropped weapon is gone: its id and who took it (0 for expiry, the cap or a new round).
 	WEAPON_GONE,
+	## Where a shot left marks on the map: up to a dozen points with a surface normal each (a bullet hole, both faces of a wall it went through, each bounce). To everybody.
+	IMPACT,
 }
 
 ## What a MAP_FX says.
@@ -1122,6 +1124,11 @@ const NORMAL_TOP := (1 << NORMAL_BITS) - 2
 
 static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
 	var w := _w()
+	_put_surface(w, point, normal)
+	return w.to_bytes()
+
+
+static func _put_surface(w: DotNetWriter, point: Vector3, normal: Vector3) -> void:
 	_pos(w, point)
 	var n := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
 	var o := Vector2(n.x, n.z) / (absf(n.x) + absf(n.y) + absf(n.z))
@@ -1129,7 +1136,6 @@ static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
 		o = Vector2((1.0 - absf(o.y)) * _sign(o.x), (1.0 - absf(o.x)) * _sign(o.y))
 	w.write_uint(clampi(roundi((o.x * 0.5 + 0.5) * NORMAL_TOP), 0, NORMAL_TOP), NORMAL_BITS)
 	w.write_uint(clampi(roundi((o.y * 0.5 + 0.5) * NORMAL_TOP), 0, NORMAL_TOP), NORMAL_BITS)
-	return w.to_bytes()
 
 
 static func _sign(v: float) -> float:
@@ -1137,6 +1143,12 @@ static func _sign(v: float) -> float:
 
 
 static func read_splat(r: DotNetReader) -> Dictionary:
+	var s := _get_surface(r)
+	s["ok"] = r.ok()
+	return s
+
+
+static func _get_surface(r: DotNetReader) -> Dictionary:
 	var point := _read_pos(r)
 	var x := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
 	var z := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
@@ -1146,7 +1158,29 @@ static func read_splat(r: DotNetReader) -> Dictionary:
 		x = (1.0 - absf(z)) * _sign(ox)
 		z = (1.0 - absf(ox)) * _sign(z)
 	var n := Vector3(x, y, z)
-	return {"point": point, "normal": n.normalized() if n.length_squared() > 0.0001 else Vector3.UP, "ok": r.ok()}
+	return {"point": point, "normal": n.normalized() if n.length_squared() > 0.0001 else Vector3.UP}
+
+
+const IMPACT_MAX := 12
+
+
+## A shot's marks: a count, then a point and an octahedral normal for each (SPLAT's encoding).
+static func write_impact(marks: Array) -> PackedByteArray:
+	var w := _w()
+	var count := mini(marks.size(), IMPACT_MAX)
+	w.write_uint(count, 4)
+	for i in count:
+		_put_surface(w, marks[i][0], marks[i][1])
+	return w.to_bytes()
+
+
+static func read_impact(r: DotNetReader) -> Dictionary:
+	var count := mini(r.read_uint(4), IMPACT_MAX)
+	var marks: Array = []
+	for i in count:
+		var s := _get_surface(r)
+		marks.append([s["point"], s["normal"]])
+	return {"marks": marks, "ok": r.ok()}
 
 
 # --- Chat ------------------------------------------------------------------

@@ -102,6 +102,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			if peer_id > 0:
 				_tell(peer_id, ZzEvents.Kind.HIT, ZzEvents.write_hit(victim, amount, point, killed, headshot))
 			_splat_for_others(id, peer_id, point))
+		game.shot_marked.connect(_marks_to_all)
 		game.ammo_given.connect(func(id: StringName) -> void:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
@@ -1178,6 +1179,22 @@ func splat(point: Vector3, from: Vector3, except_peer: int = 0) -> bool:
 	return true
 
 
+const IMPACT_PER_SECOND := 30.0
+var _impact_budget := IMPACT_PER_SECOND
+var _impact_at := 0.0
+
+
+## Server: a resolved shot's marks to every client, within a per-second budget (a full-auto crowd cannot flood the wire).
+func _marks_to_all(marks: Array) -> void:
+	var now := Time.get_ticks_msec() * 0.001
+	_impact_budget = minf(IMPACT_PER_SECOND, _impact_budget + (now - _impact_at) * IMPACT_PER_SECOND)
+	_impact_at = now
+	if _impact_budget < 1.0:
+		return
+	_impact_budget -= 1.0
+	_broadcast(ZzEvents.Kind.IMPACT, ZzEvents.write_impact(marks))
+
+
 func _splat_for_others(shooter: StringName, shooter_peer: int, point: Vector3) -> void:
 	var who := game.player_by_id(shooter)
 	if who != null:
@@ -1531,6 +1548,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 				carry_received.emit(str(carried["json"]))
 		ZzEvents.Kind.AMMO:
 			ammo_received.emit()
+		ZzEvents.Kind.IMPACT:
+			var impact := ZzEvents.read_impact(reader)
+			if bool(impact["ok"]):
+				impact_received.emit(impact["marks"])
 		ZzEvents.Kind.SPLAT:
 			var splat := ZzEvents.read_splat(reader)
 			if bool(splat["ok"]):
