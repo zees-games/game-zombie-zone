@@ -852,6 +852,8 @@ func _build_effects() -> void:
 		def.flash_decay_ms = 380
 		fx.add(def)
 
+	ZzImpactMarks.add_def(fx, ZzPaths.rebase("res://scenes/fx/bullet_hole.tscn"))
+
 	var aw_fx: GDScript = ZzGrenadeFx.script()
 	if aw_fx != null:
 		aw_fx.call(&"add_defs", fx)
@@ -3552,6 +3554,7 @@ func _advance_weapons() -> void:
 			shot.tick = _tick
 			_shoot_toys(shot)
 			var _resolved := combat.resolve_shot(shot)
+			_mark_shot(shot)
 
 			if horde != null:
 				var def := player.weapons.current_def()
@@ -3562,6 +3565,17 @@ func _advance_weapons() -> void:
 		if authoritative and hazards != null:
 			for spawn in outcome.spawns:
 				_throw(player, spawn)
+
+
+## Tells the world where [param shot] left marks (see [signal shot_marked]); nothing on a client or when no one listens.
+func _mark_shot(shot: DotShot) -> void:
+	if not authoritative or shot_marked.get_connections().is_empty():
+		return
+
+	var marks := ZzImpactMarks.collect(shot, get_world_3d(), world_mask())
+
+	if not marks.is_empty():
+		shot_marked.emit(marks)
 
 
 ## The living people's feet, once a tick: what a stand-in's distance to anyone watching is measured from.

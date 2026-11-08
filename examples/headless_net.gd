@@ -15,6 +15,7 @@ const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
+const ZzImpactMarks := preload("../game/zz_impact_marks.gd")
 const ZzNpcNet := preload("../game/net/zz_npc_net.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
@@ -35,7 +36,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 33
-const CHECKS := 219
+const CHECKS := 223
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -364,6 +365,8 @@ func _build() -> bool:
 		(_heard.get_or_add("hits", []) as Array).append([victim, amount, killed]))
 	_client_bridge.splat_received.connect(func(point: Vector3, normal: Vector3) -> void:
 		(_heard.get_or_add("splats", []) as Array).append([point, normal]))
+	_client_bridge.impact_received.connect(func(marks: Array) -> void:
+		(_heard.get_or_add("impacts", []) as Array).append(marks))
 	_client_bridge.npc_removed.connect(func(net_id: int, killed: bool, body: Node3D) -> void:
 		_heard["npc_gone"] = [net_id, killed, body.get(&"death") if body != null else null])
 	_client_bridge.downed_received.connect(func(who: int, _by: int, _why: StringName, _kind: StringName) -> void:
@@ -805,6 +808,34 @@ func _test_zombies_replicate() -> void:
 		if _server_bridge.splat(Vector3(2.0, 0.5, 3.0), Vector3(2.0, 2.5, 3.0), 0):
 			budget_sent += 1
 	_check(budget_sent <= int(ZzNetBridge.SPLAT_PER_SECOND), "SPLATs are rate limited", "%d of 100 in one burst" % budget_sent)
+
+	# A resolved shot's marks (the stop on the floor, both faces of a wall it passed, a bounce) reach every client.
+	var volley := DotShot.make(&"test", server_me.entity_id, _server_game.current_tick(), 0)
+	volley.origin = Vector3(4.0, 3.0, 4.0)
+	volley.max_range = 100.0
+	volley.impacts.append(Vector3(4.0, 0.0, 4.0))
+	volley.penetrations.append({"entry": Vector3(1.0, 1.0, 0.0), "entry_normal": Vector3.BACK,
+		"exit": Vector3(1.0, 1.0, -0.2), "exit_normal": Vector3.FORWARD})
+	volley.ricochets.append({"point": Vector3(-2.0, 0.5, 2.0), "normal": Vector3.UP})
+	var marks := ZzImpactMarks.collect(volley, _server_game.get_world_3d(), _server_game.world_mask())
+	_check(marks.size() == 4 and (marks[3][1] as Vector3).dot(Vector3.UP) > 0.98,
+		"a shot's marks are its wall faces, its bounces and the surface it stopped on", str(marks))
+	var open_air := DotShot.make(&"test", server_me.entity_id, 0, 0)
+	open_air.origin = Vector3.ZERO
+	open_air.max_range = 50.0
+	open_air.impacts.append(Vector3(0.0, 0.0, -50.0))
+	_check(ZzImpactMarks.collect(open_air, _server_game.get_world_3d(), _server_game.world_mask()).is_empty(),
+		"a miss into open air leaves no mark")
+	_server_game._mark_shot(volley)
+	await _steps(4)
+	# Earlier real shots in this run sent marks too; ours is the last message.
+	var impacts: Array = _heard.get("impacts", [])
+	var last: Array = impacts.back() if not impacts.is_empty() else []
+	_check(last.size() == 4 and ((last[0][0] as Vector3) - Vector3(1.0, 1.0, 0.0)).length() < 0.05
+		and (last[3][1] as Vector3).dot(Vector3.UP) > 0.98,
+		"an IMPACT reaches the client with every mark's point and normal", str(last))
+	var round_trip := ZzEvents.read_impact(_r(ZzEvents.write_impact(marks)))
+	_check(bool(round_trip["ok"]) and (round_trip["marks"] as Array).size() == 4, "IMPACT round-trips its marks")
 	floor_shape.queue_free()
 
 	_hurt_npc(npc, 100000.0)

@@ -486,6 +486,8 @@ func _build_netcode() -> DotResult:
 	bridge.splat_received.connect(func(point: Vector3, normal: Vector3) -> void:
 		if blood != null:
 			var _splat := blood.splat_at(point, normal))
+	bridge.impact_received.connect(func(marks: Array) -> void:
+		var _placed := ZzImpactMarks.place(game.effects, marks))
 	bridge.notice_received.connect(_on_notice)
 	bridge.shop_received.connect(_on_shop_json)
 	bridge.carry_received.connect(_on_carry_json)
