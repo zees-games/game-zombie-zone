@@ -655,6 +655,21 @@ func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 		var _woosh := audio.at(ZzAudio.WOOSH, from)
 
 
+## The server's grenade struck the world: start its arc again from there with the velocity it left with.
+func bounce(id: int, at: Vector3, velocity: Vector3) -> void:
+	var entry: Variant = _flying.get(id)
+
+	if entry == null or bool((entry as Dictionary).get("landed", false)):
+		return
+
+	var node: Node3D = (entry as Dictionary)["node"]
+
+	if node != null and is_instance_valid(node):
+		node.global_position = at
+
+	(entry as Dictionary)["velocity"] = velocity
+
+
 func land(id: int, kind: StringName, at: Vector3) -> void:
 	var entry: Variant = _flying.get(id)
 

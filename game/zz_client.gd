@@ -507,6 +507,7 @@ func _build_netcode() -> DotResult:
 	bridge.turret_removed.connect(world_view.remove_turret)
 	bridge.thrown.connect(world_view.throw)
 	bridge.landed.connect(world_view.land)
+	bridge.bounced.connect(world_view.bounce)
 	bridge.blast_received.connect(world_view.blast)
 	bridge.weapon_used_by.connect(func(session_id: int, _times: int, kind: int) -> void:
 		if session_id == _watch_id or audio == null:
@@ -658,6 +659,7 @@ func _hear_the_world() -> void:
 		game.hazards.area_ended.connect(world_view.remove_hazard)
 		game.hazards.launched.connect(world_view.throw)
 		game.hazards.landed.connect(world_view.land)
+		game.hazards.bounced.connect(world_view.bounce)
 
 	if game.turrets != null:
 		game.turrets.placed.connect(world_view.add_turret)

@@ -3,11 +3,12 @@ extends "zz_suite.gd"
 const ZzHazards := preload("../game/zz_hazards.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
+const ZzEvents := preload("../game/net/zz_events.gd")
 
 ## arena-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
 
-const SECTIONS := 9
-const CHECKS := 36
+const SECTIONS := 10
+const CHECKS := 42
 
 const SPOT := Vector3(0.0, 0.05, 14.0)
 
@@ -35,6 +36,7 @@ func _run() -> void:
 	await _test_flash_whites_survivor()
 	await _test_bot_smoke()
 	await _test_bot_flash()
+	await _test_bounce_is_announced()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -259,7 +261,27 @@ func _test_bot_flash() -> void:
 	_finished()
 
 
-func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity: Vector3) -> void:
+func _test_bounce_is_announced() -> void:
+	_section("a bounce is told to clients, so their arc follows the server's")
+	var game := await _team(1)
+	var me := game.survivors()[0]
+	me.place_at(SPOT, 0.0)
+	var heard: Array = []
+	game.hazards.bounced.connect(func(id: int, at: Vector3, v: Vector3) -> void: heard.append([id, at, v]))
+	_throw(game, me, &"aw_frag", SPOT + Vector3(0.0, 1.5, 0.0), Vector3(0.0, -6.0, 0.0), game.tick_rate * 3)
+	await _sim(game, 1.0)
+	_check(heard.size() >= 1, "a grenade thrown at the floor announces a bounce", str(heard.size()))
+	if not heard.is_empty():
+		_check((heard[0][2] as Vector3).y > 0.0, "leaving upward, not through the floor", str(heard[0][2]))
+		_check(absf((heard[0][1] as Vector3).y - SPOT.y) < 0.5, "from the floor it struck", str(heard[0][1]))
+		var back := ZzEvents.read_bounce(DotNetReader.new(ZzEvents.write_bounce(int(heard[0][0]), heard[0][1], heard[0][2])))
+		_check(bool(back["ok"]) and int(back["id"]) == int(heard[0][0]), "the event round-trips its id")
+		_check((back["at"] as Vector3).distance_to(heard[0][1]) < 0.1, "and its place")
+		_check((back["velocity"] as Vector3).distance_to(heard[0][2]) < 0.5, "and its velocity")
+	_finished()
+
+
+func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity: Vector3, fuse: int = 4) -> void:
 	var def := ZzWeapons.def_of(id)
 	var _routed: bool = game.grenades.handles(def)
 	var b := def.tuning as DotWeaponBallistics
@@ -268,7 +290,7 @@ func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity:
 	s.origin = at
 	s.velocity = velocity
 	s.gravity_scale = b.gravity_scale if b != null else 1.0
-	s.fuse_ticks = 4
+	s.fuse_ticks = fuse
 	s.splash_radius = b.splash_radius if b != null else 0.0
 	s.splash_damage = b.splash_damage if b != null else 0.0
 	s.owner_entity = player.entity_id

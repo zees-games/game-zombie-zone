@@ -176,6 +176,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 				_broadcast(ZzEvents.Kind.THROW, ZzEvents.write_throw(id, kind, from, velocity)))
 			game.hazards.landed.connect(func(id: int, kind: StringName, at: Vector3) -> void:
 				_broadcast(ZzEvents.Kind.LANDED, ZzEvents.write_landed(id, kind, at)))
+			game.hazards.bounced.connect(func(id: int, at: Vector3, velocity: Vector3) -> void:
+				_broadcast(ZzEvents.Kind.BOUNCE, ZzEvents.write_bounce(id, at, velocity)))
 
 		if game.turrets != null:
 			game.turrets.placed.connect(func(id: int, at: Vector3, yaw: float, seconds: float) -> void:
@@ -1444,6 +1446,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var t := ZzEvents.read_throw(reader)
 			if bool(t["ok"]):
 				thrown.emit(int(t["id"]), t["kind"], t["from"], t["velocity"])
+		ZzEvents.Kind.BOUNCE:
+			var bn := ZzEvents.read_bounce(reader)
+			if bool(bn["ok"]):
+				bounced.emit(int(bn["id"]), bn["at"], bn["velocity"])
 		ZzEvents.Kind.LANDED:
 			var l := ZzEvents.read_landed(reader)
 			if bool(l["ok"]):
