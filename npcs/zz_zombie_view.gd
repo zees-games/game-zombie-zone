@@ -731,7 +731,7 @@ func _leg_chains() -> Array:
 				break
 			var rest := _skeleton.get_bone_global_rest(foot).origin
 			var ankle := _skeleton.get_bone_global_rest(lower).affine_inverse() * rest
-			_legs.append([upper, lower, ankle, rest, _skeleton.get_bone_rest(lower).origin.length() + ankle.length()])
+			_legs.append([upper, lower, ankle, rest, _skeleton.get_bone_rest(lower).origin.length() + ankle.length(), foot])
 	return _legs
 
 
@@ -763,6 +763,18 @@ func _ground_feet() -> void:
 		var floor_y := (leg[3] as Vector3).y
 		if ankle.y < floor_y:
 			DotHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], Vector3(ankle.x, floor_y, ankle.z), Vector3(0.0, 0.0, 1.0), 1.0)
+		_lift_foot_bone(int(leg[5]), floor_y)
+
+
+## The foot bone hangs from Root, not from the shin, so bending the leg does not move it: a clip
+## that keys it under the floor (the sprint, up to 0.24 m) is lifted straight up to [param floor_y].
+func _lift_foot_bone(foot: int, floor_y: float) -> void:
+	var at := DotHumanoidIk.global_pose(_skeleton, foot).origin
+	if at.y >= floor_y:
+		return
+	var parent := DotHumanoidIk.global_pose(_skeleton, _skeleton.get_bone_parent(foot))
+	var local := parent.affine_inverse().basis * Vector3(0.0, floor_y - at.y, 0.0)
+	_skeleton.set_bone_pose_position(foot, _skeleton.get_bone_pose_position(foot) + local)
 
 
 ## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
