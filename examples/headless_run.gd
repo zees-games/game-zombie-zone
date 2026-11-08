@@ -42,11 +42,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-<<<<<<< HEAD
-const CHECKS := 440
-=======
-const CHECKS := 442
->>>>>>> origin/zz-manor-verify-1
+const CHECKS := 443
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
