@@ -21,6 +21,7 @@ const ZzPacks := preload("../game/zz_packs.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzRequest := preload("../game/net/zz_request.gd")
+const ZzTestToys := preload("zz_test_toys.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the

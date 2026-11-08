@@ -5,6 +5,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzNetLink := preload("../game/net/zz_net_link.gd")
+const ZZTestPorts := preload("test_ports.gd")
 
 ## The game as a deployed server runs it: a real [DotServer], booted from a config file, with
 ## the module loaded BY PATH the way an operator names it — so the netcode, the services, the

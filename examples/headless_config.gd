@@ -7,6 +7,7 @@ extends DotGameCheckSuite
 ## [/codeblock]
 
 const ZzConfig := preload("../game/zz_config.gd")
+const ZzMovementCvars := preload("../game/zz_movement_cvars.gd")
 const ROOT := "user://zz_cfgtest"
 const GAME := "game-zombie-zone"
 const ZzTurrets := preload("../game/zz_turrets.gd")

@@ -1,4 +1,3 @@
-class_name ZzTestToys
 extends RefCounted
 
 ## Test-only physics props (toys) for the practice street, which places none in play. Set

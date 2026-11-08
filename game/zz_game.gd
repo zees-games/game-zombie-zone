@@ -1,5 +1,7 @@
 extends "zz_game_state.gd"
 
+const ZzMovementCvars := preload("zz_movement_cvars.gd")
+
 func ensure_runtime() -> DotProfileRuntime:
 	if profile_runtime == null:
 		profile_runtime = DotProfileRuntime.new()

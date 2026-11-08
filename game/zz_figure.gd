@@ -4,6 +4,7 @@ const ZzPaths := preload("zz_paths.gd")
 const ZzDefibModel := preload("zz_defib_model.gd")
 const ZzBoxCrate := preload("zz_box_crate.gd")
 const ZzWeapons := preload("zz_weapons.gd")
+const ZzHeadScale := preload("zz_head_scale.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
