@@ -139,6 +139,8 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 		var reached := 0
 		var times: Array[float] = []
 		var stuck := 0
+		## Where the origins that never arrived ended, metres from the nearest survivor (the park distance).
+		var parks: Array[float] = []
 
 		for origin in origins:
 			var has_path := false
@@ -156,6 +158,9 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 			if not _static_only:
 				var t := _sim(game, kind, origin)
 
+				if t < 0.0 and has_path and not _last.is_empty():
+					parks.append(float(_last["gap"]))
+
 				if t >= 0.0:
 					reached += 1
 					times.append(t)
@@ -167,6 +172,11 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 
 		times.sort()
 		var med := "-" if times.is_empty() else "%.0fs" % times[times.size() / 2]
+		parks.sort()
+
+		if not parks.is_empty() and _ai:
+			med += " park %.0fm" % parks[parks.size() / 2]
+
 		var tot: Array = _total.get(kind, [0, 0, 0, 0])
 		_total[kind] = [tot[0] + paths, tot[1] + reached, tot[2] + origins.size(), tot[3] + stuck]
 		parts.append("%s %d/%d/%d%s %s" % [String(kind).left(5), paths, reached, origins.size(), "" if stuck == 0 else " !%d" % stuck, med])
