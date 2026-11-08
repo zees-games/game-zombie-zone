@@ -227,6 +227,9 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 	var npc: DotNpcInstance = horde.spawn_special(kind, origin, &"reach_probe")
 
 	if npc == null:
+		if _diag:
+			print("   miss %s: spawn refused at %s, horde %d, spawner %d" % [kind, origin, horde.count(), horde.spawner.count_of(kind)])
+
 		return -1.0
 
 	var ids: Array[StringName] = horde.survivor_ids()
