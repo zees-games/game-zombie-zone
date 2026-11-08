@@ -1345,10 +1345,25 @@ func _ban_player(userid: int, minutes: float, reason: String, by: String) -> voi
 func _wire_map(world: ZzGame) -> void:
 	if world.map != null and not world.map.doc.is_empty():
 		report_map(String(world.map.id()))
+		_attach_visibility(world)
 
 	world.world_rebuilt.connect(func() -> void:
 		report_map(String(world.map.id()))
+		_attach_visibility(world)
 	)
+
+
+## The checkout's converted world's PVS as the snapshot visibility (cvar net_visibility; dot-game 52). A map
+## whose world is not on disk here (a server running the maps pack) clears it and sends by distance alone.
+func _attach_visibility(world: ZzGame) -> void:
+	if not has_method(&"use_map_visibility") or world.map == null:
+		return
+	var mesh: Object = null
+	var prefix: String = world.map.local_world_prefix() if str(world.map.doc.get("world", "")) != "" else ""
+	if prefix != "" and world.map.can_draw_world() and FileAccess.file_exists(prefix + ".json"):
+		var read: DotResult = (load("res://addons/dot_map/bsp/dot_map_bsp_mesh.gd") as GDScript).call(&"load_prefix", prefix)
+		mesh = read.value if read.ok else null
+	var _on: Variant = call(&"use_map_visibility", mesh)
 
 
 ## An achievement is told to the one person who earned it.
