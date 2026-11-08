@@ -2,6 +2,7 @@ extends "zz_suite.gd"
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzPropForce := preload("../game/zz_prop_force.gd")
+const ZzTestToys := preload("zz_test_toys.gd")
 
 ## The per-weapon force table on loose props: lookup rules, the shipped file, and a shot moving a barrel further with a bigger multiplier.
 

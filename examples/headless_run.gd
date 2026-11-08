@@ -29,6 +29,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzWorldView := preload("../game/zz_world_view.gd")
+const ZzTestToys := preload("zz_test_toys.gd")
 
 ## The simulation, headless: the documents, the navigation, the horde and every special, the
 ## downs and the hands, the boxes, the objectives and how a map is won and lost.
