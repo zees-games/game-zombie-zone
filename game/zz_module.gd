@@ -261,6 +261,7 @@ func _game_load() -> DotResult:
 	# through its link, see the client's _build_netcode).
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+		_reconcile_friendly_fire(world, _passthrough)
 
 	# sv_falldamage, _threshold, _scale: dot-combat's, on by default in this game. Server-side
 	# only, so no REPLICATED: the damage is the server's and arrives as health.
@@ -889,6 +890,34 @@ func _set_meta(world: ZzGame, kind: StringName, key: String, value: float) -> vo
 
 	if def != null:
 		def.meta[key] = value
+
+
+## dot-combat's `mp_friendlyfire` and this game's `zz_friendly_fire` / `zz_friendly_fire_mode` set the same rule, and the config's won on every difficulty change. Now `mp_friendlyfire 0` means mode 0 (off), `1` turns an off mode back to the default 2, and the cvar mirrors what the config resolved to. Defaults are unchanged.
+func _reconcile_friendly_fire(world: ZzGame, made: Array) -> void:
+	var ff: Object = null
+	for cv: Variant in made:
+		if cv is Object and str((cv as Object).get(&"name")) == DotCombatManager.CVAR_FRIENDLY_FIRE:
+			ff = cv
+	if ff == null:
+		return
+	ff.connect(&"changed", func(_old: String, now: String) -> void:
+		if _mirroring_ff:
+			return
+		var on := now.strip_edges().to_lower() not in ["0", "false", ""]
+		if on and world.config.friendly_fire_mode == 0:
+			world.config.friendly_fire_mode = 2
+		elif not on:
+			world.config.friendly_fire_mode = 0
+		_apply_friendly_fire(world))
+	world.friendly_fire_changed = func(on: bool) -> void:
+		var text := "1" if on else "0"
+		if ff.call(&"get_string") != text:
+			_mirroring_ff = true
+			ff.call(&"force_set", text)
+			_mirroring_ff = false
+
+
+var _mirroring_ff := false
 
 
 func _apply_friendly_fire(world: ZzGame) -> void:
