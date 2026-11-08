@@ -696,7 +696,7 @@ func blast(at: Vector3, radius: float, kind: StringName) -> void:
 
 	var bile := kind == &"bile"
 	var colour := Color(0.55, 0.75, 0.1) if bile else (Color(0.6, 0.55, 0.5) if kind == &"slam" else Color(1.0, 0.6, 0.2))
-	var puff := _particles(colour, radius * 0.5, 60)
+	var puff := _particles(colour, radius * 0.5, 60, kind != &"slam")
 	puff.one_shot = true
 	puff.explosiveness = 0.95
 	puff.initial_velocity_min = radius * 1.2
@@ -1128,7 +1128,8 @@ func _material(colour: Color) -> StandardMaterial3D:
 	return _materials[key]
 
 
-func _particles(colour: Color, radius: float, amount: int) -> CPUParticles3D:
+## [param additive] is fire; a slam grey dust is alpha-blended like smoke (additive grey just glows).
+func _particles(colour: Color, radius: float, amount: int, additive: bool = true) -> CPUParticles3D:
 	var p := CPUParticles3D.new()
 	p.amount = amount
 	p.lifetime = 0.8
@@ -1144,7 +1145,7 @@ func _particles(colour: Color, radius: float, amount: int) -> CPUParticles3D:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.5)
 	# dot-fx's soft sprite: an untextured quad was a hard square, the "big pixels" of the fire.
-	var material := DotFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0))
+	var material := DotFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0), additive)
 	quad.material = material
 	p.mesh = quad
 	var gradient := Gradient.new()
