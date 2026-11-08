@@ -408,6 +408,8 @@ static func _spitter(c: ZzConfig) -> DotNpcDef:
 
 static func _mutant(c: ZzConfig) -> DotNpcDef:
 	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, DotNpcDef.Weight.HEAVY)
+	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
+	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 60.0
 	def.sight_half_angle_deg = 120.0
 	def.hearing_range = 25.0
@@ -428,6 +430,8 @@ static func _mutant(c: ZzConfig) -> DotNpcDef:
 ## (dot-effects' DotHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
 static func _oil_monster(c: ZzConfig) -> DotNpcDef:
 	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, DotNpcDef.Weight.HEAVY)
+	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
+	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 50.0
 	def.sight_half_angle_deg = 110.0
 	def.hearing_range = 22.0
