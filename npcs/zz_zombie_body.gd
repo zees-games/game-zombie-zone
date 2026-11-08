@@ -23,6 +23,8 @@ enum Anim {
 	CRAWL, SCREAM, GRAB, BLOCK, STRIKE_DOWN,
 	# The mutant's: a jetpack in flight, the charge-up, the dive, the landing, a gravity gun firing.
 	FLY, CHARGE_UP, DIVE, SLAM, ZAP,
+	# The oil monster eating a downed survivor (30 of the 31 the wire holds).
+	EAT,
 }
 
 ## Bits of [member flags].
