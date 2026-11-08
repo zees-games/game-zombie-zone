@@ -866,6 +866,10 @@ func _on_round(number: int, began: bool, won: bool, why: String = "") -> void:
 
 	_begin_map_end(won, why)
 
+	# The end-of-round stats card (cl_stats_ui; the platform no-ops when it is off).
+	if platform != null:
+		platform.show_stats()
+
 	if chat != null and why != "":
 		chat.say_locally(why, Color(0.98, 0.86, 0.40))
 
