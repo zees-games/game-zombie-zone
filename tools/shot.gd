@@ -24,6 +24,8 @@ func _cloud_store(spec: String) -> void:
 
 func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
+		if _orbit.take(arg):
+			continue
 		if arg.begins_with("--view="):
 			_view = arg.trim_prefix("--view=")
 		elif arg.begins_with("--action="):
@@ -424,6 +426,8 @@ func _run() -> void:
 			if _view == "pin" and foe != null:
 				var how: StringName = {&"rider": &"ride", &"crawler": &"grab", &"ram": &"carry"}.get(_zombie, &"pounce")
 				print("pin: ", how, " held ", game.horde.pin(foe, local.player_id, how))
+			_orbit.holder = foe
+			_orbit.victim = local if _view == "pin" else null
 			await _seconds_of(_seconds)
 			var mid: Vector3 = local.feet().lerp(foe.position(), 0.5) if foe != null else local.feet()
 			print("strike: survivor ", local.feet(), " zombie ", foe.position() if foe != null else "none", " anim ", foe.node.get(&"anim") if foe != null else "")
@@ -710,12 +714,21 @@ func _run() -> void:
 			var friend = local if _pin_me else (game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0])
 			if not _pin_me:
 				friend.place_at(stand + Vector3(0.0, 0.0, -4.0), 180.0)
-			var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + (Vector3(3.5, 0.0, -14.0) if kind == &"choke" else Vector3(0.0, 0.0, -5.0))), &"shot")
+			var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + (Vector3(3.5, 0.0, -14.0) if kind == &"choke" else Vector3(0.0, 0.0, -5.0))), &"shot", Basis(Vector3.UP, PI))
 			await _seconds_of(0.3)
 			var _held := game.pins.pin(game.horde.entity_id_for(npc), npc, friend.player_id, kind)
+			_orbit.holder = npc
+			_orbit.victim = friend
 			await _seconds_of(_seconds)
 		_:
 			await _seconds_of(_seconds)
+
+	if _orbit.enabled:
+		_orbit.me = local
+		_orbit.point = _at if _at != Vector3.INF else stand
+		await _orbit_frames()
+		get_tree().quit(0)
+		return
 
 	if _board:
 		var tab := InputEventKey.new()

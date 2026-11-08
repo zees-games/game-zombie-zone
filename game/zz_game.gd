@@ -1524,6 +1524,15 @@ func _build_stamp(doc: Dictionary) -> int:
 	return hash([doc.hash(), map.gravity, map.draw_world, map.authoritative, map.use_mechanics, ZzMap.use_bakes])
 
 
+## A client told the map it already has built (a new round on the same map): the map's per-round
+## state starts over without tearing the world down, so the cover never closes for it.
+func restart_same_map() -> void:
+	_reset_barricades()
+	_reset_objectives()
+	for p: ZzPlayer in players.values():
+		p.flashlight_ready = false
+
+
 ## Builds [param doc] as the map: what the server does between maps, and a client when sent one.
 ## With [param reuse], a map already built from the same inputs is kept and only the signals fire again.
 func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
