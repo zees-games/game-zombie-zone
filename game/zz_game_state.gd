@@ -15,6 +15,7 @@ const ZzConfig := preload("zz_config.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzFlashlight := preload("zz_flashlight.gd")
 const ZzGrenadeFx := preload("zz_grenade_fx.gd")
+const ZzImpactMarks := preload("zz_impact_marks.gd")
 const ZzHazards := preload("zz_hazards.gd")
 const ZzTurrets := preload("zz_turrets.gd")
 const ZzHorde := preload("zz_horde.gd")
@@ -169,6 +170,9 @@ signal ammo_given(player_id: StringName)
 ## hit marker is drawn from. The authority's decision, sent to the shooter alone; [param victim] is the
 ## zombie's entity id and [param point] where it landed.
 signal hit_landed(player_id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
+
+## A shot was resolved on the authority and left marks on the map: `[[point, normal], ...]` (see ZzImpactMarks).
+signal shot_marked(marks: Array)
 
 ## A barricade took damage, broke, or was mended: its strength as a share, and whether it stands.
 signal barricade_changed(id: String, fraction: float, intact: bool)

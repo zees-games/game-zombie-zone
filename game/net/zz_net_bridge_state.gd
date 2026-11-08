@@ -110,6 +110,8 @@ signal ammo_received()
 signal hit_received(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool)
 ## Somebody else's hit left blood on a surface here (see [method splat]); the shooter never gets this.
 signal splat_received(point: Vector3, normal: Vector3)
+## A shot's bullet holes, wall faces and bounce marks, `[[point, normal], ...]`; to everybody, the shooter too.
+signal impact_received(marks: Array)
 
 ## Client side: a zombie mirror was built, or let go. [param body] is its scene, already in the
 ## world; the client hangs a [ZzZombieView] off it.
