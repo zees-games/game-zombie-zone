@@ -37,9 +37,10 @@ const CHOKE := &"choke"
 const CARRY := &"carry"
 const RIDE := &"ride"
 const GRAB := &"grab"
+const EAT := &"eat"
 
 ## Damage over time, per kind, per second, on normal. A brain may override it in its meta.
-const DAMAGE_PER_SECOND := {POUNCE: 10.0, CHOKE: 5.0, CARRY: 13.0, RIDE: 4.0, GRAB: 6.0}
+const DAMAGE_PER_SECOND := {POUNCE: 10.0, CHOKE: 5.0, CARRY: 13.0, RIDE: 4.0, GRAB: 6.0, EAT: 0.0}
 
 ## How close a choked survivor ends up to the strangler, and how fast they are dragged.
 const CHOKE_GAP := 1.2
@@ -75,7 +76,7 @@ func pin(entity: int, npc: DotNpcInstance, victim: StringName, kind: StringName)
 
 	# Only a ram's carry and a choke may take a downed survivor; a leaper or a rider on somebody
 	# already on the floor is a special wasting itself, and the genre does not allow it.
-	if player.is_down() and kind != CHOKE and kind != CARRY:
+	if player.is_down() and kind != CHOKE and kind != CARRY and kind != EAT:
 		return false
 
 	pins[victim] = {"npc": npc, "entity": entity, "kind": kind, "since": game.now(), "dealt": 0.0}
@@ -174,6 +175,12 @@ func steer(delta: float) -> void:
 				var ahead := special + npc.facing() * 0.9 - from
 				ahead.y = 0.0
 				state.velocity = carried + ahead * 8.0
+			EAT:
+				# Held up at the mouth: the lift is the pin's own height, the rest follows the monster.
+				var mouth := special + npc.facing() * float(npc.def.meta.get("eat_hold_gap", 1.1))
+				var lift := eat_lift(game.now() - float(held["since"]), npc.def.meta)
+				var goal := Vector3(mouth.x, special.y + lift, mouth.z)
+				state.velocity = (goal - from) * 8.0
 			RIDE:
 				var body := npc.node as ZzZombieBody
 				var steer_to := body.wish if body != null else Vector3.ZERO
@@ -217,8 +224,11 @@ func advance(delta: float) -> void:
 				pass
 			CHOKE:
 				pass
+			EAT:
+				body.anchored = true
 
-		var rate: float = float(npc.def.meta.get("pin_dps", DAMAGE_PER_SECOND.get(held["kind"], 5.0)))
+		var rate: float = float(npc.def.meta.get("eat_victim_dps", 6.0)) if held["kind"] == EAT \
+			else float(npc.def.meta.get("pin_dps", DAMAGE_PER_SECOND.get(held["kind"], 5.0)))
 		held["dealt"] = float(held["dealt"]) + rate * delta
 
 		# Whole points, a few a second: dot-combat is told about every one, and a stream of
@@ -229,11 +239,50 @@ func advance(delta: float) -> void:
 			game.pin_damage(npc, int(held["entity"]), victim, amount, held["kind"])
 
 
+## The eat's phases, in order, with their profile keys: grab, lift, bite, swallow.
+const EAT_PHASES: Array[StringName] = [&"grab", &"lift", &"bite", &"swallow"]
+
+
+## Seconds of each eat phase from the monster's profile [param meta].
+static func eat_durations(meta: Dictionary) -> Array[float]:
+	return [float(meta.get("eat_grab_seconds", 0.6)), float(meta.get("eat_lift_seconds", 0.8)),
+		float(meta.get("eat_bite_seconds", 2.4)), float(meta.get("eat_swallow_seconds", 1.0))]
+
+
+## The whole sequence's length in seconds.
+static func eat_total(meta: Dictionary) -> float:
+	var sum := 0.0
+	for d in eat_durations(meta):
+		sum += d
+	return sum
+
+
+## The phase at [param elapsed] seconds: {"phase": name, "t": 0..1 inside it, "done": bool}.
+static func eat_phase(elapsed: float, meta: Dictionary) -> Dictionary:
+	var left := elapsed
+	var durations := eat_durations(meta)
+
+	for i in durations.size():
+		if left < durations[i] or i == durations.size() - 1:
+			return {"phase": EAT_PHASES[i], "t": clampf(left / maxf(durations[i], 0.001), 0.0, 1.0),
+				"done": elapsed >= eat_total(meta)}
+		left -= durations[i]
+
+	return {"phase": &"swallow", "t": 1.0, "done": true}
+
+
+## Metres the victim is held above the monster's feet at [param elapsed]: rises through the lift, stays up after.
+static func eat_lift(elapsed: float, meta: Dictionary) -> float:
+	var d := eat_durations(meta)
+	var top := float(meta.get("eat_lift_height", 1.4))
+	return top * clampf((elapsed - d[0]) / maxf(d[1], 0.001), 0.0, 1.0)
+
+
 ## A shove reaching [param victim] or their special: frees them, unless it is a carry.
 func shoved(victim: StringName) -> bool:
 	var kind := kind_of(victim)
 
-	if kind == &"" or kind == CARRY:
+	if kind == &"" or kind == CARRY or kind == EAT:
 		return false
 
 	var npc := holder_of(victim)

@@ -86,7 +86,7 @@ var net_carry: int = 0
 ## Bile in bit 0, burning in bit 1, a box's blinding in bit 2, goo stacks on the screen (0 to 3) in bits 3-4, a grenade flash in bit 5.
 var net_status: int = 0
 
-const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride"]
+const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride", &"grab", &"eat"]
 const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair", &"deploy", &"defib", &"pills"]
 
 ## Points this match and the server's ping for the player, for everybody's Tab board.

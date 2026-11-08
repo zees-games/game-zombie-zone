@@ -444,6 +444,9 @@ static func _oil_monster(c: ZzConfig) -> DotNpcDef:
 		"trail_radius": 1.1, "trail_seconds": 6.0, "trail_dps": 5.0, "trail_dps_start": 5.0, "trail_slow_factor": 0.75,
 		"trail_tick_interval": 0.5, "trail_fade_seconds": 1.5, "trail_max_per_owner": 30, "trail_global_cap": 120,
 		"trail_spacing": 1.4, "trail_interval": 0.2,
+		"eat_enabled": 1.0, "eat_health_below": 0.5, "eat_reach": 2.2, "eat_grab_seconds": 0.6, "eat_lift_seconds": 0.8,
+		"eat_bite_seconds": 2.4, "eat_swallow_seconds": 1.0, "eat_lift_height": 1.4, "eat_hold_gap": 1.1,
+		"eat_victim_dps": 6.0, "eat_interrupt_damage": 150.0, "eat_cooldown": 4.0,
 		"body": "oil_monster", "radius": 0.6, "height": 2.5, "fit_height": 2.1,
 	}
 	return def

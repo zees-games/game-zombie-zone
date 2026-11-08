@@ -4,12 +4,18 @@ extends "zz_special_brain.gd"
 ## spits black goo that hurts, blinds the screen and leaves a puddle, and mauls what it reaches.
 ##
 ## [b]It never breaks off.[/b] It is a wall of hazard, not a sniper: it presses the team, spitting whenever the
-## spit is ready and the line is clear, and the trail is why standing still near it is a mistake. The eat sequence
-## for a last-down survivor is a later step; this brain only chases, spits and bites.
+## spit is ready and the line is clear, and the trail is why standing still near it is a mistake. A downed
+## survivor under the health threshold is eaten (pin kind eat); damage to the monster breaks it off.
+
+const ZzPins := preload("../game/zz_pins.gd")
 
 const SPIT := &"spit"
+const EAT := &"eat"
 
 var _spit_at: float = INF
+var _eat_victim: StringName = &""
+var _eat_taken: float = 0.0
+var _eat_at: float = 0.0
 
 
 func _build() -> void:
@@ -25,7 +31,26 @@ func _may_retreat() -> bool:
 
 
 func _victim_allowed(id: StringName) -> bool:
-	return survivor_is(id, &"alive")
+	return survivor_is(id, &"alive") and (not survivor_is(id, &"pinned") or id == _eat_victim)
+
+
+## A survivor on the floor and low enough is its meal: nearer than any standing one.
+func _victim_bonus(id: StringName, _at: Vector3) -> float:
+	return -60.0 if _edible(id) else 0.0
+
+
+## Whether [param id] is down and under the profile's health threshold.
+func _edible(id: StringName) -> bool:
+	return tune(&"eat_enabled", 1.0) > 0.0 and survivor_is(id, &"down") and not survivor_is(id, &"pinned") \
+		and horde() != null and float(horde().call(&"survivor_health", id)) <= tune(&"eat_health_below", 0.5)
+
+
+## Damage it takes while eating counts toward breaking the meal off.
+func damaged(amount: float, by: StringName) -> void:
+	super(amount, by)
+
+	if state == EAT:
+		_eat_taken += amount
 
 
 func _decide(delta: float) -> void:
@@ -47,6 +72,10 @@ func _leak() -> void:
 
 func _special(_delta: float) -> void:
 	var b := body()
+
+	if _try_eat():
+		return
+
 	var gap := distance_to(victim)
 	var from := npc.position() + Vector3(0.0, 1.6, 0.0)
 	var to := survivor_at(victim) + Vector3(0.0, 0.8, 0.0)
@@ -100,6 +129,70 @@ func _npc_died(by: StringName) -> void:
 		h.call(&"end_goo_trail", npc)
 
 
+## Starts eating the chosen victim when they are edible and within reach. True when it did.
+func _try_eat() -> bool:
+	if not _edible(victim) or not cooled_down():
+		return false
+
+	var at := survivor_at(victim)
+
+	if at == Vector3.INF or distance_to(victim) > tune(&"eat_reach", 2.2) or absf(npc.position().y - at.y) > 1.6:
+		return false
+
+	if not bool(horde().call(&"pin", npc, victim, &"eat")):
+		return false
+
+	_eat_victim = victim
+	_eat_taken = 0.0
+	_eat_at = now()
+	face(at - npc.position())
+	go(EAT)
+	return true
+
+
+## The meal: grab, lift, bite, swallow, by the pin's clock. Enough damage in time breaks it off.
+func _holding(delta: float) -> void:
+	if state != EAT:
+		super(delta)
+		return
+
+	halt()
+	var b := body()
+	b.anim = ZzZombieBody.Anim.EAT
+	var h := horde()
+	var at := survivor_at(_eat_victim)
+
+	if at != Vector3.INF:
+		face(at - npc.position())
+
+	if _eat_taken >= tune(&"eat_interrupt_damage", 150.0):
+		h.call(&"unpin", npc)
+		return
+
+	var meta := npc.def.meta
+	var phase: Dictionary = ZzPins.eat_phase(now() - _eat_at, meta)
+
+	if bool(phase["done"]):
+		h.call(&"eat_finished", npc, _eat_victim)
+		_end_eat(tune(&"eat_cooldown", 4.0))
+
+
+## The hold broke off (interrupted, or the victim died): back to chasing after a pause.
+func pin_released(_victim: StringName, why: StringName) -> void:
+	if state == EAT:
+		_end_eat(tune(&"eat_cooldown", 4.0) if why != &"shoved" else 3.0)
+		return
+
+	super(_victim, why)
+
+
+func _end_eat(cooldown: float) -> void:
+	_eat_victim = &""
+	_eat_taken = 0.0
+	cool_down(cooldown)
+	go(APPROACH)
+
+
 ## State for the console and the probes.
 func status() -> Dictionary:
-	return {"state": String(state), "spitting": _spit_at != INF}
+	return {"state": String(state), "spitting": _spit_at != INF, "eating": String(_eat_victim), "eat_damage": _eat_taken}
