@@ -19,12 +19,17 @@ for c in doc["clips"]:
         print(c["name"], v)
 PY
 )
+gpu_sh=${GPU_SH:-}
+for c in /home/gamedev/godot/dot-bootstrap/tools/gpu.sh ../gpu.sh; do
+  [[ -z $gpu_sh && -f $c ]] && gpu_sh=$c
+done
+[[ -f $gpu_sh ]] || { echo "gpu.sh not found (set GPU_SH=path)" >&2; exit 1; }
 box=${GPU_SHOT_BOXES:-staging02}
 host=gamedev@${box%%[ ,]*}.deacon.internal   # GPU_SHOT_BOXES=staging runs it on the laptop
 for job in "${jobs[@]}"; do
   read -r clip view <<< "$job"
   name=$clip; [[ $clip == zombie_* ]] || name=${clip}_$view
-  GPU_SHOT_BOXES=$box ../gpu.sh shot game-zombie-zone tools/filmstrip_run.sh "$clip" "$view" "${FPS:-15}"
+  GPU_SHOT_BOXES=$box "$gpu_sh" shot game-zombie-zone tools/filmstrip_run.sh "$clip" "$view" "${FPS:-15}"
   rsync -az -e "ssh -i $HOME/.ssh/gpu-laptop -o BatchMode=yes" \
     "$host:gpu/shot/game-zombie-zone/$out/$name.mp4" "$host:gpu/shot/game-zombie-zone/$out/${name}_report.txt" "$out/"
 done
