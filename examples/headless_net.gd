@@ -10,6 +10,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzClient := preload("../game/zz_client.gd")
+const ZzKillcam := preload("../game/zz_killcam.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
@@ -33,7 +34,7 @@ const ZzRequest := preload("../game/net/zz_request.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 30
-const CHECKS := 200
+const CHECKS := 202
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -1295,6 +1296,13 @@ func _test_the_map_ends() -> void:
 	_check(_heard.has("round_over") and float(_heard["round_over"][3]) == _server_game.match_node.rules.intermission_sec
 		and StringName(_heard["round_over"][4]) == _server_game.next_map_id,
 		"and how long until the next map, and which, for its countdown", str(_heard.get("round_over")))
+	var kc := ZzKillcam.new()
+	_check(kc.camera_mode_fn.call() == DotKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
+	var framing := DotKillcamFraming.new(null, 1)
+	var eye := Transform3D(Basis.IDENTITY, Vector3(0, 1.6, 0))
+	var placed: Dictionary = framing.place(DotKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
+	_check((placed["transform"] as Transform3D).origin.z > 1.0, "the behind camera sits behind the killer's eye")
+	kc.free()
 	_finished()
 
 
