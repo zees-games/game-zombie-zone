@@ -357,6 +357,9 @@ func setup_seconds() -> float:
 ## Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 never. `zz_stuck_remove_after`.
 @export_range(0, 10, 1) var stuck_remove_after: int = 2
 
+## Seconds between "stuck infected repathed" log lines; repaths in between are counted and reported on the next line. 0 logs every one. `zz_stuck_log_interval`.
+@export_range(0.0, 300.0, 1.0) var stuck_log_interval: float = 5.0
+
 ## A graph edge that rises more than this many metres is taken down only (a drop seen from below is a wall). 0 off. `zz_nav_steep`.
 @export_range(0.0, 20.0, 0.1) var nav_steep: float = 1.2
 
