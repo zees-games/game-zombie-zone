@@ -24,9 +24,9 @@ const ZzFooting := preload("../game/zz_footing.gd")
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 17
+const SECTIONS := 18
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
-const CHECKS := 150
+const CHECKS := 151
 
 var _entered := 0
 var _finished := 0
@@ -86,6 +86,7 @@ func _run() -> void:
 	await _test_no_world()
 	await _test_footing_rescue()
 	await _test_ladders()
+	await _test_ladder_from_water()
 	await _test_fall_damage()
 
 	if _skipped > 0:
@@ -1329,6 +1330,48 @@ func _test_ladders() -> void:
 				break
 		_check(boxes.size() > 0 and gained > 1.5, "%s: a survivor climbs a ladder" % id, "%d ladder boxes, climbed %.1f m of a %.1f m one" % [boxes.size(), gained, best.size.y])
 		game.queue_free()
+	_finished += 1
+
+
+## A ladder whose foot stands in water is still a ladder: swimming into its face puts the survivor on it, and the swim
+## mode does not pull them back off it on the next tick (its own check ran before the ladder's, every tick).
+func _test_ladder_from_water() -> void:
+	_entered += 1
+	if _skip_without_world(1):
+		return
+	var id := &"zm_roy_the_ship"
+	var game := await _game(id)
+	var me := game.add_player(&"u1", "Swimmer")
+	me.health.invulnerable = true
+	game.next_map_id = id
+	game.start()
+	await _sim(game, 8)
+	var boxes: Array[AABB] = game.map.mechanics.ladder_boxes() if game.map.mechanics != null else []
+	var tall := boxes.duplicate()
+	tall.sort_custom(func(l: AABB, r: AABB) -> bool: return l.size.y > r.size.y)
+	var gained := 0.0
+	for box: AABB in tall.slice(0, 4):
+		for side in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+			var at: Vector3 = box.get_center() + side * ((absf(side.x) * box.size.x + absf(side.z) * box.size.z) * 0.5 + 0.5)
+			at.y = box.position.y + 0.05
+			var wet: Array[AABB] = [AABB(Vector3(at.x - 4.0, at.y - 1.0, at.z - 4.0), Vector3(8.0, 3.2, 8.0))]
+			me.set_water(wet, game.water_rules)
+			me.place_at(at, 0.0)
+			me.controller.state.velocity = Vector3.ZERO
+			var up := DotFpsCommand.new()
+			up.move = Vector2(0.0, 1.0)
+			up.yaw = rad_to_deg(atan2(side.x, side.z))
+			up.pitch = 60.0
+			me.controller.apply_command(up)
+			await _sim(game, TICK_RATE * 2)
+			gained = maxf(gained, me.feet().y - at.y)
+			me.controller.apply_command(DotFpsCommand.new())
+		if gained > 1.5:
+			break
+	var none: Array[AABB] = []
+	me.set_water(none, game.water_rules)
+	_check(gained > 1.5, "a survivor climbs a ladder from water", "climbed %.1f m" % gained)
+	game.queue_free()
 	_finished += 1
 
 
