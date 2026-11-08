@@ -9,7 +9,7 @@ const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 ## zombie at a walking or slow chasing pace shambles and only one at running pace runs.
 
 const SECTIONS := 6
-const CHECKS := 35
+const CHECKS := 37
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -80,7 +80,7 @@ func _test_view() -> void:
 	_sections_finished += 1
 
 
-## The lowest of the two feet's bone heights (view space, floor 0) over a walk, as [min, max].
+## The lowest of the two feet's bone heights (view space, floor 0, from the local poses as they are now: the skeleton's cached global poses are last frame's) over a walk, as [min, max].
 func _foot_band(kind: StringName, speed: float) -> Vector2:
 	var view := ZzZombieView.new()
 	add_child(view)
@@ -99,7 +99,7 @@ func _foot_band(kind: StringName, speed: float) -> Vector2:
 		var low := 99.0
 
 		for f in feet:
-			low = minf(low, (skeleton.global_transform * skeleton.get_bone_global_pose(f)).origin.y)
+			low = minf(low, (skeleton.global_transform * DotHumanoidIk.global_pose(skeleton, f)).origin.y)
 
 		band = Vector2(minf(band.x, low), maxf(band.y, low))
 
@@ -116,6 +116,8 @@ func _test_feet() -> void:
 		var detail := "1.1 m/s %s, 2.2 m/s %s" % [slow, chase]
 		_check(maxf(slow.y, chase.y) < 0.08, "%s: a foot is always within 8 cm of the floor while walking (none floats)" % kind, detail)
 		_check(minf(slow.x, chase.x) > -0.1, "%s: no foot sinks more than 10 cm under the floor while walking" % kind, detail)
+		var sprint := _foot_band(kind, 6.3)
+		_check(sprint.x > -0.1, "%s: no foot sinks more than 10 cm under the floor at a sprint (6.3 m/s)" % kind, "6.3 m/s %s" % sprint)
 	_sections_finished += 1
 
 
