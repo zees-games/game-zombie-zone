@@ -1,5 +1,7 @@
 extends "zz_client_state.gd"
 
+const ZzViewGrip := preload("zz_view_grip.gd")
+
 func _ready() -> void:
 	# First, before anything can be drawn: the map, the player and the camera all arrive
 	# after this node is in the tree. The platform puts the loading cover up, held until the

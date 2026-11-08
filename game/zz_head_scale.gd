@@ -1,4 +1,3 @@
-class_name ZzHeadScale
 extends SkeletonModifier3D
 
 ## Shrinks the head bone (and the hair skinned to it) after the clip has posed it, so the kit's big-headed
@@ -29,7 +28,7 @@ static func attach(root: Node, p_factor: float) -> void:
 	for node in root.find_children("*", "Skeleton3D", true, false):
 		if node.get_node_or_null(^"HeadScale") != null:
 			continue
-		var modifier := ZzHeadScale.new()
+		var modifier := new()
 		modifier.name = "HeadScale"
 		modifier.factor = p_factor
 		node.add_child(modifier)

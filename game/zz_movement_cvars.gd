@@ -1,4 +1,3 @@
-class_name ZzMovementCvars
 extends RefCounted
 
 ## The shared movement cvar names (`sv_runspeed`, `sv_gravity`, `sv_walkspeed`, `sv_airaccelerate`) over [ZzConfig], which stays the one source of truth.
