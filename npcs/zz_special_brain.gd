@@ -31,6 +31,14 @@ const RETREAT_HEALTH := 0.35
 ## Seconds it is willing to wait out of sight for the team to be busy.
 const PATIENCE := 6.0
 
+## A special farther than PARK_FAR from every survivor that has not got PARK_PROGRESS closer in PARK_AFTER seconds is
+## parked (no unseen spot, or waiting on the team again and again): it drops the stalking and runs at the nearest
+## survivor like a common for PARK_RUSH seconds, then judges again.
+const PARK_FAR := 16.0
+const PARK_AFTER := 12.0
+const PARK_PROGRESS := 2.0
+const PARK_RUSH := 25.0
+
 var victim: StringName = &""
 var _hide_spot: Vector3 = Vector3.INF
 var _hide_for: StringName = &""
@@ -41,6 +49,9 @@ var _retreat_until: float = -1.0
 var _retreated_at_health: float = 1.0
 var _cooldown_until: float = 0.0
 var _waited_since: float = -1.0
+var _park_best: float = INF
+var _park_since: float = 0.0
+var _rush_until: float = -1.0
 
 
 func _build() -> void:
@@ -272,6 +283,10 @@ func _decide(delta: float) -> void:
 		begin_retreat()
 		return
 
+	if _parked():
+		var _rushed := melee_chase(npc.def.move_speed)
+		return
+
 	victim = choose_victim()
 
 	if victim == &"":
@@ -283,6 +298,36 @@ func _decide(delta: float) -> void:
 		return
 
 	_special(delta)
+
+
+## True while the special is rushing because its approach stalled far from the team.
+func _parked() -> bool:
+	var t := now()
+
+	if t < _rush_until:
+		return true
+
+	var gap := INF
+	var here := npc.position()
+
+	for id in _survivors():
+		var at := survivor_at(id)
+
+		if at != Vector3.INF:
+			gap = minf(gap, flat_distance(here, at))
+
+	if gap <= PARK_FAR or gap == INF or gap < _park_best - PARK_PROGRESS:
+		_park_best = gap
+		_park_since = t
+		return false
+
+	if t - _park_since < PARK_AFTER:
+		return false
+
+	_rush_until = t + PARK_RUSH
+	_park_best = gap
+	_park_since = _rush_until
+	return true
 
 
 ## Whether this kind breaks off when hurt. The ram and the brute do not.
