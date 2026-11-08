@@ -983,8 +983,13 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 		var nudged := _nudge_sideways(b, survivor_position(nearest_id))
 		stuck_nudges += int(nudged)
-		DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged, "edge": edge,
-			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+		if stuck_log_at < 0.0 or _time < stuck_log_at or _time - stuck_log_at >= config.stuck_log_interval:
+			stuck_log_at = _time
+			DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged, "edge": edge,
+				"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", "")), "suppressed": stuck_log_skipped})
+			stuck_log_skipped = 0
+		else:
+			stuck_log_skipped += 1
 		return
 
 	if action == DotNpcStuckRescue.REMOVE:
