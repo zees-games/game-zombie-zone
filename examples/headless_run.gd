@@ -3,6 +3,7 @@ extends DotGameCheckSuite
 const ZzBindings := preload("../game/zz_bindings.gd")
 const ZzBoxes := preload("../game/zz_boxes.gd")
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
+const ZzFlashlight := preload("../game/zz_flashlight.gd")
 const ZzWaterRules := preload("../game/zz_water_rules.gd")
 const ZzClient := preload("../game/zz_client.gd")
 const ZzUnstick := preload("../game/zz_unstick.gd")
@@ -41,7 +42,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 439
+const CHECKS := 442
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1391,6 +1392,15 @@ func _test_the_flashlight() -> void:
 	me.flashlight_ready = false
 	await _sim(game, 0.1)
 	_check(not me.flashlight, "and one that starts dark does not")
+
+	# Converted maps write "ambient" as a dictionary: the manor (ambient 0.3) is dark by mood alone.
+	var dark_cfg := DotFlashlightConfig.new()
+	dark_cfg.default_state = DotFlashlightConfig.START_DARK
+	var manor := {"ambient": {"mood": "interior_horror", "indoor": "interior_horror"}, "environment": {"ambient_energy": 0.3}}
+	var hall := {"ambient": {"mood": "indoor_hall", "indoor": "interior_horror"}, "environment": {"ambient_energy": 0.3}}
+	_check(ZzFlashlight.starts_on(dark_cfg, "ze_biohazard_manor", manor), "an interior_horror map document starts lit")
+	_check(not ZzFlashlight.starts_on(dark_cfg, "zm_mansion_css", hall), "an indoor_hall one over the floor does not")
+	_check(ZzFlashlight.starts_on(dark_cfg, "zz_chapel", {}), "the hand-made chapel starts lit by its table mood")
 
 	me.actions = ZzNetCommand.ACT_FLASHLIGHT
 	await _sim(game, 0.4)
