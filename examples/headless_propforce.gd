@@ -1,5 +1,6 @@
 extends "zz_suite.gd"
 
+const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzPropForce := preload("../game/zz_prop_force.gd")
 
 ## The per-weapon force table on loose props: lookup rules, the shipped file, and a shot moving a barrel further with a bigger multiplier.
@@ -9,6 +10,7 @@ const CHECKS := 9
 
 
 func _ready() -> void:
+	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
