@@ -901,10 +901,14 @@ func _build_spectate() -> void:
 	spectate.name = "Spectate"
 	spectate.players = players
 	spectate.sides = sides
-	spectate.phase_fn = func() -> int: return phase
+	spectate.authoritative = authoritative
+	spectate.tick_rate = tick_rate
+	spectate.force_camera = config.spectate_camera
+	# Both overview slots are the same view here, so the phase never needs to pick.
+	spectate.fixed_index_fn = func(_key: String) -> int: return ZzSpectate.OVERVIEW_FIELD
 	add_child(spectate)
 
-	var ready_now := spectate.setup(authoritative, tick_rate, config.spectate_camera)
+	var ready_now := spectate.setup()
 
 	if not ready_now.ok:
 		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
@@ -1549,7 +1553,7 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	_reset_objectives()
 
 	if spectate != null:
-		spectate.set_overviews(map.overview(), map.overview())
+		spectate.set_overview_pair(map.overview(), map.overview())
 
 	for p: ZzPlayer in players.values():
 		p.flashlight_ready = false
