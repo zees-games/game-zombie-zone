@@ -1191,6 +1191,8 @@ func _arm_locally(weapon_id: StringName) -> void:
 		view_model.name = "ViewModel"
 		view_model.feel_rules = game.feel_rules
 		camera.add_child(view_model)
+		if ZzViewGrip.available():
+			view_model.hands_reached.connect(_on_hands_reached)
 
 		weapons = ZeeWeaponRig.new()
 		weapons.name = "Weapons"
@@ -1817,6 +1819,13 @@ func _build_settings() -> void:
 
 ## The player's `cl_crosshair_*` cvars at the console's local source.
 func _bind_crosshair_console() -> void:
+	if console != null:
+		var held_sources: Array = console.sources()
+		if not held_sources.is_empty() and held_sources[0] is DotConsoleLocal:
+			(held_sources[0] as DotConsoleLocal).add_var(&"cl_viewarms_held",
+				"1 draws the held weapon in the first-person arms (default 0)",
+				func() -> String: return "1" if cl_viewarms_held else "0",
+				func(v: String) -> void: cl_viewarms_held = v.to_int() != 0)
 	if console != null and hud != null:
 		var _bound := game.combat_feel.bind_console(console, hud.crosshair())
 		var sources: Array = console.sources()
@@ -2081,6 +2090,12 @@ func _process(delta: float) -> void:
 
 
 ## Your crawling arms while down in first person. The pivot turns with the yaw only: under the pitch they would swing with the look.
+var cl_viewarms_held: bool = false
+var _held_grip: DotViewGrip = null
+var _held_on: bool = false
+var _arms_downed: bool = false
+
+
 func _present_view_arms(delta: float, yaw: float) -> void:
 	if view_arms == null or not is_instance_valid(view_arms):
 		_arms_yaw = Node3D.new()
@@ -2093,14 +2108,38 @@ func _present_view_arms(delta: float, yaw: float) -> void:
 		view_arms.build(player.view_look(game.side_colour(ZzGame.SURVIVORS)), ZzPlayer.BODY_HEIGHT)
 
 	_arms_yaw.global_position = camera.global_position
-	_arms_yaw.global_rotation = Vector3(0.0, yaw, 0.0)
+	# Holding a weapon the arms follow the look's pitch too: the gun they grip is under the camera.
+	_arms_yaw.global_rotation = Vector3(camera.global_rotation.x if _held_on else 0.0, yaw, 0.0)
 	var on := player.is_down() and player.is_alive() and not third_person and not is_spectating() and _end_weight < 0.3
 
-	if on != view_arms.shown:
+	if on != _arms_downed:
+		_arms_downed = on
 		view_arms.set_downed(on)
+
+	_present_held_hands()
 
 	var velocity := player.controller.state.velocity
 	view_arms.tick(Vector2(velocity.x, velocity.z).length(), delta)
+
+
+## `cl_viewarms_held 1` (opt-in): the arms hold the weapon where the view model measured its grip, in place of
+## the view model's own hands.
+func _on_hands_reached(anchor: Node3D, grip: Vector3, fore: Vector3, pose: StringName) -> void:
+	_held_grip = ZzViewGrip.update(_held_grip, anchor, grip, fore, pose)
+
+
+func _present_held_hands() -> void:
+	var opted := cl_viewarms_held and ZzViewGrip.available()
+	if view_model != null and is_instance_valid(view_model):
+		view_model.show_arms = not opted
+
+	var want := opted and _held_grip != null and player.is_alive() and not third_person \
+		and not is_spectating() and _end_weight < 0.3 and (view_model == null or view_model.visible)
+	if want != _held_on:
+		_held_on = want
+		if not want:
+			_held_grip = null
+	view_arms.set_held(_held_grip if want else null)
 
 
 ## The box in the hands, drawn under the camera in first person while one is out.
