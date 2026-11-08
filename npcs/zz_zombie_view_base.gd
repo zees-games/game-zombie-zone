@@ -121,26 +121,26 @@ const LOOKS := {
 		"bones": {"UpperArm.L*": 1.12, "UpperArm.R*": 1.12, "Head": 0.95}, "hunch": 0.35,
 		"clips": {"walk": &"crawl", "idle": &"crawl", "run_arms": &"crawl", "run": &"crawl"}, "wear": [], "blood": 0.6},
 	&"strangler": {"body": &"basic", "height": 2.05, "girth": 0.78, "skin": "8e9a5c", "bottom": "3b3a33", "belt": "2b2a26",
-		"bones": {"Neck": Vector3(0.9, 2.2, 0.9), "Head": 0.85, "Tongue1*": Vector3(1.5, 2.6, 1.5)}, "hunch": 0.3, "shamble": {"stoop": 0.3, "head": 0.45, "arms": -0.2, "swing": 0.5, "drag": 0.25, "sway": 0.18}, "wear": [&"neck_growth"], "mark": "4a2a3a", "blood": 0.62},
+		"bones": {"Neck": Vector3(0.9, 2.2, 0.9), "Head": 0.85, "Tongue1*": Vector3(1.5, 2.6, 1.5)}, "hunch": 0.3, "shamble": {"stoop": 0.3, "head": 0.45, "arms": -0.2, "swing": 0.5, "drag": 0.25, "sway": 0.18}, "wear": [&"neck_growth"], "mark": "4a2a3a", "vein": "5a2e55", "blood": 0.62},
 	&"bloater": {"body": &"chubby", "height": 1.85, "girth": 1.4, "skin": "a8a45a", "bottom": "4a3f30",
-		"bones": {"Abdomen": Vector3(1.45, 1.0, 1.45), "Torso": Vector3(1.25, 1.0, 1.3), "Head": 0.9}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [&"boils"], "mark": "6b7a2a", "blood": 0.7},
+		"bones": {"Abdomen": Vector3(1.45, 1.0, 1.45), "Torso": Vector3(1.25, 1.0, 1.3), "Head": 0.9}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [&"boils"], "mark": "6b7a2a", "vein": "4f5a1c", "blood": 0.7},
 	&"ram": {"body": &"arm", "height": 2.05, "girth": 1.1, "skin": "6e6152", "bottom": "2e3440",
-		"bones": {}, "hunch": 0.2, "shamble": {"stoop": 0.4, "head": -0.1, "arms": -0.35, "swing": 0.65, "drag": 0.5, "sway": 0.2, "hip": 0.2}, "wear": [], "mark": "3a2a24", "blood": 0.64,
+		"bones": {}, "hunch": 0.2, "shamble": {"stoop": 0.4, "head": -0.1, "arms": -0.35, "swing": 0.65, "drag": 0.5, "sway": 0.2, "hip": 0.2}, "wear": [], "mark": "3a2a24", "vein": "1c1814", "blood": 0.64,
 		"clips": {"attack_idle": &"attack", "crawl": &"walk"}},
 	&"spitter": {"body": &"lis", "height": 1.95, "girth": 0.8, "skin": "9fb35a", "top": "3d4a2e", "bottom": "2c2e26", "hair": "1c1d18",
-		"bones": {"Neck": Vector3(0.9, 2.4, 0.9), "Head": 0.9}, "hunch": 0.15, "shamble": {"stoop": 0.3, "head": 0.55, "hang": -0.9, "swing": 0.5, "drag": 0.2}, "wear": [&"acid_mouth"], "mark": "2e4a12", "blood": 0.65, "glow": "4f8a12"},
+		"bones": {"Neck": Vector3(0.9, 2.4, 0.9), "Head": 0.9}, "hunch": 0.15, "shamble": {"stoop": 0.3, "head": 0.55, "hang": -0.9, "swing": 0.5, "drag": 0.2}, "wear": [&"acid_mouth"], "mark": "2e4a12", "vein": "3f6a14", "blood": 0.65, "glow": "4f8a12"},
 	&"rider": {"body": &"basic", "height": 1.2, "girth": 1.0, "skin": "8a7a66", "bottom": "4a3a2a", "belt": "2a221a",
 		"bones": {"UpperArm.L*": 1.35, "UpperArm.R*": 1.35, "Head": 1.15, "UpperLeg.L*": 0.8, "UpperLeg.R*": 0.8}, "hunch": 0.55, "wear": [], "blood": 0.64,
 		"clips": {"run": &"run_arms", "walk": &"run_arms"}},
 	&"brute": {"body": &"chubby", "height": 2.95, "girth": 1.55, "skin": "5e5263", "bottom": "2e2a2a",
 		"bones": {"UpperArm.L*": 1.4, "UpperArm.R*": 1.4, "Shoulder.L": 1.3, "Shoulder.R": 1.3, "Head": 0.6, "Torso": Vector3(1.2, 1.0, 1.15)}, "hunch": 0.35, "shamble": {"stoop": 0.35, "head": 0.1, "arms": -0.5, "hang": -0.9, "swing": 0.6, "drag": 0.6, "trail": 0.1, "sway": 0.22, "hip": 0.2, "cadence": 0.8, "lurch": 0.0},
-		"wear": [&"spikes"], "mark": "2a1d3a", "blood": 0.62},
+		"wear": [&"spikes"], "mark": "2a1d3a", "vein": "1e1230", "blood": 0.62},
 	&"sleeper": {"body": &"lis", "height": 1.65, "girth": 0.85, "skin": "e4e4e8", "top": "d6d2c8", "bottom": "c8c2b8", "hair": "16161a",
 		"bones": {"Index1.L*": Vector3(0.8, 1.9, 0.8), "Index1.R*": Vector3(0.8, 1.9, 0.8), "Middle1.L*": Vector3(0.8, 1.9, 0.8), "Middle1.R*": Vector3(0.8, 1.9, 0.8), "Pinky1.L*": Vector3(0.8, 1.9, 0.8), "Pinky1.R*": Vector3(0.8, 1.9, 0.8)},
-		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "mark": "7a8a9a", "blood": 0.62},
+		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "mark": "7a8a9a", "vein": "7a3040", "blood": 0.62},
 	&"screamer": {"body": &"chubby", "height": 2.0, "girth": 0.72, "skin": "b6bfc6", "bottom": "3a1e22",
 		"bones": {"Abdomen": Vector3(0.62, 1.15, 0.62), "Torso": Vector3(0.68, 1.1, 0.7), "Neck": Vector3(0.8, 1.6, 0.8), "BottomMouth": 1.4}, "hunch": 0.2, "shamble": {"stoop": 0.1, "head": -0.1, "arms": -0.5, "hang": -0.7, "swing": 0.7, "drag": 0.7, "trail": 0.0, "sway": 0.08, "hip": 0.06, "cadence": 1.1, "lurch": 0.0},
-		"wear": [], "mark": "5a6a8a", "blood": 0.62},
+		"wear": [], "mark": "5a6a8a", "vein": "4a5878", "blood": 0.62},
 	&"crawler": {"body": &"basic", "height": 1.75, "girth": 1.0, "skin": "6f7a55", "bottom": "3a3a30", "belt": "4a2020",
 		"bones": {"UpperLeg.L*": 0.04, "UpperLeg.R*": 0.04}, "hunch": 0.0,
 		"clips": {"idle": &"crawl", "walk": &"crawl", "run": &"crawl", "run_arms": &"crawl", "attack": &"crawl", "attack_idle": &"crawl", "attack_run": &"crawl", "hit": &"crawl", "jump_idle": &"crawl"}, "wear": [&"gore"], "blood": 0.55},
@@ -239,6 +239,8 @@ uniform vec3 blood_colour : source_color = vec3(0.45, 0.06, 0.05);
 uniform vec3 glow = vec3(0.0);
 uniform vec3 mark_colour : source_color = vec3(0.0);
 uniform float mark_amount = 0.0;
+uniform vec3 vein_colour : source_color = vec3(0.0);
+uniform float vein_amount = 0.0;
 uniform float flash = 0.0;
 uniform float lift = 0.0;
 
@@ -269,6 +271,12 @@ void fragment() {
 	// Bruises and sores: where the noises disagree with the blood, so the two never overlap.
 	float mark = smoothstep(0.48, 0.56, COLOR.g) * (1.0 - smoothstep(0.45, 0.52, COLOR.r));
 	c = mix(c, mark_colour, mark * mark_amount);
+	// Veins, cracks and scars: the contour lines of a smooth field built from the skin-fixed
+	// noises, so a flat-coloured body carries a pattern that moves with it and costs no texture.
+	float field = COLOR.b * 11.0 + COLOR.r * 6.0 - COLOR.g * 5.0;
+	float vein_d = abs(fract(field) - 0.5);
+	float vein = (1.0 - smoothstep(0.012, 0.012 + 0.02 + fwidth(field), vein_d)) * smoothstep(0.5, 0.62, COLOR.b) * smoothstep(0.35, 0.5, COLOR.g) * (1.0 - blood);
+	c = mix(c, vein_colour, vein * vein_amount);
 	ALBEDO = c;
 	ROUGHNESS = mix(0.9, 0.3, blood);
 	// A little self-light so a dark skin on a night map keeps its legs, head and face: lit by
@@ -567,7 +575,8 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 
 	var glow := Color(str(look.get("glow", "000000")))
 	var mark := Color(str(look.get("mark", "000000"))).srgb_to_linear() if detail else Color.BLACK
-	var key := "%s%s|%s|%s|%.2f|%.2f|%s|%s" % [look["body"], look.get("tex", ""), from, to, float(look.get("blood", 0.6)), float(look.get("dirt", 0.5)), glow.to_html(), mark.to_html()]
+	var vein := Color(str(look.get("vein", "000000"))).srgb_to_linear() if detail else Color.BLACK
+	var key := "%s%s|%s|%s|%.2f|%.2f|%s|%s|%s" % [look["body"], look.get("tex", ""), from, to, float(look.get("blood", 0.6)), float(look.get("dirt", 0.5)), glow.to_html(), mark.to_html(), vein.to_html()]
 
 	if _materials.has(key):
 		return _materials[key]
@@ -624,6 +633,8 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	material.set_shader_parameter(&"lift", BODY_LIFT)
 	material.set_shader_parameter(&"mark_colour", Color(mark.r, mark.g, mark.b))
 	material.set_shader_parameter(&"mark_amount", 0.95 if mark != Color.BLACK else 0.0)
+	material.set_shader_parameter(&"vein_colour", Color(vein.r, vein.g, vein.b))
+	material.set_shader_parameter(&"vein_amount", 0.6 if vein != Color.BLACK else 0.0)
 	_materials[key] = material
 	return material
 

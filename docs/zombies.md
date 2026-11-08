@@ -101,6 +101,8 @@ A rare special (`zz_oil_monster_chance` 0.3, first wave `zz_oil_monster_min_wave
 
 `mark` in a kind's `LOOKS` entry is a bruise or sore colour the palette shader paints where the vertex noise is high in green and low in red (the blood's complement, so the two never overlap). `zz_zombie_detail 0` draws the plain colour. It is one smoothstep pair per fragment and no extra draw call. Contact sheets of the audit (2026-10-25) are under `~/npc-shots/` on the dev VM.
 
+`vein` in a `LOOKS` entry (the specials with a `mark`) draws cracks and veins in that colour: the contour lines of a smooth field built from the vertex-colour noises, thinned by a mask so they are patches and scars, not stripes (a first, unmasked version read as a zebra). They are fixed to the skin, cost no texture and no draw call, and follow `zz_zombie_detail`. Not done from the audit: real textured CC0 bodies for the specials, limb-loss meshes, and a measured LOD-pop and foot-slide pass; in-game distance shots need `tools/shot.sh --seconds=35` on a display (xvfb-run is enough).
+
 ## Dark bodies at night
 
 Lit by a night map's moon alone, the specials' charcoal skins (ram, leaper, brute) drew as black cones with only claws showing, and the spitter's whole-body `glow` drew it as a flat green silhouette. The shader now emits `BODY_LIFT` of the body's own colour, and a kind's `glow` reaches the body at `GLOW_BODY` (the throat is its own mesh). `zombie_rack.gd --night` renders the sheet by a night's light; `--set=ragdolls [--sever=head,legL] [--kinds=...]` drops each kind as the world view does.
