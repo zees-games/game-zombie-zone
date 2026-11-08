@@ -12,7 +12,7 @@ mkdir -p "$out"
 log=$out/$name.log
 timeout 300 xvfb-run -a godot --path . --resolution 960x540 --fixed-fps "$fps" \
   --write-movie "$out/$name.avi" --script res://tools/filmstrip_capture.gd -- "$clip" "$view" --zz-map-ids=zz_practice > "$log" 2>&1 || true
-grep -E "^(clip |PASS|FAIL|SKIP|SCRIPT ERROR|ERROR)" "$log" | head -n 30
+grep -E "^(clip |PASS|FAIL|SKIP|SCRIPT ERROR|ERROR)" "$log" | uniq | head -n 30 || true   # head closing the pipe gave rc 141 under pipefail
 # The movie includes the cover and the wait for the round: cut it to the clip itself.
 read -r first count < <(sed -n 's/^FILMSTRIP_CLIP start_frame=\([0-9]*\) frames=\([0-9]*\)/\1 \2/p' "$log")
 if [[ -n ${first:-} ]]; then
