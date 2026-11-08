@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 437
+const CHECKS := 439
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1611,6 +1611,13 @@ func _test_how_survivors_fall() -> void:
 	view.ragdoll_rules = game.ragdoll_rules
 	view.ragdoll_mask = game.world_mask()
 	game.add_child(view)
+	# A slam's grey dust blends like smoke; a pipe's fire is additive.
+	for kind: StringName in [&"slam", &"pipe"]:
+		view.blast(Vector3.ZERO, 4.0, kind)
+		var puff := view.get_child(view.get_child_count() - 1).find_children("*", "CPUParticles3D", false, false)[0] as CPUParticles3D
+		var blend := ((puff.mesh as QuadMesh).material as StandardMaterial3D).blend_mode
+		_check(blend == (BaseMaterial3D.BLEND_MODE_MIX if kind == &"slam" else BaseMaterial3D.BLEND_MODE_ADD),
+			"a %s blast's particles use the right blend" % kind, str(blend))
 	var _shown := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
 	me.incaps = game.config.max_incaps
 	var hit := DotDamage.make(claw, me.entity_id, me.health.health * 50.0 + 500.0, game.combat.damage_type(&"strike"))
