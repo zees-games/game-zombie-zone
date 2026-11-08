@@ -4,6 +4,8 @@ extends SceneTree
 ## through the real offline client (first or third person) or a common infected on a stage.
 ## Run by tools/filmstrip_run.sh with user args `<clip> <fp|tp>`.
 
+## Frame time (60 fps) a hop is judged at when the weapon's wall retract moved it.
+const REFERENCE_DT := 1.0 / 60.0
 const BUTTON_ACTIONS := {"sprint": &"dot_fps_sprint", "walk": &"dot_fps_walk", "crouch": &"dot_fps_crouch"}
 
 var _clip: DotScenario = null
@@ -28,6 +30,8 @@ var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
 var _worst_hop := 0.0
 var _frame_hop := 0.0
+var _delta := 0.0
+var _last_wall := 0.0
 var _worst_at := 0.0
 var _worst_part := ""
 var _log: Array[String] = []
@@ -101,6 +105,7 @@ func _process(delta: float) -> bool:
 		_set_up()
 		return false
 	_time += delta
+	_delta = delta
 	_survivor_frame()
 	if _time >= _clip.duration:
 		return _finish()
@@ -191,18 +196,25 @@ func _first_person_sample(feet: Vector3) -> void:
 	if _last_places.size() != places.size():
 		_last_places = places.duplicate()
 	_frame_hop = 0.0
+	# The weapon's wall retract is a timed swing, so on a frame where it moves the hop is read as a speed
+	# at the reference frame rate; at 15 fps a 0.2 s retract is not a pop. Every other hop stays raw.
+	var wall: float = (model as Node).call("wall_amount")
+	var scale := 1.0
+	if absf(wall - _last_wall) > 0.0001 and _delta > REFERENCE_DT:
+		scale = REFERENCE_DT / _delta
+	_last_wall = wall
 	for i in places.size():
 		# Hidden pairs and a part going hidden are never seen; a reappearing part is judged from where it vanished.
 		if not shown[i]:
 			continue
-		var hop := places[i].distance_to(_last_places[i])
+		var hop := places[i].distance_to(_last_places[i]) * scale
 		_frame_hop = maxf(_frame_hop, hop)
 		if hop > _worst_hop:
 			_worst_hop = hop
 			_worst_at = _time
 			_worst_part = "%s (%s)" % [_parts[i].get_path(), _parts[i].get_class()]
 		_last_places[i] = places[i]
-	_log.append("%.2f pos=(%.1f,%.1f,%.1f) down=%s wall=%.3f hop=%.3f" % [_time, feet.x, feet.y, feet.z, _local.is_down(), (model as Node).call("wall_amount"), _frame_hop])
+	_log.append("%.2f pos=(%.1f,%.1f,%.1f) down=%s wall=%.3f hop=%.3f" % [_time, feet.x, feet.y, feet.z, _local.is_down(), wall, _frame_hop])
 
 
 func _actions(move: Array, want: Array) -> void:
