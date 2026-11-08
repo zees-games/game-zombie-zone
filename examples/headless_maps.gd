@@ -9,6 +9,7 @@ const ZzLampBudget := preload("../game/zz_lamp_budget.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
 const ZzPaths := preload("../game/zz_paths.gd")
+const ZzTestToys := preload("zz_test_toys.gd")
 
 ## Every map the game can be sent, built the way a server builds it and looked over for the
 ## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
