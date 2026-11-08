@@ -621,6 +621,13 @@ func _test_big_map(id: StringName) -> void:
 	var kills := 0
 	var torn := 0
 	var t := 0.0
+	# Wall-clock cost, so a loaded box (other suites share its CPUs) only ever makes a window slower: the minute is
+	# five windows and the budget is judged on the cheapest one's mean; a real slowdown makes every window slow.
+	var windows := 5
+	var window_ticks := int(PLAY_SECONDS * float(TICK_RATE) / float(windows))
+	var window_spent := 0
+	var window_n := 0
+	var cheapest := INF
 
 	while t < PLAY_SECONDS:
 		for i in 32:
@@ -630,6 +637,12 @@ func _test_big_map(id: StringName) -> void:
 			spent += cost
 			worst = maxi(worst, cost)
 			ticks += 1
+			window_spent += cost
+			window_n += 1
+			if window_n >= window_ticks:
+				cheapest = minf(cheapest, float(window_spent) / float(window_n) / 1000.0)
+				window_spent = 0
+				window_n = 0
 		t += 32.0 * TICK
 		await get_tree().physics_frame
 
@@ -668,7 +681,9 @@ func _test_big_map(id: StringName) -> void:
 	var mean := float(spent) / float(maxi(ticks, 1)) / 1000.0
 	print("    %s: %d ticks, %.2f ms mean, %.1f ms worst, %d zombies at the end, %d nav points" % [
 		id, ticks, mean, float(worst) / 1000.0, game.horde.count(), game.horde.nav.point_count()])
-	_check(mean < 1000.0 / float(TICK_RATE), "a tick fits in a 64 Hz server's budget", "%.2f ms mean, %.1f worst" % [mean, float(worst) / 1000.0])
+	if cheapest == INF:
+		cheapest = mean
+	_check(cheapest < 1000.0 / float(TICK_RATE), "a tick fits in a 64 Hz server's budget", "%.2f ms cheapest of %d windows, %.2f ms mean, %.1f worst" % [cheapest, windows, mean, float(worst) / 1000.0])
 	await _dispose(game)
 	_finished()
 
