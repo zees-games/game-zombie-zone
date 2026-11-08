@@ -118,6 +118,12 @@ func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> 
 	if ragdolls == null or figure == null or not figure.is_inside_tree():
 		return null
 	ragdolls.rules.collision_mask = ragdoll_mask
+	# The gun in the hand leaves the body first and falls as a short-lived prop (sv_ragdoll_weapon_drop);
+	# the hand's copy hides so the ragdoll is not copied with it raised.
+	var gun: Variant = figure.get(&"held")
+	if gun is Node3D and is_instance_valid(gun) and (gun as Node3D).is_inside_tree() and (gun as Node3D).visible:
+		if ragdolls.drop_prop(gun as Node3D, velocity) != null:
+			(gun as Node3D).visible = false
 	return ragdolls.spawn(figure, death if death != null else DotPlayerDeath.new(), velocity)
 
 

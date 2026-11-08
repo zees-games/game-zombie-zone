@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 439
+const CHECKS := 440
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1632,7 +1632,13 @@ func _test_how_survivors_fall() -> void:
 	var _reset := game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", "")
 
 	# Laid down from the figure, in the zombies' yard.
+	var gun: Variant = me.figure.get(&"held")
+	var gun_drawn: bool = gun is Node3D and (gun as Node3D).visible and (gun as Node3D).is_inside_tree()
 	var body := view.drop_survivor(me.figure, death, Vector3.ZERO)
+	if gun_drawn:
+		var fallen := view.ragdolls.get_children().filter(func(n: Node) -> bool: return n.name.begins_with("DroppedWeapon"))
+		_check(not (gun as Node3D).visible and not fallen.is_empty(),
+			"the gun in the dead survivor's hand falls as its own prop and the hand's copy hides", str(fallen.size()))
 	_check(body != null and view.ragdolls.live().has(body) and view.ragdolls.rules == game.ragdoll_rules,
 		"a client copies the body from the figure into the zombies' yard, under the game's rules")
 	for i in 90:
