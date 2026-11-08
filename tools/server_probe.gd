@@ -432,12 +432,17 @@ func _one_tick(tick: int) -> void:
 	var h = g.horde
 	if h != null:
 		h._time += delta
+		var ht := Time.get_ticks_usec()
 		h._rebuild_candidates()
+		ht = _lap_logic("horde.candidates", ht)
 		h._rebuild_grid()
+		ht = _lap_logic("horde.grid", ht)
 		h.spawner.set_candidates(h._candidates)
 		h._land_alerts()
+		ht = _lap_logic("horde.alerts", ht)
 		h._advance_lures()
 		h._advance_bile()
+		ht = _lap_logic("horde.lures_bile", ht)
 		at = _add("horde_other", at)
 		var sp: DotNpcSpawner = h.spawner
 		sp._now += delta
@@ -468,16 +473,22 @@ func _one_tick(tick: int) -> void:
 				npc.node.speed_scale = speed
 				npc.node.tick(delta)
 		at = _add("bodies", at)
+		ht = Time.get_ticks_usec()
 		h.squads.prune()
 		h._release_pending()
+		ht = _lap_logic("horde.prune_release", ht)
 		if h.pacing:
 			if h.waves_mode:
 				h._advance_panic()
 			else:
 				h._advance_mobs()
+				ht = _lap_logic("horde.mobs", ht)
 				h._advance_specials()
+				ht = _lap_logic("horde.specials", ht)
 				h._advance_brute()
+				ht = _lap_logic("horde.brute", ht)
 				h._advance_panic()
+				ht = _lap_logic("horde.panic", ht)
 		at = _add("horde_other", at)
 	var lt := Time.get_ticks_usec()
 	if g.pins != null:
