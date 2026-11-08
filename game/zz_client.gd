@@ -464,6 +464,7 @@ func _build_netcode() -> DotResult:
 	bridge.armed_received.connect(_on_armed)
 	bridge.ammo_received.connect(_on_ammo)
 	bridge.map_received.connect(_on_map)
+	bridge.map_repeated.connect(_on_map)
 	bridge.map_received.connect(func(_id: StringName) -> void: _server_map_told = true)
 	# A map on its way is a cover up already: the survivor's first position on it arrives before it is built.
 	bridge.map_incoming.connect(func() -> void:

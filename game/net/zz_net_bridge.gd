@@ -2027,7 +2027,10 @@ func _apply_map_part(reader: DotNetReader) -> void:
 	if _incoming_map.is_empty() or int(_incoming_map["seq"]) != int(part["seq"]):
 		_incoming_map = {"seq": int(part["seq"]), "count": int(part["count"]), "pieces": {}}
 		# The first piece of a map: the client covers the screen now, before the map is built.
-		map_incoming.emit()
+		# Not for a map this end already has built, as far as its first piece shows (a new round on
+		# the same map): the cover stays down, and a late difference holds it when the whole map is here.
+		if not _is_built_prefix(int(part["index"]), int(part["count"]), part["piece"]):
+			map_incoming.emit()
 
 	(_incoming_map["pieces"] as Dictionary)[int(part["index"])] = part["piece"]
 
@@ -2050,8 +2053,25 @@ func _apply_map(reader: DotNetReader) -> void:
 	_build_told_map(told["encoded"])
 
 
+## Client: whether this piece is the same slice of the map this end last built from the server's word.
+func _is_built_prefix(index: int, count: int, piece: PackedByteArray) -> bool:
+	if _built_bytes.is_empty() or game == null or game.map == null:
+		return false
+
+	var at := index * ZzEvents.MAP_PART_BYTES
+	var expected_count := (_built_bytes.size() + ZzEvents.MAP_PART_BYTES - 1) / ZzEvents.MAP_PART_BYTES
+	return count == expected_count and _built_bytes.slice(at, at + piece.size()) == piece and piece.size() <= _built_bytes.size() - at
+
+
 func _build_told_map(encoded: PackedByteArray) -> void:
 	if game == null:
+		return
+
+	# The map this end already has, told again (the server's next round on the same map): nothing
+	# to tear down or rebuild, so no cover. The per-round state restarts and the client hears it as a map.
+	if game.map != null and not _built_bytes.is_empty() and encoded == _built_bytes:
+		game.restart_same_map()
+		map_repeated.emit(game.map.id())
 		return
 
 	var decoded := ZzMapDoc.decode(encoded)
@@ -2065,6 +2085,7 @@ func _build_told_map(encoded: PackedByteArray) -> void:
 	var built := game.build_map(decoded.value)
 
 	if built.ok:
+		_built_bytes = encoded
 		map_received.emit(game.map.id())
 
 

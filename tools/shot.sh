@@ -17,6 +17,9 @@
 #   tools/shot.sh --view=action --action=emote:dance --seconds=0.5   # a stand-in playing an avatar action (pose:sit)
 #   tools/shot.sh --view=defib_other                                 # a stand-in charging a defibrillator, from the front (_b behind, _c the side)
 #   tools/shot.sh --view=pinned --pin=choke                          # a friend tongued
+#   tools/shot.sh --view=pinned --pin=pounce --seconds=0.2 --cam=orbit --target=pair --dist=3 --yaw=0,90,180,270 --times=0.3,0.8 --out=res://screenshots/hold.png
+#                  # an orbit camera round the pinned pair: hold_t0.30_y0.png ... (flags in tools/shot_orbit.gd:
+#                  # --target=holder|victim|pair|point|me --dist --yaw --pitch --lift --times; pin=pounce|choke|carry|ride|grab)
 #   tools/shot.sh --view=hit --spawn=common:6                        # confirmed hits, borrowed health, a hold-out clock
 #   tools/shot.sh --view=survivor --spawn=ram:2 --hard=5          # five Hard Box stacks: mutants drawn faded
 #   tools/shot.sh --view=survivor --goo=3                         # three stacks of black goo: the screen impair
@@ -55,7 +58,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

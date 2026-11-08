@@ -60,7 +60,7 @@ A death is dot-player-char's: the server picks a `DotPlayerDeath` reaction from 
 
 ## A holder at the lens
 
-The server puts a leaper or a rider on top of its victim, which is right for everybody else and puts its body round the victim's own camera (the play test saw "two black polygons", the inside of its mesh). For the victim alone, the holder's view is taken out from under its body (the camera fade hides whatever hangs off a collider at the lens) and stood a step in front of the camera, facing them (`ZzWorldView._present_lens_holder`). `tools/shot.sh --view=pinned --pin=ride --pin-me` draws it.
+The server puts a leaper or a rider on top of its victim, which is right for everybody else and puts its body round the victim's own camera (the play test saw "two black polygons", the inside of its mesh). For the victim alone, the holder's view is taken out from under its body (the camera fade hides whatever hangs off a collider at the lens) and stood a step in front of the camera, facing them (`ZzWorldView._present_lens_holder`). `tools/shot.sh --view=pinned --pin=ride --pin-me` draws it. `--view=pinned --pin=pounce|carry|choke --cam=orbit --target=holder|pair --dist=2.2 --yaw=0,90,180,270 --times=0.15,0.45 --seconds=0.2` circles a held pair and saves a frame per time and yaw (`tools/shot_orbit.gd` lists the flags). The strangler's hold is the tongue reel (`_pose_reel`, anim TONGUE): its `_pose_hold` branch is not reached.
 
 ## What a horde costs
 
