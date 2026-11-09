@@ -857,14 +857,28 @@ func _build_toggles(world: RefCounted) -> void:
 	for vol: Variant in _ents.volumes:
 		if not VOLUME_KINDS.has(vol.kind):
 			continue
-		var t := {"vol": vol, "entity": vol.entity, "kind": vol.kind, "enabled": not vol.disabled,
-				"initial": not vol.disabled, "bounds": (vol.bounds() as AABB).grow(BODY_PAD), "idx": _toggle_base + _toggles.size()}
+		var live: bool = not vol.disabled and not is_start_guard(vol)
+		var t := {"vol": vol, "entity": vol.entity, "kind": vol.kind, "enabled": live,
+				"initial": live, "bounds": (vol.bounds() as AABB).grow(BODY_PAD), "idx": _toggle_base + _toggles.size()}
 		_by_entity[vol.entity] = {"type": &"toggle", "i": _toggles.size()}
 		_toggles.append(t)
 		if PREDICTED_KINDS.has(vol.kind):
 			_predicted.append(t)
 	if authoritative and not _toggles.is_empty():
 		_build_volume_io(world)
+
+
+## A push a start `trigger_once` switches off (the Counter-Strike anti-camp shove at a spawn): survivors seldom cross that
+## trigger, so the push would stay on all round. Here it starts off, and the horde graph does not route around it.
+func is_start_guard(vol: Variant) -> bool:
+	if vol.kind != "push":
+		return false
+	for link: Dictionary in _ents.links.driving(vol.entity, "Disable"):
+		var from := int(link.get("from", -1))
+		for other: Variant in _ents.volumes:
+			if other.entity == from and other.kind == "once":
+				return true
+	return false
 
 
 ## The map's `info_player_*` entities as `[{name, origin, enabled}]`, live: an `Enable` or `Disable` input flips `enabled`.

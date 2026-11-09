@@ -26,7 +26,7 @@ const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 18
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
-const CHECKS := 151
+const CHECKS := 152
 
 var _entered := 0
 var _finished := 0
@@ -649,6 +649,14 @@ func _test_volumes() -> void:
 		game.queue_free()
 		_finished += 1
 		return
+
+	var guards := 0
+	var guards_live := 0
+	for t in mech.volume_toggles():
+		if mech.is_start_guard(t["vol"]):
+			guards += 1
+			guards_live += int(bool(t["initial"]))
+	_check(guards_live == 0, "a push a start trigger_once disables starts off (an anti-camp shove survivors never cross)", "%d of %d live" % [guards_live, guards])
 
 	var mild := _first_volume(mech, "hurt", true, 0.0, 499.0)
 	rider.place_at(_volume_spot(mild), 0.0)
