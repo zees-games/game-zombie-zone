@@ -7,8 +7,8 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
-const SECTIONS := 4
-const CHECKS := 30
+const SECTIONS := 5
+const CHECKS := 33
 
 
 func _ready() -> void:
@@ -24,6 +24,7 @@ func _run() -> void:
 	await _test_rules()
 	await _test_wire()
 	await _test_shot_hold()
+	await _test_bot_pickup()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -94,6 +95,46 @@ func _test_throw() -> void:
 			back = w
 	_check(back != null and back.magazine == 3, "with its magazine")
 	_check(ars.ammo().count(def.ammo_type) == reserve, "and the reserve", "%d of %d" % [ars.ammo().count(def.ammo_type), reserve])
+	_finished()
+
+
+func _test_bot_pickup() -> void:
+	_section("bot: a stand-in walks to a thrown primary and picks it up")
+	var game := await _team(1, _quiet, true)
+	var p := game.survivors()[0]
+	var ars := p.weapons.arsenal
+	var drops := game.weapon_layer.drops
+	var id := await _equip_primary(game, p)
+	var slot: int = ars.catalogue.get_def(id).slot
+	# Whatever else the stand-in carries in that slot goes too, so the slot is empty and it wants a primary.
+	game.weapon_layer.rules.pickup_radius = 0.0
+	var thrown := 0
+	for i in 6:
+		if ars.weapons_in(slot).is_empty():
+			break
+		p.wanted_slot = slot
+		var _on := ars.equip(slot)
+		await _sim(game, 0.6)
+		if game.weapon_layer.throw(p):
+			thrown += 1
+			await _sim(game, 0.3)
+	_check(thrown >= 1 and drops.count() == thrown and ars.weapons_in(slot).is_empty(), "the stand-in's primary lies on the floor", "thrown %d drops %d" % [thrown, drops.count()])
+	game.weapon_layer.rules.pickup_radius = 1.0
+	# The stand-in has wandered to its post by now: set it down a few metres from the weapon, in its reach.
+	await _sim(game, 3.0)
+	var lying: Vector3 = drops.snapshot()[0]["at"].origin
+	p.place_at(Vector3(lying.x + 4.0, 0.1, lying.z), 0.0)
+	await _sim(game, 0.25)
+	for i in 60:
+		# The horde is not what is being tried: the stand-in sees nobody, so the floor is its only business.
+		var memory: Dictionary = game.bots._memory(p)
+		memory["threat"] = null
+		memory["threat_until"] = game.current_tick() + 100
+		await _sim(game, 0.25)
+		if drops.count() < thrown:
+			break
+	_check(drops.count() < thrown, "it walked to a thrown weapon and took it", "drops %d of %d, at %s lying %s" % [drops.count(), thrown, p.feet(), lying])
+	_check(not ars.weapons_in(slot).is_empty(), "and holds a primary again")
 	_finished()
 
 
