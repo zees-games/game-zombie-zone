@@ -2724,8 +2724,8 @@ func _test_the_map_menu() -> void:
 	var gore_row: DotMenuRow = image.find_row(&"gore") if image != null else null
 	_check(gore_row != null and gore_row.row_id() == &"gore" and settings.schema.has(&"gore"),
 		"the Video page's Image section has a Blood splatters row on the gore setting")
-	# Gore persists: toggled off, flushed to a real file store in a scratch user:// directory, read back by a fresh instance.
-	var scratch := "user://headless_gore_persist"
+	# Gore persists: toggled off, flushed to a real file store in this process's scratch directory, read back by a fresh instance.
+	var scratch := DotSettingsScratch.use("headless_gore_persist")
 	var first := ZzSettings.new()
 	first.directory = scratch
 	add_child(first)
