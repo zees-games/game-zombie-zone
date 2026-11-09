@@ -5,6 +5,7 @@ extends Node
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzNavPrune := preload("../game/zz_nav_prune.gd")
 const RADIUS := 0.32
 const HEIGHT := 1.75
 ## Feet lifted off the line: a stair tread or kerb is climbed, a hanging prop or a wall is not.
@@ -107,7 +108,7 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	shape.height = HEIGHT - LIFT
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
-	query.collision_mask = _game.physics.layer_mask(&"world")
+	query.collision_mask = ZzNavPrune.body_mask(_game.physics)
 	if at.is_empty():
 		var all := nav.points_within(nav.points[0], 100000.0)
 		all.sort()

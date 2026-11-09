@@ -1020,6 +1020,15 @@ func push_at(feet: Vector3, height: float) -> Vector3:
 	return out
 
 
+## The map's push volumes that start live (the horde's nav costs up the points inside them: a body there is thrown, not walked).
+func push_volumes() -> Array[DotMapVolume]:
+	var out: Array[DotMapVolume] = []
+	for t in _toggles:
+		if str(t["kind"]) == "push" and bool(t["initial"]) and t.has("vol"):
+			out.append(t["vol"] as DotMapVolume)
+	return out
+
+
 ## The gravity scale a survivor at [param feet] is under (1 outside every gravity volume).
 func gravity_at(feet: Vector3, height: float) -> float:
 	for t in _predicted:
