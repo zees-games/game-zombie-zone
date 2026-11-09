@@ -733,6 +733,24 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	return shown
 
 
+## Floats this survivor's name and health pill over the drawn body for [param camera]'s owner:
+## shown for a living team-mate that is drawn, hidden otherwise. Presentation only.
+func present_tag(shown: bool, at: Vector3, camera: Camera3D, delta: float) -> void:
+	if not shown or camera == null:
+		if _tag != null:
+			_tag.visible = false
+		return
+
+	if _tag == null:
+		_tag = DotHealthTag.new()
+		_tag.name = "HealthTag"
+		add_child(_tag)
+
+	_tag.global_position = at + Vector3(0.0, BODY_HEIGHT + 0.35, 0.0)
+	_tag.face(camera)
+	_tag.update(real_health() / maxf(health.max_health, 1.0), true, true, display_name, true, delta)
+
+
 ## Breaks this player's body apart: torn up by a brute. Client side.
 func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value: int) -> DotPlayerBodyBreak:
 	if figure == null or not figure.visible or break_rules == null:

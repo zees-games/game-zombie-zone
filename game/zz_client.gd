@@ -235,6 +235,10 @@ func _warm_zombies() -> void:
 		own.build(kind, 0)
 		own.queue_free()
 
+	# A first death compiles the bone bodies' materials and shapes; do it here, not at the kill.
+	if world_view.ragdolls != null:
+		world_view.ragdolls.prewarm()
+
 	gate.warm_up(materials)
 
 
@@ -2460,8 +2464,13 @@ static func present_frame(
 		var colour := p_game.side_colour(ZzGame.SURVIVORS)
 		var hidden := (mine and first_person) or body == watched
 
-		if body.present_body(hidden, at, colour):
+		var drawn := body.present_body(hidden, at, colour)
+
+		if drawn:
 			shown += 1
+
+		# The others' names and health over their heads; your own, never.
+		body.present_tag(drawn and not mine and body != watched, at, own.get_viewport().get_camera_3d() if own != null and own.is_inside_tree() else null, delta)
 
 		var _pinged := body.present_beacon(delta, at, mine and first_person, 2.0)
 

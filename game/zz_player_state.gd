@@ -202,6 +202,8 @@ var in_end_area: bool = false
 
 ## What other people see this player as. Client side.
 var figure: ZzFigure = null
+## The name and health pill floating over this survivor for the others to read (dot-ui).
+var _tag: DotHealthTag = null
 
 ## How this survivor's body falls on their death: the server's pick ([method ZzGame.decide_death]),
 ## carried on DEATH and set here before anybody hears of it. Null before a first death.
