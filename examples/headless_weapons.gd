@@ -18,8 +18,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 15
-const CHECKS := 95
+const SECTIONS := 16
+const CHECKS := 99
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -50,6 +50,7 @@ func _run() -> void:
 		await _test_rearmed()
 		await _test_box_guns_are_drawn()
 		await _test_fire_bloom()
+		_test_spray()
 		_test_spawner()
 		_test_trader()
 		_test_shop()
@@ -348,6 +349,55 @@ func _test_box_guns_are_drawn() -> void:
 
 		_check(not ids.is_empty() and bad.is_empty(), "every %s the boxes hand out is drawn (%d)" % [tier, ids.size()], ", ".join(bad))
 
+	_finished()
+
+
+## One second of held trigger through the server's recoil rules: the view's peak climb, the peak
+## sideways wander, and what is left a second and a half after release.
+func _spray(def: DotWeaponDef) -> Array:
+	var b := def.tuning as DotWeaponBallistics
+	var view := DotWeaponRecoil.new()
+	var state := {}
+	var rate := maxi(Engine.physics_ticks_per_second, 1)
+	var interval := maxi(def.use_interval_ticks, 1)
+	var climb := 0.0
+	var wander := 0.0
+	var tick := 1000
+
+	while tick < 1000 + rate:
+		var out := DotWeaponOutcome.new()
+		var ctx := DotWeaponContext.new()
+		ctx.tick = tick
+		var _bullet: Variant = _client.game.combat_feel.recoil.apply(out, b, state, ctx, def.id, rate)
+		view.kick_outcome(out)
+		view.advance(float(interval) / rate)
+		climb = maxf(climb, view.offset().x)
+		wander = maxf(wander, absf(view.offset().y))
+		tick += interval
+
+	view.advance(1.5)
+	return [climb, wander, view.offset().length()]
+
+
+func _test_spray() -> void:
+	_section("a held second of every firearm: the automatics climb and wander, a rifle more than an SMG, and all settle")
+	var sprays := {}
+	var stuck := PackedStringArray()
+
+	for def in ZzWeapons.all_defs():
+		if def.tuning is DotWeaponBallistics and def.use_interval_ticks > 0:
+			sprays[def.id] = _spray(def)
+
+			if sprays[def.id][2] > 0.25:
+				stuck.append(String(def.id))
+
+	_check(sprays.has(&"zz_m4") and sprays.has(&"zz_smg"), "the rifle and SMG are measured", str(sprays.keys()))
+
+	if sprays.has(&"zz_m4") and sprays.has(&"zz_smg"):
+		_check(sprays[&"zz_m4"][0] > 0.5 and sprays[&"zz_m4"][1] > 0.2, "a rifle climbs and wanders sideways in a held second", str(sprays[&"zz_m4"]))
+		_check(sprays[&"zz_m4"][0] > sprays[&"zz_smg"][0], "a rifle climbs more than an SMG", "%.2f over %.2f" % [sprays[&"zz_m4"][0], sprays[&"zz_smg"][0]])
+
+	_check(stuck.is_empty(), "every firearm settles within a second and a half of release", ",".join(stuck))
 	_finished()
 
 

@@ -2093,8 +2093,13 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 		_aim_sent())
 
 
+## Whether the player sees their own legs in first person: the client-only `cl_legs` setting.
+func _own_legs() -> bool:
+	return settings != null and settings.settings != null and settings.settings.get_bool(DotOwnBodySetting.KEY, DotOwnBodySetting.DEFAULT)
+
+
 func _process(delta: float) -> void:
-	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
+	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes(), _own_legs())
 	# After the frame's poses, so the position the server just applied is the one judged and no frame of the void is drawn.
 	_guard_placed()
 
@@ -2610,7 +2615,8 @@ static func present_frame(
 	first_person: bool,
 	delta: float,
 	alpha: float = -1.0,
-	watched: ZzPlayer = null
+	watched: ZzPlayer = null,
+	own_legs: bool = false
 ) -> int:
 	var networked := p_net != null and p_net.is_running()
 
@@ -2640,14 +2646,15 @@ static func present_frame(
 		var mine := body == own
 		var at := drawn_position(body, networked and not mine)
 		var colour := p_game.side_colour(ZzGame.SURVIVORS)
-		var hidden := (mine and first_person) or body == watched
+		var legs := mine and first_person and own_legs and body != watched and body.is_alive()
+		var hidden := (mine and first_person and not legs) or body == watched
 
 		# A body standing in your head is not drawn: from the eye it is a wall of skin and hair (zz-look-model-survivors).
 		if first_person and own != null and not mine and own.is_inside_tree() \
 				and Vector2(at.x - own.global_position.x, at.z - own.global_position.z).length() < NEAR_EYE:
 			hidden = true
 
-		var drawn := body.present_body(hidden, at, colour)
+		var drawn := body.present_body(hidden, at, colour, legs)
 
 		if drawn:
 			shown += 1

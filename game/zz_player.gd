@@ -693,7 +693,7 @@ func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) 
 
 ## Draws this player for one frame at [param at]: standing, crouched, or on the floor. Returns
 ## whether anything was shown.
-func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
+func present_body(hidden: bool, at: Vector3, team_colour: Color, own_legs: bool = false) -> bool:
 	var shown := not hidden and is_alive() and not watching
 
 	if figure == null:
@@ -712,7 +712,11 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	figure.visible = shown
 
 	if shown:
+		# Your own legs in first person (cl_legs): the figure shrinks head and torso away and trails back from the eye itself.
+		figure.person.first_person = DotHumanoidOwnView.LEGS if own_legs else DotHumanoidOwnView.THIRD
 		_present_held()
+		if own_legs and figure.held != null:
+			figure.held.visible = false
 		var velocity := controller.state.velocity
 
 		# A body nobody simulates here (another player's) shows its crawl from the speed it is drawn at.

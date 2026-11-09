@@ -330,6 +330,10 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# zz_head_mult, zz_neck_mult, zz_stomach_mult, zz_leg_mult: what a hit on that zone does, for every attacker.
+	if world.combat != null and world.combat.resolver.hit_groups != null:
+		var _zones: Array = world.combat.resolver.hit_groups.bind_cvars(add_cvar, "zz", DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+
 	# Spread, recoil, sprint and stamina: the server's shot, and a client's prediction and view, read the same numbers.
 	world.combat_feel.bind_cvars(add_cvar)
 

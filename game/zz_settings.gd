@@ -72,6 +72,9 @@ static func spec_for() -> DotMenuGameSpec:
 		DotSettingsDef.integer(&"vis_mode", 3, 0, 3, &"video").with_description(
 			"Which hidden parts of a map are skipped when drawing: none, by precomputed visibility, by occluders, or both."),
 	]
+	var legs: Variant = DotOwnBodySetting.def()
+	if legs != null:
+		s.extra_defs.append(legs)
 	s.late_defs = [DotSettingsDef.number(&"ambient_frequency", 1.0, 0.0, 2.0, &"audio")]
 	s.extra_rows = [
 		[&"video", "Image", DotMenuRow.select(&"crowd_detail", "Crowd detail",
@@ -80,6 +83,7 @@ static func spec_for() -> DotMenuGameSpec:
 		[&"video", "Image", DotMenuRow.select(&"vis_mode", "Map culling",
 			"Skips the parts of a map you cannot see. Off draws everything (slower, for checking).",
 			[[0, "Off"], [1, "Precomputed"], [2, "Occluders"], [3, "Both"]])],
+		[&"video", "Image", DotMenuRow.toggle(DotOwnBodySetting.KEY, "Own legs", "See your own legs and body when you look down.")],
 		[&"audio", "Ambience", DotMenuRow.toggle(&"ambient", "Creepy ambience", "Quiet beds and distant sounds under the map.")],
 		[&"audio", "Ambience", DotMenuRow.slider(&"ambient_volume", "Ambience volume", "Turns the server's level down; it cannot turn it up.")],
 		[&"audio", "Ambience", DotMenuRow.slider(&"ambient_frequency", "Distant sounds", "How often the one-shots come.")],
