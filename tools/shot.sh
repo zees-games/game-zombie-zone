@@ -77,5 +77,7 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
-exec xvfb-run -a -s "-screen 0 1280x720x24" "${GODOT:-godot}" --path . --resolution 1280x720 \
+# RESOLUTION=844x390 tools/shot.sh ... renders at a phone's size (the HUD's fit scale, not a 720p shot shrunk).
+res="${RESOLUTION:-1280x720}"
+exec xvfb-run -a -s "-screen 0 ${res}x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"

@@ -193,6 +193,7 @@ func _test_infection() -> void:
 			cfg.survival_style = 0
 			cfg.survival_warmup_seconds = 100.0
 			cfg.infect_after_seconds = 0.0 if off else 2.0
+			cfg.infect_kind = "no_such_kind"
 			cfg.infect_count = 9, 4)
 		await _sim(game, 3.5)
 		var up := game.survivors().filter(func(p: ZzPlayer) -> bool: return p.life != ZzPlayer.Life.DEAD).size()
@@ -201,7 +202,7 @@ func _test_infection() -> void:
 			_check(up == 4 and zombies == 0, "off: nobody turns", "%d up, %d zombies" % [up, zombies])
 		else:
 			_check(up == 1, "on: all but the last turn", "%d up" % up)
-			_check(zombies == 3, "each leaves a zombie where they fell", "%d zombies" % zombies)
+			_check(zombies == 3, "each leaves a zombie where they fell", "%d zombies (an unknown kind falls back to a common)" % zombies)
 			_check(game.infection.turned == 3, "and the count is kept", str(game.infection.turned))
 		await _dispose(game)
 

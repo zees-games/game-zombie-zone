@@ -2,6 +2,11 @@ extends RefCounted
 ## The mod-style opening: some survivors turn after a delay and the rest hold. Off by default (`zz_infect_after`).
 
 const CHANNEL := "zz.infection"
+## The kind a turned survivor becomes when zz_infect_kind names none the catalogue has.
+const FALLBACK_KIND := &"common"
+
+## Not done: the turned survivor is an AI zombie, not a body the player drives. That needs the
+## player to possess an npc (input, camera, a zombie moveset, a net codec for it), which is not small.
 
 var game = null
 var clock: float = 0.0
@@ -42,10 +47,16 @@ func tick(delta: float) -> void:
 func turn(player: Object) -> void:
 	var at: Vector3 = player.feet()
 	game._die(player, &"infection", &"infected")
-	var npc = game.horde.spawner.spawn(StringName(game.config.infect_kind), at, &"infected")
+	var kind := StringName(game.config.infect_kind)
+	var npc = game.horde.spawner.spawn(kind, at, &"infected")
+
+	# An unknown kind (a typo in zz_infect_kind) falls back to the common, so a turned survivor is never just gone.
+	if npc == null and kind != FALLBACK_KIND:
+		DotLog.warn(CHANNEL, "unknown zz_infect_kind, turning into a common", {"kind": String(kind)})
+		npc = game.horde.spawner.spawn(FALLBACK_KIND, at, &"infected")
 
 	if npc == null:
-		DotLog.warn(CHANNEL, "a turned survivor left no zombie", {"kind": game.config.infect_kind})
+		DotLog.warn(CHANNEL, "a turned survivor left no zombie", {"kind": String(kind)})
 		return
 
 	turned += 1
