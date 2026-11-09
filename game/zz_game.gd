@@ -3836,7 +3836,7 @@ func _roll_into_survivors(delta: float) -> void:
 ## Whether any rolling kind of toy is past the speed that hurts; false is the usual tick.
 func _toy_moving_fast() -> bool:
 	var floor_speed := minf(rolling.min_speed, rolling_zombies.min_speed)
-	for toy: DotPropToy in map.toys.toys:
+	for toy: DotPropBody in map.toys.toys:
 		if is_instance_valid(toy) and toy.body != null and toy.body.linear_velocity.length_squared() >= floor_speed * floor_speed:
 			return true
 	return false

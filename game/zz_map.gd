@@ -185,14 +185,14 @@ var _gates: Dictionary = {}
 ## AABB, mat, tint, intact, fraction}.
 var _barricades: Dictionary = {}
 
-## The map's toys (dot-props' [DotPropToyBox]): loose ones only on this game's maps (barrels,
+## The map's toys (dot-props' [DotPropBodyBox]): loose ones only on this game's maps (barrels,
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
-var toys: DotPropToyBox = null
+var toys: DotPropBodyBox = null
 ## Breakables of a drawn world with loose props on them ([DotMapSupport]); a shot breaks one and what stood on it falls.
 var supports: Array[DotMapSupport] = []
 var authoritative: bool = true
-var toy_rules: DotPropToyRules = null
+var toy_rules: DotPropBodyRules = null
 var gravity: float = 20.0
 
 var _solid: StaticBody3D = null
@@ -302,7 +302,7 @@ func build(p_doc: Dictionary) -> DotResult:
 ## furniture and other toys stop and a survivor or a zombie never does (they walk through it,
 ## and a survivor pushes it, `ZzGame._advance_toys`).
 func _build_toys() -> void:
-	toys = DotPropToyBox.new()
+	toys = DotPropBodyBox.new()
 	toys.name = "Toys"
 	toys.authoritative = authoritative
 	toys.draw = draw_world

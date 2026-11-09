@@ -95,7 +95,7 @@ func _test_props() -> void:
 	var a := await _arena(10.0, {"prop_chance": 1.0, "fly_from": 999.0, "hold_time": 0.5})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
-	var toy: DotPropToy = game.map.toys.add_toy(&"barrel", SPOT + Vector3(0.0, 0.6, 6.0))
+	var toy: DotPropBody = game.map.toys.add_toy(&"barrel", SPOT + Vector3(0.0, 0.6, 6.0))
 	_check(toy != null and toy.body != null, "a loose barrel is on the map")
 	var held := false
 	var before := me.health.health
