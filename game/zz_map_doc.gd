@@ -515,6 +515,12 @@ static func validate(source: Dictionary) -> DotResult:
 			(nav["floors"] as Array).append(f)
 		for raw: Variant in (nav_in as Dictionary).get("links", []):
 			(nav["links"] as Array).append(_floats(raw, 6))
+		# [pad xyz, destination xyz]: a trigger_teleport a body steps on, one way (ZzNavGraph.apply_teleports).
+		var teleports: Array = []
+		for raw: Variant in (nav_in as Dictionary).get("teleports", []):
+			teleports.append(_floats(raw, 6))
+		if not teleports.is_empty():
+			nav["teleports"] = teleports
 
 	if (nav["floors"] as Array).size() > MAX_NAV_FLOORS or (nav["links"] as Array).size() > MAX_NAV_LINKS:
 		return _refuse("too many nav floors or links", source)

@@ -235,6 +235,8 @@ func _adopt_links() -> void:
 	graph.steep = config.nav_steep if config.nav_steep > 0.0 else INF
 	spawner.nav = graph
 
+	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
+
 	if notes.is_ready():
 		notes.apply_links(graph)
 		_mark_narrow()
