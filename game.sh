@@ -37,7 +37,7 @@
 GAME_NAME="Zombie Zone"
 PACK="zombiezone"
 EXTRA_PACKS="zombiezone_maps:zombie-zone-maps"
-SUITES="headless_propforce headless_propcarry headless_classes headless_config headless_workbench headless_mapcfg headless_look headless_run headless_maps headless_workshop headless_net headless_weapons dedicated headless_survival headless_nav headless_start headless_buildonce headless_packs headless_mechanics headless_defib headless_ambience headless_arsenal headless_carry headless_mutant headless_gait headless_sprint headless_hazards headless_collide headless_prefetch headless_downed headless_weapon_drop headless_stats headless_consumables headless_grenades"
+SUITES="headless_propforce headless_propcarry headless_classes headless_config headless_workbench headless_mapcfg headless_look headless_run headless_maps headless_workshop headless_net headless_weapons dedicated headless_survival headless_nav headless_start headless_buildonce headless_packs headless_mechanics headless_defib headless_ambience headless_arsenal headless_carry headless_mutant headless_gait headless_slide headless_sprint headless_hazards headless_collide headless_prefetch headless_downed headless_weapon_drop headless_stats headless_consumables headless_grenades"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail

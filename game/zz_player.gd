@@ -184,6 +184,7 @@ static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null) 
 	t.walk_speed_scale = p_config.walk_speed_scale if p_config != null else 0.45
 	t.can_walk = true
 	apply_sprint(t, p_config)
+	apply_slide(t, p_config)
 	t.can_crouch = true
 	t.crouch_speed_scale = 0.45
 	t.accelerate = 10.0
@@ -218,6 +219,21 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 	t.sprint_load_drain = p_config.sprint_load_drain
 	t.sprint_blocks_aim = p_config.sprint_blocks_aim
 	t.sprint_toggle = p_config.sprint_toggle
+
+
+## Slide, ZZ's way: only a sprinter holding C slides. A walk, a plain run or a crouch alone never
+## does, because [code]slide_requires_sprint[/code] wants the sprint button and the minimum speed sits
+## above a plain run. Arena leaves both at the addon default (no sprint needed), so it is unchanged.
+static func apply_slide(t: DotFpsTunables, p_config: ZzConfig) -> void:
+	t.slide_enabled = p_config != null and p_config.slide_enabled and p_config.sprint_enabled
+	t.slide_requires_sprint = true
+	t.slide_min_speed = t.max_speed * 1.05
+	if p_config == null:
+		return
+	t.slide_boost = p_config.slide_boost
+	t.slide_max_speed = p_config.slide_max_speed
+	t.slide_duration = p_config.slide_duration
+	t.slide_cooldown = p_config.slide_cooldown
 
 
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.
