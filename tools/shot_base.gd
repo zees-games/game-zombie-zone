@@ -65,6 +65,10 @@ var _world_key := ""
 ## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.
 const _AimHolder := preload("shot_aim_holder.gd")
 const _ShotCamera := preload("shot_camera.gd")
+const ReloadShots := preload("res://addons/dot_weapon/view/dot_weapon_reload_shots.gd")
+
+## `--frames=N`: how many frames `--view=reload` takes.
+var _frame_count := 12
 const _ShotOrbit := preload("shot_orbit.gd")
 ## `--cam=orbit ...`: the orbit camera (shot_orbit.gd lists the flags).
 var _orbit := _ShotOrbit.new()
@@ -125,7 +129,59 @@ func _held_third_frames(game: ZzGame, local) -> void:
 	lamp.queue_free()
 
 
-func _weapon_sheets(game: ZzGame, local) -> void:
+## Starts a whole reload of the held gun (down to one round on both rigs, so a shell-at-a-time gun loads
+## several) and one tile at each of [param fractions] by the drawn rig's own fraction; a tile past the end of the
+## reload says so in its label. [param keep] saves each tile full size as `reload_<id>_NN.png` in `_out`.
+func _reload_tiles(label: Label, id: StringName, local, rig: ZeeWeaponRig, fractions, keep: bool = false) -> Array[Image]:
+	for held in [local.weapons, rig]:
+		if held != null and held.arsenal.current() != null:
+			held.arsenal.current().magazine = mini(1, held.arsenal.current().magazine)
+	_client.set("_reloading", true)
+	await _frames(2)
+	_client.set("_reloading", false)
+	var fraction_of := func() -> float:
+		return rig._reload_fraction(rig._last_tick) if rig != null and rig.arsenal.is_reloading() else -1.0
+	var tiles: Array[Image] = []
+	for n in fractions.size():
+		var target := float(fractions[n])
+		var reached: bool = await ReloadShots.wait_for(get_tree(), fraction_of, target)
+		var tile := await _tile(label, id, "reload %d%%%s" % [int(target * 100.0), "" if reached else " (not reloading)"])
+		tiles.append(tile)
+		if keep:
+			var path := ProjectSettings.globalize_path(_out).path_join("reload_%s_%02d.png" % [id, n])
+			var err := tile.save_png(path)
+			if err != OK:
+				printerr("could not save %s: %s" % [path, error_string(err)])
+	return tiles
+
+
+## `--view=reload [--weapons=ids|all] [--frames=N]`: each magazine gun's whole first-person reload, N frames
+## (12 by default) full size as `reload_<id>_NN.png` and a contact sheet `reload_<id>_sheet.png` in `_out`, through
+## the real client and the real reload key. The shared fractions and sheet are dot-weapon's.
+func _reload_shots(game: ZzGame, local) -> void:
+	var ids := _magazine_ids()
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var label := Label.new()
+	label.position = Vector2(24.0, 70.0)
+	label.add_theme_font_size_override(&"font_size", 34)
+	label.add_theme_color_override(&"font_outline_color", Color.BLACK)
+	label.add_theme_constant_override(&"outline_size", 8)
+	layer.add_child(label)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_out))
+	for id in ids:
+		if not await _hold_exact(game, local, id):
+			continue
+		await _seconds_of(1.2)
+		var tiles := await _reload_tiles(label, id, local, local.view_rig, ReloadShots.fractions(_frame_count), true)
+		var sheet := ReloadShots.sheet(tiles, 4)
+		var path := ProjectSettings.globalize_path(_out).path_join("reload_%s_sheet.png" % id)
+		print("reload %s: %d frames, sheet %s" % [id, tiles.size(), error_string(sheet.save_png(path)) if sheet != null else "none"])
+
+
+## The `--weapons=` ids, or every gun with a magazine for none or `all`.
+func _magazine_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
 	if _weapons.is_empty() or _weapons[0] == "all":
 		for def in ZzWeapons.all_defs():
@@ -134,6 +190,11 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 	else:
 		for id in _weapons:
 			ids.append(StringName(id))
+	return ids
+
+
+func _weapon_sheets(game: ZzGame, local) -> void:
+	var ids := _magazine_ids()
 
 	var layer := CanvasLayer.new()
 	layer.layer = 100
@@ -162,25 +223,8 @@ func _weapon_sheets(game: ZzGame, local) -> void:
 		tiles.append(await _tile(label, id, "fire +6"))
 		_client.set("_firing", false)
 		await _seconds_of(0.6)
-		# Down to one round on both rigs, so the reload is a whole one (a shell-at-a-time gun loads
-		# several), not the one round the shots above spent.
-		for held in [local.weapons, rig]:
-			if held != null and held.arsenal.current() != null:
-				held.arsenal.current().magazine = mini(1, held.arsenal.current().magazine)
-		_client.set("_reloading", true)
-		await _frames(2)
-		_client.set("_reloading", false)
-		for target in [0.15, 0.25, 0.4, 0.5, 0.57, 0.75, 0.88]:
-			var waited := 0
-			while rig != null and rig.arsenal.is_reloading() and rig._reload_fraction(rig._last_tick) < target and waited < 2000:
-				await get_tree().process_frame
-				waited += 1
-			tiles.append(await _tile(label, id, "reload %d%%%s" % [int(target * 100.0), "" if rig.arsenal.is_reloading() else " (not reloading)"]))
-		var sheet := Image.create(640 * 5, 360 * 2, false, Image.FORMAT_RGB8)
-		for n in tiles.size():
-			var tile := tiles[n]
-			tile.resize(640, 360, Image.INTERPOLATE_BILINEAR)
-			sheet.blit_rect(tile, Rect2i(0, 0, 640, 360), Vector2i((n % 5) * 640, (n / 5) * 360))
+		tiles.append_array(await _reload_tiles(label, id, local, rig, [0.15, 0.25, 0.4, 0.5, 0.57, 0.75, 0.88]))
+		var sheet := ReloadShots.sheet(tiles, 5, Vector2i(640, 360))
 		var path := dir.path_join("sheet_%s.png" % id)
 		print("saved %s: %s" % [path, error_string(sheet.save_png(path))])
 

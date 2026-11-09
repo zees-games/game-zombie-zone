@@ -66,6 +66,8 @@ func _ready() -> void:
 			_fires.append(arg.trim_prefix("--fire="))
 		elif arg.begins_with("--weapons="):
 			_weapons = arg.trim_prefix("--weapons=").split(",", false)
+		elif arg.begins_with("--frames="):
+			_frame_count = clampi(arg.trim_prefix("--frames=").to_int(), 1, 48)
 		elif arg.begins_with("--aim="):
 			_aim = arg.trim_prefix("--aim=").to_float()
 		elif arg.begins_with("--hard="):
@@ -633,6 +635,10 @@ func _run() -> void:
 			return
 		"weapons":
 			await _weapon_sheets(game, local)
+			get_tree().quit(0)
+			return
+		"reload":
+			await _reload_shots(game, local)
 			get_tree().quit(0)
 			return
 		"ragdoll":
