@@ -17,7 +17,7 @@ const ZZTestPorts := preload("test_ports.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 13
-const CHECKS := 108
+const CHECKS := 110
 
 const SERVER_DIR := "user://zz_dedicated"
 const TICK_RATE := 60
@@ -290,6 +290,14 @@ func _test_the_commands() -> void:
 	_check(not game.combat.rules.pass_through_team_mate_at_muzzle and not game.combat.rules.pass_through_team_mates,
 		"and 0 turns both pass-through rules off", str(game.combat.rules.describe()))
 	var _default := _run_command("mp_teammate_passthrough 1")
+	# Hit zone multipliers are the operator's too: one cvar per zone, set on the resolver every attacker meets.
+	var head_cvar := server.console.find_cvar("zz_head_mult")
+	var zones := game.combat.resolver.hit_groups
+	_check(head_cvar != null and head_cvar.get_string() == "4.0" and server.console.find_cvar("zz_leg_mult") != null,
+		"zz_head_mult and zz_leg_mult are registered at the table's numbers", head_cvar.get_string() if head_cvar != null else "missing")
+	var _hot := _run_command("zz_head_mult 6")
+	_check(is_equal_approx(zones.multiplier(DotHitGroup.HEAD), 6.0), "a changed zz_head_mult reaches the resolver's table")
+	var _cool := _run_command("zz_head_mult 4")
 	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
 	# every change, so a client's own combat manager (following its link) predicts tracers
 	# under the server's level rather than its default.

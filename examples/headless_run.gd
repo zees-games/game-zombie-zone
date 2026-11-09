@@ -43,7 +43,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 446
+const CHECKS := 448
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1630,6 +1630,12 @@ func _test_how_survivors_fall() -> void:
 		_check(blend == (BaseMaterial3D.BLEND_MODE_MIX if kind == &"slam" else BaseMaterial3D.BLEND_MODE_ADD),
 			"a %s blast's particles use the right blend" % kind, str(blend))
 	var _shown := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
+	# cl_legs: your own body in first person keeps the legs and drops the gun; third person is whole again.
+	var _legs := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9), true)
+	_check(me.figure.person.first_person == DotHumanoidOwnView.LEGS and me.figure.visible
+		and (me.figure.held == null or not me.figure.held.visible), "own legs: first person draws the legs, not the gun")
+	var _whole := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
+	_check(me.figure.person.first_person == DotHumanoidOwnView.THIRD, "own legs: third person draws the whole figure")
 	me.incaps = game.config.max_incaps
 	var hit := DotDamage.make(claw, me.entity_id, me.health.health * 50.0 + 500.0, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
@@ -2644,8 +2650,8 @@ func _test_help_and_menu() -> void:
 	settings.close()
 	# The document and the extra rows the game's spec declares, in the order they always had.
 	var sk := settings.schema.keys()
-	var want_keys: Array[StringName] = [&"field_of_view", &"reduce_motion", &"gore", &"crowd_detail", &"vis_mode", &"ambient", &"ambient_volume", &"ambient_frequency"]
-	_check(sk.slice(0, 8) == want_keys, "the document starts with the game's own settings, in order", str(sk.slice(0, 8)))
+	var want_keys: Array[StringName] = [&"field_of_view", &"reduce_motion", &"gore", &"crowd_detail", &"vis_mode", &"cl_legs", &"ambient", &"ambient_volume", &"ambient_frequency"]
+	_check(sk.slice(0, 9) == want_keys, "the document starts with the game's own settings, in order", str(sk.slice(0, 9)))
 	_check(settings.settings.get_int(&"crowd_detail", -1) == 1 and settings.settings.get_int(&"vis_mode", -1) == 3
 		and settings.schema.find(&"field_of_view").default_value == ZzSettings.DEFAULT_FOV and not settings.schema.has(&"shake_scale"),
 		"with the defaults and the stock keys it leaves out")
