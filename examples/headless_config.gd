@@ -17,7 +17,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 56
+const CHECKS := 57
 
 
 func _ready() -> void:
@@ -55,6 +55,9 @@ func _run() -> void:
 	_check(config.gore_level == 2 and config.gore_max_gibs == 24 and config.gore_max_wounds == 48 and config.attack_anim == 0 and keys.has("attack_anim"), "gore and attack_anim defaults to flying limbs, 24 gibs, 48 wound marks")
 	console.set_cvar("zz_gore_level", "0")
 	_check(config.gore_level == 0 and keys.has("gore_max_gibs"), "zz_gore_level is a cvar on the config and gore_max_gibs is exposed")
+	console.set_cvar("zz_infect_kind", "runner")
+	_check(config.infect_kind == "runner" and keys.has("infect_kind") and config.infect_after_seconds == 0.0 and config.infect_count == 1,
+		"zz_infect_kind is a cvar on the config (the opening stays off, one turns)")
 	var schema_path := "user://zz_config_schema.json"
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
