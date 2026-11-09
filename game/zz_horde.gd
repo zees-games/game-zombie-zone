@@ -1,6 +1,8 @@
 extends "zz_horde_state.gd"
 
 const ZzWatchCull := preload("zz_watch_cull.gd")
+## What a point inside a push volume costs to arrive at, times the usual.
+const PUSH_COST := 12.0
 
 ## The mover watch and cull (game/zz_watch_cull.gd), built with each map.
 var wcull: ZzWatchCull = null
@@ -172,7 +174,7 @@ func _begin_notes() -> void:
 	if game == null or game.map == null or game.physics == null:
 		return
 
-	notes.link_mask = game.physics.layer_mask(&"world")
+	notes.link_mask = ZzNavPrune.body_mask(game.physics)
 	notes.link_world = game.get_world_3d()
 	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
 
@@ -206,6 +208,26 @@ func _adopt_links() -> void:
 	if notes.is_ready():
 		notes.apply_links(graph)
 		_mark_narrow()
+
+	_mark_pushes(graph)
+
+
+## Costs up every point inside a live push volume for good: a zombie there is thrown along the push, so a path through one
+## is walked against it. Paths still use them when nothing else joins the two ends.
+func _mark_pushes(graph: DotNpcNavGraph) -> void:
+	if game == null or game.map == null or game.map.mechanics == null:
+		return
+
+	var volumes: Array[DotMapVolume] = game.map.mechanics.push_volumes()
+
+	if volumes.is_empty():
+		return
+
+	for p in nav.points:
+		for vol in volumes:
+			if vol.contains(p):
+				var _i := graph.mark_bad(p, INF, PUSH_COST, 0.05)
+				break
 
 
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
@@ -392,7 +414,7 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 
 	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
 	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
-	var mask: int = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip")
+	var mask: int = ZzNavPrune.body_mask(game.physics)
 	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders)
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)

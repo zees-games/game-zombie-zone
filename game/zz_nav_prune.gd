@@ -19,6 +19,11 @@ const CLIMB := 0.6
 const LADDER_REACH := 3.0
 const LADDER_HEIGHT := 1.5
 
+## What a zombie body collides with that the graph must clear: world, prop and clip (a hull clip ceiling or a solid prop no document box describes).
+static func body_mask(physics: Object) -> int:
+	return physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"clip")
+
+
 var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
 
