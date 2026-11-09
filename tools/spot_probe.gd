@@ -200,7 +200,7 @@ func _reach_map(id: String) -> PackedStringArray:
 			bad.append("    %s %s -> %s %s unreachable" % [j[0], _f(j[1]), j[2], _f(j[3])])
 	graph.filter = saved_filter
 	out.append("%s: %d pairs (%d survivor spawns, %d zombie spawns, %d posts), %d unreachable" % [id, jobs.size(), survivors.size(), zombies.size(), posts.size(), bad.size()])
-	out.append_array(bad.slice(0, 12))
+	out.append_array(bad if OS.get_cmdline_user_args().has("--all") else bad.slice(0, 12))
 	out.append("MAP %s: %d unreachable" % [id, bad.size()])
 	_free_game()
 	await get_tree().process_frame
