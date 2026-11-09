@@ -65,6 +65,16 @@
 # sprint_blocks_aim: true
 # Whether Shift toggles sprint instead of being held.
 # sprint_toggle: false
+# Slide: only a sprinter holding C slides, never from a walk, a plain run or a crouch alone.
+# slide_enabled: true
+#  [0.0..20.0]
+# slide_boost: 1.5
+#  [1.0..30.0]
+# slide_max_speed: 10.5
+#  [0.1..5.0]
+# slide_duration: 0.9
+#  [0.0..10.0]
+# slide_cooldown: 1.0
 #  [0.1..5.0]
 # jump_height: 1.1
 #  [1.0..60.0]
