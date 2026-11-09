@@ -209,6 +209,11 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			layer.removed.connect(func(id: int, taker: int) -> void:
 				_broadcast(ZzEvents.Kind.WEAPON_GONE, ZzEvents.write_loot_gone(id, taker)))
 
+		var knives: DotWeaponKnives = game.weapon_layer.knives
+		if knives != null:
+			knives.changed.connect(func(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> void:
+				_broadcast(ZzEvents.Kind.KNIFE, ZzEvents.write_knife(id, owner, phase, victim, at, motion)))
+
 		if game.boxes != null:
 			game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
 				# The outcome's title and message are the reveal; the TYPE is not, with box_labels off.
@@ -994,6 +999,11 @@ func _tell_the_world(peer_id: int) -> void:
 			_tell(peer_id, ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(
 				int(entry["id"]), entry["state"], entry["at"], Vector3.ZERO, float(entry["life"]), bool(entry["rest"])))
 
+	if game.weapon_layer.knives != null:
+		for k in game.weapon_layer.knives.entries():
+			var motion: Vector3 = k.velocity if k.phase == DotWeaponKnives.Phase.FLY else k.facing
+			_tell(peer_id, ZzEvents.Kind.KNIFE, ZzEvents.write_knife(k.id, k.owner, k.phase, k.victim, k.at, motion))
+
 	if game.hazards != null:
 		for id: int in game.hazards.areas:
 			var a: Dictionary = game.hazards.areas[id]
@@ -1435,6 +1445,10 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var wg := ZzEvents.read_loot_gone(reader)
 			if bool(wg["ok"]) and game.weapon_layer.drops != null:
 				game.weapon_layer.drops.mirror_removed(int(wg["id"]))
+		ZzEvents.Kind.KNIFE:
+			var kn := ZzEvents.read_knife(reader)
+			if bool(kn["ok"]) and game.weapon_layer.knives != null:
+				game.weapon_layer.knives.mirror(int(kn["id"]), int(kn["owner"]), int(kn["phase"]), int(kn["victim"]), kn["at"], kn["motion"])
 		ZzEvents.Kind.BOX:
 			var box := ZzEvents.read_box(reader)
 			if bool(box["ok"]):
