@@ -41,7 +41,7 @@ const ZzWorldView := preload("../game/zz_world_view.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 429
+const CHECKS := 432
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -2986,6 +2986,7 @@ func _test_the_hud() -> void:
 	_check(not hides or not bool(cross.call(&"is_shown")), "and gone once they are dead (alive_source)")
 	me.health.alive = true
 	_check_requires()
+	await _check_survivor_tag()
 	await _check_killcam_time()
 
 	hud.queue_free()
@@ -3137,6 +3138,26 @@ func _check_requires() -> void:
 		"the pack asks a shell for dot-ui level 4, the glance pieces",
 		str(asks.get("dot_ui"))
 	)
+
+
+## Another survivor wears dot-ui's name and health pill over the drawn body; the own player and
+## the hidden or dead wear none. Presentation only.
+func _check_survivor_tag() -> void:
+	var game := await _world()
+	var other := game.add_player(&"u-tag", "Tagged")
+	game.start()
+	await get_tree().physics_frame
+	var camera := Camera3D.new()
+	add_child(camera)
+	camera.global_position = Vector3(0.0, 2.0, 6.0)
+	other.present_tag(true, Vector3.ZERO, camera, 0.016)
+	var tag := other.get_node_or_null("HealthTag") as DotHealthTag
+	_check(tag != null and tag.visible, "another survivor wears a health tag over the drawn body")
+	_check(tag != null and tag.global_position.y > ZzPlayer.BODY_HEIGHT and absf(tag.global_transform.basis.z.normalized().dot(Vector3.UP)) < 0.5,
+		"above the head, turned to the camera")
+	other.present_tag(false, Vector3.ZERO, camera, 0.016)
+	_check(tag != null and not tag.visible, "and none once the body is not shown")
+	camera.queue_free()
 
 
 ## The killcam is added to an intermission, never to an intermission of 0 (the suites run on 0).
