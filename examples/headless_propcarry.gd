@@ -3,11 +3,14 @@ extends "zz_suite.gd"
 ## A survivor picking up a loose prop, carrying it and putting it down (server side), and the zz_prop_force override.
 
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const ZzCatalogue := preload("../game/zz_catalogue.gd")
+const ZzTestToys := preload("zz_test_toys.gd")
 const SECTIONS := 5
 const CHECKS := 29
 
 
 func _ready() -> void:
+	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()

@@ -56,3 +56,4 @@ extra:
   body: oil_monster
   radius: 0.6
   height: 2.5
+  fit_height: 2.1
