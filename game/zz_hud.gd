@@ -79,6 +79,63 @@ func _follow() -> void:
 		_menu.call(&"follow_hud", _root, piece_theme())
 
 
+## The player's `cl_hud_show_<element>` switches (dot-ui's [DotHudElementCvars]; `cl_hud_scale` is
+## the menu's own HUD size, so it is not registered). The pieces below are attached in [method _attach_elements].
+var elements := DotHudElementCvars.new()
+
+## element id -> the controls it hides; a piece that sets its own visibility each frame is put
+## back to hidden after the draw (see [method _hold_hidden_elements]).
+var _element_nodes: Dictionary = {}
+
+
+func _attach_elements() -> void:
+	var map := {
+		&"vitals": [vitals, stamina_bar, kits],
+		&"weapons": [_weapon_icon, _weight, _weight_back, _weight_fill, _carry],
+		&"ammo": [ammo],
+		&"fire_mode": [fire_mode],
+		&"teammates": [_team],
+		&"wave": [strip],
+		&"prompts": [_prompt, _use_back, _use_fill, _use_label, _held],
+		&"damage_dir": _hurt_marks.map(func(m: Dictionary) -> Control: return m["rect"]),
+		&"hit_markers": [hit_marker, damage_numbers],
+	}
+	for id: StringName in map:
+		_element_nodes[id] = map[id]
+		for node: Variant in map[id]:
+			var _ok := elements.attach(id, node as CanvasItem)
+	elements.changed.connect(elements.apply)
+
+
+func _hold_hidden_elements() -> void:
+	for id: StringName in _element_nodes:
+		if elements.is_shown(id):
+			continue
+		for node: Variant in _element_nodes[id]:
+			if is_instance_valid(node):
+				(node as CanvasItem).visible = false
+
+
+## Registers the element cvars on a console's local source.
+func bind_elements(local: Object) -> void:
+	if local == null or not local.has_method(&"add_var"):
+		return
+	for id: StringName in DotHudElementCvars.ELEMENTS:
+		var name := DotHudElementCvars.cvar_name(id)
+		local.call(&"add_var", StringName(name), String((DotHudElementCvars.ELEMENTS[id] as Array)[1]) + " (0 hides, 1 shows)",
+			func() -> Variant: return "1" if elements.is_shown(id) else "0",
+			func(v: Variant) -> Variant:
+				if not elements.set_cvar(name, str(v)):
+					return DotResult.fail(DotError.CODE_INVALID, "unreadable value: " + str(v))
+				elements.apply()
+				return null)
+
+
+## The full-rect Control every piece sits on.
+func screen() -> Control:
+	return _root
+
+
 var game: ZzGame = null
 var player: ZzPlayer = null
 
@@ -431,6 +488,7 @@ func _build() -> void:
 		mark.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 		_root.add_child(mark)
 		_hurt_marks.append({"rect": mark, "left": 0.0})
+	_attach_elements()
 
 
 func _cover(cover_name: String, colour: Color) -> ColorRect:
@@ -559,6 +617,7 @@ func _process(delta: float) -> void:
 	_draw_effects()
 	_draw_overlays(delta)
 	_draw_hurt(delta)
+	_hold_hidden_elements()
 
 
 func _draw_top() -> void:

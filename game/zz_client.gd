@@ -63,7 +63,7 @@ func _ready() -> void:
 	_hold_for_maps()
 	add_child(game)
 
-	_sampler = DotFpsSampler.new(ZzPlayer.tunables_for(config))
+	_sampler = ZzPlayer.make_sampler(ZzPlayer.tunables_for(config))
 	ZzPlayer.register_actions(_sampler)
 	game.combat_feel.track_tunables(_sampler.tunables)
 
@@ -71,6 +71,7 @@ func _ready() -> void:
 	_build_chat()
 	_build_audio()
 	_build_settings()
+	_build_touch()
 	_build_killcam()
 	_build_world_view()
 	_read_box_colours()
@@ -570,6 +571,8 @@ func _adopt(candidate: ZzPlayer) -> void:
 	# sample (see `ZzPlayer.command_stamp`); connected, they go onto the command sent.
 	if _offline:
 		player.command_stamp = _stamp
+		if _touch != null:
+			_touch.call(&"attach", player.sampler, hud.get_viewport().get_visible_rect().size.x)
 
 	if settings != null:
 		settings.bind_camera(self, &"base_fov")
@@ -1236,6 +1239,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 			if audio != null and camera != null:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
+	_prewarm_weapons()
 	player.view_rig = weapons
 	_mirror.mirror = true
 	var _moved := _mirror.sync(game.config)
@@ -1253,6 +1257,19 @@ func _arm_locally(weapon_id: StringName) -> void:
 
 	if audio != null:
 		var _ding := audio.play(ZzAudio.PICKUP)
+
+
+## Builds every weapon's view once on a spare under the cover (the first draw of each gun otherwise
+## loads its model mid-play); the load gate's `weapons` reason holds until it is done.
+func _prewarm_weapons() -> void:
+	if _prewarmed or view_model == null or camera == null:
+		return
+	_prewarmed = true
+	var warm := ZzPrewarm.new()
+	warm.name = "WeaponPrewarm"
+	add_child(warm)
+	if not warm.begin(gate, camera, view_model):
+		warm.queue_free()
 
 
 ## The server's word on what is carried: the HUD shows it, and a weapon this end never heard of is given.
@@ -1428,6 +1445,40 @@ func _build_hud() -> void:
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
+
+
+## The phone's on-screen buttons over the HUD; none off touch. Needs the settings menu (its button
+## is kept clear of the look drag), so after [method _build_settings].
+func _build_touch() -> void:
+	var menu_button: Control = null
+	if settings != null and settings.menu != null:
+		menu_button = (settings.menu as DotMenu).menu_button
+	_touch = ZzTouch.build(self, hud.screen(), menu_button)
+	if _touch != null:
+		_touch.call(&"attach", _sampler, hud.get_viewport().get_visible_rect().size.x)
+
+
+## A touch button went down or up: the same flags the keys set.
+func touch_button(id: StringName, down: bool) -> void:
+	var sampler: DotFpsSampler = player.sampler if _offline and player != null and player.sampler != null else _sampler
+	match id:
+		&"fire":
+			_firing = down and not is_spectating()
+		&"reload":
+			_reloading = down
+		&"use":
+			_using = down
+		&"heal":
+			_healing = down
+		&"jump":
+			if sampler is DotFpsTouchSampler:
+				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_JUMP, down)
+		&"crouch":
+			if sampler is DotFpsTouchSampler:
+				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_CROUCH, down)
+		&"next":
+			if down:
+				_cycle_slot(1)
 
 
 ## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
@@ -1850,6 +1901,7 @@ func _bind_crosshair_console() -> void:
 		var sources: Array = console.sources()
 		if not sources.is_empty() and sources[0] is DotConsoleLocal:
 			ZzWeaponIcons.shared.bind_console(sources[0])
+			hud.bind_elements(sources[0])
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
@@ -1885,7 +1937,7 @@ var pointer_forced := false
 
 
 func _pointer_ours() -> bool:
-	return pointer_forced or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
+	return pointer_forced or _touch != null or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 ## The sound manager the flashlight clicks play through, or null before audio is up.
@@ -2641,6 +2693,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and not event.is_echo():
 		if _key_event(event):
 			get_viewport().set_input_as_handled()
+			return
+
+	# A phone's finger: the sampler steers and looks, the buttons are the HUD's. The mouse the
+	# engine makes from a touch is not a click.
+	if _touch != null:
+		if event is InputEventScreenTouch or event is InputEventScreenDrag:
+			var touched: DotFpsSampler = player.sampler if _offline and player != null and player.sampler != null else _sampler
+			if touched != null and player != null:
+				touched.handle_event(event)
+			return
+		if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
 			return
 
 	if event is InputEventMouseButton:

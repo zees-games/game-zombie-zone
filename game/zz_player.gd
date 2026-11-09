@@ -15,8 +15,13 @@ func _ready() -> void:
 	controller.before_fn = _before_tick
 
 	if samples_input:
-		sampler = DotFpsSampler.new(controller.tunables)
+		sampler = make_sampler(controller.tunables)
 		register_actions(sampler)
+
+
+## The sampler a screen's player is read through: touch (stick, look drag, buttons) on a phone.
+static func make_sampler(p_tunables: DotFpsTunables) -> DotFpsSampler:
+	return DotFpsTouchSampler.new(p_tunables) if DotPlatform.has_touch() else DotFpsSampler.new(p_tunables)
 
 
 ## Hands over the map's water, [param boxes] (empty: none), and the rules that tune it.
