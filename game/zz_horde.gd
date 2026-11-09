@@ -445,9 +445,22 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
 	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
 	var mask: int = ZzNavPrune.body_mask(game.physics)
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders)
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots())
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
+
+
+## The survivors' spawns and the posts: where a body must be able to walk to, whatever the prune cut.
+func _required_spots() -> PackedVector3Array:
+	var spots := PackedVector3Array()
+
+	for spawn: Dictionary in (_doc.get("spawns", {}) as Dictionary).get("survivors", []):
+		spots.append(ZzMapDoc.v3(spawn["at"]))
+
+	for p: Array in _doc.get("posts", []):
+		spots.append(ZzMapDoc.v3(p))
+
+	return spots
 
 
 ## A map's own `zombie_spawns` join the ones the graph gave: a mapper who wants a crowd to

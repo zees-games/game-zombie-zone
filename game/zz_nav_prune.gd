@@ -28,10 +28,11 @@ var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
 
 
+## [param required] (spawns, posts) keeps a piece holding one joined to the next such piece by a bridge edge even through a floor.
 ## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask. Each of
 ## [param ladders] is then joined foot to head: its shaft blocks the capsule, and the builder drops a ladder link
 ## whose ends a stair link already joined, which this prune may then cut.
-static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = []) -> Vector2i:
+static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array()) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN)
 	var bare := new()
@@ -44,11 +45,12 @@ static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: in
 	prune.loose_edge_blocked = bare._edge_blocked
 	prune.nudge = NUDGE
 	prune.climb = CLIMB
+	prune.required = required
 	var dropped := prune.apply(nav)
 	var climbs := join_ladders(nav, ladders)
 
-	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or climbs > 0:
-		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "ladders": climbs})
+	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or prune.bridged_edges > 0 or climbs > 0:
+		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
 
 	return dropped
 
