@@ -1336,7 +1336,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 	var loot = game.loot
 
 	if loot == null:
-		return false
+		return _pick_up_drop(player, command, memory, reach)
 
 	var best := -1
 	var best_gap := reach
@@ -1394,7 +1394,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 
 	if best < 0:
 		memory["pick"] = -1
-		return false
+		return _pick_up_drop(player, command, memory, reach)
 
 	if best != kept:
 		memory["pick"] = best
@@ -1443,6 +1443,34 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 	else:
 		_walk_to(player, command, at, memory)
 
+	return true
+
+
+## A thrown or dropped weapon (the weapon layer's drops) the stand-in wants, within [param reach]: walks to the nearest.
+## The layer's own take hands it over once the stand-in stands at it, so no key is pressed.
+func _pick_up_drop(player, command: DotFpsCommand, memory: Dictionary, reach: float) -> bool:
+	var layer = game.weapon_layer
+
+	if layer == null or layer.drops == null or layer.drops.count() == 0 or player.weapons == null or player.weapons.arsenal == null:
+		return false
+
+	var at := Vector3.INF
+	var best_gap := reach
+
+	for d: Dictionary in layer.drops.snapshot():
+		var pos: Vector3 = (d["at"] as Transform3D).origin
+		var gap := pos.distance_to(player.feet())
+
+		if gap > best_gap or not _wants_weapon(player, StringName(d["state"]["id"])):
+			continue
+
+		best_gap = gap
+		at = pos
+
+	if at == Vector3.INF or not _can_walk_to(player, at):
+		return false
+
+	_walk_to(player, command, at, memory)
 	return true
 
 
