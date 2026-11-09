@@ -222,6 +222,8 @@ func _build_world_view() -> void:
 	blood.mask = game.world_mask()
 	game.add_child(blood)
 	blood.apply_settings(null)
+	if game.weapon_layer.knives != null:
+		game.weapon_layer.knives.bind_view(world_view.ragdolls, blood)
 	break_fx = ZzBreakFx.new()
 	game.add_child(break_fx)
 	game.wood_broke.connect(break_fx.splinter)

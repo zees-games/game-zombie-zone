@@ -12,8 +12,16 @@ const CHANNEL := "zz.weapon_layer"
 ## Slot 1 is the melee weapon, which a survivor never puts down.
 const KEEP_SLOTS: Array[int] = [1]
 
+## The weapon a throw takes out of the hand, and the damage of a hit (a zombie has hundreds of health at most).
+const KNIFE_WEAPON := &"zz_knife"
+const KNIFE_DAMAGE := 120.0
+
 var rules := DotWeaponDropRules.new()
 var drops: DotWeaponDrops = null
+## The aim key throws the knife in hand ([DotWeaponKnives], `zz_knife_throw*`). A thrown knife is a
+## weapon like any other, so it hurts what the horde is made of: the default is a hard hit, not a kill.
+var knives: DotWeaponKnives = null
+var knife_rules: Dictionary = DotWeaponKnives.DEFAULT_RULES.duplicate()
 var game = null
 
 
@@ -35,6 +43,7 @@ func build() -> void:
 	drops.keep_slots = KEEP_SLOTS
 	drops.look_of = _look
 	game.add_child(drops)
+	_build_knives()
 	if not drops.is_authority:
 		var panel := ZzPickupPanel.new()
 		panel.name = "PickupPanel"
@@ -42,10 +51,50 @@ func build() -> void:
 		game.add_child(panel)
 
 
+func _build_knives() -> void:
+	knife_rules["damage"] = KNIFE_DAMAGE
+	knives = DotWeaponKnives.new()
+	knives.name = "Knives"
+	knives.rules = knife_rules
+	knives.weapon_id = KNIFE_WEAPON
+	knives.is_authority = game.authoritative
+	knives.draws = DisplayServer.get_name() != "headless"
+	knives.tick_rate = game.tick_rate
+	knives.player_for = func(entity: int) -> Object: return game.player_for_entity(entity)
+	knives.player_ids = func() -> Array:
+		var ids: Array = []
+		for player in game.players.values():
+			ids.append(player.entity_id)
+		return ids
+	knives.look_of = _look
+	game.add_child(knives)
+
+
 ## A new round: whatever lay about goes.
 func clear() -> void:
 	if drops != null:
 		drops.clear()
+	if knives != null:
+		knives.clear()
+
+
+## The aim key before the survivor's weapons simulate: a knife in hand leaves it (no protection of
+## any kind: a thrown knife hurts whoever the game's damage rules let it hurt).
+func knife_input(player, command: DotWeaponCommand) -> void:
+	if knives == null or not knives.is_authority or not _free(player):
+		return
+	var before := knives.count()
+	knives.input(player.entity_id, player, command)
+	if knives.count() != before:
+		player.wanted_slot = player.weapons.arsenal.current_slot()
+
+
+## Every tick, after everybody moved.
+func knife_tick(tick: int, delta: float) -> void:
+	if knives == null or not knives.is_authority:
+		return
+	knives.combat = game.combat
+	knives.tick(tick, delta)
 
 
 func _look(weapon_id: StringName) -> Node3D:

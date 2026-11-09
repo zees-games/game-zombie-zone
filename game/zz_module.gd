@@ -239,6 +239,7 @@ func _game_load() -> DotResult:
 	_wire_progress(world)
 	_add_tunables(world)
 	var _weapon_drop_cvars := world.weapon_layer.rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	var _knife_cvars := DotWeaponKnives.bind_cvars(world.weapon_layer.knife_rules, add_cvar, "zz_knife", DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
 	world.grenades.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
 	world.consumables.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 

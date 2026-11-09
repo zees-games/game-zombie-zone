@@ -137,6 +137,8 @@ enum Kind {
 	WEAPON_GONE,
 	## Where a shot left marks on the map: up to a dozen points with a surface normal each (a bullet hole, both faces of a wall it went through, each bounce). To everybody.
 	IMPACT,
+	## A thrown knife flew, bounced, lay, stuck or was taken (dot-weapon's DotWeaponKnifeWire). Also one per knife out at signon.
+	KNIFE,
 }
 
 ## What a MAP_FX says.
@@ -671,6 +673,17 @@ static func read_weapon_drop(r: DotNetReader) -> Dictionary:
 	out["rest"] = r.read_bool()
 	out["ok"] = r.ok()
 	return out
+
+
+## A thrown knife's change, in dot-weapon's own wire format.
+static func write_knife(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> PackedByteArray:
+	var w := _w()
+	DotWeaponKnifeWire.write_knife(w, id, owner, phase, victim, at, motion)
+	return w.to_bytes()
+
+
+static func read_knife(r: DotNetReader) -> Dictionary:
+	return DotWeaponKnifeWire.read_knife(r)
 
 
 static func write_weapon_settled(id: int, at: Transform3D) -> PackedByteArray:

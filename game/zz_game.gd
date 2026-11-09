@@ -3553,6 +3553,7 @@ func _advance_weapons() -> void:
 
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
+		weapon_layer.knife_input(player, command)
 		var outcome := player.weapons.simulate_tick(command, _tick)
 
 		for shot in outcome.shots:
@@ -3859,6 +3860,7 @@ func _step(delta: float) -> void:
 			_tick_horde(delta)
 		if pins != null:
 			pins.advance(delta)
+		weapon_layer.knife_tick(_tick, delta)
 		if hazards != null:
 			hazards.tick(delta)
 			grenades.tick()

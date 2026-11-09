@@ -508,6 +508,17 @@ func decay_temp(amount: float) -> void:
 # --- Bodies ----------------------------------------------------------------
 
 ## Where this player's eyes are: standing, crouched, or on the floor.
+## The weapons' arsenal, under the name dot-weapon's [DotWeaponKnives] reads a player by.
+var arsenal: DotWeaponArsenal:
+	get:
+		return weapons.arsenal if weapons != null else null
+
+
+## Where a thrown thing leaves the hand: the eye.
+func muzzle_position() -> Vector3:
+	return eye_position()
+
+
 func eye_position() -> Vector3:
 	if is_down():
 		return controller.state.position + Vector3(0.0, EYE_DOWN, 0.0)
