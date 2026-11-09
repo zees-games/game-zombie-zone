@@ -439,12 +439,12 @@ func _test_worlds() -> void:
 		var wanted_props := 0
 		# A library model draws when the pack's model store resolves (the game's .stores link, present only
 		# while a tool such as solid_props.sh holds it) and otherwise becomes a proxy, so count both worlds.
+		# The world finds its own store (dot-map follows a linked world folder; a lexical `../` off res:// does not).
 		var licence: Dictionary = manifest.get("licence", {})
-		var store_root := prefix.get_base_dir().path_join(str(licence.get("model_store", "model-library"))).simplify_path()
 		var in_store := {}
 		for row: Dictionary in licence.get("model_stand_ins", []):
-			var stored := store_root.path_join(str(row.get("store_file", "")))
-			if row.has("store_file") and FileAccess.file_exists(stored):
+			var stored: String = world.call(&"_library_path", str(row.get("stand_in", "")))
+			if stored != "" and FileAccess.file_exists(stored):
 				# A damaged model is drawn as its box (dot-map warns); it is a data defect to print, not a prop to count.
 				var defect: String = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"gltf_defect", stored)
 				if defect != "":
