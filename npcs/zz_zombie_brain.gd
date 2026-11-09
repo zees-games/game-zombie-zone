@@ -497,7 +497,16 @@ func _bash_if_barred(delta: float) -> void:
 ## (asked a few times a second, not every tick). A zombie with somebody to hit, swinging, or
 ## staggered always thinks every tick.
 func _think_every() -> int:
-	if npc == null or not npc.is_alive() or swinging() or staggered():
+	if npc == null or not npc.is_alive() or staggered():
+		return 1
+
+	if swinging():
+		# Once the blow has landed only the recovery is left to run out: nothing to decide, so a
+		# crowd chewing on one survivor thinks half as often. Every tick before the landing (the
+		# hit is on time) and for the last few ticks of the recovery (the swing ends on time).
+		if _swing_landed and (SWING_WINDUP + SWING_RECOVER) * _attack_scale() - (now() - _swing_at) > 0.05:
+			return 2
+
 		return 1
 
 	# Tearing at boards is a halt, a face and a blow paid by the time owed: a quarter as often.
