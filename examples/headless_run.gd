@@ -43,7 +43,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 448
+const CHECKS := 449
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -3052,6 +3052,14 @@ func _test_the_hud() -> void:
 		and _crosshair_alpha(hud) == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
 		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
+	var scope_prefs := load("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
+	var probe := ZeeViewModel.new()
+	scope_prefs.mode = 2
+	scope_prefs.apply(probe)
+	_check(probe.scope_mode == ZeeViewModel.SCOPE_FULL and not probe.scope_is_lens(),
+		"the cl_scope_mode pref reaches the view model", "mode %d" % probe.scope_mode)
+	scope_prefs.mode = 1
+	probe.free()
 	hud.set_aim(0.0, false)
 	var cross: Control = hud._crosshair
 	var hides := DotAddonApi.build_level("dot_ui") >= 14

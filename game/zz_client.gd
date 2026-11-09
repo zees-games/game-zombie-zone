@@ -1,6 +1,8 @@
 extends "zz_client_state.gd"
 
 const ZzViewGrip := preload("zz_view_grip.gd")
+const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
+
 
 func _ready() -> void:
 	# First, before anything can be drawn: the map, the player and the camera all arrive
@@ -1896,6 +1898,10 @@ func _bind_crosshair_console() -> void:
 				"1 draws the held weapon in the first-person arms (default 0)",
 				func() -> String: return "1" if cl_viewarms_held else "0",
 				func(v: String) -> void: cl_viewarms_held = v.to_int() != 0)
+	if console != null:
+		var scope_sources: Array = console.sources()
+		if not scope_sources.is_empty() and scope_sources[0] is DotConsoleLocal:
+			ScopePrefs.bind_cvars(scope_sources[0])
 	if console != null and hud != null:
 		var _bound := game.combat_feel.bind_console(console, hud.crosshair())
 		var sources: Array = console.sources()
@@ -2265,14 +2271,20 @@ func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:
 		hands.aim_input(_aiming and _aim_allowed())
-	var zoom := hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0
-	camera.fov = base_fov * zoom
+	var zoom := 1.0
+	var view_zoom := 1.0
+	if hands != null and not is_spectating():
+		ScopePrefs.apply(hands)
+		zoom = hands.aim_fov_scale()
+		# A scope drawn as a lens zooms in its own camera; the main one stays at the hip's field of view.
+		view_zoom = hands.view_fov_scale()
+	camera.fov = base_fov * view_zoom
 	if _sampler != null:
 		_sampler.look_scale = zoom
 	if player != null and player.sampler != null:
 		player.sampler.look_scale = zoom
 	if hud != null:
-		hud.follow_hands(hands)
+		hud.follow_hands(hands, camera)
 		if weapons != null and weapons.arsenal != null:
 			hud.set_spread(weapons.arsenal.spread_now(), camera.fov, weapons.arsenal.crosshair_scale())
 
