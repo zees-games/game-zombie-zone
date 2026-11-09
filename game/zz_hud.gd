@@ -157,7 +157,7 @@ var vitals: DotVitals = null
 ## What is in hand and how much is in it.
 var ammo: DotAmmoCounter = null
 ## The carried weapon's sprite above the counter (`cl_weapon_icons`); hidden when the weapon has none.
-var _weapon_icon: TextureRect = null
+var _weapon_icon: DotWeaponIconPlate = null
 ## The held gun's fire modes, above the ammunition.
 var fire_mode: DotFireModeIndicator = null
 ## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
@@ -173,14 +173,14 @@ var hit_fx: DotHitFeedback = null
 var hit_marker: DotHitMarker = null
 ## The confirmed hits' numbers, on the bodies they landed on.
 var damage_numbers: DotDamageNumbers = null
-var _status: Label = null
+var _status: DotStatusLines = null
 var _nav_meter: PanelContainer = null
 ## The team, top left: a row per other survivor (name, a health bar, the number or DOWN /
 ## HELD / dead). The bar is drawn, not typed: as a row of block characters it came out as
 ## missing-glyph boxes on Windows, whose fallback fonts lack them (first play test).
 var _team: Control = null
 var _team_rows: Array[Dictionary] = []
-var _effects: Label = null
+var _effects: DotStatusLines = null
 var _prompt: Label = null
 ## The box file's order, titles and colours, set by the client: the carried slot is drawn from
 ## `player.carried_index` (an index into it plus one; 0 is unknown, or nothing carried).
@@ -347,7 +347,11 @@ func _build() -> void:
 	kits.offset_right = 24.0 + 300.0
 	_root.add_child(kits)
 
-	_status = _label(16)
+	_status = DotStatusLines.new()
+	_status.name = "Status"
+	_status.font_size = 16
+	_status.max_lines = 1
+	_root.add_child(_status)
 	_status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_status.offset_left = 24.0
 	_status.offset_right = 600.0
@@ -373,16 +377,14 @@ func _build() -> void:
 	ammo.offset_bottom = -24.0
 	_root.add_child(ammo)
 
-	_weapon_icon = TextureRect.new()
+	_weapon_icon = DotWeaponIconPlate.new()
 	_weapon_icon.name = "WeaponIcon"
+	_weapon_icon.show_plate = false
 	_weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	_weapon_icon.offset_left = -310.0
 	_weapon_icon.offset_right = -150.0
 	_weapon_icon.offset_top = -96.0
 	_weapon_icon.offset_bottom = -28.0
-	_weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_weapon_icon)
 
 	fire_mode = DotFireModeIndicator.new()
@@ -399,14 +401,16 @@ func _build() -> void:
 	_root.add_child(_nav_meter)
 
 	# What the boxes are doing, right side.
-	_effects = _label(15)
+	_effects = DotStatusLines.new()
+	_effects.name = "Effects"
+	_effects.align_right = true
+	_effects.font_size = 15
+	_root.add_child(_effects)
 	_effects.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_effects.offset_left = -420.0
 	_effects.offset_right = -22.0
 	_effects.offset_top = 90.0
 	_effects.offset_bottom = 360.0
-	_effects.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_effects.add_theme_color_override("font_color", Color(0.98, 0.84, 0.5))
 
 	# The centre: crosshair, prompt, the bar of what you hold E for.
 	_crosshair = _make_crosshair()
@@ -761,16 +765,16 @@ func _draw_health() -> void:
 		vitals.show_vitals(health.health, max_health)
 		vitals.show_status("DOWN")
 		if player.helped_fraction > 0.0:
-			_status.text = "Getting up…"
+			_status.show_lines(["Getting up…"])
 		elif game.crawl_rules.speed > 0.0:
-			_status.text = "Down — crawl to a friend, or hold on for help"
+			_status.show_lines(["Down — crawl to a friend, or hold on for help"])
 		else:
-			_status.text = "Down — hold on for help"
+			_status.show_lines(["Down — hold on for help"])
 	elif not player.is_alive():
 		vitals.low_fraction = 1.0
 		vitals.show_vitals(0.0, max_health)
 		vitals.show_status("DEAD")
-		_status.text = "Dead. Wait to be rescued." if game.config.rescue_seconds > 0.0 else "Dead."
+		_status.show_lines(["Dead. Wait to be rescued." if game.config.rescue_seconds > 0.0 else "Dead."])
 	else:
 		# Red at the limp: the bar and the number go to the theme's low colour where the
 		# controller starts limping, which is the line that matters here.
@@ -780,8 +784,8 @@ func _draw_health() -> void:
 		vitals.show_status("")
 
 		var downs_left := game.config.max_incaps - player.incaps
-		_status.text = "LAST LIFE — the next down is death" if downs_left <= 0 \
-			else ("%d down%s left" % [downs_left, "" if downs_left == 1 else "s"])
+		_status.show_lines(["LAST LIFE — the next down is death" if downs_left <= 0 \
+			else ("%d down%s left" % [downs_left, "" if downs_left == 1 else "s"])])
 
 	var rows: Array = []
 	if player.medkits > 0:
@@ -797,7 +801,7 @@ func _draw_health() -> void:
 	kits.offset_bottom = plate_top - 4.0
 	kits.offset_top = kits.offset_bottom - kits.row_height * rows.size()
 	_status.offset_bottom = kits.offset_top - 2.0
-	_status.offset_top = _status.offset_bottom - 26.0
+	_status.offset_top = _status.offset_bottom - _status.row_height
 
 
 func _set_width(rect: ColorRect, width: float) -> void:
@@ -983,7 +987,7 @@ func _draw_weapon() -> void:
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
 		fire_mode.clear()
-		_weapon_icon.visible = false
+		_weapon_icon.clear()
 		return
 
 	var names := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
@@ -995,9 +999,7 @@ func _draw_weapon() -> void:
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)
 	var sprite := ZzWeaponIcons.shared.texture(slot.def.id)
-	_weapon_icon.texture = sprite
-	_weapon_icon.visible = sprite != null
-	ZzWeaponIcons.shared.filter(_weapon_icon, true)
+	_weapon_icon.show_icon(sprite, slot.def.id)
 
 	if slot.def.magazine > 0:
 		var reserve := rig.arsenal.ammo().count(slot.def.ammo_type) if slot.def.ammo_type != &"" else 0
@@ -1062,11 +1064,11 @@ func _draw_carry() -> void:
 
 func _draw_effects() -> void:
 	if _effect_rows.is_empty():
-		_effects.text = ""
+		_effects.clear()
 		return
 
 	var since := Time.get_ticks_msec() / 1000.0 - _effects_at
-	var lines := PackedStringArray()
+	var lines: Array = []
 
 	for row: Dictionary in _effect_rows:
 		var timed := float(row["seconds"]) >= 0.0
@@ -1083,14 +1085,13 @@ func _draw_effects() -> void:
 
 		var stacks := int(row["stacks"])
 		var scale := float(row.get("scale", 1.0))
-		var tag := ""
+		var title := str(row["title"])
 		if scale != 1.0 and scale > 0.0:
-			tag = " x%s" % (str(snappedf(scale, 0.01)) if scale < 10.0 else str(int(scale)))
-		elif stacks > 1:
-			tag = " x%d" % stacks
-		lines.append("%s%s  %s" % [str(row["title"]), tag, DotScoreStrip.clock_text(left) if timed else "this round"])
+			title += " x%s" % (str(snappedf(scale, 0.01)) if scale < 10.0 else str(int(scale)))
+			stacks = 1
+		lines.append({"text": DotStatusLines.effect_text(title, stacks, left if timed else -1.0), "colour": AMBER})
 
-	_effects.text = "\n".join(lines)
+	_effects.show_lines(lines)
 
 
 func _draw_overlays(delta: float) -> void:

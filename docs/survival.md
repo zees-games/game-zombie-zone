@@ -50,7 +50,7 @@ Stand-ins on a survival map hold **posts** (the map's `posts`, shared out by sea
 
 ## The opening that turns survivors
 
-`zz_infect_after <seconds>` (0, off, by default) turns `zz_infect_count` random living survivors into zombies of `infect_kind` once that many seconds of play have passed; the rest hold. The last human is never turned. Turned survivors become AI zombies; a player-controlled zombie body is not built yet.
+`zz_infect_after <seconds>` (0, off, by default; 30 is a good opening to try) turns `zz_infect_count` random living survivors into zombies of `zz_infect_kind` once that many seconds of play have passed; the rest hold. The last human is never turned. Turned survivors become AI zombies; a player-controlled zombie body is not built yet.
 
 ## The light by day
 
