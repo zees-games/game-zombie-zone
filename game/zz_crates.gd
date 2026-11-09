@@ -3,7 +3,7 @@ extends RefCounted
 const ZzConfig := preload("zz_config.gd")
 
 ## Ammo piles and boxes lying on the ground as real rigid bodies (dot-props' `crate` toy, in a
-## [DotPropToyBox] of their own so the map's toys keep their wire indexes): pushed by survivors and
+## [DotPropBodyBox] of their own so the map's toys keep their wire indexes): pushed by survivors and
 ## zombies, shot, thrown by a blast. The server simulates; a client is sent where the awake ones
 ## are, a few times a second ([signal moved_many]), and the loot entry's place follows the body,
 ## so use, buy and a stand-in's pick-up find a moved crate where it lies.
@@ -19,7 +19,7 @@ signal moved_many(batch: Array)
 
 var game = null
 
-var _box: DotPropToyBox = null
+var _box: DotPropBodyBox = null
 var _toys: Dictionary = {}
 var _sent: Dictionary = {}
 var _since_sync: float = 0.0
@@ -45,12 +45,12 @@ func count() -> int:
 	return _toys.size()
 
 
-func toy_of(id: int) -> DotPropToy:
+func toy_of(id: int) -> DotPropBody:
 	return _toys.get(id)
 
 
 ## The loot id a toy stands for, or -1.
-func id_of(toy: DotPropToy) -> int:
+func id_of(toy: DotPropBody) -> int:
 	for id: int in _toys:
 		if _toys[id] == toy:
 			return id
@@ -73,11 +73,11 @@ func _ensure() -> bool:
 		return false
 	_toys.clear()
 	_sent.clear()
-	_box = DotPropToyBox.new()
+	_box = DotPropBodyBox.new()
 	_box.name = "Crates"
 	_box.authoritative = true
 	_box.draw = false
-	_box.rules = DotPropToyRules.new()
+	_box.rules = DotPropBodyRules.new()
 	_box.gravity = game.config.gravity
 	_box.kill_y = game.map.kill_height()
 	var _l := _box.lost.connect(_on_lost)
@@ -103,7 +103,7 @@ func _apply_rules() -> void:
 	_box.rules.push_scale = cfg.crate_push
 	_box.sleep_after = cfg.crate_sleep_seconds
 	_box.fall_limit = cfg.crate_fall_limit
-	_box.lost_mode = DotPropToyBox.LostMode.REMOVE if cfg.crate_lost == 1 else DotPropToyBox.LostMode.LAST_REST
+	_box.lost_mode = DotPropBodyBox.LostMode.REMOVE if cfg.crate_lost == 1 else DotPropBodyBox.LostMode.LAST_REST
 
 
 func _on_added(id: int, kind: StringName, _item: StringName, at: Vector3) -> void:
@@ -122,11 +122,11 @@ func _on_added(id: int, kind: StringName, _item: StringName, at: Vector3) -> voi
 
 ## A crate fell out of the map. One that never rested has no place to go back to, so it is
 ## removed with its loot entry; the others are put back by the box and their entry follows.
-func _on_lost(toy: DotPropToy) -> void:
+func _on_lost(toy: DotPropBody) -> void:
 	var id := id_of(toy)
 	if id < 0:
 		return
-	var back := _box.lost_mode == DotPropToyBox.LostMode.LAST_REST and _box.has_rested(toy)
+	var back := _box.lost_mode == DotPropBodyBox.LostMode.LAST_REST and _box.has_rested(toy)
 	DotLog.debug(CHANNEL, "a crate fell out of the map", {"id": id, "recovered": back})
 	if not back:
 		game.loot.remove(id)
@@ -138,7 +138,7 @@ func _on_removed(id: int, _by: StringName) -> void:
 	_sent.erase(id)
 	# A map change frees the box and its toys before the loot is cleared.
 	if is_instance_valid(toy) and _ready():
-		_box.remove_toy(toy as DotPropToy)
+		_box.remove_toy(toy as DotPropBody)
 
 
 ## One server tick: survivors and zombies push, the box steps, the loot follows the bodies, and the
@@ -156,7 +156,7 @@ func tick(delta: float) -> void:
 
 	var loot = game.loot
 	for id: int in _toys.keys():
-		var toy: DotPropToy = _toys[id]
+		var toy: DotPropBody = _toys[id]
 		if not is_instance_valid(toy) or toy.body == null or not loot.exists(id):
 			continue
 		var at := toy.body.global_position - Vector3(0.0, float(toy.def["size"].y) * 0.5, 0.0)
@@ -177,7 +177,7 @@ var _pending: Dictionary = {}
 func _flush() -> void:
 	var batch: Array = []
 	for id: int in _pending.keys():
-		var toy: DotPropToy = _toys.get(id)
+		var toy: DotPropBody = _toys.get(id)
 		if toy == null or not is_instance_valid(toy) or toy.body == null:
 			continue
 		var at: Vector3 = game.loot.entries[id]["at"] if game.loot.exists(id) else toy.body.global_position
