@@ -1209,10 +1209,13 @@ func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 
 
 ## The client's hands this frame: the scope follows their progressive fade-in and the crosshair gives way as it rises.
-func follow_hands(hands: ZeeViewModel) -> void:
+func follow_hands(hands: ZeeViewModel, camera: Camera3D = null) -> void:
 	set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.scope_fraction() > 0.0)
 	if scope != null and hands != null:
 		scope.follow(hands)
+		# The lens view draws the zoom with a second camera that follows the player's and leaves the hands out.
+		if scope.mode == 1 and camera != null:
+			scope.bind_camera(camera, (1 << (hands.view_layer - 1)) if hands.view_layer > 0 else 0)
 
 
 ## The aim this frame: the dot fades as the gun comes up; [param scoped] hides it for the scope.
