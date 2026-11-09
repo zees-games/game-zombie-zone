@@ -1101,7 +1101,9 @@ func _on_hurt(amount: float, from: Vector3) -> void:
 		var _flash := game.effects.flash(&"hurt")
 
 	if audio != null:
-		var _ouch := audio.play(ZzAudio.HURT)
+		# Scaled by the damage; a hit that downs or kills leaves the moment to the down or death cry.
+		var lethal := player != null and (player.is_down() or not player.is_alive())
+		var _ouch := DotHurtSound.play(audio, ZzAudio.HURT, amount, lethal)
 
 	if hud != null and player != null:
 		hud.hurt_from(from, amount)
