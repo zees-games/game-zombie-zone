@@ -44,6 +44,13 @@ var _down: Dictionary = {}
 ## from index -> the points a jump up leads to (a climb).
 var _up: Dictionary = {}
 
+## from index -> the points a trigger_teleport pad there sends a body to. One way, and for every filter: a stand-in
+## steps on a pad as readily as a zombie, and bot_filter bypasses the drops.
+var _tele: Dictionary = {}
+
+## Teleport links in this graph, for suites and describe.
+var tele_count: int = 0
+
 ## Every point either end of a link touches, to ask quickly whether a point has one.
 var _linked: Dictionary = {}
 
@@ -219,8 +226,41 @@ func add_climb(low: int, high: int) -> void:
 	_patched.clear()
 
 
+## A one-way teleport from the pad point [param from] to [param to]. Both are graph points.
+func add_teleport(from: int, to: int) -> void:
+	_append(_tele, from, to)
+	tele_count += 1
+	_native.clear()
+	_patched.clear()
+
+
+## Puts the document's `nav.teleports` rows ([pad xyz, destination xyz]) on the graph, each joined to the nearest point
+## of its end (within [constant TELE_REACH]); returns how many were joined.
+func apply_teleports(rows: Array) -> int:
+	var joined := 0
+
+	for row: Array in rows:
+		var pad := Vector3(float(row[0]), float(row[1]), float(row[2]))
+		var dest := Vector3(float(row[3]), float(row[4]), float(row[5]))
+		var from := data.nearest_point_where(pad, TELE_REACH, func(i: int) -> bool: return absf(data.points[i].y - pad.y) < 0.9)
+		var to := data.nearest_point_where(dest, TELE_REACH, func(i: int) -> bool: return absf(data.points[i].y - dest.y) < 0.9)
+
+		if from >= 0 and to >= 0 and from != to:
+			add_teleport(from, to)
+			joined += 1
+
+	if joined > 0:
+		relabel()
+
+	return joined
+
+
+## How far from a teleport's end the graph's nearest point may be, metres.
+const TELE_REACH := 2.0
+
+
 func has_links() -> bool:
-	return drop_count > 0 or up_count > 0
+	return drop_count > 0 or up_count > 0 or tele_count > 0
 
 
 ## Labels the components again once every link is in: a drop can join two pieces of the map.
@@ -416,7 +456,22 @@ func is_link(a: int, b: int) -> bool:
 
 
 func neighbours(index: int) -> PackedInt32Array:
-	var base := super(index)
+	var out: PackedInt32Array = _neighbours_walk(index)
+
+	if _building or not _tele.has(index):
+		return out
+
+	out = out.duplicate()
+
+	for to in _tele[index] as PackedInt32Array:
+		if not out.has(to):
+			out.append(to)
+
+	return out
+
+
+func _neighbours_walk(index: int) -> PackedInt32Array:
+	var base: PackedInt32Array = super.neighbours(index)
 
 	if filter == bot_filter and not _building:
 		return base
@@ -469,10 +524,17 @@ func _native_for(with: DotNpcNavFilter) -> AStar3D:
 	_building = false
 	_steep_cut = false
 
-	if with == bot_filter or _patched.has(astar.get_instance_id()):
+	if _patched.has(astar.get_instance_id()):
 		return astar
 
 	_patched[astar.get_instance_id()] = true
+
+	for from: int in _tele:
+		for to in _tele[from] as PackedInt32Array:
+			astar.connect_points(from, to, false)
+
+	if with == bot_filter:
+		return astar
 
 	# The steep plain edges, downhill (and uphill with allow_climb), one way each.
 	for i in data.points.size():
