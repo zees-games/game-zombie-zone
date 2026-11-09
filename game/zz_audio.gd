@@ -522,8 +522,9 @@ func listen_from(at: Vector3) -> void:
 		manager.listener_position = at
 
 
-func play(id: StringName) -> bool:
-	return manager != null and manager.play(id) != 0
+## The optional scales let DotHurtSound, which calls play(id, volume, pitch), drive this wrapper.
+func play(id: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
+	return manager != null and manager.play(id, volume_scale, pitch_scale) != 0
 
 
 func at(id: StringName, where: Vector3, volume: float = 1.0) -> int:
