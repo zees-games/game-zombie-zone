@@ -230,15 +230,17 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 ## does, because [code]slide_requires_sprint[/code] wants the sprint button and the minimum speed sits
 ## above a plain run. Arena leaves both at the addon default (no sprint needed), so it is unchanged.
 static func apply_slide(t: DotFpsTunables, p_config: ZzConfig) -> void:
-	t.slide_enabled = p_config != null and p_config.slide_enabled and p_config.sprint_enabled
-	t.slide_requires_sprint = true
-	t.slide_min_speed = t.max_speed * 1.05
 	if p_config == null:
+		DotFpsSlidePreset.apply_sprint(t, false, t.slide_boost, t.slide_max_speed, t.slide_duration, t.slide_cooldown)
 		return
-	t.slide_boost = p_config.slide_boost
-	t.slide_max_speed = p_config.slide_max_speed
-	t.slide_duration = p_config.slide_duration
-	t.slide_cooldown = p_config.slide_cooldown
+	DotFpsSlidePreset.apply_sprint(
+		t,
+		p_config.slide_enabled and p_config.sprint_enabled,
+		p_config.slide_boost,
+		p_config.slide_max_speed,
+		p_config.slide_duration,
+		p_config.slide_cooldown
+	)
 
 
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.
