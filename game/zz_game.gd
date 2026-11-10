@@ -1752,7 +1752,7 @@ func _set_phase(to: int) -> void:
 
 
 func is_survival() -> bool:
-	return str(map_doc.get("mode", ZzMapDoc.EXODUS)) == ZzMapDoc.SURVIVAL
+	return String(map_doc.get("mode", ZzMapDoc.EXODUS)) == ZzMapDoc.SURVIVAL
 
 
 ## The team the map in play is built for, or the configured minimum: what stand-ins fill to.
@@ -2544,10 +2544,10 @@ func _flashlight_hands(player: ZzPlayer, pressed: int) -> void:
 	var cfg := flashlight_conf()
 	if not player.flashlight_ready:
 		player.flashlight_ready = true
-		var map_id := str(map_doc.get("id", ""))
+		var map_id := String(map_doc.get("id", ""))
 		player.flashlight = cfg.enabled and ZzFlashlight.starts_on(cfg, map_id, map_doc)
 	if (pressed & ZzNetCommand.ACT_FLASHLIGHT) != 0 and cfg.enabled \
-			and DotFlashlightRules.allowed_on(cfg, str(map_doc.get("id", ""))):
+			and DotFlashlightRules.allowed_on(cfg, String(map_doc.get("id", ""))):
 		player.flashlight = not player.flashlight
 
 

@@ -608,7 +608,7 @@ func hurt_from(from: Vector3, amount: float) -> void:
 
 
 func _key(action: StringName) -> String:
-	return str(key_fn.call(action)) if key_fn.is_valid() else String(action)
+	return String(key_fn.call(action)) if key_fn.is_valid() else String(action)
 
 
 func _process(delta: float) -> void:
@@ -636,16 +636,41 @@ func _process(delta: float) -> void:
 	_hold_hidden_elements()
 
 
+## The top's text is rebuilt when what it is made of changes (a tenth of a second at the
+## finest), not every frame; the strip is fed the cached clock each frame as before.
+var _top_sig: int = 0
+var _top_clock: String = ""
+var _top_clock_low: bool = false
+var _top_under: String = ""
+var _top_rebuild_fn: Callable = _top_rebuild
+
+
 func _draw_top() -> void:
+	var hold := game.survival_state()
+	var objective := game.current_objective()
+	var sig := hash([game.phase, game.is_survival(), hold.get("style", 0), hold.get("stage", 0), hold.get("index", 0),
+		hold.get("count", 0), hold.get("remaining", 0), hold.get("twist", ""), floori(float(hold.get("left", -1.0)) * 10.0),
+		hold.is_empty(), floori(game.next_round_seconds() * 10.0), game.next_round_map(),
+		game.map.id() if game.map != null else &"", game.map_doc.get("name", ""),
+		floori(game.survival_elapsed * 10.0), game.survival_goal, objective,
+		game.objective_states[objective] if objective >= 0 and objective < game.objective_states.size() else &"",
+		floori(game.objective_progress[objective] * 10.0) if objective >= 0 and objective < game.objective_progress.size() else 0,
+		floori(game.now() * 10.0), floori(game.grace_left_for_hud() * 10.0)])
+	if sig != _top_sig:
+		_top_sig = sig
+		_top_rebuild_fn.call()
+	strip.show_clock(_top_clock, _top_clock_low, _top_under if _top_clock != "" else "")
+
+
+func _top_rebuild() -> void:
 	var lines := PackedStringArray()
+	var hold := game.survival_state()
 	var sub := ""
 
 	# A clock, when there is one, is the strip's, with what it is counting as its line.
 	var clock := ""
 	var clock_low := false
 	var under := ""
-
-	var hold := game.survival_state()
 
 	if game.phase == ZzGame.Phase.READY:
 		lines.append("Leave the shelter when you are ready" if not game.is_survival() else str(game.map_doc.get("name", "")))
@@ -695,7 +720,9 @@ func _draw_top() -> void:
 
 	_top.text = "\n".join(lines)
 	_top_sub.text = sub
-	strip.show_clock(clock, clock_low, under if clock != "" else "")
+	_top_clock = clock
+	_top_clock_low = clock_low
+	_top_under = under
 
 
 ## The line under the title while the start grace runs; static so a suite reads it without a screen.
@@ -777,16 +804,16 @@ func _draw_health() -> void:
 		vitals.show_vitals(health.health, max_health)
 		vitals.show_status("DOWN")
 		if player.helped_fraction > 0.0:
-			_status.show_lines(["Getting up…"])
+			_set_status_sig(1)
 		elif game.crawl_rules.speed > 0.0:
-			_status.show_lines(["Down — crawl to a friend, or hold on for help"])
+			_set_status_sig(2)
 		else:
-			_status.show_lines(["Down — hold on for help"])
+			_set_status_sig(3)
 	elif not player.is_alive():
 		vitals.low_fraction = 1.0
 		vitals.show_vitals(0.0, max_health)
 		vitals.show_status("DEAD")
-		_status.show_lines(["Dead. Wait to be rescued." if game.config.rescue_seconds > 0.0 else "Dead."])
+		_set_status_sig(4 if game.config.rescue_seconds > 0.0 else 5)
 	else:
 		# Red at the limp: the bar and the number go to the theme's low colour where the
 		# controller starts limping, which is the line that matters here.
@@ -796,17 +823,20 @@ func _draw_health() -> void:
 		vitals.show_status("")
 
 		var downs_left := game.config.max_incaps - player.incaps
-		_status.show_lines(["LAST LIFE — the next down is death" if downs_left <= 0 \
-			else ("%d down%s left" % [downs_left, "" if downs_left == 1 else "s"])])
+		_set_status_sig(6 if downs_left <= 0 else 100 + downs_left)
+	_status.show_lines(_status_lines)
 
-	var rows: Array = []
-	if player.medkits > 0:
-		rows.append(["medkit x%d" % player.medkits, _key(ZzBindings.HEAL)])
-	if player.pills > 0:
-		rows.append(["pills x%d" % player.pills, _key(ZzBindings.PILLS)])
-	if player.defibs > 0:
-		rows.append(["defibrillator x%d" % player.defibs, _key(ZzBindings.USE)])
-	kits.show_hints(rows)
+	# The kit rows are rebuilt only when a count or a key changes, not every frame.
+	var heal_key := _key(ZzBindings.HEAL)
+	var pills_key := _key(ZzBindings.PILLS)
+	var use_key := _key(ZzBindings.USE)
+	var kit_sig := player.medkits + (player.pills << 10) + (player.defibs << 20)
+	if kit_sig != _kit_sig or heal_key != _kit_keys[0] or pills_key != _kit_keys[1] or use_key != _kit_keys[2]:
+		_kit_sig = kit_sig
+		_kit_keys = [heal_key, pills_key, use_key]
+		_kit_rows = _build_kit_rows.call()
+	kits.show_hints(_kit_rows)
+	var rows := _kit_rows
 
 	# Stacked upward from the plate: the kits' rows, then the line about downs.
 	var plate_top := -PLATE_BOTTOM - 56.0
@@ -814,6 +844,40 @@ func _draw_health() -> void:
 	kits.offset_top = kits.offset_bottom - kits.row_height * rows.size()
 	_status.offset_bottom = kits.offset_top - 2.0
 	_status.offset_top = _status.offset_bottom - _status.row_height
+
+
+## What the status line says, by what the player is: set only when the state changes. The
+## builders are Callables, run on a change and not every frame.
+var _status_sig: int = 0
+var _status_lines: Array = []
+var _kit_sig: int = -1
+var _kit_keys: Array = ["", "", ""]
+var _kit_rows: Array = []
+var _build_kit_rows: Callable = func() -> Array:
+	var rows: Array = []
+	if player.medkits > 0:
+		rows.append(["medkit x%d" % player.medkits, _kit_keys[0]])
+	if player.pills > 0:
+		rows.append(["pills x%d" % player.pills, _kit_keys[1]])
+	if player.defibs > 0:
+		rows.append(["defibrillator x%d" % player.defibs, _kit_keys[2]])
+	return rows
+var _build_status_lines: Callable = func(sig: int) -> Array:
+	match sig:
+		1: return ["Getting up…"]
+		2: return ["Down — crawl to a friend, or hold on for help"]
+		3: return ["Down — hold on for help"]
+		4: return ["Dead. Wait to be rescued."]
+		5: return ["Dead."]
+		6: return ["LAST LIFE — the next down is death"]
+	var n := sig - 100
+	return ["%d down%s left" % [n, "" if n == 1 else "s"]]
+
+
+func _set_status_sig(sig: int) -> void:
+	if sig != _status_sig:
+		_status_sig = sig
+		_status_lines = _build_status_lines.call(sig)
 
 
 func _set_width(rect: ColorRect, width: float) -> void:
@@ -844,22 +908,29 @@ func _draw_team() -> void:
 		if other == player or shown >= TEAM_ROWS:
 			continue
 
-		var state := ""
+		var kind := 0
+		var value := 0
 		var fraction := -1.0
 
 		if other.watching or not other.is_alive():
-			state = "dead"
+			kind = 1
 		elif other.is_pinned():
-			state = "HELD (%s)" % String(other.pin_kind)
+			kind = 2
+			value = hash(other.pin_kind)
 		elif other.is_down():
-			state = "DOWN"
+			kind = 3
 		elif other.health != null:
-			state = "%d" % int(ceilf(other.health.health))
+			kind = 4
+			value = int(ceilf(other.health.health))
 			fraction = clampf(other.health.health / maxf(other.health.max_health, 1.0), 0.0, 1.0)
 
 		var row := _team_row(shown)
 		(row["name"] as Label).text = other.display_name.substr(0, 16)
-		(row["state"] as Label).text = state
+		# The state's words are built when they change, not every frame.
+		var state_sig := kind + (value << 3)
+		if state_sig != int(row.get("sig", -1)):
+			row["sig"] = state_sig
+			(row["state"] as Label).text = _team_state_fn.call(kind, value, other)
 		var back: ColorRect = row["back"]
 		var fill: ColorRect = row["fill"]
 		back.visible = fraction >= 0.0
@@ -875,6 +946,15 @@ func _draw_team() -> void:
 		var row: Dictionary = _team_rows[i]
 		for part: String in ["name", "state", "back", "fill"]:
 			(row[part] as CanvasItem).visible = false
+
+
+var _team_state_fn: Callable = func(kind: int, value: int, other: ZzPlayer) -> String:
+	match kind:
+		1: return "dead"
+		2: return "HELD (%s)" % String(other.pin_kind)
+		3: return "DOWN"
+		4: return "%d" % value
+	return ""
 
 
 ## Row [param index] of the team list, made the first time it is needed.
@@ -936,9 +1016,34 @@ func team_lines() -> PackedStringArray:
 	return out
 
 
+## The weight readout's words, rebuilt when [method set_carry] brings a new state.
+var _weight_text: String = ""
+var _weight_text_stale: bool = true
+var _weight_text_fn: Callable = func() -> String:
+	var carried := float(_weight_state.get("w", 0.0))
+	var limit := maxf(float(_weight_state.get("l", 1.0)), 0.1)
+	var lines := PackedStringArray()
+	var slots: Dictionary = _weight_state.get("slots", {})
+	var keys := slots.keys()
+	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return int(a) < int(b))
+	for key in keys:
+		var names := PackedStringArray()
+		for id: Variant in slots[key]:
+			names.append(ZzWeapons.title_of(StringName(str(id))))
+		if names.size() > 1:
+			var rest := names.slice(1)
+			lines.append("%s: [%s] %s" % [key, names[0], " ".join(rest)])
+		else:
+			lines.append("%s: %s" % [key, names[0]])
+	var pack: String = " | pack %d" % int(_weight_state.get("tier", 0)) if int(_weight_state.get("max", 0)) > 0 else ""
+	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
+	return "%s\nweight %.1f / %.1f%s%s" % ["\n".join(lines), carried, limit, pack, slow]
+
+
 ## What the player carries (the CARRY event's document, or [method ZzCarry.state_json] offline).
 func set_carry(state: Dictionary) -> void:
 	_weight_state = state
+	_weight_text_stale = true
 
 
 func _draw_stamina() -> void:
@@ -970,23 +1075,31 @@ func _draw_weight() -> void:
 	var colour := Color(1.0, 0.35, 0.3) if over else (AMBER if share > 0.8 else Color(0.55, 0.8, 0.4))
 	_set_width(_weight_fill, 310.0 * minf(share, 1.0))
 	_weight_fill.color = colour
-	var lines := PackedStringArray()
-	var slots: Dictionary = _weight_state.get("slots", {})
-	var keys := slots.keys()
-	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return int(a) < int(b))
-	for key in keys:
-		var names := PackedStringArray()
-		for id: Variant in slots[key]:
-			names.append(ZzWeapons.title_of(StringName(str(id))))
-		if names.size() > 1:
-			var rest := names.slice(1)
-			lines.append("%s: [%s] %s" % [key, names[0], " ".join(rest)])
-		else:
-			lines.append("%s: %s" % [key, names[0]])
-	var pack: String = " | pack %d" % int(_weight_state.get("tier", 0)) if int(_weight_state.get("max", 0)) > 0 else ""
-	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
-	_weight.text = "%s\nweight %.1f / %.1f%s%s" % ["\n".join(lines), carried, limit, pack, slow]
+	if _weight_text_stale:
+		_weight_text_stale = false
+		_weight_text = _weight_text_fn.call()
+	_weight.text = _weight_text
 	_weight.add_theme_color_override("font_color", colour)
+
+
+const FIRE_NAMES := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
+
+## Scratch for the fire modes on offer, reused each frame.
+var _offered: Array = []
+var _rig_player: ZzPlayer = null
+var _rig_node: ZeeWeaponRig = null
+
+
+var _rig_lookup_fn: Callable = func() -> ZeeWeaponRig:
+	return player.get_node_or_null(^"Weapons") as ZeeWeaponRig
+
+
+## The player's own "Weapons" rig by name (the world's, offline), looked up once per player.
+func _world_rig() -> ZeeWeaponRig:
+	if _rig_player != player or not is_instance_valid(_rig_node):
+		_rig_player = player
+		_rig_node = _rig_lookup_fn.call()
+	return _rig_node
 
 
 func _draw_weapon() -> void:
@@ -994,7 +1107,7 @@ func _draw_weapon() -> void:
 	# name this read the world's rig offline, a second rig beside the drawn one (which Godot had
 	# renamed), and showed whatever that one had.
 	var rig: ZeeWeaponRig = player.view_rig if player.view_rig != null and is_instance_valid(player.view_rig) \
-		else player.get_node_or_null(^"Weapons") as ZeeWeaponRig
+		else _world_rig()
 
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
@@ -1002,11 +1115,10 @@ func _draw_weapon() -> void:
 		_weapon_icon.clear()
 		return
 
-	var names := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
-	var offered: Array = []
+	_offered.clear()
 	for m in rig.arsenal.fire_modes_available():
-		offered.append(names.get(m, &""))
-	fire_mode.show_modes(offered, names.get(rig.arsenal.fire_mode(), &""))
+		_offered.append(FIRE_NAMES.get(m, &""))
+	fire_mode.show_modes(_offered, FIRE_NAMES.get(rig.arsenal.fire_mode(), &""))
 
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)
@@ -1022,13 +1134,25 @@ func _draw_weapon() -> void:
 		ammo.show_ammo(title, -1, -1)
 
 
+const USE_TEXT := {&"revive": "Picking them up…", &"heal": "Healing…", &"pills": "Taking a pill — hold still…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}
+const HELD_TEXT := {
+	&"grab": "GRABBED — shoot it, or a friend can shove it off",
+	&"pounce": "POUNCED — your team has to free you",
+	&"choke": "TONGUED — your team has to free you",
+	&"carry": "CARRIED — your team has to free you",
+	&"ride": "RIDDEN — your team has to free you",
+	&"eat": "BEING EATEN — your team has to free you",
+}
+const HELD_DEFAULT := "HELD — your team has to free you"
+
+
 func _draw_use() -> void:
 	var fraction := 0.0
 	var text := ""
 
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = {&"revive": "Picking them up…", &"heal": "Healing…", &"pills": "Taking a pill — hold still…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}.get(player.using, "")
+		text = USE_TEXT.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
 		text = "Somebody is helping you…"
@@ -1040,9 +1164,7 @@ func _draw_use() -> void:
 	_use_label.text = text
 
 	if player.is_pinned():
-		_held.text = "GRABBED — shoot it, or a friend can shove it off" if player.pin_kind == &"grab" \
-			else {&"pounce": "POUNCED", &"choke": "TONGUED", &"carry": "CARRIED", &"ride": "RIDDEN", &"eat": "BEING EATEN"}.get(player.pin_kind, "HELD") \
-			+ " — your team has to free you"
+		_held.text = HELD_TEXT.get(player.pin_kind, HELD_DEFAULT)
 		_held.visible = true
 	else:
 		_held.visible = false
@@ -1050,6 +1172,16 @@ func _draw_use() -> void:
 
 ## The box slot: what is in the hands and the key that opens it. Without `box_labels` the type is
 ## not known to this end at all (`carried_index` is 0), so this says only "a box".
+var _carry_sig: int = -1
+var _carry_keys: Array = ["", ""]
+var _carry_text_fn: Callable = func(id: StringName) -> String:
+	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
+	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
+	if player.box_out:
+		return "%s%s — hold %s to deploy (%s puts it away)" % [title, more, _carry_keys[0], _carry_keys[1]]
+	return "%s%s — %s takes it out" % [title, more, _carry_keys[1]]
+
+
 func _draw_carry() -> void:
 	if _carry == null:
 		return
@@ -1060,12 +1192,13 @@ func _draw_carry() -> void:
 		return
 
 	var id: StringName = box_order[player.carried_index - 1] if player.carried_index > 0 and player.carried_index <= box_order.size() else &""
-	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
-	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
-	if player.box_out:
-		_carry.text = "%s%s — hold %s to deploy (%s puts it away)" % [title, more, _key(ZzBindings.FIRE), _key(ZzBindings.BOX)]
-	else:
-		_carry.text = "%s%s — %s takes it out" % [title, more, _key(ZzBindings.BOX)]
+	var fire_key := _key(ZzBindings.FIRE)
+	var box_key := _key(ZzBindings.BOX)
+	var carry_sig := player.carried_index + (player.carried_count << 8) + ((1 << 20) if player.box_out else 0)
+	if carry_sig != _carry_sig or fire_key != _carry_keys[0] or box_key != _carry_keys[1]:
+		_carry_sig = carry_sig
+		_carry_keys = [fire_key, box_key]
+		_carry.text = _carry_text_fn.call(id)
 	_carry.add_theme_color_override("font_color", (box_colours.get(id, Color(0.98, 0.84, 0.5)) as Color).lightened(0.2))
 	# The meter pulses while it fills: the first-person cue that something is happening.
 	if player.using == &"deploy":
