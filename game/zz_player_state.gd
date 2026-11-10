@@ -172,6 +172,10 @@ var carry_scale: float = 1.0
 var shove_held: bool = false
 var previous_shove: bool = false
 
+## The latest command the server heard from this player, kept for a dead one too: it is what drives
+## the zombie they possess (see [ZzPossession]). Null until the first.
+var input_move: DotFpsCommand = null
+
 ## An administrator's `blind` and `beacon`, as dot-moderation's tools set them.
 var blinded: bool = false
 var beacon: bool = false

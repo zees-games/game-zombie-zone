@@ -66,6 +66,9 @@ signal carry_received(json: String)
 ## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
 signal spectate_received(viewer: int, mode: int, target: int)
 
+## Client side: the server gave this client a zombie body to drive (its net id), or took it (0).
+signal possess_received(net_id: int)
+
 ## Client side: somebody else used their weapon [param times] times since the last
 ## snapshot. [param kind] is one of `ZeeWeaponNet.KIND_*`. Relayed from that player's own
 ## behaviour, because a client builds those one per JOIN and nothing else could find them.

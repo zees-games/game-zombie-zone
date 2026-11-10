@@ -3,6 +3,7 @@ extends Node3D
 ## The simulation's state: every constant, signal and variable of [ZzGame], so the rules file holds only behaviour.
 
 const ZzBoxes := preload("zz_boxes.gd")
+const ZzPossession := preload("zz_possession.gd")
 const ZzPropForce := preload("zz_prop_force.gd")
 const ZzPropCarry := preload("zz_prop_carry.gd")
 const ZzCarry := preload("zz_carry.gd")
@@ -366,6 +367,9 @@ var survival_goal: float = 0.0
 ## Server: the survival map's hold, while one is being held. See [ZzSurvival].
 var survival: ZzSurvival = null
 var infection: ZzInfection = null
+
+## Server: survivors who turned and now hold a zombie body.
+var possession: ZzPossession = null
 
 ## What a client was told of the hold, the shape of [method ZzSurvival.state]; empty for none.
 var remote_survival: Dictionary = {}

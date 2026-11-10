@@ -29,6 +29,9 @@ const SWING_RECOVER := 0.55
 ## Where the horde publishes itself on the spawner, so a brain built from a path can reach it.
 const HORDE_META := &"zz_horde"
 
+## The drive's attack button (the player's fire).
+const DRIVE_ATTACK := 1
+
 ## What the brain is doing, for a describe() and for a subclass's own machine.
 var state: StringName = &"idle"
 var state_since: float = 0.0
@@ -113,7 +116,12 @@ func body() -> ZzZombieBody:
 
 
 func now() -> float:
-	return context.now if context != null else 0.0
+	return maxf(context.now if context != null else 0.0, _driven_clock)
+
+
+## A held body's own clock. The shared one moves only when this body's senses run, which a body
+## nobody is near and nothing is hunting need not do, so a swing would never land or end.
+var _driven_clock := 0.0
 
 
 func go(next: StringName) -> void:
@@ -368,6 +376,72 @@ func _npc_think(delta: float) -> void:
 	_think_now(delta)
 	# Decided once per thought rather than every tick: a swing or the boards only start in one.
 	_every = _think_every()
+
+
+## A player holds this body (see [ZzPossession]): its own wish from the player's keys, a swing on
+## the attack press at whoever is in reach in front, and the swing, stagger and freeze rules the AI
+## obeys. The kind's specials (a leap, a charge) are not driven yet.
+func _npc_driven(delta: float) -> void:
+	if npc == null or not npc.is_alive() or body() == null or drive == null:
+		return
+
+	_driven_clock = maxf(_driven_clock + delta, context.now if context != null else 0.0)
+
+	var h := horde()
+	if h != null and float(h.get(&"zombie_speed_scale")) <= 0.0:
+		halt()
+		cancel_swing()
+		return
+
+	_advance_swing()
+
+	if staggered():
+		halt()
+		return
+
+	var b := body()
+	var speed := npc.def.move_speed if npc.def != null else 3.0
+	var wish := drive.wish_velocity(speed)
+	var pressed := drive.take_pressed()
+
+	if drive.buttons & DRIVE_ATTACK != 0 or pressed & DRIVE_ATTACK != 0:
+		var victim := _victim_in_front()
+		if victim != &"":
+			swing_at(victim)
+
+	if swinging():
+		wish = Vector3.ZERO
+
+	b.wish = wish
+	b.rotation.y = drive.yaw
+	b.anim = swing_anim() if swinging() else (ZzZombieBody.Anim.RUN if wish != Vector3.ZERO else ZzZombieBody.Anim.IDLE)
+
+
+## The nearest living survivor within a swing's reach and in front of the held body.
+func _victim_in_front() -> StringName:
+	var h := horde()
+	if h == null:
+		return &""
+
+	var reach := tune(&"reach", 1.5) + 0.3
+	var forward := Basis(Vector3.UP, drive.yaw) * Vector3.FORWARD
+	var best := &""
+	var best_d := INF
+
+	for id: StringName in h.call(&"survivor_ids"):
+		var at := survivor_at(id)
+		if at == Vector3.INF:
+			continue
+		var to := at - npc.position()
+		to.y = 0.0
+		var d := to.length()
+		if d > reach or d < 0.001 or to.normalized().dot(forward) < 0.3:
+			continue
+		if d < best_d:
+			best_d = d
+			best = id
+
+	return best
 
 
 func _think_now(delta: float) -> void:

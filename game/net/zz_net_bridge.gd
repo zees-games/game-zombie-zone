@@ -230,6 +230,9 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		if game.spectate != null:
 			game.spectate.view_changed.connect(_on_spectate_changed)
 
+		if game.possession != null:
+			game.possession.changed.connect(_on_possession_changed)
+
 		_wire_lag_compensation()
 
 	return DotResult.success(true)
@@ -595,6 +598,19 @@ func _on_spectate_changed(key: String) -> void:
 	_tell(peer_id, ZzEvents.Kind.SPECTATE, ZzEvents.write_spectate(
 		session_id, int(view.mode), target, killer, view.death_position
 	))
+
+
+## Tells a turned survivor which body is theirs (0: none now). To the one peer: a hold is private
+## and a stand-in, whose peer is zero, is told nothing.
+func _on_possession_changed(player_id: StringName, npc_id: int) -> void:
+	var peer_id := peer_for_player(session_of(player_id))
+
+	if peer_id <= 0 or not _ready_peers.has(peer_id):
+		return
+
+	var behaviour: ZzNpcNet = _zombie_nets.get(npc_id)
+	var net_id: int = behaviour.identity.net_id if behaviour != null and behaviour.identity != null else 0
+	_tell(peer_id, ZzEvents.Kind.POSSESS, ZzEvents.write_possess(net_id))
 
 
 ## Says what somebody was handed.
@@ -1380,6 +1396,11 @@ func _on_event(message: DotNetMessage) -> void:
 				spectate_received.emit(
 					int(view["viewer"]), int(view["mode"]), int(view["target"])
 				)
+		ZzEvents.Kind.POSSESS:
+			var held := ZzEvents.read_possess(reader)
+
+			if bool(held["ok"]):
+				possess_received.emit(int(held["net_id"]))
 		_:
 			_on_world_event(event.kind, reader)
 

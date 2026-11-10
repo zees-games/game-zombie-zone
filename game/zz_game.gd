@@ -1803,6 +1803,9 @@ func _advance_phase(delta: float) -> void:
 			if infection != null and authoritative and not grace.is_active():
 				infection.tick(delta)
 
+			if possession != null and authoritative:
+				possession.tick(delta)
+
 			_advance_objectives(delta)
 			_check_round()
 
@@ -1823,6 +1826,7 @@ func _anybody_left_start() -> bool:
 func _begin_play() -> void:
 	_set_phase(Phase.PLAY)
 	infection = ZzInfection.new(self)
+	possession = ZzPossession.new(self)
 
 	var grace_seconds := grace_seconds_for_map()
 	if authoritative and grace_seconds > 0.0 and grace.begin(grace_seconds):
