@@ -2034,6 +2034,8 @@ func _actions() -> int:
 	if _drop_ticks > 0:
 		_drop_ticks -= 1
 		out |= ZzNetCommand.ACT_DROP
+	elif _drop_down:
+		out |= ZzNetCommand.ACT_DROP
 	if _box_key:
 		out |= ZzNetCommand.ACT_BOX
 	if _aim_sent():
@@ -2916,6 +2918,9 @@ func _key_event(event: InputEvent) -> bool:
 	if event.is_action(ZzBindings.AIM):
 		_aiming = pressed
 		return true
+
+	if event.is_action(ZzBindings.DROP):
+		_drop_down = pressed
 
 	if not pressed:
 		return false

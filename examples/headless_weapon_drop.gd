@@ -8,7 +8,7 @@ const ZzBindings := preload("../game/zz_bindings.gd")
 ## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 5
-const CHECKS := 33
+const CHECKS := 37
 
 
 func _ready() -> void:
@@ -155,6 +155,22 @@ func _test_rules() -> void:
 
 	drops.clear()
 	_check(drops.count() == 0, "clear() empties the layer")
+
+	# The drop key with a hold (DotWeaponDropKey): nothing on the press, a throw when the hold is over, none on an early release.
+	var layer = game.weapon_layer
+	var _held_id := await _equip_primary(game, p)
+	rules.key_hold = 0.5
+	_check(not layer.drop_key(p, true, 0.0) and drops.count() == 0, "a hold key throws nothing on the press")
+	_check(not layer.drop_key(p, true, 0.3) and drops.count() == 0, "nor before the hold is over")
+	_check(layer.drop_key(p, true, 0.3) and drops.count() == 1, "it throws when the hold is over")
+	drops.clear()
+	var _again := await _equip_primary(game, p)
+	var _a := layer.drop_key(p, true, 0.0)
+	var _b := layer.drop_key(p, true, 0.3)
+	var _c := layer.drop_key(p, false, 0.0)
+	_check(not layer.drop_key(p, false, 0.5) and drops.count() == 0, "a release before the hold is over throws nothing")
+	rules.key_hold = 0.0
+	var _third := await _equip_primary(game, p)
 
 	p.wanted_slot = 1
 	var _m := ars.equip(1)

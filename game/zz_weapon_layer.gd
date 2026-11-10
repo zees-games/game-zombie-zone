@@ -112,18 +112,41 @@ func _free(player) -> bool:
 		and player.is_alive() and not player.is_down() and not player.is_held()
 
 
-## The drop key: the weapon in hand goes along the aim. True if one left.
+## The drop key tapped once: the weapon in hand goes along the aim when `sv_weapon_drop_key_hold` is 0. True if one left.
 func throw(player) -> bool:
+	var thrown := drop_key(player, true, 0.0)
+	var _released := drop_key(player, false, 0.0)
+	return thrown
+
+
+## The player's drop key, every tick: a press throws the weapon in hand along the aim at once, or once the key has been
+## held for `sv_weapon_drop_key_hold`. True if one left.
+func drop_key(player, pressed: bool, delta: float) -> bool:
 	if not _free(player):
+		reset_key(player)
 		return false
+	var keys: Dictionary = game.get_meta(&"drop_keys", {})
+	game.set_meta(&"drop_keys", keys)
+	var key: DotWeaponDropKey = keys.get(player.entity_id)
+	if key == null:
+		key = DotWeaponDropKey.new()
+		keys[player.entity_id] = key
 	var arsenal: DotWeaponArsenal = player.weapons.arsenal
-	var id := drops.throw(arsenal, player.eye_position(), player.aim_direction(), player.entity_id,
-		player.class_def, player.controller.state.velocity)
+	var id := key.step(drops, arsenal, player.eye_position(), player.aim_direction(), player.entity_id,
+		pressed, delta, player.class_def, player.controller.state.velocity)
 	if id == 0:
 		return false
 	player.wanted_slot = arsenal.current_slot()
 	DotLog.debug(CHANNEL, "threw", {"player": String(player.player_id), "drop": id})
 	return true
+
+
+## Forgets a hold in progress: call on death, respawn and disconnect.
+func reset_key(player) -> void:
+	var keys: Dictionary = game.get_meta(&"drop_keys", {})
+	var key: DotWeaponDropKey = keys.get(player.entity_id)
+	if key != null:
+		key.reset()
 
 
 ## Every tick: an empty slot takes a drop in reach.

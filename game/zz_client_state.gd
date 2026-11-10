@@ -69,6 +69,8 @@ var _fire_mode_ticks := 0
 var _cycle_ticks := 0
 ## Ticks left to hold ACT_DROP after the drop-weapon key was pressed.
 var _drop_ticks := 0
+## Whether the drop-weapon key is down now: the server holds it for `sv_weapon_drop_key_hold`.
+var _drop_down := false
 var _give_pills_ticks := 0
 var _give_kit_ticks := 0
 ## This end's copy of the carry rules: stows several per slot like the server, never refuses on weight.
