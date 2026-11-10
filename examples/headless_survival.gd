@@ -32,7 +32,7 @@ const CHECKS := 139
 ## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core` is everything but the big maps, and each
 ## big map is its own shard, so the tick-budget check (which load flakes) sits alone with its map. `-- --merge LOG...` holds that every
 ## shard's log is there and that together they entered all SECTIONS.
-const SHARDS := {"core": [16, 102], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
+const SHARDS := {"core": [17, 111], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
