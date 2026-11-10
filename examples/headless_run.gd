@@ -43,7 +43,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 449
+const CHECKS := 452
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -56,6 +56,10 @@ const SWITCH := Vector3(6.5, 1.0, 36.0)
 const END_ROOM := Vector3(0.0, 0.05, 85.0)
 
 var _sections_entered := 0
+## Every SCRIPT ERROR the engine prints while the suite runs: a runtime one (a call to a method
+## the object lacks) aborts only its function, prints, and changes no exit code, so a client
+## that errs every frame would otherwise pass. The run fails on any.
+var _script_errors := ScriptErrors.new()
 var _sections_finished := 0
 
 var _worlds: Array[ZzGame] = []
@@ -64,6 +68,7 @@ var _worlds: Array[ZzGame] = []
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
+	OS.add_logger(_script_errors)
 	# The installed packs are the game's weapons (zee carries only fists), so this suite scans addons/; the stand-ins' thresholds
 	# hold with them (headless_packs covers pack rules).
 	load("res://game/zz_packs.gd").root = "res://addons"
@@ -135,6 +140,10 @@ func _run() -> void:
 
 	await get_tree().process_frame
 
+	OS.remove_logger(_script_errors)
+	var errs := _script_errors.seen()
+	_check(errs.is_empty(), "no script error anywhere in the run",
+		"%d, first: %s" % [errs.size(), " | ".join(errs.slice(0, 3))])
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
@@ -3059,7 +3068,15 @@ func _test_the_hud() -> void:
 	_check(probe.scope_mode == ZeeViewModel.SCOPE_FULL and not probe.scope_is_lens(),
 		"the cl_scope_mode pref reaches the view model", "mode %d" % probe.scope_mode)
 	scope_prefs.mode = 1
+	var before := _script_errors.seen().size()
+	_check(is_equal_approx(ZzClient.scope_view_zoom(probe), probe.view_fov_scale()) and probe.scope_mode == ZeeViewModel.SCOPE_LENS,
+		"the client's camera zoom comes from the view model's view_fov_scale, prefs applied", "mode %d" % probe.scope_mode)
 	probe.free()
+	# A zee_weapons copy from before its scope views (no LEVEL bump came with them) errs every frame if called blind.
+	var old_hands := OldScopeHands.new()
+	_check(is_equal_approx(ZzClient.scope_view_zoom(old_hands), OldScopeHands.ZOOM) and _script_errors.seen().size() == before,
+		"hands without resolve_scope_mode/view_fov_scale zoom the main camera, with no script error",
+		str(_script_errors.seen().slice(before)))
 	hud.set_aim(0.0, false)
 	var cross: Control = hud._crosshair
 	var hides := DotAddonApi.build_level("dot_ui") >= 14
@@ -3401,3 +3418,36 @@ func _hurt_npc(game: ZzGame, npc: DotNpcInstance, amount: float) -> void:
 	var hit := DotDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
+
+
+## View-model hands as zee_weapons drew them before `resolve_scope_mode` and `view_fov_scale`.
+class OldScopeHands extends RefCounted:
+	const ZOOM := 0.4
+
+	func aim_fov_scale() -> float:
+		return ZOOM
+
+
+## Collects the engine's SCRIPT errors (any thread) while installed.
+class ScriptErrors extends Logger:
+	var _lock := Mutex.new()
+	var _seen := PackedStringArray()
+
+	func _log_error(
+		function: String, file: String, line: int, code: String, rationale: String,
+		_editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]
+	) -> void:
+		if error_type != ERROR_TYPE_SCRIPT:
+			return
+		_lock.lock()
+		_seen.append("%s %s (%s %s:%d)" % [code, rationale, function, file, line])
+		_lock.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
+
+	func seen() -> PackedStringArray:
+		_lock.lock()
+		var out := _seen.duplicate()
+		_lock.unlock()
+		return out
