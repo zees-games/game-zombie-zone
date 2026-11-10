@@ -57,8 +57,6 @@ func _probe(id: String) -> void:
 			return _game.props_catalogue.size_of(pid) if _game.props_catalogue.has(pid) else Vector3.ZERO
 	var job = ZzNpcs.nav_job(doc, props_size, horde.open_gates, blockers, false, false)
 	var raw: DotNpcNavData = job.run_blocking()
-	var b: DotNpcNavBuilder = job.make_builder.call([], {})
-	b.begin(&"x", "")
 	var pc := _comps(pr)
 	var rc := _comps(raw)
 	var main := _biggest(pc)
@@ -75,7 +73,6 @@ func _probe(id: String) -> void:
 		var i := pr.nearest_point(e, 2.5)
 		if i >= 0 and pc[i] != main:
 			pieces[pc[i]] = int(pieces.get(pc[i], 0)) + 1
-	var floors: Array = doc.get("nav", {}).get("floors", [])
 	for c: int in pieces:
 		var n := 0
 		var bi := -1
@@ -103,17 +100,6 @@ func _probe(id: String) -> void:
 		print("  piece %d (%d pts, %d ends): %s -> main %s, %.2f m dy %.2f; raw %s" % [c, n, pieces[c], _f(a), _f(z), best, z.y - a.y, "JOINED (prune split)" if joined_raw else "split"])
 		if joined_raw:
 			_raw_path_cuts(raw, rc, pr, pc, main, ra, rz)
-		elif false:
-			var steps := maxi(int(a.distance_to(z) / 0.25), 1)
-			for k in steps + 1:
-				var s := a.lerp(z, float(k) / steps)
-				var fl := PackedStringArray()
-				for f: Array in floors:
-					if s.x >= float(f[0]) and s.x <= float(f[2]) and s.z >= float(f[1]) and s.z <= float(f[3]) and absf(float(f[4]) - s.y) < 3.0:
-						fl.append("%.2f%s" % [float(f[4]), "B" if b._blocked(Vector3(s.x, float(f[4]), s.z)) else ""])
-				var ob := _obstacle_at(b, s)
-				var rp := raw.nearest_point(s, 0.45)
-				print("    %s floors[%s] raw_pt %s %s" % [_f(s), ",".join(fl), _f(raw.points[rp]) if rp >= 0 else "-", ob])
 		if OS.get_cmdline_user_args().has("--links"):
 			_links_near(doc, pr, pc, c, main)
 	_zombie_view(ends)

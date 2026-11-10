@@ -247,21 +247,8 @@ func _decide(player, command: DotFpsCommand) -> void:
 	if pinned != null and not _answers(player, pinned):
 		pinned = null
 
-	if pinned != null:
-		var holder: DotNpcInstance = game.pins.holder_of(pinned.player_id)
-
-		if holder != null:
-			var gap: float = holder.position().distance_to(player.feet())
-
-			if gap <= 2.0:
-				_aim(player, command, holder.position() + Vector3(0.0, 1.0, 0.0))
-				player.shove_held = (game.current_tick() % 8) < 2
-			else:
-				if _sees(player, _aim_point(holder)):
-					_aim_at(player, command, holder)
-					command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, holder))
-				_walk_to(player, command, holder.position(), memory)
-			return
+	if pinned != null and _help_pinned(player, command, memory, pinned):
+		return
 
 	# 2. A friend down, and nothing on top of us.
 	var downed = _downed_friend(player)
@@ -288,22 +275,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 
 	# 3. Threats.
 	if danger != null:
-		_aim_at(player, command, danger)
-		_choose_slot(player, danger)
-		var crowd := _crowd_within(player, game.config.bot_shove_range)
-
-		if crowd >= 2 or (danger.def.id == ZzNpcs.COMMON and danger.position().distance_to(player.feet()) < 1.3):
-			player.shove_held = (game.current_tick() % 10) < 2
-
-		command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, danger))
-		# Backpedal from anything in its face; otherwise keep with the team (or its post) while
-		# shooting.
-		if danger.position().distance_to(player.feet()) < 2.5:
-			_move_world(player, command, player.feet() - danger.position())
-		elif game.is_survival():
-			_hold_post(player, command, memory)
-		else:
-			_follow(player, command, memory)
+		_fight(player, command, memory, danger)
 		return
 
 	# 4. Itself.
@@ -343,6 +315,46 @@ func _decide(player, command: DotFpsCommand) -> void:
 		return
 
 	_follow(player, command, memory)
+
+
+## Kills or shoves what holds [param pinned]. True when it spent the tick on that.
+func _help_pinned(player, command: DotFpsCommand, memory: Dictionary, pinned) -> bool:
+	var holder: DotNpcInstance = game.pins.holder_of(pinned.player_id)
+
+	if holder == null:
+		return false
+
+	var gap: float = holder.position().distance_to(player.feet())
+
+	if gap <= 2.0:
+		_aim(player, command, holder.position() + Vector3(0.0, 1.0, 0.0))
+		player.shove_held = (game.current_tick() % 8) < 2
+	else:
+		if _sees(player, _aim_point(holder)):
+			_aim_at(player, command, holder)
+			command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, holder))
+		_walk_to(player, command, holder.position(), memory)
+	return true
+
+
+## Fights [param danger]: aims, picks a slot, shoves a crowd and backs off from what is in its face.
+func _fight(player, command: DotFpsCommand, memory: Dictionary, danger: DotNpcInstance) -> void:
+	_aim_at(player, command, danger)
+	_choose_slot(player, danger)
+	var crowd := _crowd_within(player, game.config.bot_shove_range)
+
+	if crowd >= 2 or (danger.def.id == ZzNpcs.COMMON and danger.position().distance_to(player.feet()) < 1.3):
+		player.shove_held = (game.current_tick() % 10) < 2
+
+	command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_ok(player, memory, danger))
+	# Backpedal from anything in its face; otherwise keep with the team (or its post) while
+	# shooting.
+	if danger.position().distance_to(player.feet()) < 2.5:
+		_move_world(player, command, player.feet() - danger.position())
+	elif game.is_survival():
+		_hold_post(player, command, memory)
+	else:
+		_follow(player, command, memory)
 
 
 ## Shocks the nearest dead friend back when [param player] holds a defibrillator and the body is still good
@@ -1417,21 +1429,7 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 		if game.spawners != null and game.spawners.refusal(id, player) != "":
 			continue
 
-		var wanted := false
-
-		match e["kind"]:
-			ZzLoot.MEDKIT:
-				wanted = player.medkits == 0
-			ZzLoot.PILLS:
-				wanted = player.pills == 0
-			ZzLoot.DEFIB:
-				wanted = game.config.bot_defib and player.defibs == 0
-			ZzLoot.AMMO:
-				wanted = _low_on_ammo(player)
-			ZzLoot.BOX:
-				wanted = game.config.bot_open_boxes and (game.config.box_carry <= 0 or (game.boxes != null and game.boxes.can_carry(player)))
-			ZzLoot.WEAPON, ZzLoot.THROWABLE:
-				wanted = _wants_weapon(player, e["item"])
+		var wanted := _wants_loot(player, e)
 
 		if wanted and id == kept:
 			best = id
@@ -1493,6 +1491,24 @@ func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float =
 		_walk_to(player, command, at, memory)
 
 	return true
+
+
+## Whether the stand-in has a use for the loot entry [param e] (a kind it is short of, or lacks).
+func _wants_loot(player, e: Dictionary) -> bool:
+	match e["kind"]:
+		ZzLoot.MEDKIT:
+			return player.medkits == 0
+		ZzLoot.PILLS:
+			return player.pills == 0
+		ZzLoot.DEFIB:
+			return game.config.bot_defib and player.defibs == 0
+		ZzLoot.AMMO:
+			return _low_on_ammo(player)
+		ZzLoot.BOX:
+			return game.config.bot_open_boxes and (game.config.box_carry <= 0 or (game.boxes != null and game.boxes.can_carry(player)))
+		ZzLoot.WEAPON, ZzLoot.THROWABLE:
+			return _wants_weapon(player, e["item"])
+	return false
 
 
 ## A thrown or dropped weapon (the weapon layer's drops) the stand-in wants, within [param reach]: walks to the nearest.

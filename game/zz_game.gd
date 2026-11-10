@@ -80,17 +80,7 @@ func _ready() -> void:
 	lap = _lap(&"art_table", lap)
 
 	_build_physics()
-	pass_rules.humans_pass = config.humans_pass_barricades
-	crawl_rules.speed = config.downed_crawl_speed
-	combat_feel.sprint_defaults(ZzPlayer.tunables_for(config))
-	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
-		crawl_rules.changed.connect(_on_crawl_rules_changed)
-	if not water_rules.changed.is_connected(_push_water):
-		water_rules.changed.connect(_push_water)
-	if not body_rules.changed.is_connected(_on_body_rules_changed):
-		body_rules.changed.connect(_on_body_rules_changed)
-	if not pass_rules.changed.is_connected(_on_body_rules_changed):
-		pass_rules.changed.connect(_on_body_rules_changed)
+	_wire_rules()
 	team_damage.config = config
 	team_damage.playtime_fn = _playtime_of
 	_apply_gravity()
@@ -151,6 +141,21 @@ func _ready() -> void:
 		DotRegistry.register(SERVICE, self)
 
 	DotLog.info(CHANNEL, "world ready", config.describe())
+
+
+## The movement rule sets take the config and tell the game when they change.
+func _wire_rules() -> void:
+	pass_rules.humans_pass = config.humans_pass_barricades
+	crawl_rules.speed = config.downed_crawl_speed
+	combat_feel.sprint_defaults(ZzPlayer.tunables_for(config))
+	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
+		crawl_rules.changed.connect(_on_crawl_rules_changed)
+	if not water_rules.changed.is_connected(_push_water):
+		water_rules.changed.connect(_push_water)
+	if not body_rules.changed.is_connected(_on_body_rules_changed):
+		body_rules.changed.connect(_on_body_rules_changed)
+	if not pass_rules.changed.is_connected(_on_body_rules_changed):
+		pass_rules.changed.connect(_on_body_rules_changed)
 
 
 ## The `<pack>/<subdir>` directories of the map packs a host running this game with no server

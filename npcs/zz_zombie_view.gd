@@ -48,6 +48,25 @@ func build(p_kind: StringName, p_variant: int) -> void:
 	_model.basis = Basis(Vector3.UP, PI).scaled(Vector3(_scale * girth, _scale, _scale * girth))
 	_hunch = float(_look.get("hunch", 0.0))
 
+	_index_bones()
+
+	_mesh.material_override = _material_for(_look)
+	_material = _mesh.material_override as ShaderMaterial
+	# A zombie a long way off is not drawn at all: the far end of a street is where a horde
+	# is thickest and where nobody can make one out.
+	_mesh.visibility_range_end = lod.draw_until if lod != null else 120.0
+	_mesh.lod_bias = LOD_BIAS
+	_mesh.visibility_range_end_margin = 10.0
+
+	for item: StringName in _look.get("wear", []):
+		_wear(item)
+
+	_clip = &""
+	_play(&"idle", 1.0)
+
+
+## Looks up the bones the animation and the hit reactions drive, and the shapes a look bends.
+func _index_bones() -> void:
 	_bones.clear()
 	for bone in [&"Abdomen", &"Torso", &"Neck", &"Head", &"Hips", &"Tongue1", &"Tongue2", &"Tongue3", &"BottomMouth"]:
 		_bones[bone] = _skeleton.find_bone(String(bone))
@@ -66,20 +85,6 @@ func build(p_kind: StringName, p_variant: int) -> void:
 		if key.begins_with("Tongue"):
 			limp.erase(key)
 	_dead_bones = shape_scales(_skeleton, limp)
-
-	_mesh.material_override = _material_for(_look)
-	_material = _mesh.material_override as ShaderMaterial
-	# A zombie a long way off is not drawn at all: the far end of a street is where a horde
-	# is thickest and where nobody can make one out.
-	_mesh.visibility_range_end = lod.draw_until if lod != null else 120.0
-	_mesh.lod_bias = LOD_BIAS
-	_mesh.visibility_range_end_margin = 10.0
-
-	for item: StringName in _look.get("wear", []):
-		_wear(item)
-
-	_clip = &""
-	_play(&"idle", 1.0)
 
 
 ## [DotNpcLimbs]' view seam: takes a limb off the drawn body, and returns where it was cut.

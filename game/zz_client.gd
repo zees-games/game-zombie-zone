@@ -9,12 +9,7 @@ func _ready() -> void:
 	# after this node is in the tree. The platform puts the loading cover up, held until the
 	# player exists and the camera is current, and finds the link.
 	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
-	var own_threads := false
-	for a in OS.get_cmdline_user_args():
-		own_threads = own_threads or a.begins_with("--map_load_threads=")
-	if not own_threads:
-		MapThreads.client_value = -1
-		var _on := MapThreads.apply(-1)
+	_own_map_threads()
 	platform = DotGameClient.new()
 	platform.name = "Platform"
 	platform.force_offline = force_offline
@@ -82,6 +77,16 @@ func _ready() -> void:
 		_start_offline()
 	else:
 		DotLog.result(CHANNEL, "the netcode", _build_netcode())
+
+
+## Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
+func _own_map_threads() -> void:
+	var own_threads := false
+	for a in OS.get_cmdline_user_args():
+		own_threads = own_threads or a.begins_with("--map_load_threads=")
+	if not own_threads:
+		MapThreads.client_value = -1
+		var _on := MapThreads.apply(-1)
 
 
 # The load gate is the platform's. Covered also means the horde does not act: offline the
@@ -394,7 +399,8 @@ func _add_noblock_and_workbench() -> void:
 
 # --- Connected -------------------------------------------------------------
 
-func _build_netcode() -> DotResult:
+## Follows the server's replicated rule cvars, so this end predicts and draws by the server's rules.
+func _follow_server_rules() -> void:
 	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this
 	# end traces its own shots for tracers and impacts, and on its default 1 against a server
 	# on 0 or 2 they ended in (or went through) a team-mate where the server's did the
@@ -425,6 +431,10 @@ func _build_netcode() -> DotResult:
 		var _toys := game.toy_rules.follow_cvars(link)
 		var _weapon_drops := game.weapon_layer.rules.follow_cvars(link)
 		var _roster := follow_roster(link, game.config)
+
+
+func _build_netcode() -> DotResult:
+	_follow_server_rules()
 
 	net = DotNetManager.new()
 	net.name = "Net"
@@ -2819,19 +2829,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			_sampler.handle_event(event)
 
 
+## The use key: opens the trader when near one (or says why it is shut), else is held as use.
+func _use_key(pressed: bool) -> void:
+	if pressed and _near_trader() and _prompt() == "":
+		open_shop()
+		return
+	if pressed and not _near_trader() and _near_trader(false) and _prompt() == "":
+		var why := str(shop_state.get("closed_message", ""))
+		if why != "":
+			game.notice.emit(why)
+	_using = pressed
+
+
+## The fire-mode key: asks the server, and cycles the world's own arsenal when offline.
+func _fire_mode_key() -> void:
+	_fire_mode_ticks = 3
+	# Offline the world's arsenal is this one and the server path cycles it.
+	if not _offline and weapons != null and weapons.arsenal != null:
+		var _moded := weapons.arsenal.cycle_fire_mode()
+	if audio != null and weapons != null and weapons.arsenal != null and weapons.arsenal.fire_modes_available().size() > 1:
+		var _clicked := audio.click()
+
+
 ## The game's own keys, held and pressed. True when one was used.
 func _key_event(event: InputEvent) -> bool:
 	var pressed := event.is_pressed()
 
 	if event.is_action(ZzBindings.USE):
-		if pressed and _near_trader() and _prompt() == "":
-			open_shop()
-			return true
-		if pressed and not _near_trader() and _near_trader(false) and _prompt() == "":
-			var why := str(shop_state.get("closed_message", ""))
-			if why != "":
-				game.notice.emit(why)
-		_using = pressed
+		_use_key(pressed)
 		return true
 
 	if event.is_action(ZzBindings.HEAL):
@@ -2884,12 +2909,7 @@ func _key_event(event: InputEvent) -> bool:
 	if event.is_action_pressed(ZzBindings.GIVE_KIT):
 		_give_kit_ticks = 3
 	if event.is_action_pressed(ZzBindings.FIRE_MODE):
-		_fire_mode_ticks = 3
-		# Offline the world's arsenal is this one and the server path cycles it.
-		if not _offline and weapons != null and weapons.arsenal != null:
-			var _moded := weapons.arsenal.cycle_fire_mode()
-		if audio != null and weapons != null and weapons.arsenal != null and weapons.arsenal.fire_modes_available().size() > 1:
-			var _clicked := audio.click()
+		_fire_mode_key()
 		return true
 
 	if event.is_action_pressed(ZzBindings.SHOVE):

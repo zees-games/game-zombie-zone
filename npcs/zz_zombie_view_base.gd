@@ -583,25 +583,9 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 
 	var normal_tex: bool = NORMALS.has(look["body"])
 
-	if _shader == null:
-		_shader = Shader.new()
-		_shader.code = SHADER
+	_ensure_shaders(normal_tex)
 
-	if normal_tex and _shader_normal == null:
-		# Only the body that has a normal map pays for sampling one.
-		_shader_normal = Shader.new()
-		_shader_normal.code = SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
-			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
-
-	var atlas_id: StringName = ATLAS_OF.get(look["body"], &"basic")
-	var path: String = ATLASES[atlas_id]
-
-	if look["body"] == &"city":
-		atlas_id = StringName("city_%d" % int(look.get("tex", 0)))
-		path = path.replace("city_albedo_0", "city_albedo_%d" % int(look.get("tex", 0)))
-
-	if not _atlases.has(atlas_id):
-		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
+	var atlas_id := _load_atlas(look)
 
 	var material := ShaderMaterial.new()
 	material.shader = _shader_normal if normal_tex else _shader
@@ -637,6 +621,32 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	material.set_shader_parameter(&"vein_amount", 0.6 if vein != Color.BLACK else 0.0)
 	_materials[key] = material
 	return material
+
+
+static func _ensure_shaders(normal_tex: bool) -> void:
+	if _shader == null:
+		_shader = Shader.new()
+		_shader.code = SHADER
+
+	if normal_tex and _shader_normal == null:
+		# Only the body that has a normal map pays for sampling one.
+		_shader_normal = Shader.new()
+		_shader_normal.code = SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
+			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
+
+
+## Loads (once) the atlas a look is painted on and returns its id.
+static func _load_atlas(look: Dictionary) -> StringName:
+	var atlas_id: StringName = ATLAS_OF.get(look["body"], &"basic")
+	var path: String = ATLASES[atlas_id]
+
+	if look["body"] == &"city":
+		atlas_id = StringName("city_%d" % int(look.get("tex", 0)))
+		path = path.replace("city_albedo_0", "city_albedo_%d" % int(look.get("tex", 0)))
+
+	if not _atlases.has(atlas_id):
+		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
+	return atlas_id
 
 
 static func _lin(hex: String) -> Vector4:

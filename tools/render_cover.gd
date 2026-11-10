@@ -135,15 +135,7 @@ func _shot(name: String) -> void:
 
 func _run() -> void:
 	_dir = "cover_%s" % _mode
-	var out := ProjectSettings.globalize_path("res://screenshots/%s" % _dir)
-	DirAccess.make_dir_recursive_absolute(out)
-	for old in DirAccess.get_files_at(out):
-		var _rm := DirAccess.remove_absolute("%s/%s" % [out, old])
-	var data := ProjectSettings.globalize_path("user://render_cover_server")
-	DirAccess.make_dir_recursive_absolute(data)
-	_server_pid = OS.create_process(OS.get_executable_path(), PackedStringArray([
-		"--headless", "--path", ProjectSettings.globalize_path("res://"),
-		"res://tools/render_cover.tscn", "--", "server", "mode=%s" % _mode]))
+	var data := _start_server()
 	await get_tree().create_timer(8.0).timeout
 
 	var port := PORT
@@ -216,6 +208,20 @@ func _run() -> void:
 		printerr("render_cover FAIL: ", fail)
 	print("render_cover: %s %s (%d frames measured, %d shots)" % [_mode, "FAILED" if not _fails.is_empty() else "clean", _frame, _shots])
 	get_tree().quit(1 if not _fails.is_empty() else 0)
+
+
+## Clears the screenshot folder and starts the headless server; returns its data folder.
+func _start_server() -> String:
+	var out := ProjectSettings.globalize_path("res://screenshots/%s" % _dir)
+	DirAccess.make_dir_recursive_absolute(out)
+	for old in DirAccess.get_files_at(out):
+		var _rm := DirAccess.remove_absolute("%s/%s" % [out, old])
+	var data := ProjectSettings.globalize_path("user://render_cover_server")
+	DirAccess.make_dir_recursive_absolute(data)
+	_server_pid = OS.create_process(OS.get_executable_path(), PackedStringArray([
+		"--headless", "--path", ProjectSettings.globalize_path("res://"),
+		"res://tools/render_cover.tscn", "--", "server", "mode=%s" % _mode]))
+	return data
 
 
 func _map_id() -> StringName:
