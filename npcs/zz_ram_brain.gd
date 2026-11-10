@@ -90,6 +90,21 @@ func _special(delta: float) -> void:
 	b.anim = ZzZombieBody.Anim.RUN
 
 
+## Held by a player: the ability key winds up and charges the way they face, and the wind-up,
+## the charge, the carry and the stun are the AI's own.
+func _driven_special(delta: float, pressed: int) -> bool:
+	if state == WINDUP or state == CHARGE or state == STUNNED:
+		_special(delta)
+		return true
+
+	if pressed & DRIVE_ABILITY != 0 and cooled_down():
+		_direction = driven_forward()
+		go(WINDUP)
+		return true
+
+	return false
+
+
 func _walkable_line(a: Vector3, b: Vector3) -> bool:
 	var h := horde()
 

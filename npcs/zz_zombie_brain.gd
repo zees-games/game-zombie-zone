@@ -32,6 +32,9 @@ const HORDE_META := &"zz_horde"
 ## The drive's attack button (the player's fire).
 const DRIVE_ATTACK := 1
 
+## The drive's ability button (the player's shove key): a special's leap, charge or spit.
+const DRIVE_ABILITY := 2
+
 ## What the brain is doing, for a describe() and for a subclass's own machine.
 var state: StringName = &"idle"
 var state_since: float = 0.0
@@ -380,7 +383,7 @@ func _npc_think(delta: float) -> void:
 
 ## A player holds this body (see [ZzPossession]): its own wish from the player's keys, a swing on
 ## the attack press at whoever is in reach in front, and the swing, stagger and freeze rules the AI
-## obeys. The kind's specials (a leap, a charge) are not driven yet.
+## obeys. A special's trick goes through [method _driven_ability] on the ability button.
 func _npc_driven(delta: float) -> void:
 	if npc == null or not npc.is_alive() or body() == null or drive == null:
 		return
@@ -395,14 +398,18 @@ func _npc_driven(delta: float) -> void:
 
 	_advance_swing()
 
+	var pressed := drive.take_pressed()
+
 	if staggered():
 		halt()
+		return
+
+	if _driven_ability(delta, pressed):
 		return
 
 	var b := body()
 	var speed := npc.def.move_speed if npc.def != null else 3.0
 	var wish := drive.wish_velocity(speed)
-	var pressed := drive.take_pressed()
 
 	if drive.buttons & DRIVE_ATTACK != 0 or pressed & DRIVE_ATTACK != 0:
 		var victim := _victim_in_front()
@@ -415,6 +422,13 @@ func _npc_driven(delta: float) -> void:
 	b.wish = wish
 	b.rotation.y = drive.yaw
 	b.anim = swing_anim() if swinging() else (ZzZombieBody.Anim.RUN if wish != Vector3.ZERO else ZzZombieBody.Anim.IDLE)
+
+
+## A kind's trick while a player holds it. [param pressed] is the buttons that went down this tick
+## ([constant DRIVE_ABILITY] among them). True when the trick has the body this tick (a leap in the
+## air, a charge, a spit), so the walk and the swing stand aside. The common zombie has none.
+func _driven_ability(_delta: float, _pressed: int) -> bool:
+	return false
 
 
 ## The nearest living survivor within a swing's reach and in front of the held body.

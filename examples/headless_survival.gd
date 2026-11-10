@@ -26,8 +26,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 20
-const CHECKS := 130
+const SECTIONS := 21
+const CHECKS := 139
 
 ## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core` is everything but the big maps, and each
 ## big map is its own shard, so the tick-budget check (which load flakes) sits alone with its map. `-- --merge LOG...` holds that every
@@ -97,6 +97,7 @@ func _run() -> void:
 		await _test_respawn()
 		await _test_infection()
 		await _test_possession()
+		await _test_possession_ability()
 		await _test_nights()
 		await _test_clock()
 		await _test_wipe()
@@ -300,6 +301,52 @@ func _test_possession() -> void:
 	var _dealt := game.horde.spawner.damage(npc.instance_id, 9999.0, &"")
 	await _sim(game, 0.5)
 	_check(not game.possession.is_holding(holder), "the hold ends when the body dies", str(game.possession.holds))
+	await _dispose(game)
+	_finished()
+
+
+func _test_possession_ability() -> void:
+	_section("possession: a special's trick on the shove key (leap, charge, spit)")
+	var game := await _hold(func(cfg: ZzConfig) -> void:
+		cfg.survival_style = 0
+		cfg.survival_warmup_seconds = 100.0, 2)
+
+	var holder: ZzPlayer = game.survivors()[0]
+	var base := game.survivors()[1].global_position
+	var cmd := DotFpsCommand.new()
+	cmd.yaw = 180.0
+	holder.input_move = cmd
+
+	for kind: StringName in [ZzNpcs.LEAPER, ZzNpcs.RAM, ZzNpcs.SPITTER]:
+		var npc := game.horde.spawner.spawn(kind, base + Vector3(0.0, 0.0, 6.0), &"test")
+		await _sim(game, 0.3)
+		_check(npc != null and game.possession.possess(holder, npc), "%s: can be held" % kind)
+
+		if npc == null:
+			continue
+
+		var from := npc.position()
+		var brain := npc.brain
+		await _sim(game, 0.4)
+		_check(npc.position().distance_to(from) < 1.0, "%s: stands until told" % kind, str(npc.position().distance_to(from)))
+		from = npc.position()
+		cmd.set_button(ZzNetCommand.BUTTON_SHOVE, true)
+		await _sim(game, 0.1)
+		cmd.set_button(ZzNetCommand.BUTTON_SHOVE, false)
+		await _sim(game, 1.6)
+		var moved := npc.position() - from
+
+		match kind:
+			ZzNpcs.LEAPER:
+				_check(moved.z > 6.0 and absf(moved.x) < 3.0, "the leaper leaps along where they face", str(moved))
+			ZzNpcs.RAM:
+				_check(moved.z > 8.0 and absf(moved.x) < 3.0, "the ram charges that way", str(moved))
+			_:
+				_check(not brain.cooled_down() and moved.length() < 1.0, "the spitter spat (cooling down) without walking", str(moved))
+
+		game.possession.release(holder.player_id)
+		var _dealt := game.horde.spawner.damage(npc.instance_id, 99999.0, &"")
+
 	await _dispose(game)
 	_finished()
 

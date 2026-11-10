@@ -629,6 +629,10 @@ func server_tick(tick: int) -> void:
 	_tick = tick
 	_game_ticked_for = -1
 
+	# Possession is built when play begins, after attach; hear it from then on.
+	if game != null and game.possession != null and not game.possession.changed.is_connected(_on_possession_changed):
+		game.possession.changed.connect(_on_possession_changed)
+
 	if net != null:
 		_in_server_tick = true
 		net.server_tick(tick)

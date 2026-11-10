@@ -211,9 +211,16 @@ func _retreat_step(speed: float) -> void:
 		go(APPROACH)
 
 
+## Who it can catch or knock: everybody but the player who holds it (their body rides this one).
 func _survivors() -> Array:
 	var h := horde()
-	return h.call(&"survivor_ids") if h != null else []
+	var out: Array = h.call(&"survivor_ids") if h != null else []
+
+	if drive != null and drive.active and out.has(drive.holder):
+		out = out.duplicate()
+		out.erase(drive.holder)
+
+	return out
 
 
 func cooled_down() -> bool:
@@ -286,6 +293,28 @@ func _may_retreat() -> bool:
 ## The kind's own behaviour while free. Called with [member victim] chosen.
 func _special(_delta: float) -> void:
 	pass
+
+
+## Held by a player: a pinned catch keeps the body (so the pin ends as it does for the AI), else
+## the kind's own [method _driven_special].
+func _driven_ability(delta: float, pressed: int) -> bool:
+	var h := horde()
+
+	if h != null and h.call(&"pinning", npc) != &"":
+		_holding(delta)
+		return true
+
+	return _driven_special(delta, pressed)
+
+
+## The kind's trick on the ability button; true while it has the body. [member victim] is not set.
+func _driven_special(_delta: float, _pressed: int) -> bool:
+	return false
+
+
+## Where the holder faces, as a flat unit vector.
+func driven_forward() -> Vector3:
+	return Basis(Vector3.UP, drive.yaw) * Vector3.FORWARD if drive != null else Vector3.FORWARD
 
 
 ## While it has hold of somebody.

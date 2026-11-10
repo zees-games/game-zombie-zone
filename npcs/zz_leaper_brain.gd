@@ -53,16 +53,8 @@ func _special(_delta: float) -> void:
 			b.anim = ZzZombieBody.Anim.LEAP
 
 			if b.flying:
-				# Whoever it passes close enough to on the way is who it gets.
-				for id in _survivors():
-					if survivor_is(id, &"up") and not survivor_is(id, &"pinned") \
-							and survivor_at(id).distance_to(npc.position()) < 1.4:
-						var h := horde()
-						if h != null and bool(h.call(&"pin", npc, id, &"pounce")):
-							b.flying = false
-							b.velocity = Vector3.ZERO
-							go(&"pinned")
-							return
+				if _catch_in_flight():
+					return
 			elif now() - _launched_at > 0.2:
 				go(RECOVER)
 			return
@@ -98,11 +90,63 @@ func _special(_delta: float) -> void:
 	b.anim = ZzZombieBody.Anim.CROUCH if gap < far * 1.5 else ZzZombieBody.Anim.RUN
 
 
-func _pounce() -> void:
+## Whoever it passes close enough to on the way is who it gets. True when it pinned somebody.
+func _catch_in_flight() -> bool:
 	var b := body()
-	var speed := tune(&"pounce_speed", 16.0)
-	var target := lead(victim, distance_to(victim) / speed) + Vector3(0.0, 0.6, 0.0)
-	b.leap(launch_to(npc.position(), target, speed, ZzZombieBody.GRAVITY))
+
+	for id in _survivors():
+		if survivor_is(id, &"up") and not survivor_is(id, &"pinned") \
+				and survivor_at(id).distance_to(npc.position()) < 1.4:
+			var h := horde()
+			if h != null and bool(h.call(&"pin", npc, id, &"pounce")):
+				b.flying = false
+				b.velocity = Vector3.ZERO
+				go(&"pinned")
+				return true
+
+	return false
+
+
+## Held by a player: the ability key leaps along where they face (pounce_max at most, 12 m a
+## default), the same flight, catch and recovery the AI's pounce has.
+func _driven_special(_delta: float, pressed: int) -> bool:
+	var b := body()
+
+	if state == POUNCE:
+		b.anim = ZzZombieBody.Anim.LEAP
+
+		if b.flying:
+			var _caught := _catch_in_flight()
+			return true
+
+		if now() - _launched_at <= 0.2:
+			return true
+
+		go(RECOVER)
+
+	if state == RECOVER:
+		halt()
+		b.anim = ZzZombieBody.Anim.CROUCH
+
+		if in_state_for() <= 1.0:
+			return true
+
+		go(APPROACH)
+
+	if pressed & DRIVE_ABILITY != 0 and cooled_down() and b.is_on_floor():
+		_leap_to(npc.position() + driven_forward() * tune(&"driven_pounce_range", 12.0) + Vector3(0.0, 0.6, 0.0))
+		return true
+
+	return false
+
+
+func _pounce() -> void:
+	_leap_to(lead(victim, distance_to(victim) / tune(&"pounce_speed", 16.0)) + Vector3(0.0, 0.6, 0.0))
+
+
+func _leap_to(target: Vector3) -> void:
+	var b := body()
+	b.leap(launch_to(npc.position(), target, tune(&"pounce_speed", 16.0), ZzZombieBody.GRAVITY))
 	b.anim = ZzZombieBody.Anim.LEAP
 	_launched_at = now()
 	cool_down(1.5)
