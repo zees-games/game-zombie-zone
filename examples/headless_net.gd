@@ -37,8 +37,8 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 33
-const CHECKS := 225
+const SECTIONS := 34
+const CHECKS := 232
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -103,6 +103,7 @@ func _run() -> void:
 		await _test_the_ads_rules_cross_to_the_client()
 		_test_the_view_feel_crosses_to_the_client()
 		await _test_a_pin_reaches_the_client()
+		await _test_a_possession_reaches_the_client()
 		await _test_flash_strength_reaches_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
@@ -204,6 +205,14 @@ func _test_the_codec() -> void:
 	var copy := ZzEvents.read_copy(_r(ZzEvents.write_copy(412, 7, Vector3(12.5, 0.0, -3.0), true)))
 	_check(bool(copy["ok"]) and int(copy["id"]) == 412 and int(copy["model"]) == 7 and bool(copy["alive"])
 		and (copy["offset"] as Vector3).distance_to(Vector3(12.5, 0.0, -3.0)) < 0.05, "COPY", str(copy))
+
+	var held := ZzEvents.read_possess(_r(ZzEvents.write_possess(4097)))
+	_check(bool(held["ok"]) and int(held["net_id"]) == 4097, "POSSESS names the body", str(held))
+	var let_go := ZzEvents.read_possess(_r(ZzEvents.write_possess(0)))
+	_check(bool(let_go["ok"]) and int(let_go["net_id"]) == 0, "POSSESS 0 lets go", str(let_go))
+	var negative := ZzEvents.read_possess(_r(ZzEvents.write_possess(-5)))
+	_check(bool(negative["ok"]) and int(negative["net_id"]) == 0, "POSSESS clamps a negative id to none", str(negative))
+	_check(not bool(ZzEvents.read_possess(_r(PackedByteArray()))["ok"]), "POSSESS: an empty body reads as not ok")
 
 	var gone := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(77, true)))
 	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]) and gone["death"] == null, "NPC_GONE")
@@ -377,6 +386,8 @@ func _build() -> bool:
 		_heard["revive"] = who)
 	_client_bridge.pin_received.connect(func(who: int, npc: int, kind: StringName) -> void:
 		_heard["pin"] = [who, npc, kind])
+	_client_bridge.possess_received.connect(func(net_id: int) -> void:
+		_heard["possess"] = net_id)
 	_client_bridge.unpin_received.connect(func(who: int, _why: StringName) -> void:
 		_heard["unpin"] = who)
 	_client_bridge.loot_added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
@@ -1077,6 +1088,26 @@ func _test_a_pin_reaches_the_client() -> void:
 	_hurt_npc(strangler, 100000.0)
 	await _steps(10)
 	_check(int(_heard.get("unpin", 0)) == SESSION and not _mine().is_pinned(), "killed: free on both ends")
+	_finished()
+
+
+func _test_a_possession_reaches_the_client() -> void:
+	_section("a held body is named to its holder, and the hold's end is too")
+	var server_me := _server_me()
+	server_me.place_at(STREET, 0.0)
+	await _steps(4)
+	var npc := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test")
+	await _steps(6)
+	_heard.erase("possess")
+	_check(_server_game.possession.possess(server_me, npc), "the server gives the player a body")
+	await _steps(10)
+	var net_id := int(_heard.get("possess", 0))
+	_check(net_id != 0 and _client_bridge.zombie_mirror(net_id) != null, "the client is told which body, and draws it", str(_heard.get("possess")))
+	_server_game.possession.release(server_me.player_id)
+	await _steps(10)
+	_check(_heard.get("possess", -1) == 0, "let go: the client is told none")
+	_hurt_npc(npc, 100000.0)
+	await _steps(4)
 	_finished()
 
 

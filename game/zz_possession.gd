@@ -6,6 +6,7 @@ extends RefCounted
 ## the player is then dead, as before, and spectates.
 
 const ZzNetCommand := preload("net/zz_net_command.gd")
+const ZzPlayer := preload("zz_player.gd")
 
 const CHANNEL := "zz.possession"
 
@@ -66,7 +67,13 @@ func tick(_delta: float) -> void:
 		var player: Object = game.players.get(player_id)
 
 		if npc == null or not npc.is_alive() or player == null or npc.brain == null:
+			var last: Vector3 = player.global_position if player != null else Vector3.ZERO
 			release(player_id)
+
+			# The body is gone and the player with it: the death camera starts over where the
+			# body fell, instead of carrying on from where the player first died.
+			if player != null and player.life == ZzPlayer.Life.DEAD and game.spectate != null and game.authoritative:
+				game.spectate.on_died(player_id, &"", false, last, game.map.kill_height() + 8.0, game.current_tick())
 			continue
 
 		# The dead player's own position rides the body, so what the server sends them
@@ -82,4 +89,7 @@ func tick(_delta: float) -> void:
 		var buttons := 0
 		if cmd.is_pressed(ZzNetCommand.BUTTON_FIRE):
 			buttons |= 1
+		# The shove key is the body's trick: a leap, a charge, a spit.
+		if cmd.is_pressed(ZzNetCommand.BUTTON_SHOVE):
+			buttons |= 2
 		npc.brain.drive.feed(cmd.move, deg_to_rad(cmd.yaw), buttons)
