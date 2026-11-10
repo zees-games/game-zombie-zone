@@ -1215,8 +1215,13 @@ func follow_hands(hands: ZeeViewModel, camera: Camera3D = null) -> void:
 	if scope != null and hands != null:
 		scope.follow(hands)
 		# The lens view draws the zoom with a second camera that follows the player's and leaves the hands out.
-		if scope.mode == 1 and camera != null:
-			scope.bind_camera(camera, (1 << (hands.view_layer - 1)) if hands.view_layer > 0 else 0)
+		# Only for hands that keep the main camera at the hip in lens mode (`view_fov_scale`); an older
+		# zee-weapons copy zooms the main camera, and a lens on top would zoom twice. By name, as the
+		# overlay of such a copy has no `mode` either (ZzClient.scope_view_zoom has the story).
+		var overlay: Object = scope
+		if camera != null and hands.has_method(&"view_fov_scale") and "mode" in overlay and int(overlay.get(&"mode")) == 1 \
+				and overlay.has_method(&"bind_camera"):
+			overlay.call(&"bind_camera", camera, (1 << (hands.view_layer - 1)) if hands.view_layer > 0 else 0)
 
 
 ## The aim this frame: the dot fades as the gun comes up; [param scoped] hides it for the scope.

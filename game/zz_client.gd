@@ -2267,6 +2267,20 @@ func _aim_sent() -> bool:
 	return _aim_allowed() and (hands.is_aim_held() if hands != null else _aiming)
 
 
+## The main camera's field-of-view multiplier for [param hands], with this machine's scope prefs
+## given to them first. A scope drawn as a lens zooms in its own camera, so the main one stays at
+## the hip's. Duck-typed: zee-weapons gained `resolve_scope_mode` and `view_fov_scale` without
+## raising its API level, and a copied addons/zee_weapons older than that (Windows bootstrap
+## copies, and a copy does not follow a pull) has neither. Calling them anyway raised two script
+## errors every frame and left the camera unzoomed; such hands get the old full-screen zoom.
+static func scope_view_zoom(hands: Object) -> float:
+	if hands.has_method(&"resolve_scope_mode"):
+		ScopePrefs.apply(hands)
+	if hands.has_method(&"view_fov_scale"):
+		return float(hands.call(&"view_fov_scale"))
+	return float(hands.call(&"aim_fov_scale"))
+
+
 ## weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the HUD
 ## fades its dot and shows a scope. Nobody aims down, held, dead, watching, in third person or
 ## with the pointer free. Presentation only, as in the arena: the server's shot ignores it.
@@ -2277,10 +2291,8 @@ func _present_aim() -> void:
 	var zoom := 1.0
 	var view_zoom := 1.0
 	if hands != null and not is_spectating():
-		ScopePrefs.apply(hands)
 		zoom = hands.aim_fov_scale()
-		# A scope drawn as a lens zooms in its own camera; the main one stays at the hip's field of view.
-		view_zoom = hands.view_fov_scale()
+		view_zoom = scope_view_zoom(hands)
 	camera.fov = base_fov * view_zoom
 	if _sampler != null:
 		_sampler.look_scale = zoom
