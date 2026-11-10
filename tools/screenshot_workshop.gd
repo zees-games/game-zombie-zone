@@ -52,5 +52,5 @@ func _process(_delta: float) -> bool:
 		return false
 	var image := root.get_texture().get_image()
 	image.save_png(OUT)
-	print("wrote %s (%d x %d)" % [OUT, image.get_width(), image.get_height()])
+	print("wrote ", OUT, " (", image.get_width(), " x ", image.get_height(), ")")
 	return true

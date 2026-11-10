@@ -573,6 +573,7 @@ func box_banner(title: String, message: String, colour: Color) -> void:
 func set_effects(rows: Array) -> void:
 	_effect_rows = rows
 	_effects_at = Time.get_ticks_msec() / 1000.0
+	_effects_sig = 0
 
 
 func set_prompt(text: String) -> void:
@@ -1207,27 +1208,55 @@ func _draw_carry() -> void:
 		_use_fill.color = Color(0.95, 0.85, 0.35)
 
 
+## The effect lines are rebuilt when a clock ticks over, a row comes or goes, or the rows are
+## replaced, not every frame. The signature below is integers only.
+var _effects_sig: int = 0
+var _effects_rebuild_fn: Callable = _effects_rebuild
+
+
+## Whether [param row] is on show [param since] seconds after the rows arrived.
+func _effect_on(row: Dictionary, since: float) -> bool:
+	# A negative clock is "until the round ends": it never runs out here.
+	if float(row["seconds"]) >= 0.0 and float(row["seconds"]) - since <= 0.0:
+		return false
+
+	var who: String = row.get("who", "")
+	# The rows carry a name ("everybody" or a person), never a player key, so compare by name.
+	return who == "" or who == "everybody" or player == null or who == player.display_name
+
+
 func _draw_effects() -> void:
 	if _effect_rows.is_empty():
 		_effects.clear()
+		_effects_sig = 0
 		return
 
 	var since := Time.get_ticks_msec() / 1000.0 - _effects_at
+	var sig := _effect_rows.size() + 1
+
+	for i in _effect_rows.size():
+		var row: Dictionary = _effect_rows[i]
+
+		if _effect_on(row, since):
+			var seconds := float(row["seconds"])
+			sig = sig * 1000003 + i * 7919 + (int(ceilf(seconds - since)) if seconds >= 0.0 else -1)
+
+	if sig == _effects_sig:
+		return
+
+	_effects_sig = sig
+	_effects_rebuild_fn.call(since)
+
+
+func _effects_rebuild(since: float) -> void:
 	var lines: Array = []
 
 	for row: Dictionary in _effect_rows:
+		if not _effect_on(row, since):
+			continue
+
 		var timed := float(row["seconds"]) >= 0.0
 		var left := float(row["seconds"]) - since
-
-		# A negative clock is "until the round ends": it never runs out here.
-		if timed and left <= 0.0:
-			continue
-
-		var who := str(row.get("who", ""))
-		# The rows carry a name ("everybody" or a person), never a player key, so compare by name.
-		if who != "" and who != "everybody" and player != null and who != player.display_name:
-			continue
-
 		var stacks := int(row["stacks"])
 		var scale := float(row.get("scale", 1.0))
 		var title := str(row["title"])
