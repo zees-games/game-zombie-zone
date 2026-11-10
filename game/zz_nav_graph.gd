@@ -389,36 +389,6 @@ func connected(a: int, b: int) -> bool:
 	return ((_reach[from * _reach_words + (to >> 6)] >> (to & 63)) & 1) == 1
 
 
-## dot-npc's, asking [method connected] where it compares labels: the nearest point a zombie can walk to is as often in
-## a piece below its own. (Its own would read the same if it asked [method connected]; until it does, this is a copy.)
-func _nearest_in_component(start: int, to: Vector3) -> int:
-	var radius := maxf(data.spacing(), 1.0) * 2.0
-
-	while radius < 4096.0:
-		var best := -1
-		var best_sq := INF
-
-		for index in data.points_within(to, radius):
-			if not connected(start, index):
-				continue
-
-			if filter != null and not filter.passes(data.area_of(index), data.flags_of(index)):
-				continue
-
-			var d := data.points[index].distance_squared_to(to)
-
-			if d < best_sq or (d == best_sq and index < best):
-				best_sq = d
-				best = index
-
-		if best >= 0:
-			return best
-
-		radius *= 2.0
-
-	return start
-
-
 func _append(into: Dictionary, from: int, to: int) -> void:
 	var list: PackedInt32Array = into.get(from, PackedInt32Array())
 

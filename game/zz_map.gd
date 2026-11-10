@@ -1359,6 +1359,8 @@ func read_nav_extra(root: String = "") -> Dictionary:
 		if FileAccess.file_exists(prefix + ".nav.json"):
 			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(prefix + ".nav.json"))
 			if parsed is Dictionary:
+				# The hulls the physics prune runs against are not in the boxes: their files' hash joins the graph's cache key.
+				parsed["hull_sha"] = (FileAccess.get_sha256(prefix + ".json") + FileAccess.get_sha256(prefix + ".bin")).sha256_text()
 				return parsed
 			DotLog.warn(CHANNEL, "a map's navigation extra would not read", {"map": String(id()), "at": prefix})
 			return {}

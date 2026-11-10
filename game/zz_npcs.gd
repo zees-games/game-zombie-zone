@@ -45,7 +45,7 @@ const CHANNEL := "zz.npcs"
 ## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 10
+const NAV_CACHE_VERSION := 11
 
 ## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
 const NAV_BRIDGE_GAP := 2.5
@@ -682,6 +682,7 @@ static func with_nav_extra(doc: Dictionary, extra: Dictionary) -> Dictionary:
 
 	var out := doc.duplicate()
 	var boxes: Array = (doc.get("boxes", []) as Array).duplicate()
+	out["hull_sha"] = str(extra.get("hull_sha", ""))
 
 	for box: Dictionary in extra.get("boxes", []):
 		# attach_world_collision takes only solid, clip and glass hulls: a nodraw brush of the whole map holds no body.
@@ -995,7 +996,7 @@ static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStr
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
 		JSON.stringify(doc.get("solid_props", [])).sha256_text(), JSON.stringify(doc.get("world_collision", {})),
-		str(doc.get("world", "")), str(doc.get("world_key", "")),
+		str(doc.get("world", "")), str(doc.get("world_key", "")), str(doc.get("hull_sha", "")),
 		",".join(open_gates), str(extra_solids),
 		NAV_OVERHEAD, str(NAV_OVERHEAD_BY_MAP), "link_obstacles_needed", SLAB_THICK, SLAB_TOP_CUT,
 		float(doc.get("nav", {}).get("spacing", 1.0)), float(doc.get("nav", {}).get("clearance", 0.35)), NAV_COVER_RANGE,
