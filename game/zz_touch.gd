@@ -18,6 +18,9 @@ const LAYOUT: Array[Dictionary] = [
 	{"id": &"heal", "label": "HEAL", "offset": Vector2(280, 300), "radius": 30.0},
 ]
 
+## How far left of the right edge the HUD's weight readout moves, in HUD units, to clear the cluster.
+const WEIGHT_SHIFT := 330.0
+
 var buttons: DotTouchButtons = null
 var _client: Node = null
 var _menu_button: Control = null

@@ -59,7 +59,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--frames=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--frames=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*|--touch=1) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
