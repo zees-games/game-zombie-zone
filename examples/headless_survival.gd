@@ -29,6 +29,11 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const SECTIONS := 20
 const CHECKS := 130
 
+## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core` is everything but the big maps, and each
+## big map is its own shard, so the tick-budget check (which load flakes) sits alone with its map. `-- --merge LOG...` holds that every
+## shard's log is there and that together they entered all SECTIONS.
+const SHARDS := {"core": [16, 102], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
+
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 
@@ -58,35 +63,62 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+func _merge(logs: Array) -> void:
+	var absent: Array = logs.filter(func(path: String) -> bool: return not FileAccess.file_exists(path))
+	_check(logs.size() == SHARDS.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
+	var entered := 0
+	var rx := RegEx.create_from_string("(?m)^(\\d+) sections entered")
+	for path: String in logs:
+		var hit := rx.search(FileAccess.get_file_as_string(path))
+		if hit != null:
+			entered += int(hit.get_string(1))
+	_check(entered == SECTIONS, "the shards entered every section (%d of %d)" % [entered, SECTIONS])
+	_report_sections(1, 1, 1, 2)
+
+
 func _run() -> void:
 	print("zombiezone survival")
 	print("")
+	var args := OS.get_cmdline_user_args()
+	var merge := args.find("--merge")
+
+	if merge >= 0:
+		_merge(args.slice(merge + 1))
+		return
+
+	var at := args.find("--shard")
+	var shard: String = args[at + 1] if at >= 0 and at + 1 < args.size() else ""
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 
-	await _test_waves()
-	await _test_prestart()
-	await _test_wave_sets()
-	await _test_respawn()
-	await _test_infection()
-	await _test_possession()
-	await _test_nights()
-	await _test_clock()
-	await _test_wipe()
-	await _test_barricades()
-	await _test_team_size()
-	_test_the_wire()
-	_test_the_hud()
-	await _test_map_rows()
-	await _test_personas()
-	await _test_stuck_rescue()
+	if shard == "" or shard == "core":
+		await _test_waves()
+		await _test_prestart()
+		await _test_wave_sets()
+		await _test_respawn()
+		await _test_infection()
+		await _test_possession()
+		await _test_nights()
+		await _test_clock()
+		await _test_wipe()
+		await _test_barricades()
+		await _test_team_size()
+		_test_the_wire()
+		_test_the_hud()
+		await _test_map_rows()
+		await _test_personas()
+		await _test_stuck_rescue()
 
 	for id: String in BIG_MAPS:
-		await _test_big_map(StringName(id))
+		if shard == "" or shard == id:
+			await _test_big_map(StringName(id))
 
 	for game in _worlds.duplicate():
 		await _dispose(game)
 
-	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
+	if shard == "":
+		_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
+	else:
+		_report_sections(_sections_entered, _sections_finished, SHARDS[shard][0], SHARDS[shard][1])
 
 
 # --- Wave sets ------------------------------------------------------------------------------
