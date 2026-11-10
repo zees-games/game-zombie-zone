@@ -9,6 +9,10 @@ var view: DotWeaponPickupView = null
 var hold := DotWeaponUseHold.new()
 
 
+## What the prompt shows when there is nothing to pick up; read, never changed.
+const _NO_INFO: Dictionary = {}
+
+
 func _process(delta: float) -> void:
 	var layer: DotWeaponDrops = game.weapon_layer.drops if game != null else null
 	var camera := get_viewport().get_camera_3d()
@@ -17,7 +21,7 @@ func _process(delta: float) -> void:
 			view.show_prompt({})
 		return
 	var me = _nearest_player(camera.global_position)
-	var info := {}
+	var info: Dictionary = _NO_INFO
 	if me != null and me.weapons != null and me.weapons.arsenal != null and me.is_alive() and not me.is_down():
 		info = layer.prompt_for(me.weapons.arsenal, camera.global_position, -camera.global_basis.z, me.class_def)
 	if view == null:

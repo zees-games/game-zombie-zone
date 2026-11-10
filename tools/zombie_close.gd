@@ -121,7 +121,7 @@ func _process(_delta: float) -> bool:
 		var image := _vp.get_texture().get_image()
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_out.get_base_dir()))
 		image.save_png(_out)
-		print("wrote %s %s" % [_out, image.get_size()])
+		print("wrote ", _out, " ", image.get_size())
 		quit()
 
 	return false

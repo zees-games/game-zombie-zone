@@ -1024,7 +1024,8 @@ func _present_defib_hands(delta: float) -> void:
 ## for whoever is within `defib_hear_range` of them. They are the ones whose `using` the net carries.
 func _hear_defib_charges() -> void:
 	var reach: float = game.config.defib_hear_range
-	var now := {}
+	var now := _defib_scratch
+	now.clear()
 
 	for key: Variant in game.players:
 		var other: ZzPlayer = game.players[key]
@@ -1040,6 +1041,7 @@ func _hear_defib_charges() -> void:
 		if other.feet().distance_to(player.feet()) <= reach:
 			var _charge := audio.at(ZzAudio.DEFIB_CHARGE, other.feet() + Vector3(0.0, 1.0, 0.0))
 
+	_defib_scratch = _defib_heard
 	_defib_heard = now
 
 
@@ -1535,7 +1537,7 @@ func _key(action: StringName) -> String:
 			return text
 
 	var row := ZzBindings.make().row_for_action(action)
-	return str(row.get("default", action))
+	return String(row.get("default", action))
 
 
 # --- The Tab board ---------------------------------------------------------
@@ -1968,6 +1970,11 @@ func _flash_audio_ref() -> DotNodeRef:
 
 
 ## The light on the eye follows the server's state (but not for 0.4 s after our own switch, which is shown at once), and everyone else's beams follow theirs.
+func _on_flash_switch(_want: bool) -> void:
+	_flash_ticks = 3
+	_flash_msec = Time.get_ticks_msec()
+
+
 func _present_flashlights() -> void:
 	var cfg := game.flashlight_conf()
 
@@ -1977,11 +1984,10 @@ func _present_flashlights() -> void:
 		flash.config = cfg
 		flash.handle_input = false
 		flash.authoritative = false
-		flash.allowed = DotFlashlightRules.allowed_on(cfg, str(game.map_doc.get("id", "")))
+		flash.allowed = DotFlashlightRules.allowed_on(cfg, String(game.map_doc.get("id", "")))
 		flash.audio = _flash_audio_ref()
-		flash.switch_requested.connect(func(_want: bool) -> void:
-			_flash_ticks = 3
-			_flash_msec = Time.get_ticks_msec())
+		if not flash.switch_requested.is_connected(_on_flash_switch):
+			flash.switch_requested.connect(_on_flash_switch)
 		camera.add_child(flash)
 
 	if flash.get_parent() != camera:
@@ -2182,7 +2188,7 @@ func _process(delta: float) -> void:
 	if hud != null:
 		var prompt := _prompt()
 		if prompt == "" and _near_trader() and not (_shop_menu != null and _shop_menu.is_open()):
-			prompt = "%s — trade" % _key(ZzBindings.USE)
+			prompt = _use_line(Vector2i(-7, 0), "{k} — trade")
 		hud.set_prompt(prompt)
 		_follow_shop_menu()
 
@@ -2434,8 +2440,8 @@ func _follow_shop_menu() -> void:
 	if not is_shop_open():
 		return
 	if not _near_trader():
-		if not bool(shop_state.get("open", false)) and str(shop_state.get("closed_message", "")) != "":
-			game.notice.emit(str(shop_state["closed_message"]))
+		if not bool(shop_state.get("open", false)) and String(shop_state.get("closed_message", "")) != "":
+			game.notice.emit(String(shop_state["closed_message"]))
 		close_shop()
 		return
 	_shop_menu.refresh(shop_state.get("items", []), player.points)
@@ -2478,6 +2484,30 @@ func _shop_buy(item_id: String) -> void:
 		_follow_shop_menu()
 
 
+## Finished prompt lines by (kind, id), rebuilt when the Use key's name or the words change, so a
+## held prompt is the same String every frame instead of a new one.
+var _prompt_lines: Dictionary = {}
+var _prompt_key := ""
+
+
+## [param template] with {k} the Use key, {a} and {b} the words, {n} the number; built on a miss only.
+func _use_line(slot: Vector2i, template: String, a: String = "", b: String = "", n: int = 0) -> String:
+	var key := _key(ZzBindings.USE)
+
+	if key != _prompt_key or _prompt_lines.size() > 96:
+		_prompt_lines.clear()
+		_prompt_key = key
+
+	var held: Variant = _prompt_lines.get(slot)
+
+	if held != null and (held as PackedStringArray)[1] == a and (held as PackedStringArray)[2] == b:
+		return (held as PackedStringArray)[0]
+
+	var line := template.replace("{k}", key).replace("{a}", a).replace("{b}", b).replace("{n}", String.num_int64(n))
+	_prompt_lines[slot] = PackedStringArray([line, a, b])
+	return line
+
+
 func _prompt() -> String:
 	if player == null or not player.can_act():
 		return ""
@@ -2487,13 +2517,13 @@ func _prompt() -> String:
 
 	for other in game.survivors():
 		if other != player and other.is_down() and other.feet().distance_to(player.feet()) <= game.config.revive_range + 0.4:
-			return "%s — pick up %s" % [_key(ZzBindings.USE), other.display_name]
+			return _use_line(Vector2i(1, hash(other.player_id)), "{k} — pick up {a}", other.display_name)
 
 	if player.defibs > 0:
 		for other in game.survivors():
 			if other != player and other.life == ZzPlayer.Life.DEAD \
 					and other.feet().distance_to(player.feet()) <= game.config.defib_range + 0.4:
-				return "%s — hold to shock %s back" % [_key(ZzBindings.USE), other.display_name]
+				return _use_line(Vector2i(2, hash(other.player_id)), "{k} — hold to shock {a} back", other.display_name)
 
 	var best := ""
 	var best_off := 0.7
@@ -2511,8 +2541,8 @@ func _prompt() -> String:
 		if off < best_off:
 			best_off = off
 			var cost := int(node.get_meta(&"price", 0))
-			best = "%s — %s%s" % [_key(ZzBindings.USE), str(node.get_meta(&"label", "pick up")),
-				" (%d points)" % cost if cost > 0 else ""]
+			best = _use_line(Vector2i(3 + maxi(cost, 0) * 4, id), "{k} — {a} ({n} points)" if cost > 0 else "{k} — {a}",
+				String(node.get_meta(&"label", "pick up")), "", cost)
 
 	if best != "":
 		return best
@@ -2522,23 +2552,23 @@ func _prompt() -> String:
 	if index >= 0 and game.objective_states[index] == &"waiting":
 		var o: Dictionary = (game.map_doc["objectives"] as Array)[index]
 		if o["kind"] == "use" and eye.distance_to(ZzMapDoc.v3(o["at"])) <= float(o["radius"]) + 0.6:
-			return "%s — %s" % [_key(ZzBindings.USE), str(o["label"])]
+			return _use_line(Vector2i(-4, index), "{k} — {a}", String(o["label"]))
 
 	# A barricade within reach that is not whole: the same test the server mends by.
 	var mend := game.barricade_to_mend(player)
 
 	if mend >= 0:
 		var entry: Dictionary = (game.map_doc["barricades"] as Array)[mend]
-		var held: Dictionary = game.barricades.get(str(entry["id"]), {})
+		var held: Dictionary = game.barricades.get(String(entry["id"]), {})
 		if not held.is_empty():
 			var share := int(round(100.0 * float(held["health"]) / float(held["max"])))
-			return "%s — %s %s (%d%%)" % [_key(ZzBindings.USE), "mend" if bool(held["intact"]) else "rebuild",
-				str(entry.get("label", "the barricade")), share]
+			return _use_line(Vector2i(5 + share * 4, mend), "{k} — {b} {a} ({n}%)", String(entry.get("label", "the barricade")),
+				"mend" if bool(held["intact"]) else "rebuild", share)
 
 	if game.map != null and game.map.toys != null:
 		var act: String = game.prop_carry.hint(game.map.toys, eye, aim, game.world_mask(), game.prop_carry.max_mass)
 		if act != "":
-			return "%s — %s" % [_key(ZzBindings.USE), act]
+			return _use_line(Vector2i(-6, 0), "{k} — {a}", act)
 
 	return ""
 

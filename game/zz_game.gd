@@ -2099,7 +2099,7 @@ func _objective_used(index: int) -> void:
 			if holdout >= 90.0:
 				horde.call_deferred(&"spawn_brute")
 
-		notice.emit(str(o.get("message", "")) if str(o.get("message", "")) != "" \
+		notice.emit(String(o.get("message", "")) if String(o.get("message", "")) != "" \
 			else "Hold out for %s!" % _clock(holdout))
 	else:
 		_finish_objective(index)
@@ -2113,8 +2113,8 @@ func _finish_objective(index: int) -> void:
 	for gate in (o.get("opens", PackedStringArray()) as PackedStringArray):
 		open_gate(gate)
 
-	if float(o.get("holdout", 0.0)) <= 0.0 and str(o.get("message", "")) != "":
-		notice.emit(str(o["message"]))
+	if float(o.get("holdout", 0.0)) <= 0.0 and String(o.get("message", "")) != "":
+		notice.emit(String(o["message"]))
 	elif float(o.get("holdout", 0.0)) > 0.0:
 		notice.emit("Done. Move!")
 
@@ -2210,7 +2210,7 @@ func barricade_to_mend(player: ZzPlayer) -> int:
 	var eye := player.eye_position()
 
 	for i in list.size():
-		var id := str((list[i] as Dictionary)["id"])
+		var id := String((list[i] as Dictionary)["id"])
 		var entry: Variant = barricades.get(id)
 
 		if entry == null or float((entry as Dictionary)["health"]) >= float((entry as Dictionary)["max"]):
@@ -2237,7 +2237,7 @@ func mend_barricade(index: int, by: ZzPlayer) -> bool:
 	if index < 0 or index >= list.size():
 		return false
 
-	var id := str((list[index] as Dictionary)["id"])
+	var id := String((list[index] as Dictionary)["id"])
 	var e: Dictionary = barricades.get(id, {})
 
 	if e.is_empty():
@@ -2300,12 +2300,15 @@ func _clear_gap(id: String) -> void:
 
 
 ## Where a survivor in a mended barricade's gap steps out to: the nearer side of the thin axis, else the other, else the nearest free spot round the box; INF when none is free (they stay put rather than end inside a wall).
+const GAP_MARGINS: Array[float] = [0.5, 0.9, 1.4]
+
+
 func _gap_exit(box: AABB, at: Vector3, across_x: bool) -> Vector3:
 	var lo := box.position.x if across_x else box.position.z
 	var hi := box.end.x if across_x else box.end.z
 	var here := at.x if across_x else at.z
 	var near_hi := absf(hi - here) <= absf(here - lo)
-	var offsets: Array[float] = [0.5, 0.9, 1.4]
+	var offsets := GAP_MARGINS
 	var cands: Array[Vector3] = []
 
 	for margin in offsets:
@@ -3480,7 +3483,14 @@ func _wire_carry(player: ZzPlayer) -> void:
 	carry.tune_catalogue(arsenal.catalogue)
 	arsenal.carry = carry.carry
 	player.carry_dirty = true
-	arsenal.carried_changed.connect(func() -> void: player.carry_dirty = true)
+	var mark := _mark_carry_dirty.bind(player)
+
+	if not arsenal.carried_changed.is_connected(mark):
+		arsenal.carried_changed.connect(mark)
+
+
+func _mark_carry_dirty(player: ZzPlayer) -> void:
+	player.carry_dirty = true
 
 
 ## Wears backpack [param tier] if it is bigger than the one worn; says why not.

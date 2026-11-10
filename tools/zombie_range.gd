@@ -62,10 +62,10 @@ func _process(_delta: float) -> bool:
 	if _frames % 20 != 0:
 		return false
 	var image := get_root().get_texture().get_image()
-	var path := "%s_%d.png" % [_out, int(range_m)]
+	var path := "".join(PackedStringArray([_out, "_", String.num_int64(int(range_m)), ".png"]))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	image.save_png(path)
-	print("wrote %s" % path)
+	print("wrote ", path)
 	_step += 1
 	if _step >= _ranges.size():
 		quit()
