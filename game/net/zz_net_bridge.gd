@@ -139,28 +139,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 				_broadcast(ZzEvents.Kind.SURVIVAL, ZzEvents.write_survival(held)))
 		game.exploded.connect(func(at: Vector3, radius: float, kind: StringName) -> void:
 			_broadcast(ZzEvents.Kind.BLAST, ZzEvents.write_blast(at, radius, kind)))
-		# Here and not in the module: the net suite has no module, and mg-deathrun found a handout
-		# wired there that reached nobody in it.
-		game.player_armed.connect(announce_armed)
-		game.player_disarmed.connect(func(id: StringName) -> void: announce_armed(id, &""))
-		game.player_classed.connect(announce_classed)
-		# To the one who asked, never broadcast: a refusal is that person's business.
-		game.refused.connect(func(id: StringName, why: String) -> void:
-			var peer_id := peer_for_player(session_of(id))
-			if peer_id > 0:
-				notice(peer_id, why))
-		game.told.connect(func(id: StringName, text: String) -> void:
-			var peer_id := peer_for_player(session_of(id))
-			if peer_id > 0:
-				notice(peer_id, text))
-		game.carry_changed.connect(func(id: StringName) -> void:
-			var peer_id := peer_for_player(session_of(id))
-			var who: ZzPlayer = game.players.get(id)
-			if peer_id > 0 and who != null:
-				_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(who))))
-		game.shop_changed.connect(func() -> void:
-			if game.shop != null:
-				_broadcast(ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json())))
+		_serve_player_events()
 
 		if game.pins != null:
 			game.pins.pinned.connect(func(victim: StringName, kind: StringName, attacker: int) -> void:
@@ -186,56 +165,87 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			game.turrets.ended.connect(func(id: int) -> void:
 				_broadcast(ZzEvents.Kind.TURRET_GONE, ZzEvents.write_id(id)))
 
-		if game.loot != null:
-			game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
-				_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at, game.loot.price_of(id))))
-			game.loot.removed.connect(func(id: int, by: StringName) -> void:
-				_broadcast(ZzEvents.Kind.LOOT_GONE, ZzEvents.write_loot_gone(id, _session_or_zero(by))))
-			game.loot.moved_many.connect(func(batch: Array) -> void:
-				_broadcast(ZzEvents.Kind.LOOT_MOVED, ZzEvents.write_loot_moved(batch)))
-
-		var layer: DotWeaponDrops = game.weapon_layer.drops
-		if layer != null:
-			layer.dropped.connect(func(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, _owner: int) -> void:
-				_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, state, at, velocity, layer.rules.lifetime, false)))
-			var changed := func(id: int) -> void:
-				var pose := layer.pose_of(id)
-				if not pose.is_empty():
-					_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, pose["state"], pose["at"], pose["velocity"], layer.rules.lifetime, bool(pose["rest"])))
-			layer.pushed.connect(func(id: int, _at: Transform3D, _v: Vector3, _spin: Vector3) -> void: changed.call(id))
-			layer.ammo_changed.connect(func(id: int, _state: Dictionary) -> void: changed.call(id))
-			layer.settled.connect(func(id: int, at: Transform3D) -> void:
-				_broadcast(ZzEvents.Kind.WEAPON_SETTLED, ZzEvents.write_weapon_settled(id, at)))
-			layer.removed.connect(func(id: int, taker: int) -> void:
-				_broadcast(ZzEvents.Kind.WEAPON_GONE, ZzEvents.write_loot_gone(id, taker)))
-
-		var knives: DotWeaponKnives = game.weapon_layer.knives
-		if knives != null:
-			knives.changed.connect(func(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> void:
-				_broadcast(ZzEvents.Kind.KNIFE, ZzEvents.write_knife(id, owner, phase, victim, at, motion)))
-
-		if game.boxes != null:
-			game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
-				# The outcome's title and message are the reveal; the TYPE is not, with box_labels off.
-				_broadcast(ZzEvents.Kind.BOX, ZzEvents.write_box(session_of(id), game.boxes.shown_item(type_id), title, message)))
-			game.boxes.effects_changed.connect(func() -> void:
-				_broadcast(ZzEvents.Kind.EFFECTS, ZzEvents.write_effects(game.boxes.effects_summary())))
-
-		if game.horde != null and game.horde.spawner != null:
-			game.horde.spawner.spawned.connect(_on_zombie_spawned)
-			game.horde.spawner.removed.connect(_on_zombie_removed)
-			game.horde.spawner.died.connect(func(npc: DotNpcInstance, _by: StringName) -> void:
-				_died[npc.instance_id] = true)
-
-		if game.spectate != null:
-			game.spectate.view_changed.connect(_on_spectate_changed)
-
-		if game.possession != null:
-			game.possession.changed.connect(_on_possession_changed)
+		_serve_item_events()
 
 		_wire_lag_compensation()
 
 	return DotResult.success(true)
+
+
+## Server side: what a survivor is handed, refused, told and carries goes to the clients.
+func _serve_player_events() -> void:
+	# Here and not in the module: the net suite has no module, and mg-deathrun found a handout
+	# wired there that reached nobody in it.
+	game.player_armed.connect(announce_armed)
+	game.player_disarmed.connect(func(id: StringName) -> void: announce_armed(id, &""))
+	game.player_classed.connect(announce_classed)
+	# To the one who asked, never broadcast: a refusal is that person's business.
+	game.refused.connect(func(id: StringName, why: String) -> void:
+		var peer_id := peer_for_player(session_of(id))
+		if peer_id > 0:
+			notice(peer_id, why))
+	game.told.connect(func(id: StringName, text: String) -> void:
+		var peer_id := peer_for_player(session_of(id))
+		if peer_id > 0:
+			notice(peer_id, text))
+	game.carry_changed.connect(func(id: StringName) -> void:
+		var peer_id := peer_for_player(session_of(id))
+		var who: ZzPlayer = game.players.get(id)
+		if peer_id > 0 and who != null:
+			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(who))))
+	game.shop_changed.connect(func() -> void:
+		if game.shop != null:
+			_broadcast(ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json())))
+
+
+## Server side: loot, dropped weapons, knives, boxes, the horde, spectators and possession go to the clients.
+func _serve_item_events() -> void:
+	if game.loot != null:
+		game.loot.added.connect(func(id: int, kind: StringName, item: StringName, at: Vector3) -> void:
+			_broadcast(ZzEvents.Kind.LOOT, ZzEvents.write_loot(id, kind, game.loot.shown(kind, item), at, game.loot.price_of(id))))
+		game.loot.removed.connect(func(id: int, by: StringName) -> void:
+			_broadcast(ZzEvents.Kind.LOOT_GONE, ZzEvents.write_loot_gone(id, _session_or_zero(by))))
+		game.loot.moved_many.connect(func(batch: Array) -> void:
+			_broadcast(ZzEvents.Kind.LOOT_MOVED, ZzEvents.write_loot_moved(batch)))
+
+	var layer: DotWeaponDrops = game.weapon_layer.drops
+	if layer != null:
+		layer.dropped.connect(func(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, _owner: int) -> void:
+			_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, state, at, velocity, layer.rules.lifetime, false)))
+		var changed := func(id: int) -> void:
+			var pose := layer.pose_of(id)
+			if not pose.is_empty():
+				_broadcast(ZzEvents.Kind.WEAPON_DROP, _weapon_drop_body(id, pose["state"], pose["at"], pose["velocity"], layer.rules.lifetime, bool(pose["rest"])))
+		layer.pushed.connect(func(id: int, _at: Transform3D, _v: Vector3, _spin: Vector3) -> void: changed.call(id))
+		layer.ammo_changed.connect(func(id: int, _state: Dictionary) -> void: changed.call(id))
+		layer.settled.connect(func(id: int, at: Transform3D) -> void:
+			_broadcast(ZzEvents.Kind.WEAPON_SETTLED, ZzEvents.write_weapon_settled(id, at)))
+		layer.removed.connect(func(id: int, taker: int) -> void:
+			_broadcast(ZzEvents.Kind.WEAPON_GONE, ZzEvents.write_loot_gone(id, taker)))
+
+	var knives: DotWeaponKnives = game.weapon_layer.knives
+	if knives != null:
+		knives.changed.connect(func(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> void:
+			_broadcast(ZzEvents.Kind.KNIFE, ZzEvents.write_knife(id, owner, phase, victim, at, motion)))
+
+	if game.boxes != null:
+		game.boxes.opened.connect(func(id: StringName, type_id: StringName, title: String, message: String) -> void:
+			# The outcome's title and message are the reveal; the TYPE is not, with box_labels off.
+			_broadcast(ZzEvents.Kind.BOX, ZzEvents.write_box(session_of(id), game.boxes.shown_item(type_id), title, message)))
+		game.boxes.effects_changed.connect(func() -> void:
+			_broadcast(ZzEvents.Kind.EFFECTS, ZzEvents.write_effects(game.boxes.effects_summary())))
+
+	if game.horde != null and game.horde.spawner != null:
+		game.horde.spawner.spawned.connect(_on_zombie_spawned)
+		game.horde.spawner.removed.connect(_on_zombie_removed)
+		game.horde.spawner.died.connect(func(npc: DotNpcInstance, _by: StringName) -> void:
+			_died[npc.instance_id] = true)
+
+	if game.spectate != null:
+		game.spectate.view_changed.connect(_on_spectate_changed)
+
+	if game.possession != null:
+		game.possession.changed.connect(_on_possession_changed)
 
 
 ## Hands dot-combat the two callables that make lag compensation real.
@@ -1309,38 +1319,11 @@ func _on_event(message: DotNetMessage) -> void:
 			game.remove_player(player_key(session_id))
 			roster_changed.emit(session_id)
 		ZzEvents.Kind.TEAM:
-			var side := ZzEvents.read_team(reader)
-
-			if bool(side["ok"]):
-				var id := player_key(int(side["player_id"]))
-				game.sides[id] = int(side["team"])
-
-				if game.players.has(id):
-					(game.players[id] as ZzPlayer).team = int(side["team"])
-
-				roster_changed.emit(int(side["player_id"]))
+			_apply_team(reader)
 		ZzEvents.Kind.CLOCK:
 			_apply_clock(reader)
 		ZzEvents.Kind.ROUND:
-			var round_info := ZzEvents.read_round(reader)
-
-			if bool(round_info["ok"]):
-				game.round_number = int(round_info["round"])
-
-				game.remote_next_round = -1.0 if bool(round_info["began"]) else float(round_info["next_in"])
-				game.remote_next_map = &"" if bool(round_info["began"]) else StringName(str(round_info["next_map"]))
-
-				if bool(round_info["began"]):
-					game.phase_elapsed = 0.0
-					game.survival_elapsed = 0.0
-					game._reset_objectives()
-
-				round_changed.emit(
-					int(round_info["round"]),
-					bool(round_info["began"]),
-					bool(round_info["won"]),
-					str(round_info["why"])
-				)
+			_apply_round(reader)
 		ZzEvents.Kind.PHASE:
 			var moved := ZzEvents.read_phase(reader)
 
@@ -1350,32 +1333,9 @@ func _on_event(message: DotNetMessage) -> void:
 
 				phase_received.emit(int(moved["phase"]))
 		ZzEvents.Kind.DEATH:
-			var death := ZzEvents.read_death(reader)
-
-			if bool(death["ok"]):
-				# The fall goes on the player before anybody hears of the death, so the client
-				# that draws it reads the server's pick.
-				var fell: ZzPlayer = game.players.get(player_key(int(death["player_id"]))) \
-					if game != null else null
-				if fell != null and death.has("death"):
-					fell.death = death["death"]
-				death_received.emit(
-					int(death["player_id"]), int(death["by"]), death["why"], death["by_kind"], death["weapon_id"]
-				)
+			_apply_death(reader)
 		ZzEvents.Kind.ARMED:
-			var armed := ZzEvents.read_armed(reader)
-
-			if bool(armed["ok"]):
-				# Noted on the player here rather than by whoever listens, so every client
-				# draws the gun in a watched player's hand: see `ZzPlayer.dealt`.
-				var dealt_to: ZzPlayer = game.players.get(player_key(int(armed["player_id"]))) \
-					if game != null else null
-				if dealt_to != null:
-					if armed["weapon_id"] == &"":
-						dealt_to.dealt.clear()
-					else:
-						dealt_to.note_dealt(armed["weapon_id"], game.round_number)
-				armed_received.emit(int(armed["player_id"]), armed["weapon_id"])
+			_apply_armed(reader)
 		ZzEvents.Kind.CHAT:
 			var wire := ZzEvents.read_chat(reader)
 
@@ -1387,19 +1347,7 @@ func _on_event(message: DotNetMessage) -> void:
 			if bool(text["ok"]):
 				notice_received.emit(str(text["text"]))
 		ZzEvents.Kind.SPECTATE:
-			var view := ZzEvents.read_spectate(reader)
-
-			if bool(view["ok"]) and game.spectate != null:
-				game.spectate.apply_view(
-					player_key(int(view["viewer"])),
-					int(view["mode"]),
-					player_key(int(view["target"])) if int(view["target"]) != 0 else &"",
-					player_key(int(view["killer"])) if int(view["killer"]) != 0 else &"",
-					view["death_at"]
-				)
-				spectate_received.emit(
-					int(view["viewer"]), int(view["mode"]), int(view["target"])
-				)
+			_apply_spectate(reader)
 		ZzEvents.Kind.POSSESS:
 			var held := ZzEvents.read_possess(reader)
 
@@ -1407,6 +1355,95 @@ func _on_event(message: DotNetMessage) -> void:
 				possess_received.emit(int(held["net_id"]))
 		_:
 			_on_world_event(event.kind, reader)
+
+
+
+
+## A team change: the side is kept on the table and the player.
+func _apply_team(reader: DotNetReader) -> void:
+	var side := ZzEvents.read_team(reader)
+
+	if bool(side["ok"]):
+		var id := player_key(int(side["player_id"]))
+		game.sides[id] = int(side["team"])
+
+		if game.players.has(id):
+			(game.players[id] as ZzPlayer).team = int(side["team"])
+
+		roster_changed.emit(int(side["player_id"]))
+
+
+## A round began or ended.
+func _apply_round(reader: DotNetReader) -> void:
+	var round_info := ZzEvents.read_round(reader)
+
+	if bool(round_info["ok"]):
+		game.round_number = int(round_info["round"])
+
+		game.remote_next_round = -1.0 if bool(round_info["began"]) else float(round_info["next_in"])
+		game.remote_next_map = &"" if bool(round_info["began"]) else StringName(str(round_info["next_map"]))
+
+		if bool(round_info["began"]):
+			game.phase_elapsed = 0.0
+			game.survival_elapsed = 0.0
+			game._reset_objectives()
+
+		round_changed.emit(
+			int(round_info["round"]),
+			bool(round_info["began"]),
+			bool(round_info["won"]),
+			str(round_info["why"])
+		)
+
+
+## A death: the fall goes on the player before anybody hears of it.
+func _apply_death(reader: DotNetReader) -> void:
+	var death := ZzEvents.read_death(reader)
+
+	if bool(death["ok"]):
+		# The fall goes on the player before anybody hears of the death, so the client
+		# that draws it reads the server's pick.
+		var fell: ZzPlayer = game.players.get(player_key(int(death["player_id"]))) \
+			if game != null else null
+		if fell != null and death.has("death"):
+			fell.death = death["death"]
+		death_received.emit(
+			int(death["player_id"]), int(death["by"]), death["why"], death["by_kind"], death["weapon_id"]
+		)
+
+
+## A weapon dealt to a player, noted on it for every client.
+func _apply_armed(reader: DotNetReader) -> void:
+	var armed := ZzEvents.read_armed(reader)
+
+	if bool(armed["ok"]):
+		# Noted on the player here rather than by whoever listens, so every client
+		# draws the gun in a watched player's hand: see `ZzPlayer.dealt`.
+		var dealt_to: ZzPlayer = game.players.get(player_key(int(armed["player_id"]))) \
+			if game != null else null
+		if dealt_to != null:
+			if armed["weapon_id"] == &"":
+				dealt_to.dealt.clear()
+			else:
+				dealt_to.note_dealt(armed["weapon_id"], game.round_number)
+		armed_received.emit(int(armed["player_id"]), armed["weapon_id"])
+
+
+## A spectator's view.
+func _apply_spectate(reader: DotNetReader) -> void:
+	var view := ZzEvents.read_spectate(reader)
+
+	if bool(view["ok"]) and game.spectate != null:
+		game.spectate.apply_view(
+			player_key(int(view["viewer"])),
+			int(view["mode"]),
+			player_key(int(view["target"])) if int(view["target"]) != 0 else &"",
+			player_key(int(view["killer"])) if int(view["killer"]) != 0 else &"",
+			view["death_at"]
+		)
+		spectate_received.emit(
+			int(view["viewer"]), int(view["mode"]), int(view["target"])
+		)
 
 
 ## The events about what happens in the world rather than who is in it. Client side.
@@ -1514,6 +1551,13 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			var bile := ZzEvents.read_bile(reader)
 			if bool(bile["ok"]):
 				bile_received.emit(int(bile["player_id"]), float(bile["seconds"]))
+		_:
+			_on_world_event_more(kind, reader)
+
+
+## The rest of the world's events (objectives and map toys to hits): [method _on_world_event]'s second half.
+func _on_world_event_more(kind: int, reader: DotNetReader) -> void:
+	match kind:
 		ZzEvents.Kind.OBJECTIVE:
 			var o := ZzEvents.read_objective(reader)
 			if bool(o["ok"]):
@@ -1561,6 +1605,13 @@ func _on_world_event(kind: int, reader: DotNetReader) -> void:
 			if bool(held["ok"]):
 				held.erase("ok")
 				game.remote_survival = held
+		_:
+			_on_world_event_last(kind, reader)
+
+
+## The last of the world's events (effects, hurt, nav, shop, ammo, impacts and hits).
+func _on_world_event_last(kind: int, reader: DotNetReader) -> void:
+	match kind:
 		ZzEvents.Kind.EFFECTS:
 			var fx := ZzEvents.read_effects(reader)
 			if bool(fx["ok"]):
