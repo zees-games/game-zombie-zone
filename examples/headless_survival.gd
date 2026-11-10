@@ -26,8 +26,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## Counts sections and checks; the second is the one that matters (dot-settings' story).
 
-const SECTIONS := 19
-const CHECKS := 122
+const SECTIONS := 20
+const CHECKS := 130
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -68,6 +68,7 @@ func _run() -> void:
 	await _test_wave_sets()
 	await _test_respawn()
 	await _test_infection()
+	await _test_possession()
 	await _test_nights()
 	await _test_clock()
 	await _test_wipe()
@@ -206,6 +207,68 @@ func _test_infection() -> void:
 			_check(game.infection.turned == 3, "and the count is kept", str(game.infection.turned))
 		await _dispose(game)
 
+	_finished()
+
+
+func _test_possession() -> void:
+	_section("possession: a turned player drives the zombie they became")
+	var game := await _hold(func(cfg: ZzConfig) -> void:
+		cfg.survival_style = 0
+		cfg.survival_warmup_seconds = 100.0
+		cfg.infect_after_seconds = 1.0
+		cfg.infect_count = 1, 2)
+
+	var cmd := DotFpsCommand.new()
+	cmd.move = Vector2(0, 1)
+	cmd.yaw = 90.0
+	for p: ZzPlayer in game.survivors():
+		p.input_move = cmd
+
+	await _sim(game, 1.3)
+	var holder: StringName = &""
+	for id: StringName in game.possession.holds:
+		holder = id
+	_check(game.possession.holds.size() == 1 and holder != &"", "the turned player holds a body", str(game.possession.holds))
+	var npc: DotNpcInstance = game.horde.spawner.get_npc(game.possession.body_of(holder))
+	_check(npc != null and npc.brain.drive != null and npc.brain.drive.active, "its brain is driven")
+	_check(game.players[holder].life == ZzPlayer.Life.DEAD, "and the player themselves is dead")
+
+	var before := npc.position()
+	await _sim(game, 1.0)
+	var moved := npc.position() - before
+	_check(moved.x < -1.0 and absf(moved.z) < 0.5, "forward at yaw 90 walks it along -X", str(moved))
+	_check(is_equal_approx(fposmod(((npc.node as Node3D).rotation.y - PI * 0.5) + PI, TAU) - PI, 0.0), "and faces that way", str((npc.node as Node3D).rotation.y))
+
+	# Let go of the stick: it stands, and nothing else walks it.
+	cmd.move = Vector2.ZERO
+	await _sim(game, 0.6)
+	before = npc.position()
+	await _sim(game, 0.5)
+	# Crowd separation may nudge it; what matters is that nothing walks it.
+	_check((npc.node as ZzZombieBody).wish.length() < 0.01 and npc.position().distance_to(before) < 0.8, "no input: it stands still, no AI wandering", "%s -> %s wish %s" % [before, npc.position(), (npc.node as ZzZombieBody).wish])
+
+	# A survivor in front of it, and fire: they are hurt.
+	var other: ZzPlayer = null
+	for p: ZzPlayer in game.survivors():
+		if p.player_id != holder and p.life != ZzPlayer.Life.DEAD:
+			other = p
+	other.health.invulnerable = false
+	var forward := Basis(Vector3.UP, deg_to_rad(90.0)) * Vector3.FORWARD
+	other.place_at(npc.position() + forward * 1.0, 0.0)
+	var hurt_ids: Array = []
+	var on_hurt := func(victim: StringName, _amount: float, _from: Vector3) -> void: hurt_ids.append(victim)
+	game.player_hurt.connect(on_hurt)
+	cmd.set_button(ZzNetCommand.BUTTON_FIRE, true)
+	await _sim(game, 1.0)
+	game.player_hurt.disconnect(on_hurt)
+	_check(hurt_ids.has(other.player_id), "attack hits a survivor in reach in front", str(hurt_ids))
+
+	# Death of the body ends the hold.
+	cmd.set_button(ZzNetCommand.BUTTON_FIRE, false)
+	var _dealt := game.horde.spawner.damage(npc.instance_id, 9999.0, &"")
+	await _sim(game, 0.5)
+	_check(not game.possession.is_holding(holder), "the hold ends when the body dies", str(game.possession.holds))
+	await _dispose(game)
 	_finished()
 
 

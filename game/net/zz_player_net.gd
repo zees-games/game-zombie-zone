@@ -232,6 +232,7 @@ func _net_apply_input(input: DotNetInput, _tick: int) -> void:
 		last_slot = command.slot
 
 		if player != null:
+			player.input_move = command.move
 			player.wanted_slot = command.slot
 			player.actions = command.actions
 			player.shove_held = command.move.is_pressed(ZzNetCommand.BUTTON_SHOVE)

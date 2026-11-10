@@ -501,6 +501,7 @@ func _build_netcode() -> DotResult:
 	bridge.impact_received.connect(func(marks: Array) -> void:
 		var _placed := ZzImpactMarks.place(game.effects, marks))
 	bridge.notice_received.connect(_on_notice)
+	bridge.possess_received.connect(func(net_id: int) -> void: _possessed_net_id = net_id)
 	bridge.shop_received.connect(_on_shop_json)
 	bridge.carry_received.connect(_on_carry_json)
 	bridge.npc_added.connect(func(net_id: int, kind: StringName, variant: int, body: Node3D) -> void:
@@ -2549,7 +2550,51 @@ func _watched_through_eyes() -> ZzPlayer:
 	return game.players.get(StringName(game.spectate.watching(player.player_id)))
 
 
+## The zombie body the server gave this client to drive, by net id; 0 when none.
+var _possessed_net_id := 0
+## How far behind and above a driven body the camera rides.
+const POSSESS_BACK := 3.6
+const POSSESS_UP := 2.1
+
+
+## The camera on a zombie this client drives: behind it, looking the way the player's own yaw and
+## pitch say, since that is what the server is steering by. False when there is no body to follow.
+func _drive_possessed_camera() -> bool:
+	if _possessed_net_id == 0 or bridge == null:
+		return false
+
+	var body := bridge.zombie_mirror(_possessed_net_id)
+
+	if body == null or not is_instance_valid(body):
+		return false
+
+	if camera.get_parent() != self:
+		camera.get_parent().remove_child(camera)
+		add_child(camera)
+		camera.current = true
+
+		if _arm != null and is_instance_valid(_arm):
+			_arm.queue_free()
+			_arm = null
+
+	if view_model != null and is_instance_valid(view_model):
+		view_model.visible = false
+
+	var state := player.controller.state
+	var look := Basis.from_euler(Vector3(deg_to_rad(state.pitch), deg_to_rad(state.yaw), 0.0))
+	var focus := body.global_position + Vector3(0.0, POSSESS_UP, 0.0)
+	camera.global_transform = Transform3D(look, focus + look.z * POSSESS_BACK)
+
+	if hud != null:
+		hud.set_watching("You are a zombie")
+
+	return true
+
+
 func _drive_spectator_camera(delta: float) -> bool:
+	if _drive_possessed_camera():
+		return true
+
 	if not is_spectating():
 		if camera.get_parent() == self:
 			_place_camera()

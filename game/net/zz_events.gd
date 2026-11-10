@@ -139,6 +139,8 @@ enum Kind {
 	IMPACT,
 	## A thrown knife flew, bounced, lay, stuck or was taken (dot-weapon's DotWeaponKnifeWire). Also one per knife out at signon.
 	KNIFE,
+	## Which zombie body this one player now drives (its net id), or 0 when they let go. To its owner only.
+	POSSESS,
 }
 
 ## What a MAP_FX says.
@@ -552,6 +554,18 @@ static func read_spectate(r: DotNetReader) -> Dictionary:
 		"viewer": viewer, "mode": mode, "target": target, "killer": killer,
 		"death_at": death_at, "ok": r.ok(),
 	}
+
+
+## The body a turned survivor drives, by net id; 0 is none.
+static func write_possess(net_id: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(maxi(net_id, 0))
+	return w.to_bytes()
+
+
+static func read_possess(r: DotNetReader) -> Dictionary:
+	var net_id := r.read_varint()
+	return {"net_id": net_id, "ok": r.ok()}
 
 
 ## Next (+1), previous (-1), or the other camera (0).

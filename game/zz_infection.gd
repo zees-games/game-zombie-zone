@@ -5,8 +5,9 @@ const CHANNEL := "zz.infection"
 ## The kind a turned survivor becomes when zz_infect_kind names none the catalogue has.
 const FALLBACK_KIND := &"common"
 
-## Not done: the turned survivor is an AI zombie, not a body the player drives. That needs the
-## player to possess an npc (input, camera, a zombie moveset, a net codec for it), which is not small.
+## The turned survivor takes the zombie they became: [ZzPossession] feeds their command to its brain
+## ([DotNpcDrive]) until it dies, then they are dead as before. Only the plain walk and swing are
+## driven; a special's own ability is not.
 
 var game = null
 var clock: float = 0.0
@@ -60,6 +61,11 @@ func turn(player: Object) -> void:
 		return
 
 	turned += 1
+
+	# A bot (no command ever heard) keeps an AI zombie.
+	if game.possession != null and player.input_move != null:
+		game.possession.possess(player, npc)
+
 	var best := &""
 	var best_d := INF
 	for other: Object in game.survivors():
