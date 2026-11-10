@@ -67,14 +67,9 @@ func _ready() -> void:
 
 
 func _merge(logs: Array) -> void:
-	var absent: Array = logs.filter(func(path: String) -> bool: return not FileAccess.file_exists(path))
+	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARDS.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := 0
-	var rx := RegEx.create_from_string("(?m)^(\\d+) sections entered")
-	for path: String in logs:
-		var hit := rx.search(FileAccess.get_file_as_string(path))
-		if hit != null:
-			entered += int(hit.get_string(1))
+	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
 	_check(entered == SECTIONS, "the shards entered every section (%d of %d)" % [entered, SECTIONS])
 	_report_sections(1, 1, 1, 2)
 
@@ -82,15 +77,11 @@ func _merge(logs: Array) -> void:
 func _run() -> void:
 	print("zombiezone survival")
 	print("")
-	var args := OS.get_cmdline_user_args()
-	var merge := args.find("--merge")
-
-	if merge >= 0:
-		_merge(args.slice(merge + 1))
+	if DotGameShardArgs.is_merge():
+		_merge(DotGameShardArgs.merge_logs())
 		return
 
-	var at := args.find("--shard")
-	var shard: String = args[at + 1] if at >= 0 and at + 1 < args.size() else ""
+	var shard := DotGameShardArgs.shard()
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 
 	if shard == "" or shard == "core":
