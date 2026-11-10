@@ -6,6 +6,7 @@ extends Node
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzNavPrune := preload("../game/zz_nav_prune.gd")
 
 var _game: ZzGame
 
@@ -115,9 +116,143 @@ func _probe(id: String) -> void:
 				print("    %s floors[%s] raw_pt %s %s" % [_f(s), ",".join(fl), _f(raw.points[rp]) if rp >= 0 else "-", ob])
 		if OS.get_cmdline_user_args().has("--links"):
 			_links_near(doc, pr, pc, c, main)
+	_zombie_view(ends)
+	await _close()
+
+
+func _close() -> void:
 	remove_child(_game)
 	_game.free()
 	await get_tree().process_frame
+
+
+## The pieces as a zombie's search labels them (drops down only, no rise over the graph's `steep`), which the undirected
+## pieces above do not show: each one holding a spawn or post, and every edge that crosses its border with its rise.
+func _zombie_view(ends: Array) -> void:
+	var graph = _game.horde.spawner.nav if _game.horde.spawner != null else null
+	if graph == null or not graph.is_ready():
+		return
+	graph.filter = null
+	graph.relabel()
+	var d: DotNpcNavData = graph.data
+	var comp: PackedInt32Array = graph._component
+	var main := _biggest(comp)
+	var held := {}
+	for e: Vector3 in ends:
+		var i := d.nearest_point(e, 2.5)
+		if i >= 0 and comp[i] != main:
+			held[comp[i]] = int(held.get(comp[i], 0)) + 1
+	print("  as a zombie: %d pieces, %d holding a spawn or post, steep %.2f, %d drops, %d jump ups" % [_count(comp), held.size(), graph.steep, graph.drop_count, graph.up_count])
+	for c: int in held:
+		var n := 0
+		var lo := Vector3.INF
+		var hi := -Vector3.INF
+		for i in comp.size():
+			if comp[i] == c:
+				n += 1
+				lo = lo.min(d.points[i])
+				hi = hi.max(d.points[i])
+		print("  zombie piece %d (%d pts, %d ends) %s..%s" % [c, n, held[c], _f(lo), _f(hi)])
+		var rows := PackedStringArray()
+		for k in range(0, d.edges.size(), 2):
+			var a := d.edges[k]
+			var b := d.edges[k + 1]
+			if (comp[a] == c) == (comp[b] == c):
+				continue
+			var inside := a if comp[a] == c else b
+			var outside := b if comp[a] == c else a
+			var rise := d.points[outside].y - d.points[inside].y
+			rows.append("    edge %s -> %s (piece %d%s) rise %.2f: %s" % [_f(d.points[inside]), _f(d.points[outside]), comp[outside], " main" if comp[outside] == main else "", rise,
+					"a way OUT, down" if rise < -graph.steep else ("a way IN from above" if rise > graph.steep else "level, yet another piece")])
+		for from: int in graph._down:
+			for to: int in graph._down[from]:
+				if (comp[from] == c) != (comp[to] == c):
+					rows.append("    drop %s -> %s: %s piece %d%s" % [_f(d.points[from]), _f(d.points[to]), "OUT to" if comp[from] == c else "IN from", comp[to] if comp[from] == c else comp[from], " main" if (comp[to] if comp[from] == c else comp[from]) == main else ""])
+		print("    %d crossing edges" % rows.size())
+		for r in rows.slice(0, 10):
+			print(r)
+	_zombie_reach(graph, d)
+
+
+## What a zombie can really reach, by a flood of its own over the one-way edges, held against what the graph's pieces
+## say ([method ZzNavGraph.connected], which the search trusts without searching): the two must agree on every pair.
+## Per group of survivor spawns and posts no zombie spawn reaches: the edges that lead in, which a zombie may not climb.
+func _zombie_reach(graph: Variant, d: DotNpcNavData) -> void:
+	var doc: Dictionary = _game.map_doc
+	var starts: Array[int] = []
+	for z: Variant in doc.get("zombie_spawns", []):
+		var i := d.nearest_point(_v(z), 2.5)
+		if i >= 0:
+			starts.append(i)
+	var goals := {}
+	for s: Variant in (doc.get("spawns", {}) as Dictionary).get("survivors", []):
+		var i := d.nearest_point(_v(s["at"] if s is Dictionary else s), 2.5)
+		if i >= 0:
+			goals[i] = int(goals.get(i, 0)) + 1
+	for q: Variant in doc.get("posts", []):
+		var i := d.nearest_point(_v(q), 2.5)
+		if i >= 0:
+			goals[i] = int(goals.get(i, 0)) + 1
+	var n := d.points.size()
+	var rev: Array = []
+	rev.resize(n)
+	for i in n:
+		rev[i] = []
+	for i in n:
+		for to in graph.neighbours(i):
+			(rev[to] as Array).append(i)
+	var pairs := 0
+	var reached := 0
+	var refused := 0
+	var let_through := 0
+	var groups := {}
+	for g: int in goals:
+		var seen := PackedByteArray()
+		seen.resize(n)
+		seen[g] = 1
+		var stack: Array[int] = [g]
+		var size := 1
+		var low := g
+		while not stack.is_empty():
+			var at: int = stack.pop_back()
+			for from: int in rev[at]:
+				if seen[from] == 0:
+					seen[from] = 1
+					size += 1
+					low = mini(low, from)
+					stack.append(from)
+		var missed := 0
+		for z in starts:
+			pairs += int(goals[g])
+			if seen[z] == 1:
+				reached += int(goals[g])
+				if not graph.connected(z, g):
+					refused += int(goals[g])
+			else:
+				missed += 1
+				if graph.connected(z, g):
+					let_through += int(goals[g])
+		if missed > 0:
+			var key := "%d:%d" % [size, low]
+			if not groups.has(key):
+				groups[key] = {"seen": seen, "size": size, "goals": [], "missed": missed}
+			(groups[key]["goals"] as Array).append(g)
+	print("  zombie reach by search: %d pairs, %d reached, %d not; the pieces refuse %d of the reached and let %d of the others through (0 and 0 when they are right)" % [pairs, reached, pairs - reached, refused, let_through])
+	for key: String in groups:
+		var seen: PackedByteArray = groups[key]["seen"]
+		var gs: Array = groups[key]["goals"]
+		var rows: Array = []
+		for k in range(0, d.edges.size(), 2):
+			for turn in 2:
+				var u := d.edges[k + turn]
+				var v := d.edges[k + 1 - turn]
+				if seen[u] == 0 and seen[v] == 1:
+					rows.append([d.points[v].y - d.points[u].y, "      up %.2f m: %s -> %s" % [d.points[v].y - d.points[u].y, _f(d.points[u]), _f(d.points[v])]])
+		rows.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+		print("    %d spawns or posts (first %s) missed by %d of %d zombie spawns: %d points lead there, %d edges lead in%s" % [gs.size(), _f(d.points[gs[0]]), groups[key]["missed"], starts.size(), groups[key]["size"], rows.size(),
+				", all too steep for a zombie" if not rows.is_empty() else ": no edge at all, a piece of its own"])
+		for r: Array in rows.slice(0, 5):
+			print(r[1])
 
 
 func _raw_path_cuts(raw: DotNpcNavData, rc: PackedInt32Array, pr: DotNpcNavData, pc: PackedInt32Array, main: int, start: int, _goal: int) -> void:
@@ -154,6 +289,11 @@ func _raw_path_cuts(raw: DotNpcNavData, rc: PackedInt32Array, pr: DotNpcNavData,
 		var pu := pr.nearest_point(u, 0.05)
 		var pv := pr.nearest_point(v, 0.05)
 		var why := ""
+		# A blocked point the prune slid aside is still there, a nudge away.
+		if pu < 0:
+			pu = pr.nearest_point(u, ZzNavPrune.NUDGE + 0.05)
+		if pv < 0:
+			pv = pr.nearest_point(v, ZzNavPrune.NUDGE + 0.05)
 		if pu < 0:
 			why = "point dropped " + _f(u)
 		elif pv < 0:
@@ -163,6 +303,11 @@ func _raw_path_cuts(raw: DotNpcNavData, rc: PackedInt32Array, pr: DotNpcNavData,
 		if why == "" or shown >= 3:
 			continue
 		shown += 1
+		# The prune tested the edge between where the points ended up, so that is the line to look along.
+		if pu >= 0:
+			u = pr.points[pu]
+		if pv >= 0:
+			v = pr.points[pv]
 		print("    CUT %s -> %s len %.2f dy %.2f: %s | r.42: %s | r.32: %s" % [_f(u), _f(v), u.distance_to(v), v.y - u.y, why, _first_hit(space, u, v, 0.42), _first_hit(space, u, v, 0.32)])
 		if absf(u.y - v.y) > 0.6:
 			var hi := u if u.y > v.y else v
@@ -186,7 +331,8 @@ func _first_hit(space: PhysicsDirectSpaceState3D, a: Vector3, z: Vector3, radius
 	shape.height = 1.45
 	var q := PhysicsShapeQueryParameters3D.new()
 	q.shape = shape
-	q.collision_mask = _game.physics.layer_mask(&"world")
+	# The prune's own mask: a prop or a clip body cuts an edge the world layer alone calls clear.
+	q.collision_mask = ZzNavPrune.body_mask(_game.physics)
 	var steps := maxi(int(ceil(a.distance_to(z) / 0.25)), 1)
 	for k in steps + 1:
 		var s := a.lerp(z, float(k) / steps)
@@ -252,10 +398,18 @@ func _space_hits(space: PhysicsDirectSpaceState3D, q: PhysicsShapeQueryParameter
 			out.append("?")
 			continue
 		var owner_node := co.shape_owner_get_owner(co.shape_find_owner(int(h["shape"]))) as Node3D
-		var desc := "%s/%s" % [co.name, owner_node.name if owner_node != null else "?"]
+		var desc := "%s/%s L%d" % [co.name, owner_node.name if owner_node != null else "?", co.collision_layer]
 		var cs := owner_node as CollisionShape3D
 		if cs != null and cs.shape is BoxShape3D:
 			desc += " box %s at %s" % [(cs.shape as BoxShape3D).size, _f(cs.global_position)]
+		elif cs != null and cs.shape is ConvexPolygonShape3D:
+			var lo := Vector3.INF
+			var hi := -Vector3.INF
+			for p: Vector3 in (cs.shape as ConvexPolygonShape3D).points:
+				var w := cs.global_transform * p
+				lo = lo.min(w)
+				hi = hi.max(w)
+			desc += " hull %s..%s" % [_f(lo), _f(hi)]
 		elif cs != null:
 			desc += " " + cs.shape.get_class()
 		out.append(desc)

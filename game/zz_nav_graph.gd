@@ -29,6 +29,10 @@ var allow_climb: bool = false:
 			_native.clear()
 			_patched.clear()
 
+			# Which piece walks to which changed with it.
+			if not _component.is_empty():
+				_label_components()
+
 ## A plain edge that rises more than this is a drop seen from above: the importer's links join two levels with one undirected
 ## edge, and a zombie cannot step back up a 2 m drop (the ship's, where commons stood under it pressing at a wall). Down only,
 ## up only with [member allow_climb].
@@ -58,6 +62,11 @@ var _steep_cut: bool = false
 ## Drops in this graph, for suites and describe.
 var drop_count: int = 0
 var up_count: int = 0
+
+## Which piece a zombie walks to from which: a row per piece, a bit per piece, [member _reach_words] 64-bit words a row.
+## Empty when no edge leaves any piece ([method _label_components]).
+var _reach: PackedInt64Array = PackedInt64Array()
+var _reach_words: int = 0
 
 
 func _init(p_data: DotNpcNavData = null) -> void:
@@ -217,6 +226,197 @@ func has_links() -> bool:
 ## Labels the components again once every link is in: a drop can join two pieces of the map.
 func relabel() -> void:
 	_label_components()
+
+
+## The pieces as a zombie walks them: points that reach each other BOTH ways, and [member _reach] says which piece leads to
+## which. dot-npc's flood in point order is right for two-way edges and wrong here: a ledge whose top was numbered after its
+## foot was "another piece" and the search refused the way down. They are the pieces of whoever [member filter] is.
+func _label_components() -> void:
+	var count := data.points.size()
+	_component = PackedInt32Array()
+	_component.resize(count)
+	_component.fill(-1)
+	_reach = PackedInt64Array()
+	_reach_words = 0
+
+	var edges: Array[PackedInt32Array] = []
+
+	for i in count:
+		edges.append(neighbours(i))
+
+	var pieces := _strong_pieces(edges)
+
+	if pieces > 1:
+		_fill_reach(edges, pieces)
+
+
+## Writes [member _component] as the strongly connected components of [param edges] (Tarjan's, as a walk of its own: the
+## recursion would overflow on a 15 000 point map) and returns how many. A piece gets its number only after every piece
+## it leads to.
+func _strong_pieces(edges: Array[PackedInt32Array]) -> int:
+	var count := edges.size()
+	var order := PackedInt32Array()
+	order.resize(count)
+	order.fill(-1)
+	var lowest := PackedInt32Array()
+	lowest.resize(count)
+	lowest.fill(0)
+	var open := PackedByteArray()
+	open.resize(count)
+	open.fill(0)
+	var trail := PackedInt32Array()
+	var walk := PackedInt32Array()
+	var walk_edge := PackedInt32Array()
+	var stamp := 0
+	var pieces := 0
+
+	for root in count:
+		if order[root] >= 0:
+			continue
+
+		order[root] = stamp
+		lowest[root] = stamp
+		stamp += 1
+		trail.append(root)
+		open[root] = 1
+		walk.append(root)
+		walk_edge.append(0)
+
+		while not walk.is_empty():
+			var depth := walk.size() - 1
+			var at := walk[depth]
+			var from_here: PackedInt32Array = edges[at]
+			var edge := walk_edge[depth]
+
+			if edge < from_here.size():
+				walk_edge[depth] = edge + 1
+				var next := from_here[edge]
+
+				if order[next] < 0:
+					order[next] = stamp
+					lowest[next] = stamp
+					stamp += 1
+					trail.append(next)
+					open[next] = 1
+					walk.append(next)
+					walk_edge.append(0)
+				elif open[next] == 1:
+					lowest[at] = mini(lowest[at], order[next])
+
+				continue
+
+			walk.resize(depth)
+			walk_edge.resize(depth)
+
+			if depth > 0:
+				var parent := walk[depth - 1]
+				lowest[parent] = mini(lowest[parent], lowest[at])
+
+			if lowest[at] != order[at]:
+				continue
+
+			# [param at] is the first point of its piece the walk met: everything on the trail above it is the piece.
+			while true:
+				var member := trail[trail.size() - 1]
+				trail.resize(trail.size() - 1)
+				open[member] = 0
+				_component[member] = pieces
+
+				if member == at:
+					break
+
+			pieces += 1
+
+	return pieces
+
+
+## [member _reach] from the edges that cross from one piece to another.
+func _fill_reach(edges: Array[PackedInt32Array], pieces: int) -> void:
+	var leads_to: Array[Dictionary] = []
+
+	for _i in pieces:
+		leads_to.append({})
+
+	var any := false
+
+	for i in edges.size():
+		var here := _component[i]
+
+		for next in edges[i]:
+			if _component[next] != here:
+				leads_to[here][_component[next]] = true
+				any = true
+
+	# No edge between two pieces: the label alone answers, and a map of a thousand loose points keeps no table.
+	if not any:
+		return
+
+	var words := (pieces + 63) >> 6
+	var reach := PackedInt64Array()
+	reach.resize(pieces * words)
+	reach.fill(0)
+
+	# A piece is closed only after every piece it leads to, so those have the lower numbers and their rows are whole.
+	for piece in pieces:
+		var row := piece * words
+		reach[row + (piece >> 6)] |= 1 << (piece & 63)
+
+		for below: int in leads_to[piece]:
+			var other := below * words
+
+			for w in words:
+				reach[row + w] |= reach[other + w]
+
+	_reach = reach
+	_reach_words = words
+
+
+## Whether a zombie at point [param a] can walk to point [param b]. One way, like its edges: the top of a ledge is
+## connected to its foot, the foot is not connected to the top.
+func connected(a: int, b: int) -> bool:
+	if a < 0 or b < 0 or a >= _component.size() or b >= _component.size():
+		return false
+
+	var from := _component[a]
+	var to := _component[b]
+
+	if from == to:
+		return true
+
+	if _reach.is_empty():
+		return false
+
+	return ((_reach[from * _reach_words + (to >> 6)] >> (to & 63)) & 1) == 1
+
+
+## dot-npc's, asking [method connected] where it compares labels: the nearest point a zombie can walk to is as often in
+## a piece below its own. (Its own would read the same if it asked [method connected]; until it does, this is a copy.)
+func _nearest_in_component(start: int, to: Vector3) -> int:
+	var radius := maxf(data.spacing(), 1.0) * 2.0
+
+	while radius < 4096.0:
+		var best := -1
+		var best_sq := INF
+
+		for index in data.points_within(to, radius):
+			if not connected(start, index):
+				continue
+
+			if filter != null and not filter.passes(data.area_of(index), data.flags_of(index)):
+				continue
+
+			var d := data.points[index].distance_squared_to(to)
+
+			if d < best_sq or (d == best_sq and index < best):
+				best_sq = d
+				best = index
+
+		if best >= 0:
+			return best
+
+		radius *= 2.0
+
+	return start
 
 
 func _append(into: Dictionary, from: int, to: int) -> void:

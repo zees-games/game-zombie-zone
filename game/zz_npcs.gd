@@ -987,11 +987,15 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 	return false
 
 
-## A fingerprint of everything the graph was built from.
+## A fingerprint of everything the graph was built from, and of what the physics pass then cut it on: the cache holds
+## the PRUNED graph (ZzHorde._prune_blocked), so the document's choice of colliding world hulls and its solid props are
+## part of the key. Without them a map whose `world_collision` changed kept its old cuts on every box that had run it.
 static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> String:
 	return DotNpcNavData.digest_of([
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
+		JSON.stringify(doc.get("solid_props", [])).sha256_text(), JSON.stringify(doc.get("world_collision", {})),
+		str(doc.get("world", "")), str(doc.get("world_key", "")),
 		",".join(open_gates), str(extra_solids),
 		NAV_OVERHEAD, str(NAV_OVERHEAD_BY_MAP), "link_obstacles_needed", SLAB_THICK, SLAB_TOP_CUT,
 		float(doc.get("nav", {}).get("spacing", 1.0)), float(doc.get("nav", {}).get("clearance", 0.35)), NAV_COVER_RANGE,
