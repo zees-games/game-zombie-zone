@@ -966,15 +966,9 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 		stuck.forget(npc.instance_id)
 		return
 
-	var nearest := INF
-	var nearest_id := &""
-
-	for id in survivor_ids():
-		var gap := npc.position().distance_to(survivor_position(id))
-
-		if gap < nearest:
-			nearest = gap
-			nearest_id = id
+	var found := _nearest_survivor(npc.position())
+	var nearest: float = found[0]
+	var nearest_id: StringName = found[1]
 
 	if nearest_id == &"":
 		stuck.forget(npc.instance_id)
@@ -1043,6 +1037,21 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 
 	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
 		"to": str(spot.snappedf(0.1)), "edge": edge, "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
+
+
+## The distance to, and the id of, the survivor nearest [param at] (INF and an empty id with none).
+func _nearest_survivor(at: Vector3) -> Array:
+	var nearest := INF
+	var nearest_id := &""
+
+	for id in survivor_ids():
+		var gap := at.distance_to(survivor_position(id))
+
+		if gap < nearest:
+			nearest = gap
+			nearest_id = id
+
+	return [nearest, nearest_id]
 
 
 ## Costs up, for the whole horde, the place [param npc] stalled at and the next corner of the path it was on, so later paths go round
