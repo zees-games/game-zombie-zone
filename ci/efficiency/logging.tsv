@@ -1,0 +1,6 @@
+# logging
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+game/zz_consumables.gd::channel_silent	1
+game/zz_grenades.gd::channel_silent	1
+game/zz_possession.gd::channel_silent	1
+game/zz_spectate.gd::channel_silent	1
