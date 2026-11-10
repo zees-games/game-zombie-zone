@@ -1,0 +1,15 @@
+{
+  "format": "tmc-game-listing",
+  "version": 1,
+  "listing": {
+    "name": "Zombie Zone",
+    "description": "A team of survivors fights through a city at night, from one shelter to the next, or holds a school, a mall or a ballpark with a dozen or more of them through ten waves of the horde, against zombies that are directed rather than random and special infected that each have one nasty trick. Zombies drop boxes that do something random when you open them, good or very bad.",
+    "tags": ["3D", "Multiplayer"],
+    "platforms": ["PLATFORM_WEB"],
+    "graphicsType": "THREE_D",
+    "tmcKind": "GAME"
+  },
+  "pack": {
+    "id": "gamemann/game-zombie-zone"
+  }
+}
