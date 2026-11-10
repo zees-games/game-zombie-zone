@@ -1461,6 +1461,7 @@ func _build_touch() -> void:
 	_touch = ZzTouch.build(self, hud.screen(), menu_button)
 	if _touch != null:
 		_touch.call(&"attach", _sampler, hud.get_viewport().get_visible_rect().size.x)
+		hud.shift_weight_left(ZzTouch.WEIGHT_SHIFT)
 
 
 ## A touch button went down or up: the same flags the keys set.

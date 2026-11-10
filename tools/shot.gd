@@ -32,6 +32,8 @@ func _ready() -> void:
 			_action = arg.trim_prefix("--action=")
 		elif arg == "--board":
 			_board = true
+		elif arg == "--touch=1":
+			DotPlatform.touch_override = 1
 		elif arg.begins_with("--seconds="):
 			_seconds = arg.trim_prefix("--seconds=").to_float()
 		elif arg.begins_with("--out="):

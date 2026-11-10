@@ -133,7 +133,19 @@ func bind_elements(local: Object) -> void:
 
 ## The full-rect Control every piece sits on.
 func screen() -> Control:
+	# Built on demand: the touch buttons ask before a survivor is seated (bind builds it otherwise).
+	if _root == null:
+		_build()
 	return _root
+
+
+## Moves the weight readout (slot list and bar) [param px] left of the right edge, clear of the touch
+## buttons: FIRE and its cluster sit over it on a phone.
+func shift_weight_left(px: float) -> void:
+	screen()
+	for c: Control in [_weight, _weight_back, _weight_fill]:
+		c.offset_left -= px
+		c.offset_right -= px
 
 
 var game: ZzGame = null
