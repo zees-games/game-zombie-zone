@@ -19,7 +19,7 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 
 ## Without the per-map wave-origin sections (one section, two checks each).
 const SECTIONS := 21
-const CHECKS := 98
+const CHECKS := 109
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -286,6 +286,7 @@ func _test_graph() -> void:
 	_check(cached != null and cached.matches("test"), "a graph survives the cache to the byte's digest")
 	_check(cached != null and cached.points == data.points and cached.edges == data.edges, "with its points and edges whole")
 	_check(DotNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
+	_check_cache_key()
 
 	# The grid thinning of spawn points keeps what the director's own loop keeps, in its order.
 	var cloud := DotNpcNavData.new()
@@ -326,7 +327,73 @@ func _test_graph() -> void:
 	graph.allow_climb = true
 	_check(not graph.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
 		"and is taken, both ways, when they do")
+	_check_one_way()
 	_finished()
+
+
+## The cache holds the graph AFTER the physics pass cut it, so what that pass collides with is part of the key: a map
+## whose colliding hulls changed (a never-solid brush taken out of a doorway) must not load its old cuts.
+func _check_cache_key() -> void:
+	var keyed := {"id": "key_test", "world": "zz_world_key_test", "world_collision": {"models": [1, 2], "flat": []}, "solid_props": [[0.0, 1.0, 0.0, 1.0, 2.0, 1.0, 0.0]]}
+	var fewer := keyed.duplicate(true)
+	fewer["world_collision"]["models"] = [1]
+	var no_prop := keyed.duplicate(true)
+	no_prop["solid_props"] = []
+	_check(ZzNpcs.digest_of(keyed) == ZzNpcs.digest_of(keyed.duplicate(true)), "the same document keys the same cache")
+	_check(ZzNpcs.digest_of(keyed) != ZzNpcs.digest_of(fewer), "a change of the colliding world hulls is another cache")
+	_check(ZzNpcs.digest_of(keyed) != ZzNpcs.digest_of(no_prop), "and so is a change of the solid props")
+
+
+## The pieces are a zombie's, and a zombie's edges are one way. [method _test_graph]'s graph numbers its high floor first,
+## the one order a forward flood labels right; Roy Highway's deck was numbered after the street and its two zombie
+## spawns were refused the way down they had.
+func _check_one_way() -> void:
+	var late := DotNpcNavData.new()
+	late.map_id = &"late_test"
+	late.source_digest = "test"
+	late.grid_spacing = 1.0
+	var foot := PackedInt32Array()
+	var top := PackedInt32Array()
+	var roof := PackedInt32Array()
+
+	for i in 3:
+		foot.append(late.add_point(Vector3(float(i), 0.0, 6.0)))
+
+	for i in 3:
+		top.append(late.add_point(Vector3(float(i), 3.0, 0.0)))
+
+	for i in 2:
+		roof.append(late.add_point(Vector3(float(i), 6.0, -6.0)))
+
+	for i in 2:
+		var _c := late.connect_points(foot[i], foot[i + 1])
+		var _d := late.connect_points(top[i], top[i + 1])
+
+	var _e := late.connect_points(roof[0], roof[1])
+	# A plain edge 3 m high: the importer's link down a ledge, which a zombie takes down only.
+	var _f := late.connect_points(top[2], foot[0])
+	var one_way := ZzNavGraph.new()
+	var late_built := one_way.rebuild(late)
+	_check(late_built.ok, "the late graph builds", "" if late_built.ok else late_built.error.message)
+	_check(not one_way.find_path(Vector3(0.0, 3.0, 0.0), Vector3(2.0, 0.0, 6.0), 0.5).is_empty(),
+		"a zombie walks down a ledge whose top is numbered after its foot")
+	_check(one_way.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(), "and still not up it")
+	_check(one_way.connected(top[0], foot[2]) and not one_way.connected(foot[2], top[0]),
+		"the pieces say the same: the top reaches the foot, the foot not the top")
+	var short := one_way.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5, true)
+	_check(one_way.last_partial and short.size() >= 2 and short[short.size() - 1].distance_to(Vector3(0.0, 0.0, 6.0)) < 0.1,
+		"a partial path up it ends at the foot of the ledge", str(short))
+
+	one_way.add_drop(roof[1], top[0])
+	one_way.relabel()
+	_check(one_way.connected(roof[0], foot[2]) and not one_way.connected(top[0], roof[0]),
+		"a drop numbered last reaches through two pieces, and nothing reaches back up it")
+	_check(not one_way.find_path(Vector3(0.0, 6.0, -6.0), Vector3(2.0, 0.0, 6.0), 0.5).is_empty(),
+		"and the zombie on the roof walks all the way down")
+
+	one_way.allow_climb = true
+	_check(one_way.connected(foot[2], top[0]) and not one_way.connected(foot[2], roof[0]),
+		"with climbing on the ledge is one piece again, at once; a drop still is not a way up")
 
 
 # --- Exodus -------------------------------------------------------------------------------------
