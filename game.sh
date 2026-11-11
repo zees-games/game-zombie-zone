@@ -18,7 +18,8 @@
 #
 # Options (before the command):
 #   --godot PATH     the Godot 4.7 binary to use (default: $GODOT, then godot on PATH)
-#   --timeout SEC    the longest one test suite may run (default 1200)
+#   --timeout SEC    the longest one test suite may run (default 1200; headless_nav gets 3600
+#                    unless you pass this)
 #   --no-parse       skip the parse pass in `test`
 #
 # `online` and `server` use dot-server-deploy, found next to this repository (or at
@@ -50,6 +51,9 @@ cd "$ROOT" || exit 1
 
 GODOT="${GODOT:-godot}"
 TIMEOUT=1200
+TIMEOUT_SET=0
+# Suites that legitimately outrun the default (headless_nav bakes navmeshes: ~3300 s measured).
+declare -A SUITE_TIMEOUT=([headless_nav]=3600)
 PARSE=1
 # tools/verify_ui.sh checks that drive the real client under xvfb.
 UI_CHECKS="trader crouch nav"
@@ -70,8 +74,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --godot) GODOT="${2:?--godot needs a path}"; shift 2 ;;
         --godot=*) GODOT="${1#*=}"; shift ;;
-        --timeout) TIMEOUT="${2:?--timeout needs seconds}"; shift 2 ;;
-        --timeout=*) TIMEOUT="${1#*=}"; shift ;;
+        --timeout) TIMEOUT="${2:?--timeout needs seconds}"; TIMEOUT_SET=1; shift 2 ;;
+        --timeout=*) TIMEOUT="${1#*=}"; TIMEOUT_SET=1; shift ;;
         --no-parse) PARSE=0; shift ;;
         -h|--help|help) usage; exit 0 ;;
         *) break ;;
