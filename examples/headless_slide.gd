@@ -2,12 +2,13 @@ extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
+const ZzSlideRules := preload("../game/zz_slide_rules.gd")
 
 ## Slide in Zombie Zone: only a sprinter holding C slides. A walk, a plain run or a crouch alone
 ## never does. (Arena keeps the addon default and slides at a run; its own suite holds that.)
 
 const SECTIONS := 3
-const CHECKS := 11
+const CHECKS := 18
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -37,6 +38,14 @@ func _command(forward: float, buttons: int) -> DotFpsCommand:
 
 
 ## A survivor settled after [param seconds] of holding [param buttons] forward.
+class _Link extends RefCounted:
+	signal replicated_cvar_changed(cvar_name: String, value: String)
+	var held := {}
+
+	func replicated_cvar(cvar_name: String, fallback: String) -> String:
+		return String(held.get(cvar_name, fallback))
+
+
 func _run_for(motor: DotFpsMotor, buttons: int, seconds: float) -> DotFpsState:
 	var s := DotFpsState.new()
 	s.mode = DotFpsState.Mode.GROUND
@@ -54,9 +63,24 @@ func _test_tunables() -> void:
 	_check(t.slide_enabled, "sliding is on")
 	_check(t.slide_requires_sprint, "a slide needs the sprint button")
 	_check(t.slide_min_speed > t.max_speed, "the minimum speed is above a plain run")
-	var off := ZzConfig.new()
-	off.slide_enabled = false
-	_check(not ZzPlayer.tunables_for(off).slide_enabled, "the config can turn it off")
+	var rules := ZzSlideRules.new()
+	_check(rules.set_cvar("zz_slide", "0"), "zz_slide is a cvar")
+	_check(not ZzPlayer.tunables_for(ZzConfig.new(), null, rules).slide_enabled, "zz_slide 0 turns it off")
+	_check(not rules.set_cvar("zz_slide_nope", "1") and not rules.set_cvar("zz_slide_boost", "fast"), "an unknown name or a non-number is refused")
+	_check(rules.set_cvar("zz_slide_boost", "99") and is_equal_approx(rules.slide_boost, 20.0), "a value is clamped to its range")
+	rules.set_cvar("zz_slide", "1")
+	rules.set_cvar("zz_slide_boost", "4")
+	rules.set_cvar("zz_slide_min_speed", "9")
+	var tuned := ZzPlayer.tunables_for(ZzConfig.new(), null, rules)
+	_check(tuned.slide_enabled and is_equal_approx(tuned.slide_boost, 4.0) and is_equal_approx(tuned.slide_min_speed, 9.0), "the cvars reach the tunables")
+	var names := ZzSlideRules.table().keys()
+	_check(names == DotFpsSlidePreset.cvar_table("zz_slide").keys() and names.has("zz_slide_cooldown"), "the names are the addon's table under zz_slide")
+	var link := _Link.new()
+	link.held["zz_slide_duration"] = "2.5"
+	var follower := ZzSlideRules.new()
+	_check(follower.follow_cvars(link) and is_equal_approx(follower.slide_duration, 2.5), "a client follows the held value")
+	link.replicated_cvar_changed.emit("zz_slide_cooldown", "0.2")
+	_check(is_equal_approx(follower.slide_cooldown, 0.2), "and a change")
 	_sections_finished += 1
 
 

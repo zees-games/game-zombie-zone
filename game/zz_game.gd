@@ -150,6 +150,8 @@ func _wire_rules() -> void:
 	combat_feel.sprint_defaults(ZzPlayer.tunables_for(config))
 	if not crawl_rules.changed.is_connected(_on_crawl_rules_changed):
 		crawl_rules.changed.connect(_on_crawl_rules_changed)
+	if not slide_rules.changed.is_connected(_on_slide_rules_changed):
+		slide_rules.changed.connect(_on_slide_rules_changed)
 	if not water_rules.changed.is_connected(_push_water):
 		water_rules.changed.connect(_push_water)
 	if not body_rules.changed.is_connected(_on_body_rules_changed):
@@ -235,6 +237,11 @@ func _apply_body_mask(player: ZzPlayer) -> void:
 
 
 ## The DOWN modifier's pace on every survivor, on this end; the server and each client run the same.
+func _on_slide_rules_changed() -> void:
+	for id in players:
+		(players[id] as ZzPlayer).retune_slide()
+
+
 func _on_crawl_rules_changed() -> void:
 	for id in players:
 		(players[id] as ZzPlayer).controller.set_crawl_speed(crawl_rules.speed)
@@ -1048,6 +1055,8 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		_apply_body_mask(player)
 
 	player.controller.set_crawl_speed(crawl_rules.speed)
+	player.slide_rules = slide_rules
+	player.retune_slide()
 	player.downed_rules = downed_rules
 	player.downed_default = StringName(config.start_weapons[0])
 	combat_feel.track_tunables(player.controller.tunables)
