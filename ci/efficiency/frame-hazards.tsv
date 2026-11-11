@@ -7,9 +7,6 @@ game/zz_game.gd::_defib_revive::string_build	1
 game/zz_game.gd::_feed_map_uis::alloc_dict	1
 game/zz_game.gd::_gap_exit::alloc_array	2
 game/zz_game.gd::_objective_used::string_build	1
-game/zz_game.gd::_roll_into_survivors::alloc_array	1
-game/zz_game.gd::_roll_into_zombies::alloc_array	1
-game/zz_game.gd::_roll_into_zombies::alloc_dict	1
 game/zz_game.gd::_tell_horde_barricades::alloc_dict	1
 game/zz_game.gd::players_on::alloc_array	1
 game/zz_game.gd::rescue::string_build	1

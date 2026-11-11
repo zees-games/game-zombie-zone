@@ -3958,13 +3958,19 @@ func set_prop_force_override(text: String) -> bool:
 
 
 ## A loose barrel going fast hurts the survivor it runs into (once per cooldown), as the original supports' barrels did.
+## Scratch for the roll scans, reused every tick (cleared on entry; the scans do not keep them).
+var _roll_victims: Array = []
+var _roll_by_id: Dictionary = {}
+
+
 func _roll_into_survivors(delta: float) -> void:
 	if not _toy_moving_fast():
 		# Still advances the cooldown clocks; no victim list for 100 players and 250 zombies a tick.
 		var _none := rolling.scan(map.toys, [], delta)
 		var _none_z := rolling_zombies.scan(map.toys, [], delta)
 		return
-	var victims: Array = []
+	var victims := _roll_victims
+	victims.clear()
 	for id: StringName in players:
 		var player: ZzPlayer = players[id]
 		if player.is_alive() and not player.watching:
@@ -3997,8 +4003,10 @@ func _toy_moving_fast() -> bool:
 func _roll_into_zombies(delta: float) -> void:
 	if horde == null or horde.spawner == null:
 		return
-	var victims: Array = []
-	var by_id := {}
+	var victims := _roll_victims
+	var by_id := _roll_by_id
+	victims.clear()
+	by_id.clear()
 	for npc: DotNpcInstance in horde.spawner.all_npcs():
 		var entity := horde.entity_id_for(npc)
 		if not npc.is_alive() or entity == 0:
