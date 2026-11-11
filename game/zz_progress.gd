@@ -127,6 +127,7 @@ static func schema() -> DotStatsSchema:
 	var _points := DotStatsPoints.declare(out, POINTS, "Points")
 	var _pen := DotStatsPenetration.declare(out)
 	var _zones := DotStatsHitzones.declare(out)
+	DotStatsPenetration.declare_walls(out)
 	return out
 
 
@@ -327,6 +328,12 @@ func _build_feed() -> void:
 	]
 	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(who, stat, value)
 	rank.key_fn = func(who: Variant) -> StringName: return _key(StringName(who))
+
+
+## Every wall a resolved shot crossed, for the site's Penetration cost panel (the shape is dot-stats').
+func report_shot(shot: DotShot) -> void:
+	if feed != null and stats != null:
+		var _walls := DotStatsDamage.report_shot(feed, shot)
 
 
 ## Files a survivor's landed hit by body zone and penetration (shots by anybody else are refused by the feed).
