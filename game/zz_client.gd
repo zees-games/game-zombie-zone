@@ -1861,7 +1861,7 @@ func _build_settings() -> void:
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
-	var _flinch := platform.add_hit_flinch(
+	_hit_flinch = platform.add_hit_flinch(
 		func() -> Variant: return player.sampler if _offline and player != null and player.sampler != null else _sampler,
 		func() -> Variant: return camera,
 		_aim_sent)
@@ -2286,6 +2286,7 @@ func carried_colour(who: ZzPlayer) -> Color:
 ## dead or watching.
 func _aim_allowed() -> bool:
 	return _pointer_ours() and not third_person and not is_spectating() \
+		and not (_hit_flinch != null and _hit_flinch.blocked()) \
 		and player != null and player.is_alive() and not player.is_down() and not player.is_held() \
 		and not (player.controller != null and player.controller.state.sprinting \
 			and player.controller.tunables != null and player.controller.tunables.sprint_blocks_aim)

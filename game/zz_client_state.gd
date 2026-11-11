@@ -149,6 +149,8 @@ var _map_why: String = ""
 var _board_opened: bool = false
 var _covered_by_reveal: Dictionary = {}
 var _sampler: DotFpsSampler = null
+## The hit flinch the platform drives; `blocked()` refuses the sights for a moment after a hit (sv_unscope_hit).
+var _hit_flinch: DotGameHitFlinch = null
 ## The phone's on-screen buttons ([code]zz_touch.gd[/code]); null off touch.
 var _touch: RefCounted = null
 var _prewarmed := false
