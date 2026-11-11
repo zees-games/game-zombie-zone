@@ -244,6 +244,9 @@ func _run() -> void:
 	await _until_a_round(game)
 	var local = _client.get("player")
 	await _await_world(game)
+	# Waits past the load cover (slow on a cold GPU box) before any timing starts; capped, so a stuck cover cannot hang the shot.
+	if not await DotShotGate.wait_lifted(get_tree(), _client.get("platform")):
+		printerr("shot: load cover still up after the wait; shooting anyway")
 
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
