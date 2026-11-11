@@ -530,8 +530,12 @@ func _pack_handles(game: ZzGame, player: Object) -> void:
 	_check(not bool(tiger.brain.get(&"bashing")) and tiger.position().distance_to(held) > 1.0, "gone, it walks on")
 	game.barricades.erase("fx_pack")
 
-	# A lure: nobody to hunt, it goes to the point and stands there.
 	game.horde.spawner.remove(tiger.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	_pack_lure(game, player)
+
+
+## A lure: nobody to hunt, it goes to the point and stands there.
+func _pack_lure(game: ZzGame, player: Object) -> void:
 	var lured := _spawn_far(game, &"zhm_bear", player.global_position, 24.0)
 	var plain := _spawn_far(game, &"zhm_tiger", player.global_position, 24.0)
 	# Blind, so only the lure moves them; the point is ten metres down the street toward the survivor.

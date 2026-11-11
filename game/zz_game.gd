@@ -2441,26 +2441,8 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 	if (pressed & ZzNetCommand.ACT_GIVE_KIT) != 0:
 		var _gave_kit := consumables.give(player, &"medkit")
 
-	# Holding: E, or the medkit. Whatever was started keeps going while its key is held.
 	if player.using != &"":
-		var key := ZzNetCommand.ACT_USE
-
-		if player.using == &"heal":
-			key = ZzNetCommand.ACT_HEAL
-		elif player.using == &"pills":
-			key = ZzNetCommand.ACT_PILLS
-		elif player.using == &"deploy":
-			key = ZzNetCommand.ACT_DEPLOY
-
-		var keyed := (held & key) != 0 or (player.using == &"deploy" and fire_now)
-
-		if not keyed or not _use_still_valid(player):
-			if keyed and player.using == &"heal":
-				consumables.lock(player)
-
-			cancel_use(player)
-		else:
-			_advance_use(player, delta)
+		_advance_held_use(player, held, fire_now, delta)
 		return
 
 	if boxes != null and (((held & ZzNetCommand.ACT_DEPLOY) != 0 and (pressed & ZzNetCommand.ACT_DEPLOY) != 0) \
@@ -2470,6 +2452,28 @@ func _advance_hands(player: ZzPlayer, delta: float) -> void:
 		_begin_heal(player)
 	elif not weapon_aimed and (held & ZzNetCommand.ACT_USE) != 0 and (pressed & ZzNetCommand.ACT_USE) != 0:
 		_begin_use(player)
+
+
+## Holding: E, or the medkit. Whatever was started keeps going while its key is held.
+func _advance_held_use(player: ZzPlayer, held: int, fire_now: bool, delta: float) -> void:
+	var key := ZzNetCommand.ACT_USE
+
+	if player.using == &"heal":
+		key = ZzNetCommand.ACT_HEAL
+	elif player.using == &"pills":
+		key = ZzNetCommand.ACT_PILLS
+	elif player.using == &"deploy":
+		key = ZzNetCommand.ACT_DEPLOY
+
+	var keyed := (held & key) != 0 or (player.using == &"deploy" and fire_now)
+
+	if not keyed or not _use_still_valid(player):
+		if keyed and player.using == &"heal":
+			consumables.lock(player)
+
+		cancel_use(player)
+	else:
+		_advance_use(player, delta)
 
 
 func _begin_use(player: ZzPlayer) -> void:
