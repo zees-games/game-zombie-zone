@@ -42,6 +42,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzProgress := preload("zz_progress.gd")
 const ZzProps := preload("zz_props.gd")
 const ZzCrawlRules := preload("zz_crawl_rules.gd")
+const ZzSlideRules := preload("zz_slide_rules.gd")
 const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzFooting := preload("zz_footing.gd")
 const ZzPassRules := preload("zz_pass_rules.gd")
@@ -308,6 +309,9 @@ var footing: ZzFooting = ZzFooting.new()
 ## `zz_down_crawl_speed`: how fast a downed survivor crawls (0: not at all). Bound by the module
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
+
+## `zz_slide*`: the slide's numbers ([ZzSlideRules]). REPLICATED and followed by a client, which predicts its own slide.
+var slide_rules: ZzSlideRules = ZzSlideRules.new()
 
 ## `sv_downed_*`: what a downed survivor holds and whether they crawl with it. REPLICATED, followed by a client.
 var downed_rules: DotDownedRules = DotDownedRules.new()

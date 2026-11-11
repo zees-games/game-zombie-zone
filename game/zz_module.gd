@@ -315,6 +315,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# The slide's numbers (dot-player-controller's cvar table under `zz_slide`): REPLICATED, a client predicts its own slide.
+	var _slide := world.slide_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# What a downed survivor holds and whether they crawl with it: part of the prediction (can_crawl).
 	var _downed := world.downed_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED

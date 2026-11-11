@@ -5,6 +5,7 @@ extends CharacterBody3D
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzClasses := preload("zz_classes.gd")
 const ZzConfig := preload("zz_config.gd")
+const ZzSlideRules := preload("zz_slide_rules.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzWaterRules := preload("zz_water_rules.gd")
 const ZzFigure := preload("zz_figure.gd")
@@ -217,6 +218,9 @@ var view_rig: ZeeWeaponRig = null
 
 ## The downed rules (`sv_downed_*`) and the default pistol a downed survivor falls back to, set by the game.
 var downed_rules: DotDownedRules = null
+
+## The slide's cvars, shared with the game ([ZzSlideRules]); null reads the defaults.
+var slide_rules: ZzSlideRules = null
 var downed_default: StringName = &"zz_pistol"
 
 ## The slot a downed survivor is held to on the server's rig, and on the drawn one (0: not picked yet).

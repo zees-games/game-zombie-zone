@@ -7,7 +7,7 @@ func _ready() -> void:
 	# EXTERNAL even offline: the world owns the tick, which is the shape a dedicated server
 	# needs and the one a predicting client replays.
 	controller.drive = DotFpsController.Drive.EXTERNAL
-	controller.tunables = tunables_for(config)
+	controller.tunables = tunables_for(config, null, slide_rules)
 	controller.admin_abilities = true
 	controller.extra_modes = [swim, ladder]
 	add_child(controller)
@@ -180,7 +180,7 @@ func breathe(delta: float, rules: ZzWaterRules) -> float:
 
 ## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
 ## the two must agree.
-static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null) -> DotFpsTunables:
+static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null, p_slide: ZzSlideRules = null) -> DotFpsTunables:
 	var t := DotFpsTunables.with_profile("legacy")
 	t.max_speed = p_config.run_speed if p_config != null else 6.2
 	t.gravity = p_config.gravity if p_config != null else 20.0
@@ -189,7 +189,7 @@ static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null) 
 	t.walk_speed_scale = p_config.walk_speed_scale if p_config != null else 0.45
 	t.can_walk = true
 	apply_sprint(t, p_config)
-	apply_slide(t, p_config)
+	apply_slide(t, p_config, p_slide)
 	t.can_crouch = true
 	t.crouch_speed_scale = 0.45
 	t.accelerate = 10.0
@@ -226,21 +226,12 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 	t.sprint_toggle = p_config.sprint_toggle
 
 
-## Slide, ZZ's way: only a sprinter holding C slides. A walk, a plain run or a crouch alone never
-## does, because [code]slide_requires_sprint[/code] wants the sprint button and the minimum speed sits
-## above a plain run. Arena leaves both at the addon default (no sprint needed), so it is unchanged.
-static func apply_slide(t: DotFpsTunables, p_config: ZzConfig) -> void:
-	if p_config == null:
-		DotFpsSlidePreset.apply_sprint(t, false, t.slide_boost, t.slide_max_speed, t.slide_duration, t.slide_cooldown)
-		return
-	DotFpsSlidePreset.apply_sprint(
-		t,
-		p_config.slide_enabled and p_config.sprint_enabled,
-		p_config.slide_boost,
-		p_config.slide_max_speed,
-		p_config.slide_duration,
-		p_config.slide_cooldown
-	)
+## Slide, ZZ's way: only a sprinter holding C slides (see [ZzSlideRules]). A walk, a plain run or a
+## crouch alone never does, because [code]slide_requires_sprint[/code] wants the sprint button and the
+## minimum speed sits above a plain run. Arena leaves both at the addon default, so it is unchanged.
+static func apply_slide(t: DotFpsTunables, p_config: ZzConfig, p_slide: ZzSlideRules = null) -> void:
+	var rules := p_slide if p_slide != null else ZzSlideRules.new()
+	rules.apply(t, p_config.slide_max_speed if p_config != null else t.slide_max_speed, p_config != null and p_config.sprint_enabled)
 
 
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.
@@ -675,10 +666,16 @@ func retune() -> void:
 	if controller == null:
 		return
 
-	controller.tunables = tunables_for(config, class_def)
+	controller.tunables = tunables_for(config, class_def, slide_rules)
 
 	if sampler != null:
 		sampler.tunables = controller.tunables
+
+
+## Puts the slide cvars on the live tunables in place (the combat feel and the sampler hold them).
+func retune_slide() -> void:
+	if controller != null and controller.tunables != null:
+		apply_slide(controller.tunables, config, slide_rules)
 
 
 # --- Drawing (client side) --------------------------------------------------

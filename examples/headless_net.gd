@@ -38,7 +38,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 34
-const CHECKS := 232
+const CHECKS := 233
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -1238,6 +1238,10 @@ func _test_a_downed_crawl_is_predicted() -> void:
 	_check(follower.follow_cvars(link) and is_equal_approx(follower.speed, 2.5), "a client reads the server's value through its link")
 	link.replicated_cvar_changed.emit(ZzCrawlRules.CVAR, "0.5")
 	_check(is_equal_approx(follower.speed, 0.5), "and follows every change")
+
+	_server_game.slide_rules.set_cvar("zz_slide_boost", "6")
+	_check(is_equal_approx(server_me.controller.tunables.slide_boost, 6.0), "a slide cvar reaches a live survivor's tunables")
+	_server_game.slide_rules.set_cvar("zz_slide_boost", "1.5")
 
 	_server_game.crawl_rules.speed = 1.4
 	_client_game.crawl_rules.speed = 1.4

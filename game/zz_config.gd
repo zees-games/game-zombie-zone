@@ -498,12 +498,8 @@ func setup_seconds() -> float:
 ## Whether Shift toggles sprint instead of being held.
 @export var sprint_toggle: bool = false
 
-## Slide: only a sprinter holding C slides, never from a walk, a plain run or a crouch alone.
-@export var slide_enabled: bool = true
-@export_range(0.0, 20.0, 0.1) var slide_boost: float = 1.5
+## Slide top speed; the rest of the slide is the `zz_slide*` cvars.
 @export_range(1.0, 30.0, 0.1) var slide_max_speed: float = 10.5
-@export_range(0.1, 5.0, 0.05) var slide_duration: float = 0.9
-@export_range(0.0, 10.0, 0.05) var slide_cooldown: float = 1.0
 @export_range(0.1, 5.0, 0.05) var jump_height: float = 1.1
 @export_range(1.0, 60.0, 0.5) var gravity: float = 20.0
 @export_range(0.0, 200.0, 1.0) var air_accelerate: float = 12.0
