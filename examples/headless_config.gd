@@ -8,7 +8,10 @@ extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzMovementCvars := preload("../game/zz_movement_cvars.gd")
-const ROOT := "user://zz_cfgtest"
+## One directory per suite process (the probe child is handed its parent's): user:// is shared by
+## every copy of this project on a box, and two suites at once wrote and deleted each other's cfg files.
+const ROOT_ARG := "--cfgroot="
+var ROOT := _root()
 const GAME := "game-zombie-zone"
 const ZzTurrets := preload("../game/zz_turrets.gd")
 const ZzHazards := preload("../game/zz_hazards.gd")
@@ -23,6 +26,13 @@ const CHECKS := 57
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
+
+
+func _root() -> String:
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with(ROOT_ARG):
+			return a.substr(ROOT_ARG.length())
+	return "user://zz_cfgtest_%d" % OS.get_process_id()
 
 
 func _run() -> void:
@@ -58,17 +68,17 @@ func _run() -> void:
 	console.set_cvar("zz_infect_kind", "runner")
 	_check(config.infect_kind == "runner" and keys.has("infect_kind") and config.infect_after_seconds == 0.0 and config.infect_count == 1,
 		"zz_infect_kind is a cvar on the config (the opening stays off, one turns)")
-	var schema_path := "user://zz_config_schema.json"
+	var schema_path := ROOT + "_config_schema.json"
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
 
-	var bad := FileAccess.open("user://zz_config_bad.json", FileAccess.WRITE)
+	var bad := FileAccess.open(ROOT + "_config_bad.json", FileAccess.WRITE)
 	bad.store_string('{"no_such_field": 1}')
 	bad.close()
-	var strict := ZzConfig.make_binder(ZzConfig.new(), "user://zz_config_bad.json")
+	var strict := ZzConfig.make_binder(ZzConfig.new(), ROOT + "_config_bad.json")
 	strict.strict = true
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
-	DirAccess.remove_absolute("user://zz_config_bad.json")
+	DirAccess.remove_absolute(ROOT + "_config_bad.json")
 
 	var shipped := "res://cfg/game/%s/config_round/game.yml" % GAME
 	var kept := FileAccess.get_file_as_string(shipped)
@@ -168,7 +178,7 @@ func _probe() -> void:
 func _child() -> String:
 	var out: Array = []
 	OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
-		"res://examples/headless_config.tscn", "--", "--probe", "--zz-gore-max-gibs=12", "--zz-start-points=120"], out, true)
+		"res://examples/headless_config.tscn", "--", "--probe", ROOT_ARG + ROOT, "--zz-gore-max-gibs=12", "--zz-start-points=120"], out, true)
 	return "".join(PackedStringArray(out))
 
 
