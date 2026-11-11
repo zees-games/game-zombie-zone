@@ -1674,6 +1674,14 @@ func _test_how_survivors_fall() -> void:
 		"a second and a half on, it lies on the street: not standing, not through it",
 		str(body.describe()) if down else "gone")
 
+	_check_death_wire()
+	view.queue_free()
+	_finished()
+
+
+
+## What a DEATH carries on the wire, and that the death sounds are catalogued.
+func _check_death_wire() -> void:
 	# The fall rides DEATH last and optional, so a death from an older server still reads.
 	var fall := DotPlayerDeath.new()
 	fall.reaction = &"face_plant"
@@ -1695,8 +1703,6 @@ func _test_how_survivors_fall() -> void:
 	for row: Dictionary in DotPlayerDeathSounds.rows():
 		listed = listed and catalogue.find(row["id"]) != null
 	_check(listed, "the death sounds are in the game's catalogue")
-	view.queue_free()
-	_finished()
 
 
 ## The view, without a renderer: every kind builds an animated model, commons differ, states
@@ -2675,6 +2681,13 @@ func _test_help_and_menu() -> void:
 	settings.queue_free()
 	await get_tree().process_frame
 
+	await _check_old_settings_document()
+	_finished()
+
+
+
+## A settings file saved before the keys moved still loads, and keeps what the player chose.
+func _check_old_settings_document() -> void:
 	# A document saved when the medkit was on H and the shove on V: they follow their new
 	# defaults, help keeps H, and a key the player chose stays where they put it.
 	var old_doc := DotSettingsStoreMemory.new()
@@ -2711,7 +2724,6 @@ func _test_help_and_menu() -> void:
 		"the slider is horizontal degrees at 4:3, converted for the camera", "%.2f" % fov_cam.fov)
 	returning.queue_free()
 	await get_tree().process_frame
-	_finished()
 
 
 ## The family's rule since the first play test: M opens the map list, and solo a choice

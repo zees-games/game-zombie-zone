@@ -798,6 +798,21 @@ func _test_zombies_replicate() -> void:
 	_check((_heard.get("splats", []) as Array).is_empty(),
 		"the shooter is not sent a SPLAT for their own hit (they splatter from the HIT)", str(_heard.get("splats", [])))
 
+	await _check_splats(server_me)
+
+	_hurt_npc(npc, 100000.0)
+	await _steps(6)
+	_check((_heard.get("hits", []) as Array).size() == 1,
+		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
+	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
+		"killed, and the client is told it died rather than went away")
+	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
+		"and how it fell, for its body to fall that way")
+	_finished()
+
+
+## Blood landing on a floor reaches another client, rate limited, and so do a shot's marks.
+func _check_splats(server_me: ZzPlayer) -> void:
 	# Another survivor's client is told where blood landed: a floor 1 m under the point, seen from above.
 	var floor_at := Vector3(0.0, 0.0, 0.0)
 	var floor_shape := StaticBody3D.new()
@@ -822,6 +837,12 @@ func _test_zombies_replicate() -> void:
 			budget_sent += 1
 	_check(budget_sent <= int(ZzNetBridge.SPLAT_PER_SECOND), "SPLATs are rate limited", "%d of 100 in one burst" % budget_sent)
 
+	await _check_impact_marks(server_me)
+	floor_shape.queue_free()
+
+
+## A resolved shot's marks reach every client, and a miss into open air leaves none.
+func _check_impact_marks(server_me: ZzPlayer) -> void:
 	# A resolved shot's marks (the stop on the floor, both faces of a wall it passed, a bounce) reach every client.
 	var volley := DotShot.make(&"test", server_me.entity_id, _server_game.current_tick(), 0)
 	volley.origin = Vector3(4.0, 3.0, 4.0)
@@ -849,17 +870,6 @@ func _test_zombies_replicate() -> void:
 		"an IMPACT reaches the client with every mark's point and normal", str(last))
 	var round_trip := ZzEvents.read_impact(_r(ZzEvents.write_impact(marks)))
 	_check(bool(round_trip["ok"]) and (round_trip["marks"] as Array).size() == 4, "IMPACT round-trips its marks")
-	floor_shape.queue_free()
-
-	_hurt_npc(npc, 100000.0)
-	await _steps(6)
-	_check((_heard.get("hits", []) as Array).size() == 1,
-		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
-	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
-		"killed, and the client is told it died rather than went away")
-	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
-		"and how it fell, for its body to fall that way")
-	_finished()
 
 
 ## A zz-historical-monsters monster (the pack's brain on a zombie body, drawn as the leaper) on the wire: the client is
