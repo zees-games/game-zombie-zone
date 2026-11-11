@@ -1316,6 +1316,11 @@ func _on_carry_json(json: String) -> void:
 			dropped = dropped or not told.has(held.id())
 	if dropped:
 		# The server put something down (an over-limit drop, a swap): this end rebuilds to its list.
+		# A rebuilt gun starts in its first mode, so the chosen ones are put back after.
+		var modes := {}
+		for slot: int in arsenal.slots():
+			for held in arsenal.weapons_in(slot):
+				modes[held.id()] = held.fire_mode_index
 		for slot: int in arsenal.slots():
 			while not arsenal.weapons_in(slot).is_empty() and arsenal.take(slot).ok:
 				pass
@@ -1324,6 +1329,9 @@ func _on_carry_json(json: String) -> void:
 			ids.reverse()
 			for id: Variant in ids:
 				var _back := arsenal.give(StringName(str(id)), false)
+		for slot: int in arsenal.slots():
+			for held in arsenal.weapons_in(slot):
+				held.fire_mode_index = int(modes.get(held.id(), held.fire_mode_index))
 	for key in slots:
 		for id: Variant in slots[key]:
 			if not weapons.arsenal.carries(StringName(str(id))):
