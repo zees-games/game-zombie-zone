@@ -1,6 +1,6 @@
 extends RefCounted
 
-## arena-weapons' smoke and fire clouds, reached by path because the pack is optional (no pack: no cloud).
+## fc-weapons' smoke and fire clouds, reached by path because the pack is optional (no pack: no cloud).
 
 const SMOKE := 0
 const FIRE := 1

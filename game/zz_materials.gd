@@ -18,7 +18,7 @@ extends RefCounted
 ## [b]A surface has a tint.[/b] A map document names a surface and may tint it, so one carpet
 ## is a blue classroom and a red library without a second texture.
 ##
-## [b]The building is drawn in the family's look, dusted for the night[/b] (game-arena's
+## [b]The building is drawn in the family's look, dusted for the night[/b] (game-fatal-contact's
 ## built-in maps, then mg-prop-hunt's rooms): every surface a street or a room is built of
 ## (floors, walls, ceilings, roofs, the ground) is Kenney's light prototype grid, or his tiles
 ## on a floor, under a pastel that says what it is ([constant PASTELS]), moved
@@ -43,7 +43,7 @@ const GRID_PATH := "res://assets/kenney/prototype/grid.png"
 const TILES_PATH := "res://assets/kenney/prototype/tiles.png"
 
 ## How much world one copy of either texture covers: 4 m, so a major line is 2 m and a faint
-## one 0.5 m, as on game-arena's maps.
+## one 0.5 m, as on game-fatal-contact's maps.
 const GRID_METRES := 4.0
 
 ## How far each pastel is moved toward its own grey. mg-prop-hunt's pastels at full

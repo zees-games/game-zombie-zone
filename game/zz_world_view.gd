@@ -429,7 +429,7 @@ func remove_loot(id: int) -> void:
 
 # --- Hazards ---------------------------------------------------------------------
 
-## Shows arena-weapons' smoke or fire cloud for a hazard; freed with [param node].
+## Shows fc-weapons' smoke or fire cloud for a hazard; freed with [param node].
 func _attach_cloud(node: Node3D, fx: int, at: Vector3, radius: float, seconds: float) -> void:
 	var cloud := ZzGrenadeFx.show(effects, get_tree(), fx, at, radius, seconds)
 

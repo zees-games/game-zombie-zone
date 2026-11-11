@@ -189,7 +189,7 @@ const EFFECTS_BYTES := 2048
 
 ## Where a body may be, in metres, on the wire. Read from [ZzGame], not written here: a
 ## quantised position is decoded against this range, and two files holding two numbers put
-## the thing somewhere else (game-arena: 256 against 128).
+## the thing somewhere else (game-fatal-contact: 256 against 128).
 const WORLD_EXTENT := ZzGame.NET_WORLD_EXTENT
 const POS_BITS := 24
 

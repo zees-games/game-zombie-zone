@@ -7,7 +7,7 @@ const ZzPackBrains := preload("zz_pack_brains.gd")
 const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## [b]The game ships without them and nothing here is needed to run.[/b] At start every
 ## directory under `res://addons` is looked at for one file, `spawn_provider.gd` (the contract
-## game-playground's spawn menu reads too). An addon without it is never loaded. One with it is
+## game-playlot's spawn menu reads too). An addon without it is never loaded. One with it is
 ## loaded by path and called by name, never named in this game's code, because a script that
 ## said `ZzModernWeapons...` would not parse in a checkout without the pack.
 ##

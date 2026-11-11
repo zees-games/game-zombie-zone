@@ -5,7 +5,7 @@ const ZzHazards := preload("zz_hazards.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPaths := preload("zz_paths.gd")
 
-## Thrown grenades of arena-weapons (frag, sticky, flash, smoke, incendiary), flown and blown on the server.
+## Thrown grenades of fc-weapons (frag, sticky, flash, smoke, incendiary), flown and blown on the server.
 ## The pack is optional and reached by path; its events become damage, a fire area, a lure and a replicated cloud or flash.
 
 const DIR := "res://addons/arena_weapons/"
@@ -16,7 +16,7 @@ var game = null
 var rules: Object = null
 
 var _grenade: GDScript = null
-## arena-weapons' AwUtilityZones (API 4): victims, line of sight, blind ledger and fire pulses as the thrower.
+## fc-weapons' AwUtilityZones (API 4): victims, line of sight, blind ledger and fire pulses as the thrower.
 var zones: Object = null
 ## id -> {g, def}
 var _flying: Dictionary = {}
@@ -67,7 +67,7 @@ func _load() -> bool:
 	return true
 
 
-## The host's copy of an arena-weapons file first: loading a bundled copy of a class the host already declares errors "hides a global script class".
+## The host's copy of an fc-weapons file first: loading a bundled copy of a class the host already declares errors "hides a global script class".
 func _path(file: String) -> String:
 	for path: String in [DIR + file, ZzPaths.rebase(DIR + file)]:
 		if ResourceLoader.exists(path):
