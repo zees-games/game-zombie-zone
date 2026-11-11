@@ -122,7 +122,14 @@ pack_all() {
         echo "packing $id"
         (cd "$deploy" && ./server pack "$id" --source "$ROOT/../$repo") >/dev/null || die "could not pack $id"
     done
-    "$GODOT" --headless --path . --import >/dev/null 2>&1
+    if [ "${DOT_PACK_ETC2_ASTC:-0}" = 1 ]; then
+        # Mobile browsers: ETC2/ASTC variants too (bigger pack). dot-bootstrap's tool; default stays desktop only.
+        local mob="${DOT_BOOTSTRAP:-$ROOT/../dot-bootstrap}/tools/import-mobile.sh"
+        [ -x "$mob" ] || die "DOT_PACK_ETC2_ASTC=1 needs dot-bootstrap's tools/import-mobile.sh beside this game." 2
+        "$mob" "$GODOT" . >/dev/null 2>&1 || die "mobile import failed"
+    else
+        "$GODOT" --headless --path . --import >/dev/null 2>&1
+    fi
     echo "packing $PACK"
     (cd "$deploy" && ./server pack "$PACK" --source "$ROOT") >/dev/null || die "could not pack $PACK"
 }
