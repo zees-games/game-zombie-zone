@@ -3586,6 +3586,8 @@ func _advance_weapons() -> void:
 			shot.tick = _tick
 			_shoot_toys(shot)
 			var _resolved := combat.resolve_shot(shot)
+			if progress != null:
+				progress.report_shot(_resolved)
 			_mark_shot(shot)
 
 			if horde != null:
