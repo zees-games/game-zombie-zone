@@ -30,7 +30,7 @@ jobs:
                 examples/headless_classes examples/headless_collide examples/headless_config examples/headless_consumables
                 examples/headless_defib examples/headless_downed examples/headless_gait examples/headless_slide examples/headless_grenades
                 examples/headless_hazards examples/headless_look examples/headless_mapcfg examples/headless_maps
-                examples/headless_mechanics examples/headless_mutant examples/headless_nav examples/headless_net
+                examples/headless_mechanics examples/headless_mutant examples/headless_nav examples/headless_nav_holds examples/headless_nav_waves examples/headless_net
             efficiency: true
             hygiene: true
         secrets:

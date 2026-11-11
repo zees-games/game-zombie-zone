@@ -17,9 +17,15 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-## Without the per-map wave-origin sections (one section, two checks each).
-const SECTIONS := 21
-const CHECKS := 109
+## The suite is three scenes over this script, one per `shard` (game.sh caps a suite at 1200 s and the
+## whole of it ran about 1800): headless_nav (core), headless_nav_holds and headless_nav_waves, which
+## has one section and two checks per wave map. Together 52 sections, 171 checks.
+@export var shard := "core"
+
+const CORE_SECTIONS := 11
+const CORE_CHECKS := 69
+const HOLDS_SECTIONS := 10
+const HOLDS_CHECKS := 40
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -162,34 +168,38 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
-	_test_graph()
-	await _test_exodus()
+	match shard:
+		"holds":
+			for id: String in MAPS:
+				await _test_holding(StringName(id))
 
-	var holds := {}
-	var spreads := {}
-
-	for id: String in MAPS:
-		holds[id] = await _test_holding(StringName(id))
-
-	await _test_fallback()
-	await _test_spread(&"zz_high_school")
-	await _test_spread(&"zz_mall")
-	await _test_async_build()
-	await _test_mend_gap()
-
-	for id: String in STUCK_BANDS:
-		await _test_stuck(StringName(id))
-
-	await _test_hop_wedge()
-	await _test_unstick_steps()
-	await _test_lure_crowd()
-	_test_thin_props()
-	await _test_wave_origins()
+			for id: String in STUCK_BANDS:
+				await _test_stuck(StringName(id))
+		"waves":
+			await _test_wave_origins()
+		_:
+			_test_graph()
+			await _test_exodus()
+			await _test_fallback()
+			await _test_spread(&"zz_high_school")
+			await _test_spread(&"zz_mall")
+			await _test_async_build()
+			await _test_mend_gap()
+			await _test_hop_wedge()
+			await _test_unstick_steps()
+			await _test_lure_crowd()
+			_test_thin_props()
 
 	for game in _worlds.duplicate():
 		await _dispose(game)
 
-	_report_sections(_sections_entered, _sections_finished, SECTIONS + _wave_maps(), CHECKS + 2 * _wave_maps())
+	match shard:
+		"holds":
+			_report_sections(_sections_entered, _sections_finished, HOLDS_SECTIONS, HOLDS_CHECKS)
+		"waves":
+			_report_sections(_sections_entered, _sections_finished, _wave_maps(), 2 * _wave_maps())
+		_:
+			_report_sections(_sections_entered, _sections_finished, CORE_SECTIONS, CORE_CHECKS)
 
 
 # --- The graph built off the frame ---------------------------------------------------------------
