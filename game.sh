@@ -38,6 +38,9 @@ GAME_NAME="Zombie Zone"
 PACK="zombiezone"
 EXTRA_PACKS="zombiezone_maps:zombie-zone-maps"
 SUITES="headless_propforce headless_propcarry headless_classes headless_config headless_workbench headless_mapcfg headless_look headless_run headless_maps headless_workshop headless_net headless_weapons dedicated headless_survival headless_nav headless_nav_holds headless_nav_waves headless_start headless_buildonce headless_packs headless_mechanics headless_defib headless_ambience headless_arsenal headless_carry headless_mutant headless_gait headless_sprint headless_hazards headless_collide headless_prefetch headless_downed headless_weapon_drop headless_stats headless_consumables headless_grenades"
+# A suite that legitimately needs at least this long, as name=seconds; a larger --timeout still wins.
+# headless_nav runs about 17 min on staging02, past the 1200 s default.
+MIN_TIMEOUTS="headless_nav=3300"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail
@@ -144,12 +147,16 @@ run_suite() {
         *.merge) extra=(--merge $(for _s in $(shards_of "$base"); do printf '.godot/test-logs/%s.%s.log ' "$base" "$_s"; done) "$@") ;;
         *.*) extra=(--shard "${scene#*.}" "$@") ;;
     esac
-    local log out status summary
+    local log out status summary limit="$TIMEOUT" _m
+    # Per-suite floor from MIN_TIMEOUTS (name=seconds); the larger of it and --timeout wins.
+    for _m in $MIN_TIMEOUTS; do
+        if [ "${_m%%=*}" = "$base" ] && [ "${_m#*=}" -gt "$limit" ]; then limit="${_m#*=}"; fi
+    done
     [ -f "examples/$base.tscn" ] || { printf '  %s??%s   %s: no examples/%s.tscn\n' "$YLW" "$OFF" "$scene" "$base"; return 1; }
     mkdir -p .godot/test-logs
     log=".godot/test-logs/$scene.log"
     [ -t 1 ] && printf '  ..   %s' "$scene"
-    timeout "$TIMEOUT" "$GODOT" --headless --path . "res://examples/$base.tscn" ${extra[@]+-- "${extra[@]}"} >"$log" 2>&1
+    timeout "$limit" "$GODOT" --headless --path . "res://examples/$base.tscn" ${extra[@]+-- "${extra[@]}"} >"$log" 2>&1
     status=$?
     summary="$(grep -Eo '[0-9]+ (passed|checks), [0-9]+ failed' "$log" | tail -1)"
     # Section accounting: "N sections entered, M finished" from DotGameCheckSuite._report_sections.
@@ -162,7 +169,7 @@ run_suite() {
         summary="$summary  [no section accounting]"
     fi
     if [ "$status" -eq 124 ]; then
-        out="did not finish within ${TIMEOUT}s"
+        out="did not finish within ${limit}s"
     elif [ "$status" -ne 0 ]; then
         out="exited $status"
     elif grep -qE 'SCRIPT ERROR|Parse Error|Lambda capture' "$log"; then
