@@ -2143,7 +2143,7 @@ func daylight() -> float:
 
 ## The dot-lighting document a map's `environment` describes.
 ##
-## [b]The sun is the map's, at the map's strength[/b]: 380 (game-arena's daylight) times the
+## [b]The sun is the map's, at the map's strength[/b]: 380 (game-fatal-contact's daylight) times the
 ## square of `sun_energy`, which for a night map's 0.12 is a faint moon (drawn below the rig's
 ## floor, see [method _build_environment]) and leaves the lamps to light the street. [b]The fill is the map's
 ## ambient hue taken halfway to neutral and brought up to a pale value[/b]: a night map's

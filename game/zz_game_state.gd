@@ -250,7 +250,7 @@ var turrets: ZzTurrets = null
 var loot: ZzLoot = null
 ## Weapons lying in the world (the drop key, Q; deaths): see [ZzWeaponLayer].
 var weapon_layer := ZzWeaponLayer.new(self)
-## arena-weapons' thrown grenades, when that pack is mounted.
+## fc-weapons' thrown grenades, when that pack is mounted.
 var grenades := ZzGrenades.new(self)
 ## Pills and medkits: slots, stack limits, use times, healing and handing over a friend.
 var consumables := ZzConsumables.new(self)

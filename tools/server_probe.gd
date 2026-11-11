@@ -11,7 +11,7 @@ extends Node
 ## [/codeblock]
 ##
 ## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
-## [ZzNetBridge] with the socket replaced by a counter (load_probe's pattern in game-g2gfast, and
+## [ZzNetBridge] with the socket replaced by a counter (load_probe's pattern in game-airdrift, and
 ## headless_net's wiring). Every survivor is a peer the way a real one is (`add_player`, `_admit`,
 ## its own entity and snapshot) and is then driven by the stand-in brain (`is_bot`), so it walks
 ## the route, holds a post and shoots, and the snapshots do the work they would for N people.
@@ -56,7 +56,7 @@ var _native := true
 var _native_interest := true
 var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
-## (game-g2gfast's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
+## (game-airdrift's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
 var _acks := false
 ## --no-snapshot-auto: keep SNAPSHOT_RATE; by default dot-game's net_snapshot_auto tiers it by --n as a real server does.
 var _snapshot_auto := true

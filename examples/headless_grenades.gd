@@ -4,7 +4,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
-## arena-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
+## fc-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
 
 const SECTIONS := 9
 const CHECKS := 36
