@@ -5,7 +5,7 @@ const ZzMaterials := preload("../game/zz_materials.gd")
 ## Stats wiring through the shared addons: ammo profiles, per-shape materials, hitzone and penetration stats, rank.
 
 const SECTIONS := 4
-const CHECKS := 25
+const CHECKS := 26
 
 
 ## Set before _world(): the lifetime file the next world keeps.
@@ -92,6 +92,15 @@ func _test_stats() -> void:
 	_check(_stat(game, p, DotStatsPenetration.HITS) == 2.0, "a ricochet counts too")
 	_hit(game, p, &"legs", &"zz_m4", {}, true)
 	_check(_stat(game, p, DotStatsHitzones.HITS) == 4.0 and _stat(game, p, DotStatsHitzones.KILLS) == 1.0, "a lethal zoned hit counts as a zone kill")
+	var shot := DotShot.new()
+	shot.attacker = p.entity_id
+	shot.weapon_id = &"zz_m4"
+	game.combat.shot_resolved.emit(shot)
+	var d := DotDamage.make(p.entity_id, 0x7fff0001, 20.0, game.combat.damage_type(&"strike"))
+	d.health_lost = 20.0
+	shot.damages.append(d)
+	game.combat.shot_resolved.emit(shot)
+	_check(_stat(game, p, DotStatsShots.SHOTS) == 2.0 and _stat(game, p, DotStatsShots.HITS) == 1.0, "a resolved shot files accuracy: two shots, one landed", "%s %s" % [_stat(game, p, DotStatsShots.SHOTS), _stat(game, p, DotStatsShots.HITS)])
 	_finished()
 
 

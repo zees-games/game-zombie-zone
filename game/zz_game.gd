@@ -974,6 +974,8 @@ func _build_progress() -> void:
 	progress.earned.connect(func(id: StringName, title: String, points: int) -> void:
 		achievement_earned.emit(id, title, points)
 	)
+	# Accuracy: one shot per trigger pull, a hit when it met someone (players only; the feed's key_of refuses NPCs).
+	var _bound := progress.feed.bind_shots(combat.shot_resolved)
 
 
 ## The horde picks a zombie's fall from the server's `sv_ragdoll_reactions` weights, as a

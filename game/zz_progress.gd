@@ -128,6 +128,7 @@ static func schema() -> DotStatsSchema:
 	var _pen := DotStatsPenetration.declare(out)
 	var _zones := DotStatsHitzones.declare(out)
 	DotStatsPenetration.declare_walls(out)
+	var _shots := DotStatsShots.declare(out)
 	return out
 
 
