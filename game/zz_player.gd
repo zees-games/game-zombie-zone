@@ -507,6 +507,17 @@ var arsenal: DotWeaponArsenal:
 		return weapons.arsenal if weapons != null else null
 
 
+## The server rig's [member DotWeaponArsenal.idle_still]: true only when the posture the rig's idle tick reads
+## ([method DotWeaponPlayerBridge.posture_for], from [method DotFpsController.motion]) is the settled one, so an idle
+## weapon at rest skips its tick. Read off the state directly; erring towards false only costs that tick.
+func weapon_still() -> bool:
+	if controller == null:
+		return false
+	var s := controller.state
+	return s.velocity.x == 0.0 and s.velocity.z == 0.0 and s.mode == DotFpsState.Mode.GROUND \
+		and s.crouch_fraction <= 0.5 and not s.sprinting and not s.is_sliding()
+
+
 ## Where a thrown thing leaves the hand: the eye.
 func muzzle_position() -> Vector3:
 	return eye_position()

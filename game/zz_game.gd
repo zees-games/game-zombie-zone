@@ -3489,6 +3489,8 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 
 		player.weapons = rig
 		rig.arsenal.ammo_types = ammo_types
+		# The rig's own idle posture leaves idle_still unset, so a resting gun ran its full tick every tick.
+		rig.arsenal.idle_still = player.weapon_still
 		combat_feel.attach(rig.arsenal)
 		_wire_carry(player)
 
