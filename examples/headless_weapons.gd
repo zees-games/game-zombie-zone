@@ -19,7 +19,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const ZzHud := preload("../game/zz_hud.gd")
 const SECTIONS := 16
-const CHECKS := 99
+const CHECKS := 102
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -614,6 +614,13 @@ func _test_trader_phases_and_grace() -> void:
 	sp.tick()
 	_check(game.grace.is_active() and sp.trader_window() == &"grace" and sp.trader_open(), "in the grace it is open")
 	_check(not game.horde.pacing and game.horde.spawner.all_npcs().is_empty(), "and no zombie exists or is paced")
+	var st := ZzHud.streak_step(0, -1, 0.0, 5, 1.0)
+	st = ZzHud.streak_step(st[0], st[1], st[2], 7, 3.0)
+	_check(st[0] == 2, "two kills in a window make a streak of 2", str(st))
+	st = ZzHud.streak_step(st[0], st[1], st[2], 8, 20.0)
+	_check(st[0] == 1, "a kill after the window starts over", str(st))
+	st = ZzHud.streak_step(st[0], st[1], st[2], 8, 30.0)
+	_check(st[0] == 0, "a quiet window ends the streak", str(st))
 	_check(game.grace_left_for_hud() > 4.0 and ZzHud.grace_line(23.0) == "Zombies arrive in 0:23", "the HUD counts down", ZzHud.grace_line(23.0))
 	cfg.grace_hud = 0
 	_check(game.grace_left_for_hud() == 0.0, "zz_grace_hud 0 hides the countdown")

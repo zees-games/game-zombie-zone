@@ -625,6 +625,7 @@ func _process(delta: float) -> void:
 	_nav_meter.show_percent(game.nav_percent())
 	_draw_top()
 	_draw_health()
+	_draw_streak()
 	_draw_stamina()
 	_draw_team()
 	_draw_weapon()
@@ -724,6 +725,37 @@ func _top_rebuild() -> void:
 	_top_clock = clock
 	_top_clock_low = clock_low
 	_top_under = under
+
+
+## Kills in a row: each kill within this many seconds of the last extends the streak.
+const STREAK_WINDOW := 6.0
+## The streak at which the row's bar reads full.
+const STREAK_FULL := 10
+var _streak: int = 0
+var _streak_kills: int = -1
+var _streak_at: float = 0.0
+
+
+## The streak after [param kills] total kills at [param now]: `[streak, last_kills, last_at]`. Static so a
+## suite reads it without a screen. A first look (`last_kills < 0`) only records the total; a lower
+## total (a new map) resets.
+static func streak_step(streak: int, last_kills: int, last_at: float, kills: int, now: float) -> Array:
+	if last_kills < 0 or kills < last_kills:
+		return [0, kills, now]
+	if kills > last_kills:
+		var run := streak if now - last_at <= STREAK_WINDOW else 0
+		return [run + (kills - last_kills), kills, now]
+	if streak > 0 and now - last_at > STREAK_WINDOW:
+		return [0, kills, last_at]
+	return [streak, kills, last_at]
+
+
+func _draw_streak() -> void:
+	var step := streak_step(_streak, _streak_kills, _streak_at, player.commons_killed + player.specials_killed, game.now())
+	_streak = step[0]
+	_streak_kills = step[1]
+	_streak_at = step[2]
+	vitals.show_streak(_streak, STREAK_FULL)
 
 
 ## The line under the title while the start grace runs; static so a suite reads it without a screen.
