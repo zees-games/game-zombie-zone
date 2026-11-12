@@ -15,12 +15,14 @@ const ZzAvatars := preload("zz_avatars.gd")
 ## At zero health a survivor goes down (bleed-out pool, DOWN modifier); [member ZzConfig.max_incaps] downs make the next zero death. Temporary health comes off first and drains by itself.
 ## [member pinned_by] is the special holding them and [member pin_kind] what it does; the PINNED modifier holds them on both ends.
 
-const EYE_HEIGHT := 1.6
+## 64 units on the 72-unit body (dot-player-controller default hull).
+const EYE_HEIGHT := 1.6256
 const EYE_DOWN := 0.45
 
-const BODY_RADIUS := 0.35
-const BODY_HEIGHT := 1.8
-const BODY_CROUCH := 0.95
+## The shared 72-unit body (DotFpsTunables defaults): 32 unit hull, 72 standing, 54 crouched.
+const BODY_RADIUS := 0.4064
+const BODY_HEIGHT := 1.83
+const BODY_CROUCH := 1.372
 ## Above the 0.42 m rise of a converted map's stairs, so walking up one does not wait on a hop.
 const BODY_STEP := 0.45
 

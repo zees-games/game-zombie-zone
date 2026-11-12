@@ -547,7 +547,7 @@ func build_hitboxes(combat: DotCombatManager) -> void:
 	chest.name = "Chest"
 	chest.group = DotHitGroup.CHEST
 	chest.shape = DotHitbox.Shape.CAPSULE
-	chest.radius = 0.34
+	chest.radius = BODY_RADIUS - 0.0064  # the 0.4 m torso of the 72-unit body
 	chest.height = 1.25
 	chest.position = Vector3(0.0, 0.78, 0.0)
 	hitboxes.add_child(chest)
