@@ -22,6 +22,8 @@ var drops: DotWeaponDrops = null
 ## weapon like any other, so it hurts what the horde is made of: the default is a hard hit, not a kill.
 var knives: DotWeaponKnives = null
 var knife_rules: Dictionary = DotWeaponKnives.DEFAULT_RULES.duplicate()
+## Entity ids whose aim key was last handed to [member knives] down.
+var _aim_sent: Dictionary = {}
 var game = null
 
 
@@ -81,8 +83,16 @@ func clear() -> void:
 ## The aim key before the survivor's weapons simulate: a knife in hand leaves it (no protection of
 ## any kind: a thrown knife hurts whoever the game's damage rules let it hurt).
 func knife_input(player, command: DotWeaponCommand) -> void:
+	var down := command.is_pressed(DotWeaponCommand.BUTTON_AIM)
+	# Only a press throws; a released key the knives last saw released changes nothing there.
+	if not down and not _aim_sent.has(player.entity_id):
+		return
 	if knives == null or not knives.is_authority or not _free(player):
 		return
+	if down:
+		_aim_sent[player.entity_id] = true
+	else:
+		_aim_sent.erase(player.entity_id)
 	var before := knives.count()
 	knives.input(player.entity_id, player, command)
 	if knives.count() != before:
