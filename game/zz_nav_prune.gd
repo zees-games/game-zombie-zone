@@ -31,12 +31,13 @@ var _query := PhysicsShapeQueryParameters3D.new()
 ## [param required] (spawns, posts) keeps a piece holding one joined to the next such piece by a bridge edge even through a floor.
 ## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask. Each of
 ## [param ladders] is then joined foot to head: its shaft blocks the capsule, and the builder drops a ladder link
-## whose ends a stair link already joined, which this prune may then cut.
-static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array()) -> Vector2i:
+## whose ends a stair link already joined, which this prune may then cut. [param passable] are bodies that block
+## nothing here: the doors that open to whoever walks up ([method ZzMechanics.walk_through_bodies]).
+static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = []) -> Vector2i:
 	var pruner := new()
-	pruner._setup(space, mask, MARGIN)
+	pruner._setup(space, mask, MARGIN, passable)
 	var bare := new()
-	bare._setup(space, mask, 0.0)
+	bare._setup(space, mask, 0.0, passable)
 	var prune := DotNpcNavPrune.new()
 	prune.point_blocked = pruner._point_blocked
 	prune.edge_blocked = pruner._edge_blocked
@@ -78,16 +79,17 @@ static func _ladder_end(nav: DotNpcNavData, at: Vector3) -> int:
 
 
 ## The same test for a link added after the prune (a drop or a jump up): `func(a: Vector3, b: Vector3) -> bool`.
-static func edge_test(space: PhysicsDirectSpaceState3D, mask: int) -> Callable:
+static func edge_test(space: PhysicsDirectSpaceState3D, mask: int, passable: Array[RID] = []) -> Callable:
 	var pruner := new()
-	pruner._setup(space, mask, MARGIN)
+	pruner._setup(space, mask, MARGIN, passable)
 	# A lambda holds the pruner; a bound method would leave the Callable dangling once this returns.
 	return func(a: Vector3, b: Vector3) -> bool:
 		return DotNpcNavPrune.level_change_blocked(pruner._edge_blocked, pruner._point_blocked, a, b, CLIMB)
 
 
-func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float) -> void:
+func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float, passable: Array[RID] = []) -> void:
 	_space = space
+	_query.exclude = passable
 	var shape := CapsuleShape3D.new()
 	shape.radius = RADIUS + margin
 	shape.height = HEIGHT - LIFT

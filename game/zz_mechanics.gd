@@ -245,6 +245,27 @@ func mover_count() -> int:
 	return _movers.size()
 
 
+## The bodies of the doors that open to whoever walks up (unlocked, nothing drives them): a zombie opens one as a
+## survivor does, so the horde's graph must not take a shut one for a wall. A room whose only way in was such a door
+## was an island no zombie set out for (zs_krusty_krab_large's hatch room, and the basement under it).
+func walk_through_bodies() -> Array[RID]:
+	var found: Array[RID] = []
+
+	for m in _movers:
+		if not bool(m["auto"]) or bool(m["initial_locked"]):
+			continue
+
+		var body: Variant = m.get("body")
+		var node: Variant = m.get("node")
+
+		if body is CollisionObject3D:
+			found.append((body as CollisionObject3D).get_rid())
+		elif node is Node3D and (node as Node3D).get_node_or_null("col_solid") is CollisionObject3D:
+			found.append(((node as Node3D).get_node("col_solid") as CollisionObject3D).get_rid())
+
+	return found
+
+
 ## Where the pieces of the moving hulls (boats, trains) lie at rest, for the zombies' graph: walkers climbed
 ## onto one and stood wedged on it. Doors and lifts are left out, they open or are gated.
 func rest_blockers() -> Array[AABB]:

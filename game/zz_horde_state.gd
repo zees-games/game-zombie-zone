@@ -8,7 +8,7 @@ const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
 ## Bumped when the prune records or tests more (6: the prop and clip layers too; 7: dot-npc v0.1.21 and the hull files in the key; 8: bridges between pieces holding a spawn or post), so older caches prune again.
-const PRUNE_VERSION := 8
+const PRUNE_VERSION := 9
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzLaps := preload("zz_laps.gd")
 

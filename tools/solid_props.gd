@@ -14,6 +14,9 @@ const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
 const NPCS_SCRIPT := "res://game/zz_npcs.gd"
 const GRAPH_SCRIPT := "res://addons/dot_npc/nav/dot_npc_nav_graph.gd"
 const SNAP := 2.5
+## The movers that leave their doorway when they open, and how far past the shut panel their dressing reaches.
+const DOOR_CLASSES := ["func_door", "func_door_rotating", "func_movelinear"]
+const DOOR_GROW := 0.2
 
 
 func _initialize() -> void:
@@ -56,6 +59,12 @@ func _initialize() -> void:
 				boxes.append([snappedf(o.x, 0.001), snappedf(o.y, 0.001), snappedf(o.z, 0.001),
 					snappedf(size.x, 0.001), snappedf(size.y, 0.001), snappedf(size.z, 0.001), snappedf(yaw, 0.01)])
 			body.free()
+		var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://world/%s/%s.json" % [(doc as Dictionary)["world"], id]))
+		var movers: Array = (manifest as Dictionary).get("movers", []) if manifest is Dictionary else []
+		var undressed := _clear_of_doors(movers, boxes)
+		if undressed.size() < boxes.size():
+			print(id, ": ", boxes.size() - undressed.size(), " solid props left out: they hang on a door that opens")
+		boxes = undressed
 		var clear := _clear_of_spawns(doc as Dictionary, boxes)
 		if clear.size() < boxes.size():
 			print(id, ": ", boxes.size() - clear.size(), " solid props left out: they stand where a spawn does")
@@ -81,6 +90,37 @@ static func _places(doc: Dictionary) -> Array[Vector3]:
 	for o: Dictionary in doc.get("objectives", []):
 		var at: Array = o["at"]
 		out.append(Vector3(float(at[0]), float(at[1]), float(at[2])))
+	return out
+
+
+## [param boxes] without those whose centre is inside a brush door's shut panel: the door model, handle or wreath the
+## original parents to the door, which swings away with it. The converter places such a prop as a static stand-in
+## where the door is shut, so its box would wall the very doorway the door opens (zs_krusty_krab_large: 43 boxes of
+## three props on "Door05" shut the basement that holds every post).
+static func _clear_of_doors(movers: Array, boxes: Array) -> Array:
+	var panels: Array[AABB] = []
+	for m: Variant in movers:
+		if not (m is Dictionary) or not DOOR_CLASSES.has(str((m as Dictionary).get("classname", "")).to_lower()):
+			continue
+		var lo: Variant = (m as Dictionary).get("mins")
+		var hi: Variant = (m as Dictionary).get("maxs")
+		if not (lo is Array) or not (hi is Array) or (lo as Array).size() != 3 or (hi as Array).size() != 3:
+			continue
+		var from := Vector3(float(lo[0]), float(lo[1]), float(lo[2]))
+		var to := Vector3(float(hi[0]), float(hi[1]), float(hi[2]))
+		panels.append(AABB(from, to - from).grow(DOOR_GROW))
+	if panels.is_empty():
+		return boxes
+	var out := []
+	for box: Array in boxes:
+		var at := Vector3(float(box[0]), float(box[1]), float(box[2]))
+		var hangs := false
+		for panel in panels:
+			if panel.has_point(at):
+				hangs = true
+				break
+		if not hangs:
+			out.append(box)
 	return out
 
 

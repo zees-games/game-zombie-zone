@@ -9,6 +9,8 @@ const ZzLoot := preload("../game/zz_loot.gd")
 const ZzMapObjects := preload("../game/zz_map_objects.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzNavPrune := preload("../game/zz_nav_prune.gd")
+const SolidProps := preload("../tools/solid_props.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 
 ## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
@@ -26,7 +28,7 @@ const TICK := 1.0 / float(TICK_RATE)
 const LIFT_MAP := &"zm_4way_tunnel"
 const SECTIONS := 18
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
-const CHECKS := 152
+const CHECKS := 155
 
 var _entered := 0
 var _finished := 0
@@ -466,6 +468,29 @@ func _test_brush_door(game: ZzGame, mech: ZzMechanics) -> void:
 	mech.opener_fn = func(_box: AABB) -> Variant: return null if who[0] == Vector3.INF else who[0]
 	await get_tree().physics_frame
 	_check(_body_covers(game, body, shut_at), "shut, its body is at the doorway", str(shut_at))
+	# The horde's graph walks through it: a door that opens to anyone is no wall to a zombie.
+	var passable := mech.walk_through_bodies()
+	_check(passable.has(body.get_rid()), "the door is one of the bodies the horde's graph walks through", str(passable.size()))
+	var space := game.get_world_3d().direct_space_state
+	var foot := Vector3(centre.x, (body.global_transform * shape_box).position.y, centre.z)
+	var shut_pruner := ZzNavPrune.new()
+	shut_pruner._setup(space, body.collision_layer, 0.0)
+	var open_pruner := ZzNavPrune.new()
+	open_pruner._setup(space, body.collision_layer, 0.0, passable)
+	var walled: bool = shut_pruner._point_blocked(foot)
+	var _clear: bool = open_pruner._point_blocked(foot)
+	var met := false
+	for hit: Dictionary in space.intersect_shape(open_pruner._query, 16):
+		met = met or hit["collider"] == body
+	_check(walled and not met, "the prune's body meets the shut door, and does not once the door is passable", "walled %s, met %s at %s" % [walled, met, str(foot)])
+	# A prop the original hangs on a door is no wall where the door is shut; one beside the panel, or on a spinner, stays.
+	var hung := [[8.4, -3.7, -12.1, 0.4, 0.3, 0.2, 0.0], [8.4, -3.7, -11.8, 0.4, 0.3, 0.2, 0.0], [8.4, -3.7, -11.5, 0.4, 0.3, 0.2, 0.0], [1.0, 1.0, 1.0, 0.4, 0.3, 0.2, 0.0]]
+	var doors := [
+		{"classname": "func_door_rotating", "mins": [7.77, -4.88, -12.12], "maxs": [8.99, -2.44, -11.96]},
+		{"classname": "func_rotating", "mins": [0.5, 0.5, 0.5], "maxs": [1.5, 1.5, 1.5]},
+		{"classname": "prop_door_rotating"}]
+	var left: Array = SolidProps._clear_of_doors(doors, hung)
+	_check(left == [hung[2], hung[3]] and SolidProps._clear_of_doors([], hung) == hung, "a solid prop's box inside a door's shut panel is left out, the others stay", str(left))
 	who[0] = centre + Vector3(0.0, 0.0, 0.5)
 	var tick := 6000
 	var spent := 0

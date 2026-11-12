@@ -205,6 +205,7 @@ func _begin_notes() -> void:
 
 	notes.link_mask = ZzNavPrune.body_mask(game.physics)
 	notes.link_world = game.get_world_3d()
+	notes.link_passable = game.map.mechanics.walk_through_bodies() if game.map.mechanics != null else ([] as Array[RID])
 	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
 
 
@@ -438,14 +439,16 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 		return
 
 	var ladders: Array[AABB] = []
+	var passable: Array[RID] = []
 
 	if game.map != null and game.map.mechanics != null:
 		ladders = game.map.mechanics.ladder_boxes()
+		passable = game.map.mechanics.walk_through_bodies()
 
 	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
 	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
 	var mask: int = ZzNavPrune.body_mask(game.physics)
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots())
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots(), passable)
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 
