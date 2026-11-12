@@ -22,8 +22,8 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ## has one section and two checks per wave map. Together 52 sections, 171 checks.
 @export var shard := "core"
 
-const CORE_SECTIONS := 11
-const CORE_CHECKS := 69
+const CORE_SECTIONS := 12
+const CORE_CHECKS := 74
 const HOLDS_SECTIONS := 10
 const HOLDS_CHECKS := 40
 
@@ -153,6 +153,11 @@ func _run() -> void:
 		_report()
 		return
 
+	if only == "repeat":
+		await _test_repeatable()
+		_report()
+		return
+
 	if only == "lure":
 		await _test_lure_crowd()
 		_report()
@@ -184,6 +189,7 @@ func _run() -> void:
 			await _test_fallback()
 			await _test_spread(&"zz_high_school")
 			await _test_spread(&"zz_mall")
+			await _test_repeatable()
 			await _test_async_build()
 			await _test_mend_gap()
 			await _test_hop_wedge()
@@ -1058,6 +1064,83 @@ func _test_spread(id: StringName) -> void:
 	# so it is printed in the detail and not asserted: the sending is what the code decides.
 	_check(off["sent"] == 0, "with zz_zombie_spread off nothing is sent anywhere (the old behaviour)", line)
 	_finished()
+
+
+const REPEAT_TICKS := 2000
+
+
+## sv_threads_npc's promise: the same seed gives the same horde, and worker threads change nothing.
+## Path workers above 0 queue repaths to answer after every brain has thought (dot-npc), which
+## shifts paths by a tick by design, so that run is checked against itself rather than against off.
+func _test_repeatable() -> void:
+	_section("a seeded horde is the same horde twice, and with npc workers")
+	if not _linked:
+		for i in 5:
+			_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var verify_before := DotParallel.verify
+	var failures_before := DotParallel.verify_failures
+	var off: Array = await _repeat_run(0, 0)
+	var off_again: Array = await _repeat_run(0, 0)
+	DotParallel.verify = true
+	var on: Array = await _repeat_run(2, 0)
+	var queued: Array = await _repeat_run(2, 2)
+	var queued_again: Array = await _repeat_run(2, 2)
+	DotParallel.verify = verify_before
+	var line := "off %s, off %s, workers 2 %s, path workers 2 %s, %s" % [off, off_again, on, queued, queued_again]
+	var threads := "" if DotParallel.resolve_workers(2) > 0 else " (no threads here: inline)"
+	_check(off[1] > 0 and off[2] > 0, "the hash covers a horde that moved and searched paths", line)
+	_check(off[0] == off_again[0], "off against off: the same hash of %d ticks" % REPEAT_TICKS, line)
+	_check(on[0] == off[0], "sense and think workers 2 against off: the same hash", line + threads)
+	_check(queued[0] == queued_again[0] and queued[2] > 0, "path workers 2 against itself: the same hash", line + threads)
+	_check(DotParallel.verify_failures == failures_before, "and verify found no task that differs between runs",
+		"%d failures" % (DotParallel.verify_failures - failures_before))
+	_finished()
+
+
+## [hash of every NPC's id, target, state and position each tick, NPC-ticks seen, path searches].
+## Nav notes are off: their annotation is sliced by wall time, so its arrival tick is not repeatable.
+func _repeat_run(workers: int, path_workers: int) -> Array:
+	seed(4402)
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zz_high_school"])
+		c.survival_style = 0
+		c.survival_warmup_seconds = 2.0
+		c.wanderer_density = 0.0
+		c.sleepers_enabled = false
+		c.nav_notes = false
+		c.seed_value = 4402)
+
+	for i in 4:
+		var p := game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
+		p.is_bot = false
+		p.health.invulnerable = true
+
+	game.start()
+	var spawner: DotNpcSpawner = game.horde.spawner
+	spawner.sense_workers = workers
+	spawner.path_workers = path_workers
+	spawner.think_workers = workers
+	var h := 0
+	var seen := 0
+
+	for t in REPEAT_TICKS:
+		game.simulate(TICK)
+		for npc in spawner.all_npcs():
+			var brain: Object = npc.brain
+			var state: Variant = brain.get(&"state") if brain != null else null
+			var at := npc.position()
+			h = hash([h, npc.seed, npc.target_id, state, snappedf(at.x, 0.001), snappedf(at.z, 0.001)])
+			seen += 1
+		if t % 8 == 7:
+			await get_tree().physics_frame
+
+	var searches: int = spawner.nav.searches if spawner.has_nav() else 0
+	h = hash([h, searches, spawner.nav.failures if spawner.has_nav() else 0])
+	await _dispose(game)
+	return [h, seen, searches]
 
 
 func _horde(id: StringName, spread: bool) -> Dictionary:

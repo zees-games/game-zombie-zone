@@ -48,7 +48,7 @@ var _fill := true
 var _relevance := true
 ## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
 var _workers := 0
-## --npc-workers=N: DotNpcSpawner.sense_workers and path_workers (what sv_threads_npc sets on a server).
+## --npc-workers=N: DotNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server).
 var _npc_workers := 0
 ## Native snapshots and native interest are on (the shipped setting to measure); --no-native / --no-native-interest turn them off.
 var _native := true
@@ -444,6 +444,7 @@ func _one_tick(tick: int) -> void:
 		sp._ticks += 1
 		sp.sense_workers = _npc_workers
 		sp.path_workers = _npc_workers
+		sp.think_workers = _npc_workers
 		if _lod == null and not _cvars.is_empty():
 			var console := DotConsole.new()
 			add_child(console)

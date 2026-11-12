@@ -1649,8 +1649,8 @@ func spawn_wave(size: int) -> int:
 func _wave_origin() -> Vector3:
 	var nodes := _survivor_nodes()
 	var hints: Array = _doc.get("zombie_spawns", [])
-	var order: Array = range(hints.size())
-	order.shuffle()
+	# The horde's seeded stream, never Array.shuffle (the global RNG): a seeded round repeats.
+	var order: Array = DotRandomStream.new(_rng.randi()).next_shuffled(range(hints.size()))
 
 	for i: int in order:
 		var p := ZzMapDoc.v3(hints[i])
