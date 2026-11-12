@@ -21,3 +21,10 @@ print("| survivors | Hz | paths/tick | us/search | pathing ms (derived, inside b
 print("|---|---|---|---|---|")
 for r in rows:
     print("| %d | %d | %.2f | %.0f | %.2f |" % (r["n"], r["rate"], r["searches_per_tick"], r["us_per_search"], r["path_ms_derived"]))
+
+print()
+print("| survivors | Hz | physics engine | thread | frame mean | physics step mean | rest mean |")
+print("|---|---|---|---|---|---|---|")
+for r in rows:
+    print("| %d | %d | %s | %s | %.2f | %.2f | %.2f |" % (r["n"], r["rate"], r.get("physics_engine", "?"), r.get("physics_thread", "?"),
+        r["engine_step_ms"]["mean"], r.get("engine_physics_ms", {"mean": 0})["mean"], r.get("engine_rest_ms", {"mean": 0})["mean"]))
