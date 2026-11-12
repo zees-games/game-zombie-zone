@@ -47,6 +47,13 @@ var spawner: DotNpcSpawner = null
 ## The game's end of the monsters' host seam (also the spawner's meta `zhm_host`).
 var monster_host: MonsterHost = null
 var director: DotNpcDirector = null
+## Every spawn point the graph gave, safe rooms left out: the wanderers' and the notes' ground. The
+## director's own `spawn_points` are those a zombie can walk to a survivor from ([code]_keep_reaching[/code]).
+var spawn_ground: PackedVector3Array = PackedVector3Array()
+var _spawn_ground_nodes: PackedInt32Array = PackedInt32Array()
+## Seconds between [code]_keep_reaching[/code] passes, and the horde time of the next one.
+const REACH_REFRESH := 1.0
+var _reach_due: float = 0.0
 var senses: DotNpcSenses = null
 var squads: DotNpcAiSquads = DotNpcAiSquads.new()
 
