@@ -39,6 +39,8 @@ const SLICE_BUDGET_US := 1500
 ## How far behind a choke (toward the post) a defender stands, and how far a covered spot may be.
 const HOLD_BEHIND := 4.0
 const COVER_WITHIN := 3.5
+## The farthest from its choke a covered place to stand may be, metres (flat).
+const HOLD_FARTHEST := 9.0
 
 ## A choke is on a route when the route passes within this of it.
 const ON_ROUTE := 2.5
@@ -444,7 +446,7 @@ func _stand_behind(graph, path: PackedVector3Array, along_choke: float, choke_at
 		var at: Vector3 = spot["at"]
 		var gap := Vector2(at.x - choke_at.x, at.z - choke_at.z).length()
 
-		if gap < 2.5 or gap > 9.0 or absf(at.y - behind.y) > 1.2:
+		if gap < 2.5 or gap > HOLD_FARTHEST or absf(at.y - behind.y) > 1.2:
 			continue
 
 		if graph.data.is_navigable(at, 1.0):

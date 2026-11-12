@@ -30,9 +30,10 @@ const HOLDS_CHECKS := 40
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
 
-## Maps held by a team, and how far from a choke a stand-in counts as holding it.
+## Maps held by a team, and how far from a choke a stand-in counts as holding it: as far as the
+## game may put the place to stand.
 const MAPS := ["zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zz_chapel", "zz_lot", "zs_ravenstreet"]
-const NEAR := 7.0
+const NEAR := ZzNavNotes.HOLD_FARTHEST
 
 ## Seconds the stand-ins have to walk to their places before a wave comes.
 const SETTLE := 45.0
@@ -452,9 +453,9 @@ func _test_holding(id: StringName) -> void:
 	var off := await _settle(id, false)
 	_check(on["ready"] and on["chokes"] >= 1, "it is annotated and has chokes on the horde's routes",
 		"%d on routes of %d found, %.0f ms bake, %.0f annotate" % [on["chokes"], on["found"], on["bake"], on["annotate"]])
-	_check(on["share"] >= 0.75, "most stand-ins stand at a choke before the wave", "%.2f within %.0f m" % [on["share"], NEAR])
+	_check(on["share"] >= 0.75, "most stand-ins stand at a choke before the wave", "%.2f within %.0f m (m to the nearest choke: %s)" % [on["share"], NEAR, on["dists"]])
 	_check(on["share"] >= off["share"] + 0.25 or (off["share"] >= 0.9 and on["share"] >= off["share"]), "which the posts alone did not do (a post already at a choke is allowed to stay)",
-		"%.2f against %.2f at their posts" % [on["share"], off["share"]])
+		"%.2f against %.2f at their posts (%s)" % [on["share"], off["share"], off["dists"]])
 	_check(on["distinct"] >= mini(2, on["places"]), "and they are spread over the chokes, not at one",
 		"%d chokes held of %d (%d places to stand)" % [on["distinct"], on["chokes"], on["places"]])
 	_finished()
@@ -489,6 +490,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	var near := 0
 	var total := 0
 	var held := {}
+	var dists := PackedStringArray()
 
 	for p in game.survivors():
 		if not p.is_bot:
@@ -501,6 +503,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 			var at: Vector3 = notes.chokes[i]["at"]
 			best = minf(best, Vector2(at.x - p.feet().x, at.z - p.feet().z).length())
 
+		dists.append("%.1f" % best)
 		if best > NEAR:
 			continue
 
@@ -538,7 +541,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	var out := {
 		"places": places.size(), "ready": notes.is_ready(), "chokes": notes.chokes.size(), "found": notes.all_chokes.size(),
 		"share": float(near) / float(maxi(total, 1)), "distinct": held.size(),
-		"bake": notes.bake_ms, "annotate": notes.annotate_ms,
+		"bake": notes.bake_ms, "annotate": notes.annotate_ms, "dists": ", ".join(dists),
 	}
 	await _dispose(game)
 	return out
