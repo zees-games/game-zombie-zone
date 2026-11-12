@@ -1034,6 +1034,7 @@ func _follow_npc_threads() -> void:
 		var workers := int(server.config.call(&"npc_workers"))
 		world.horde.spawner.sense_workers = workers
 		world.horde.spawner.path_workers = workers
+		world.horde.spawner.think_workers = workers
 	if npc_lod == null or npc_lod.spawner != world.horde.spawner:
 		var _lod := attach_npc_lod(world.horde.spawner)
 
