@@ -22,7 +22,8 @@ extends Node
 ## survival_long_run's profile is) and around the manager's half of the tick. dot-npc has no timer
 ## inside a path search, so pathing is derived: searches per tick from
 ## [member DotNpcNavGraph.searches], times the cost of one search measured on the same graph after
-## the window. The engine's own frame (one physics step of the server's world) is the time spent in
+## the window. The frame is split into the step (physics_frame to process_frame; engine_physics_ms) and the rest
+## (engine_rest_ms), and the row names the physics engine and the thread setting (tools/server_probe.sh PHYS_ENGINE=JoltPhysics3D PHYS_THREAD=1). The engine's own frame (one physics step of the server's world) is the time spent in
 ## `await physics_frame`, taken once every 16 ticks; "bodies" is the zombies' move_and_slide, the motor queries.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -257,6 +258,9 @@ func _run() -> void:
 	var measured := 0
 	var window := int(_seconds * float(_rate))
 	var physics_ms: Array = []
+	# The frame split in two: the physics step, and the rest of the engine frame.
+	var step_ms: Array = []
+	var idle_ms: Array = []
 	var searches0 := 0
 	var wall := Time.get_ticks_msec()
 	var cap := 0
@@ -287,6 +291,14 @@ func _run() -> void:
 			await get_tree().physics_frame
 			if measuring:
 				physics_ms.append(float(Time.get_ticks_usec() - before) / 1000.0)
+				# physics_frame is emitted before the step, process_frame after it: the wait to the first is the rest of
+				# the engine frame (idle, render sync), the wait from it to the second is the step (physics nodes and the server).
+				var at_physics := Time.get_ticks_usec()
+				await get_tree().process_frame
+				step_ms.append(float(Time.get_ticks_usec() - at_physics) / 1000.0)
+				idle_ms.append(float(at_physics - before) / 1000.0)
+				# The next batch of ticks runs inside a physics frame again, where the server's tick belongs.
+				await get_tree().physics_frame
 
 		var w: DotNpcDirectorWaves = _game.survival.waves if _game.survival != null else null
 		if w == null:
@@ -348,7 +360,9 @@ func _run() -> void:
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
 		"us_per_search": snappedf(us_per_search, 0.1),
 		"path_ms_derived": snappedf(float(searches) / float(measured) * us_per_search / 1000.0, 0.01),
-		"engine_step_ms": _stats(physics_ms), "rss_peak_mb": _peak_mb(), "phases": {}}
+		"engine_step_ms": _stats(physics_ms), "engine_physics_ms": _stats(step_ms), "engine_rest_ms": _stats(idle_ms),
+		"physics_engine": str(ProjectSettings.get_setting("physics/3d/physics_engine", "?")),
+		"physics_thread": bool(ProjectSettings.get_setting("physics/3d/run_on_separate_thread", false)), "rss_peak_mb": _peak_mb(), "phases": {}}
 	for k: String in _series:
 		row["phases"][k] = _stats(_series[k])
 	row["gameplay"] = {"kills": _kills, "dmg_to_zombies": snappedf(_dmg_npc, 1.0),
