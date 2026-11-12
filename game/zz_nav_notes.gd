@@ -29,6 +29,7 @@ extends RefCounted
 
 const CHANNEL := "zz.nav"
 const ZzNavPrune := preload("zz_nav_prune.gd")
+const ZzBody := preload("zz_player_state.gd")
 
 enum State { OFF, WAITING, ANNOTATING, READY, FAILED, BAKING }
 
@@ -193,7 +194,9 @@ func _bake() -> bool:
 		bot.cache_id = bake_id
 		DirAccess.make_dir_recursive_absolute(bot.cache_dir)
 
-	var agent := {"radius": 0.35, "height": 1.8, "climb": 0.4}
+	# The survivors' 72-unit body; the default 0.175 m cell rounds its radius up to 0.525 m and shuts
+	# doors, a 0.1016 m cell is exactly 4 cells of it (dot-bot API level 23; older dot-bot ignores it).
+	var agent := {"radius": ZzBody.BODY_RADIUS, "height": ZzBody.BODY_HEIGHT, "climb": 0.4, "cell": 0.1016, "cell_height": 0.05}
 
 	if background and DotPlatform.has_threads():
 		_bot = bot
@@ -243,8 +246,8 @@ func _baked(bot: DotBotNav) -> bool:
 	bake_cached = bot.last_bake_cached
 	var mesh := bot.mesh
 	var annotator := DotNpcAiNavAnnotator.new(mesh, _world)
-	annotator.agent_radius = 0.35
-	annotator.stand_height = 1.8
+	annotator.agent_radius = ZzBody.BODY_RADIUS
+	annotator.stand_height = ZzBody.BODY_HEIGHT
 	annotator.climb = 0.4
 	annotator.jump_up = 1.0
 	annotator.drop_max = float(_config.nav_drop_max)
