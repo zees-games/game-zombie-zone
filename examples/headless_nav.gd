@@ -938,6 +938,9 @@ func _test_lure_crowd() -> void:
 		c.map_ids = PackedStringArray(["zz_blackout_2"])
 		c.survival_warmup_seconds = 10.0
 		c.wanderer_density = 0.0
+		# A cold nav cache spends seconds of game time getting READY; the director's commons then down
+		# the Watcher before the lure and the lost round clears the crowd. Only the test's crowd here.
+		c.director_enabled = false
 		c.sleepers_enabled = false)
 	var _p := game.add_player(&"u100", "Watcher")
 	game.start()
