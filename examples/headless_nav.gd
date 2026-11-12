@@ -1070,8 +1070,8 @@ const REPEAT_TICKS := 2000
 
 
 ## sv_threads_npc's promise: the same seed gives the same horde, and worker threads change nothing.
-## Path workers above 0 queue repaths to answer after every brain has thought (dot-npc), which
-## shifts paths by a tick by design, so that run is checked against itself rather than against off.
+## The horde sets dot-npc's deferred_paths (ZzHorde.setup): every repath is queued and answered
+## after every brain has thought, at 0 path workers too, so path workers 0 and 2 agree.
 func _test_repeatable() -> void:
 	_section("a seeded horde is the same horde twice, and with npc workers")
 	if not _linked:
@@ -1087,14 +1087,14 @@ func _test_repeatable() -> void:
 	DotParallel.verify = true
 	var on: Array = await _repeat_run(2, 0)
 	var queued: Array = await _repeat_run(2, 2)
-	var queued_again: Array = await _repeat_run(2, 2)
 	DotParallel.verify = verify_before
-	var line := "off %s, off %s, workers 2 %s, path workers 2 %s, %s" % [off, off_again, on, queued, queued_again]
+	var line := "off %s, off %s, sense+think workers 2 %s, and path workers 2 %s" % [off, off_again, on, queued]
 	var threads := "" if DotParallel.resolve_workers(2) > 0 else " (no threads here: inline)"
 	_check(off[1] > 0 and off[2] > 0, "the hash covers a horde that moved and searched paths", line)
 	_check(off[0] == off_again[0], "off against off: the same hash of %d ticks" % REPEAT_TICKS, line)
 	_check(on[0] == off[0], "sense and think workers 2 against off: the same hash", line + threads)
-	_check(queued[0] == queued_again[0] and queued[2] > 0, "path workers 2 against itself: the same hash", line + threads)
+	_check(queued[0] == off[0] and queued[2] == off[2] and queued[2] > 0,
+		"sense, think and path workers 2 against off: the same hash and searches", line + threads)
 	_check(DotParallel.verify_failures == failures_before, "and verify found no task that differs between runs",
 		"%d failures" % (DotParallel.verify_failures - failures_before))
 	_finished()

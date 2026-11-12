@@ -170,6 +170,8 @@ tools/shot.sh --view=ragdoll --reaction=face_plant --seconds=2.5   # a stand-in 
 tools/filmstrip.sh [clip...]   # survivor (fp, tp) and common-infected clips as contact sheets, mp4 and a metrics report in screenshots/filmstrip/, on staging02 under xvfb; clips in tools/filmstrip_scenarios.json, limits in filmstrip_thresholds.json, logic in dot-core's DotScenario/DotClipMetrics
 ```
 
+NPC worker threads: `echo 2 > zz_npc_workers.force` (untracked, never commit it, and not gitignored: gpu.sh sends the boxes only `git ls-files -co --exclude-standard`; or env `ZZ_NPC_WORKERS=2` locally, which hv does not pass on) makes every horde use 2 sense, path and think workers with `DotParallel.verify` on, so any suite run then checks that the threaded horde plays the same as the serial one. The horde always sets `deferred_paths` (ZzHorde.setup), so a seeded round is the same whether `sv_threads_npc` is on or off.
+
 Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice street only, and says so.
 
 ## Still to do

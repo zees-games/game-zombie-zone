@@ -7,6 +7,27 @@ const PUSH_COST := 12.0
 ## The mover watch and cull (game/zz_watch_cull.gd), built with each map.
 var wcull: ZzWatchCull = null
 
+## A file holding a worker count that forces the horde's NPC workers for a test run (see
+## [method forced_npc_workers]). Untracked on purpose: write it, run the suites, delete it.
+const FORCE_WORKERS_FILE := "res://zz_npc_workers.force"
+static var _forced_workers := -2
+
+
+## Every NPC worker count (sense, path, think) forced for a test run, with DotParallel.verify on:
+## env ZZ_NPC_WORKERS=N, else the number in [constant FORCE_WORKERS_FILE] (the form that reaches a
+## box a suite is offloaded to, which gets the worktree's files but not the caller's env). -1 unset.
+static func forced_npc_workers() -> int:
+	if _forced_workers == -2:
+		var v := OS.get_environment("ZZ_NPC_WORKERS").strip_edges()
+		if v == "" and FileAccess.file_exists(FORCE_WORKERS_FILE):
+			v = FileAccess.get_file_as_string(FORCE_WORKERS_FILE).strip_edges()
+		_forced_workers = v.to_int() if v.is_valid_int() and v.to_int() >= 0 else -1
+		if _forced_workers >= 0:
+			DotParallel.verify = true
+			print("ZzHorde: NPC workers forced to %d with DotParallel.verify" % _forced_workers)
+	return _forced_workers
+
+
 func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game = p_game
 	config = p_config
@@ -37,6 +58,14 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	spawner.set(&"repath_drift_ratio", config.repath_drift_ratio)
 	spawner.set(&"repath_interval_per_m", config.repath_interval_per_m)
 	spawner.occlusion_mask = game.world_mask()
+	# Every repath is queued and answered after every brain has thought, at 0 path workers too,
+	# so sv_threads_npc on and off play the same seeded round (dot-npc's deferred_paths).
+	spawner.deferred_paths = true
+	var forced := forced_npc_workers()
+	if forced >= 0:
+		spawner.sense_workers = forced
+		spawner.path_workers = forced
+		spawner.think_workers = forced
 	# Every zombie's own seed (`npc.seed`, what the brains draw their idle, pace and wander from)
 	# comes from the session's seed and its spawn count, so a server given the same seed plays
 	# the same zombies. Never their object id: see dot-npc's docs/runtime.md.

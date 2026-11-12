@@ -48,7 +48,8 @@ var _fill := true
 var _relevance := true
 ## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
 var _workers := 0
-## --npc-workers=N: DotNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server).
+## --npc-workers=N: DotNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server);
+## deferred_paths is on at every N, as on a server.
 var _npc_workers := 0
 ## Native snapshots and native interest are on (the shipped setting to measure); --no-native / --no-native-interest turn them off.
 var _native := true
@@ -442,6 +443,7 @@ func _one_tick(tick: int) -> void:
 		var sp: DotNpcSpawner = h.spawner
 		sp._now += delta
 		sp._ticks += 1
+		sp.deferred_paths = true  # as ZzHorde.setup sets it in every game
 		sp.sense_workers = _npc_workers
 		sp.path_workers = _npc_workers
 		sp.think_workers = _npc_workers

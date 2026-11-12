@@ -934,6 +934,8 @@ func _reconcile_friendly_fire(world: ZzGame, made: Array) -> void:
 
 
 var _mirroring_ff := false
+var _admin_rng := RandomNumberGenerator.new()
+var _admin_rng_game: Object = null
 
 
 func _apply_friendly_fire(world: ZzGame) -> void:
@@ -1031,7 +1033,8 @@ func _follow_npc_threads() -> void:
 	if world == null or world.horde == null or world.horde.spawner == null:
 		return
 	if server != null and server.config != null and server.config.has_method(&"npc_workers"):
-		var workers := int(server.config.call(&"npc_workers"))
+		var forced := world.horde.forced_npc_workers()
+		var workers := forced if forced >= 0 else int(server.config.call(&"npc_workers"))
 		world.horde.spawner.sense_workers = workers
 		world.horde.spawner.path_workers = workers
 		world.horde.spawner.think_workers = workers
@@ -1664,14 +1667,24 @@ func _spawn_in_tick(ctx: DotCmdContext) -> void:
 
 	var at := _command_spot(ctx, 8.0)
 	var made := 0
+	var rng := _admin_stream(world)
 
 	for i in count:
 		var npc: DotNpcInstance = world.horde.spawn_brute(at) if kind == ZzNpcs.BRUTE \
-			else world.horde.spawner.spawn(kind, at + Vector3(randf_range(-1.5, 1.5), 0.0, randf_range(-1.5, 1.5)), &"admin")
+			else world.horde.spawner.spawn(kind, at + Vector3(rng.randf_range(-1.5, 1.5), 0.0, rng.randf_range(-1.5, 1.5)), &"admin")
 		if npc != null:
 			made += 1
 
 	ctx.reply("%d %s." % [made, String(kind)])
+
+
+## Admin spawn and box commands draw from the round's seed, never the global RNG, so a seeded
+## round with the same commands repeats. Reseeded when the game object changes.
+func _admin_stream(world: ZzGame) -> RandomNumberGenerator:
+	if _admin_rng_game != world:
+		_admin_rng_game = world
+		_admin_rng.seed = int(world.config.seed_value) ^ hash("admin commands")
+	return _admin_rng
 
 
 func _cmd_class(ctx: DotCmdContext) -> void:
@@ -1705,7 +1718,7 @@ func _box_in_tick(ctx: DotCmdContext) -> void:
 		ctx.reply("No boxes.")
 		return
 
-	var type := StringName(ctx.arg(0)) if ctx.argc() > 0 else world.boxes.random_type(&"map", RandomNumberGenerator.new())
+	var type := StringName(ctx.arg(0)) if ctx.argc() > 0 else world.boxes.random_type(&"map", _admin_stream(world))
 
 	if not world.boxes.types.has(type):
 		ctx.reply("Which? %s" % ", ".join(world.boxes.order))
