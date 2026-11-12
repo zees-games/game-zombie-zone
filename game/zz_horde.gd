@@ -827,25 +827,28 @@ func tick(delta: float, ticks: int = 1) -> void:
 func _rebuild_candidates() -> void:
 	_candidates.clear()
 	_survivors.clear()
+	var grace_on: bool = game.grace.is_active()
 
 	for player in game.survivors():
 		var id: StringName = player.player_id
 		var state: DotFpsState = player.controller.state
 		# A seat behind its loading cover is not a target: not chased, not spawned at, not counted
 		# in the crowd's size (dot-game's "still loading"); it is still alive for the round.
-		var alive: bool = player.is_alive() and not player.watching and game.can_be_harmed(id) and not game.grace.is_active()
+		var alive: bool = not grace_on and player.is_alive() and not player.watching and game.can_be_harmed(id)
 
-		_survivors[id] = {
-			"position": state.position,
-			"eye": player.eye_position(),
-			"alive": alive,
-			"up": player.is_up(),
-			"down": player.is_down(),
-			"pinned": player.is_pinned(),
-			"biled": _bile.has(id),
-			"health": player.health_fraction() if alive else 0.0,
-			"entity": player.entity_id,
-		}
+		if not _facts_of.has(id):
+			_facts_of[id] = {}
+		var facts: Dictionary = _facts_of[id]
+		facts["position"] = state.position
+		facts["eye"] = player.eye_position()
+		facts["alive"] = alive
+		facts["up"] = player.is_up()
+		facts["down"] = player.is_down()
+		facts["pinned"] = player.is_pinned()
+		facts["biled"] = _bile.has(id)
+		facts["health"] = player.health_fraction() if alive else 0.0
+		facts["entity"] = player.entity_id
+		_survivors[id] = facts
 
 		if not alive:
 			continue
@@ -856,9 +859,20 @@ func _rebuild_candidates() -> void:
 		if state.is_crouched():
 			loudness *= 0.3
 
-		_candidates.append(DotNpcSenses.Candidate.new(
-			id, state.position + Vector3(0.0, 1.0, 0.0), &"survivor", loudness
-		))
+		var cand: DotNpcSenses.Candidate = _cand_of.get(id)
+		if cand == null:
+			cand = DotNpcSenses.Candidate.new(id, Vector3.ZERO, &"survivor")
+			_cand_of[id] = cand
+		cand.position = state.position + Vector3(0.0, 1.0, 0.0)
+		cand.loudness = loudness
+		_candidates.append(cand)
+
+	# Players who left: dropped once the cache outgrows the roster.
+	if _facts_of.size() > _survivors.size() + 8:
+		for id: StringName in _facts_of.keys():
+			if not _survivors.has(id):
+				_facts_of.erase(id)
+				_cand_of.erase(id)
 
 
 ## Hard Box stacks now on, which the commons' chase speed climbs with.
