@@ -16,8 +16,8 @@ const ZZTestPorts := preload("test_ports.gd")
 ## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
 ## nothing but the stand-ins the module seats itself.
 
-const SECTIONS := 13
-const CHECKS := 110
+const SECTIONS := 14
+const CHECKS := 114
 
 const SERVER_DIR := "user://zz_dedicated"
 const TICK_RATE := 60
@@ -55,6 +55,7 @@ func _run() -> void:
 	if server != null and server.state == DotServer.State.RUNNING:
 		await _test_the_module_loads()
 		_test_the_commands()
+		await _test_commands_wait_for_the_tick()
 		await _test_a_round_runs()
 		# Before the reload section: a reload leaves two links on the server (see the report), and
 		# the live one is then named @Node@n, which no client path reaches.
@@ -331,6 +332,21 @@ func _test_the_commands() -> void:
 ## minutes and depends on how the horde goes, and a suite with a wall-clock limit cannot wait
 ## for that. So they play for real until they have killed something, and then are put in the
 ## end room, which is the rule that decides a campaign map; `headless_run` crosses the street.
+## With the threaded physics option a space query is safe only in the physics step, and a console
+## line arrives between steps: an admin command that spawns waits in the world's tick gate.
+func _test_commands_wait_for_the_tick() -> void:
+	_section("commands that touch the world wait for the tick")
+	var gate := game.tick_gate
+	_check(gate.armed, "the module arms the world's tick gate")
+	var pending_before := gate.pending()
+	var said := _run_command("zz_mob 1")
+	_check(said.is_empty() and gate.pending() == pending_before + 1, "zz_mob typed between ticks is queued, not run")
+	var ran := await _until(func() -> bool: return gate.pending() == 0, 5.0)
+	_check(ran, "the next tick runs it")
+	_check(_said(_run_command("zz_status"), "zombiezone"), "a command that only reads still answers at once")
+	_finished()
+
+
 func _test_a_round_runs() -> void:
 	_section("a map, played by the stand-ins")
 	var rounds: Array = []
@@ -459,8 +475,8 @@ func _test_the_map_vote() -> void:
 	var menu_half: Object = vote.get("commands").get("map_menu")
 	_check(menu_half != null and server.console.find_command("mapmenu") != null
 		and server.console.find_cvar("sv_map_menu_flag").get_string() == "generic"
-		and (menu_half.get("change_fn") as Callable).is_valid(),
-		"the map menu is there, staff-only by default, changing the map now")
+		and (menu_half.get("change_fn") as Callable).get_method() == &"change_map_in_tick",
+		"the map menu is there, staff-only by default, changing the map at the next tick")
 	var staff := DotCmdContext.new()
 	staff.source = DotCmdContext.Source.CHAT
 	staff.permissions = PackedStringArray(["generic"])

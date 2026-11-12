@@ -1460,6 +1460,13 @@ func change_map_now(id: StringName) -> DotResult:
 	return DotResult.success(id)
 
 
+## [method change_map_now] from a handler that runs between ticks (the map menu's `change_fn`):
+## building the map casts rays and prunes nav, so on a server it waits for the next tick.
+func change_map_in_tick(id: StringName) -> DotResult:
+	await tick_gate.reached()
+	return change_map_now(id)
+
+
 ## Reads maps.yml (the `--config` directory first) and applies it. Called at boot and by
 ## `sv_map_rotation_file`. A file that is present and unreadable is an ERROR and changes nothing:
 ## rotating every map is a better failure than rotating none.
@@ -3799,6 +3806,7 @@ func simulate(delta: float) -> void:
 
 func _simulate(delta: float) -> void:
 	_tick += 1
+	tick_gate.open()
 
 	if hold_clock.is_valid() and bool(hold_clock.call()):
 		_step_bodies_only(delta)
@@ -3819,6 +3827,8 @@ func _step_bodies_only(delta: float) -> void:
 
 ## One tick, numbered by the netcode. What the bridge uses.
 func tick_once(tick: int) -> void:
+	tick_gate.open()
+
 	if match_node == null:
 		return
 

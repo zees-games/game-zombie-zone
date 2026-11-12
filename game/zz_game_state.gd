@@ -466,6 +466,11 @@ var _far_cache: Dictionary = {}
 var hold_clock: Callable = Callable()
 
 
+## Console, chat and map-menu handlers that build the map or ask the physics space wait here for
+## the next tick (dot-physics' DotTickGate). Armed by ZzModule on a server; solo leaves it open.
+var tick_gate := DotTickGate.new()
+
+
 ## Microseconds spent inside [method simulate] since the start (tools/bench.gd reads it).
 var tick_us_total: int = 0
 

@@ -205,6 +205,7 @@ func _game_load() -> DotResult:
 		return DotResult.fail(DotError.CODE_STATE, "The registered game is not an ZzGame.")
 
 	world.world_key_fn = _world_key
+	world.tick_gate.armed = true
 	add_command("zz_status", _cmd_status, "Show the map, the survivors and the horde")
 	add_command("zz_net", _cmd_net, "Show what the netcode is doing")
 	# The map commands are renameable from maps.yml's `commands:` block, like dot-vote's roles.
@@ -980,6 +981,9 @@ func _tunable(
 func _game_unload() -> void:
 	_bot_ids.clear()
 
+	if game is ZzGame:
+		(game as ZzGame).tick_gate.disarm()
+
 	if workbench != null:
 		workbench.queue_free()
 		workbench = null
@@ -1231,7 +1235,7 @@ func _build_vote(world: ZzGame) -> void:
 	# because a server on a dot-vote older than the menu has no `map_menu` and runs without it.
 	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
 	if menu_half is Object:
-		(menu_half as Object).set(&"change_fn", world.change_map_now)
+		(menu_half as Object).set(&"change_fn", world.change_map_in_tick)
 		(menu_half as Object).set(&"rows_fn", func(_rows: Array) -> Array: return world.map_rows())
 
 	_tunable("zz_vote_after", vote.open_after_sec,
@@ -1615,6 +1619,16 @@ func _cmd_boxes(ctx: DotCmdContext) -> void:
 		ctx.reply("%-12s %-18s %s" % [String(id), str(box["title"]), ", ".join(titles)])
 
 
+## An admin command that spawns or drops something asks the physics space (floor rays, sight),
+## so between ticks it waits for the next one; its reply comes from there.
+func _in_tick(fn: Callable) -> void:
+	var world := game as ZzGame
+	if world == null:
+		fn.call()
+	else:
+		world.tick_gate.run(fn)
+
+
 ## Where an admin command puts something: in front of whoever typed it, or by the team.
 func _command_spot(ctx: DotCmdContext, ahead: float) -> Vector3:
 	var world := game as ZzGame
@@ -1635,6 +1649,10 @@ func _command_spot(ctx: DotCmdContext, ahead: float) -> Vector3:
 
 
 func _cmd_spawn(ctx: DotCmdContext) -> void:
+	_in_tick(_spawn_in_tick.bind(ctx))
+
+
+func _spawn_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 	var kind := StringName(ctx.arg(0)) if ctx.argc() > 0 else &"common"
 	var count := clampi(ctx.arg(1).to_int(), 1, 50) if ctx.argc() > 1 else 1
@@ -1676,6 +1694,10 @@ func _cmd_class(ctx: DotCmdContext) -> void:
 
 
 func _cmd_box(ctx: DotCmdContext) -> void:
+	_in_tick(_box_in_tick.bind(ctx))
+
+
+func _box_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 
 	if world == null or world.boxes == null:
@@ -1693,6 +1715,10 @@ func _cmd_box(ctx: DotCmdContext) -> void:
 
 
 func _cmd_mob(ctx: DotCmdContext) -> void:
+	_in_tick(_mob_in_tick.bind(ctx))
+
+
+func _mob_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 
 	if world == null or world.horde == null:
