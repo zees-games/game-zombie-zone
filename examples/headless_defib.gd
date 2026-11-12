@@ -160,6 +160,8 @@ func _test_stand_ins() -> void:
 	_section("a stand-in with a defibrillator walks to a dead friend and shocks them back; a dead body's respawn timer is cleared")
 	var setup := func(c: ZzConfig) -> void:
 		_quiet(c)
+		# The director's crowd now walks to the street (it used to spawn beyond the barrier): no fight here.
+		c.director_enabled = false
 		c.defib_charge_seconds = 1.0
 		c.defib_max_body_age = 30.0
 		c.timed_respawn = true

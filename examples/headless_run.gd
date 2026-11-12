@@ -43,7 +43,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 55
 
-const CHECKS := 452
+const CHECKS := 453
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -263,6 +263,17 @@ func _test_navigation() -> void:
 		if (p.z < -5.0 and absf(p.x) < 6.0) or (p.z > 79.0 and absf(p.x) < 6.0):
 			in_rooms += 1
 	_check(in_rooms == 0, "and none in a safe room", "%d spawn points in one" % in_rooms)
+
+	# The director's own spawns too: a crowd drawn beyond the shut barrier never arrives.
+	await _sim(game, game.horde.REACH_REFRESH)
+	var here := graph.data.nearest_point(STREET, 3.0)
+	var cut_off := 0
+	for p: Vector3 in game.horde.director.spawn_points:
+		if not graph.connected(graph.data.nearest_point(p, 3.0), here):
+			cut_off += 1
+	_check(cut_off == 0 and game.horde.spawn_ground.size() > game.horde.director.spawn_points.size(),
+		"the director spawns only where a zombie can walk to somebody, the wanderers on all the ground",
+		"%d of %d cut off, %d on the ground" % [cut_off, game.horde.director.spawn_points.size(), game.horde.spawn_ground.size()])
 
 	_check(graph != null and graph.is_ready() and game.horde.nav.point_count() > 1000,
 		"the street is walkable", "%d points" % game.horde.nav.point_count())
@@ -3357,11 +3368,12 @@ func _team(count: int, configure: Callable = Callable(), bots: bool = false) -> 
 	return game
 
 
-## Nothing on the street but what a section puts there: no wanderers, no specials, no mob. A
-## wanderer's swing during a revive or a heal is a different number, and which spawn point a
-## wanderer is drawn at is the horde's business, not the section's.
+## Nothing on the street but what a section puts there: no wanderers, no specials, no mob, no
+## director crowd. A wanderer's swing during a revive or a heal is a different number, and which
+## spawn point a wanderer is drawn at is the horde's business, not the section's.
 static func _quiet(c: ZzConfig) -> void:
 	c.wanderer_density = 0.0
+	c.director_enabled = false
 	c.specials_base = 0
 	c.mob_interval_min = 900.0
 	c.mob_interval_max = 900.0

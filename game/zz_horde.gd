@@ -281,7 +281,7 @@ func _plan_notes() -> void:
 		posts.append(ZzMapDoc.v3(p))
 
 	_mark_narrow()
-	notes.plan(spawner.nav, director.spawn_points, posts)
+	notes.plan(spawner.nav, spawn_ground, posts)
 
 
 ## Where a zombie keyed [param key] should walk on its way to [param goal]: through the choke it
@@ -421,6 +421,7 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, DotNpcNavFilter.walking_only())
 	_add_hinted_spawns()
 	var kept := _keep_out_of_safe_rooms()
+	_set_spawn_ground()
 	lap = ZzLaps.lap(sections, &"nav_spawns", lap)
 
 	DotLog.info(CHANNEL, "navigation built", {
@@ -454,6 +455,37 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 func _add_hinted_spawns() -> void:
 	for p: Array in _doc.get("zombie_spawns", []):
 		director.spawn_points.append(ZzMapDoc.v3(p))
+
+
+## The kept spawn points become [member spawn_ground], and each one's graph point is looked up once for [method _keep_reaching].
+func _set_spawn_ground() -> void:
+	spawn_ground = director.spawn_points
+	_spawn_ground_nodes = PackedInt32Array()
+
+	for p: Vector3 in spawn_ground:
+		_spawn_ground_nodes.append(spawner.nav.data.nearest_point(p, 3.0))
+
+	_reach_due = 0.0
+
+
+## The director spawns only where a zombie can walk to a survivor (one way, as it walks): one drawn on an island,
+## or on a deck it can only drop from, never arrives. The ground as a whole when none reaches anybody.
+func _keep_reaching() -> void:
+	if _time < _reach_due or spawner.nav == null:
+		return
+
+	_reach_due = _time + REACH_REFRESH
+	var nodes := _survivor_nodes()
+	var kept := PackedVector3Array()
+
+	if not nodes.is_empty():
+		for i in spawn_ground.size():
+			for node in nodes:
+				if spawner.nav.connected(_spawn_ground_nodes[i], node):
+					kept.append(spawn_ground[i])
+					break
+
+	director.spawn_points = kept if not kept.is_empty() else spawn_ground
 
 
 ## Drops every spawn point inside a start or end area, and a metre round it. The graph puts
@@ -638,7 +670,7 @@ func _place_wanderers() -> void:
 	var share := SURVIVAL_WANDERER_SHARE if str(_doc.get("mode", "")) == "survival" else 0.8
 	var wanted := mini(int(area / 100.0 * config.wanderer_density), int(config.commons_cap(_planned_team()) * share))
 	var starts := _start_points()
-	var candidates := director.spawn_points.duplicate()
+	var candidates := spawn_ground.duplicate()
 	var placed := 0
 	var guard := 0
 
@@ -730,6 +762,7 @@ func tick(delta: float, ticks: int = 1) -> void:
 
 	notes.update(delta, self)
 	_rebuild_candidates()
+	_keep_reaching()
 	_rebuild_grid()
 	spawner.set_candidates(_candidates)
 	_land_alerts()
