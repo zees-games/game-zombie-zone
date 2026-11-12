@@ -2613,14 +2613,15 @@ func _test_a_crowd_is_cheap() -> void:
 		if npc != null:
 			npc.brain.call(&"force_target", me.player_id)
 	await _sim(game, 4.0)
-	# Wall-clock cost, so a loaded box (other suites share its CPUs) only ever makes a window slower: the cheapest of five
-	# windows of a second each is the tick's cost, and a real slowdown makes every window slow. One window read 15 ms once.
+	# CPU time (DotGameCheckSuite.cpu_usec), not wall time: a loaded box (other suites share its CPUs) stretches wall time
+	# but not the CPU a tick burns. The cheapest of five windows of a second each is the tick's cost, and a real slowdown
+	# makes every window slow. One wall-time window read 15 ms once.
 	var per_tick := INF
 	for window in 5:
-		var started := Time.get_ticks_usec()
+		var started := DotGameCheckSuite.cpu_usec()
 		for i in 64:
 			game.simulate(TICK)
-		per_tick = minf(per_tick, float(Time.get_ticks_usec() - started) / 64000.0)
+		per_tick = minf(per_tick, float(DotGameCheckSuite.cpu_usec() - started) / 64000.0)
 	var near := game.horde.spawner.npcs_near(me.feet(), 6.0).size()
 	_check(near > 15, "sixty arrive", "%d within 6 m" % near)
 	_check(per_tick < 12.0, "and a tick costs less than a 64 Hz tick has", "%.2f ms" % per_tick)
