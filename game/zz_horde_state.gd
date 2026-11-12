@@ -131,6 +131,11 @@ var _world: Node3D = null
 var _by_entity: Dictionary = {}
 var _candidates: Array = []
 var _survivors: Dictionary = {}
+## Per survivor id, the [member _survivors] facts and the perception candidate, refilled in place each tick
+## (nothing holds either past the tick). A new nine-key dictionary and Candidate per survivor per tick
+## was most of _rebuild_candidates' 2.9 ms on PH with 100 survivors.
+var _facts_of: Dictionary = {}
+var _cand_of: Dictionary = {}
 var _doc: Dictionary = {}
 ## The server-only `hulls/<id>.nav.json` of a map whose boxes the wire budget cut ([method ZzMap.read_nav_extra]).
 var _nav_extra: Dictionary = {}
