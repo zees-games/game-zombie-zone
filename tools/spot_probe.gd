@@ -1,6 +1,6 @@
 extends Node
 ## Fixed-seed check of the zombie nav around known snag spots: each nearby edge is swept with a capsule; a blocked one is a snag.
-##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [--reach] [map x,y,z]
+##   godot --headless --path . res://tools/spot_probe.tscn -- [--survival [--maps=a,b]] [--reach [--all] [--near=x,y,z[,r]]] [map x,y,z]
 ## --reach: every spawn to every post must have a full path (stand-in and zombie filters); exits 1 on any unreachable pair or blocked edge.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -109,6 +109,7 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	var query := PhysicsShapeQueryParameters3D.new()
 	query.shape = shape
 	query.collision_mask = ZzNavPrune.body_mask(_game.physics)
+	query.exclude = _game.map.mechanics.walk_through_bodies() if _game.map != null and _game.map.mechanics != null else ([] as Array[RID])
 	if at.is_empty():
 		var all := nav.points_within(nav.points[0], 100000.0)
 		all.sort()
@@ -192,6 +193,9 @@ func _reach_map(id: String) -> PackedStringArray:
 	graph.relabel()
 	out.append("  as a zombie (drops down only):")
 	out.append_array(_reach_causes(graph, [] as Array[Vector3], zombies, posts))
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--near="):
+			out.append_array(_near_dump(graph, arg.substr(7)))
 	var bad := PackedStringArray()
 	for j: Array in jobs:
 		graph.filter = graph.bot_filter if j.size() > 4 else null
@@ -264,6 +268,55 @@ func _reach_causes(graph: DotNpcNavGraph, survivors: Array[Vector3], zombies: Ar
 	return out
 
 
+## --near=x,y,z[,r]: the zombie graph's points within r (3 m) of a spot, each with its piece and its neighbours, and every
+## edge the prune cut that ends there with what the body hits on it. Where two pieces should join, this names the cut.
+func _near_dump(graph: DotNpcNavGraph, arg: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var parts := arg.split(",")
+	var at := Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
+	var r := float(parts[3]) if parts.size() > 3 else 3.0
+	var pts := graph.data.points
+	var idx := Array(graph.data.points_within(at, r))
+	idx.sort()
+	var joined := {}
+	var edges := graph.data.edges
+	for k in range(0, edges.size() - 1, 2):
+		if idx.has(edges[k]) or idx.has(edges[k + 1]):
+			(joined.get_or_add(edges[k], []) as Array).append(edges[k + 1])
+			(joined.get_or_add(edges[k + 1], []) as Array).append(edges[k])
+	out.append("  near %s within %.1f m: %d points" % [_f2(at), r, idx.size()])
+	for i: int in idx:
+		var to := PackedStringArray()
+		for j: int in joined.get(i, []):
+			to.append(_f2(pts[j]))
+		out.append("    point %s piece %d -> %s" % [_f2(pts[i]), graph._component[i], " ".join(to)])
+	var shape := CapsuleShape3D.new()
+	shape.radius = RADIUS
+	shape.height = HEIGHT - LIFT
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = shape
+	query.collision_mask = ZzNavPrune.body_mask(_game.physics)
+	query.exclude = _game.map.mechanics.walk_through_bodies() if _game.map != null and _game.map.mechanics != null else ([] as Array[RID])
+	var space := _game.get_world_3d().direct_space_state
+	var cut := graph.data.cut_edges()
+	for k in range(0, cut.size() - 1, 2):
+		if cut[k].distance_to(at) > r and cut[k + 1].distance_to(at) > r:
+			continue
+		var what := "nothing on the line (an end is blocked or the rise is over the climb)"
+		var n := maxi(ceili(cut[k].distance_to(cut[k + 1]) / 0.1), 1)
+		for i in n + 1:
+			var p := cut[k].lerp(cut[k + 1], float(i) / float(n))
+			var found := _body_at(space, query, p)
+			if not found.is_empty():
+				var c := found[0]["collider"] as CollisionObject3D
+				var cs := c.shape_owner_get_owner(c.shape_find_owner(int(found[0]["shape"]))) as CollisionShape3D
+				var box := cs.shape as BoxShape3D if cs != null else null
+				what = "hit at %s: %s %s" % [_f2(p), c.name, "?" if cs == null else "%s at %s" % [box.size if box != null else cs.shape.get_class(), _f2(cs.global_position)]]
+				break
+		out.append("    cut %s - %s: %s" % [_f2(cut[k]), _f2(cut[k + 1]), what])
+	return out
+
+
 func _free_game() -> void:
 	remove_child(_game)
 	_game.free()
@@ -322,6 +375,10 @@ static func _survival_maps() -> PackedStringArray:
 
 static func _f(v: Vector3) -> String:
 	return "(%.1f,%.1f,%.1f)" % [v.x, v.y, v.z]
+
+
+static func _f2(v: Vector3) -> String:
+	return "(%.2f,%.2f,%.2f)" % [v.x, v.y, v.z]
 
 
 static func _vec(s: String) -> Vector3:

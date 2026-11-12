@@ -113,6 +113,8 @@ var _climbs: Array = []
 ## Layers a drop or jump up must be clear of (the world's; props move). 0 keeps every link.
 var link_mask: int = 0
 var link_world: World3D = null
+## Bodies a link may cross: the doors that open to whoever walks up.
+var link_passable: Array[RID] = []
 var drops_applied: int = 0
 var climbs_applied: int = 0
 
@@ -482,7 +484,7 @@ func apply_links(graph) -> void:
 
 	graph.allow_climb = bool(_config.zombie_climb)
 	# A link joins two floors by a diagonal the grid prune never saw; a ledge or wall on it is a path no body takes.
-	var blocked: Callable = ZzNavPrune.edge_test(link_world.direct_space_state, link_mask) if link_world != null and link_mask != 0 else Callable()
+	var blocked: Callable = ZzNavPrune.edge_test(link_world.direct_space_state, link_mask, link_passable) if link_world != null and link_mask != 0 else Callable()
 
 	if bool(_config.zombie_drops):
 		for pair: Array in _drops:
