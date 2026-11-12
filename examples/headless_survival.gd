@@ -760,11 +760,12 @@ func _test_big_map(id: StringName) -> void:
 
 	var ticks := 0
 	var spent := 0
+	var wall_spent := 0
 	var worst := 0
 	var kills := 0
 	var torn := 0
 	var t := 0.0
-	# Wall-clock cost, so a loaded box (other suites share its CPUs) only ever makes a window slower: the minute is
+	# CPU time (DotGameCheckSuite.cpu_usec), not wall time, so a loaded box (other suites share its CPUs) does not inflate it: the minute is
 	# five windows and the budget is judged on the cheapest one's mean; a real slowdown makes every window slow.
 	var windows := 5
 	var window_ticks := int(PLAY_SECONDS * float(TICK_RATE) / float(windows))
@@ -774,9 +775,11 @@ func _test_big_map(id: StringName) -> void:
 
 	while t < PLAY_SECONDS:
 		for i in 32:
-			var before := Time.get_ticks_usec()
+			var wall_before := Time.get_ticks_usec()
+			var before := DotGameCheckSuite.cpu_usec()
 			game.simulate(TICK)
-			var cost := Time.get_ticks_usec() - before
+			var cost := DotGameCheckSuite.cpu_usec() - before
+			wall_spent += Time.get_ticks_usec() - wall_before
 			spent += cost
 			worst = maxi(worst, cost)
 			ticks += 1
@@ -826,7 +829,7 @@ func _test_big_map(id: StringName) -> void:
 		id, ticks, mean, float(worst) / 1000.0, game.horde.count(), game.horde.nav.point_count()])
 	if cheapest == INF:
 		cheapest = mean
-	_check(cheapest < 1000.0 / float(TICK_RATE), "a tick fits in a 64 Hz server's budget", "%.2f ms cheapest of %d windows, %.2f ms mean, %.1f worst" % [cheapest, windows, mean, float(worst) / 1000.0])
+	_check(cheapest < 1000.0 / float(TICK_RATE), "a tick fits in a 64 Hz server's budget", "%.2f ms cpu cheapest of %d windows, %.2f ms mean (%.2f ms wall mean), %.1f worst" % [cheapest, windows, mean, float(wall_spent) / float(maxi(ticks, 1)) / 1000.0, float(worst) / 1000.0])
 	await _dispose(game)
 	_finished()
 
