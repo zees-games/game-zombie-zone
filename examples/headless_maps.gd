@@ -1,6 +1,5 @@
 extends DotGameCheckSuite
 
-const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
