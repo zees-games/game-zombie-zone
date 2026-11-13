@@ -4,6 +4,7 @@ const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
+const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzLampBudget := preload("../game/zz_lamp_budget.gd")
 const ZzMap := preload("../game/zz_map.gd")
@@ -74,6 +75,7 @@ func _run() -> void:
 	print("")
 
 	await _test_the_catalogue()
+	_test_lazy_catalogue()
 	await _test_baked_light()
 	await _test_lamp_budget()
 	await _test_solid_prop_budget()
@@ -94,8 +96,8 @@ func _run() -> void:
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := 7 + _maps.size()
-	var checks := 2 + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := 8 + _maps.size()
+	var checks := 2 + LAZY_CHECKS + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
 	_broken = _maps.is_empty()
 	_report_sections(_sections_entered, _sections_finished, sections, checks)
 
@@ -146,6 +148,55 @@ func _test_the_catalogue() -> void:
 	_check(missing.is_empty() and game.catalogue.refused.is_empty(),
 		"every map is in it, and no file was refused", "have %s, missing %s, refused %s" % [ids, missing, game.catalogue.refused])
 	await _dispose(game)
+	_finished()
+
+
+const LAZY_CHECKS := 8
+
+
+## The browser's catalogue holds a name and a mode per map and reads one whole document at a
+## time (zombie-zone-maps 0.1.16's 47 maps ran the wasm heap out); native reads every one.
+func _test_lazy_catalogue() -> void:
+	_section("the lazy catalogue")
+	var dir := "user://zz_lazy_catalogue_test"
+	var _made := DirAccess.make_dir_recursive_absolute(dir)
+
+	for id in ["lz_a", "lz_b"]:
+		var doc := ZzCatalogue.practice().duplicate(true)
+		doc["id"] = id
+		doc["name"] = "Lazy %s" % id
+		# The builder writes the identity first; so does this.
+		var ordered := {"format": doc["format"], "kind": doc["kind"], "id": id, "name": doc["name"], "mode": doc["mode"]}
+		ordered.merge(doc)
+		var file := FileAccess.open(dir.path_join(id + ".json"), FileAccess.WRITE)
+		file.store_string(JSON.stringify(ordered, " ", false))
+		file.close()
+
+	var eager := ZzCatalogue.new()
+	eager.lazy = false
+	var lazy := ZzCatalogue.new()
+	lazy.lazy = true
+	_check(eager.add_directory(dir) == 2 and lazy.add_directory(dir) == 2, "both read the two documents")
+	_check(not (eager.maps[&"lz_a"] as Dictionary).has("_stub") and (eager.maps[&"lz_a"] as Dictionary).has("boxes"),
+		"natively the whole document is read up front, as before")
+	_check((lazy.maps[&"lz_a"] as Dictionary).get("_stub", false) and not (lazy.maps[&"lz_a"] as Dictionary).has("boxes"),
+		"lazily a map is its name and mode only")
+	_check(lazy.display_name(&"lz_b") == "Lazy lz_b" and str(lazy.maps[&"lz_b"]["mode"]) == str(ZzCatalogue.practice()["mode"]),
+		"the stand-in answers the name and the mode a menu shows")
+	var whole := lazy.doc(&"lz_a")
+	_check(whole.has("boxes") and ZzMapDoc.digest(whole) == ZzMapDoc.digest(eager.maps[&"lz_a"]), "doc() reads the whole document, the same one")
+	var _other := lazy.doc(&"lz_b")
+	_check((lazy.maps[&"lz_a"] as Dictionary).get("_stub", false) and not (lazy.maps[&"lz_b"] as Dictionary).has("_stub"),
+		"reading another map puts the last back to its stand-in")
+	var drawn := lazy.next_map(PackedStringArray(["lz_a"]), false, null, &"")
+	_check(drawn.has("boxes") and str(drawn["id"]) == "lz_a", "the next-map draw hands back a whole document")
+	_check(lazy.playable(PackedStringArray()).size() == 2, "both are playable")
+	var gone := DirAccess.open(dir)
+
+	for file in gone.get_files():
+		var _removed := gone.remove(file)
+
+	var _dropped := DirAccess.remove_absolute(dir)
 	_finished()
 
 

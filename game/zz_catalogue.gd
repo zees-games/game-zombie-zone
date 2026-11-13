@@ -35,6 +35,18 @@ var refused: Dictionary = {}
 
 var _order: Array[StringName] = []
 
+## Whether a directory's documents are read as a name and a mode only, and a map's whole
+## document only when it is needed ([method doc]). The browser's memory cannot hold 47 parsed
+## documents (zombie-zone-maps 0.1.16 is 53 MiB of JSON and ran the wasm heap out), and a
+## round plays one map. Off natively, where every document is read up front as it always was.
+var lazy: bool = OS.has_feature("web")
+
+## id -> the file a stub was peeked from, and the stubs themselves (what [member maps] holds
+## for a map whose document is not read), so a map that was read can be put back.
+var _files: Dictionary = {}
+var _stubs: Dictionary = {}
+const PEEK_BYTES := 4096
+
 ## The server's maps.yml, or null when there is none (every map rotates, as it always did).
 ## dot-map's rotation file speaks DotMapDef; this catalogue holds map documents, so [member _defs]
 ## mirrors the ids and the file marks `in_rotation` on the mirror. See [method rotating].
@@ -62,6 +74,8 @@ func load_from(directory: String) -> int:
 	maps.clear()
 	roots.clear()
 	refused.clear()
+	_files.clear()
+	_stubs.clear()
 	_content_ids.clear()
 	_content_docs.clear()
 
@@ -104,6 +118,17 @@ func _read_directory(root: String) -> int:
 	var loaded := 0
 
 	for file in files:
+		if lazy:
+			var stub := _peek(root.path_join(file))
+
+			if not stub.is_empty() and _add(stub, file):
+				var stub_id := StringName(str(stub["id"]))
+				roots[stub_id] = root
+				_files[stub_id] = root.path_join(file)
+				_stubs[stub_id] = stub
+				loaded += 1
+				continue
+
 		var cached := _cache_read(root, file)
 
 		if not cached.is_empty() and _add(cached, file):
@@ -189,6 +214,68 @@ func _cache_key(root: String, file: String) -> String:
 	var f := FileAccess.open(src, FileAccess.READ)
 	var size := f.get_length() if f != null else -1
 	return "%d:%d:%s" % [size, FileAccess.get_modified_time(src), _validator_key]
+
+
+## The head of a document, as a stand-in map: id, name, mode, author, blurb, survivors, flagged
+## `_stub`. Empty when the head does not read as a map document, which is then read whole (and
+## refused with its reason) as ever. The builder writes these keys first; the full document
+## is what [method doc] reads.
+func _peek(path: String) -> Dictionary:
+	var file := FileAccess.open(path, FileAccess.READ)
+
+	if file == null:
+		return {}
+
+	var head := file.get_buffer(PEEK_BYTES).get_string_from_utf8()
+	var id := _peek_string(head, "id")
+	var kind := _peek_string(head, "kind")
+
+	if id == "" or kind != ZzMapDoc.KIND or not head.contains("\"format\": %d" % ZzMapDoc.FORMAT):
+		return {}
+
+	var survivors := RegEx.create_from_string("\"survivors\"\\s*:\\s*(\\d+)").search(head)
+	var mode := _peek_string(head, "mode")
+	return {
+		"id": id, "name": _peek_string(head, "name", id), "mode": mode if mode != "" else ZzMapDoc.EXODUS,
+		"author": _peek_string(head, "author"), "blurb": _peek_string(head, "blurb"),
+		"survivors": int(survivors.get_string(1)) if survivors != null else 0,
+		"props": [], "_stub": true,
+	}
+
+
+func _peek_string(head: String, key: String, fallback: String = "") -> String:
+	var found := RegEx.create_from_string("\"%s\"\\s*:\\s*(\"(?:[^\"\\\\]|\\\\.)*\")" % key).search(head)
+
+	if found == null:
+		return fallback
+
+	var value: Variant = JSON.parse_string(found.get_string(1))
+	return str(value) if value != null else fallback
+
+
+## The whole document of map [param id]: what [member maps] holds, or, for a stand-in, the file
+## read now. Only one such document is kept: reading another puts the last back to its stand-in,
+## so the catalogue's cost is a map's, not the pack's. Empty when there is no such map or its
+## document has gone bad since it was peeked.
+func doc(id: StringName) -> Dictionary:
+	var held: Dictionary = maps.get(id, {})
+
+	if not held.get("_stub", false):
+		return held
+
+	for other: StringName in _stubs:
+		if other != id and maps.has(other) and not maps[other].get("_stub", false):
+			maps[other] = _stubs[other]
+
+	var parsed := ZzMapDoc.parse_json(FileAccess.get_file_as_string(str(_files[id])), str(_files[id]))
+
+	if not parsed.ok:
+		refused[str(_files[id]).get_file()] = parsed.error.message
+		DotLog.warn(CHANNEL, "a map was refused", {"file": _files[id], "why": parsed.error.message})
+		return {}
+
+	maps[id] = parsed.value
+	return parsed.value
 
 
 ## Follows [param index]: subscribed (solo) map entries of an accepted kind become maps here, for
@@ -445,7 +532,7 @@ func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream
 		var chosen := _rotation.choose(0)
 
 		if chosen != null and maps.has(chosen.id):
-			return maps[chosen.id]
+			return doc(chosen.id)
 
 	var ids := rotating(allowed)
 
@@ -466,7 +553,7 @@ func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream
 		pick = ids[_next % ids.size()]
 		_next += 1
 
-	return maps[pick]
+	return doc(pick)
 
 
 func describe_lines() -> PackedStringArray:
