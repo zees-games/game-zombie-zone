@@ -43,9 +43,31 @@ static func zone_of(limb: StringName, rel: float) -> StringName:
 ## The limbs of [param kind]: the base set with the kind's own keys over it. A limb's `share` of
 ## [param max_health] becomes its `health` (0 leaves `health` as written, or 100).
 static func defs_for(kind: StringName, max_health: float) -> Dictionary:
+	var defs := (_configured(kind) as Dictionary).duplicate(true)
+
+	for limb: String in defs:
+		var d := defs[limb] as Dictionary
+
+		if d.has("share") and max_health > 0.0:
+			d["health"] = float(d["share"]) * max_health
+
+	return defs
+
+
+## [param kind]'s limbs as configured, read from the config dir once per kind: a read is a walk
+## over every config tier on disk, and every zombie spawned asked twice. Never handed out; a
+## caller gets a deep copy from [method defs_for].
+static var _configured_by_kind: Dictionary = {}
+
+
+static func _configured(kind: StringName) -> Dictionary:
+	if _configured_by_kind.has(kind):
+		return _configured_by_kind[kind]
+
 	# A kind with a body of its own lists every limb and takes none of the zombie's.
 	var base := DotNpcLimbs.defs_from_config(BASE) if kind != &"mutant" and kind != &"oil_monster" else {}
 
+	# Not kept: an unread config (a pack not mounted yet) is asked again next time.
 	if base.is_empty() and kind != &"mutant" and kind != &"oil_monster":
 		return {}
 
@@ -60,12 +82,7 @@ static func defs_for(kind: StringName, max_health: float) -> Dictionary:
 			else:
 				defs[limb] = own[limb]
 
-	for limb: String in defs:
-		var d := defs[limb] as Dictionary
-
-		if d.has("share") and max_health > 0.0:
-			d["health"] = float(d["share"]) * max_health
-
+	_configured_by_kind[kind] = defs
 	return defs
 
 
