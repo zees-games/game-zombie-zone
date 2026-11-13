@@ -512,6 +512,7 @@ func _build_netcode() -> DotResult:
 	bridge.impact_received.connect(func(marks: Array) -> void:
 		var _placed := ZzImpactMarks.place(game.effects, marks))
 	bridge.notice_received.connect(_on_notice)
+	bridge.fitting_received.connect(_on_fitting_resync)
 	bridge.possess_received.connect(func(net_id: int) -> void: _possessed_net_id = net_id)
 	bridge.shop_received.connect(_on_shop_json)
 	bridge.carry_received.connect(_on_carry_json)
@@ -2538,6 +2539,27 @@ func _send_fitting(fitting: DotWeaponFitting) -> void:
 
 		if not fitted.ok:
 			game.notice.emit(fitted.error.message)
+
+
+## The server refused a fit and says what it holds: that becomes the saved fitting, is worn,
+## and is what the open menu shows.
+func _on_fitting_resync(weapon_id: StringName, code: int) -> void:
+	var base := ZzWeapons.def_of(weapon_id)
+
+	if base == null or weapons == null:
+		return
+
+	var fitting := ZzPacks.attachment_catalogue().decode(base, code)
+	var saved := _saved_fittings()
+	saved[base.id] = fitting
+
+	if settings != null and settings.settings != null:
+		var _set := settings.settings.set_value(ZzFittings.SETTING, ZzFittings.format(saved))
+		var _flushed := settings.settings.flush()
+
+	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
+	if is_fitting_open():
+		_attach_menu.show_fitting(fitting)
 
 
 func is_fitting_open() -> bool:

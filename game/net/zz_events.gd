@@ -141,6 +141,8 @@ enum Kind {
 	KNIFE,
 	## Which zombie body this one player now drives (its net id), or 0 when they let go. To its owner only.
 	POSSESS,
+	## To its owner only: the fitting the server holds for a weapon (id, code), sent when it refused a fit so the menu shows what is true.
+	FITTING,
 }
 
 ## What a MAP_FX says.

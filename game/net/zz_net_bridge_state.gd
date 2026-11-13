@@ -60,6 +60,8 @@ signal death_received(player_id: int, by: int, why: StringName, by_kind: StringN
 signal armed_received(player_id: int, weapon_id: StringName)
 
 signal notice_received(text: String)
+## Client side: the server's fitting for a weapon (its encode code), after it refused one.
+signal fitting_received(weapon_id: StringName, code: int)
 signal shop_received(json: String)
 ## Client side: what this client carries (JSON from [method ZzCarry.state_json]).
 signal carry_received(json: String)

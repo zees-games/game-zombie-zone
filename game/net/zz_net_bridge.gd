@@ -933,12 +933,22 @@ func _fit_asked(peer_id: int, asked: Dictionary) -> void:
 
 	if int(asked["code"]) >= (1 << mini(catalogue.code_bits(base), 62)):
 		notice(peer_id, "That fitting is not one this server knows.")
+		_resync_fitting(peer_id, player, base)
 		return
 
 	var fitted: DotResult = game.fit_weapon(player, base.id, catalogue.decode(base, int(asked["code"])))
 
 	if not fitted.ok:
 		notice(peer_id, fitted.error.message)
+		_resync_fitting(peer_id, player, base)
+
+
+## Tells the owner what the server holds for [param base], so a refused fit does not leave
+## their menu and saved fittings showing one the server never took (0: nothing fitted).
+func _resync_fitting(peer_id: int, player: Variant, base: DotWeaponDef) -> void:
+	var kept: Variant = player.fittings.get(base.id)
+	var code := ZzPacks.attachment_catalogue().encode(base, kept) if kept != null else 0
+	_tell(peer_id, ZzEvents.Kind.FITTING, ZzEvents.write_fit(base.id, code))
 
 
 ## Somebody who is out asked to look at somebody else. The server's list, the server's rule.
@@ -1376,6 +1386,11 @@ func _on_event(message: DotNetMessage) -> void:
 				notice_received.emit(str(text["text"]))
 		ZzEvents.Kind.SPECTATE:
 			_apply_spectate(reader)
+		ZzEvents.Kind.FITTING:
+			var fit := ZzEvents.read_fit(reader)
+
+			if bool(fit["ok"]):
+				fitting_received.emit(fit["id"], int(fit["code"]))
 		ZzEvents.Kind.POSSESS:
 			var held := ZzEvents.read_possess(reader)
 
