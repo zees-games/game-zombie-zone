@@ -37,8 +37,8 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 34
-const CHECKS := 233
+const SECTIONS := 35
+const CHECKS := 239
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -93,6 +93,7 @@ func _run() -> void:
 		await _test_the_local_player_is_predicted()
 		await _test_shots_count_online()
 		await _test_fire_mode_reaches_the_server()
+		await _test_a_refused_fit_resyncs_the_owner()
 		await _test_zombies_replicate()
 		await _test_a_pack_monster_replicates()
 		await _test_a_head_shot_off_reaches_the_client()
@@ -718,6 +719,44 @@ func _test_fire_mode_reaches_the_server() -> void:
 	for _i in range(40):
 		await _mode_step(false, 0, slot)
 	_check(mag - arsenal.current().magazine == 3, "one pull in burst spends three rounds on the server", "%d -> %d" % [mag, arsenal.current().magazine])
+	_finished()
+
+
+func _test_a_refused_fit_resyncs_the_owner() -> void:
+	_section("a fit the server refuses comes back as the server's own fitting (Kind.FITTING)")
+	var server_me := _server_me()
+	var catalogue := ZzPacks.attachment_catalogue()
+	var base := ZzWeapons.def_of(ZzWeaponIds.M4)
+	var mount := &""
+	var pick := &""
+	for m: StringName in catalogue.choices_for(base).keys():
+		var list: Array = catalogue.choices_for(base)[m]
+		if not list.is_empty():
+			mount = m
+			pick = list[0]
+			break
+	_check(pick != &"", "the M4 takes at least one attachment", str(mount))
+	var held := DotWeaponFitting.make(base.id)
+	held.fit(mount, pick)
+	_check(_server_game.fit_weapon(server_me, base.id, held).ok, "the server holds a legal fitting for the M4")
+
+	var heard: Array = []
+	var listener := func(id: StringName, code: int) -> void:
+		heard.append([id, code])
+	_client_bridge.fitting_received.connect(listener)
+	# One past the largest code the M4's mounts can name: the server cannot decode it.
+	_client_bridge.ask_fit(base.id, 1 << catalogue.code_bits(base))
+	await _steps(6)
+	_client_bridge.fitting_received.disconnect(listener)
+
+	var expected := catalogue.encode(base, held)
+	_check(heard.size() == 1 and heard[0][0] == base.id and heard[0][1] == expected,
+		"the client is told the server's fitting for the M4", str(heard))
+	_check(expected != 0, "and it is the one the server holds, not nothing")
+	_check(catalogue.decode(base, int(heard[0][1]) if not heard.is_empty() else 0).attachment_on(mount) == pick,
+		"which decodes to %s on %s" % [pick, mount])
+	_check((server_me.fittings.get(base.id) as DotWeaponFitting).attachment_on(mount) == pick,
+		"the refusal left the server's fitting alone")
 	_finished()
 
 
