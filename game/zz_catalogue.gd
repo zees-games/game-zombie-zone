@@ -17,6 +17,9 @@ const CHANNEL := "zz.catalogue"
 
 const PRACTICE := &"zz_practice"
 
+## Internal-use-only originals (`*_orig` ids) unzipped into the user folder; never shipped.
+const USER_MAPS := "user://maps"
+
 ## id -> normalised document.
 var maps: Dictionary = {}
 
@@ -66,6 +69,8 @@ func load_from(directory: String) -> int:
 
 	var root := ZzPaths.rebase("res://" + directory.trim_prefix("res://").trim_prefix("/"))
 	var loaded := _read_directory(root)
+	# The game's own maps win an id; the user folder only adds.
+	loaded += _read_directory(USER_MAPS)
 	_rebuild_order()
 	sync_content()
 
