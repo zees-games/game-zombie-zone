@@ -851,10 +851,56 @@ func _build_terrain() -> void:
 		return
 	var mesh := MeshInstance3D.new()
 	mesh.name = "Boxes_terrain"
-	mesh.mesh = terrain.build_mesh()
+	mesh.mesh = _lean_terrain_mesh(faces) if OS.has_feature("web") else terrain.build_mesh()
 	var mat := terrain.mat if terrain.mat != "" else "dirt"
 	mesh.material_override = ZzMaterials.material(mat, Color.WHITE, "floor", ZzMaterials.surface_for(str(id()), mat, ""))
 	_drawn.add_child(mesh)
+
+
+## The ground's mesh from [param faces] (its physics triangles) without a SurfaceTool, which holds
+## about 100 bytes per vertex and its smoothing tables on top: a big heightfield (gm_bigisland is
+## five million vertices) takes the web build's two gigabytes whole. Flat normals; the web only,
+## so the native ground stays as [method DotMapTerrain.build_mesh] shades it.
+func _lean_terrain_mesh(faces: PackedVector3Array) -> ArrayMesh:
+	var wall := terrain.skirt_faces()
+	var count := faces.size() + wall.size() * 2
+	var verts := PackedVector3Array()
+	verts.resize(count)
+	var uvs := PackedVector2Array()
+	uvs.resize(count)
+	var normals := PackedVector3Array()
+	normals.resize(count)
+
+	for k in faces.size():
+		var p := faces[k]
+		verts[k] = p
+		uvs[k] = Vector2(p.x, p.z)
+
+	var at := faces.size()
+
+	for k in range(0, wall.size(), 3):
+		for side in 2:
+			for v in 3:
+				var p := wall[k + (v if side == 0 else 2 - v)]
+				verts[at] = p
+				uvs[at] = Vector2(p.x + p.z, p.y)
+				at += 1
+
+	for k in range(0, count, 3):
+		var a := verts[k]
+		var normal := (a - verts[k + 2]).cross(a - verts[k + 1]).normalized()
+		normals[k] = normal
+		normals[k + 1] = normal
+		normals[k + 2] = normal
+
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 ## A box that belongs to a gate: its own body, its own mesh, so opening the gate removes it whole.
