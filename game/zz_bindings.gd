@@ -66,6 +66,7 @@ static func make() -> DotMenuBindings:
 	keys.add(PILLS, &"bind_pills", "Take pills (hold)", "P", "Hands")
 	keys.add(GIVE_PILLS, &"bind_give_pills", "Give a friend pills", "N", "Hands")
 	keys.add(GIVE_KIT, &"bind_give_medkit", "Give a friend a medkit", "K", "Hands")
+	keys.add(DotWeaponAttachMenu.ACTION, &"bind_weapon_attach", "Weapon attachments", "I", "Weapons")
 	keys.add(DROP, &"bind_drop_weapon", "Drop the weapon in hand", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "T", "Hands")
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "F", "Hands")

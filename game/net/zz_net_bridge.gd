@@ -911,11 +911,34 @@ func _on_request(message: DotNetMessage) -> void:
 
 			if bool(buying["ok"]) and buyer != null and game.shop != null:
 				var _sold: bool = game.shop.buy(buyer, str(buying["id"]))
+		ZzEvents.Ask.FIT:
+			_fit_asked(peer_id, ZzEvents.read_fit(ask.reader()))
 		ZzEvents.Ask.SPECTATE:
 			var step := ZzEvents.read_ask_spectate(ask.reader())
 
 			if bool(step["ok"]):
 				_spectate_step(peer_id, int(step["direction"]))
+
+
+## A client asked to fit a weapon. The code is decoded against the server's catalogue and
+## [code]fit_weapon[/code] validates the result: a hostile code can only ask for a legal fitting.
+func _fit_asked(peer_id: int, asked: Dictionary) -> void:
+	var player: Variant = game.players.get(player_key(player_for_peer(peer_id)))
+	var base := ZzWeapons.def_of(asked["id"]) if bool(asked["ok"]) else null
+
+	if player == null or base == null:
+		return
+
+	var catalogue := ZzPacks.attachment_catalogue()
+
+	if int(asked["code"]) >= (1 << mini(catalogue.code_bits(base), 62)):
+		notice(peer_id, "That fitting is not one this server knows.")
+		return
+
+	var fitted: DotResult = game.fit_weapon(player, base.id, catalogue.decode(base, int(asked["code"])))
+
+	if not fitted.ok:
+		notice(peer_id, fitted.error.message)
 
 
 ## Somebody who is out asked to look at somebody else. The server's list, the server's rule.
@@ -1272,6 +1295,11 @@ func ask_say(channel_id: StringName, text: String) -> void:
 ## Asks the trader for [param item_id]. Client side.
 func ask_buy(item_id: String) -> void:
 	_ask(ZzEvents.Ask.BUY, ZzEvents.write_buy(item_id))
+
+
+## Asks the server to fit [param weapon_id] so. Client side; offline the game is told directly.
+func ask_fit(weapon_id: StringName, code: int) -> void:
+	_ask(ZzEvents.Ask.FIT, ZzEvents.write_fit(weapon_id, code))
 
 
 ## Out, and asking to watch somebody else: +1 next, -1 previous, 0 the other camera.

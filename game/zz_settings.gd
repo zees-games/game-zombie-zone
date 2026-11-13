@@ -76,6 +76,10 @@ static func spec_for() -> DotMenuGameSpec:
 	if legs != null:
 		s.extra_defs.append(legs)
 	s.late_defs = [DotSettingsDef.number(&"ambient_frequency", 1.0, 0.0, 2.0, &"audio")]
+	# The fitting screen's choices, per weapon (zz_fittings.gd); last, so the older keys keep their order. No row shows it.
+	var fittings := DotSettingsDef.text(&"weapon_fittings", "", &"general")
+	fittings.max_length = 2048
+	s.late_defs.append(fittings)
 	s.extra_rows = [
 		[&"video", "Image", DotMenuRow.select(&"crowd_detail", "Crowd detail",
 			"Low animates, shadows and draws far zombies less: faster in a big horde.",

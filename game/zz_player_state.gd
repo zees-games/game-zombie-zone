@@ -207,6 +207,11 @@ var mirrored: bool = false
 var dealt: Array[StringName] = []
 var dealt_round: int = -1
 var mirror_slot: int = 0
+## The held weapon's fitting, as [method DotWeaponAttachments.encode] packs it (`net_fitted`).
+var mirror_fitted: int = 0
+## Server side: weapon id -> the [DotWeaponFitting] this survivor asked for (`ZzGame.fit_weapon`).
+## One dictionary for the player's life: the arsenal's watcher holds it by reference.
+var fittings: Dictionary = {}
 var mirror_switching: bool = false
 var mirror_fired: int = 0
 var mirror_fire_kind: int = 0

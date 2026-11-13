@@ -100,6 +100,9 @@ static var weapon_rows: Array[Dictionary] = []
 static var pack_of: Dictionary = {}
 static var monsters: Array[Monster] = []
 static var _sources: Array[StringName] = []
+## The attachment art lookups registered with [ZeeAttachmentArt], one per pack that draws its own.
+static var _art_sources: Array[StringName] = []
+static var _attachments: DotWeaponAttachments = null
 static var _notes: PackedStringArray = PackedStringArray()
 
 
@@ -159,6 +162,11 @@ static func clear() -> void:
 		ZeePackSource.unregister(source)
 
 	_sources.clear()
+	for source in _art_sources:
+		ZeeAttachmentArt.remove_source(source)
+
+	_art_sources.clear()
+	_attachments = null
 	providers.clear()
 	weapon_rows.clear()
 	pack_of.clear()
@@ -234,6 +242,7 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 		var tiers: Dictionary = cfg("weapons.tiers", {})
 		ZeePackSource.register(source, provider.get_script(), Callable(ZeePackRoles, &"tiered").bind(provider.get_script(), TIERS_ALL, tiers))
 		_sources.append(source)
+		_take_attachments(pack, source, provider)
 
 	var seen := 0
 
@@ -265,6 +274,38 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row, dir)
+
+
+## Every attachment a weapon here can take: zee's own, then each pack's (its provider's
+## `attachments()`). The arsenals' `attachments`, server and client alike, so both validate
+## and apply a fitting against the same numbers.
+static func attachment_catalogue() -> DotWeaponAttachments:
+	if _attachments == null:
+		_attachments = DotWeaponAttachments.new()
+
+		for att in ZeeAttachmentPack.attachment_defs():
+			var _added := _attachments.add(att)
+
+	return _attachments
+
+
+## A pack's attachments into [method attachment_catalogue], and how it draws them
+## (`attachment_art(id)`) into [ZeeAttachmentArt]. Only for a pack whose weapons are kept:
+## an attachment fits a weapon by its mounts, and a pack's attachments are for its guns.
+static func _take_attachments(pack: String, source: StringName, provider: Object) -> void:
+	if provider.has_method(&"attachments"):
+		var theirs := provider.call(&"attachments") as DotWeaponAttachments
+		var into := attachment_catalogue()
+
+		for id in theirs.ids() if theirs != null else ([] as Array[StringName]):
+			var added := into.add(theirs.get_attachment(id))
+
+			if not added.ok:
+				DotLog.warn(CHANNEL, "a pack's attachment was not added", {"pack": pack, "why": added.error.message})
+
+	if provider.has_method(&"attachment_art"):
+		ZeeAttachmentArt.add_source(source, Callable(provider.get_script(), &"attachment_art"))
+		_art_sources.append(source)
 
 
 static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> void:
