@@ -17,7 +17,7 @@ const ZzWorkshop := preload("../game/zz_workshop.gd")
 ## godot --headless --path . res://examples/headless_workshop.tscn
 ## [/codeblock]
 
-const SECTIONS := 7
+const SECTIONS := 8
 const MAP := "fixture_ruin"
 const OTHER_KIND := "fixture_run"
 const BAD := "fixture_bad"
@@ -36,6 +36,7 @@ func _run() -> void:
 	print("game-zombie-zone — Workshop maps")
 	_test_accepts()
 	_test_solo()
+	_test_lazy_solo()
 	_test_online()
 	_test_ballot_needs_two()
 	_test_ids()
@@ -75,7 +76,11 @@ func _write_fixtures() -> void:
 	doc["mode"] = ZzMapDoc.SURVIVAL
 	doc["objectives"] = []
 	doc["caches"] = [[-2.0, 0.0, 10.0], [2.0, 0.0, 10.0]]
-	_put("ruin.json", JSON.stringify(doc))
+	var ordered := {"format": ZzMapDoc.FORMAT, "kind": ZzMapDoc.KIND, "id": MAP, "name": doc["name"], "mode": doc["mode"]}
+	for key: String in doc:
+		if not ordered.has(key):
+			ordered[key] = doc[key]
+	_put("ruin.json", JSON.stringify(ordered, " ", false))  # identity keys first, as the builder writes them, for the lazy peek
 	_put("bad.json", '{"format": 1, "kind": "zz_map", "id": "fixture_bad", "boxes": "not a list"')
 
 
@@ -141,6 +146,26 @@ func _test_solo() -> void:
 	_check(labels.has("Fixture Ruin [Ruins Pack]"), "solo: the ballot lists the pack's map (%s)" % ",".join(labels))
 	_check(not labels.has("Fixture Run [Ruins Pack]"), "solo: the ballot leaves the unaccepted kind out")
 	vote.free()
+	_completed += 1
+
+
+## On the web the pack's map is held as a stand-in (name and mode from its head) and read whole
+## only when asked for, and a later sync keeps the whole document it was handed.
+func _test_lazy_solo() -> void:
+	_entered += 1
+	var catalogue := ZzCatalogue.new()
+	catalogue.lazy = true
+	catalogue.follow_content(_index(DotContentIndex.SESSION_SOLO), ZzWorkshop.accepted_map_kinds())
+	_check(catalogue.maps.has(StringName(MAP)) and catalogue.maps[StringName(MAP)].get("_stub", false),
+		"lazy: the pack's map is held as a stand-in")
+	_check(catalogue.display_name(StringName(MAP)) == "Fixture Ruin [Ruins Pack]", "lazy: the stand-in names it with its pack")
+	_check(not catalogue.maps.has(StringName(BAD)) or catalogue.maps[StringName(BAD)].get("_stub", false) == false,
+		"lazy: a broken document is not passed off as a stand-in")
+	var whole := catalogue.doc(StringName(MAP))
+	_check(not whole.has("_stub") and (whole["caches"] as Array).size() == 2, "lazy: doc() reads the whole document")
+	var _playable := catalogue.playable(PackedStringArray())
+	_check(is_same(catalogue.maps[StringName(MAP)], whole) and catalogue.is_content(StringName(MAP)),
+		"lazy: a later sync keeps the whole document and the map stays the pack's")
 	_completed += 1
 
 

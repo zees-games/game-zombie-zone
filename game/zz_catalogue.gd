@@ -66,6 +66,7 @@ var _kinds: PackedStringArray = PackedStringArray()
 var _content_ids: Dictionary = {}    # id -> the document this follower added
 var _content_titles: Dictionary = {} # id -> pack title
 var _content_docs: Dictionary = {}   # entry key -> document ({} when refused), read once
+var _content_keys: Dictionary = {}   # id -> the entry key of a subscribed map held as a stand-in
 
 
 ## Reads every document under [param directory] (relative to this game's root), and adds the
@@ -78,6 +79,7 @@ func load_from(directory: String) -> int:
 	_stubs.clear()
 	_content_ids.clear()
 	_content_docs.clear()
+	_content_keys.clear()
 
 	_add(practice(), "built-in")
 
@@ -265,7 +267,7 @@ func doc(id: StringName) -> Dictionary:
 
 	for other: StringName in _stubs:
 		if other != id and maps.has(other) and not maps[other].get("_stub", false):
-			maps[other] = _stubs[other]
+			_hold(other, _stubs[other])
 
 	var parsed := ZzMapDoc.parse_json(FileAccess.get_file_as_string(str(_files[id])), str(_files[id]))
 
@@ -274,8 +276,20 @@ func doc(id: StringName) -> Dictionary:
 		DotLog.warn(CHANNEL, "a map was refused", {"file": _files[id], "why": parsed.error.message})
 		return {}
 
-	maps[id] = parsed.value
+	_hold(id, parsed.value)
 	return parsed.value
+
+
+## Makes [param document] what the catalogue holds for [param id]; a subscribed map's entry
+## follows, so [method sync_content] still finds the document it added.
+func _hold(id: StringName, document: Dictionary) -> void:
+	maps[id] = document
+
+	if _content_keys.has(id):
+		_content_docs[_content_keys[id]] = document
+
+		if _content_ids.has(id):
+			_content_ids[id] = document
 
 
 ## Follows [param index]: subscribed (solo) map entries of an accepted kind become maps here, for
@@ -354,6 +368,21 @@ func _content_doc(entry: DotContentEntry) -> Dictionary:
 		return _content_docs[entry.key]
 
 	var file := entry.path("scene")
+
+	if lazy and file != "":
+		var stub := _peek(file)
+
+		if not stub.is_empty() and str(stub["id"]) == entry.id:
+			var stub_id := StringName(entry.id)
+
+			if not _files.has(stub_id):  # the game's own map under this id wins, and keeps its file
+				_files[stub_id] = file
+				_stubs[stub_id] = stub
+				_content_keys[stub_id] = entry.key
+
+			_content_docs[entry.key] = stub
+			return stub
+
 	var text := FileAccess.get_file_as_string(file) if file != "" else ""
 	var doc: Dictionary = {}
 
