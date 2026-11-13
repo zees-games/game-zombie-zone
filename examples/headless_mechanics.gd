@@ -34,6 +34,10 @@ var _entered := 0
 var _finished := 0
 ## Checks of sections that need the drawn worlds, skipped because world/ is not linked (CI).
 var _skipped := 0
+## What the running section passed to _skip_without_world (-1: none), checked against what it ran when world/ is
+## here, so a declared count that drifts fails locally rather than only in CI (release
+## v0.1.30 and v0.1.31 failed validate on it: 77 checks ran, 79 then 83 expected).
+var _declared := -1
 
 
 ## A world made of data, for the chain tests: the same calls a DotMapBspMesh answers.
@@ -72,24 +76,34 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("zombiezone mechanics")
-	await _test_lift()
-	await _test_real_door()
-	await _test_prop_doors()
-	await _test_button_and_delay()
-	await _test_volume_and_unsupported()
-	await _test_volumes()
-	await _test_logic_fixture()
-	await _test_zz_logic()
-	await _test_real_zz_logic()
-	await _test_logic_blockfort()
-	await _test_logic_death_star()
-	await _test_trail_targets()
-	await _test_map_events()
-	await _test_no_world()
-	await _test_footing_rescue()
-	await _test_ladders()
-	await _test_ladder_from_water()
-	await _test_fall_damage()
+	var sections: Array[Callable] = [
+		_test_lift,
+		_test_real_door,
+		_test_prop_doors,
+		_test_button_and_delay,
+		_test_volume_and_unsupported,
+		_test_volumes,
+		_test_logic_fixture,
+		_test_zz_logic,
+		_test_real_zz_logic,
+		_test_logic_blockfort,
+		_test_logic_death_star,
+		_test_trail_targets,
+		_test_map_events,
+		_test_no_world,
+		_test_footing_rescue,
+		_test_ladders,
+		_test_ladder_from_water,
+		_test_fall_damage,
+	]
+	for section: Callable in sections:
+		_declared = -1
+		var before := _passed + _failed
+		await section.call()
+		var ran := _passed + _failed - before
+		if _declared >= 0 and ran != _declared:
+			_check(false, "%s declares %d checks for _skip_without_world but ran %d" % [section.get_method(), _declared, ran],
+					"CI has no world/ and expects the declared number; fix the argument")
 
 	if _skipped > 0:
 		print("SKIPPED: %d checks need world/ (not linked, as in CI); run dot-bootstrap for the full suite" % _skipped)
@@ -100,6 +114,7 @@ func _run() -> void:
 ## so that a checkout with the worlds still runs every check and a section cannot vanish unnoticed.
 func _skip_without_world(checks: int) -> bool:
 	if DirAccess.dir_exists_absolute(ZzPaths.rebase("res://world")):
+		_declared = checks
 		return false
 
 	_skipped += checks
@@ -335,7 +350,7 @@ func _built() -> ZzMechanics:
 ## them, opened by a zombie as by a survivor, and the side crosses the wire.
 func _test_prop_doors() -> void:
 	_entered += 1
-	if _skip_without_world(21):
+	if _skip_without_world(24):
 		return
 	const DOOR_MAP := &"zm_abandoned_mall"
 	print("%s: its hinged doors swing" % DOOR_MAP)
@@ -652,7 +667,7 @@ func _volume_spot(t: Dictionary, lift := 0.1) -> Vector3:
 ## zombies, a fall below the map kills, and the enabled state of a push or gravity volume survives the wire.
 func _test_volumes() -> void:
 	_entered += 1
-	if _skip_without_world(12):
+	if _skip_without_world(15):
 		return
 	print("%s: hurt, teleport, push and gravity volumes" % VOLUME_MAP)
 	ZzMap.bring_global_mechanics = true
