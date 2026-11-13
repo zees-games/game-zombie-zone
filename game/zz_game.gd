@@ -1635,8 +1635,8 @@ var build_sections: Dictionary = {}
 
 ## Adds the time since [param since] (usec) to section [param name]; returns the new lap start.
 func _lap(name: StringName, since: int) -> int:
-	if OS.has_feature("web"):  # the wasm heap only grows: say where it goes, per section
-		DotLog.info(CHANNEL, "build section", {"section": String(name), "heap_mb": OS.get_static_memory_usage() / 1048576})
+	if OS.has_feature("web"):  # the wasm heap only grows: a failed allocation names the section it died in
+		DotLog.info(CHANNEL, "build section", {"section": String(name)})
 	return ZzLaps.lap(build_sections, name, since)
 
 

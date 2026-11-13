@@ -248,6 +248,14 @@ func id() -> StringName:
 	return StringName(str(doc.get("id", "")))
 
 
+## A build section ended: its time, and on the web a log line (the wasm heap only grows, so a
+## failed allocation names the section it died in).
+func _mark(name: StringName, since: int) -> int:
+	if OS.has_feature("web"):
+		DotLog.info(CHANNEL, "map section", {"section": String(name)})
+	return ZzLaps.lap(sections, name, since)
+
+
 ## Builds [param p_doc], which [ZzMapDoc.validate] has already normalised.
 func build(p_doc: Dictionary) -> DotResult:
 	clear()
@@ -276,26 +284,26 @@ func build(p_doc: Dictionary) -> DotResult:
 	sections.clear()
 	var lap := Time.get_ticks_usec()
 	_build_boxes()
-	lap = ZzLaps.lap(sections, &"boxes", lap)
+	lap = _mark(&"boxes", lap)
 	_build_terrain()
-	lap = ZzLaps.lap(sections, &"terrain", lap)
+	lap = _mark(&"terrain", lap)
 	_build_boundary()
-	lap = ZzLaps.lap(sections, &"boundary", lap)
+	lap = _mark(&"boundary", lap)
 	_build_water_volumes()
-	lap = ZzLaps.lap(sections, &"water", lap)
+	lap = _mark(&"water", lap)
 	_build_props()
-	lap = ZzLaps.lap(sections, &"props", lap)
+	lap = _mark(&"props", lap)
 	_build_solid_props()
-	lap = ZzLaps.lap(sections, &"solid_props", lap)
+	lap = _mark(&"solid_props", lap)
 	_build_toys()
-	lap = ZzLaps.lap(sections, &"toys", lap)
+	lap = _mark(&"toys", lap)
 
 	if draw_world:
 		_build_water_surfaces()
 		_build_objective_props()
-		lap = ZzLaps.lap(sections, &"objective_props", lap)
+		lap = _mark(&"objective_props", lap)
 		_build_lights()
-		lap = ZzLaps.lap(sections, &"lights", lap)
+		lap = _mark(&"lights", lap)
 		_build_environment()
 		_keep_fog_variant_warm()
 		if use_bakes:
