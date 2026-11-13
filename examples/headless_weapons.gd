@@ -21,7 +21,7 @@ const ZzHud := preload("../game/zz_hud.gd")
 const ZzFittings := preload("../game/zz_fittings.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
 const SECTIONS := 17
-const CHECKS := 107
+const CHECKS := 109
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -207,6 +207,8 @@ func _test_fitting() -> void:
 		_check(true, "(skipped)")
 		_check(true, "(skipped)")
 		_check(true, "(skipped)")
+		_check(true, "(skipped)")
+		_check(true, "(skipped)")
 		_finished()
 		return
 
@@ -228,6 +230,17 @@ func _test_fitting() -> void:
 	_check(_client.weapons.arsenal.fitting_at(slot).is_empty()
 			and me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).is_empty(),
 		"choosing it again takes it off both rigs")
+
+	# The server's answer to a refused fit (Kind.FITTING): that fitting is saved and worn.
+	var told := DotWeaponFitting.make(base.id)
+	told.fit(mount, pick)
+	_client._on_fitting_resync(base.id, catalogue.encode(base, told))
+	_check(_client._saved_fittings().has(base.id)
+			and (_client._saved_fittings()[base.id] as DotWeaponFitting).attachment_on(mount) == pick,
+		"the server's fitting from a resync is the saved one")
+	_check(_client.weapons.arsenal.fitting_at(slot).attachment_on(mount) == pick,
+		"and the client's rig wears it")
+	_client._on_fitting_resync(base.id, 0)
 	_finished()
 
 
