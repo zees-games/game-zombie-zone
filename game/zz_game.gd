@@ -1549,7 +1549,7 @@ func _lay_out_map() -> void:
 	var doc: Dictionary = {}
 
 	if next_map_id != &"" and catalogue.maps.has(next_map_id):
-		doc = catalogue.maps[next_map_id]
+		doc = catalogue.doc(next_map_id)
 
 	next_map_id = &""
 
