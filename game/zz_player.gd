@@ -812,11 +812,13 @@ func _present_held() -> void:
 	var switching := false
 	var fired := 0
 	var kind := 0
+	var fitted := 0
 
 	if rig != null and rig.arsenal != null:
 		var def := rig.arsenal.current_def()
 		id = def.id if def != null else &""
 		switching = rig.arsenal.is_switching()
+		fitted = _fitted_code(rig.arsenal, id)
 		var seq := rig.fire_seq % ZeeWeaponNet.FIRE_SEQ_WRAP
 		fired = ZeeWeaponNet.uses_between(_seen_fire_seq, seq) if _seen_fire_seq >= 0 else 0
 		_seen_fire_seq = seq
@@ -826,10 +828,39 @@ func _present_held() -> void:
 		switching = mirror_switching
 		fired = mirror_fired
 		kind = mirror_fire_kind
+		fitted = mirror_fitted
 
 	mirror_fired = 0
 	figure.hold(&"" if is_holstered() else id, switching)
+	figure.fitted(fitted)
 	figure.fired(fired, kind)
+
+
+## The held gun's fitting as `net_fitted` carries it, for a rig this machine runs.
+## Catalogue, weapon and fitting -> the replicated code, for [method _fitted_code].
+static var _fit_codes: Dictionary = {}
+
+
+static func _fitted_code(arsenal: DotWeaponArsenal, id: StringName) -> int:
+	var base := ZzWeapons.def_of(id) if id != &"" and arsenal.attachments != null else null
+
+	if base == null:
+		return 0
+
+	# Every frame for every player: a bare gun costs nothing, a fitted one a lookup.
+	var fitting := arsenal.fitting_at(arsenal.current_slot())
+
+	if fitting.is_empty():
+		return 0
+
+	var key := "%d|%s|%s" % [arsenal.attachments.get_instance_id(), String(id), fitting.key()]
+
+	if not _fit_codes.has(key):
+		if _fit_codes.size() > 256:
+			_fit_codes.clear()
+		_fit_codes[key] = arsenal.attachments.encode(base, fitting)
+
+	return _fit_codes[key]
 
 
 static func held_by_slot(ids: Array[StringName], slot: int) -> StringName:

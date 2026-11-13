@@ -161,6 +161,9 @@ enum Ask {
 	SPECTATE,
 	## I want to buy this item from the trader. The server checks reach, window, stock and points.
 	BUY,
+	## Fit this weapon so (`DotWeaponAttachments.encode`; 0 takes everything off). The server
+	## decodes against its own catalogue and refuses a fitting that is not legal.
+	FIT,
 }
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.
@@ -1356,6 +1359,21 @@ static func write_buy(item_id: String) -> PackedByteArray:
 static func read_buy(r: DotNetReader) -> Dictionary:
 	var id := r.read_string(ID_BYTES)
 	return {"id": id, "ok": r.ok()}
+
+
+## A fitting asked for: the weapon and its [method DotWeaponAttachments.encode] code, which both
+## sides compute from the same catalogue (the build's packs). Ids would not fit [ZzRequest]'s body.
+static func write_fit(weapon_id: StringName, code: int) -> PackedByteArray:
+	var w := _w()
+	w.write_string(String(weapon_id), ID_BYTES)
+	w.write_varint(maxi(code, 0))
+	return w.to_bytes()
+
+
+static func read_fit(r: DotNetReader) -> Dictionary:
+	var id := r.read_string(ID_BYTES)
+	var code := r.read_varint()
+	return {"id": StringName(id), "code": code, "ok": r.ok() and code >= 0}
 
 
 static func write_notice(text: String) -> PackedByteArray:

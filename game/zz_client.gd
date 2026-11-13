@@ -1263,6 +1263,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 	var _moved := _mirror.sync(game.config)
 	weapons.arsenal.carry = _mirror.carry
 	game.combat_feel.attach(weapons.arsenal)
+	_wear_fittings()
 
 	if not weapons.give(weapon_id).ok:
 		return
@@ -1471,6 +1472,15 @@ func _build_hud() -> void:
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
+	_attach_menu = DotWeaponAttachMenu.new()
+	_attach_menu.name = "AttachMenu"
+	_attach_menu.hide()
+	_attach_menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	_attach_menu.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_attach_menu.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_attach_menu.requested.connect(_fit_requested)
+	_attach_menu.closed.connect(close_fitting)
+	hud.add_child(_attach_menu)
 
 
 ## The phone's on-screen buttons over the HUD; none off touch. Needs the settings menu (its button
@@ -2488,6 +2498,112 @@ func _shop_item_state(item: Dictionary) -> String:
 	return ""
 
 
+# --- The fitting screen --------------------------------------------------------
+
+## The saved fittings, read once from the settings.
+func _saved_fittings() -> Dictionary:
+	if not _fittings_read and settings != null and settings.settings != null:
+		_fittings_read = true
+		_fittings.merge(ZzFittings.parse(settings.settings.get_string(ZzFittings.SETTING)), true)
+	return _fittings
+
+
+## A newly built local rig: it wears the saved fittings from now on, and the server is told
+## them (offline, the game's own rig is fitted directly), since it keeps nothing between maps.
+func _wear_fittings() -> void:
+	if weapons == null or weapons.arsenal.attachments != null:
+		return
+
+	weapons.arsenal.attachments = ZzPacks.attachment_catalogue()
+	var saved := _saved_fittings()
+	ZzFittings.watch(weapons.arsenal, saved)
+	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
+
+	for id: Variant in saved.keys():
+		if not (saved[id] as DotWeaponFitting).is_empty():
+			_send_fitting(saved[id] as DotWeaponFitting)
+
+
+## Tells the authority about [param fitting]; it validates, applies and replicates it.
+func _send_fitting(fitting: DotWeaponFitting) -> void:
+	var base := ZzWeapons.def_of(fitting.weapon_id)
+
+	if base == null:
+		return
+
+	if bridge != null and not _offline:
+		bridge.ask_fit(base.id, ZzPacks.attachment_catalogue().encode(base, fitting))
+	elif game.authoritative and player != null:
+		var fitted: DotResult = game.fit_weapon(player, base.id, fitting)
+
+		if not fitted.ok:
+			game.notice.emit(fitted.error.message)
+
+
+func is_fitting_open() -> bool:
+	return _attach_menu != null and _attach_menu.visible
+
+
+## Opens the fitting screen for the gun in hand, or says why not.
+func open_fitting() -> void:
+	if _attach_menu == null or is_fitting_open() or is_shop_open() or weapons == null:
+		return
+
+	var held := weapons.arsenal.current()
+	var base := ZzWeapons.def_of(held.id()) if held != null else null
+	var catalogue := ZzPacks.attachment_catalogue()
+
+	if base == null or base.mounts.is_empty() or catalogue.choices_for(base).values().all(func(list: Array) -> bool: return list.is_empty()):
+		game.notice.emit("Nothing fits this weapon.")
+		return
+
+	_using = false
+	_firing = false
+	_aiming = false
+	_suspend_input(true)
+	platform.hold_pointer(&"fitting")
+	_chat_shown(false)
+	_attach_menu.open(catalogue, base, weapons.arsenal.fitting_at(weapons.arsenal.current_slot()))
+
+
+func close_fitting() -> void:
+	if not is_fitting_open():
+		return
+	_attach_menu.hide()
+	_chat_shown(true)
+	_suspend_input(false)
+	platform.release_pointer(&"fitting")
+
+
+## A row pressed: the new fitting is saved, worn here at once and sent to the authority.
+func _fit_requested(mount: StringName, id: StringName) -> void:
+	var held := weapons.arsenal.current() if weapons != null else null
+	var base := ZzWeapons.def_of(held.id()) if held != null else null
+
+	if base == null:
+		return
+
+	var catalogue := ZzPacks.attachment_catalogue()
+	var toggled := catalogue.toggle(base, weapons.arsenal.fitting_at(weapons.arsenal.current_slot()), mount, id)
+
+	if not toggled.ok:
+		game.notice.emit(toggled.error.message)
+		return
+
+	var fitting := toggled.value as DotWeaponFitting
+	var saved := _saved_fittings()
+	saved[base.id] = fitting
+
+	if settings != null and settings.settings != null:
+		var _set := settings.settings.set_value(ZzFittings.SETTING, ZzFittings.format(saved))
+		var _saved := settings.settings.flush()
+
+	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
+	_send_fitting(fitting)
+	if is_fitting_open():
+		_attach_menu.show_fitting(fitting)
+
+
 func _shop_buy(item_id: String) -> void:
 	if bridge != null and not _offline:
 		bridge.ask_buy(item_id)
@@ -2809,6 +2925,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if is_fitting_open():
+		return
+
 	if event.is_action_pressed("ui_cancel"):
 		# Opens the settings when the menu left this Escape alone.
 		if settings != null:
@@ -2934,6 +3053,11 @@ func _key_event(event: InputEvent) -> bool:
 
 	if not pressed:
 		return false
+
+	if event.is_action_pressed(DotWeaponAttachMenu.ACTION):
+		if not is_spectating():
+			open_fitting()
+		return true
 
 	if event.is_action_pressed(ZzBindings.VIEW):
 		if is_spectating():

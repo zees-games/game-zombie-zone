@@ -5,6 +5,7 @@ const ZzDefibModel := preload("zz_defib_model.gd")
 const ZzBoxCrate := preload("zz_box_crate.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzHeadScale := preload("zz_head_scale.gd")
+const ZzPacks := preload("zz_packs.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
@@ -81,6 +82,9 @@ var holding: StringName = &""
 
 ## The gun in the hand. Built the first time this figure holds anything; see [method hold].
 var held: ZeeWorldModel = null
+## What [method fitted] last dressed the held gun in, and for which gun.
+var _fit_code: int = -1
+var _fit_for: StringName = &""
 
 ## The person, under this node.
 var person: DotHumanoidFigure = null
@@ -263,6 +267,24 @@ func hold(id: StringName, switching: bool) -> void:
 	held.visible = not box_in_hands and not defib_in_hands
 	held.on_switching(switching)
 	_set_hold_kind()
+
+
+## Dresses the held gun in the fitting [param code] packs (`net_fitted`), decoded against this
+## game's attachment catalogue and weapon defs. Cheap when nothing changed, like [method hold].
+func fitted(code: int) -> void:
+	if held == null or holding == &"":
+		return
+
+	if code == _fit_code and held.equipped() == _fit_for:
+		return
+
+	_fit_code = code
+	_fit_for = held.equipped()
+	var base: DotWeaponDef = ZzWeapons.def_of(_fit_for) if _fit_for != &"" else null
+	var catalogue := ZzPacks.attachment_catalogue()
+
+	if base != null and catalogue.code_bits(base) <= DotWeaponNetSync.FITTED_BITS:
+		held.set_fitting(catalogue.decode(base, code))
 
 
 ## The arms the person holds this weapon with: a gun's (the kit's gun clips), a melee weapon's

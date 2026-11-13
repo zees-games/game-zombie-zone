@@ -110,6 +110,8 @@ var net_watching: bool = false
 # should not have, and dot-combat makes the same decision about the same two numbers.
 
 var net_slot: int = 0
+## The held gun's attachments (`DotWeaponNetSync.fitting_specs`), for the hand a watcher draws.
+var net_fitted: int = 0
 var net_magazine: int = 0
 var net_reserve: int = 0
 var net_fire_seq: int = 0
@@ -192,6 +194,7 @@ func _register_net_vars() -> void:
 
 	var weapon_specs := ZeeWeaponNet.all_specs()
 	weapon_specs.append_array(DotWeaponNetSync.fire_mode_specs())
+	weapon_specs.append_array(DotWeaponNetSync.fitting_specs())
 	for spec in weapon_specs:
 		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
 
@@ -423,6 +426,7 @@ func _apply_weapons() -> void:
 
 	player.mirrored = true
 	player.mirror_slot = net_slot
+	player.mirror_fitted = net_fitted
 	player.mirror_switching = net_switching
 	player.mirror_fired += int(answer["fired"])
 	if int(answer["fired"]) > 0:

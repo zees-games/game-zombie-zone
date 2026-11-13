@@ -12,6 +12,8 @@ const ZzPlayerNet := preload("zz_player_net.gd")
 const ZzNpcNet := preload("zz_npc_net.gd")
 const ZzToyNet := preload("zz_toy_net.gd")
 const ZzRequest := preload("zz_request.gd")
+const ZzWeapons := preload("../zz_weapons.gd")
+const ZzPacks := preload("../zz_packs.gd")
 
 const ZzGame := preload("../zz_game.gd")
 const ZzMapDoc := preload("../zz_map_doc.gd")

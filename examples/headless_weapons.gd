@@ -18,8 +18,10 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const ZzHud := preload("../game/zz_hud.gd")
-const SECTIONS := 16
-const CHECKS := 102
+const ZzFittings := preload("../game/zz_fittings.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
+const SECTIONS := 17
+const CHECKS := 107
 
 const CONFIG_FILE := "user://zz_headless_weapons.json"
 
@@ -43,6 +45,7 @@ func _run() -> void:
 
 	if await _test_armed():
 		_test_view_feel_wiring()
+		_test_fitting()
 		await _test_shots_count()
 		await _test_r_reloads()
 		await _test_empty_reloads()
@@ -175,6 +178,57 @@ func _test_armed() -> bool:
 		"the HUD shows its magazine and reserve", _client.hud.ammo.count_text())
 	_finished()
 	return _failed == failed_before
+
+
+## The fitting screen: a choice is saved, worn by the client's rig, and the authority's rig
+## wears it too after validating; a fitting that does not fit is refused there.
+func _test_fitting() -> void:
+	_section("a fitting chosen on the screen is saved, worn here and applied by the authority")
+	var saved := ZzFittings.parse("m4:optic=zz_red_dot,bad;;:x;ak:")
+	_check(ZzFittings.format(saved) == "m4:optic=zz_red_dot", "the saved text round-trips and drops what is malformed",
+		ZzFittings.format(saved))
+
+	var me := _client.player
+	var catalogue := ZzPacks.attachment_catalogue()
+	var held := _client.weapons.arsenal.current()
+	var base := ZzWeapons.def_of(held.id()) if held != null else null
+	var mount := &""
+	var pick := &""
+	if base != null:
+		var choices := catalogue.choices_for(base)
+		for m: StringName in choices.keys():
+			if not (choices[m] as Array).is_empty():
+				mount = m
+				pick = (choices[m] as Array)[0]
+				break
+
+	if pick == &"":
+		_check(true, "the gun in hand takes no attachment: nothing to fit (%s)" % (String(base.id) if base else "none"))
+		_check(true, "(skipped)")
+		_check(true, "(skipped)")
+		_check(true, "(skipped)")
+		_finished()
+		return
+
+	_client._fit_requested(mount, pick)
+	var slot := _client.weapons.arsenal.current_slot()
+	_check(_client.weapons.arsenal.fitting_at(slot).attachment_on(mount) == pick,
+		"the client's rig wears %s on %s" % [pick, mount])
+	_check(me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).attachment_on(mount) == pick
+			and (me.fittings.get(base.id) as DotWeaponFitting).attachment_on(mount) == pick,
+		"and the authority's rig, which keeps it for the player")
+
+	var bogus := DotWeaponFitting.make(base.id)
+	bogus.fit(mount, &"zz_no_such_attachment")
+	_check(not _client.game.fit_weapon(me, base.id, bogus).ok
+			and me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).attachment_on(mount) == pick,
+		"a fitting the catalogue refuses is not applied")
+
+	_client._fit_requested(mount, pick)
+	_check(_client.weapons.arsenal.fitting_at(slot).is_empty()
+			and me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).is_empty(),
+		"choosing it again takes it off both rigs")
+	_finished()
 
 
 func _test_view_feel_wiring() -> void:

@@ -3493,6 +3493,8 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.arsenal.idle_still = player.weapon_still
 		combat_feel.attach(rig.arsenal)
 		_wire_carry(player)
+		rig.arsenal.attachments = ZzPacks.attachment_catalogue()
+		ZzFittings.watch(rig.arsenal, player.fittings)
 
 	var given := player.weapons.give(weapon_id, true)
 	if not given.ok:
@@ -3501,6 +3503,29 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 
 	player_armed.emit(player.player_id, weapon_id)
 	return true
+
+
+## Fits [param weapon_id] the way [param fitting] says, for [param player], now and whenever
+## they hold one later (an empty fitting takes everything off). The server's check of what a
+## client asks: the fitting must be legal for the weapon's base def in the shared attachment
+## catalogue, or it is refused whole. The stats follow from the arsenal (`DotWeaponArsenal.fit`).
+func fit_weapon(player: ZzPlayer, weapon_id: StringName, fitting: DotWeaponFitting) -> DotResult:
+	var base := ZzWeapons.def_of(weapon_id) if player != null and fitting != null else null
+
+	if base == null:
+		return DotResult.fail(DotError.CODE_INVALID, "There is no such weapon to fit.")
+
+	var legal := ZzPacks.attachment_catalogue().validate_fitting(base, fitting)
+
+	if not legal.ok:
+		return legal
+
+	player.fittings[weapon_id] = fitting.duplicate_fitting()
+
+	if player.weapons != null:
+		var _changed := ZzFittings.apply_to(player.weapons.arsenal, player.fittings)
+
+	return DotResult.success(fitting)
 
 
 ## Hangs the shared carry rules on [param player]'s arsenal and weighs its catalogue.
