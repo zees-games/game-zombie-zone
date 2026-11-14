@@ -60,7 +60,7 @@
 # dormant_from: 0.0
 # Ticks a dormant zombie's thought spans (at least 8). `zz_dormant_think_every`. [8..64]
 # dormant_think_every: 16
-# Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays within 2 m of... [0..64]
+# Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays wi... [0..]
 # path_reuse_thoughts: 0
 # Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at ... [0..256]
 # bot_max: 0
