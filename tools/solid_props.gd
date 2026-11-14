@@ -9,11 +9,20 @@ extends SceneTree
 ## [/codeblock]
 ## `--from-doc` re-filters the boxes a document already has instead of rebuilding them from the world:
 ## run it after a change to how `ZzNpcs.nav_for` cuts solid props, which can seal ground the last filter left open.
+##
+## The counts must not depend on the checkout. Library models are read from the game's `.stores/model-library` by
+## absolute path, so always through GLTFDocument: through res:// a model with a `.import` (the shared store holds
+## some) loads only if this checkout's `.godot` has its imported scene, else `ResourceLoader.exists()` is true,
+## `load()` fails and dot-map drops the prop without a word, and a world's licence `model_store` is a path relative
+## to wherever it was converted. Every solid library model is loaded once first; one that does not load fails the
+## run (exit 1, nothing written), so a prop is never silently left out.
 
 const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
 const NPCS_SCRIPT := "res://game/zz_npcs.gd"
 const GRAPH_SCRIPT := "res://addons/dot_npc/nav/dot_npc_nav_graph.gd"
 const SNAP := 2.5
+## The shared model library, read outside res:// on purpose (see above).
+const STORE := "res://.stores/model-library"
 ## The movers that leave their doorway when they open, and how far past the shut panel their dressing reaches.
 const DOOR_CLASSES := ["func_door", "func_door_rotating", "func_movelinear"]
 const DOOR_GROW := 0.2
@@ -49,6 +58,15 @@ func _initialize() -> void:
 				printerr(id, ": ", read.error.message)
 				failed = true
 				continue
+			var mesh := read.value as DotMapBspMesh
+			mesh.model_library = ProjectSettings.globalize_path(STORE)
+			var bad := _unloadable_models(mesh)
+			if not bad.is_empty():
+				for line in bad:
+					printerr(id, ": ", line)
+				printerr(id, ": ", bad.size(), " solid prop models do not load (is .stores linked into the game? zombie-zone-maps tools/solid_props.sh links it)")
+				failed = true
+				continue
 			body = read.value.call(&"build_prop_collision")
 		if body != null:
 			for child in body.get_children():
@@ -75,10 +93,45 @@ func _initialize() -> void:
 		out[id] = kept
 		print(id, ": ", kept.size(), " solid props")
 
+	if failed:
+		printerr("solid_props: failed, nothing written")
+		quit(1)
+		return
 	var f := FileAccess.open(args[0], FileAccess.WRITE)
 	f.store_string(JSON.stringify(out))
 	f.close()
 	quit(1 if failed else 0)
+
+
+## Why each solid library model of [param mesh] would be left out, one line per model; empty when every one loads.
+## A model the pack does not list, or a damaged glTF ([method DotMapBspMesh.gltf_defect]: drawn as its box), is left
+## out the same way everywhere, so passes; a listed one missing from the store, or one that fails to load, does not.
+static func _unloadable_models(mesh: DotMapBspMesh) -> PackedStringArray:
+	var out := PackedStringArray()
+	var seen := {}
+	for rec: Dictionary in mesh.manifest.get("props", []):
+		if not int(rec.get("solid", 0)) in DotMapBspMesh.SOLID_BOX or rec.has("box"):
+			continue
+		var id := str(rec.get("stand_in", ""))
+		if seen.has(id):
+			continue
+		seen[id] = true
+		if not id.begins_with("lib/") or not DotMapBspMesh.find_resource_path(id, DotMapBspMesh.DEFAULT_PROP_DIRS, DotMapBspMesh.PROP_EXTS).is_empty():
+			continue
+		var path: String = mesh.call(&"_library_path", id)
+		if path.is_empty():
+			continue
+		if path.begins_with("res://"):
+			out.append("%s: %s is inside res://, where whether it loads depends on this checkout's imports" % [id, path])
+		elif not FileAccess.file_exists(path):
+			out.append("%s: %s is missing" % [id, path])
+		elif DotMapBspMesh.gltf_defect(path) == "":
+			var model: Node3D = mesh.call(&"_library_model", id)
+			if model == null:
+				out.append("%s: %s does not load" % [id, path])
+			else:
+				model.free()
+	return out
 
 
 ## The places the horde and the team must reach from the first seat: posts, caches, route, objectives, sleepers and spawn hints.
