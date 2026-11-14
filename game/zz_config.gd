@@ -531,7 +531,7 @@ func setup_seconds() -> float:
 @export_range(0.05, 1.0, 0.05) var defib_revive_fraction: float = 0.4
 @export_range(0.0, 15.0, 0.5) var defib_invulnerable_seconds: float = 2.0
 ## Revives one item holds, and seconds after a shock before the next try.
-@export_range(1, 7, 1) var defib_charges: int = 1
+@export_range(1, 7, 1, "or_greater") var defib_charges: int = 1
 @export_range(0.0, 120.0, 0.5) var defib_cooldown_seconds: float = 8.0
 ## Seconds after death beyond which the body is past saving (0: never).
 @export_range(0.0, 600.0, 1.0) var defib_max_body_age: float = 60.0

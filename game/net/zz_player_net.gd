@@ -75,8 +75,11 @@ var net_use: float = 0.0
 var net_helped: float = 0.0
 var net_using: int = 0
 
-## Medkits in bits 0 to 2, pills in bits 3 to 6, the defibrillator's charges in bits 7 to 9.
+## Medkits in bits 0 to 2, pills in bits 3 to 6.
 var net_kits: int = 0
+
+## The defibrillator's charges. A varint of its own: zz_defib_charges has no upper limit.
+var net_defibs: int = 0
 
 ## Boxes carried (bits 0-2) and the type of the top one, an index into the box file plus one,
 ## 0 for unknown (bits 3-8), and whether it is in the hands (bit 9). The server writes 0 for
@@ -184,7 +187,8 @@ func _register_net_vars() -> void:
 	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
 	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
 	replicate(&"net_using", DotNetVar.Type.UINT).bits(4).server_driven()
-	replicate(&"net_kits", DotNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_kits", DotNetVar.Type.UINT).bits(7).server_driven()
+	replicate(&"net_defibs", DotNetVar.Type.VARINT).server_driven()
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(6).server_driven()
 	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5).server_driven()
 	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10).server_driven()
@@ -279,7 +283,8 @@ func pull() -> void:
 	net_use = player.use_fraction
 	net_helped = player.helped_fraction
 	net_using = maxi(USES.find(player.using), 0)
-	net_kits = mini(player.medkits, 7) | (mini(player.pills, 15) << 3) | (mini(player.defibs, 7) << 7)
+	net_kits = mini(player.medkits, 7) | (mini(player.pills, 15) << 3)
+	net_defibs = maxi(player.defibs, 0)
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3) | (32 if player.flashed else 0)
 	net_flash = clampi(roundi(player.flash_strength * 31.0), 1, 31) if player.flashed else 0
@@ -379,7 +384,7 @@ func _adopt() -> void:
 	player.using = USES[clampi(net_using, 0, USES.size() - 1)]
 	player.medkits = net_kits & 7
 	player.pills = (net_kits >> 3) & 15
-	player.defibs = (net_kits >> 7) & 7
+	player.defibs = net_defibs
 	player.carried_count = net_carry & 7
 	player.carried_index = (net_carry >> 3) & 63
 	player.box_out = (net_carry & 512) != 0

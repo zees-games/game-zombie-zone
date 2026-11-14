@@ -96,7 +96,7 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 | `defib_range` | 2.0 | Metres from the body |
 | `defib_revive_fraction` | 0.4 | Share of maximum health they come back with |
 | `defib_invulnerable_seconds` | 2.0 | Shield after the shock |
-| `defib_charges` | 1 | Shocks per item (currently 1 to 7) |
+| `defib_charges` | 1 | Shocks per item. Any value from 1 |
 | `defib_cooldown_seconds` | 8.0 | Recharge between shocks |
 | `defib_max_body_age` | 60.0 | Seconds after death a body can be saved (0 never expires) |
 | `defib_move_tolerance` | 0.6 | Metres the user may drift while charging |

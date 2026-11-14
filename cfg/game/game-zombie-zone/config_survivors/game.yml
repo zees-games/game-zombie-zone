@@ -103,7 +103,7 @@
 # defib_revive_fraction: 0.4
 #  [0.0..15.0]
 # defib_invulnerable_seconds: 2.0
-# Revives one item holds, and seconds after a shock before the next try. [1..7]
+# Revives one item holds, and seconds after a shock before the next try. [1..]
 # defib_charges: 1
 #  [0.0..120.0]
 # defib_cooldown_seconds: 8.0

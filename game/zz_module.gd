@@ -757,8 +757,8 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.defib_revive_fraction = clampf(value, 0.05, 1.0))
 	_tunable("zz_defib_invulnerable_seconds", config.defib_invulnerable_seconds, "Seconds the revived cannot be hurt (0 to 15)",
 		func(value: float) -> void: config.defib_invulnerable_seconds = clampf(value, 0.0, 15.0))
-	_tunable("zz_defib_charges", float(config.defib_charges), "Revives one defibrillator holds (1 to 7; applies to ones picked up from now)",
-		func(value: float) -> void: config.defib_charges = clampi(int(value), 1, 7))
+	_tunable("zz_defib_charges", float(config.defib_charges), "Revives one defibrillator holds (1 or more; applies to ones picked up from now)",
+		func(value: float) -> void: config.defib_charges = maxi(int(value), 1))
 	_tunable("zz_defib_cooldown_seconds", config.defib_cooldown_seconds, "Seconds after a shock before the item may be used again (0 to 120)",
 		func(value: float) -> void: config.defib_cooldown_seconds = clampf(value, 0.0, 120.0))
 	_tunable("zz_defib_max_body_age", config.defib_max_body_age, "Seconds after death beyond which the body is past saving (0: never)",
