@@ -24,6 +24,9 @@ var knives: DotWeaponKnives = null
 var knife_rules: Dictionary = DotWeaponKnives.DEFAULT_RULES.duplicate()
 ## Entity ids whose aim key was last handed to [member knives] down.
 var _aim_sent: Dictionary = {}
+## Entity ids whose drop key was last stepped released: stepping a released key again changes nothing,
+## and [method DotWeaponDropKey.step] resolves the drop rules first (about 80 us a call), so it is skipped.
+var _drop_up: Dictionary = {}
 var game = null
 
 
@@ -135,6 +138,12 @@ func drop_key(player, pressed: bool, delta: float) -> bool:
 	if not _free(player):
 		reset_key(player)
 		return false
+	if not pressed and _drop_up.has(player.entity_id):
+		return false
+	if pressed:
+		_drop_up.erase(player.entity_id)
+	else:
+		_drop_up[player.entity_id] = true
 	var keys: Dictionary = game.get_meta(&"drop_keys", {})
 	game.set_meta(&"drop_keys", keys)
 	var key: DotWeaponDropKey = keys.get(player.entity_id)
