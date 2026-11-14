@@ -106,6 +106,7 @@ func _npc_ready() -> void:
 
 	if config != null:
 		squad_pull_interval = float(config.squad_pull_interval)
+		path_reuse_thoughts = int(config.path_reuse_thoughts)
 
 
 ## The horde this zombie belongs to. Duck-typed: see `zz_horde.gd`.

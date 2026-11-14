@@ -17,6 +17,11 @@ var _recording := false
 ## parts are printed as PROFILE lines, ms per tick over the measured frames.
 var _profile := false
 var _profiler: Node = null
+## --ab-reuse=N (with --profile): every 64 ticks every brain's `path_reuse_thoughts` flips between 0 and N, and
+## h.brains/h.bodies are summed per arm, so both arms run in one process on one box (AB lines).
+var _ab_reuse := -1
+var _ab_us := {}
+var _ab_ticks := {}
 var _ticks := 0
 var _load_s := 0.0
 ## Engine monitors per measured frame: physics-process ms (the scripts' _physics_process), active bodies, pairs, islands.
@@ -33,6 +38,8 @@ func _run() -> void:
 			_measure = arg.trim_prefix("--measure=").to_float()
 		elif arg == "--profile":
 			_profile = true
+		elif arg.begins_with("--ab-reuse="):
+			_ab_reuse = arg.trim_prefix("--ab-reuse=").to_int()
 		elif arg.begins_with("--ring="):
 			var r := arg.trim_prefix("--ring=").split(",")
 			_ring = Vector2(r[0].to_float(), r[1].to_float())
@@ -158,6 +165,9 @@ func _run() -> void:
 		var parts: Dictionary = _profiler.get(&"_parts")
 		for part: String in parts:
 			print("PROFILE %-10s %.3f ms/tick" % [part, float(parts[part]) / 1000.0 / maxf(1.0, _ticks)])
+		for arm: int in _ab_ticks:
+			print("AB reuse=%d h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [arm, float(_ab_us[arm].x) / 1000.0 / maxf(1.0, _ab_ticks[arm]),
+				float(_ab_us[arm].y) / 1000.0 / maxf(1.0, _ab_ticks[arm]), _ab_ticks[arm]])
 		_profiler.free()
 	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0])
 	for m in _monitors:
@@ -173,7 +183,9 @@ func _run() -> void:
 	# The last frame, to look at: the numbers say nothing about what a crowd detail level looks like.
 	var path := ProjectSettings.globalize_path(_out)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	print("saved %s: %s" % [_out, error_string(get_viewport().get_texture().get_image().save_png(path))])
+	# Headless has no image: the save errored and the quit below never ran, so a bench held its slot until the timeout.
+	var shot := get_viewport().get_texture().get_image()
+	print("saved %s: %s" % [_out, error_string(shot.save_png(path))] if shot != null else "no image (headless)")
 	get_tree().quit(0)
 
 
@@ -319,8 +331,17 @@ func _physics_process(_delta: float) -> void:
 	if not _recording:
 		(_profiler.get(&"_parts") as Dictionary).clear()
 		_ticks = 0
+	var arm := (_ab_reuse if ((Engine.get_physics_frames() >> 6) & 1) == 1 else 0) if _ab_reuse >= 0 else -1
+	if arm >= 0:
+		for npc: DotNpcInstance in (_client.get("game") as ZzGame).horde.spawner.all_npcs():
+			if npc.brain != null:
+				npc.brain.set(&"path_reuse_thoughts", arm)
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
+	if arm >= 0 and _recording:
+		var tick_parts: Dictionary = _profiler.get(&"_tick_parts")
+		_ab_us[arm] = _ab_us.get(arm, Vector2i.ZERO) + Vector2i(int(tick_parts.get("h.brains", 0)), int(tick_parts.get("h.bodies", 0)))
+		_ab_ticks[arm] = int(_ab_ticks.get(arm, 0)) + 1
 
 
 func _alive(game: ZzGame) -> int:

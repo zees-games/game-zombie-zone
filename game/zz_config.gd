@@ -297,6 +297,10 @@ func setup_seconds() -> float:
 @export_range(0.0, 1000.0, 1.0) var dormant_from: float = 0.0
 ## Ticks a dormant zombie's thought spans (at least 8). `zz_dormant_think_every`.
 @export_range(8, 64, 1) var dormant_think_every: int = 16
+## Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays within 2 m of
+## where it asked, instead of asking the graph again each thought. 0 (the default) asks every thought: on the 56-zombie
+## bench 4 moved brains -6%, +1%, -3% and -3% on three boxes, inside the noise (docs/survival.md). `zz_path_reuse_thoughts`.
+@export_range(0, 64, 1, "or_greater") var path_reuse_thoughts: int = 0
 
 ## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
 ## team on a small box is people plus this many. `zz_bot_max`.

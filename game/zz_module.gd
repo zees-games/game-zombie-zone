@@ -619,6 +619,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_dormant_think_every", float(config.dormant_think_every),
 		"Ticks a dormant zombie's thought spans (8 to 64)",
 		func(value: float) -> void: config.dormant_think_every = clampi(int(value), 8, 64))
+	_tunable("zz_path_reuse_thoughts", float(config.path_reuse_thoughts),
+		"Thoughts a zombie keeps its waypoint while its goal drifts under 3 m; 0 asks the graph every thought",
+		func(value: float) -> void: config.path_reuse_thoughts = maxi(int(value), 0))
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
@@ -1816,6 +1819,7 @@ const HAND_FIELDS := {
 	"zz_survival_warmup": "survival_warmup_seconds", "zz_trader": "trader_enabled",
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
 	"zz_dormant_from": "dormant_from", "zz_dormant_think_every": "dormant_think_every",
+	"zz_path_reuse_thoughts": "path_reuse_thoughts",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
 	"zz_commons_far_divisor": "commons_far_divisor",
 }
