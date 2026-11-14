@@ -1,10 +1,15 @@
-This is a game to demonstrate the capabilities of the [**Dot collection**](https://moddingcommunity.com/co/4-dot-assets) built on-top of [Godot 4](https://godotengine.org/) and [TMC's gaming platform](https://moddingcommunity.com/play). In this 3D game, a team of survivors fights through a city at night, from one shelter to the next, or holds a school, a mall or a ballpark with a dozen or more of them through ten waves of the horde, against zombies that are directed rather than random and special infected that each have one nasty trick. Zombies drop boxes that do something random when you open them, good or very bad. This is inspired by the co-operative zombie shooters and the big community servers that ran them with twenty-odd players and a hundred kinds of party box!
+# Zombie Zone
 
-**This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with TMC, you will need to build and integrate your own back-end infrastructure.
+Zombie Zone is a 3D co-operative game for a team of survivors. You fight through a city at night, from one shelter to the next, or hold a school, a mall or a ballpark through ten waves of the horde. The zombies are directed rather than random, and the special infected each have one nasty trick. Zombies drop boxes that do something random when you open them, good or very bad. It is inspired by the co-operative zombie shooters and the big community servers that ran them with twenty-odd players.
 
-**Please treat this as partially tested.** The game was built with Claude Code. Its headless test suite passes, but little of it has been in front of real players. Please report anything you run into.
+It is built on [Godot 4](https://godotengine.org/), the [Dot collection](https://moddingcommunity.com/co/4-dot-assets) and [TMC's gaming platform](https://moddingcommunity.com/play).
+
+Everything in this repository is open source under the MIT license. The only closed part is the website back-end it can sign in through. If you do not want to use TMC's platform, you can plug in your own sign-in back-end.
+
+The game was built with Claude Code and is maintained with it. It has a full automated test suite, but few real players have tried it yet, so expect rough edges. Please report what you find.
 
 ## How it plays
+
 There are two kinds of map.
 
 - **Exodus maps** go from a start shelter to an end shelter. On the way there is usually something to do: cut a lock, raise a shutter, radio a boat. Doing it is loud, and you have to hold out while everything that heard it comes for you. Get everybody who is still standing into the end shelter and the map is won, and the next one in the series starts. Lose and you play it again, a couple of times, before the server moves on.
@@ -91,7 +96,7 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 | `defib_range` | 2.0 | Metres from the body |
 | `defib_revive_fraction` | 0.4 | Share of maximum health they come back with |
 | `defib_invulnerable_seconds` | 2.0 | Shield after the shock |
-| `defib_charges` | 1 | Shocks per item (1 to 7) |
+| `defib_charges` | 1 | Shocks per item (currently 1 to 7) |
 | `defib_cooldown_seconds` | 8.0 | Recharge between shocks |
 | `defib_max_body_age` | 60.0 | Seconds after death a body can be saved (0 never expires) |
 | `defib_move_tolerance` | 0.6 | Metres the user may drift while charging |
@@ -123,9 +128,19 @@ Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.ym
 | **H** | Help: the goal, the rules and every key as you have it bound |
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
-Pills and medkits have their own slots and are server cvars: `zz_medkit_max`, `zz_pills_max`, `zz_pills_seconds`, `zz_heal_others` (hold the medkit key on a friend you aim at), `zz_heal_range`, `zz_give_pills`, `zz_give_medkits`, `zz_give_range`. Taking damage, moving away or looking away cancels a heal.
+Pills and medkits have their own slots. These are server settings:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `zz_medkit_max` | 3 | Medkits a survivor holds at most. Currently limited to 1 to 7 |
+| `zz_pills_max` | 4 | Bottles of pills a survivor holds at most. Currently limited to 1 to 15 |
+| `zz_pills_seconds`, `zz_heal_range`, `zz_give_range` | see `cvarlist zz_` | How long taking pills takes, and how close you must be to heal or give |
+| `zz_heal_others`, `zz_give_pills`, `zz_give_medkits` | see `cvarlist zz_` | Whether you can heal a friend, or hand them pills or a medkit |
+
+The two limits are what the network messages have room for (`game/zz_consumables.gd`), so a value outside them is brought back inside. Taking damage, moving away or looking away cancels a heal.
 
 ## Getting started
+
 You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:
 
 ```bash
@@ -155,6 +170,7 @@ The maps come from the zombie-zone-maps checkout, which bootstrap links into `ma
 `online` and `server` use [dot-server-deploy](https://github.com/modcommunity/dot-server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
+
 Settings are cvars. Set them in the server's config, on the command line, or live from the console. Most of them take effect straight away; the ones about a map's layout take effect from the next map.
 
 ```
@@ -219,7 +235,6 @@ The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuot
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
-
 ```
 zz_spectate_camera 0           // who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody
 ```
@@ -246,18 +261,26 @@ Admin commands, for seeing what happens (they need the `z` flag):
 | `zz_panic [seconds]` | Mobs back to back |
 
 ## Writing a map
+
 Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps/blob/main/maps/README.md).
 
 ## Testing
+
 `./game.sh test` checks that every script parses and then runs every suite:
 
 | Suite | What it checks |
 | --- | --- |
-| `headless_run` | The game itself: the horde noticing, chasing and hitting, shots and headshots, downs and revives, borrowed health, the shove, every special, acid and fire, loot, every box outcome, objectives and gates, winning and losing, the stand-ins, and that sixty zombies on one survivor fit in a tick |
-| `headless_maps` | Every map: it fits on the wire, every prop is known, every spawn has room, items can be picked up, the zombies can reach everything that matters, a shut gate really is shut, a survival map seats its team, and every barricade is on the zombies' ground on both sides |
+| `headless_run` | The game itself: the horde noticing, chasing and hitting, shots and headshots, downs and revives, borrowed health, the shove, every special, acid and fire, loot, every box outcome, objectives and gates, winning and losing, the stand-ins |
+| `headless_maps` | Every map: it fits on the wire, every prop is known, every spawn has room, the zombies can reach everything that matters, every barricade is on the zombies' ground |
 | `headless_net` | A client and a server in one process: zombies, downs, pins, loot, boxes, gates and the end of a map all reach the client |
 | `dedicated` | The game as a real server runs it: the module, the console, a map played by stand-ins, the map vote, and a clean exit |
-| `headless_survival` | Survival held each way (ten waves growing, the breather, days and nights, the clock), a wipe and the map starting again, a barricade torn down, come through and mended, the team a map is built for, and each big survival map played for a wave by a full team of stand-ins, with the tick time |
+| `headless_survival` | Survival held each way (ten waves, the breather, days and nights, the clock), a wipe, a barricade torn down and mended, each big survival map played by a full team of stand-ins |
+| `headless_config`, `headless_workbench`, `headless_mapcfg` | Settings, the workbench and per-map config |
+| `headless_consumables`, `headless_defib`, `headless_downed`, `headless_stats` | Pills and medkits, defibrillators, downs, and the stats that are kept |
+| `headless_weapons`, `headless_weapon_drop`, `headless_weapon_knife`, `headless_arsenal`, `headless_grenades` | Guns, dropping them, the knife, the arsenal and grenades |
+| `headless_nav`, `headless_start`, `headless_buildonce`, `headless_prefetch`, `headless_packs` | The navigation graph, the start of a map, one-time builds, prefetching and content packs |
+| `headless_propforce`, `headless_propcarry`, `headless_carry`, `headless_collide`, `headless_hazards` | Props, carrying things, collisions and map hazards |
+| `headless_classes`, `headless_mutant`, `headless_mechanics`, `headless_look`, `headless_gait`, `headless_slide`, `headless_sprint`, `headless_ambience`, `headless_workshop` | Zombie kinds, the Mutant, movement, looking, ambience and the workshop |
 
 `xvfb-run -a godot --path . res://tools/audio_probe.tscn` checks that the game actually makes a noise, which a headless run cannot.
 
@@ -300,4 +323,5 @@ Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDI
 If you made one of these assets and want it removed, open an issue.
 
 ## License
+
 MIT. See [LICENSE](LICENSE). The Kenney and Quaternius art and the OpenGameArt sounds are CC0, which is public domain.
