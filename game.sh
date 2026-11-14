@@ -62,7 +62,7 @@ UI_CHECKS="trader crouch nav"
 # suite once more as `-- --merge LOG...` over the shards' logs, which holds the whole-run checks.
 # `test NAME.SHARD` plays one shard; `test NAME.merge` only the merge over logs already in .godot/test-logs.
 # `suites --shards` lists the shards instead of the suite (`hv shard` runs them as separate jobs, then NAME.merge).
-SUITE_SHARDS="headless_survival=core,zz_high_school,zz_mall,zz_stadium,zz_relief_camp"
+SUITE_SHARDS="headless_survival=core,zz_high_school,zz_mall,zz_stadium,zz_relief_camp headless_maps=core,m0,m1,m2,m3"
 RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; OFF=$'\033[0m'
 CR=$'\r\033[K'
 [ -t 1 ] || { RED=""; GRN=""; YLW=""; OFF=""; CR=""; }

@@ -69,18 +69,54 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## The shards `game.conf` names: the whole-floor sections once as `core`, the maps dealt round-robin into `m0`..`m3`.
+const SHARD_NAMES := ["core", "m0", "m1", "m2", "m3"]
+const MAP_SHARDS := 4
+const CORE_SECTIONS := 8
+
+
+## The maps this machine has: all of MAPS, or only the practice street where `maps/` is not linked.
+func _linked_maps() -> Array:
+	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
+	return MAPS.duplicate() if linked else ["zz_practice"]
+
+
+func _merge(logs: Array) -> void:
+	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
+	_check(logs.size() == SHARD_NAMES.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
+	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
+	var want := CORE_SECTIONS + _linked_maps().size()
+	_check(entered == want, "the shards entered every section (%d of %d)" % [entered, want])
+	_report_sections(1, 1, 1, 2)
+
+
 func _run() -> void:
 	print("zombiezone maps")
 	print("")
 
-	await _test_the_catalogue()
-	_test_lazy_catalogue()
-	await _test_baked_light()
-	await _test_lamp_budget()
-	await _test_solid_prop_budget()
-	await _test_worlds()
-	await _test_footing()
-	_test_library_indices()
+	if DotGameShardArgs.is_merge():
+		_merge(DotGameShardArgs.merge_logs())
+		return
+
+	var shard := DotGameShardArgs.shard()
+	var core := shard == "" or shard == "core"
+	var played: Array = []
+
+	if core:
+		await _test_the_catalogue()
+		_test_lazy_catalogue()
+		await _test_baked_light()
+		await _test_lamp_budget()
+		await _test_solid_prop_budget()
+		await _test_worlds()
+		await _test_footing()
+		_test_library_indices()
+
+	if shard == "":
+		played = _maps.duplicate()
+	elif shard != "core":
+		_maps = _linked_maps()
+		played = DotGameShardArgs.slice(_maps, shard, MAP_SHARDS)
 
 	var only := ""
 
@@ -88,17 +124,21 @@ func _run() -> void:
 		if arg.begins_with("--map="):
 			only = arg.substr(6)
 
-	for id: String in _maps:
+	for id: String in played:
 		if only.is_empty() or only == id:
 			await _test_map(StringName(id))
 
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := 8 + _maps.size()
-	var checks := 2 + LAZY_CHECKS + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read + CHECKS_PER_MAP * _maps.size() + 3 * _spawner_worlds + _nav_extra_maps
+	var sections := (CORE_SECTIONS if core else 0) + played.size()
+	var checks := CHECKS_PER_MAP * played.size() + 3 * _spawner_worlds + _nav_extra_maps
+	if core:
+		checks += 2 + LAZY_CHECKS + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read
 	_broken = _maps.is_empty()
 	_report_sections(_sections_entered, _sections_finished, sections, checks)
+
+
 
 
 ## The height of the nav floor a point stands over, nearest the point's own height. The street maps
