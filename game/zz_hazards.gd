@@ -55,6 +55,8 @@ signal area_added(id: int, kind: StringName, at: Vector3, radius: float, seconds
 signal area_ended(id: int)
 signal launched(id: int, kind: StringName, from: Vector3, velocity: Vector3)
 signal landed(id: int, kind: StringName, at: Vector3)
+## A flying thing struck the world and bounced: its place and the velocity it left with, so a client re-starts its arc there.
+signal bounced(id: int, at: Vector3, velocity: Vector3)
 signal exploded(at: Vector3, radius: float, kind: StringName)
 
 ## The game (`zz_game.gd`), untyped: it preloads this file.

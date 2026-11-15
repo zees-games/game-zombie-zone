@@ -108,9 +108,15 @@ func tick() -> void:
 		var entry: Dictionary = _flying[id]
 		var g: Object = entry["g"]
 
-		if bool(g.call(&"step", _trace, maxi(game.tick_rate, 1))):
+		var bounces: int = int(g.get(&"bounces"))
+		var done: bool = bool(g.call(&"step", _trace, maxi(game.tick_rate, 1)))
+
+		if done:
 			_flying.erase(id)
 			_go_off(id, g, entry["def"])
+		elif int(g.get(&"bounces")) != bounces:
+			# The clients fly a plain arc; tell them where it struck and how it left.
+			game.hazards.bounced.emit(id, g.get(&"position"), g.get(&"velocity"))
 
 
 func clear() -> void:

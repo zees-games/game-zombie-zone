@@ -143,6 +143,8 @@ enum Kind {
 	POSSESS,
 	## To its owner only: the fitting the server holds for a weapon (id, code), sent when it refused a fit so the menu shows what is true.
 	FITTING,
+	## A thrown grenade bounced: its id, where, and the velocity it left with.
+	BOUNCE,
 }
 
 ## What a MAP_FX says.
@@ -877,6 +879,21 @@ static func read_throw(r: DotNetReader) -> Dictionary:
 	var from := _read_pos(r)
 	var velocity := r.read_vector3_range(-SPEED_MAX, SPEED_MAX, SPEED_BITS)
 	return {"id": id, "kind": StringName(kind), "from": from, "velocity": velocity, "ok": r.ok()}
+
+
+static func write_bounce(id: int, at: Vector3, velocity: Vector3) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(id)
+	_pos(w, at)
+	w.write_vector3_range(velocity, -SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	return w.to_bytes()
+
+
+static func read_bounce(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var at := _read_pos(r)
+	var velocity := r.read_vector3_range(-SPEED_MAX, SPEED_MAX, SPEED_BITS)
+	return {"id": id, "at": at, "velocity": velocity, "ok": r.ok()}
 
 
 static func write_landed(id: int, kind: StringName, at: Vector3) -> PackedByteArray:
