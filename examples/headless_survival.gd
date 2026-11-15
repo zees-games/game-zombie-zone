@@ -29,10 +29,10 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const SECTIONS := 22
 const CHECKS := 144
 
-## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core` is everything but the big maps, and each
+## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core_a` to `core_e` are everything but the big maps (split so each part finishes well inside the suite timeout on a loaded box), and each
 ## big map is its own shard, so the tick-budget check (which load flakes) sits alone with its map. `-- --merge LOG...` holds that every
 ## shard's log is there and that together they entered all SECTIONS.
-const SHARDS := {"core": [18, 116], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
+const SHARDS := {"core_a": [3, 24], "core_b": [4, 38], "core_c": [3, 11], "core_d": [5, 24], "core_e": [3, 19], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -84,22 +84,30 @@ func _run() -> void:
 	var shard := DotGameShardArgs.shard()
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 
-	if shard == "" or shard == "core":
+	if shard == "" or shard == "core_a":
 		await _test_waves()
 		await _test_prestart()
 		await _test_wave_sets()
+
+	if shard == "" or shard == "core_b":
 		await _test_respawn()
 		await _test_infection()
 		await _test_possession()
 		await _test_possession_ability()
+
+	if shard == "" or shard == "core_c":
 		await _test_nights()
 		await _test_clock()
 		await _test_wipe()
+
+	if shard == "" or shard == "core_d":
 		await _test_barricades()
 		await _test_team_size()
 		_test_the_wire()
 		_test_the_hud()
 		await _test_map_rows()
+
+	if shard == "" or shard == "core_e":
 		await _test_personas()
 		await _test_stuck_rescue()
 		await _test_dormant()
