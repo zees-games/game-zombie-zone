@@ -37,8 +37,8 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 35
-const CHECKS := 239
+const SECTIONS := 36
+const CHECKS := 242
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -106,6 +106,7 @@ func _run() -> void:
 		await _test_a_pin_reaches_the_client()
 		await _test_a_possession_reaches_the_client()
 		await _test_flash_strength_reaches_the_client()
+		await _test_points_above_16_bits_reach_the_client()
 		await _test_loot_reaches_the_client()
 		await _test_a_box_reaches_the_client()
 		await _test_a_gate_reaches_the_client()
@@ -1171,6 +1172,21 @@ func _test_flash_strength_reaches_the_client() -> void:
 	server_me.flash_until = 0.0
 	await _steps(10)
 	_check(not _mine().flashed, "and it lifts there when it lifts here")
+	_finished()
+
+
+func _test_points_above_16_bits_reach_the_client() -> void:
+	_section("points above 65535 reach the client unclamped (net_points is a varint)")
+	var src := FileAccess.get_file_as_string("res://game/net/zz_player_net.gd")
+	_check(src.contains('replicate(&"net_points", DotNetVar.Type.VARINT)'), "net_points replicates as a varint")
+	var server_me := _server_me()
+	var before := server_me.points
+	server_me.points = 1234567
+	await _steps(10)
+	_check(_mine().points == 1234567, "1234567 points arrive whole", "%d" % _mine().points)
+	server_me.points = before
+	await _steps(10)
+	_check(_mine().points == before, "and the old value returns")
 	_finished()
 
 

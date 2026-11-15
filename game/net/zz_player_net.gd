@@ -95,7 +95,7 @@ var net_status: int = 0
 const PIN_KINDS: Array[StringName] = [&"", &"pounce", &"choke", &"carry", &"ride", &"grab", &"eat"]
 const USES: Array[StringName] = [&"", &"revive", &"heal", &"loot", &"objective", &"repair", &"deploy", &"defib", &"pills"]
 
-## Points this match and the server's ping for the player, for everybody's Tab board.
+## Points this match for the player, for everybody's Tab board. A varint: points have no upper limit.
 var net_points: int = 0
 var net_ping: int = 0
 
@@ -196,7 +196,7 @@ func _register_net_vars() -> void:
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(6).server_driven()
 	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5).server_driven()
 	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10).server_driven()
-	replicate(&"net_points", DotNetVar.Type.UINT).bits(16).server_driven()
+	replicate(&"net_points", DotNetVar.Type.VARINT).server_driven()
 	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
 	replicate(&"net_watching", DotNetVar.Type.BOOL).server_driven()
 
@@ -293,7 +293,7 @@ func pull() -> void:
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3) | (32 if player.flashed else 0)
 	net_flash = clampi(roundi(player.flash_strength * 31.0), 1, 31) if player.flashed else 0
-	net_points = clampi(player.points, 0, 65535)
+	net_points = maxi(player.points, 0)
 	net_ping = clampi(player.ping_ms, 0, 1023)
 	net_watching = player.watching
 	net_blind = player.blinded
