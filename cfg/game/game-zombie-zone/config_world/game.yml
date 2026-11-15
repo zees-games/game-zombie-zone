@@ -50,7 +50,7 @@
 # seed_value: 20261010
 
 # --- Netcode
-# The upper bounds the zz_* cvars used to clamp to, as `zz_waves=0,zz_nights=40` (see game/zz_caps.gd for the...
+# The upper bounds the zz_* cvars clamped to, as `zz_waves=0,zz_nights=40` (see game/zz_caps.gd for the cvars...
 # cap_overrides: ""
 # Metres within which a survivor is sent a common's and a special's updates (live). A client hides a mirror t... [40.0..]
 # net_common_radius: 80.0

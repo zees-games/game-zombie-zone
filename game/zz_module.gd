@@ -1,203 +1,4 @@
-extends DotGameModule
-
-## The workbench kind of the ambience cvar set.
-const AMBIENT_KIND := "ambience"
-const ZzMapConfig := preload("zz_map_config.gd")
-const ZzNetBridge := preload("net/zz_net_bridge.gd")
-const ZzServices := preload("zz_services.gd")
-
-const ZzBots := preload("zz_bots.gd")
-const ZzCaps := preload("zz_caps.gd")
-const ZzGame := preload("zz_game.gd")
-const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
-const ZzPlayer := preload("zz_player.gd")
-const ZzAvatars := preload("zz_avatars.gd")
-const ZzClasses := preload("zz_classes.gd")
-const ZzVote := preload("zz_vote.gd")
-const ZzNpcs := preload("zz_npcs.gd")
-
-## This game, as a module a dedicated server loads.
-##
-## [b]What [DotGameModule] does not.[/b]
-## [DotGameModule] holds the netcode and its four load-bearing constants, the bridge, the
-## message seal, the identity layer, the roster, the authoritative tick and a teardown in
-## the reverse order. Two of those five hand-written copies had the same line wrong and
-## nobody could ever join those servers. What is left here is what is actually this game's:
-## the cvars an operator turns between rounds, the console commands, the map vote, and the rule
-## that keeps enough people in a round for one to happen.
-##
-## [b]No `class_name`, and that is a requirement rather than a style.[/b]
-## [method DotModuleHost.load_module] takes a PATH and constructs the module itself — it
-## must, because that is the shape that lets an operator name one in a config file — and a
-## module delivered inside a dot-cloud pack cannot have a `class_name` at all: a mounted
-## pack's globals are not registered in the host.
-##
-## [codeblock]
-## server.modules.load_module("res://game/zz_module.gd")
-## [/codeblock]
-
-# [b]No `const CHANNEL` here, and its absence is the point.[/b] [DotGameModule] already
-# declares one and GDScript refuses to let a subclass redeclare it — which is the right
-# refusal: a module logs through [method DotModule.log_info], which stamps the module's own
-# name, so a second channel would split one module's records across two places an operator
-# has to know to turn up separately.
-
-## Seconds between checks of how many people are in the round.
-const ROSTER_INTERVAL := 2.0
-
-## Where the services keep punishments. Empty is [DotGameServices]'s own default,
-## `user://zombiezone_punishments.json` — the store a real server enforces.
-##
-## [b]Static, because nothing holds this module before it exists[/b]: dot-server constructs
-## it from a path inside `load_module`, so there is no instance for a host to set a field on
-## first. `examples/dedicated.tscn` points it at a directory of its own; before it could,
-## every run appended the live tools' audit warnings to the real store, 106 of them by the
-## time anybody counted.
-static var punishments_file: String = ""
-
-## The `zz_bots` cvar, held so the tick does not look it up sixty times a second.
-var _bots: DotConVar = null
-
-## How many stand-ins, from how many people: dot-server's one rule for every game. See
-## [method _keep_the_round_full].
-var _quota: DotBotQuota = null
-
-var _since_roster_check: float = 0.0
-
-## How many stand-ins this module has put in, so it can take them out again.
-var _bot_ids: Array[StringName] = []
-
-## The players' vote for the next map; null when it could not be built.
-var vote: ZzVote = null
-
-## dot-vote's `DotVoteBans`: players' votes to ban a player, and the one team damage starts.
-## Null on a host whose dot-vote has none (API level under 8), which runs without them.
-var voteban: RefCounted = null
-
-## The drawn ballot's notice topic. The client shell draws one menu per topic.
-const MAP_BALLOT_TOPIC := &"map_ballot"
-
-## [key, description, min, max] of the oil monster's tunables; `goo_*` and `trail_*` are DotHazardProfile keys (see ZzHazards.configure_from_meta).
-const OIL_TUNABLES: Array = [
-	["damage", "Damage of its bite", 0.0, 200.0], ["reach", "Reach of its bite in metres", 0.5, 6.0],
-	["spit_damage", "Damage of one glob of goo", 0.0, 200.0], ["spit_range", "Farthest it spits, metres", 1.0, 80.0],
-	["spit_min", "Closest it spits, metres", 0.0, 40.0], ["spit_cooldown", "Seconds between spits", 0.5, 120.0],
-	["spit_speed", "Speed of a glob, m/s", 4.0, 60.0], ["spit_windup", "Seconds the mouth opens before the glob leaves", 0.1, 3.0],
-	["blind_seconds", "Seconds a glob's goo stays on the screen", 0.0, 60.0], ["blind_max_stacks", "Most globs that stack on a screen (1 to 3)", 1.0, 3.0],
-	["goo_radius", "Radius of the spit's puddle, metres", 0.2, 20.0], ["goo_seconds", "Seconds the spit's puddle lasts", 0.5, 120.0],
-	["goo_dps", "Damage a second in the spit's puddle", 0.0, 200.0], ["goo_slow_factor", "Speed multiplier in the spit's puddle (1 none)", 0.05, 1.0],
-	["goo_tick_interval", "Seconds between the puddle's damage payments", 0.0, 5.0], ["goo_fade_seconds", "Seconds the puddle fades out at its end", 0.0, 30.0],
-	["goo_global_cap", "Spit puddles at once on the server (0 no limit)", 0.0, 1000.0],
-	["trail_radius", "Radius of a trail puddle, metres", 0.2, 10.0], ["trail_seconds", "Seconds a trail puddle lasts", 0.5, 120.0],
-	["trail_dps", "Damage a second in the trail", 0.0, 200.0], ["trail_slow_factor", "Speed multiplier in the trail (1 none)", 0.05, 1.0],
-	["trail_tick_interval", "Seconds between the trail's damage payments", 0.0, 5.0], ["trail_fade_seconds", "Seconds a trail puddle fades at its end", 0.0, 30.0],
-	["trail_spacing", "Metres slid between trail puddles", 0.2, 20.0], ["trail_interval", "Fewest seconds between trail puddles", 0.0, 10.0],
-	["trail_max_per_owner", "Trail puddles one monster may have at once (0 no limit)", 0.0, 1000.0],
-	["trail_global_cap", "Trail puddles at once on the server (0 no limit)", 0.0, 5000.0],
-]
-
-
-## The cvars a map's `dot_map/map/<name>.yml` may set (zz_map_config.gd).
-func _map_config_keys() -> Dictionary:
-	var keys: Dictionary = ZzMapConfig.KEYS.duplicate()
-	keys.merge(DotWeaponSpawnerConfig.MAP_KEYS)
-	return keys
-
-
-## The spawner's settings live on the spawner, not in a cvar.
-func _map_config_get(key: String) -> Variant:
-	if DotWeaponSpawnerConfig.MAP_KEYS.has(key):
-		var spawners: Variant = (game as ZzGame).spawners
-		return spawners.spawner.config.get_setting(key) if spawners != null else null
-	return super._map_config_get(key)
-
-
-func _map_config_set(key: String, value: Variant) -> bool:
-	if DotWeaponSpawnerConfig.MAP_KEYS.has(key):
-		var spawners: Variant = (game as ZzGame).spawners
-		return spawners != null and spawners.spawner.config.set_setting(key, value)
-	return super._map_config_set(key, value)
-
-
-func _map_config_game() -> String:
-	return ZzMapConfig.GAME_ID
-
-
-func _module_name() -> String:
-	return "zombiezone"
-
-
-func _game_service() -> StringName:
-	return ZzGame.SERVICE
-
-
-func _game_missing_hint() -> String:
-	return (
-		"create an ZzGame, add it to the tree and let its _ready() register it under "
-		+ "'%s' — a module cannot build the world, because the world outlives it"
-		% String(ZzGame.SERVICE)
-	)
-
-
-## The netcode's numbers, which are the game's and not the addon's.
-##
-## Tick rate from the world, so `sv_tickrate` reaches it: the server sets the engine's
-## physics rate from that cvar at boot, the world is built after the server and reads it,
-## and this reads the world. A number written here instead would be a netcode running at a
-## rate the operator did not choose, silently.
-func _net_config() -> DotNetConfig:
-	var config := DotNetConfig.new()
-	config.tick_rate = (game as ZzGame).tick_rate
-	config.snapshot_rate = ZzGame.NET_SNAPSHOT_RATE
-	config.world_extent = ZzGame.NET_WORLD_EXTENT
-	config.enable_prediction = true
-	# [b]On, and the two callables that make it real are wired by the bridge.[/b] It was off
-	# for as long as they were not: a flag reported as enabled with nothing behind it is
-	# worse than one that is off, because the first reader to trust it loses an afternoon.
-	# See [method ZzNetBridge._wire_lag_compensation].
-	#
-	# A shot at a running zombie, from a hundred milliseconds away, is the ordinary reason.
-	config.enable_lag_compensation = true
-	# No cap: a snapshot that cut a 100+ horde short would leave zombies frozen where the last
-	# one that fitted left them.
-	config.max_entities_per_snapshot = 0
-	return config
-
-
-func _make_bridge() -> Node:
-	return ZzNetBridge.new()
-
-
-## Chat, voice and moderation, over [DotGameServices].
-##
-## [b]The bridge is handed over as the link, and that is the whole of the wiring.[/b] A chat
-## line goes out through `send_chat` and a voice frame through `send_voice`, both on this
-## game's own wire. [DotGameModule] does the rest: it assigns the bridge's `voice_relay_fn`,
-## checks `check_admission` before seating anybody, and tells the roster to follow this layer
-## so a leaver is forgotten by the rate limiter and the voice router together.
-func _make_services() -> Node:
-	var services := ZzServices.new()
-	services.bridge = bridge
-	services.punishments_file = punishments_file
-	return services
-
-
-## Profiles, avatars and admission: dot-platform's [DotPlatformIdentity] over this game's
-## one-slot schema. [DotGameModule] builds it before the services and loads dot-platform's
-## own module beside it.
-##
-## [b]Authentication is not here and was never this game's.[/b] Whether a player is proven
-## to be somebody is the host's `dot_auth_server`, the same for every game it runs; what
-## this layer does is everything after — a scoped profile, the name on it, and a face.
-## With authentication off everybody is a guest with a profile of their own, which is what
-## a LAN server is.
-func _make_identity() -> Node:
-	var identity_layer := DotPlatformIdentity.new()
-	identity_layer.avatar_schema = ZzAvatars.schema()
-	identity_layer.stock_avatar_fn = ZzAvatars.stock_avatar
-	identity_layer.avatar_translate_fn = ZzAvatars.from_site
-	return identity_layer
-
+extends "zz_module_base.gd"
 
 func _game_load() -> DotResult:
 	var world := game as ZzGame
@@ -207,33 +8,7 @@ func _game_load() -> DotResult:
 
 	world.world_key_fn = _world_key
 	world.tick_gate.armed = true
-	add_command("zz_status", _cmd_status, "Show the map, the survivors and the horde")
-	add_command("zz_net", _cmd_net, "Show what the netcode is doing")
-	# The map commands are renameable from maps.yml's `commands:` block, like dot-vote's roles.
-	for name in world.command_names("zz_maps"):
-		add_command(name, _cmd_maps, "List the maps, and any refused file")
-	for name in world.command_names("zz_reload"):
-		add_command(name, _cmd_reload, "Read the map directory again (from the next map)")
-	for name in world.command_names("zz_map"):
-		add_command(name, _cmd_map, "Play a map next: zz_map <id> (when this one ends)", "")
-	add_command("zz_rotation", _cmd_rotation,
-		"zz_rotation [name]: switch to a rotation in maps.yml, or list them", DotAdminFlags.CHANGEMAP)
-	add_command("zz_maps_reload", _cmd_maps_reload, "Re-read maps.yml", DotAdminFlags.CHANGEMAP)
-	var _file_cvar := add_cvar("sv_map_rotation_file", world.config.map_rotation_file,
-		"maps.yml: the maps that rotate, in named rotations. Unlisted maps stay installed.")
-	_file_cvar.changed.connect(func(_old: String, new_value: String) -> void:
-		world.config.map_rotation_file = new_value.strip_edges()
-		var _read := world.load_rotation()
-		if vote != null:
-			vote.refresh_maps())
-	add_command("zz_say", _cmd_say, "Say something to everybody, as the server")
-	add_command("zz_boxes", _cmd_boxes, "List the box types and what each can do")
-	add_command("zz_class", _cmd_class, "List the classes, or pick one for your next spawn: zz_class [id] [model]")
-	# What an admin does to a server to see what happens: a zombie, a box, a mob, a brute.
-	add_command("zz_spawn", _cmd_spawn, "Spawn a zombie: zz_spawn <kind> [count] (near you, or the team)", "z")
-	add_command("zz_box", _cmd_box, "Drop a box: zz_box [type] (in front of you, or the team)", "z")
-	add_command("zz_mob", _cmd_mob, "Send a mob now: zz_mob [size]", "z")
-	add_command("zz_panic", _cmd_panic, "Mobs back to back: zz_panic [seconds]", "z")
+	_game_commands(world)
 
 	_wire_chat()
 	_wire_identity()
@@ -408,55 +183,35 @@ func _game_load() -> DotResult:
 	log_info("the map is up", world.describe())
 	return DotResult.success(null)
 
-
-## The maps the SERVER names for this game, fetched and added to the catalogue. Returns how
-## many documents they held.
-##
-## [b]The server's list, not this game's.[/b] A map pack used to be a `server_dependencies`
-## entry in `game.yml`, which travels in this game's own pack — so a new map meant a release
-## of the game, and a server owner could not choose which maps to run. The owner names them
-## now in their deployment's map config (dot-server-deploy's `cfg/content.yml`, which fills
-## [member DotGameDescriptor.maps]); [DotGameContent] fetches each pack and hands back its
-## `maps/` directory. A server that still names one under `server_dependencies` keeps working,
-## because DotGameContent reads those too.
-##
-## [b]Still server-only.[/b] The server sends the map it is playing in MAP, so a client never
-## needs a map file and none of these is in a client's content sync. With nothing named, this
-## game plays its built-in map.
-##
-## [b]Called after EVERY catalogue load[/b], not only the first: `load_from` forgets everything
-## read before, and a reload that did not come back here dropped every delivered map — which
-## is what mg-wipeout and mg-deathrun did until the three were moved onto DotGameContent.
-func _add_delivered_maps(world: ZzGame) -> int:
-	if server == null or world.catalogue == null:
-		return 0
-
-	var read := 0
-
-	for root in await DotGameContent.map_dirs(server, "maps"):
-		read += world.catalogue.add_directory(root)
-
-	return read
-
-
-## Where a map's drawn world is published: its document's `world` pack, at the owner and version
-## of the maps pack the document came from (zombie-zone-maps' release publishes both from one tag,
-## dot-ci's release-maps). Empty for a map from no pack: a client then draws its boxes, unless
-## its own checkout has the world.
-func _world_key(doc: Dictionary) -> String:
-	var pack := str(doc.get("world", ""))
-	if server == null or pack == "":
-		return ""
-
-	for key in DotGameContent.map_keys(server):
-		if not FileAccess.file_exists("%s/maps/%s.json" % [DotGameContent.mount_of(key), str(doc.get("id", ""))]):
-			continue
-		var slash := key.find("/")
-		var at := key.rfind("@")
-		if slash > 0 and at > slash:
-			return "%s/%s@%s" % [key.substr(0, slash), pack, key.substr(at + 1)]
-
-	return ""
+## The commands the game adds to the console, the map ones under the names maps.yml gives them.
+func _game_commands(world: ZzGame) -> void:
+	add_command("zz_status", _cmd_status, "Show the map, the survivors and the horde")
+	add_command("zz_net", _cmd_net, "Show what the netcode is doing")
+	# The map commands are renameable from maps.yml's `commands:` block, like dot-vote's roles.
+	for name in world.command_names("zz_maps"):
+		add_command(name, _cmd_maps, "List the maps, and any refused file")
+	for name in world.command_names("zz_reload"):
+		add_command(name, _cmd_reload, "Read the map directory again (from the next map)")
+	for name in world.command_names("zz_map"):
+		add_command(name, _cmd_map, "Play a map next: zz_map <id> (when this one ends)", "")
+	add_command("zz_rotation", _cmd_rotation,
+		"zz_rotation [name]: switch to a rotation in maps.yml, or list them", DotAdminFlags.CHANGEMAP)
+	add_command("zz_maps_reload", _cmd_maps_reload, "Re-read maps.yml", DotAdminFlags.CHANGEMAP)
+	var _file_cvar := add_cvar("sv_map_rotation_file", world.config.map_rotation_file,
+		"maps.yml: the maps that rotate, in named rotations. Unlisted maps stay installed.")
+	_file_cvar.changed.connect(func(_old: String, new_value: String) -> void:
+		world.config.map_rotation_file = new_value.strip_edges()
+		var _read := world.load_rotation()
+		if vote != null:
+			vote.refresh_maps())
+	add_command("zz_say", _cmd_say, "Say something to everybody, as the server")
+	add_command("zz_boxes", _cmd_boxes, "List the box types and what each can do")
+	add_command("zz_class", _cmd_class, "List the classes, or pick one for your next spawn: zz_class [id] [model]")
+	# What an admin does to a server to see what happens: a zombie, a box, a mob, a brute.
+	add_command("zz_spawn", _cmd_spawn, "Spawn a zombie: zz_spawn <kind> [count] (near you, or the team)", "z")
+	add_command("zz_box", _cmd_box, "Drop a box: zz_box [type] (in front of you, or the team)", "z")
+	add_command("zz_mob", _cmd_mob, "Send a mob now: zz_mob [size]", "z")
+	add_command("zz_panic", _cmd_panic, "Mobs back to back: zz_panic [seconds]", "z")
 
 
 ## Who somebody is reaches the world: a face as they are seated, and the real name and face
@@ -471,7 +226,6 @@ func _wire_identity() -> void:
 	hook_post("player_admitted", _on_profile)
 	hook_post("player_avatar_changed", _on_profile)
 	hook_post("player_renamed", _on_profile)
-
 
 ## What a session looks like: what dot-platform resolved for them, or the stock person.
 ##
@@ -496,7 +250,6 @@ func _avatar_for(session_id: int) -> DotAvatar:
 
 	return null
 
-
 func _on_profile(event: DotEvent) -> void:
 	var session_id := event.get_int("userid")
 	var session := server.session_by_userid(session_id) if server != null else null
@@ -506,7 +259,6 @@ func _on_profile(event: DotEvent) -> void:
 		return
 
 	link.refresh_player(session_id, session.display_name, _avatar_for(session_id))
-
 
 ## The numbers an operator is actually going to want to change, as cvars.
 ##
@@ -685,6 +437,16 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.special_interval_min = value)
 	_tunable("zz_special_max", config.special_interval_max, "Seconds between specials, to",
 		func(value: float) -> void: config.special_interval_max = value)
+	_add_tunables_specials(world)
+	_add_tunables_specials_2(world)
+	_add_tunables_survival(world)
+	_add_tunables_survival_2(world)
+
+
+## The tunables of the specials added with the animated models.
+func _add_tunables_specials(world: ZzGame) -> void:
+	var config := world.config
+
 	# The specials added with the animated models. Each writes the configuration (the next map's
 	# catalogue) and the live catalogue's definition (the next one spawned), because a brain
 	# reads its numbers from its definition.
@@ -750,6 +512,11 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.box_drop_common = clampf(value, 0.0, 1.0))
 	_tunable("zz_box_special", config.box_drop_special, "Chance a special drops a box",
 		func(value: float) -> void: config.box_drop_special = clampf(value, 0.0, 1.0))
+
+
+func _add_tunables_specials_2(world: ZzGame) -> void:
+	var config := world.config
+
 	_tunable("zz_box_carry", float(config.box_carry), "How many boxes a survivor carries (0: E opens them on the ground)",
 		func(value: float) -> void: config.box_carry = int(value))
 	_tunable("zz_box_deploy_seconds", config.box_deploy_seconds, "Seconds primary fire is held to open a carried box (0.5 to 15, default 1; the config file key is box_deploy_seconds)",
@@ -813,6 +580,12 @@ func _add_tunables(world: ZzGame) -> void:
 			config.spectate_camera = clampi(int(value), 0, 2)
 			if world.spectate != null:
 				world.spectate.set_force_camera(config.spectate_camera))
+
+
+## The tunables of how a survival map is held, the stand-ins and the zombies' skill.
+func _add_tunables_survival(world: ZzGame) -> void:
+	var config := world.config
+
 	# How a survival map is held: `zz_survival waves|nights|clock` (by name or 0/1/2), and its
 	# numbers. Read when a hold begins, so a change takes from the next survival map.
 	var style := add_cvar("zz_survival", config.survival_style_name(),
@@ -865,6 +638,11 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.respawn_healthy_scale = value)
 	_tunable("zz_respawn_scarce_scale", config.respawn_scarce_scale, "Timed respawn: multiplier with few survivors up",
 		func(value: float) -> void: config.respawn_scarce_scale = value)
+
+
+func _add_tunables_survival_2(world: ZzGame) -> void:
+	var config := world.config
+
 	_tunable("zz_respawn_per_wave", config.respawn_per_wave_seconds, "Timed respawn: seconds added per wave after the first",
 		func(value: float) -> void: config.respawn_per_wave_seconds = value)
 	_tunable("zz_respawn_difficulty_step", config.respawn_difficulty_step, "Timed respawn: delay fraction per difficulty step above normal",
@@ -928,7 +706,6 @@ func _set_meta(world: ZzGame, kind: StringName, key: String, value: float) -> vo
 	if def != null:
 		def.meta[key] = value
 
-
 ## dot-combat's `mp_friendlyfire` and this game's `zz_friendly_fire` / `zz_friendly_fire_mode` set the same rule, and the config's won on every difficulty change. Now `mp_friendlyfire 0` means mode 0 (off), `1` turns an off mode back to the default 2, and the cvar mirrors what the config resolved to. Defaults are unchanged.
 func _reconcile_friendly_fire(world: ZzGame, made: Array) -> void:
 	var ff: Object = null
@@ -953,15 +730,14 @@ func _reconcile_friendly_fire(world: ZzGame, made: Array) -> void:
 			ff.call(&"force_set", text)
 			_mirroring_ff = false
 
-
 var _mirroring_ff := false
-var _admin_rng := RandomNumberGenerator.new()
-var _admin_rng_game: Object = null
 
+var _admin_rng := RandomNumberGenerator.new()
+
+var _admin_rng_game: Object = null
 
 func _apply_friendly_fire(world: ZzGame) -> void:
 	world.apply_friendly_fire()
-
 
 ## A number as an operator would type it: `34`, not `34.000000`.
 ##
@@ -972,7 +748,6 @@ func _apply_friendly_fire(world: ZzGame) -> void:
 ## then reported that the game would not load.
 static func _number(value: float) -> String:
 	return "%d" % int(round(value)) if is_equal_approx(value, round(value)) else "%.3f" % value
-
 
 ## Empty when [param value] is inside what the cvar takes, else why not (see [ZzCaps]). The highest
 ## is the old hard cap, now the `cap_overrides` setting's default; 0 there is unlimited.
@@ -989,7 +764,6 @@ func _cap_refusal(cvar_name: String, value: float, range_of: Array) -> String:
 	if ZzCaps.PAIRS.has(cvar_name):
 		return ZzCaps.pair_refusal(cvar_name, value, float((game as ZzGame).config.get(ZzCaps.PAIRS[cvar_name][0])))
 	return ""
-
 
 ## One cvar, its default taken from the configuration rather than written twice.
 ##
@@ -1021,7 +795,6 @@ func _tunable(
 		log_info("a tunable changed", {"cvar": cvar_name, "now": new_value})
 	)
 
-
 ## [b]Nothing to undo.[/b] The commands are the module's own and [DotModule] removes them;
 ## the netcode, the bridge and the roster are [DotGameModule]'s and it tears them down in
 ## the reverse order it built them. The world is NOT this module's to free: it was in the
@@ -1041,13 +814,11 @@ func _game_unload() -> void:
 		vote.queue_free()
 		vote = null
 
-
 ## The server slept or woke. The vote's director follows it on its own (DotGameModule finds
 ## it); the map ballot's timer is this game's, so it starts again here on waking.
 func _game_hibernation(hibernating: bool) -> void:
 	if not hibernating and vote != null:
 		vote.note_woke()
-
 
 ## Keeps enough people in the round for there to be one.
 ##
@@ -1073,7 +844,6 @@ func _game_tick(_tick: int, delta: float) -> void:
 	_keep_the_round_full()
 	_note_pings()
 
-
 ## The horde's sense workers and level of detail follow the cvars (dot-game's DotGameNpcLod).
 func _follow_npc_threads() -> void:
 	var world := game as ZzGame
@@ -1088,7 +858,6 @@ func _follow_npc_threads() -> void:
 	if npc_lod == null or npc_lod.spawner != world.horde.spawner:
 		var _lod := attach_npc_lod(world.horde.spawner)
 
-
 ## Each session's ping onto its player, for the Tab board. dot-server already keeps it.
 func _note_pings() -> void:
 	var world := game as ZzGame
@@ -1098,7 +867,6 @@ func _note_pings() -> void:
 		var who: ZzPlayer = world.players.get(ZzNetBridge.player_key(session.userid))
 		if who != null:
 			who.ping_ms = session.ping_ms
-
 
 func _keep_the_round_full() -> void:
 	var world := game as ZzGame
@@ -1155,7 +923,6 @@ func _keep_the_round_full() -> void:
 		var leaving: StringName = _bot_ids.pop_back()
 		bridge.call("remove_player", ZzNetBridge.session_of(leaving))
 
-
 ## Names for the stand-ins, so a scoreboard of four of them is readable: one nobody in
 ## [param world] has yet, from this game's own survivors through dot-bot's [DotBotNames] (which
 ## never doubles one up and is the same from run to run). Drawn at random, it once gave a
@@ -1167,7 +934,6 @@ static func _bot_name(world: ZzGame) -> String:
 		taken.append((world.players[id] as ZzPlayer).display_name)
 
 	return DotBotNames.pick(taken, world.players.size(), ZzBots.BOT_NAMES)
-
 
 ## Joins the bridge's chat seam to the services layer's router.
 ##
@@ -1182,7 +948,6 @@ func _wire_chat() -> void:
 
 	bridge.connect("say_requested", _on_say_requested)
 	services.connect("command_entered", _on_chat_command)
-
 
 ## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
 ##
@@ -1314,7 +1079,6 @@ func _build_vote(world: ZzGame) -> void:
 				vote.forget_voter(StringName(str(session.userid)))
 		)
 
-
 ## Votebans, dot-vote's `DotVoteBans`, and the two things team damage asks of them: a vote
 ## ([member ZzConfig.team_damage_vote]) and an outright ban ([member ZzConfig.team_damage_ban]).
 ## Loaded by path so a host whose dot-vote predates them runs without; a game never names the
@@ -1395,7 +1159,6 @@ func _build_voteban(world: ZzGame) -> void:
 				voteban.call("forget_voter", StringName(str(session.userid)))
 		)
 
-
 ## "admin", "staff" or "player", for the voteban's start and immunity roles.
 func _role_of(userid: int) -> String:
 	var session := server.session_by_userid(userid) if server != null else null
@@ -1408,7 +1171,6 @@ func _role_of(userid: int) -> String:
 
 	return "staff" if session.has_permission(DotAdminFlags.GENERIC) else "player"
 
-
 func _announce(line: String) -> void:
 	var chat: Object = services.get("chat") if services != null else null
 
@@ -1416,7 +1178,6 @@ func _announce(line: String) -> void:
 		var _said: Variant = chat.call("announce", line, ZzServices.CH_ALL)
 	elif server != null:
 		server.broadcast_message(line)
-
 
 ## Bans a connected person for [param minutes] (0 for ever) and removes them, the way dot-server's
 ## own `ban` command does: by account, by address for a guest.
@@ -1438,7 +1199,6 @@ func _ban_player(userid: int, minutes: float, reason: String, by: String) -> voi
 	var _also := server.enforce_bans("Banned: %s" % reason)
 	_announce("%s was banned: %s" % [name, reason])
 
-
 ## The map is what a server listing prints, reported on every rebuild: the server forgets it
 ## whenever a game unloads, and a browser showing last round's map is a browser lying.
 func _wire_map(world: ZzGame) -> void:
@@ -1451,7 +1211,6 @@ func _wire_map(world: ZzGame) -> void:
 		_attach_visibility(world)
 	)
 
-
 ## The checkout's converted world's PVS as the snapshot visibility (cvar net_visibility; dot-game 52). A map
 ## whose world is not on disk here (a server running the maps pack) clears it and sends by distance alone.
 func _attach_visibility(world: ZzGame) -> void:
@@ -1463,7 +1222,6 @@ func _attach_visibility(world: ZzGame) -> void:
 		var read: DotResult = (load("res://addons/dot_map/bsp/dot_map_bsp_mesh.gd") as GDScript).call(&"load_prefix", prefix)
 		mesh = read.value if read.ok else null
 	var _on: Variant = call(&"use_map_visibility", mesh)
-
 
 ## An achievement is told to the one person who earned it.
 ##
@@ -1512,7 +1270,6 @@ func _wire_progress(world: ZzGame) -> void:
 			bridge.call("notice", peer_id, "Achievement: %s (+%d)" % [title, points])
 	)
 
-
 func _on_say_requested(peer_id: int, channel_id: StringName, text: String) -> void:
 	var said: DotResult = services.call("say", peer_id, channel_id, text)
 
@@ -1522,7 +1279,6 @@ func _on_say_requested(peer_id: int, channel_id: StringName, text: String) -> vo
 	# Back to the one person who asked. A refusal broadcast would be a rate limit announced
 	# to the server.
 	bridge.call("notice", peer_id, said.error.message)
-
 
 ## A `!command` typed into chat. Run through the console as the person who typed it.
 ##
@@ -1543,7 +1299,6 @@ func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) ->
 	):
 		bridge.call("notice", peer_id, reply)
 
-
 func _cmd_say(ctx: DotCmdContext) -> void:
 	var text := ctx.rest()
 
@@ -1563,7 +1318,6 @@ func _cmd_say(ctx: DotCmdContext) -> void:
 
 	ctx.reply("Said: %s" % text)
 
-
 func _cmd_status(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 
@@ -1572,7 +1326,6 @@ func _cmd_status(ctx: DotCmdContext) -> void:
 		return
 
 	ctx.reply_lines(world.describe_lines())
-
 
 func _cmd_net(ctx: DotCmdContext) -> void:
 	if bridge == null:
@@ -1584,7 +1337,6 @@ func _cmd_net(ctx: DotCmdContext) -> void:
 	if services != null:
 		ctx.reply_lines(services.call("describe_lines"))
 
-
 func _cmd_maps(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 
@@ -1594,7 +1346,6 @@ func _cmd_maps(ctx: DotCmdContext) -> void:
 
 	ctx.reply_lines(world.catalogue.describe_lines())
 	ctx.reply("playing: %s" % str(world.map_doc.get("id", "-")))
-
 
 func _cmd_map(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1610,7 +1361,6 @@ func _cmd_map(ctx: DotCmdContext) -> void:
 
 	world.next_map_id = id
 	ctx.reply("%s is next, from the end of this round." % String(id))
-
 
 func _cmd_rotation(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1637,7 +1387,6 @@ func _cmd_rotation(ctx: DotCmdContext) -> void:
 
 	ctx.reply("Rotation: %s" % wanted)
 
-
 func _cmd_maps_reload(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 
@@ -1651,7 +1400,6 @@ func _cmd_maps_reload(ctx: DotCmdContext) -> void:
 		vote.refresh_maps()
 
 	ctx.reply("maps.yml read." if read.ok else read.error.message)
-
 
 func _cmd_boxes(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1669,7 +1417,6 @@ func _cmd_boxes(ctx: DotCmdContext) -> void:
 
 		ctx.reply("%-12s %-18s %s" % [String(id), str(box["title"]), ", ".join(titles)])
 
-
 ## An admin command that spawns or drops something asks the physics space (floor rays, sight),
 ## so between ticks it waits for the next one; its reply comes from there.
 func _in_tick(fn: Callable) -> void:
@@ -1678,7 +1425,6 @@ func _in_tick(fn: Callable) -> void:
 		fn.call()
 	else:
 		world.tick_gate.run(fn)
-
 
 ## Where an admin command puts something: in front of whoever typed it, or by the team.
 func _command_spot(ctx: DotCmdContext, ahead: float) -> Vector3:
@@ -1698,10 +1444,8 @@ func _command_spot(ctx: DotCmdContext, ahead: float) -> Vector3:
 	var at := who.feet() + who.aim_direction() * Vector3(1.0, 0.0, 1.0) * ahead
 	return world.horde.snap_to_nav(at) if world.horde != null else at
 
-
 func _cmd_spawn(ctx: DotCmdContext) -> void:
 	_in_tick(_spawn_in_tick.bind(ctx))
-
 
 func _spawn_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1728,7 +1472,6 @@ func _spawn_in_tick(ctx: DotCmdContext) -> void:
 
 	ctx.reply("%d %s." % [made, String(kind)])
 
-
 ## Admin spawn and box commands draw from the round's seed, never the global RNG, so a seeded
 ## round with the same commands repeats. Reseeded when the game object changes.
 func _admin_stream(world: ZzGame) -> RandomNumberGenerator:
@@ -1736,7 +1479,6 @@ func _admin_stream(world: ZzGame) -> RandomNumberGenerator:
 		_admin_rng_game = world
 		_admin_rng.seed = int(world.config.seed_value) ^ hash("admin commands")
 	return _admin_rng
-
 
 func _cmd_class(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1757,10 +1499,8 @@ func _cmd_class(ctx: DotCmdContext) -> void:
 		else DotResult.fail(DotError.CODE_INVALID, "Not in the game.")
 	ctx.reply("You will be %s from your next spawn." % ctx.arg(0) if res.ok else res.error.message)
 
-
 func _cmd_box(ctx: DotCmdContext) -> void:
 	_in_tick(_box_in_tick.bind(ctx))
-
 
 func _box_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1778,10 +1518,8 @@ func _box_in_tick(ctx: DotCmdContext) -> void:
 	var _dropped := world.boxes.drop(type, _command_spot(ctx, 2.0))
 	ctx.reply("A %s." % world.boxes.title_of(type))
 
-
 func _cmd_mob(ctx: DotCmdContext) -> void:
 	_in_tick(_mob_in_tick.bind(ctx))
-
 
 func _mob_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1796,7 +1534,6 @@ func _mob_in_tick(ctx: DotCmdContext) -> void:
 		return
 
 	ctx.reply("%d coming." % world.horde.spawn_mob(size))
-
 
 func _cmd_panic(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1813,7 +1550,6 @@ func _cmd_panic(ctx: DotCmdContext) -> void:
 
 	world.horde.panic(seconds)
 	ctx.reply("Panic for %d s." % int(seconds))
-
 
 func _cmd_reload(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
@@ -1832,7 +1568,6 @@ func _cmd_reload(ctx: DotCmdContext) -> void:
 	ctx.reply("%d documents read; %d refused. The next map draws from them." % [
 		loaded, world.catalogue.refused.size()])
 
-
 ## This game's columns on the Tab board: kills, specials, points.
 func _game_board_fields(session: Object) -> Dictionary:
 	var world := game as ZzGame
@@ -1843,7 +1578,6 @@ func _game_board_fields(session: Object) -> Dictionary:
 
 	return {"points": who.points, "kills": who.commons_killed, "specials": who.specials_killed, "team": ZzGame.SURVIVORS}
 
-
 func describe() -> Dictionary:
 	var out := super.describe()
 	var world := game as ZzGame
@@ -1852,7 +1586,6 @@ func describe() -> Dictionary:
 		out.merge({"round": world.round_number, "world": world.describe()}, true)
 
 	return out
-
 
 ## Hand-written cvars whose name is not `zz_<field>`: cvar -> config field.
 const HAND_FIELDS := {
@@ -1877,7 +1610,6 @@ const HAND_FIELDS := {
 
 ## The admin web page and F9 panel over the config; HTTP only with `workbench.enabled` in cfg/server.yml.
 var workbench: DotGameWorkbench = null
-
 
 ## Every [ZzConfig] field as a `zz_<field>` cvar, a cfg/ yml key and a workbench set. A hand-written cvar keeps its own code; a workbench or yml edit is pushed through it.
 func _bind_config(world: ZzGame) -> void:
@@ -1910,7 +1642,6 @@ func _bind_config(world: ZzGame) -> void:
 		var text := world.config.survival_style_name() if key == "survival_style" else DotGameConfigBinder._to_text(value)
 		console.set_cvar(hand[key], text))
 
-
 ## Puts the gore cvars on dot-npc's process-wide dial; live, so a workbench edit takes effect on the next shot.
 func _apply_gore(config: DotConfig) -> void:
 	DotNpcGore.level = int(config.get(&"gore_level"))
@@ -1918,16 +1649,13 @@ func _apply_gore(config: DotConfig) -> void:
 	DotNpcGore.max_wounds = int(config.get(&"gore_max_wounds"))
 	ZzZombieView.attack_anim = int(config.get(&"attack_anim"))
 
-
 func _noblock_side(id: Variant) -> Variant:
 	var game_world := game as ZzGame
 	var side := int(game_world.sides.get(id, 0)) if game_world != null else 0
 	return str(side) if side > 0 else ""
 
-
 func _noblock_runtime() -> Object:
 	return (game as ZzGame).ensure_runtime()
-
 
 ## `!block` and `!noblock` find a player by `u<userid>`, the key every survivor is seated under.
 func _build_noblock() -> DotResult:
@@ -1937,7 +1665,6 @@ func _build_noblock() -> DotResult:
 			var session: Variant = ctx.get("session")
 			return ZzNetBridge.player_key(int(session.get("userid"))) if session is Object else null)
 	return built
-
 
 func _start_workbench(world: ZzGame) -> void:
 	var rt := world.ensure_runtime()

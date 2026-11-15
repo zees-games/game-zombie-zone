@@ -1,54 +1,4 @@
-extends RefCounted
-
-const ZzMaterials := preload("zz_materials.gd")
-const ZzFixtures := preload("zz_fixtures.gd")
-
-## What a map IS: a JSON document, checked here before anything is built.
-##
-## [b]A map is a document, not a scene[/b], for mg-wipeout's reason, which every map-driven game
-## in this family has taken since: a scene per map is content to import, to rebase inside a
-## mounted pack and to keep in step across a server and every client; a document is a few tens
-## of kilobytes the server reads off disk and SENDS to each client when the map changes. A
-## client needs no map files, a server gets a new map by having a file dropped in a directory,
-## and the two ends cannot disagree about where a wall or a chair is, because there is one copy
-## and it travelled.
-##
-## [b]What is in one:[/b] boxes (the streets, the buildings, the barricades), props (cars, crates,
-## furniture, by catalogue id), lights, where the survivors start, and how the sky looks. Then
-## what makes it a zombie map rather than a room:
-##
-## [codeblock]
-## mode          "exodus" (get from the start shelter to the end one) or "survival" (hold out)
-## survivors     the team the map is built for; stand-ins fill to it (ZzConfig.team_from_map);
-##               unsaid (0), the server's own number
-## areas         {start: [area], end: [area]}: the safe rooms, each {min, max}
-## route         the critical path the director spawns AHEAD along, start to end
-## nav           {spacing, floors: [[x0, z0, x1, z1, y]], links: [[from xyz, to xyz]]}
-## terrain       a converted map's displacement ground (dot-map's DotMapTerrain), with the walk mask
-## items         weapons, ammo, medkits, pills and boxes lying where a mapper left them
-## mechanics     true when the document's boxes leave out the world's movers, so a global pack's lifts and doors run
-## traders       shelves of priced stock: {at, yaw?, pool?, slots?, spacing?, restock?}, the stock from the spawner config's pool
-## spawners      weapon and supply spawners (dot-weapon docs/spawners.md): {at, pool?, tags_any?, respawn?, max?...}
-## objectives    things to do on the way: press a button, hold out while the horde comes
-## gates         a box with a "gate" id is a door an objective opens
-## sleepers      where the crying one sits, waiting for somebody to come too close
-## posts         survival: where a team holds; stand-ins spread over them
-## caches        survival: where supplies are restocked in every breather, better each wave
-## barricades    survival: [{id, label, health}]; a box with a "barricade" id is part of one:
-##               solid, but on the zombies' ground, so they come to it and break it down
-## day_environment  survival by nights: the sky by day (the map's `environment` is its night)
-## [/codeblock]
-##
-## Every length is metres, every angle degrees. A box's `at` is its CENTRE; a prop's `at` is the
-## middle of its footprint ON the floor, so a mapper places a car by where it stands.
-##
-## [b]Normalised into plain arrays, never vectors.[/b] What a server encodes is what this
-## returned, and a vector's float32 components come back out of JSON as `0.300000011920929`:
-## twice the bytes for a map of a thousand boxes and a document whose digest moves when nothing
-## did. Rounded to the millimetre here, once.
-##
-## `maps/README.md` in zombie-zone-maps is the mapper's copy of this.
-
+extends "zz_map_doc_base.gd"
 
 ## The format this build reads. A document written for a later one is refused rather than
 ## half-built.
@@ -58,12 +8,14 @@ const FORMAT := 1
 const TRIM_SIZE := 0.3
 
 const KIND := "zombiezone_map"
+
 ## The words a hidden box's `kind` may take.
 const HIDDEN_KINDS: PackedStringArray = ["clip", "nodraw", "sky"]
 
 ## The most a document may be on the wire, deflated: a safety bound against a hostile server, not a budget. A map bigger than
 ## one message goes as MAP_PART pieces ([constant ZzEvents.MAP_PART_BYTES]), so a browser's 64 KiB outbound buffer no longer sizes a map.
 const WIRE_LIMIT := 32 * 1024 * 1024
+
 ## The most a reader inflates (a corrupt header would otherwise allocate whatever it says).
 const WIRE_INFLATED_MAX := 256 * 1024 * 1024
 
@@ -71,36 +23,55 @@ const WIRE_INFLATED_MAX := 256 * 1024 * 1024
 const WORLD_PREFIX := "zz_world_"
 
 const MAX_BOXES := 400000
+
 const MAX_PROPS := 20000
+
 const MAX_TOYS := 96
+
 ## Loose props the converter marked (free barrels) and the breakables that hold them up; the drawn world's own.
 const MAX_LOOSE := 256
+
 const MAX_SUPPORTS := 128
+
 ## Every lamp of the source is kept (the bake uses all of them); the game lights only the nearest few
 ## at once ([constant ZzMap.REALTIME_LAMPS]), so this bounds the document, not the frame.
 const MAX_LIGHTS := 16384
 
 const MAX_WATER := 256
+
 ## Solid-prop boxes a document may hold (a safety bound; the largest converted map has a few thousand).
 const MAX_SOLID_PROPS := 200000
+
 const MAX_SPAWNS := 256
+
 const MAX_ITEMS := 4000
+
 const MAX_OBJECTIVES := 16
+
 const MAX_ROUTE := 2048
+
 const MAX_NAV_FLOORS := 50000
+
 const MAX_NAV_LINKS := 50000
+
 const MAX_SLEEPERS := 256
+
 const MAX_AREAS := 64
 
 ## The two ways a map is played. Exodus was called "campaign" until the first play test asked
 ## for a name of its own; a document that still says "campaign" is read as exodus.
 const EXODUS := "exodus"
+
 const SURVIVAL := "survival"
+
 const LEGACY_CAMPAIGN := "campaign"
 
 const MAX_TEAM := 64
+
 const MAX_POSTS := 64
+
 const MAX_CACHES := 32
+
 const MAX_BARRICADES := 96
 
 ## What a mapper may leave lying about. `box` is one of the random boxes (by `id`, or any).
@@ -124,7 +95,6 @@ const DEFAULT_ENV := {
 	"fog": 0.0,
 }
 
-
 ## What the converter writes when the source map says nothing of its light.
 const IMPORTER_ENV := {
 	"sky_top": [0.02, 0.03, 0.07], "sky_horizon": [0.08, 0.1, 0.15], "ground": [0.03, 0.03, 0.04],
@@ -135,14 +105,12 @@ const IMPORTER_ENV := {
 ## Sky names that are dark by name (dot-map's build_environment reads the same words).
 const NIGHT_SKY_WORDS := ["night", "dark", "black", "space", "star"]
 
-
 ## True when [param env] is the converter's placeholder, so the drawn world's own entities decide.
 static func is_importer_env(env: Dictionary) -> bool:
 	for key: String in IMPORTER_ENV:
 		if not env.has(key) or str(env[key]) != str(_floats(IMPORTER_ENV[key], 3) if IMPORTER_ENV[key] is Array else float(IMPORTER_ENV[key])):
 			return false
 	return true
-
 
 ## An `environment` block from a drawn world's own light_environment, env_fog_controller and sky
 ## name (dot-map's `environment_data()`); {} when it has no sun or sky to read.
@@ -194,7 +162,6 @@ static func environment_from_world(data: Dictionary) -> Dictionary:
 		env["fog_end"] = maxf(float(off.get("end", 0.0)), 600.0)
 	return env
 
-
 ## Puts [param derived] (from [method environment_from_world]) into [param doc]. A hold fades between
 ## the placeholder night and a day, so a derived day becomes its `day_environment` and the night stays;
 ## a derived night, or any other mode, replaces the `environment`.
@@ -204,7 +171,6 @@ static func take_derived_light(doc: Dictionary, derived: Dictionary) -> void:
 		doc["day_environment"] = derived
 	else:
 		doc["environment"] = derived
-
 
 ## Reads a document from JSON text, and checks it.
 static func parse_json(text: String, origin: String = "") -> DotResult:
@@ -220,6 +186,52 @@ static func parse_json(text: String, origin: String = "") -> DotResult:
 		return DotResult.fail(DotError.CODE_PARSE, "The map is not a JSON object.", origin)
 
 	return validate(json.data as Dictionary)
+
+## The navigation and terrain part of [method validate] into `doc`: the refusal text, or "" when it reads.
+static func _nav_block(source: Dictionary, doc: Dictionary) -> String:
+	var nav_in: Variant = source.get("nav", {})
+	var nav := {"spacing": 1.0, "clearance": 0.35, "floors": [], "links": []}
+
+	if nav_in is Dictionary:
+		nav["spacing"] = clampf(float((nav_in as Dictionary).get("spacing", 1.0)), 0.5, 4.0)
+		nav["clearance"] = clampf(float((nav_in as Dictionary).get("clearance", 0.35)), 0.1, 1.5)
+		if (nav_in as Dictionary).has("under_feet"):
+			nav["under_feet"] = clampf(float((nav_in as Dictionary)["under_feet"]), 0.0, 1.5)
+		if (nav_in as Dictionary).has("bridge"):
+			nav["bridge"] = clampf(float((nav_in as Dictionary)["bridge"]), 0.0, 6.0)
+		for raw: Variant in (nav_in as Dictionary).get("floors", []):
+			var f := _floats(raw, 5)
+			if f[2] <= f[0] or f[3] <= f[1]:
+				return "a nav floor %s is not [x0, z0, x1, z1, y] with x1 > x0 and z1 > z0" % str(raw)
+			(nav["floors"] as Array).append(f)
+		for raw: Variant in (nav_in as Dictionary).get("links", []):
+			(nav["links"] as Array).append(_floats(raw, 6))
+		# [pad xyz, destination xyz]: a trigger_teleport a body steps on, one way (ZzNavGraph.apply_teleports).
+		var teleports: Array = []
+		for raw: Variant in (nav_in as Dictionary).get("teleports", []):
+			teleports.append(_floats(raw, 6))
+		if not teleports.is_empty():
+			nav["teleports"] = teleports
+
+	if (nav["floors"] as Array).size() > MAX_NAV_FLOORS or (nav["links"] as Array).size() > MAX_NAV_LINKS:
+		return "too many nav floors or links"
+
+	var walked := 0
+	if source.has("terrain"):
+		if not (source["terrain"] is Dictionary):
+			return "terrain is not a dictionary"
+		var ground := DotMapTerrain.from_dict(source["terrain"])
+		if not ground.ok:
+			return "terrain: %s" % str(ground)
+		walked = (ground.value as DotMapTerrain).describe()["walk"]
+		doc["terrain"] = source["terrain"]
+
+	if (nav["floors"] as Array).is_empty() and walked == 0:
+		return "no nav floors: the zombies would have nowhere to walk"
+
+	doc["nav"] = nav
+
+	return ""
 
 
 ## Checks a document and returns a normalised copy of it: every optional field present, every
@@ -498,47 +510,9 @@ static func validate(source: Dictionary) -> DotResult:
 	doc["route"] = route
 
 	# --- Navigation ------------------------------------------------------------
-	var nav_in: Variant = source.get("nav", {})
-	var nav := {"spacing": 1.0, "clearance": 0.35, "floors": [], "links": []}
-
-	if nav_in is Dictionary:
-		nav["spacing"] = clampf(float((nav_in as Dictionary).get("spacing", 1.0)), 0.5, 4.0)
-		nav["clearance"] = clampf(float((nav_in as Dictionary).get("clearance", 0.35)), 0.1, 1.5)
-		if (nav_in as Dictionary).has("under_feet"):
-			nav["under_feet"] = clampf(float((nav_in as Dictionary)["under_feet"]), 0.0, 1.5)
-		if (nav_in as Dictionary).has("bridge"):
-			nav["bridge"] = clampf(float((nav_in as Dictionary)["bridge"]), 0.0, 6.0)
-		for raw: Variant in (nav_in as Dictionary).get("floors", []):
-			var f := _floats(raw, 5)
-			if f[2] <= f[0] or f[3] <= f[1]:
-				return _refuse("a nav floor %s is not [x0, z0, x1, z1, y] with x1 > x0 and z1 > z0" % str(raw), source)
-			(nav["floors"] as Array).append(f)
-		for raw: Variant in (nav_in as Dictionary).get("links", []):
-			(nav["links"] as Array).append(_floats(raw, 6))
-		# [pad xyz, destination xyz]: a trigger_teleport a body steps on, one way (ZzNavGraph.apply_teleports).
-		var teleports: Array = []
-		for raw: Variant in (nav_in as Dictionary).get("teleports", []):
-			teleports.append(_floats(raw, 6))
-		if not teleports.is_empty():
-			nav["teleports"] = teleports
-
-	if (nav["floors"] as Array).size() > MAX_NAV_FLOORS or (nav["links"] as Array).size() > MAX_NAV_LINKS:
-		return _refuse("too many nav floors or links", source)
-
-	var walked := 0
-	if source.has("terrain"):
-		if not (source["terrain"] is Dictionary):
-			return _refuse("terrain is not a dictionary", source)
-		var ground := DotMapTerrain.from_dict(source["terrain"])
-		if not ground.ok:
-			return _refuse("terrain: %s" % str(ground), source)
-		walked = (ground.value as DotMapTerrain).describe()["walk"]
-		doc["terrain"] = source["terrain"]
-
-	if (nav["floors"] as Array).is_empty() and walked == 0:
-		return _refuse("no nav floors: the zombies would have nowhere to walk", source)
-
-	doc["nav"] = nav
+	var nav_fault := _nav_block(source, doc)
+	if nav_fault != "":
+		return _refuse(nav_fault, source)
 
 	# --- Items -----------------------------------------------------------------
 	var items: Array = []
@@ -662,7 +636,6 @@ static func validate(source: Dictionary) -> DotResult:
 
 	return DotResult.success(doc)
 
-
 static func _box(raw: Variant) -> Dictionary:
 	if not (raw is Dictionary):
 		return {}
@@ -729,7 +702,6 @@ static func _box(raw: Variant) -> Dictionary:
 
 	return out
 
-
 ## Door hardware and such: a box no side of which is over 0.3 m. Neither body nor nav sees it, since a
 ## 0.1 m latch on a jamb wedged zombies in a doorway for minutes (ze_nuke_beta) and a mover cannot use it.
 static func is_trim(box: Dictionary) -> bool:
@@ -738,7 +710,6 @@ static func is_trim(box: Dictionary) -> bool:
 
 	var size := v3(box["size"])
 	return maxf(size.x, maxf(size.y, size.z)) <= TRIM_SIZE
-
 
 ## An axis-aligned area, `{min, max}`, normalised so min is the lesser corner.
 static func _area(raw: Variant) -> Dictionary:
@@ -755,12 +726,10 @@ static func _area(raw: Variant) -> Dictionary:
 
 	return {"min": lo, "max": hi}
 
-
 ## An area as an [AABB].
 static func area_box(area: Dictionary) -> AABB:
 	var lo := v3(area.get("min", [0, 0, 0]))
 	return AABB(lo, v3(area.get("max", [0, 0, 0])) - lo)
-
 
 static func _prop(raw: Variant) -> Dictionary:
 	if not (raw is Dictionary):
@@ -779,7 +748,6 @@ static func _prop(raw: Variant) -> Dictionary:
 
 	return out
 
-
 ## The document as the wire carries it: a map with `wire_lamps` (the bake's fingerprint) also carries a digest of its lamps.
 ## Applying it twice changes nothing, so both ends digest the same text.
 static func wire_form(doc: Dictionary) -> Dictionary:
@@ -793,7 +761,6 @@ static func wire_form(doc: Dictionary) -> Dictionary:
 
 	return out
 
-
 ## What a bake of the lamps is checked against: the lamps themselves, or for a map with `wire_lamps` a digest
 ## of all of them (a client holds only the first few, and has the digest it was sent).
 static func lamps_key(doc: Dictionary) -> Variant:
@@ -802,7 +769,6 @@ static func lamps_key(doc: Dictionary) -> Variant:
 
 	var wired := wire_form(doc)
 	return wired["lights_digest"] if wired.has("lights_digest") else doc.get("lights", [])
-
 
 ## A normalised document as bytes: JSON, deflated, behind both its lengths.
 static func encode(doc: Dictionary) -> PackedByteArray:
@@ -815,7 +781,6 @@ static func encode(doc: Dictionary) -> PackedByteArray:
 	out.encode_u32(4, packed.size())
 	out.append_array(packed)
 	return out
-
 
 static func decode(bytes: PackedByteArray) -> DotResult:
 	if bytes.size() < 9:
@@ -836,7 +801,6 @@ static func decode(bytes: PackedByteArray) -> DotResult:
 		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire would not decompress.")
 
 	return parse_json(raw.get_string_from_utf8(), "wire")
-
 
 ## A short fingerprint of a document, for a log line and for two ends to compare.
 static func digest(doc: Dictionary) -> String:
@@ -861,7 +825,6 @@ static func _as_floats(value: Variant) -> Variant:
 		return list
 	return value
 
-
 static func v3(value: Variant) -> Vector3:
 	if value is Vector3:
 		return value
@@ -871,13 +834,11 @@ static func v3(value: Variant) -> Vector3:
 
 	return Vector3.ZERO
 
-
 static func colour(value: Variant, fallback: Color = Color.WHITE) -> Color:
 	if typeof(value) == TYPE_ARRAY and (value as Array).size() >= 3:
 		return Color(float(value[0]), float(value[1]), float(value[2]))
 
 	return fallback
-
 
 static func _floats(value: Variant, count: int) -> Array:
 	var out: Array = []
@@ -894,7 +855,6 @@ static func _floats(value: Variant, count: int) -> Array:
 
 	return out
 
-
 static func _colour_list(value: Variant) -> Array:
 	if typeof(value) == TYPE_STRING and Color.html_is_valid(str(value)):
 		var c := Color.html(str(value))
@@ -902,11 +862,9 @@ static func _colour_list(value: Variant) -> Array:
 
 	return value if typeof(value) == TYPE_ARRAY else [1.0, 1.0, 1.0]
 
-
 ## Millimetres, as a double JSON prints short.
 static func _r(value: float) -> float:
 	return snappedf(value, 0.001)
-
 
 ## The numbers of a list as ints; anything else in it is dropped.
 static func _ints(value: Variant) -> Array:
@@ -917,7 +875,6 @@ static func _ints(value: Variant) -> Array:
 				out.append(int(v))
 	return out
 
-
 ## The six-number boxes (`[x0, y0, z0, x1, y1, z1]`) of a list; a malformed one is dropped.
 static func _boxes(value: Variant) -> Array:
 	var out: Array = []
@@ -927,7 +884,6 @@ static func _boxes(value: Variant) -> Array:
 			if f is Array and (f as Array).size() == 6:
 				out.append(f)
 	return out
-
 
 ## Whether [param key] is `<owner>/<world>@<version>` for exactly [param world].
 static func _world_key_ok(key: String, world: String) -> bool:
@@ -944,7 +900,6 @@ static func _world_key_ok(key: String, world: String) -> bool:
 			if not (character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.+"):
 				return false
 	return not owner.contains("..") and not version.contains("..")
-
 
 ## An `ambient` field in its safe form: a mood id, or a dictionary of ids and clamped scales; "" for nothing usable.
 static func _ambient(raw: Variant) -> Variant:
@@ -967,7 +922,6 @@ static func _ambient(raw: Variant) -> Variant:
 		out["frequency"] = clampf(float(src["frequency"]), 0.0, 4.0)
 	return mood if out.size() == 1 else out
 
-
 static func _is_id(id: String) -> bool:
 	if id.is_empty() or id.length() > 48:
 		return false
@@ -978,7 +932,6 @@ static func _is_id(id: String) -> bool:
 			return false
 
 	return true
-
 
 static func _refuse(why: String, doc: Dictionary) -> DotResult:
 	return DotResult.fail(

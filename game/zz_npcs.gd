@@ -1,158 +1,7 @@
-extends RefCounted
-
-const ZzConfig := preload("zz_config.gd")
-const ZzMapDoc := preload("zz_map_doc.gd")
-const ZzPackList := preload("zz_packs.gd")
-const ZzNavGraph := preload("zz_nav_graph.gd")
-const ZzNpcProfiles := preload("zz_npc_profiles.gd")
-const ZzPaths := preload("zz_paths.gd")
-const ZzNavJob := preload("zz_nav_job.gd")
-
-## What can come at you, and the ground it walks on.
-##
-## [b]Twelve kinds, and only one is the crowd.[/b] The common infected are most of what is ever
-## alive; the eleven specials are each a different answer to "what does a team that sticks
-## together and shoots straight still have to fear", which is the genre's whole design:
-##
-## [codeblock]
-## common     the crowd. Weak alone, a down in seconds when it surrounds you.
-## leaper     waits crouched out of sight, then jumps from twenty metres and pins whoever strayed.
-## strangler  a tongue from cover across a street: drags one survivor away and chokes them.
-## bloater    slow and soft. Its vomit blinds you and calls every common in earshot to you;
-##            so does its bursting, which is why you shove it rather than shoot it close.
-## ram        charges in a straight line, carries whoever it hit and beats them on the floor.
-## spitter    lobs acid where you are standing, or where your friend is lying pinned.
-## rider      leaps onto a head and steers its victim away from help.
-## brute      the boss. Throws a rock, then a car's worth of fists; you shoot it together.
-## sleeper    sits crying in the dark. Leave her alone.
-## screamer   keeps its distance and screams: a mob comes for whoever it saw. Thin, quick to kill,
-##            and the one to shoot first.
-## crawler    no legs, flat on the ground, slow; grabs the ankle of whoever walks past and holds
-##            them in place, gnawing, until somebody shoves it off (the victim can still shoot).
-## riot       a common in riot gear: a shield in front that a bullet barely gets through, so it
-##            walks into the team's fire. Shot from the side or behind, or shoved round.
-## [/codeblock]
-##
-## [b]Every number here is a default the catalogue carries in `meta`.[/b] A brain reads its
-## numbers with [method DotNpcBrain.tune], so a server owner who wants a faster leaper edits a
-## definition rather than a brain; the difficulty scales on top (see [ZzConfig]).
-##
-## [b]A path, never a `class_name`, for every brain[/b], because a brain in a mounted dot-cloud
-## pack cannot resolve one.
-
-const CHANNEL := "zz.npcs"
-
-## Where built navigation graphs are kept, keyed by the map's digest. Bump the version when the
-## builder's output changes for the same document (the digest cannot see code).
-const NAV_CACHE_DIR := "user://nav_cache"
-const NAV_CACHE_VERSION := 12
-
-## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
-const NAV_BRIDGE_GAP := 2.5
-const NAV_COVER_RANGE := 1.2
-
-## How far from a post the graph's nearest point may be for a stand-in to path to it.
-const POST_SNAP := 2.5
-
-const COMMON := &"common"
-const LEAPER := &"leaper"
-const STRANGLER := &"strangler"
-const BLOATER := &"bloater"
-const RAM := &"ram"
-const SPITTER := &"spitter"
-const RIDER := &"rider"
-const BRUTE := &"brute"
-const SLEEPER := &"sleeper"
-const SCREAMER := &"screamer"
-const CRAWLER := &"crawler"
-const RIOT := &"riot"
-const MUTANT := &"mutant"
-const OIL_MONSTER := &"oil_monster"
-
-## The specials the director chooses between. Not the brute (its own clock) or the sleeper
-## (placed by the map).
-const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT, MUTANT, OIL_MONSTER]
-
-const FACTION := &"infected"
-
-static var SCENE := ZzPaths.rebase("res://npcs/zz_zombie.tscn")
-static var COMMON_BRAIN := ZzPaths.rebase("res://npcs/zz_common_brain.gd")
-static var LEAPER_BRAIN := ZzPaths.rebase("res://npcs/zz_leaper_brain.gd")
-static var STRANGLER_BRAIN := ZzPaths.rebase("res://npcs/zz_strangler_brain.gd")
-static var BLOATER_BRAIN := ZzPaths.rebase("res://npcs/zz_bloater_brain.gd")
-static var RAM_BRAIN := ZzPaths.rebase("res://npcs/zz_ram_brain.gd")
-static var SPITTER_BRAIN := ZzPaths.rebase("res://npcs/zz_spitter_brain.gd")
-static var RIDER_BRAIN := ZzPaths.rebase("res://npcs/zz_rider_brain.gd")
-static var BRUTE_BRAIN := ZzPaths.rebase("res://npcs/zz_brute_brain.gd")
-static var SLEEPER_BRAIN := ZzPaths.rebase("res://npcs/zz_sleeper_brain.gd")
-static var SCREAMER_BRAIN := ZzPaths.rebase("res://npcs/zz_screamer_brain.gd")
-static var CRAWLER_BRAIN := ZzPaths.rebase("res://npcs/zz_crawler_brain.gd")
-static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
-static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
-static var OIL_MONSTER_BRAIN := ZzPaths.rebase("res://npcs/zz_oil_monster_brain.gd")
-
-
-## The points of [param nav] that pass [param filter], thinned so no two are closer than [param spacing]:
-## what `DotNpcDirector.set_spawn_points_from_nav` returns, the same points in the same order (the first
-## of two close ones wins), but through a grid of cells one spacing wide. The director's own loop
-## compares every point with every kept one, which was 0.6 s a round on a big map.
-static func thinned_points(nav: DotNpcNavData, spacing: float, filter: DotNpcNavFilter) -> PackedVector3Array:
-	var kept := PackedVector3Array()
-
-	if nav == null or nav.points.is_empty():
-		return kept
-
-	var spacing_sq := spacing * spacing
-	var size := maxf(spacing, 0.001)
-	var cells: Dictionary = {}
-
-	for i in nav.points.size():
-		if filter != null and not filter.passes(nav.area_of(i), nav.flags_of(i)):
-			continue
-
-		var point := nav.points[i]
-		var cx := floori(point.x / size)
-		var cy := floori(point.y / size)
-		var cz := floori(point.z / size)
-		var too_close := false
-
-		for dx in range(-1, 2):
-			for dy in range(-1, 2):
-				for dz in range(-1, 2):
-					var bucket: Variant = cells.get(Vector3i(cx + dx, cy + dy, cz + dz))
-
-					if bucket == null:
-						continue
-
-					for other: Vector3 in bucket:
-						if other.distance_squared_to(point) < spacing_sq:
-							too_close = true
-							break
-
-					if too_close:
-						break
-				if too_close:
-					break
-			if too_close:
-				break
-
-		if too_close:
-			continue
-
-		kept.append(point)
-		var key := Vector3i(cx, cy, cz)
-
-		# A packed array is a value: it goes back into the dictionary after the append.
-		var bucket_in: PackedVector3Array = cells.get(key, PackedVector3Array())
-		bucket_in.append(point)
-		cells[key] = bucket_in
-
-	return kept
-
+extends "zz_npcs_base.gd"
 
 static func is_special(kind: StringName) -> bool:
 	return kind != COMMON and kind != &""
-
 
 ## The built-in kinds (twelve) with their `npc` profiles laid over them; [param roots] replaces the config roots (tests).
 static func catalogue(config: ZzConfig = null, roots: PackedStringArray = PackedStringArray()) -> DotNpcCatalogue:
@@ -183,7 +32,6 @@ static func catalogue(config: ZzConfig = null, roots: PackedStringArray = Packed
 
 	return out
 
-
 ## The thirteen kinds from code and [param c] alone, no profile; the floor the shipped ymls are written from.
 static func builtin(c: ZzConfig) -> Array:
 	var out: Array = []
@@ -191,7 +39,6 @@ static func builtin(c: ZzConfig) -> Array:
 			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c), _mutant(c), _oil_monster(c)]:
 		out.append(_eyes(def))
 	return out
-
 
 ## An installed pack's monsters (see zz_packs.gd), each the common's numbers with the pack's
 ## `spawn` on top. A special's health scale applies, as it does to every special.
@@ -218,14 +65,13 @@ static func _pack_defs(c: ZzConfig) -> Array:
 
 	return out
 
-
 ## The widest a pack monster's collider is made, whatever its data says: the nav graph and the maps' doorways are
 ## laid for a brute (0.7), and a T-Rex of 1.1 would jam in every one.
 const PACK_MAX_RADIUS := 0.9
+
 ## The tallest a pack monster's collider stands (a brute stoops under a 2.4 m lintel the same way); its hitboxes and
 ## eyes keep the full height.
 const PACK_FIT_HEIGHT := 2.1
-
 
 ## A pack monster's collider from the body the pack declares (`meta.cfg.body`: radius and height), if it declares one;
 ## otherwise the common's 0.34 by 1.8 stays.
@@ -246,7 +92,6 @@ static func _fit_collider(meta: Dictionary) -> void:
 	if h > 0.0:
 		meta["height"] = h
 		meta["fit_height"] = minf(h, PACK_FIT_HEIGHT) if h > PACK_FIT_HEIGHT else 0.0
-
 
 ## The population a map runs under. Commons are cheap; a special costs what it is worth, so the
 ## world budget is a real ceiling on how bad things can get at once.
@@ -289,12 +134,10 @@ static func _def(id: StringName, title: String, brain: String, health: float, sp
 	def.require_line_of_sight = true
 	return def
 
-
 ## Every kind looks from near the top of itself: a brute over a car, a rider from knee height.
 static func _eyes(def: DotNpcDef) -> DotNpcDef:
 	def.eye_height = float(def.meta.get("height", 1.75)) * 0.9
 	return def
-
 
 ## A common's chase speed in m/s: the slow base plus [param hard_stacks] steps, capped; a runner (or
 ## scaling off) keeps the old full run speed.
@@ -303,7 +146,6 @@ static func common_chase_speed(c: ZzConfig, hard_stacks: int, runner: bool) -> f
 		return c.common_run_speed
 
 	return DotStackScale.ramp(c.common_speed_base, c.common_speed_per_hard_stack, c.common_speed_max, hard_stacks)
-
 
 ## How see-through a zombie is drawn at the Hard Box stacks now on (`zz_mutant_fade*`, `zz_common_fade`).
 ## [param c] is a ZzConfig; commons stay solid unless `zz_common_fade` is on.
@@ -315,7 +157,6 @@ static func fade_alpha(c: Object, kind: StringName, stacks: int) -> float:
 		return 1.0
 
 	return DotStackScale.fade_alpha(stacks, float(c.get(&"mutant_fade_per_stack")), float(c.get(&"mutant_min_alpha")))
-
 
 ## The crowd.
 ##
@@ -334,7 +175,6 @@ static func _common(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 static func _leaper(c: ZzConfig) -> DotNpcDef:
 	var def := _def(LEAPER, "Leaper", LEAPER_BRAIN, 250.0 * c.special_health_scale(), 7.4, 4, DotNpcDef.Weight.LIGHT)
 	def.sight_range = 60.0
@@ -349,7 +189,6 @@ static func _leaper(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 static func _strangler(c: ZzConfig) -> DotNpcDef:
 	var def := _def(STRANGLER, "Strangler", STRANGLER_BRAIN, 250.0 * c.special_health_scale(), 4.6, 4, DotNpcDef.Weight.NORMAL)
 	def.sight_range = 50.0
@@ -362,7 +201,6 @@ static func _strangler(c: ZzConfig) -> DotNpcDef:
 		"body": "strangler", "radius": 0.32, "height": 2.0,
 	}
 	return def
-
 
 static func _bloater(c: ZzConfig) -> DotNpcDef:
 	var def := _def(BLOATER, "Bloater", BLOATER_BRAIN, 50.0, 4.0, 3, DotNpcDef.Weight.HEAVY)
@@ -377,7 +215,6 @@ static func _bloater(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 static func _ram(c: ZzConfig) -> DotNpcDef:
 	var def := _def(RAM, "Ram", RAM_BRAIN, 600.0 * c.special_health_scale(), 5.6, 5, DotNpcDef.Weight.HEAVY)
 	def.sight_range = 45.0
@@ -391,7 +228,6 @@ static func _ram(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 static func _spitter(c: ZzConfig) -> DotNpcDef:
 	var def := _def(SPITTER, "Spitter", SPITTER_BRAIN, 100.0 * c.special_health_scale(), 5.2, 3, DotNpcDef.Weight.LIGHT)
 	def.sight_range = 50.0
@@ -404,7 +240,6 @@ static func _spitter(c: ZzConfig) -> DotNpcDef:
 		"body": "spitter", "radius": 0.3, "height": 1.9,
 	}
 	return def
-
 
 static func _mutant(c: ZzConfig) -> DotNpcDef:
 	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, DotNpcDef.Weight.HEAVY)
@@ -424,7 +259,6 @@ static func _mutant(c: ZzConfig) -> DotNpcDef:
 		"body": "mutant", "radius": 0.55, "height": 2.4, "fit_height": 2.1,
 	}
 	return def
-
 
 ## The oil monster: slides, leaves a trail, spits goo that blinds and pools. `goo_*` keys are the spit's puddle, `trail_*` the trail's
 ## (dot-effects' DotHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
@@ -451,7 +285,6 @@ static func _oil_monster(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 static func _rider(c: ZzConfig) -> DotNpcDef:
 	var def := _def(RIDER, "Rider", RIDER_BRAIN, 325.0 * c.special_health_scale(), 7.0, 4, DotNpcDef.Weight.LIGHT)
 	def.sight_range = 45.0
@@ -464,7 +297,6 @@ static func _rider(c: ZzConfig) -> DotNpcDef:
 		"body": "rider", "radius": 0.28, "height": 1.2,
 	}
 	return def
-
 
 ## The boss. Its health is set at spawn from how many survivors there are; see [method brute_health].
 static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
@@ -482,11 +314,9 @@ static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
 	}
 	return def
 
-
 static func brute_health(c: ZzConfig, survivors: int, def: DotNpcDef = null) -> float:
 	var base: float = float(def.meta.get("brute_health", c.brute_health)) if def != null else c.brute_health
 	return (base + c.brute_health_per_survivor * float(maxi(survivors - 1, 0))) * c.special_health_scale()
-
 
 static func _sleeper(c: ZzConfig) -> DotNpcDef:
 	var def := _def(SLEEPER, "Sleeper", SLEEPER_BRAIN, 1000.0 * c.special_health_scale(), 7.8, 0, DotNpcDef.Weight.NORMAL)
@@ -500,7 +330,6 @@ static func _sleeper(c: ZzConfig) -> DotNpcDef:
 		"body": "sleeper", "radius": 0.3, "height": 1.6,
 	}
 	return def
-
 
 ## Thin and quick to kill; what it does is call the horde. Health is low on purpose: it is the
 ## special a team wins by noticing, not by emptying a magazine into.
@@ -517,7 +346,6 @@ static func _screamer(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-
 ## Low enough that a shot over the crowd's heads misses it, and slow; its danger is where it
 ## lies, not how fast it comes.
 static func _crawler(c: ZzConfig) -> DotNpcDef:
@@ -531,7 +359,6 @@ static func _crawler(c: ZzConfig) -> DotNpcDef:
 		"body": "crawler", "radius": 0.34, "height": 0.75,
 	}
 	return def
-
 
 ## Walks into fire behind a shield (`shield` is the share of a frontal hit that gets through).
 static func _riot(c: ZzConfig) -> DotNpcDef:
@@ -553,26 +380,38 @@ static func _riot(c: ZzConfig) -> DotNpcDef:
 ## corner stood there for a hundred seconds, sliding on six contacts, because the graph said the
 ## way was clear and the body could not step it.
 const PROP_CUT_HEIGHT := 0.3
+
 ## A drawn world's solid prop is cut only above a zombie's step (STEP_UP 0.45) and below head height: a low crate in a corridor is stepped over.
 const SOLID_PROP_CUT_HEIGHT := 0.5
+
 const SOLID_PROP_HEAD := 1.8
+
 ## A box whose underside is lower than this above a point blocks it: a body does not fit under a desk top on legs.
 ## 1.2 cut a fixture hung across the corridor and a stairwell out of the escape maps' graphs.
 const NAV_OVERHEAD := 0.9
+
 ## Maps where even 0.9 cuts the only way on (a 0.83 m fixture 0.42 m above a landing): -1 is the clearance, the old rule.
 const NAV_OVERHEAD_BY_MAP := {"ze_nuke_beta": -1.0}
+
 ## A turned prop thinner than this is cut as a row of boxes along its length, not one box round its corners.
 const THIN_PROP := 0.6
+
 const THIN_STEP := 0.4
+
 ## Metres above the higher end a link is tested for a wall at (a counter top and a chest), and trimmed off each end of it.
 const LINK_TEST_HEIGHTS := [0.4, 0.9]
+
 const LINK_TEST_TRIM := 0.15
+
 ## A link that rises more than this is a drop or a climb, and is tested against the floors it crosses.
 const LINK_STEEP := 1.2
+
 ## Horizontal run inside a floor slab below which a level-changing link only nicks the slab's edge.
 const LINK_CLIP_MIN := 0.3
+
 ## How far (m) and how far off in height a graph point may stand from the foot or head of a ladder and still be its end.
 const LADDER_REACH := 6.5
+
 const LADDER_HEIGHT := 1.5
 
 ## The ground the zombies walk on, for one map document: its nav floors, everything solid on
@@ -614,13 +453,11 @@ static func prop_obstacles(at: Vector3, yaw: float, size: Vector3) -> Array[AABB
 
 	return out
 
-
 static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> DotNpcNavData:
 	var job := nav_job(doc, props_size, open_gates, extra_solids, cache, false)
 	var built := job.run_blocking()
 	job.flush_log()
 	return built
-
 
 ## The same graph as [method nav_for] as a job to be stepped or run on a thread ([ZzNavJob]).
 ## [param isolate] copies the document, for a thread that must not see the game change it. The
@@ -652,7 +489,6 @@ static func nav_job(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 
 	return job
 
-
 ## [param doc] with one climb link per ladder box in [param ladders] (metres, world): foot to head, joined to the graph's
 ## nearest points. Kept apart from `nav.links` because a ladder stands in a wall, which the links' wall test would drop.
 static func with_ladders(doc: Dictionary, ladders: Array[AABB]) -> Dictionary:
@@ -671,7 +507,6 @@ static func with_ladders(doc: Dictionary, ladders: Array[AABB]) -> Dictionary:
 	nav["ladders"] = rows
 	out["nav"] = nav
 	return out
-
 
 ## [param doc] with the boxes of the whole map ([param extra], from the maps pack's `hulls/<id>.nav.json`)
 ## added, and its floors and links joined to the document's (not replacing them: the full conversion's heights differ
@@ -696,7 +531,6 @@ static func with_nav_extra(doc: Dictionary, extra: Dictionary) -> Dictionary:
 	out["nav"] = nav
 	return out
 
-
 ## [param have] and the rows of [param more] whose first [param keys] numbers match none of its rows to a centimetre.
 static func _joined(have: Array, more: Array, keys: int) -> Array:
 	var seen := {}
@@ -708,13 +542,11 @@ static func _joined(have: Array, more: Array, keys: int) -> Array:
 			out.append(row)
 	return out
 
-
 static func _row_key(row: Array, keys: int) -> String:
 	var parts := PackedStringArray()
 	for i in keys:
 		parts.append(str(roundi(float(row[i]) * 100.0)))
 	return ",".join(parts)
-
 
 ## The map's posts whose nearest point is joined to the first survivor spawn's on [param nav]; every post when none
 ## is (a map whose graph has no spawn point is not judged).
@@ -740,7 +572,6 @@ static func reachable_posts(nav: DotNpcNavData, doc: Dictionary) -> Array:
 			kept.append(p)
 
 	return kept if not kept.is_empty() else posts
-
 
 ## The posts and the points of the ground joined to the first survivor spawn on [param nav].
 static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
@@ -770,7 +601,6 @@ static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
 			points += 1
 
 	return Vector2i(posts, points)
-
 
 static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> DotNpcNavBuilder:
 	var nav_doc: Dictionary = doc.get("nav", {})
@@ -880,7 +710,6 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 
 	return builder
 
-
 ## Whether the straight run from [param from] to [param to] goes through a wall: the importer
 ## emits links without looking, and one through a wall joins two rooms that have no door. Tested
 ## at knee and chest height over the higher end, shrunk at both ends so a link that starts at a wall's face
@@ -909,7 +738,6 @@ static func _link_blocked(from: Vector3, to: Vector3, solids: Array[AABB], heigh
 
 	return false
 
-
 ## Whether a link that changes level (a drop, a stair) runs through a floor slab rather than past its edge: the importer
 ## puts links under decks that have no hole there, and the graph then sends zombies up through a ceiling they push at for ever.
 static func _link_through_floor(from: Vector3, to: Vector3, slabs: Array[AABB]) -> bool:
@@ -936,7 +764,6 @@ static func _link_through_floor(from: Vector3, to: Vector3, slabs: Array[AABB]) 
 
 	return false
 
-
 ## The axis-aligned bounds of a (possibly turned) box.
 static func _box_bounds(box: Dictionary) -> AABB:
 	var size := ZzMapDoc.v3(box["size"])
@@ -953,7 +780,6 @@ static func _box_bounds(box: Dictionary) -> AABB:
 		absf(turn.x.z) * half.x + absf(turn.z.z) * half.z)
 	return AABB(at - extent, extent * 2.0)
 
-
 ## The height of the highest nav floor under (x, z) that is no higher than [param y] (a prop's middle), 0 when none: a prop's
 ## head clearance is measured from the floor it stands on, not from sea level (a deck at 10 m has every prop above 1.8).
 static func _floor_under(floors: Array, x: float, z: float, y: float) -> float:
@@ -967,12 +793,11 @@ static func _floor_under(floors: Array, x: float, z: float, y: float) -> float:
 
 	return 0.0 if best == -INF else best
 
-
 ## Whether [param bounds] is a floor: its top at a nav floor's height, under that floor.
 ## A box taller than this that meets a floor is a wall as well; its top is cut down by SLAB_TOP_CUT so the floor's own surface stays free.
 const SLAB_THICK := 1.0
-const SLAB_TOP_CUT := 0.5
 
+const SLAB_TOP_CUT := 0.5
 
 static func _is_floor(bounds: AABB, floors: Array) -> bool:
 	var top := bounds.end.y
@@ -986,7 +811,6 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 			return true
 
 	return false
-
 
 ## A fingerprint of everything the graph was built from, and of what the physics pass then cut it on: the cache holds
 ## the PRUNED graph (ZzHorde._prune_blocked), so the document's choice of colliding world hulls and its solid props are

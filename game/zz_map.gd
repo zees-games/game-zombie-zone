@@ -1,168 +1,8 @@
-extends Node3D
+extends "zz_map_base.gd"
 
-const ZzMapDoc := preload("zz_map_doc.gd")
-const ZzLaps := preload("zz_laps.gd")
-
-## Milliseconds by section of the last [method build], for the cold-start tool.
-var sections: Dictionary = {}
-const ZzMaterials := preload("zz_materials.gd")
-const ZzProps := preload("zz_props.gd")
-const ZzLampBudget := preload("zz_lamp_budget.gd")
-const ZzFixtures := preload("zz_fixtures.gd")
-const ZzPaths := preload("zz_paths.gd")
-const ZzMechanics := preload("zz_mechanics.gd")
-## Loaded, not preloaded: a client whose dot-map predates it still parses this file and draws a plain sheet.
-const WATER_SHADER_PATH := "res://addons/dot_map/surfaces/liquid.gdshader"
-
-## A map document, built: the building, the furniture, the lights and the sky.
-##
-## [b]The same document on every machine, and a server builds only what collides.[/b] Boxes
-## become one static body of box shapes on the world layer; props become one static body of
-## box shapes on the prop layer, each shape knowing which prop it is. A client also draws them.
-## A server draws nothing, so a dedicated server holds a few thousand shapes and no meshes.
-##
-## [b]Boxes are drawn batched, by material and by twelve-metre chunk.[/b] A school is a
-## thousand boxes, and a mesh per box is a thousand draw calls, which a browser does not give
-## you. One mesh per material is the other extreme and is wrong for a reason only the renderer
-## knows: the compatibility renderer the shell uses lights each mesh with at most eight omni
-## lights, so one floor mesh for the whole school would be lit by eight of its forty lamps and
-## every other room would be dark. A chunk is about a room, which is about a lamp.
-##
-## [b]Props are drawn as [MultiMeshInstance3D]s, one per model mesh.[/b] Two hundred chairs are
-## one draw call per chair mesh, not two hundred. They never move.
-##
-## [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
-## it.[/b] A tree is its trunk, branches and leaf clumps, a table its top and legs (dot-props'
-## [DotPropPieces], measured offline into `props/pieces.json`). What a shot stops on and what a
-## player walks into are the same shapes, so the two can never disagree about where the car is;
-## a zombie still paths round the prop's box, which only keeps it further off.
-##
-## [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an
-## objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`),
-## which come and go: broken by the horde, mended by the survivors ([method set_barricade]),
-## and drawn darker as they weaken so a defender sees which window is about to go.
-##
-## [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by
-## `tools/bake_lightmaps.sh`; dot-lighting's [DotLightBake]). Every opaque box batch carries a
-## second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only),
-## because the bake names its meshes by path and was made from this same code. A bake whose
-## fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
-## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked,
-## the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their
-## shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays
-## live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters
-## only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes), and
-## so are brushed-metal batches (`Shiny_<n>`): a lamp's highlight is what makes metal look like
-## metal and a lightmap holds diffuse light only, so metal stays live-lit. Everything that moves
-## (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by the LightmapGI probes
-## plus the live lamps. A lightmap ignores the Environment's ambient, and a closed room has no sky
-## for the bake's own sky term to show, so the bake makes every surface emit the ambient colour
-## (tools/lightmap_scenes.gd, `EMIT_BY_MAP`): the flat fill the live map has, with occlusion.
-## What a day raises is carried by `BAKED_DAY_EXPOSURE`. Glass and water are not in the bake. A
-## server never loads one ([member draw_world] is false).
-
-const CHANNEL := "zz.map"
-
-## Metres of world one batched mesh covers. See the class notes.
-const CHUNK := 12.0
-
-## A shot's impact closer than this to a prop's box counts as hitting it: a bullet stops on the
-## surface, and a point exactly on a face is outside a strict test half the time.
-const HIT_MARGIN := 0.06
-
-## How much deeper than drawn a ground slab collides (see `_build_boxes`).
-const GROUND_DEPTH := 1.8
-## A hidden box with no `kind` (an older document) this far above everything playable is a sky box.
-const SKY_CLEARANCE := 30.0
-
-## How far past the playable ground (the nav floors, spawns and route) the invisible boundary
-## stands, its thickness, and how far above the highest floor it reaches. A converted map's
-## boxes run far past what is walked on (ze_jurassicpark: 500 m of terrain round a 240 m play
-## area), and nothing stopped a survivor going out to the edge of the world.
-const BOUNDARY_MARGIN := 8.0
-const BOUNDARY_THICKNESS := 4.0
-const BOUNDARY_HEIGHT := 60.0
-
-## How far [method clear_spot] looks for room round a start point that is inside something.
-const SPAWN_SEARCH := 3.0
-
-## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
-## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
-const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
-const SHEET_SCRIPT := "res://addons/dot_lighting/bake/dot_lightmap_sheet.gd"
-const BAKE_VERSION := 3
-
-## What a day adds to a lightmapped surface: nothing from the ambient, so the exposure rises with
-## the day by this factor instead (frames: a baked school by day read a third darker than live).
-const BAKED_DAY_EXPOSURE := 1.5
-
-## Where a map's bake is, by id; rebased, so a delivered pack finds its own.
-const BAKE_PATH := "res://lightmaps/%s.res"
-
-## Whether a client looks for a map's bake at all. Off draws every map with live lamps.
-static var use_bakes: bool = true
-
-## Whether a client draws a converted map with its own geometry ([method load_world]). Off
-## draws the boxes, as before the worlds existed.
-static var use_worlds: bool = true
-
-## Whether a checkout's own `world/` is read when it is there; off, the world is always fetched through dot-cloud by `world_key` (the delivery check).
-static var local_worlds: bool = true
-
-## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
-const SKY_ROOT := "res://assets/sky"
-const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
-const LIT_SCRIPT := "res://addons/dot_map/bsp/dot_map_lit_world.gd"
-const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
-const VIS_SCRIPT := "res://addons/dot_map/bsp/dot_map_visibility.gd"
-
-## Where a checkout keeps a map's world: `world/<pack>/<id>`.
-const LOCAL_WORLD := "res://world/%s/%s"
-
-## True once [method attach_world] has drawn this map's own geometry.
-var world_drawn: bool = false
-## How a drawn world is culled (dot-map DotMapVisibility): off, pvs, occluders or both.
-var vis_mode: String = "both"
-## Draw the world pack's baked lightmap when it has one (`zz_lightmaps`).
-var use_lightmaps: bool = true
-var visibility: Node = null
-## The client platform's `attach_visibility(world, drawn)`; unset (a test, a bench) uses the culling built here.
-var cull_fn := Callable()
-
-## The converted map's lifts, doors, buttons and triggers (null on a map without a world).
-var mechanics: ZzMechanics = null
-## The world pack's hulls the document's `world_collision` names ([method attach_world_collision]).
-var world_collision: StaticBody3D = null
-## The clip-kind hulls of the same world, on the clip layer.
-var world_clip: StaticBody3D = null
-## A box per solid prop of the drawn world (prop_dynamic and prop_physics the source makes solid), on the prop layer.
-var world_props: StaticBody3D = null
-
-## Whether a world's movers are built (off in suites that want the boxes alone).
-var use_mechanics: bool = true
-## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
-## already stand where its doors are); a map document says `"mechanics": true` when its boxes leave the movers out. Suites set this.
-static var bring_global_mechanics: bool = false
-## Handed to the mechanics: a box has somebody in it, and the living survivors' points.
-var occupants_fn: Callable = Callable()
-var points_fn: Callable = Callable()
-var opener_fn: Callable = Callable()
-## The game's side of hurt, push and teleport volumes (see [ZzMechanics]).
-var volume_bodies_fn: Callable = Callable()
-var volume_damage_fn: Callable = Callable()
-var volume_move_fn: Callable = Callable()
-var _pending_movers: Dictionary = {}
-var _pending_copies: Array = []
-
-signal built()
-## A moving part changed state on the server (see [method ZzMechanics.snapshot]).
-signal mover_changed(index: int)
-## A support broke (its index in [member supports]); the host tells clients.
-signal support_broken(index: int)
-## Wood gave way (a barricade or a support) at a point, about this wide in metres; drawn on every end, no wire of its own.
-signal wood_broke(at: Vector3, size: float)
 ## The map's point_template made or killed a brush copy; see [signal ZzMechanics.copy_changed].
 signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
+
 ## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
 signal logic_event(kind: String, data: Dictionary)
 
@@ -193,10 +33,14 @@ var _barricades: Dictionary = {}
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
 var toys: DotPropBodyBox = null
+
 ## Breakables of a drawn world with loose props on them ([DotMapSupport]); a shot breaks one and what stood on it falls.
 var supports: Array[DotMapSupport] = []
+
 var authoritative: bool = true
+
 var toy_rules: DotPropBodyRules = null
+
 var gravity: float = 20.0
 
 ## The world's solid boxes go into bodies of this many shapes each; 0 puts them all in one.
@@ -206,37 +50,57 @@ var gravity: float = 20.0
 
 ## The Solid body new boxes go into (the last of [member _solids]).
 var _solid: StaticBody3D = null
+
 var _solids: Array[StaticBody3D] = []
+
 var _furniture: StaticBody3D = null
+
 ## Invisible solids (player clip, nodraw): movers stop at them, shots and sight pass.
 var _clip: StaticBody3D = null
+
 var _drawn: Node3D = null
+
 var _environment: WorldEnvironment = null
+
 var _sun: DirectionalLight3D = null
+
 ## dot-lighting's fill (painted()), turned with the sun; blended with it by set_daylight.
 var _fill: DirectionalLight3D = null
 
 ## A map held by nights draws its day as well: the light at night (the map's own) and by day,
 ## captured once as the properties [method set_daylight] blends between. Empty: no day.
 var _night_light: Dictionary = {}
+
 var _day_light: Dictionary = {}
+
 var _daylight: float = 0.0
+
 var _bounds: AABB = AABB()
+
 ## The converted map's displacement ground (the document's `terrain`), or null.
 var terrain: DotMapTerrain = null
+
 var _missing: PackedStringArray = PackedStringArray()
+
 var _lamps: Array[Light3D] = []
+
 var _lamp_budget := ZzLampBudget.new()
+
 ## The most lamps lit at once (the nearest to the camera); a map may have many more, all in its bake.
 @export var realtime_lamps := 128
+
 ## Cascades of the sun's shadow (1, 2 or 4), set by the client from `sun_shadow_splits`.
 var sun_shadow_splits := 4
+
 ## Cap for decoded world texture files (dot-map's `max_texture_size`); 0 keeps them.
 var texture_max: int = 2048
+
 ## Props shorter than this cast no sun shadow (0: all do); set by the client from `prop_shadow_min`.
 var prop_shadow_min := 0.0
+
 ## The sun's least energy on a lightmapped world; set by the client from `sun_floor`.
 var sun_floor := 0.0
+
 ## The LightmapGI laid over this map, or null: drawn with live lamps.
 var baked: LightmapGI = null
 
@@ -246,14 +110,15 @@ var baked: LightmapGI = null
 var water_boxes: Array[AABB] = []
 
 var _water_nodes: Array[MeshInstance3D] = []
-var _dry_fog: Dictionary = {}
-var _wet: bool = false
-var _baked_exposure: float = 1.0
 
+var _dry_fog: Dictionary = {}
+
+var _wet: bool = false
+
+var _baked_exposure: float = 1.0
 
 func id() -> StringName:
 	return StringName(str(doc.get("id", "")))
-
 
 ## A build section ended: its time, and on the web a log line (the wasm heap only grows, so a
 ## failed allocation names the section it died in).
@@ -261,7 +126,6 @@ func _mark(name: StringName, since: int) -> int:
 	if OS.has_feature("web"):
 		DotLog.info(CHANNEL, "map section", {"section": String(name)})
 	return ZzLaps.lap(sections, name, since)
-
 
 ## Builds [param p_doc], which [ZzMapDoc.validate] has already normalised.
 func build(p_doc: Dictionary) -> DotResult:
@@ -325,7 +189,6 @@ func build(p_doc: Dictionary) -> DotResult:
 	built.emit()
 	return DotResult.success(null)
 
-
 ## The toys, on their own layer: a loose one (a barrel, a ball) on `toy`, which the world, the
 ## furniture and other toys stop and a survivor or a zombie never does (they walk through it,
 ## and a survivor pushes it, `ZzGame._advance_toys`).
@@ -358,7 +221,6 @@ func _build_toys() -> void:
 	if not built.ok:
 		DotLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
 
-
 ## What stood on a broken support wakes and falls (a barrel rolls on).
 func _on_support_broken(held: PackedInt32Array, _at: Vector3, index: int) -> void:
 	if toys == null:
@@ -373,7 +235,6 @@ func _on_support_broken(held: PackedInt32Array, _at: Vector3, index: int) -> voi
 		var box := supports[index].box
 		wood_broke.emit(box.get_center(), clampf(box.get_longest_axis_size(), 0.5, 3.0))
 
-
 ## Each support hides the drawn brush model it replaces when it breaks.
 func _bind_support_visuals() -> void:
 	if supports.is_empty() or _drawn == null:
@@ -386,12 +247,10 @@ func _bind_support_visuals() -> void:
 					if support.is_broken():
 						support.visual.visible = false
 
-
 ## The host said support [param index] broke (a client).
 func break_support(index: int) -> void:
 	if index >= 0 and index < supports.size():
 		supports[index].apply_broken()
-
 
 func clear() -> void:
 	for child in get_children():
@@ -431,7 +290,6 @@ func clear() -> void:
 	_day_light = {}
 	_daylight = 0.0
 
-
 ## Fog on is a different shader variant in the Compatibility renderer, so a pool's first underwater frame recompiled every material. A map with water keeps fog on at zero density from the start and pays that once, behind the load.
 func _keep_fog_variant_warm() -> void:
 	if water_boxes.is_empty() or _environment == null or _environment.environment == null:
@@ -441,7 +299,6 @@ func _keep_fog_variant_warm() -> void:
 		env.fog_density = 0.0
 		env.fog_enabled = true
 
-
 ## The document's water as boxes (`at` is the centre, the top face is the surface).
 func _build_water_volumes() -> void:
 	water_boxes.clear()
@@ -449,7 +306,6 @@ func _build_water_volumes() -> void:
 	for pool: Dictionary in doc.get("water", []):
 		var size := ZzMapDoc.v3(pool["size"])
 		water_boxes.append(AABB(ZzMapDoc.v3(pool["at"]) - size * 0.5, size))
-
 
 ## Each volume's surface: one sheet at the top face, with dot-map's liquid shader,
 ## which draws the ripples, the sheen and the lip. The volume has no walls: Source's water is a
@@ -489,7 +345,6 @@ func _build_water_surfaces() -> void:
 		_drawn.add_child(sheet)
 		_water_nodes.append(sheet)
 
-
 ## Under the surface: the world's fog turns to the water's colour and closes in, so the pool's
 ## far side is a murk and not a clear room. [param tint] is the water's colour; false puts the
 ## map's own fog back. Presentation only, on the end whose camera it is.
@@ -517,7 +372,6 @@ func set_underwater(under: bool, tint: Color = Color(0.05, 0.28, 0.36)) -> void:
 			env.set(key, _dry_fog[key])
 		_dry_fog = {}
 
-
 ## Starts a Solid body on the world layer: "Solid", then "Solid2", "Solid3"...
 func _new_solid() -> void:
 	_solid = StaticBody3D.new()
@@ -526,7 +380,6 @@ func _new_solid() -> void:
 	_put_on(_solid, &"world")
 	_solids.append(_solid)
 
-
 ## Adds a world shape, to a new Solid body once the current one holds [member solid_body_shapes].
 func _add_solid(shape: CollisionShape3D) -> void:
 	if solid_body_shapes < 0:
@@ -534,7 +387,6 @@ func _add_solid(shape: CollisionShape3D) -> void:
 	elif solid_body_shapes > 0 and _solid.get_child_count() >= solid_body_shapes:
 		_new_solid()
 	_solid.add_child(shape)
-
 
 func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 	if physics == null:
@@ -593,7 +445,6 @@ func playable_region() -> AABB:
 
 	return AABB(lo, hi - lo)
 
-
 ## Four invisible walls round [method playable_region], from the kill height up, on the world
 ## layer: nobody walks, falls off a ledge or is thrown out of the map's ground, on any map.
 ## Under the world's own boxes, so a map that already closes itself in loses nothing.
@@ -633,7 +484,6 @@ func _build_boundary() -> void:
 		shape.position = walls[i][0]
 		body.add_child(shape)
 
-
 ## Whether an invisible box stops movers: its `kind` says (sky never does), else its height does.
 func _collides_hidden(box: Dictionary, bottom: float, sky_floor: float) -> bool:
 	match str(box.get("kind", "")):
@@ -642,7 +492,6 @@ func _collides_hidden(box: Dictionary, bottom: float, sky_floor: float) -> bool:
 		"clip", "nodraw":
 			return true
 	return bottom < sky_floor
-
 
 ## Whether the document names ground (a nav floor or a spawn) under [param size] at [param at] deeper than a slab's thickening: a cellar.
 func _ground_below(at: Vector3, size: Vector3) -> bool:
@@ -661,7 +510,6 @@ func _ground_below(at: Vector3, size: Vector3) -> bool:
 				return true
 	return false
 
-
 ## Whether a thin glass pane stands as a doorway: floor-standing, door-sized. Nothing breaks glass here, so one in an opening shuts it for good.
 func is_glass_door(at: Vector3, size: Vector3) -> bool:
 	var width := maxf(size.x, size.z)
@@ -676,7 +524,6 @@ func is_glass_door(at: Vector3, size: Vector3) -> bool:
 		if float(fl[4]) > bottom - 0.9 and float(fl[4]) < bottom + 0.3 and float(fl[0]) < x1 and float(fl[2]) > x0 and float(fl[1]) < z1 and float(fl[3]) > z0:
 			return true
 	return false
-
 
 func _build_boxes() -> void:
 	var batches := {}
@@ -791,8 +638,8 @@ func _build_boxes() -> void:
 
 ## Whether a map's decoded terrain is kept in `user://terrain_cache` between runs.
 static var terrain_cache: bool = true
-const TERRAIN_CACHE_VERSION := 2
 
+const TERRAIN_CACHE_VERSION := 2
 
 ## The terrain, its faces and its bounds stored under [param key], or {} when there are none.
 func _terrain_cache_read(key: String) -> Dictionary:
@@ -817,7 +664,6 @@ func _terrain_cache_read(key: String) -> Dictionary:
 	t.walk = d["walk"]
 	return {"terrain": t, "faces": d["faces"], "box": d["box"]}
 
-
 func _terrain_cache_write(key: String, faces: PackedVector3Array, box: AABB) -> void:
 	if key == "":
 		return
@@ -833,7 +679,6 @@ func _terrain_cache_write(key: String, faces: PackedVector3Array, box: AABB) -> 
 	})
 	f.close()
 	var _renamed := DirAccess.rename_absolute(path + ".tmp", path)
-
 
 ## The displacement ground: one triangle shape, and drawn as a "Boxes_" mesh so a drawn world
 ## replaces it like the boxes.
@@ -879,7 +724,6 @@ func _build_terrain() -> void:
 	mesh.material_override = ZzMaterials.material(mat, Color.WHITE, "floor", ZzMaterials.surface_for(str(id()), mat, ""))
 	_drawn.add_child(mesh)
 
-
 ## A box that belongs to a gate: its own body, its own mesh, so opening the gate removes it whole.
 func _add_gate_box(gate: String, box: Dictionary, frame: Transform3D, size: Vector3) -> void:
 	if not _gates.has(gate):
@@ -916,7 +760,6 @@ func _add_gate_box(gate: String, box: Dictionary, frame: Transform3D, size: Vect
 		_drawn.add_child(drawn)
 		(entry["drawn"] as Array).append(drawn)
 
-
 ## The objectives' pictures ([ZzFixtures]): a padlock hangs on the gate its objective opens and
 ## goes with it, a lever or a radio stands where the objective is.
 func _build_objective_props() -> void:
@@ -941,7 +784,6 @@ func _build_objective_props() -> void:
 		_drawn.add_child(drawn)
 		if str(o.get("prop", "")) == "padlock" and _gates.has(gate_id):
 			((_gates[gate_id] as Dictionary)["drawn"] as Array).append(drawn)
-
 
 ## A box that belongs to a barricade: its own body (one per barricade) and its own mesh.
 func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: Vector3, bounds: AABB) -> void:
@@ -979,22 +821,18 @@ func _add_barricade_box(id: String, box: Dictionary, frame: Transform3D, size: V
 		_drawn.add_child(mesh)
 		(entry["drawn"] as Array).append(mesh)
 
-
 ## Every barricade's id, in the order the map lists its boxes.
 func barricade_ids() -> PackedStringArray:
 	return PackedStringArray(_barricades.keys())
-
 
 ## The space a barricade's boxes fill, or an empty AABB.
 func barricade_bounds(id: String) -> AABB:
 	var entry: Variant = _barricades.get(id)
 	return (entry as Dictionary)["bounds"] if entry != null else AABB()
 
-
 func barricade_intact(id: String) -> bool:
 	var entry: Variant = _barricades.get(id)
 	return entry != null and bool((entry as Dictionary)["intact"])
-
 
 ## Puts a barricade up or takes it down, collision and picture, and shades what stands by
 ## [param fraction] of its strength: whole is the wood's own colour, a quarter is near black.
@@ -1031,7 +869,6 @@ func set_barricade(id: String, intact: bool, fraction: float) -> void:
 		mesh.material_override = ZzMaterials.material(str(mesh.get_meta(&"zz_mat", "wood")),
 			Color(tint.r * step, tint.g * step, tint.b * step), "barricade")
 
-
 ## Takes a gate's boxes away: collision and picture.
 func open_gate(gate: String) -> void:
 	var entry: Variant = _gates.get(gate)
@@ -1052,10 +889,8 @@ func open_gate(gate: String) -> void:
 		if is_instance_valid(node):
 			node.queue_free()
 
-
 func gate_is_shut(gate: String) -> bool:
 	return _gates.has(gate)
-
 
 ## Whether [param point] is inside any of the map's [param side] areas (`start`, `end`).
 func in_area(side: String, point: Vector3) -> bool:
@@ -1064,7 +899,6 @@ func in_area(side: String, point: Vector3) -> bool:
 			return true
 
 	return false
-
 
 ## Six faces of a box, outward normals, into [param tool]. No UVs: every surface material is
 ## mapped in world space.
@@ -1078,12 +912,10 @@ static func _add_box(tool: SurfaceTool, frame: Transform3D, size: Vector3) -> vo
 			tool.set_normal(face[0])
 			tool.add_vertex(v)
 
-
 ## The same six faces into a lightmap sheet, which writes them with the same winding plus UV2.
 static func _add_box_faces(sheet: RefCounted, frame: Transform3D, size: Vector3) -> void:
 	for face: Array in _box_faces(frame, size):
 		sheet.face(face[1], face[2], face[3], face[4], face[0])
-
 
 ## `[normal, a, b, c, d]` per face, in world space: a to b up the face, a to d across it.
 static func _box_faces(frame: Transform3D, size: Vector3) -> Array:
@@ -1103,7 +935,6 @@ static func _box_faces(frame: Transform3D, size: Vector3) -> Array:
 			frame * (face[2] as Vector3), frame * (face[3] as Vector3), frame * (face[4] as Vector3)])
 
 	return out
-
 
 func _build_props() -> void:
 	var by_id := {}
@@ -1170,7 +1001,6 @@ func _build_props() -> void:
 			drawn.multimesh = multi
 			_drawn.add_child(drawn)
 
-
 func _build_lights() -> void:
 	for light: Dictionary in doc["lights"]:
 		var lamp: Light3D
@@ -1204,7 +1034,6 @@ func _build_lights() -> void:
 	_lamp_budget.setup(_lamps)
 	set_process(_lamps.size() > realtime_lamps)
 
-
 ## Frame by frame the lamps nearest the camera are the ones lit, so a map of hundreds costs what
 ## [member realtime_lamps] do; the bake and the document still hold them all.
 func _process(delta: float) -> void:
@@ -1213,7 +1042,6 @@ func _process(delta: float) -> void:
 	if camera != null and _drawn != null:
 		_lamp_budget.update(_lamps, _drawn.to_local(camera.global_position), delta)
 
-
 ## Whether the host's dot-lighting can lay a bake (API level 5: DotLightBake, DotLightmapSheet). Those
 ## classes are reached by path, never by name: a host shell with an older dot-lighting would fail to
 ## parse this whole script on the name, and the map would not load. Without them the map is drawn
@@ -1221,7 +1049,6 @@ func _process(delta: float) -> void:
 static func can_bake() -> bool:
 	return DotAddonApi.build_level("dot_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
 			and ResourceLoader.exists(SHEET_SCRIPT)
-
 
 ## What this map's bake must have been made from: the boxes, the lamps and the sky, and the
 ## versions of everything that lays them out. The same on the machine that baked and on every
@@ -1234,7 +1061,6 @@ func light_fingerprint() -> String:
 		"zz": BAKE_VERSION, "boxes": doc.get("boxes", []), "props": doc.get("props", []), "lights": ZzMapDoc.lamps_key(doc),
 		"environment": doc.get("environment", {}),
 	})
-
 
 ## The map's bake laid over it, if the game ships one made from this document.
 func _attach_bake() -> void:
@@ -1259,19 +1085,16 @@ func _attach_bake() -> void:
 
 	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
 
-
 ## Whether this host can read a map's drawn world: dot-map's [code]DotMapBspMesh[/code], reached by
 ## path for the reason [method can_bake] gives (a shell with an older dot-map would fail to parse
 ## this script on the name).
 static func can_draw_world() -> bool:
 	return ResourceLoader.exists(MESH_SCRIPT)
 
-
 ## Where a world sits beside the game in a checkout (`world/` is zombie-zone-maps' `world/`,
 ## linked by dot-bootstrap and never shipped in the game's pack).
 func local_world_prefix() -> String:
 	return ZzPaths.rebase(LOCAL_WORLD % [str(doc.get("world", "")), String(id())])
-
 
 ## Collides with the hulls of [param world] (a [code]DotMapBspMesh[/code]) that the document's
 ## `world_collision` selects: the solids the wire budget dropped from its boxes. Once per map.
@@ -1326,7 +1149,6 @@ func attach_world_collision(world: RefCounted) -> void:
 	world_clip = clip
 	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
 
-
 ## The document's `solid_props` as one body of boxes on the prop layer, the same on a server and a client.
 func _build_solid_props() -> void:
 	var boxes: Array = doc.get("solid_props", [])
@@ -1345,7 +1167,6 @@ func _build_solid_props() -> void:
 	add_child(body)
 	world_props = body
 
-
 ## Collides with the solid props of [param world]'s manifest (dot-map's `build_prop_collision`) when the document carries no `solid_props` of its own. Once per map.
 func attach_world_props(world: RefCounted) -> void:
 	if world_props != null:
@@ -1357,7 +1178,6 @@ func attach_world_props(world: RefCounted) -> void:
 	add_child(body)
 	world_props = body
 	DotLog.debug(CHANNEL, "the map collides with its solid props", {"map": String(id()), "boxes": body.get_child_count()})
-
 
 ## [method attach_world_props] on a dev server from the checkout's world, for a document with no `solid_props`.
 func build_world_props_local() -> bool:
@@ -1373,13 +1193,11 @@ func build_world_props_local() -> bool:
 	attach_world_props(read.value)
 	return world_props != null
 
-
 func _hull_prefixes(root: String) -> PackedStringArray:
 	var prefixes := PackedStringArray([ZzPaths.rebase("res://maps/hulls/" + String(id())), local_world_prefix()])
 	if root != "":
 		prefixes.insert(0, root.path_join("hulls").path_join(String(id())))
 	return prefixes
-
 
 ## The maps pack's `hulls/<id>.nav.json` (the whole map's boxes, floors and links the budget cut from the
 ## document, for the horde's graph), or {} when the map lost nothing or the file is not here.
@@ -1398,7 +1216,6 @@ func read_nav_extra(root: String = "") -> Dictionary:
 	DotLog.warn(CHANNEL, "a map's navigation extra was not found; the horde walks the document's floor only", {"map": String(id())})
 	return {}
 
-
 ## [method attach_world_collision] on a server, which loads no world: from the maps pack's
 ## `hulls/<id>` under [param root] (where the document was read), else the checkout's world.
 func build_world_collision_local(root: String = "") -> bool:
@@ -1414,7 +1231,6 @@ func build_world_collision_local(root: String = "") -> bool:
 		DotLog.warn(CHANNEL, "a map's hulls would not read", {"map": String(id()), "at": prefix, "why": read.error.message})
 	DotLog.warn(CHANNEL, "a map's hulls were not found; it collides with its boxes only", {"map": String(id())})
 	return false
-
 
 ## Draws the map with its own geometry ([member doc]'s `world`, zombie-zone-maps'
 ## tools/build_worlds.py) in place of its boxes, which still collide and still are the horde's
@@ -1472,7 +1288,6 @@ func load_world() -> DotResult:
 		return DotResult.success(false)
 	return DotResult.success(attached)
 
-
 ## Fades and spins the drawn world's ambient players on the map's `sound_fade` and `sound_spin` events; null without ambient sounds.
 var sound_driver: DotMapSoundDriver = null
 
@@ -1481,7 +1296,6 @@ var world_sounds: Dictionary = {}
 
 ## The drawn world's credit line (DotMapCredits.line): the map's author and the art whose licence asks for a name.
 var world_credits: String = ""
-
 
 ## Lays [param world] (a [code]DotMapBspMesh[/code]) over the map: its meshes in, the box batches
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
@@ -1506,7 +1320,6 @@ func attach_world(world: RefCounted, dir: String = "") -> bool:
 	_world_attached.emit(done)
 	return done
 
-
 ## Emitted when the attach in flight ends; true when it drew the world.
 signal _world_attached(drawn: bool)
 
@@ -1517,7 +1330,6 @@ var _world_for: Node3D = null
 
 ## How many times the world extras ran (a regression check counts them).
 var extras_runs: int = 0
-
 
 func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> bool:
 
@@ -1610,7 +1422,6 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
 	return true
 
-
 ## Probes, sounds, prop stand-ins and fx after the first drawn frames: they cost about 3 s on the biggest map and nothing needs them to play.
 func _attach_extras_later(world: RefCounted, node: Node3D) -> void:
 	if not is_inside_tree():
@@ -1624,13 +1435,11 @@ func _attach_extras_later(world: RefCounted, node: Node3D) -> void:
 	_attach_world_extras(world, node)
 	DotLog.info(CHANNEL, "world extras attached", {"map": String(id()), "ms": Time.get_ticks_msec() - started})
 
-
 ## Adds the milliseconds since [param since] to [param stages] under [param name]; returns now.
 static func _lap(stages: Dictionary, name: String, since: int) -> int:
 	var now := Time.get_ticks_msec()
 	stages[name] = now - since
 	return now
-
 
 ## Culls the drawn world to what the camera's cluster can see, and adds its occluders; a pack
 ## without visibility data, or a headless run, draws everything.
@@ -1654,13 +1463,11 @@ func _attach_visibility(world: RefCounted, node: Node3D) -> void:
 		return
 	visibility = vis
 
-
 ## Follows the client's culling setting on a world already drawn.
 func set_vis_mode(text: String) -> void:
 	vis_mode = text
 	if visibility != null:
 		visibility.call(&"set_mode", visibility.call(&"parse_mode", text))
-
 
 ## The free sky panorama (assets/sky, CC0) for a day map's sky name, in place of the plain gradient.
 ## Night and space skies keep the procedural sky and its stars.
@@ -1674,7 +1481,6 @@ func _dress_panorama_sky(world: RefCounted) -> void:
 	var panorama := PanoramaSkyMaterial.new()
 	panorama.panorama = tex
 	sky.sky_material = panorama
-
 
 ## A converted map whose document kept the converter's placeholder light takes the sky, sun,
 ## ambient and fog its own entities name, and the lighting is built again from them.
@@ -1693,7 +1499,6 @@ func _light_from_world(world: RefCounted) -> void:
 	_fill = null
 	_environment = null
 	_build_environment()
-
 
 ## What the drawn world carries beyond its meshes: reflection probes, fog when the map document
 ## sets none (the document's own sun and sky stay: a second sun lit everything twice), ambient
@@ -1746,10 +1551,8 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	DotLog.info(CHANNEL, "world extras stages", {"ms": stages})
 	_bind_support_visuals()
 
-
 ## The player's `light_floor` cvar; a map's own `light_floor` (document top level) can only lower it.
 var _light_floor_setting := -1.0
-
 
 ## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.
 ## A map document's own `light_floor` lowers it for that map: a lightmapped mall or tunnel the
@@ -1757,7 +1560,6 @@ var _light_floor_setting := -1.0
 func set_light_floor(value: float) -> void:
 	_light_floor_setting = value
 	_apply_light_floor()
-
 
 func _apply_light_floor() -> void:
 	if not can_draw_world():
@@ -1769,7 +1571,6 @@ func _apply_light_floor() -> void:
 		return    # neither the player's setting nor the map's: dot-map's own default stands
 	(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
 
-
 ## Sets dot-map's world shadow cost (before the world is built); the `shadow_proxy`, `shadow_range` and `shadow_translucent` cvars.
 func set_shadow_cost(proxy: bool, range_m: float, translucent: bool) -> void:
 	if can_draw_world():
@@ -1777,12 +1578,10 @@ func set_shadow_cost(proxy: bool, range_m: float, translucent: bool) -> void:
 		mesh.call(&"set_shadow_cost", proxy, range_m)
 		mesh.call(&"set_shadow_translucent", translucent)
 
-
 ## Sets dot-map's LOD size for library models (before the world is built); the `prop_lod_min_tris` cvar.
 func set_model_lod(min_tris: int, max_tris: int) -> void:
 	if can_draw_world():
 		(load(MESH_SCRIPT) as GDScript).call(&"set_model_lod", min_tris, max_tris)
-
 
 ## Turns off the sun shadow of every prop under [param props] whose longest side is under [member prop_shadow_min].
 func _trim_prop_shadows(props: Node3D) -> void:
@@ -1794,7 +1593,6 @@ func _trim_prop_shadows(props: Node3D) -> void:
 		if geometry.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_ON and maxf(size.x, maxf(size.y, size.z)) < prop_shadow_min:
 			geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-
 ## Sets the sun's cascades: each is another draw of every caster in it.
 func set_sun_shadow_splits(splits: int) -> void:
 	sun_shadow_splits = splits
@@ -1802,7 +1600,6 @@ func set_sun_shadow_splits(splits: int) -> void:
 		return
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if splits <= 1 \
 		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if splits == 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-
 
 ## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's DotMapFx), capped per map.
 func _attach_fx(world: RefCounted, node: Node3D) -> void:
@@ -1821,7 +1618,6 @@ func _attach_fx(world: RefCounted, node: Node3D) -> void:
 	fx.trail_target_fn = moving_node_named
 	node.add_child(fx.build((parsed as Dictionary).get("entities", [])))
 
-
 ## What a spritetrail's parentname follows: a mover's drawn node, else the drawn world's brush-entity node of that targetname; null for neither.
 func moving_node_named(target: String) -> Node3D:
 	if mechanics != null:
@@ -1829,7 +1625,6 @@ func moving_node_named(target: String) -> Node3D:
 		if found != null:
 			return found
 	return _drawn.find_child(target.validate_node_name(), true, false) as Node3D if _drawn != null else null
-
 
 ## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
 ## for the solid ones, the outputs that drive them. A second call keeps the first.
@@ -1868,7 +1663,6 @@ func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
 		made.apply_state(index, int(s[0]), int(s[1]), int(s[2]), int(s[3]) != 0, float(s[4]))
 	_pending_movers.clear()
 
-
 ## Reads the map's world from the checkout's `world/` (no drawing, no fetch) and builds its
 ## mechanics: what a server, which draws nothing, runs. True when there were any.
 func build_mechanics_local() -> bool:
@@ -1886,7 +1680,6 @@ func build_mechanics_local() -> bool:
 	attach_mechanics(read.value, not own)
 	return mechanics != null
 
-
 ## A mover's state as the server sent it; kept until the mechanics exist.
 func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
 	if mechanics != null:
@@ -1894,14 +1687,12 @@ func apply_mover_state(index: int, start: int, from_thousandths: int, dir: int, 
 	else:
 		_pending_movers[index] = [start, from_thousandths, dir, 1 if locked else 0, side]
 
-
 ## A brush copy as the server sent it; kept until the mechanics exist.
 func apply_copy(id: int, model: int, offset: Vector3, alive: bool, mover: int = -1) -> void:
 	if mechanics != null:
 		mechanics.apply_copy(id, model, offset, alive, "", mover)
 	else:
 		_pending_copies.append([id, model, offset, alive, mover])
-
 
 ## Takes a bake off: what was baked was the boxes.
 func _unbake() -> void:
@@ -1915,11 +1706,9 @@ func _unbake() -> void:
 	if _environment != null:
 		_environment.environment.tonemap_exposure = _baked_exposure
 
-
 ## The lamps, for the bake scene and the suites.
 func lamps() -> Array[Light3D]:
 	return _lamps
-
 
 ## The sky, the moon or the low sun, and the fill: a dot-lighting document made from the map's
 ## `environment` ([method light_document]), so every map has the family's light (filmic tone
@@ -1966,7 +1755,6 @@ func _build_environment() -> void:
 	if str(doc.get("mode", "")) == ZzMapDoc.SURVIVAL:
 		_capture_day()
 
-
 ## What [method set_daylight] blends: the sun, the fill, the fog and the sky.
 const LIGHT_KEYS := [
 	"sun:light_energy", "sun:light_color", "sun:rotation_degrees",
@@ -1975,7 +1763,6 @@ const LIGHT_KEYS := [
 	"sky:ground_horizon_color", "sky:ground_bottom_color", "sky:sky_cover_modulate", "sky:sun_angle_max",
 	"fill:light_energy", "fill:light_color", "fill:rotation",
 ]
-
 
 ## A map's sky is night when its zenith is this dark (every blackout street, the holds' nights).
 const NIGHT_SKY_LUMINANCE := 0.12
@@ -1986,19 +1773,19 @@ const NIGHT_SKY_LUMINANCE := 0.12
 ## nothing. Drawn here: a deep blue overhead, the glow of a dead city low down, so a roofline
 ## reads, and stars and a moon in it.
 const NIGHT_ZENITH := Color(0.035, 0.05, 0.12)
+
 const NIGHT_HORIZON := Color(0.15, 0.15, 0.22)
 
 ## How many stars, and the cover's size (equirectangular: the top half is the sky).
 const STARS := 1400
+
 const STAR_MAP := Vector2i(2048, 1024)
 
 static var _star_maps: Dictionary = {}
 
-
 static func is_night(env_doc: Dictionary) -> bool:
 	return ZzMapDoc.colour(env_doc["sky_top"]).get_luminance() < NIGHT_SKY_LUMINANCE \
 		and float(env_doc["sun_energy"]) < 0.4
-
 
 ## Stars and the moon on the sky's cover. Only what is drawn: the fog keeps the map's horizon
 ## and the fill its ambient. The moon is painted where the map's (dim) sun shines from: the
@@ -2015,7 +1802,6 @@ func _dress_night_sky(material: ProceduralSkyMaterial, moon: DirectionalLight3D)
 		towards = moon.transform.basis.z.normalized()
 	material.sky_cover = star_map(towards)
 	material.sky_cover_modulate = Color(1.0, 1.0, 1.0, 0.9)
-
 
 ## The stars (seeded, so every machine draws the same sky; brighter ones rarer, a few two
 ## pixels wide) and a moon towards [param moon_from] (none when zero), built once per moon
@@ -2049,14 +1835,12 @@ static func star_map(moon_from: Vector3 = Vector3.ZERO) -> ImageTexture:
 	_star_maps[key] = texture
 	return texture
 
-
 ## Where a direction lands on the equirectangular cover, in pixels. Measured from frames (a
 ## disc painted by the textbook `atan2(x, -z)` came out on the opposite side of the sky).
 static func sky_pixel(direction: Vector3) -> Vector2:
 	var u := atan2(-direction.x, direction.z) / TAU + 0.5
 	var v := acos(clampf(direction.y, -1.0, 1.0)) / PI
 	return Vector2(u * float(STAR_MAP.x), v * float(STAR_MAP.y))
-
 
 ## A pale disc a degree and a half across, a little shading on one side, in a wide faint halo.
 static func _paint_moon(image: Image, direction: Vector3) -> void:
@@ -2086,7 +1870,6 @@ static func _paint_moon(image: Image, direction: Vector3) -> void:
 			else:
 				continue
 			image.set_pixel(px, py, colour)
-
 
 ## The day of a map held by nights: its `day_environment`, or a plain overcast morning over
 ## the same ground. Built beside the night once, so a dawn is a blend and never a rebuild.
@@ -2122,7 +1905,6 @@ func _capture_day() -> void:
 
 	scratch.free()
 
-
 ## The rig's Fill under [param lighting], aimed away from [param sun] as the map turned it: the
 ## rig aimed it opposite the sun it was given, and the map's own angle is set after, so left
 ## alone the fill lights the faces the sun already does. Null when the profile has no fill.
@@ -2136,7 +1918,6 @@ static func _aim_fill(lighting: Node, env_doc: Dictionary, sun: DirectionalLight
 	aimed.free()
 	return fill
 
-
 static func _light_values(sun: DirectionalLight3D, world: WorldEnvironment, fill: DirectionalLight3D) -> Dictionary:
 	var out := {}
 	var env := world.environment
@@ -2149,7 +1930,6 @@ static func _light_values(sun: DirectionalLight3D, world: WorldEnvironment, fill
 			out[key] = holder.get(parts[1])
 
 	return out
-
 
 ## How much of the light is day, 0 (the map's own night) to 1. Nothing happens on a map that
 ## has no day captured, or on a server, which draws no light.
@@ -2185,10 +1965,8 @@ func set_daylight(amount: float) -> void:
 	if baked != null:
 		env.tonemap_exposure = _baked_exposure * lerpf(1.0, BAKED_DAY_EXPOSURE, amount)
 
-
 func daylight() -> float:
 	return _daylight
-
 
 ## The dot-lighting document a map's `environment` describes.
 ##
@@ -2235,7 +2013,6 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 		},
 	}
 
-
 ## What this machine draws of a map's light: dot-lighting's `painted()` (API level 3), the
 ## family's profile for hand-built worlds, with the map's ambient and fill.
 ##
@@ -2252,6 +2029,7 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 ## dusky with the lamps pooling and a zombie a dark figure against a lighter wall, and the
 ## school by day loses the glare that washed its field white.
 const AMBIENT := 3.4
+
 const FILL := 2.4
 
 static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
@@ -2292,7 +2070,6 @@ func spawn(side: String, seat: int) -> Array:
 
 	return [clear_spot(at), float(base.get("yaw", 0.0))]
 
-
 ## [param at] if a standing survivor fits there, else the nearest spot within [constant SPAWN_SEARCH] metres where one does and
 ## the ground is under it: a converted map's start point can land inside a prop. Unchanged before the map is in a world.
 func clear_spot(at: Vector3) -> Vector3:
@@ -2311,7 +2088,6 @@ func clear_spot(at: Vector3) -> Vector3:
 		reach += 0.5
 	return at
 
-
 func _fits(space: PhysicsDirectSpaceState3D, mask: int, feet: Vector3) -> bool:
 	var capsule := CapsuleShape3D.new()
 	capsule.radius = 0.36
@@ -2324,7 +2100,6 @@ func _fits(space: PhysicsDirectSpaceState3D, mask: int, feet: Vector3) -> bool:
 		return false
 	var down := PhysicsRayQueryParameters3D.create(feet + Vector3(0.0, 0.5, 0.0), feet + Vector3(0.0, -0.6, 0.0), mask)
 	return not space.intersect_ray(down).is_empty()
-
 
 ## Whether a start point is on: the map's `info_player_*` entity says so live, else the document's `disabled`. Found by name (the document keeps 64 characters of it); where several share a name, the one nearest the entry, else by standing within 0.75 m of it.
 func spawn_enabled(entry: Dictionary) -> bool:
@@ -2357,14 +2132,11 @@ func spawn_enabled(entry: Dictionary) -> bool:
 
 	return not bool(entry.get("disabled", false))
 
-
 func kill_height() -> float:
 	return float(doc.get("kill_y", -30.0))
 
-
 func bounds() -> AABB:
 	return _bounds
-
 
 ## Which prop a physics query hit, from the collider and the shape index it reported; -1 for
 ## anything that is not a prop.
@@ -2379,7 +2151,6 @@ func prop_from_hit(collider: Object, shape_index: int) -> int:
 		return -1
 
 	return int(node.get_meta(&"zz_prop"))
-
 
 ## Which prop [param point] is on, within [constant HIT_MARGIN]: a shot that stopped
 ## on furniture. -1 for none.
@@ -2402,10 +2173,8 @@ func prop_containing(point: Vector3) -> int:
 
 	return -1
 
-
 func prop_id(index: int) -> StringName:
 	return (props[index] as Dictionary)["id"] if index >= 0 and index < props.size() else &""
-
 
 ## A camera for watching the whole map from above, for somebody with nobody left to watch.
 func overview() -> Transform3D:
@@ -2413,7 +2182,6 @@ func overview() -> Transform3D:
 	var reach := maxf(_bounds.size.length() * 0.45, 12.0)
 	var eye := centre + Vector3(reach * 0.5, reach * 0.55, reach * 0.5)
 	return Transform3D(Basis.IDENTITY, eye).looking_at(centre, Vector3.UP)
-
 
 func describe_lines() -> PackedStringArray:
 	return PackedStringArray([

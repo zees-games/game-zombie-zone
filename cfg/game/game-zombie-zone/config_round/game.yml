@@ -1,6 +1,15 @@
 # game-zombie-zone: every key of this file at its code default, commented out. Uncomment a line to change it;
 # an operator overrides in cfg/server/game/game-zombie-zone/config_round/game.yml. Layers: defaults < this < env < argv.
 
+# --- Watching
+# Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
+# spectate_camera: 0
+
+# --- Progress
+# keep_progress: true
+# progress_directory: ""
+# report_progress: false
+
 # --- The HUD
 # The top-left list of team-mates with their health bars. Off by default: the Tab board carries each survivor...
 # team_roster: false
@@ -122,12 +131,3 @@
 # grace_hud: 1
 # `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode). [-1..]
 # start_points: -1
-
-# --- Watching
-# Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
-# spectate_camera: 0
-
-# --- Progress
-# keep_progress: true
-# progress_directory: ""
-# report_progress: false

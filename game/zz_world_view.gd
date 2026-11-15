@@ -1,47 +1,15 @@
-extends Node3D
-
-const ZzAudio := preload("zz_audio.gd")
-const ZzBoxes := preload("zz_boxes.gd")
-const ZzPaths := preload("zz_paths.gd")
-const ZzDefibModel := preload("zz_defib_model.gd")
-const ZzGrenadeFx := preload("zz_grenade_fx.gd")
-const ZzWeapons := preload("zz_weapons.gd")
-const ZzNpcs := preload("zz_npcs.gd")
-const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
-const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
-const ZzOilMonsterView := preload("../npcs/zz_oil_monster_view.gd")
-const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
-const ZzZombieLod := preload("../npcs/zz_zombie_lod.gd")
-
-## Everything a client draws in the world that is not a survivor or a wall: the zombies and their
-## bodies, what lies on the ground, pools of acid and fire, things thrown, explosions, and a
-## strangler's tongue.
-##
-## [b]Told, never asking.[/b] Offline the world's own signals call these methods; connected, the
-## bridge's do, with the same arguments, so the two can only differ in where a fact came from —
-## the shape `ZzClient._hear_the_world` already has for the rest.
-##
-## [b]Sound is placed here, because this is what knows where things are.[/b] A common moans now
-## and then while it idles, screams on the frame it turns to RAGE, and the special's own voice
-## plays when it appears and when it uses what it has. The sleeper's crying is a loop that
-## follows her, so it is louder the closer you are, which is the only warning she gives.
-
-## Seconds a killed zombie's body stays before it sinks away, when nothing gave the rules.
-const CORPSE_SECONDS := 6.0
-
-## Seconds a blast's flash lasts.
-const BLAST_SECONDS := 0.6
-
-## Gravity a thrown thing falls by on a client: the server's (`ZzHazards.GRAVITY`).
-const GRAVITY := 18.0
+extends "zz_world_view_base.gd"
 
 var audio: ZzAudio = null
+
 ## The client's effects layer: where the smoke and fire clouds spawn.
 var effects: DotFxManager = null
+
 ## The config the fade cvars live in, and the Hard Box stacks last heard of; a change of either redraws.
 var fade_config: Object = null
+
 var hard_stacks := 0
+
 var _fade_seen := ""
 
 ## key -> {body, view, last_anim, next_moan, voice_handle}
@@ -52,6 +20,7 @@ var _corpses: Array = []
 
 ## id -> node
 var _loot: Dictionary = {}
+
 var _hazards: Dictionary = {}
 
 ## id -> {node, head, gun, muzzle, yaw, pitch, want_yaw, want_pitch, idle, flash}
@@ -71,10 +40,13 @@ const TONGUE_SEGMENTS := 10
 
 ## The special holding the person whose eyes these are, drawn in front of them (see [method pin]).
 var _lens_holder: Node3D = null
+
 var _lens_victim: Node3D = null
+
 var _lens_view: Node3D = null
 
 var _rng := RandomNumberGenerator.new()
+
 var _materials: Dictionary = {}
 
 ## Where killed zombies fall as skeletal ragdolls: dot-player-char's yard, the same bodies and
@@ -90,9 +62,9 @@ var ragdoll_mask: int = 1
 ## The server's `sv_ragdoll*` rules (`ZzGame.ragdoll_rules`, followed through the link), set
 ## before this enters the tree. Null: the stock rules with [constant CORPSE_SECONDS].
 var ragdoll_rules: DotPlayerRagdollRules = null
+
 ## How far each zombie is animated, shadowed and drawn; the client points it at `crowd_detail`.
 var lod := ZzZombieLod.new()
-
 
 func _ready() -> void:
 	_rng.seed = Time.get_ticks_usec()
@@ -105,12 +77,10 @@ func _ready() -> void:
 	ragdolls.sound_fn = _ragdoll_sound
 	add_child(ragdolls)
 
-
 ## A dead body's landing (dot-player-char's stock death sounds), where it landed.
 func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
 	if audio != null:
 		var _played := audio.at(id, at, clampf(volume, 0.3, 1.0))
-
 
 ## Drops a survivor's [param figure] the way [param death] says: the same yard and rules as the
 ## zombies, so the cap counts both and the oldest body (a zombie, as a rule) makes room.
@@ -139,7 +109,6 @@ static func view_for(kind: StringName) -> ZzZombieView:
 
 	return ZzZombieView.new()
 
-
 func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	if body == null or _zombies.has(key):
 		return
@@ -165,7 +134,6 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 		if kind == &"sleeper":
 			entry["voice"] = handle
 
-
 ## What the killcam records: [key, kind, variant, position, yaw, anim, flags] for each zombie
 ## within [param radius] of [param centre].
 func snapshot(centre: Vector3, radius: float) -> Array:
@@ -182,7 +150,6 @@ func snapshot(centre: Vector3, radius: float) -> Array:
 		rows.append([key, entry["kind"], view.variant, at, body.global_rotation.y, int(body.get(&"anim")), int(body.get(&"flags"))])
 	return rows
 
-
 ## Hides the live zombies and their corpses while a replay draws its own, and shows them again.
 func set_replaying(on: bool) -> void:
 	for key: int in _zombies:
@@ -197,12 +164,10 @@ func set_replaying(on: bool) -> void:
 	if ragdolls != null:
 		ragdolls.visible = not on
 
-
 ## The kind of the zombie drawn under [param key], or empty.
 func kind_of(key: int) -> StringName:
 	var entry: Variant = _zombies.get(key)
 	return (entry as Dictionary)["kind"] if entry != null else &""
-
 
 ## A zombie gone: a body to drop for a moment if it was killed.
 func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
@@ -266,7 +231,6 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	if body != null and is_instance_valid(body):
 		body.queue_free()
 
-
 ## Drops [param view] as a ragdoll the way [param death] says, or false when this machine is
 ## at its cap or the server turned ragdolls off (the caller draws the animated fall instead).
 func _ragdoll(view: ZzZombieView, death: DotPlayerDeath) -> bool:
@@ -276,7 +240,6 @@ func _ragdoll(view: ZzZombieView, death: DotPlayerDeath) -> bool:
 		return false
 	ragdolls.rules.collision_mask = ragdoll_mask
 	return ragdolls.spawn(view, death) != null
-
 
 func zombie_count() -> int:
 	return _zombies.size()
@@ -361,7 +324,6 @@ func add_loot(id: int, kind: StringName, item: StringName, at: Vector3, box_colo
 	node.set_meta(&"label", _label(kind, item))
 	_loot[id] = node
 
-
 static func _label(kind: StringName, item: StringName) -> String:
 	match kind:
 		&"weapon", &"throwable":
@@ -379,7 +341,6 @@ static func _label(kind: StringName, item: StringName) -> String:
 		&"box":
 			return "take the box" if item == &"unknown" else "take the %s box" % String(item).replace("_", " ")
 	return "pick up"
-
 
 ## Marks loot [param id] as sold for [param price] points; the prompt says so.
 func set_loot_price(id: int, price: int) -> void:
@@ -401,7 +362,6 @@ func set_loot_price(id: int, price: int) -> void:
 		tag.position = Vector3(0.0, 0.7, 0.0)
 		node.add_child(tag)
 
-
 ## Crates that moved on the server: `[id, at, rotation]` each. The pose is eased to in
 ## [method _present_loot], so ten updates a second are not ten steps; a bobbing box rests instead.
 func move_loot_many(rows: Array) -> void:
@@ -417,7 +377,6 @@ func move_loot_many(rows: Array) -> void:
 			if crate != null:
 				crate.position.y = 0.225
 				crate.rotation.y = 0.0
-
 
 func remove_loot(id: int) -> void:
 	var node: Node3D = _loot.get(id)
@@ -435,7 +394,6 @@ func _attach_cloud(node: Node3D, fx: int, at: Vector3, radius: float, seconds: f
 
 	if cloud != null:
 		cloud.reparent(node)
-
 
 func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> void:
 	remove_hazard(id)
@@ -502,7 +460,6 @@ const TURRET_MODEL := "res://assets/turret/turret.glb"
 ## drawn gun is on its target when the shot is told.
 const TURRET_TURN := 9.0
 
-
 func add_turret(id: int, at: Vector3, yaw: float, _seconds: float) -> void:
 	remove_turret(id)
 	var scene := load(ZzPaths.rebase(TURRET_MODEL)) as PackedScene
@@ -525,7 +482,6 @@ func add_turret(id: int, at: Vector3, yaw: float, _seconds: float) -> void:
 	_turrets[id] = {"node": node, "head": head, "gun": gun, "muzzle": muzzle, "yaw": yaw, "pitch": 0.0,
 		"want_yaw": yaw, "want_pitch": 0.0, "idle": 0.0, "flash": flash, "flash_left": 0.0, "age": 0.0}
 
-
 ## The server told it fired at [param target]: turn the barrel there, flash, and draw the line.
 func fire_turret(id: int, target: Vector3) -> void:
 	var t: Dictionary = _turrets.get(id, {})
@@ -544,15 +500,12 @@ func fire_turret(id: int, target: Vector3) -> void:
 	(t["flash"] as OmniLight3D).light_energy = 3.0
 	_tracer(from, target)
 
-
-
 func remove_turret(id: int) -> void:
 	var t: Dictionary = _turrets.get(id, {})
 	_turrets.erase(id)
 
 	if not t.is_empty() and is_instance_valid(t["node"]):
 		(t["node"] as Node).queue_free()
-
 
 func _tracer(from: Vector3, to: Vector3) -> void:
 	var line := MeshInstance3D.new()
@@ -569,7 +522,6 @@ func _tracer(from: Vector3, to: Vector3) -> void:
 	line.look_at(to)
 	var tween := line.create_tween()
 	tween.tween_callback(line.queue_free).set_delay(0.05)
-
 
 func _present_turrets(delta: float) -> void:
 	for id: int in _turrets:
@@ -596,7 +548,6 @@ func _present_turrets(delta: float) -> void:
 
 			if float(t["flash_left"]) <= 0.0:
 				(t["flash"] as OmniLight3D).light_energy = 0.0
-
 
 func remove_hazard(id: int) -> void:
 	var node: Node3D = _hazards.get(id)
@@ -660,7 +611,6 @@ func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 	if audio != null and kind != &"shell":
 		var _woosh := audio.at(ZzAudio.WOOSH, from)
 
-
 ## The server's grenade struck the world: start its arc again from there with the velocity it left with.
 func bounce(id: int, at: Vector3, velocity: Vector3) -> void:
 	var entry: Variant = _flying.get(id)
@@ -674,7 +624,6 @@ func bounce(id: int, at: Vector3, velocity: Vector3) -> void:
 		node.global_position = at
 
 	(entry as Dictionary)["velocity"] = velocity
-
 
 func land(id: int, kind: StringName, at: Vector3) -> void:
 	var entry: Variant = _flying.get(id)
@@ -699,7 +648,6 @@ func land(id: int, kind: StringName, at: Vector3) -> void:
 
 	if kind == &"rock" and audio != null:
 		var _crack := audio.at(ZzAudio.ROCK, at)
-
 
 ## An explosion's flash, its fire and its noise.
 func blast(at: Vector3, radius: float, kind: StringName) -> void:
@@ -798,7 +746,6 @@ func pin(victim: Node3D, holder: Node3D, kind: StringName, at_lens: bool = false
 	add_child(knot)
 	_tongues[victim] = {"holder": holder, "segments": segments, "knot": knot}
 
-
 func unpin(victim: Node3D) -> void:
 	var entry: Variant = _tongues.get(victim)
 	_tongues.erase(victim)
@@ -835,10 +782,8 @@ func set_effects(rows: Array) -> void:
 
 	hard_stacks = stacks
 
-
 func _alpha_of(kind: StringName) -> float:
 	return ZzNpcs.fade_alpha(fade_config, kind, hard_stacks) if fade_config != null else 1.0
-
 
 ## Redraws every zombie when a stack or a cvar moved, so a change mid-life shows at once.
 func _refresh_fade() -> void:
@@ -860,7 +805,6 @@ func _refresh_fade() -> void:
 		if is_instance_valid(view):
 			view.set_fade(_alpha_of(entry["kind"]))
 
-
 func present(delta: float, listener: Vector3) -> void:
 	_refresh_fade()
 	_present_zombies(delta, listener)
@@ -872,7 +816,6 @@ func present(delta: float, listener: Vector3) -> void:
 	_present_blasts(delta)
 	_present_tongues()
 	_present_lens_holder()
-
 
 ## A shot landed at [param point]: the nearest zombie within reach gets a wound mark there (client only).
 func wound_near(point: Vector3) -> void:
@@ -888,7 +831,6 @@ func wound_near(point: Vector3) -> void:
 			best = view
 	if best != null:
 		best.wound_at(point)
-
 
 func _present_zombies(delta: float, listener: Vector3) -> void:
 	lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
@@ -953,7 +895,6 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 			if entry["kind"] == &"common":
 				var _m := audio.cue_at(&"common", &"idle", at, 0.8)
 
-
 func _present_corpses(delta: float) -> void:
 	var kept: Array = []
 
@@ -977,7 +918,6 @@ func _present_corpses(delta: float) -> void:
 
 	_corpses = kept
 
-
 func _present_loot(delta: float) -> void:
 	var t := float(Time.get_ticks_msec()) * 0.001
 
@@ -993,7 +933,6 @@ func _present_loot(delta: float) -> void:
 				crate.position.y = 0.4 + sin(t * 2.0 + float(id)) * 0.08
 				crate.rotation.y += delta * 0.8
 
-
 func _present_hazards(delta: float) -> void:
 	for id: int in _hazards:
 		var node: Node3D = _hazards[id]
@@ -1004,7 +943,6 @@ func _present_hazards(delta: float) -> void:
 		if pool != null:
 			var radius := float(node.get_meta(&"radius")) * clampf(age, 0.2, 1.0)
 			pool.scale = Vector3(radius, 1.0, radius)
-
 
 func _present_flying(delta: float) -> void:
 	for id: int in _flying.keys():
@@ -1029,7 +967,6 @@ func _present_flying(delta: float) -> void:
 		entry["velocity"] = velocity
 		node.global_position += velocity * delta
 
-
 func _present_blasts(delta: float) -> void:
 	var kept: Array = []
 
@@ -1048,7 +985,6 @@ func _present_blasts(delta: float) -> void:
 		kept.append(b)
 
 	_blasts = kept
-
 
 func _present_tongues() -> void:
 	for victim: Node3D in _tongues.keys():
@@ -1083,7 +1019,6 @@ func _present_tongues() -> void:
 		var knot: MeshInstance3D = entry["knot"]
 		knot.global_position = to + Vector3.DOWN * 0.1
 
-
 ## Lays a unit-tall cylinder from [param a] to [param b].
 static func _stretch(piece: MeshInstance3D, a: Vector3, b: Vector3) -> void:
 	var length := a.distance_to(b)
@@ -1094,7 +1029,6 @@ static func _stretch(piece: MeshInstance3D, a: Vector3, b: Vector3) -> void:
 	var up := (b - a) / length
 	var side := up.cross(Vector3.FORWARD) if absf(up.dot(Vector3.FORWARD)) < 0.95 else up.cross(Vector3.RIGHT)
 	piece.global_transform = Transform3D(Basis(side.normalized(), up, side.normalized().cross(up)).scaled(Vector3(1.0, length * 1.08, 1.0)), (a + b) * 0.5)
-
 
 ## The holder at the lens, put where the victim can see it: a step in front, facing them.
 func _present_lens_holder() -> void:
@@ -1136,7 +1070,6 @@ func _box(size: Vector3, colour: Color) -> MeshInstance3D:
 	mesh.material_override = _material(colour)
 	return mesh
 
-
 func _material(colour: Color) -> StandardMaterial3D:
 	var key := colour.to_html()
 
@@ -1147,7 +1080,6 @@ func _material(colour: Color) -> StandardMaterial3D:
 		_materials[key] = m
 
 	return _materials[key]
-
 
 ## [param additive] is fire; a slam grey dust is alpha-blended like smoke (additive grey just glows).
 func _particles(colour: Color, radius: float, amount: int, additive: bool = true) -> CPUParticles3D:
@@ -1175,7 +1107,6 @@ func _particles(colour: Color, radius: float, amount: int, additive: bool = true
 	p.color_ramp = gradient
 	return p
 
-
 func clear() -> void:
 	if ragdolls != null:
 		ragdolls.clear()
@@ -1194,7 +1125,6 @@ func clear() -> void:
 		unpin(victim)
 	if _lens_victim != null:
 		unpin(_lens_victim)
-
 
 func describe() -> Dictionary:
 	return {

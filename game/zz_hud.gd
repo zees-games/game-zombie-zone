@@ -1,134 +1,4 @@
-extends CanvasLayer
-
-const ZzGame := preload("zz_game.gd")
-const ZzPlayer := preload("zz_player.gd")
-const ZzBindings := preload("zz_bindings.gd")
-const ZzMapDoc := preload("zz_map_doc.gd")
-const ZzWeapons := preload("zz_weapons.gd")
-const ZzWeaponIcons := preload("zz_weapon_icons.gd")
-const ZzNavMeter := preload("zz_nav_meter.gd")
-
-## What a survivor needs on screen, and nothing that would make a dark street less dark.
-##
-## [codeblock]
-## bottom left    your health: real health green, borrowed health white over it; down, a red
-##                bleed bar and how many downs are left; your medkit and pills
-## left           the team: each name, their health, and whether they are up, down, held or dead
-## bottom right   what you are holding and how much is in it
-## top            the objective, a hold-out's clock, a survival map's clock
-## centre         the crosshair, what E would do, the bar of what you are holding E for,
-##                and the bar of somebody picking you up
-## right          what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12")
-## over it all    which way a hit came from; bile, a flash, fire, the last-life grey
-## [/codeblock]
-##
-## [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the
-## action is on NOW, from the same table the menu's Controls page edits.
-##
-## [b]The glance pieces are dot-ui's[/b]: health is a [DotVitals] (borrowed health as its
-## `bonus`, DOWN and DEAD as its `status`), the weapon a [DotAmmoCounter] (an endless reserve
-## as ∞), a hold-out's or a survival map's clock a [DotScoreStrip] under the title, the
-## medkit and pills [DotKeyHints], and every hit the server confirms a [DotHitMarker] and a
-## [DotDamageNumbers] number on the body. The number on the health plate is real health; the
-## borrowed part is the white length after it, which drains, and a number that included it
-## would fall on its own while nobody was hitting you.
-
-const BLIND_FADE_SEC := 0.25
-const HURT_SECONDS := 1.2
-
-## Seconds left of a hold-out at which its clock turns red.
-const LOW_CLOCK_SEC := 10.0
-
-const HEALTH_COLOUR := Color(0.35, 0.85, 0.35)
-const BLEED_COLOUR := Color(0.85, 0.12, 0.1)
-
-## Where the health plate ends, pixels off the bottom: above the chat box's full eight-row
-## log, which reaches 202 (checked in headless_run).
-const PLATE_BOTTOM := 206.0
-
-## The boxes' amber, which is also the glance pieces' highlight.
-const AMBER := Color(0.98, 0.84, 0.5)
-
-
-## This game's accent over whichever theme the player picked: the boxes' amber as the glance pieces' highlight, the
-## health bar's green as "good". The plates, words and outline are the theme's (dark by default), so a light or
-## high-contrast theme can change them. Static so a render tool can use it.
-static func piece_theme() -> Theme:
-	var t := Theme.new()
-	var type := DotHudPiece.THEME_TYPE
-	t.set_color(&"highlight", type, AMBER)
-	t.set_color(&"good", type, HEALTH_COLOUR)
-	return t
-
-
-## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the
-## theme on the HUD's root now and at every theme change, and applies the player's HUD size.
-## Christian's first play test (2026-10-11) asked for a darker HUD a player can restyle in the
-## menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
-var _menu: Object = null
-
-
-func follow_menu(menu: Object) -> void:
-	_menu = menu
-	_follow()
-
-
-func _follow() -> void:
-	if _root != null and _menu != null and _menu.has_method(&"follow_hud"):
-		_menu.call(&"follow_hud", _root, piece_theme())
-
-
-## The player's `cl_hud_show_<element>` switches (dot-ui's [DotHudElementCvars]; `cl_hud_scale` is
-## the menu's own HUD size, so it is not registered). The pieces below are attached in [method _attach_elements].
-var elements := DotHudElementCvars.new()
-
-## element id -> the controls it hides; a piece that sets its own visibility each frame is put
-## back to hidden after the draw (see [method _hold_hidden_elements]).
-var _element_nodes: Dictionary = {}
-
-
-func _attach_elements() -> void:
-	var map := {
-		&"vitals": [vitals, stamina_bar, kits],
-		&"weapons": [_weapon_icon, _weight, _weight_back, _weight_fill, _carry],
-		&"ammo": [ammo],
-		&"fire_mode": [fire_mode],
-		&"teammates": [_team],
-		&"wave": [strip],
-		&"prompts": [_prompt, _use_back, _use_fill, _use_label, _held],
-		&"damage_dir": _hurt_marks.map(func(m: Dictionary) -> Control: return m["rect"]),
-		&"hit_markers": [hit_marker, damage_numbers],
-	}
-	for id: StringName in map:
-		_element_nodes[id] = map[id]
-		for node: Variant in map[id]:
-			var _ok := elements.attach(id, node as CanvasItem)
-	elements.changed.connect(elements.apply)
-
-
-func _hold_hidden_elements() -> void:
-	for id: StringName in _element_nodes:
-		if elements.is_shown(id):
-			continue
-		for node: Variant in _element_nodes[id]:
-			if is_instance_valid(node):
-				(node as CanvasItem).visible = false
-
-
-## Registers the element cvars on a console's local source.
-func bind_elements(local: Object) -> void:
-	if local == null or not local.has_method(&"add_var"):
-		return
-	for id: StringName in DotHudElementCvars.ELEMENTS:
-		var name := DotHudElementCvars.cvar_name(id)
-		local.call(&"add_var", StringName(name), String((DotHudElementCvars.ELEMENTS[id] as Array)[1]) + " (0 hides, 1 shows)",
-			func() -> Variant: return "1" if elements.is_shown(id) else "0",
-			func(v: Variant) -> Variant:
-				if not elements.set_cvar(name, str(v)):
-					return DotResult.fail(DotError.CODE_INVALID, "unreadable value: " + str(v))
-				elements.apply()
-				return null)
-
+extends "zz_hud_base.gd"
 
 ## The full-rect Control every piece sits on.
 func screen() -> Control:
@@ -136,7 +6,6 @@ func screen() -> Control:
 	if _root == null:
 		_build()
 	return _root
-
 
 ## Moves the weight readout (slot list and bar) [param px] left of the right edge, clear of the touch
 ## buttons: FIRE and its cluster sit over it on a phone.
@@ -146,99 +15,12 @@ func shift_weight_left(px: float) -> void:
 		c.offset_left -= px
 		c.offset_right -= px
 
-
-var game: ZzGame = null
-var player: ZzPlayer = null
-
-## `func(action: StringName) -> String`: the key an action is on. Set by the client.
-var key_fn: Callable = Callable()
-
-var watching_label: Label = null
-
-var _root: Control = null
-var _shout: Label = null
-var _shout_for: float = 0.0
-var _banner: Label = null
-var _banner_line: Label = null
-var _banner_for: float = 0.0
-var _top: Label = null
-var _top_sub: Label = null
-## Health: real, borrowed (its bonus), and DOWN or DEAD in place of the number.
-var vitals: DotVitals = null
-## What is in hand and how much is in it.
-var ammo: DotAmmoCounter = null
-## The carried weapon's sprite above the counter (`cl_weapon_icons`); hidden when the weapon has none.
-var _weapon_icon: DotWeaponIconPlate = null
-## The held gun's fire modes, above the ammunition.
-var fire_mode: DotFireModeIndicator = null
-## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
-var strip: DotScoreStrip = null
-## The medkit and pills, each with its key.
-var kits: DotKeyHints = null
-var stamina_bar: DotStatBar = null
-var _stamina_pct: float = 100.0
-## Four ticks round the crosshair on a hit the server confirmed.
-## The marker and numbers layer ([DotHitFeedback]); [member hit_marker] and
-## [member damage_numbers] are its two pieces.
-var hit_fx: DotHitFeedback = null
-var hit_marker: DotHitMarker = null
-## The confirmed hits' numbers, on the bodies they landed on.
-var damage_numbers: DotDamageNumbers = null
-var _status: DotStatusLines = null
-var _nav_meter: PanelContainer = null
-## The team, top left: a row per other survivor (name, a health bar, the number or DOWN /
-## HELD / dead). The bar is drawn, not typed: as a row of block characters it came out as
-## missing-glyph boxes on Windows, whose fallback fonts lack them (first play test).
-var _team: Control = null
-var _team_rows: Array[Dictionary] = []
-var _effects: DotStatusLines = null
-var _prompt: Label = null
-## The box file's order, titles and colours, set by the client: the carried slot is drawn from
-## `player.carried_index` (an index into it plus one; 0 is unknown, or nothing carried).
-var box_order: Array[StringName] = []
-var box_titles: Dictionary = {}
-var box_colours: Dictionary = {}
-var _carry: Label = null
-## The weight readout (bar and slot contents), fed by [method set_carry]; hidden when the rule is off.
-var _weight: Label = null
-var _weight_back: ColorRect = null
-var _weight_fill: ColorRect = null
-var _weight_state: Dictionary = {"on": false}
-var _use_back: ColorRect = null
-var _use_fill: ColorRect = null
-var _use_label: Label = null
-var _held: Label = null
-var _crosshair: Control = null
-## Through a scoped weapon at full aim: zee's circle and reticle (the gun is not drawn then).
-var scope: ZeeScopeOverlay = null
-## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
-var aim_fraction: float = 0.0
-var _scoped: bool = false
-## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
-var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
-var _bile: ColorRect = null
-## The black goo a spit leaves on the screen; stacks come from the server in `net_status`.
-var _goo: DotFxScreenGoo = null
-var _blind: ColorRect = null
-var _flash: ColorRect = null
-var _fire: ColorRect = null
-var _grey: ColorRect = null
-var _low: ColorRect = null
-var _wet: ColorRect = null
-var _air_back: ColorRect = null
-var _air_fill: ColorRect = null
-var _hurt_marks: Array = []
-var _effect_rows: Array = []
-var _effects_at: float = 0.0
-
-
 func bind(p_game: ZzGame, p_player: ZzPlayer) -> void:
 	game = p_game
 	player = p_player
 
 	if _root == null:
 		_build()
-
 
 func _build() -> void:
 	# A full-rect Control between the CanvasLayer and the labels: a CanvasLayer does not lay its
@@ -505,111 +287,14 @@ func _build() -> void:
 		_hurt_marks.append({"rect": mark, "left": 0.0})
 	_attach_elements()
 
-
-func _cover(cover_name: String, colour: Color) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.name = cover_name
-	rect.color = colour
-	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rect.modulate.a = 0.0
-	rect.visible = false
-	_root.add_child(rect)
-	return rect
-
-
-func _rect(colour: Color, preset: int, left: float, top: float, width: float, height: float) -> ColorRect:
-	var rect := ColorRect.new()
-	rect.color = colour
-	rect.set_anchors_and_offsets_preset(preset)
-	rect.offset_left = left
-	rect.offset_right = left + width
-	rect.offset_top = top
-	rect.offset_bottom = top + height
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(rect)
-	return rect
-
-
-func _label(size: int) -> Label:
-	var label := Label.new()
-	label.add_theme_font_size_override("font_size", size)
-	# An outline rather than a panel: readable over a lamp-lit wall and the night alike. Its
-	# colour and the words' are the menu's theme's (a Label under the root takes them), so a
-	# player's theme reaches these lines; only the accent lines (a shout, the boxes) set their own.
-	label.add_theme_constant_override("outline_size", 6)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(label)
-	return label
-
-
-func set_watching(text: String) -> void:
-	if watching_label != null:
-		watching_label.text = text
-
-
-## One line in the middle of the screen, for a few seconds.
-func shout(text: String, seconds: float = 3.5) -> void:
-	if _shout == null:
-		return
-
-	_shout.text = text
-	_shout_for = seconds
-
-
-## A box's outcome: its title in the box's colour, and the message under it.
-func box_banner(title: String, message: String, colour: Color) -> void:
-	if _banner == null:
-		return
-
-	_banner.text = title
-	_banner.add_theme_color_override("font_color", colour.lightened(0.15))
-	_banner_line.text = message
-	_banner_for = 4.0
-
-
 ## What the boxes are doing to the game: `[{title, stacks, seconds, who, scale}]`.
 func set_effects(rows: Array) -> void:
 	_effect_rows = rows
 	_effects_at = Time.get_ticks_msec() / 1000.0
 	_effects_sig = 0
 
-
-func set_prompt(text: String) -> void:
-	if _prompt != null:
-		_prompt.text = text
-
-
-## A hit of this survivor's that the server confirmed: the marker round the crosshair, and
-## the number rising off the body. Never called from the local prediction.
-func confirm_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
-	if hit_fx != null:
-		hit_fx.confirm_hit(victim, amount, point, killed, headshot)
-
-
-## A hit from [param from]: a red mark on that side of the crosshair.
-func hurt_from(from: Vector3, amount: float) -> void:
-	if player == null or _hurt_marks.is_empty():
-		return
-
-	var to := from - player.feet()
-	to.y = 0.0
-
-	if to.length() < 0.1:
-		return
-
-	var yaw := deg_to_rad(player.controller.state.yaw)
-	var forward := Vector3(-sin(yaw), 0.0, -cos(yaw))
-	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
-	var bearing := atan2(to.normalized().dot(right), to.normalized().dot(forward))
-	var index := posmod(roundi(bearing / (PI * 0.5)), 4)
-	var mark: Dictionary = _hurt_marks[index]
-	mark["left"] = HURT_SECONDS * clampf(amount / 10.0, 0.5, 1.5)
-
-
 func _key(action: StringName) -> String:
 	return String(key_fn.call(action)) if key_fn.is_valid() else String(action)
-
 
 func _process(delta: float) -> void:
 	if _root == null or game == null or player == null or not is_instance_valid(player):
@@ -636,15 +321,17 @@ func _process(delta: float) -> void:
 	_draw_hurt(delta)
 	_hold_hidden_elements()
 
-
 ## The top's text is rebuilt when what it is made of changes (a tenth of a second at the
 ## finest), not every frame; the strip is fed the cached clock each frame as before.
 var _top_sig: int = 0
-var _top_clock: String = ""
-var _top_clock_low: bool = false
-var _top_under: String = ""
-var _top_rebuild_fn: Callable = _top_rebuild
 
+var _top_clock: String = ""
+
+var _top_clock_low: bool = false
+
+var _top_under: String = ""
+
+var _top_rebuild_fn: Callable = _top_rebuild
 
 func _draw_top() -> void:
 	var hold := game.survival_state()
@@ -661,7 +348,6 @@ func _draw_top() -> void:
 		_top_sig = sig
 		_top_rebuild_fn.call()
 	strip.show_clock(_top_clock, _top_clock_low, _top_under if _top_clock != "" else "")
-
 
 func _top_rebuild() -> void:
 	var lines := PackedStringArray()
@@ -725,15 +411,17 @@ func _top_rebuild() -> void:
 	_top_clock_low = clock_low
 	_top_under = under
 
-
 ## Kills in a row: each kill within this many seconds of the last extends the streak.
 const STREAK_WINDOW := 6.0
+
 ## The streak at which the row's bar reads full.
 const STREAK_FULL := 10
-var _streak: int = 0
-var _streak_kills: int = -1
-var _streak_at: float = 0.0
 
+var _streak: int = 0
+
+var _streak_kills: int = -1
+
+var _streak_at: float = 0.0
 
 ## The streak after [param kills] total kills at [param now]: `[streak, last_kills, last_at]`. Static so a
 ## suite reads it without a screen. A first look (`last_kills < 0`) only records the total; a lower
@@ -748,7 +436,6 @@ static func streak_step(streak: int, last_kills: int, last_at: float, kills: int
 		return [0, kills, last_at]
 	return [streak, kills, last_at]
 
-
 func _draw_streak() -> void:
 	var step := streak_step(_streak, _streak_kills, _streak_at, player.commons_killed + player.specials_killed, game.now())
 	_streak = step[0]
@@ -756,11 +443,9 @@ func _draw_streak() -> void:
 	_streak_at = step[2]
 	vitals.show_streak(_streak, STREAK_FULL)
 
-
 ## The line under the title while the start grace runs; static so a suite reads it without a screen.
 static func grace_line(seconds: float) -> String:
 	return "Zombies arrive in %s" % DotScoreStrip.clock_text(ceilf(seconds))
-
 
 ## What the top says between a decided map and the next: `[title, clock, under the clock]`.
 ## Static, so a suite can read it without a screen.
@@ -769,12 +454,10 @@ static func next_round_lines(seconds: float, next_map: StringName, this_map: Str
 	return ["Trying again" if again else "Next: %s" % next_name, DotScoreStrip.clock_text(ceilf(seconds)),
 		"until this map starts again" if again else "until the next map"]
 
-
 func _map_name(id: StringName) -> String:
 	if game != null and game.catalogue != null and game.catalogue.maps.has(id):
 		return str((game.catalogue.maps[id] as Dictionary).get("name", id))
 	return String(id)
-
 
 ## What the top of the screen says about a survival hold: `[title, clock, under the clock,
 ## line under the title, clock low]`. Static, so a suite can read it without a screen.
@@ -818,7 +501,6 @@ static func survival_lines(hold: Dictionary) -> Array:
 			return ["Morning", "", "", "", false]
 
 	return ["Hold out", clock, "left" if clock != "" else "", "", low]
-
 
 func _draw_health() -> void:
 	var health := player.health
@@ -877,14 +559,18 @@ func _draw_health() -> void:
 	_status.offset_bottom = kits.offset_top - 2.0
 	_status.offset_top = _status.offset_bottom - _status.row_height
 
-
 ## What the status line says, by what the player is: set only when the state changes. The
 ## builders are Callables, run on a change and not every frame.
 var _status_sig: int = 0
+
 var _status_lines: Array = []
+
 var _kit_sig: int = -1
+
 var _kit_keys: Array = ["", "", ""]
+
 var _kit_rows: Array = []
+
 var _build_kit_rows: Callable = func() -> Array:
 	var rows: Array = []
 	if player.medkits > 0:
@@ -894,6 +580,7 @@ var _build_kit_rows: Callable = func() -> Array:
 	if player.defibs > 0:
 		rows.append(["defibrillator x%d" % player.defibs, _kit_keys[2]])
 	return rows
+
 var _build_status_lines: Callable = func(sig: int) -> Array:
 	match sig:
 		1: return ["Getting up…"]
@@ -905,26 +592,26 @@ var _build_status_lines: Callable = func(sig: int) -> Array:
 	var n := sig - 100
 	return ["%d down%s left" % [n, "" if n == 1 else "s"]]
 
-
 func _set_status_sig(sig: int) -> void:
 	if sig != _status_sig:
 		_status_sig = sig
 		_status_lines = _build_status_lines.call(sig)
 
-
 func _set_width(rect: ColorRect, width: float) -> void:
 	rect.offset_right = rect.offset_left + maxf(width, 0.0)
 	rect.visible = width > 0.5
 
-
 ## Pixels per team row, how many rows at most (a survival map's dozen, and a few more), and
 ## where the bar sits in a row.
 const TEAM_ROW := 22.0
-const TEAM_ROWS := 16
-const TEAM_NAME_WIDTH := 150.0
-const TEAM_BAR_WIDTH := 110.0
-const TEAM_BAR_HEIGHT := 8.0
 
+const TEAM_ROWS := 16
+
+const TEAM_NAME_WIDTH := 150.0
+
+const TEAM_BAR_WIDTH := 110.0
+
+const TEAM_BAR_HEIGHT := 8.0
 
 func _draw_team() -> void:
 	# Off by default (`zz_team_roster`): hidden, so nothing is drawn and the corner is empty;
@@ -979,7 +666,6 @@ func _draw_team() -> void:
 		for part: String in ["name", "state", "back", "fill"]:
 			(row[part] as CanvasItem).visible = false
 
-
 var _team_state_fn: Callable = func(kind: int, value: int, other: ZzPlayer) -> String:
 	match kind:
 		1: return "dead"
@@ -987,7 +673,6 @@ var _team_state_fn: Callable = func(kind: int, value: int, other: ZzPlayer) -> S
 		3: return "DOWN"
 		4: return "%d" % value
 	return ""
-
 
 ## Row [param index] of the team list, made the first time it is needed.
 func _team_row(index: int) -> Dictionary:
@@ -1028,14 +713,12 @@ func _team_row(index: int) -> Dictionary:
 
 	return _team_rows[index]
 
-
 ## One of the glance pieces' colours from the theme the root has now (this game's, or the
 ## menu's when it follows one), or [param fallback] when the theme does not say.
 func _piece_colour(colour: StringName, fallback: Color) -> Color:
 	if _root != null and _root.has_theme_color(colour, DotHudPiece.THEME_TYPE):
 		return _root.get_theme_color(colour, DotHudPiece.THEME_TYPE)
 	return fallback
-
 
 ## What the team list says, row by row, for a suite: `"name|state|bar fraction"`.
 func team_lines() -> PackedStringArray:
@@ -1047,10 +730,11 @@ func team_lines() -> PackedStringArray:
 				(fill.size.x / TEAM_BAR_WIDTH) if fill.visible else 0.0])
 	return out
 
-
 ## The weight readout's words, rebuilt when [method set_carry] brings a new state.
 var _weight_text: String = ""
+
 var _weight_text_stale: bool = true
+
 var _weight_text_fn: Callable = func() -> String:
 	var carried := float(_weight_state.get("w", 0.0))
 	var limit := maxf(float(_weight_state.get("l", 1.0)), 0.1)
@@ -1071,12 +755,10 @@ var _weight_text_fn: Callable = func() -> String:
 	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
 	return "%s\nweight %.1f / %.1f%s%s" % ["\n".join(lines), carried, limit, pack, slow]
 
-
 ## What the player carries (the CARRY event's document, or [method ZzCarry.state_json] offline).
 func set_carry(state: Dictionary) -> void:
 	_weight_state = state
 	_weight_text_stale = true
-
 
 func _draw_stamina() -> void:
 	var s: DotFpsState = player.controller.state if player.controller != null else null
@@ -1089,7 +771,6 @@ func _draw_stamina() -> void:
 	stamina_bar.fill_colour = Color(0.9, 0.35, 0.25) if s.stamina_exhausted else Color(0.95, 0.8, 0.3)
 	_stamina_pct = s.stamina * 100.0
 	stamina_bar.refresh()
-
 
 func _draw_weight() -> void:
 	if _weight == null:
@@ -1113,18 +794,17 @@ func _draw_weight() -> void:
 	_weight.text = _weight_text
 	_weight.add_theme_color_override("font_color", colour)
 
-
 const FIRE_NAMES := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
 
 ## Scratch for the fire modes on offer, reused each frame.
 var _offered: Array = []
-var _rig_player: ZzPlayer = null
-var _rig_node: ZeeWeaponRig = null
 
+var _rig_player: ZzPlayer = null
+
+var _rig_node: ZeeWeaponRig = null
 
 var _rig_lookup_fn: Callable = func() -> ZeeWeaponRig:
 	return player.get_node_or_null(^"Weapons") as ZeeWeaponRig
-
 
 ## The player's own "Weapons" rig by name (the world's, offline), looked up once per player.
 func _world_rig() -> ZeeWeaponRig:
@@ -1132,7 +812,6 @@ func _world_rig() -> ZeeWeaponRig:
 		_rig_player = player
 		_rig_node = _rig_lookup_fn.call()
 	return _rig_node
-
 
 func _draw_weapon() -> void:
 	# The gun you see, whose reload you watch, corrected from the server's count. By the node's
@@ -1165,8 +844,8 @@ func _draw_weapon() -> void:
 	else:
 		ammo.show_ammo(title, -1, -1)
 
-
 const USE_TEXT := {&"revive": "Picking them up…", &"heal": "Healing…", &"pills": "Taking a pill — hold still…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}
+
 const HELD_TEXT := {
 	&"grab": "GRABBED — shoot it, or a friend can shove it off",
 	&"pounce": "POUNCED — your team has to free you",
@@ -1175,8 +854,8 @@ const HELD_TEXT := {
 	&"ride": "RIDDEN — your team has to free you",
 	&"eat": "BEING EATEN — your team has to free you",
 }
-const HELD_DEFAULT := "HELD — your team has to free you"
 
+const HELD_DEFAULT := "HELD — your team has to free you"
 
 func _draw_use() -> void:
 	var fraction := 0.0
@@ -1201,18 +880,18 @@ func _draw_use() -> void:
 	else:
 		_held.visible = false
 
-
 ## The box slot: what is in the hands and the key that opens it. Without `box_labels` the type is
 ## not known to this end at all (`carried_index` is 0), so this says only "a box".
 var _carry_sig: int = -1
+
 var _carry_keys: Array = ["", ""]
+
 var _carry_text_fn: Callable = func(id: StringName) -> String:
 	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
 	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
 	if player.box_out:
 		return "%s%s — hold %s to deploy (%s puts it away)" % [title, more, _carry_keys[0], _carry_keys[1]]
 	return "%s%s — %s takes it out" % [title, more, _carry_keys[1]]
-
 
 func _draw_carry() -> void:
 	if _carry == null:
@@ -1238,12 +917,11 @@ func _draw_carry() -> void:
 	else:
 		_use_fill.color = Color(0.95, 0.85, 0.35)
 
-
 ## The effect lines are rebuilt when a clock ticks over, a row comes or goes, or the rows are
 ## replaced, not every frame. The signature below is integers only.
 var _effects_sig: int = 0
-var _effects_rebuild_fn: Callable = _effects_rebuild
 
+var _effects_rebuild_fn: Callable = _effects_rebuild
 
 ## Whether [param row] is on show [param since] seconds after the rows arrived.
 func _effect_on(row: Dictionary, since: float) -> bool:
@@ -1254,7 +932,6 @@ func _effect_on(row: Dictionary, since: float) -> bool:
 	var who: String = row.get("who", "")
 	# The rows carry a name ("everybody" or a person), never a player key, so compare by name.
 	return who == "" or who == "everybody" or player == null or who == player.display_name
-
 
 func _draw_effects() -> void:
 	if _effect_rows.is_empty():
@@ -1278,7 +955,6 @@ func _draw_effects() -> void:
 	_effects_sig = sig
 	_effects_rebuild_fn.call(since)
 
-
 func _effects_rebuild(since: float) -> void:
 	var lines: Array = []
 
@@ -1297,7 +973,6 @@ func _effects_rebuild(since: float) -> void:
 		lines.append({"text": DotStatusLines.effect_text(title, stacks, left if timed else -1.0), "colour": AMBER})
 
 	_effects.show_lines(lines)
-
 
 func _draw_overlays(delta: float) -> void:
 	var step := maxf(delta, 0.0) / BLIND_FADE_SEC
@@ -1322,7 +997,6 @@ func _draw_overlays(delta: float) -> void:
 	var pulse := 0.12 + 0.08 * sin(Time.get_ticks_msec() * 0.006)
 	_fade(_low, pulse if low or player.is_down() else 0.0, step)
 
-
 ## The breath bar: there while the eyes are under or the lungs not yet full, red when it is out.
 func _draw_air() -> void:
 	var full := maxf(game.water_rules.drown_seconds, 0.001)
@@ -1336,11 +1010,9 @@ func _draw_air() -> void:
 		_air_fill.color = Color(0.55, 0.85, 1.0) if fraction > 0.0 else Color(0.95, 0.2, 0.15)
 		_air_fill.visible = fraction > 0.0
 
-
 func _fade(rect: ColorRect, target: float, step: float) -> void:
 	rect.modulate.a = move_toward(rect.modulate.a, target, step)
 	rect.visible = rect.modulate.a > 0.001
-
 
 func _draw_hurt(delta: float) -> void:
 	var size := get_viewport().get_visible_rect().size if get_viewport() != null else Vector2(1280, 720)
@@ -1364,12 +1036,10 @@ func _draw_hurt(delta: float) -> void:
 			3:
 				_place(rect, Vector2(-reach - 8, -60), Vector2(8, 120))
 
-
 ## The ring round the crosshair that fills while the use key is held over a dropped weapon (dot-ui API 18).
 func set_hold_progress(fraction: float) -> void:
 	if _crosshair != null and DotAddonApi.build_level("dot_ui") >= 18:
 		_crosshair.set(&"hold_progress", fraction)
-
 
 ## dot-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
 ## directly, an older dot-ui fails to compile this script.
@@ -1394,7 +1064,6 @@ func _make_crosshair() -> Control:
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return dot
 
-
 ## The crosshair control, for the feel's cl_crosshair_* binding.
 func crosshair() -> Control:
 	return _crosshair
@@ -1406,13 +1075,11 @@ func set_spread(degrees: float, fov: float = 75.0, gap_scale: float = 1.0) -> vo
 		_crosshair.set(&"fov_degrees", clampf(fov, 10.0, 170.0))
 		_crosshair.call(&"set_spread", degrees)
 
-
 func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:
 	rect.offset_left = at.x
 	rect.offset_top = at.y
 	rect.offset_right = at.x + size.x
 	rect.offset_bottom = at.y + size.y
-
 
 ## The client's hands this frame: the scope follows their progressive fade-in and the crosshair gives way as it rises.
 func follow_hands(hands: ZeeViewModel, camera: Camera3D = null) -> void:
@@ -1428,7 +1095,6 @@ func follow_hands(hands: ZeeViewModel, camera: Camera3D = null) -> void:
 				and overlay.has_method(&"bind_camera"):
 			overlay.call(&"bind_camera", camera, (1 << (hands.view_layer - 1)) if hands.view_layer > 0 else 0)
 
-
 ## The aim this frame: the dot fades as the gun comes up; [param scoped] hides it for the scope.
 func set_aim(fraction: float, scoped: bool) -> void:
 	aim_fraction = clampf(fraction, 0.0, 1.0) if is_finite(fraction) else 0.0
@@ -1441,7 +1107,6 @@ func set_aim(fraction: float, scoped: bool) -> void:
 	elif _crosshair != null:
 		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
 
-
 ## How much of the dot [param fraction] leaves: dot-ui's curve where the host has it, else the
 ## dot stays (an older shell had no aim to fade for).
 func crosshair_opacity(fraction: float) -> float:
@@ -1450,7 +1115,6 @@ func crosshair_opacity(fraction: float) -> float:
 	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
 	var crosshair: Variant = DotCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
-
 
 func is_blind() -> bool:
 	return player != null and is_instance_valid(player) and (player.blinded or player.box_blind)

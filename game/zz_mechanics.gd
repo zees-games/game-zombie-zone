@@ -1,4 +1,4 @@
-extends Node3D
+extends "zz_mechanics_base.gd"
 
 ## A converted map's lifts, doors, buttons and triggers, run from the world pack's manifest
 ## (dot-map's mover, volume and link records).
@@ -8,105 +8,80 @@ extends Node3D
 ## server does and a rider is carried the same way. The mesh is drawn only: each solid mover
 ## gets a StaticBody3D here that is posed per tick and travels with its geometry.
 
-const CHANNEL := "zz.mechanics"
-
-## Kinds that move and collide (the others are read for their outputs only).
-const SOLID_KINDS := ["slide", "rotate", "plat", "path"]
-const BUTTON_KINDS := ["button", "rotate_button"]
-## A brush door's classes: what a global pack's mover list holds that opens to whoever walks up, with no switch run.
-const DOOR_CLASSES := ["func_door", "func_door_rotating", "func_movelinear"]
-const MIN_TRAVEL := 0.05
-const DEFAULT_PATH_SPEED := 2.0
-## How long a door that stays open waits for nobody to be near before it closes.
-const STAY_OPEN_SECONDS := 2.0
-const NEAR_EVERY := 4
-const VOLUME_EVERY := 2
-const PRESS_PAD := 0.3
-const DOOR_PAD := 1.5
-const MAX_FIRES := 256
-## Volumes the server runs through dot-map's DotMapVolumes; push and gravity are also read by prediction.
-const VOLUME_KINDS := ["hurt", "push", "teleport", "gravity"]
-const PREDICTED_KINDS := ["push", "gravity"]
-## How far past a volume's brushes a body is still handed to it (its column and a margin).
-const BODY_PAD := 1.0
-const GameText := preload("zz_game_text.gd")
-const EntityMaker := preload("zz_entity_maker.gd")
-const NpcMaker := preload("zz_npc_maker.gd")
-const MapCommands := preload("zz_map_commands.gd")
-const LogicWaves := preload("zz_logic_waves.gd")
-const LogicGameRules := preload("zz_logic_gamerules.gd")
-## A template copy of these brush classes is solid where it stands (the others are drawn only).
-const COPY_SOLID := ["func_breakable", "func_brush", "func_wall", "func_physbox", "func_physbox_multiplayer"]
-## A copy of one of these has no mover of its own: it is drawn where it was made and an Open reaches its end at once.
-const MAX_COPY_MOVERS := 256
-const COPY_DOORS := ["func_door", "func_door_rotating", "func_movelinear"]
-## Longest gap of ticks the map's logic is stepped through in one go.
-const MAX_LOGIC_STEP := 4096
-
-## A mover changed state (it was told, or it settled); the bridge broadcasts this index.
-signal state_changed(index: int)
-## The map's own logic asked the game for something: `hud_text`, `say`, `cvar`, `npc_spawn`, `maker_spawn`, `template_spawn`, `damage_force`.
-signal logic_event(kind: String, data: Dictionary)
-## A brush a point_template made (or killed): `(id, model, offset in metres from where the model stands, alive)`; the bridge tells clients.
-signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
-
-var tick_rate: int = 64
-var authoritative: bool = true
-## Whether a box (world metres) has a survivor or a zombie in it.
-var occupants_fn: Callable = Callable()
-## The living survivors' body points.
-var points_fn: Callable = Callable()
-## Where whoever is in a box (survivor or zombie) stands, nearest its centre, or null: which way a door swings away from.
-var opener_fn: Callable = Callable()
-## Server: where the entities' source document is (`<prefix>.doc.json`), for their keys and filters.
-var source_doc_path: String = ""
-## Server: every body a volume may touch, as `{id, body, position (feet), height, kind, name, class, team}`.
-var bodies_fn: Callable = Callable()
-## Server: `(body, amount, kind, entity_index)` for a hurt volume's hit.
-var damage_fn: Callable = Callable()
 ## Server: `(body, Transform3D)` for a teleport and `(body, Vector3 m/s)` for a push; a player's push is predicted instead.
 var move_fn: Callable = Callable()
 
 var _ents: Variant = null
+
 var _movers: Array[Dictionary] = []
+
 var _volumes: Array[Dictionary] = []
+
 var _ladders: Array[AABB] = []
+
 var _ladders_built := false
+
 var _toggles: Array[Dictionary] = []
+
 var _toggle_base: int = 0
+
 var _predicted: Array[Dictionary] = []
+
 var _vol_io: DotMapIO = null
+
 ## Every entity of the map as a dot-map runtime, which owns the links: the lifts, buttons and volumes below are its targets.
 var _logic: DotMapIO = null
+
 var _logic_base: int = 0
+
 var _logic_synced: bool = false
+
 var _logic_busy: int = 0
+
 var _source: Array = []
+
 var _source_read: bool = false
+
 var _manifest: Dictionary = {}
+
 var _vols: DotMapVolumes = null
+
 var _generic: Dictionary = {}
+
 var _by_entity: Dictionary = {}
+
 var _by_body: Dictionary = {}
+
 var _told: Dictionary = {}
+
 var _started: bool = false
+
 var _posed_tick: int = -2147483648
+
 var _unsupported_seen: Dictionary = {}
+
 ## Who pressed the input being run (a survivor's eye), for a door's side.
 var _activator: Variant = null
+
 ## Built with doors_only: the logic runs, but never drives a door the document's gates stand in for.
 var _doors_only: bool = false
+
 var _world: RefCounted = null
+
 var _put_on: Callable = Callable()
+
 ## model number to the drawn node of that model, once the map is drawn.
 var _model_nodes: Dictionary = {}
+
 ## Template copies by entity index: `{model, offset, node, body}`.
 var _copies: Dictionary = {}
+
 ## Movers of template copies by wire index (after the toggles'); the next index is handed out in spawn order and restarts each round.
 var _cmovers: Dictionary = {}
-var _copy_next: int = 0
-var _last_tick: int = 0
 
+var _copy_next: int = 0
+
+var _last_tick: int = 0
 
 ## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
 ## it the world's physics layer.
@@ -176,10 +151,8 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 	if authoritative:
 		_build_logic()
 
-
 static func _is_brush_door(mv: Variant) -> bool:
 	return DOOR_CLASSES.has(str(mv.classname).to_lower()) and (mv.kind == "slide" or mv.kind == "rotate")
-
 
 ## A prop door has no brush: dot-map's DotMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
 func _build_door(mv: Variant, put_on: Callable, free_for_all: bool) -> void:
@@ -203,13 +176,11 @@ func _build_door(mv: Variant, put_on: Callable, free_for_all: bool) -> void:
 	_movers.append(m)
 	_by_entity[mv.entity] = {"type": &"mover", "i": m["idx"]}
 
-
 ## The side a door that starts open stands on, else 1.
 static func _rest_side(mv: Variant) -> float:
 	if mv.spawn_side != 0.0 and mv.degrees != 0.0:
 		return mv.spawn_side * signf(mv.degrees)
 	return 1.0
-
 
 ## The door's reach: its swing about the hinge, from a metre under it (a hinge is often set above the floor) to the panel's top.
 static func _door_zone(mv: Variant, node: Node3D) -> AABB:
@@ -217,7 +188,6 @@ static func _door_zone(mv: Variant, node: Node3D) -> AABB:
 	if not is_nan(mv.panel_yaw) and mv.panel_width > 0.1:
 		width = mv.panel_width
 	return AABB(node.position + Vector3(-width, -1.0, -width), Vector3(width * 2.0, DotMapDoorStandIn.SIZE.y + 1.0, width * 2.0))
-
 
 ## Hands the drawn nodes over (from build_node): each mover's node takes its pose.
 func bind_drawn(root: Node3D) -> void:
@@ -235,15 +205,12 @@ func bind_drawn(root: Node3D) -> void:
 	for id: int in _copies:
 		_show_copy(_copies[id] as Dictionary)
 
-
 ## Whether the map has volumes or logic entities to run.
 func has_logic() -> bool:
 	return not _volumes.is_empty() or not _generic.is_empty() or not _toggles.is_empty()
 
-
 func mover_count() -> int:
 	return _movers.size()
-
 
 ## The bodies of the doors that open to whoever walks up (unlocked, nothing drives them): a zombie opens one as a
 ## survivor does, so the horde's graph must not take a shut one for a wall. A room whose only way in was such a door
@@ -264,7 +231,6 @@ func walk_through_bodies() -> Array[RID]:
 			found.append(((node as Node3D).get_node("col_solid") as CollisionObject3D).get_rid())
 
 	return found
-
 
 ## Where the pieces of the moving hulls (boats, trains) lie at rest, for the zombies' graph: walkers climbed
 ## onto one and stood wedged on it. Doors and lifts are left out, they open or are gated.
@@ -291,11 +257,9 @@ func rest_blockers() -> Array[AABB]:
 
 	return found
 
-
 ## The mover at [param index] as plain data (for checks and the debug overlay).
 func mover(index: int) -> Dictionary:
 	return _mover_at(index)
-
 
 ## Mover [param index] of the map or of a template copy, else null.
 func _mover_at(index: int) -> Variant:
@@ -303,16 +267,13 @@ func _mover_at(index: int) -> Variant:
 		return _movers[index]
 	return _cmovers.get(index)
 
-
 ## The map's movers and its copies' movers.
 func _each_mover() -> Array:
 	return _movers if _cmovers.is_empty() else _movers + _cmovers.values()
 
-
 ## The wire index the first template copy's mover takes.
 func _copy_base() -> int:
 	return _toggle_base + _toggles.size()
-
 
 ## Index of the first mover whose targetname is [param name], or -1.
 func index_of(name: String) -> int:
@@ -321,14 +282,12 @@ func index_of(name: String) -> int:
 			return int(m["idx"])
 	return -1
 
-
 ## Index of the mover made from brush-entity [param entity], or -1.
 func index_of_entity(entity: int) -> int:
 	var found: Variant = _by_entity.get(entity)
 	if found == null or str((found as Dictionary)["type"]) != "mover":
 		return -1
 	return int((found as Dictionary)["i"])
-
 
 ## The drawn node of the mover whose targetname is [param name] (case does not matter), or null before the world is drawn.
 func node_named(name: String) -> Node3D:
@@ -338,22 +297,18 @@ func node_named(name: String) -> Node3D:
 			return m["node"]
 	return null
 
-
 ## The mover whose body is [param ground_id], or -1.
 func index_of_body(ground_id: int) -> int:
 	return int(_by_body.get(ground_id, -1))
-
 
 ## Where mover [param index] is along its travel (0 at rest) at [param tick].
 func fraction_at(index: int, tick: int) -> float:
 	return _fraction(_mover_at(index), tick)
 
-
 ## The mover's world transform at [param tick].
 func transform_at(index: int, tick: int) -> Transform3D:
 	var m: Dictionary = _mover_at(index)
 	return _transform_of(m, _fraction(m, tick))
-
 
 func _make_mover(mv: Variant, world: RefCounted) -> Dictionary:
 	var rec: Dictionary = mv.record
@@ -385,7 +340,6 @@ func _make_mover(mv: Variant, world: RefCounted) -> Dictionary:
 	m["auto"] = (mv.kind == "slide" or mv.kind == "rotate") and (mv.touch or mv.use) and not driven
 	return m
 
-
 ## A tracktrain's way: its origin, then each corner. Open is toward the last corner.
 func _read_path(m: Dictionary, mv: Variant) -> void:
 	var pts := PackedVector3Array()
@@ -412,14 +366,12 @@ func _read_path(m: Dictionary, mv: Variant) -> void:
 	m["len"] = total
 	m["travel"] = maxf(total / speed, MIN_TRAVEL)
 
-
 func _fraction(m: Dictionary, tick: int) -> float:
 	var d := int(m["dir"])
 	if d == 0:
 		return float(m["from"])
 	var span := float(m["travel"]) * float(tick_rate)
 	return clampf(float(m["from"]) + float(d) * float(tick - int(m["start"])) / span, 0.0, 1.0)
-
 
 func _transform_of(m: Dictionary, fraction: float) -> Transform3D:
 	var at: Vector3 = m["origin"]
@@ -446,12 +398,10 @@ func _transform_of(m: Dictionary, fraction: float) -> Transform3D:
 	var rel: Transform3D = (m["mv"] as Variant).transform_at(fraction)
 	return Transform3D(rel.basis, at + rel.origin)
 
-
 static func _place(body: Node3D, at: Transform3D) -> void:
 	body.transform = at
 	if body is CollisionObject3D and body.is_inside_tree():
 		PhysicsServer3D.body_set_state((body as CollisionObject3D).get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, body.global_transform)
-
 
 func _pose_mover(m: Dictionary, tick: int) -> void:
 	var f := _fraction(m, tick)
@@ -478,7 +428,6 @@ func _pose_mover(m: Dictionary, tick: int) -> void:
 			if solid != null and solid.is_inside_tree():
 				PhysicsServer3D.body_set_state(solid.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, solid.global_transform)
 
-
 ## Poses every body at [param tick], before a motor sweeps against them.
 func pose_at(tick: int) -> void:
 	if tick == _posed_tick:
@@ -487,7 +436,6 @@ func pose_at(tick: int) -> void:
 	for m in _each_mover():
 		if m["body"] != null or m["node"] != null:
 			_pose_mover(m, tick)
-
 
 ## What standing on [param ground_id] does to somebody at [param at] over tick [param tick].
 func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
@@ -513,7 +461,6 @@ func snapshot(index: int) -> Array:
 	return [int(m["start"]), roundi(float(m["from"]) * 1000.0), int(m["dir"]), 1 if bool(m["locked"]) else 0,
 			1 if float(m.get("side", 1.0)) > 0.0 else 0]
 
-
 ## Mover indices that have left their rest state, for somebody who joins late.
 func told_indices() -> PackedInt32Array:
 	var out := PackedInt32Array()
@@ -521,7 +468,6 @@ func told_indices() -> PackedInt32Array:
 		out.append(int(i))
 	out.sort()
 	return out
-
 
 ## Takes a state the server sent.
 func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked: bool, side: float = 1.0) -> void:
@@ -583,7 +529,6 @@ func reset(tick: int) -> void:
 	for i in touched:
 		state_changed.emit(i)
 
-
 ## One tick: the delayed outputs, doors, volumes. A client only poses.
 func step(tick: int) -> void:
 	_last_tick = tick
@@ -601,12 +546,10 @@ func step(tick: int) -> void:
 			_hazard_step()
 	pose_at(tick)
 
-
 func _start(tick: int) -> void:
 	if _logic != null:
 		_logic_to(tick)
 		_logic.start()
-
 
 func _advance(m: Dictionary, tick: int) -> void:
 	var d := int(m["dir"])
@@ -628,16 +571,13 @@ func _advance(m: Dictionary, tick: int) -> void:
 			m["close_at"] = -1
 			_set_dir(m, -1, tick)
 
-
 func _arm_close(m: Dictionary, tick: int) -> void:
 	var wait := float(m["wait"])
 	if wait > 0.0 and not bool(m["toggle"]) and not bool(m["auto"]) and SOLID_KINDS.has(str(m["kind"])):
 		m["close_at"] = tick + roundi(wait * float(tick_rate))
 
-
 func _occupied(zone: AABB) -> bool:
 	return occupants_fn.is_valid() and bool(occupants_fn.call(zone))
-
 
 func _proximity(tick: int) -> void:
 	for m in _each_mover():
@@ -655,7 +595,6 @@ func _proximity(tick: int) -> void:
 			var stay := float(m["wait"]) if float(m["wait"]) > 0.0 else STAY_OPEN_SECONDS
 			if float(tick - int(m["last_near"])) / float(tick_rate) >= stay:
 				_set_dir(m, -1, tick)
-
 
 func _volume_step(tick: int) -> void:
 	if _volumes.is_empty() or not points_fn.is_valid():
@@ -681,7 +620,6 @@ func _volume_step(tick: int) -> void:
 			_fire(entity, "OnEndTouch", tick)
 			_fire(entity, "OnEndTouchAll", tick)
 
-
 func _trip(v: Dictionary, tick: int) -> void:
 	var vol: Variant = v["vol"]
 	_fire(int(v["entity"]), "OnTrigger", tick)
@@ -690,7 +628,6 @@ func _trip(v: Dictionary, tick: int) -> void:
 		v["enabled"] = false
 	elif vol.wait > 0.0:
 		v["ready"] = tick + roundi(vol.wait * float(tick_rate))
-
 
 ## A survivor's use key: the nearest live button or hand-operated door in reach, if any.
 func try_press(eye: Vector3, look: Vector3, reach: float, tick: int) -> bool:
@@ -725,7 +662,6 @@ func _fire(entity: int, output: String, tick: int) -> void:
 		_logic_to(tick)
 	var _r := _logic.raise(entity, output, _activator)
 
-
 ## Steps the map's logic up to [param tick] (its clock starts at the first tick it is asked about), delivering what falls due.
 func _logic_to(tick: int) -> void:
 	if _logic == null or _logic_busy > 0:
@@ -737,16 +673,13 @@ func _logic_to(tick: int) -> void:
 	if behind > 0:
 		_logic.advance(mini(behind, MAX_LOGIC_STEP))
 
-
 ## The tick the logic is at, for an input it delivers.
 func _logic_tick() -> int:
 	return _logic_base + (_logic.now if _logic != null else 0)
 
-
 ## Runs [param input] on [param entity] now. Public so a check can drive one.
 func input(entity: int, input_name: String, tick: int) -> void:
 	_apply_input(entity, input_name, "", tick)
-
 
 func _apply_input(entity: int, input_name: String, _param: String, tick: int) -> void:
 	var found: Variant = _by_entity.get(entity)
@@ -766,7 +699,6 @@ func _apply_input(entity: int, input_name: String, _param: String, tick: int) ->
 		_volume_input(_volumes[i], name)
 	elif what == "toggle":
 		_toggle_input(_toggles[i], name, _param)
-
 
 func _mover_input(m: Dictionary, name: String, tick: int) -> void:
 	var button := BUTTON_KINDS.has(str(m["kind"]))
@@ -795,7 +727,6 @@ func _mover_input(m: Dictionary, name: String, tick: int) -> void:
 		_:
 			_note_unsupported("%s input %s" % [str(m["mv"].classname), name])
 
-
 func _volume_input(v: Dictionary, name: String) -> void:
 	match name:
 		"enable":
@@ -807,7 +738,6 @@ func _volume_input(v: Dictionary, name: String) -> void:
 		_:
 			_note_unsupported("volume input " + name)
 
-
 func _press(m: Dictionary, tick: int) -> void:
 	if bool(m["locked"]) or tick < int(m["ready"]):
 		return
@@ -816,14 +746,12 @@ func _press(m: Dictionary, tick: int) -> void:
 	_fire(int(m["entity"]), "OnPressed", tick)
 	_fire(int(m["entity"]), "OnIn", tick)
 
-
 func _set_locked(m: Dictionary, locked: bool) -> void:
 	if bool(m["locked"]) == locked:
 		return
 	m["locked"] = locked
 	_told[int(m["idx"])] = true
 	state_changed.emit(int(m["idx"]))
-
 
 func _open_to(m: Dictionary, d: int, tick: int) -> void:
 	if bool(m["locked"]):
@@ -834,11 +762,9 @@ func _open_to(m: Dictionary, d: int, tick: int) -> void:
 	m["close_at"] = -1
 	_set_dir(m, d, tick)
 
-
 func _toggle(m: Dictionary, tick: int) -> void:
 	var opening: bool = int(m["dir"]) > 0 or (int(m["dir"]) == 0 and float(m["from"]) >= 1.0)
 	_open_to(m, -1 if opening else 1, tick)
-
 
 func _set_dir(m: Dictionary, d: int, tick: int) -> void:
 	var f := _fraction(m, tick)
@@ -855,14 +781,12 @@ func _set_dir(m: Dictionary, d: int, tick: int) -> void:
 	elif d < 0 and before >= 0:
 		_fire(int(m["entity"]), "OnClose", tick)
 
-
 ## Which way a door about to open turns: away from whoever opens it, as dot-map's mover node chooses.
 func _swing_away(m: Dictionary) -> void:
 	var at: Variant = _activator
 	if at == null and opener_fn.is_valid():
 		at = opener_fn.call((m["zone"] as AABB).grow(DOOR_PAD))
 	m["side"] = (m["mv"] as Variant).side_away_from(at)
-
 
 func _note_unsupported(what: String) -> void:
 	if _unsupported_seen.has(what):
@@ -888,7 +812,6 @@ func _build_toggles(world: RefCounted) -> void:
 	if authoritative and not _toggles.is_empty():
 		_build_volume_io(world)
 
-
 ## A push a start `trigger_once` switches off (the Counter-Strike anti-camp shove at a spawn): survivors seldom cross that
 ## trigger, so the push would stay on all round. Here it starts off, and the horde graph does not route around it.
 func is_start_guard(vol: Variant) -> bool:
@@ -900,7 +823,6 @@ func is_start_guard(vol: Variant) -> bool:
 			if other.entity == from and other.kind == "once":
 				return true
 	return false
-
 
 ## The map's `info_player_*` entities as `[{name, origin, enabled}]`, live: an `Enable` or `Disable` input flips `enabled`.
 func spawn_entities() -> Array:
@@ -914,7 +836,6 @@ func spawn_entities() -> Array:
 			out.append({"name": e.targetname, "origin": e.origin(_logic), "enabled": e.enabled})
 
 	return out
-
 
 ## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links run in [member _logic].
 func _build_volume_io(world: RefCounted) -> void:
@@ -955,7 +876,6 @@ func _build_volume_io(world: RefCounted) -> void:
 		if e != null:
 			e.enabled = bool(t["enabled"])
 
-
 ## The manifest record of a volume as an entity record, when no source document is shipped: its damage, flags, speed and gravity.
 static func _synth_record(vol: Variant) -> Dictionary:
 	var pairs: Array = [["spawnflags", str(vol.spawnflags)], ["target", vol.target], ["filtername", vol.filter]]
@@ -964,7 +884,6 @@ static func _synth_record(vol: Variant) -> Dictionary:
 		if r.has(key):
 			pairs.append([key, str(r[key])])
 	return {"index": vol.entity, "classname": vol.classname, "targetname": vol.targetname, "pairs": pairs, "outputs": []}
-
 
 func _hazard_step() -> void:
 	if _vols == null or not bodies_fn.is_valid():
@@ -980,16 +899,13 @@ func _hazard_step() -> void:
 	_vol_io.advance(1)
 	_vols.step(near)
 
-
 func _volume_hurt(body: Variant, amount: float, kind: String, by: Variant) -> void:
 	if damage_fn.is_valid():
 		damage_fn.call(body, amount, kind, (by as DotMapEntity).index if by is DotMapEntity else -1)
 
-
 func _volume_move(body: Variant, motion: Variant) -> void:
 	if move_fn.is_valid():
 		move_fn.call(body, motion)
-
 
 func _toggle_input(t: Dictionary, name: String, param: String) -> void:
 	match name:
@@ -1006,7 +922,6 @@ func _toggle_input(t: Dictionary, name: String, param: String) -> void:
 			elif e is DotMapPush:
 				_set_push(t, (e as DotMapPush).velocity())
 
-
 func _set_toggle(t: Dictionary, on: bool) -> void:
 	if bool(t["enabled"]) == on:
 		return
@@ -1019,7 +934,6 @@ func _set_toggle(t: Dictionary, on: bool) -> void:
 		_told[int(t["idx"])] = true
 		state_changed.emit(int(t["idx"]))
 
-
 ## A push volume's velocity changed (SetPushSpeed, SetPushDirection): kept at the precision the wire carries, so prediction agrees.
 func _set_push(t: Dictionary, velocity: Vector3) -> void:
 	var packed := pack_push(velocity)
@@ -1030,7 +944,6 @@ func _set_push(t: Dictionary, velocity: Vector3) -> void:
 	_told[int(t["idx"])] = true
 	state_changed.emit(int(t["idx"]))
 
-
 ## A push velocity as one integer for the MOVER event's start field: bit 29 set, speed in 0.1 m/s (12 bits), yaw (9) and pitch + 90 (8) in degrees.
 static func pack_push(v: Vector3) -> int:
 	var speed := clampi(roundi(v.length() * 10.0), 0, 4095)
@@ -1038,13 +951,11 @@ static func pack_push(v: Vector3) -> int:
 	var pitch := clampi(roundi(rad_to_deg(asin(clampf(v.y / maxf(v.length(), 0.0001), -1.0, 1.0)))) + 90, 0, 180)
 	return (1 << 29) | speed | (yaw << 12) | (pitch << 21)
 
-
 static func unpack_push(packed: int) -> Vector3:
 	var speed := float(packed & 4095) / 10.0
 	var yaw := deg_to_rad(float((packed >> 12) & 511))
 	var pitch := deg_to_rad(float((packed >> 21) & 255) - 90.0)
 	return Vector3(cos(pitch) * cos(yaw), sin(pitch), cos(pitch) * sin(yaw)) * speed
-
 
 ## The push in m/s a survivor whose column stands at [param feet] feels from the live push volumes. Pure of the tick, so prediction and the server agree.
 func push_at(feet: Vector3, height: float) -> Vector3:
@@ -1054,7 +965,6 @@ func push_at(feet: Vector3, height: float) -> Vector3:
 			out += t["push"] if t.has("push") else (t["vol"] as DotMapVolume).push_velocity()
 	return out
 
-
 ## The map's push volumes that start live (the horde's nav costs up the points inside them: a body there is thrown, not walked).
 func push_volumes() -> Array[DotMapVolume]:
 	var out: Array[DotMapVolume] = []
@@ -1063,14 +973,12 @@ func push_volumes() -> Array[DotMapVolume]:
 			out.append(t["vol"] as DotMapVolume)
 	return out
 
-
 ## The gravity scale a survivor at [param feet] is under (1 outside every gravity volume).
 func gravity_at(feet: Vector3, height: float) -> float:
 	for t in _predicted:
 		if str(t["kind"]) == "gravity" and _touches_player(t, feet, height):
 			return float((t["vol"] as DotMapVolume).record.get("gravity", 1.0))
 	return 1.0
-
 
 func _touches_player(t: Dictionary, feet: Vector3, height: float) -> bool:
 	if not bool(t["enabled"]):
@@ -1080,7 +988,6 @@ func _touches_player(t: Dictionary, feet: Vector3, height: float) -> bool:
 	if flags != 0 and (flags & 1) == 0:
 		return false
 	return (t["bounds"] as AABB).intersects(AABB(feet - Vector3(0.05, 0.0, 0.05), Vector3(0.1, height, 0.1))) and vol.touches_column(feet, height)
-
 
 ## The ladder brushes as boxes in metres, for each survivor's DotFpsLadderMode. Built once: the same list on both ends is what keeps a replayed climb the server's.
 func ladder_boxes() -> Array[AABB]:
@@ -1092,14 +999,12 @@ func ladder_boxes() -> Array[AABB]:
 			_ladders.append_array(vol.brush_boxes())
 	return _ladders
 
-
 ## Counts for checks: volumes by kind, and how many are live.
 func volume_counts() -> Dictionary:
 	var out := {}
 	for t in _toggles:
 		out[t["kind"]] = int(out.get(t["kind"], 0)) + 1
 	return out
-
 
 ## The toggle volumes as plain data (checks): `{kind, entity, enabled, bounds}`.
 func volume_toggles() -> Array[Dictionary]:
@@ -1113,7 +1018,6 @@ func _scale_io(io: DotMapIO, manifest: Variant) -> void:
 		io.unit_scale = float(((manifest as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", io.unit_scale))
 		io.destinations = (manifest as Dictionary).get("destinations", {})
 
-
 ## Every entity of the source document (`entities[]`), or [] when it is not shipped beside the world.
 func _source_records() -> Array:
 	if _source_read:
@@ -1124,7 +1028,6 @@ func _source_records() -> Array:
 		if parsed is Dictionary and (parsed as Dictionary).get("entities") is Array:
 			_source = (parsed as Dictionary)["entities"]
 	return _source
-
 
 ## Without the source document, entity records made from what the manifest keeps: every mover, volume and unknown class, with its outputs.
 func _manifest_records() -> Array:
@@ -1144,14 +1047,12 @@ func _manifest_records() -> Array:
 			out.append(_record_of(vol.entity, str(vol.classname), str(vol.targetname), _synth_record(vol)["pairs"]))
 	return out
 
-
 func _record_of(entity: int, classname: String, targetname: String, pairs: Array) -> Dictionary:
 	var outs: Array = []
 	for link: Dictionary in _ents.links.fired_by(entity):
 		outs.append({"output": str(link["output"]), "target": str(link["target"]), "input": str(link["input"]),
 				"param": str(link.get("param", "")), "delay": float(link.get("delay", 0.0)), "times": int(link.get("times", -1))})
 	return {"index": entity, "classname": classname, "targetname": targetname, "pairs": pairs, "outputs": outs}
-
 
 ## Builds (or rebuilds, for a new round) the logic runtime from the source document, else the manifest. The mover, button and
 ## volume classes hand their inputs to this class; the logic classes, the makers and the texts run in dot-map and here.
@@ -1191,7 +1092,6 @@ func _build_logic() -> void:
 		return
 	_logic = io
 
-
 ## An input the logic delivers to one of this class's own entities (a lift, a button, a volume).
 func _own_input(e: DotMapEntity, input_name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	if not _by_entity.has(e.index):
@@ -1204,7 +1104,6 @@ func _own_input(e: DotMapEntity, input_name: String, param: String, activator: V
 	_logic_busy -= 1
 	_activator = keep
 	return true
-
 
 ## A door's copy is not a mover, so an Open on it is over at once (its OnFullyOpen then kills the streak or sprite it was made with).
 func _copy_door_input(e: DotMapEntity, input_name: String, activator: Variant) -> bool:
@@ -1219,7 +1118,6 @@ func _copy_door_input(e: DotMapEntity, input_name: String, activator: Variant) -
 			return true
 	return false
 
-
 func _on_logic_event(kind: String, data: Dictionary) -> void:
 	match kind:
 		"template_spawn":
@@ -1227,7 +1125,6 @@ func _on_logic_event(kind: String, data: Dictionary) -> void:
 		"collision_pair":
 			_set_pair(data)
 	logic_event.emit(kind, data)
-
 
 ## The survival hold began wave [param number] (and [param ended] when it was cleared): every logic_waves naming it fires.
 func wave_changed(number: int, ended: bool = false) -> void:
@@ -1242,7 +1139,6 @@ func wave_changed(number: int, ended: bool = false) -> void:
 				e.wave_started(_logic, number)
 	_logic.settle()
 
-
 ## Whether a map's logic_beats has the wave announcer switched off.
 func announcer_off() -> bool:
 	if _logic == null:
@@ -1251,7 +1147,6 @@ func announcer_off() -> bool:
 		if e is DotMapBeats and e.alive and e.announcer_off():
 			return true
 	return false
-
 
 ## The round was decided: every logic_winlose fires OnWin or OnLose.
 func round_decided(won: bool) -> void:
@@ -1263,7 +1158,6 @@ func round_decided(won: bool) -> void:
 			e.decided(_logic, won)
 	_logic.settle()
 
-
 ## A zombie of the map's npc_template_maker [param maker] (an entity index) is dead, gone or never came to be.
 func maker_child_gone(maker: int) -> void:
 	if _logic == null:
@@ -1273,14 +1167,12 @@ func maker_child_gone(maker: int) -> void:
 		e.call(&"child_gone", _logic)
 		_logic.settle()
 
-
 ## Hands every active game_ui the buttons its holder has down; [param held_fn] is `(entity index, holder) -> Dictionary` of button names.
 func feed_uis(held_fn: Callable) -> void:
 	if _logic == null:
 		return
 	for e: DotMapEntity in _logic.active_uis():
 		_logic.feed_ui(e.index, held_fn.call(e.index, (e as DotMapGameUi).player))
-
 
 func _on_logic_state(e: DotMapEntity, key: String, value: Variant, _tick: int) -> void:
 	if key == "alive" and value == false and _copies.has(e.index):
@@ -1310,7 +1202,6 @@ func template_models() -> Dictionary:
 				out[int(d["model"])] = true
 	return out
 
-
 func _copy_made(data: Dictionary) -> void:
 	var src := _logic.entity_of(int(data["source"]))
 	if src == null or not src.key("model").begins_with("*"):
@@ -1323,7 +1214,6 @@ func _copy_made(data: Dictionary) -> void:
 			offset = maker.origin(_logic) - tpl.origin(_logic)
 	var id := int(data["entity"])
 	apply_copy(id, int(src.key("model").substr(1)), offset, true, src.classname)
-
 
 ## A copy of brush [param model] stands [param offset] from where the model does ([param alive]), or goes. A client is told the same.
 func apply_copy(id: int, model: int, offset: Vector3, alive: bool, classname: String = "", mover_index: int = -1) -> void:
@@ -1343,14 +1233,12 @@ func apply_copy(id: int, model: int, offset: Vector3, alive: bool, classname: St
 	if authoritative:
 		copy_changed.emit(id, model, offset, true)
 
-
 ## The mover that stands for brush [param model] in the map (a door or lift a template names), else null.
 func _source_mover(model: int) -> Variant:
 	for m in _movers:
 		if int(m["model"]) == model and not m.has("door"):
 			return m
 	return null
-
 
 ## Gives copy [param c] a mover of its own, posed like its source. The server hands out the next index; a client takes the one
 ## it was sent, which must lie in the copy range.
@@ -1385,12 +1273,10 @@ func _make_copy_mover(c: Dictionary, source: Dictionary, wanted: int) -> void:
 	_by_entity[int(c["id"])] = {"type": &"cmover", "i": index}
 	c["mover"] = index
 
-
 ## The wire index of copy [param id]'s mover, or -1.
 func copy_mover_index(id: int) -> int:
 	var c: Variant = _copies.get(id)
 	return -1 if c == null else int((c as Dictionary)["mover"])
-
 
 func _show_copy(c: Dictionary) -> void:
 	if c["node"] != null or not _model_nodes.has(int(c["model"])):
@@ -1405,7 +1291,6 @@ func _show_copy(c: Dictionary) -> void:
 	if int(c["mover"]) != -1:
 		_cmovers[int(c["mover"])]["node"] = made
 		_posed_tick = -2147483648
-
 
 func _solidify_copy(c: Dictionary) -> void:
 	var shapes: Array = _world.call(&"hull_shapes", int(c["model"]))
@@ -1431,7 +1316,6 @@ func _solidify_copy(c: Dictionary) -> void:
 		_by_body[body.get_instance_id()] = int(c["mover"])
 		_posed_tick = -2147483648
 
-
 func _drop_copy(id: int, tell: bool = true) -> void:
 	var c: Variant = _copies.get(id)
 	if c == null:
@@ -1451,7 +1335,6 @@ func _drop_copy(id: int, tell: bool = true) -> void:
 			(n as Node).queue_free()
 	if tell and authoritative:
 		copy_changed.emit(id, int((c as Dictionary)["model"]), (c as Dictionary)["offset"], false)
-
 
 ## The copies standing now, for a client that joins: `[{id, model, offset}]`.
 func copies() -> Array:
@@ -1477,7 +1360,6 @@ func _set_pair(data: Dictionary) -> void:
 	else:
 		a.add_collision_exception_with(b)
 
-
 func _body_named(targetname: String) -> PhysicsBody3D:
 	if _logic == null or targetname.is_empty():
 		return null
@@ -1488,7 +1370,6 @@ func _body_named(targetname: String) -> PhysicsBody3D:
 			for c in e.node.find_children("*", "PhysicsBody3D", true, false):
 				return c as PhysicsBody3D
 	return null
-
 
 ## What the map's links asked for that nothing here answers, for checks and the log:
 ## `{entities, unresolved (targets nothing carries), unhandled (class|input), denied commands, loop trips}`.
@@ -1506,7 +1387,6 @@ func logic_report() -> Dictionary:
 	var cover := _logic.coverage()
 	return {"entities": _logic.entities.size(), "unresolved": gone, "unhandled": cover["unhandled"],
 			"commands_denied": cover["commands_denied"], "loop_trips": cover["loop_trips"]}
-
 
 ## The logic runtime itself, for checks.
 func logic() -> DotMapIO:

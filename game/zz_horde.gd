@@ -1,32 +1,4 @@
-extends "zz_horde_state.gd"
-
-const ZzWatchCull := preload("zz_watch_cull.gd")
-## What a point inside a push volume costs to arrive at, times the usual.
-const PUSH_COST := 12.0
-
-## The mover watch and cull (game/zz_watch_cull.gd), built with each map.
-var wcull: ZzWatchCull = null
-
-## A file holding a worker count that forces the horde's NPC workers for a test run (see
-## [method forced_npc_workers]). Untracked on purpose: write it, run the suites, delete it.
-const FORCE_WORKERS_FILE := "res://zz_npc_workers.force"
-static var _forced_workers := -2
-
-
-## Every NPC worker count (sense, path, think) forced for a test run, with DotParallel.verify on:
-## env ZZ_NPC_WORKERS=N, else the number in [constant FORCE_WORKERS_FILE] (the form that reaches a
-## box a suite is offloaded to, which gets the worktree's files but not the caller's env). -1 unset.
-static func forced_npc_workers() -> int:
-	if _forced_workers == -2:
-		var v := OS.get_environment("ZZ_NPC_WORKERS").strip_edges()
-		if v == "" and FileAccess.file_exists(FORCE_WORKERS_FILE):
-			v = FileAccess.get_file_as_string(FORCE_WORKERS_FILE).strip_edges()
-		_forced_workers = v.to_int() if v.is_valid_int() and v.to_int() >= 0 else -1
-		if _forced_workers >= 0:
-			DotParallel.verify = true
-			DotLog.info(CHANNEL, "NPC workers forced, DotParallel.verify on", {"workers": _forced_workers})
-	return _forced_workers
-
+extends "zz_horde_base.gd"
 
 func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game = p_game
@@ -103,33 +75,6 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game.combat.damage_applied.connect(_on_damage_applied)
 	return DotResult.success(self)
 
-
-## How the background pressure behaves. The genre's numbers: spawn well ahead and out of
-## sight, peak when the worst-off survivor is struggling, rest when the team has moved on.
-func _rules() -> DotNpcDirectorRules:
-	var rules := DotNpcDirectorRules.new()
-	rules.peak_per_player = 5.0
-	rules.build_up_per_player = 2.5
-	rules.relax_per_player = 0.6
-	rules.absolute_cap = config.commons_cap(4)
-	rules.peak_stress = 0.72
-	rules.sustain_seconds = 5.0
-	rules.fade_seconds = 8.0
-	rules.relax_seconds = 25.0
-	rules.relax_distance = 45.0
-	rules.spawn_min_distance = 22.0 * spawn_distance_scale
-	rules.spawn_max_distance = 60.0 * spawn_distance_scale
-	rules.spawn_ahead = 35.0 * spawn_distance_scale
-	rules.behind_fraction = 0.2
-	rules.spawn_out_of_sight = true
-	rules.spawn_burst = 3
-	rules.spawn_interval = 0.6
-	rules.reclaim_interval = 3.0
-	rules.stress_per_damage = 1.2
-	rules.stress_threat_radius = 6.0
-	return rules
-
-
 ## Builds the horde for a map: its graph, its spawn points, its route, its sleepers, and the
 ## commons standing about in it.
 func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
@@ -160,7 +105,6 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 
 	return DotResult.success(null)
 
-
 ## What waits on the first graph of a map: its route, its sleepers and wanderers, and the bake.
 func _finish_map_build() -> void:
 	var lap := Time.get_ticks_usec()
@@ -180,7 +124,6 @@ func _finish_map_build() -> void:
 	_begin_notes()
 	lap = ZzLaps.lap(sections, &"begin_notes", lap)
 
-
 ## Places the map's sleepers and wanderers, once per build.
 func populate_map() -> void:
 	if _populated:
@@ -189,7 +132,6 @@ func populate_map() -> void:
 	_populated = true
 	_place_sleepers()
 	_place_wanderers()
-
 
 ## Starts annotating the map's colliders: bake, annotate, and then [method _plan_notes]. Survival
 ## and exodus alike (the zombies' drops and spread are for both); only a survival map's stand-ins
@@ -207,22 +149,6 @@ func _begin_notes() -> void:
 	notes.link_world = game.get_world_3d()
 	notes.link_passable = game.map.mechanics.walk_through_bodies() if game.map.mechanics != null else ([] as Array[RID])
 	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
-
-
-func _note_seeds() -> PackedVector3Array:
-	var seeds := PackedVector3Array()
-
-	for i in 4:
-		var spot: Array = game.map.spawn("survivors", i)
-		seeds.append(spot[0])
-
-	# Where the horde comes from and where survivors hold: both ends of a street a car cuts in two.
-	for key: String in ["zombie_spawns", "posts"]:
-		for p: Variant in _doc.get(key, []):
-			seeds.append(ZzMapDoc.v3(p))
-
-	return seeds
-
 
 ## The graph the spawner built is a plain one; the zombies' is `ZzNavGraph`, which also knows the
 ## drops. Swapped in after every rebuild, with the links put back.
@@ -243,25 +169,6 @@ func _adopt_links() -> void:
 
 	_mark_pushes(graph)
 
-
-## Costs up every point inside a live push volume for good: a zombie there is thrown along the push, so a path through one
-## is walked against it. Paths still use them when nothing else joins the two ends.
-func _mark_pushes(graph: DotNpcNavGraph) -> void:
-	if game == null or game.map == null or game.map.mechanics == null:
-		return
-
-	var volumes: Array[DotMapVolume] = game.map.mechanics.push_volumes()
-
-	if volumes.is_empty():
-		return
-
-	for p in nav.points:
-		for vol in volumes:
-			if vol.contains(p):
-				var _i := graph.mark_bad(p, INF, PUSH_COST, 0.05)
-				break
-
-
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
 func _mark_narrow() -> void:
 	if spawner.nav.has_method(&"mark_narrow"):
@@ -271,11 +178,9 @@ func _mark_narrow() -> void:
 		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
 			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), radius, fit)
 
-
 ## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
 func usable_posts() -> Array:
 	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
-
 
 func _plan_notes() -> void:
 	var posts := PackedVector3Array()
@@ -286,7 +191,6 @@ func _plan_notes() -> void:
 	_mark_narrow()
 	notes.plan(spawner.nav, spawn_ground, posts)
 
-
 ## Where a zombie keyed [param key] should walk on its way to [param goal]: through the choke it
 ## was given. The goal itself with `zz_zombie_spread` off or no notes.
 func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
@@ -295,35 +199,31 @@ func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
 
 	return notes.waypoint_for(key, from, goal)
 
-
 ## Set by the hosts (the client and the server), not by a suite: the graph is then built off the
 ## frame ([ZzConfig.nav_threads]) and play waits for the first one ([method nav_blocks_play]).
 var nav_async: bool = false
 
 var _nav_job: ZzNavJob = null
-var _map_nav_pending: bool = false
-var _nav_started: int = 0
 
+var _map_nav_pending: bool = false
+
+var _nav_started: int = 0
 
 ## Whether the map's first graph is still being built: nothing may spawn, and the round has not begun.
 func nav_blocks_play() -> bool:
 	return _map_nav_pending
 
-
 ## Whether any graph (the first, or one rebuilt after a gate opened) is being built.
 func nav_building() -> bool:
 	return _nav_job != null
-
 
 ## How far the build in progress has got, 0 to 1; 1 when none is.
 func nav_progress() -> float:
 	return _nav_job.progress() if _nav_job != null else 1.0
 
-
 ## The pass the build is in ("points", "edges", "links", "cover").
 func nav_stage() -> String:
 	return _nav_job.stage() if _nav_job != null else ""
-
 
 ## The document the graph is built from: the map's, with its whole-map boxes and one climb link per ladder.
 func nav_doc() -> Dictionary:
@@ -333,7 +233,6 @@ func nav_doc() -> Dictionary:
 		ladders = game.map.mechanics.ladder_boxes()
 
 	return ZzNpcs.with_ladders(ZzNpcs.with_nav_extra(_doc, _nav_extra), ladders)
-
 
 ## Builds (or starts building) the graph for the map and the gates now open. Synchronous unless
 ## [member nav_async]; then the graph lands from [method tick] and a graph already in use stays in
@@ -369,12 +268,10 @@ func rebuild_navigation() -> DotResult:
 	DotLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
 	return DotResult.success(0)
 
-
 func _drop_nav_job() -> void:
 	if _nav_job != null:
 		_nav_job.cancel()
 		_nav_job = null
-
 
 ## Once a tick: lets a sliced build work for its budget, and takes a finished graph in.
 func _poll_nav() -> void:
@@ -396,7 +293,6 @@ func _poll_nav() -> void:
 
 	if _map_nav_pending:
 		_finish_map_build()
-
 
 func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	nav = graph
@@ -434,7 +330,6 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	})
 	return DotResult.success(kept)
 
-
 ## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
 func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 	if int(data.meta.get("pruned", 0)) >= PRUNE_VERSION or game == null or game.physics == null or not game.is_inside_tree():
@@ -454,7 +349,6 @@ func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 
-
 ## The survivors' spawns and the posts: where a body must be able to walk to, whatever the prune cut.
 func _required_spots() -> PackedVector3Array:
 	var spots := PackedVector3Array()
@@ -467,13 +361,11 @@ func _required_spots() -> PackedVector3Array:
 
 	return spots
 
-
 ## A map's own `zombie_spawns` join the ones the graph gave: a mapper who wants a crowd to
 ## pour out of a particular alley says so.
 func _add_hinted_spawns() -> void:
 	for p: Array in _doc.get("zombie_spawns", []):
 		director.spawn_points.append(ZzMapDoc.v3(p))
-
 
 ## The kept spawn points become [member spawn_ground], and each one's graph point is looked up once for [method _keep_reaching].
 func _set_spawn_ground() -> void:
@@ -484,7 +376,6 @@ func _set_spawn_ground() -> void:
 		_spawn_ground_nodes.append(spawner.nav.data.nearest_point(p, 3.0))
 
 	_reach_due = 0.0
-
 
 ## The director spawns only where a zombie can walk to a survivor (one way, as it walks): one drawn on an island,
 ## or on a deck it can only drop from, never arrives. The ground as a whole when none reaches anybody.
@@ -504,7 +395,6 @@ func _keep_reaching() -> void:
 					break
 
 	director.spawn_points = kept if not kept.is_empty() else spawn_ground
-
 
 ## Drops every spawn point inside a start or end area, and a metre round it. The graph puts
 ## points wherever there is floor, and a safe room is floor: the first dedicated run had six
@@ -533,7 +423,6 @@ func _keep_out_of_safe_rooms() -> int:
 	director.spawn_points = kept
 	return kept.size()
 
-
 ## The graph's point at each survivor's feet, for "can a zombie from there reach anybody".
 func _survivor_nodes() -> PackedInt32Array:
 	var out := PackedInt32Array()
@@ -548,7 +437,6 @@ func _survivor_nodes() -> PackedInt32Array:
 			out.append(index)
 
 	return out
-
 
 ## Whether a zombie at [param p] could walk to any survivor. A graph cut by a shut gate is two
 ## pieces, and a mob spawned in the other one presses against the gate for the whole hold-out:
@@ -566,7 +454,6 @@ func _reaches_somebody(p: Vector3, nodes: PackedInt32Array) -> bool:
 
 	return false
 
-
 ## Opens a gate: the graph is built again without it.
 func open_gate(gate: String) -> void:
 	if open_gates.has(gate):
@@ -575,11 +462,9 @@ func open_gate(gate: String) -> void:
 	open_gates.append(gate)
 	var _rebuilt := rebuild_navigation()
 
-
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_drop_nav_job()
-
 
 func clear() -> void:
 	_drop_nav_job()
@@ -614,7 +499,6 @@ func clear() -> void:
 	if director != null:
 		director.enabled = false
 
-
 ## Starts the clocks: the team has left the start area, or a night fell.
 func start_pacing(p_survival: bool) -> void:
 	pacing = true
@@ -631,7 +515,6 @@ func start_pacing(p_survival: bool) -> void:
 	director.enabled = config.director_enabled
 	DotLog.info(CHANNEL, "the horde is coming", {"survival": survival})
 
-
 ## A wave is on: perception, brains and panic run, and nothing spawns but what the survival
 ## runtime releases through [method spawn_wave], [method spawn_special] and [method spawn_brute].
 func start_waves() -> void:
@@ -643,12 +526,10 @@ func start_waves() -> void:
 	_next_special = INF
 	_next_brute = INF
 
-
 func stop_pacing() -> void:
 	pacing = false
 	waves_mode = false
 	director.enabled = false
-
 
 ## Sleepers sit where the map put them.
 func _place_sleepers() -> void:
@@ -662,14 +543,12 @@ func _place_sleepers() -> void:
 		if npc == null:
 			DotLog.warn(CHANNEL, "a sleeper could not be placed", {"at": str(at)})
 
-
 ## The share of the commons cap a survival map's wanderers may take. The waves are the hold;
 ## the ballpark's floor area put sixty-five wanderers on it, idle in the far stands, and a wave
 ## had seventeen places left under the cap: its spawns were refused for minutes ("sent" fell
 ## back) and the team stood about. What is left of them each wave is sent in
 ## ([method send_map_commons]).
 const SURVIVAL_WANDERER_SHARE := 0.2
-
 
 ## Commons standing about: clusters on the graph, never near where the team starts.
 func _place_wanderers() -> void:
@@ -722,12 +601,10 @@ func _place_wanderers() -> void:
 
 	DotLog.debug(CHANNEL, "wanderers placed", {"wanted": wanted, "placed": placed})
 
-
 ## The team the map in play is built for, or the survivors there are, whichever is more.
 func _planned_team() -> int:
 	var team: int = game.team_size() if game != null and game.has_method(&"team_size") else 4
 	return maxi(team, game.survivors().size() if game != null else 1)
-
 
 func _start_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
@@ -743,11 +620,9 @@ func _start_points() -> Array[Vector3]:
 ## Set the tick the navigation annotations arrive; the plan runs on the next one.
 var _plan_due := false
 
-
 ## Whether the annotations arrived and the plan (routes, chokes) runs on the next tick.
 func plan_pending() -> bool:
 	return _plan_due
-
 
 ## One tick, or [param ticks] ticks of [param delta] at once. After the survivors moved and shot,
 ## before anything reads where a zombie is.
@@ -827,7 +702,6 @@ func tick(delta: float, ticks: int = 1) -> void:
 	_advance_brute()
 	_advance_panic()
 
-
 ## The survivors, as perception candidates and as facts a brain asks about.
 func _rebuild_candidates() -> void:
 	_candidates.clear()
@@ -879,11 +753,9 @@ func _rebuild_candidates() -> void:
 				_facts_of.erase(id)
 				_cand_of.erase(id)
 
-
 ## Hard Box stacks now on, which the commons' chase speed climbs with.
 func hard_stacks() -> int:
 	return game.boxes.stacks_of(&"hard") if game != null and game.boxes != null else 0
-
 
 ## Whether a common with this [param roll] (0 to 1, fixed per zombie) runs now: an Angry Box is on.
 func is_runner(roll: float) -> bool:
@@ -892,11 +764,9 @@ func is_runner(roll: float) -> bool:
 
 	return roll < config.angry_runner_fraction
 
-
 ## A common's chase speed in m/s under the speed cvars; the brain asks every tick.
 func common_chase_speed(roll: float) -> float:
 	return ZzNpcs.common_chase_speed(config, hard_stacks(), is_runner(roll))
-
 
 func _survivor_count() -> int:
 	var n := 0
@@ -914,32 +784,26 @@ func survivor_position(id: StringName) -> Vector3:
 	var info: Variant = _survivors.get(id)
 	return (info as Dictionary)["position"] if info != null and bool((info as Dictionary)["alive"]) else Vector3.INF
 
-
 func survivor_eye(id: StringName) -> Vector3:
 	var info: Variant = _survivors.get(id)
 	return (info as Dictionary)["eye"] if info != null else Vector3.INF
-
 
 ## Whether zombies strike a downed survivor on the ground, and the damage multiplier of that blow.
 func down_attack_rules() -> Vector2:
 	return Vector2(1.0 if game.config.down_attack else 0.0, game.config.down_attack_damage)
 
-
 func survivor_alive(id: StringName) -> bool:
 	var info: Variant = _survivors.get(id)
 	return info != null and bool((info as Dictionary)["alive"])
-
 
 ## A survivor's health as a fraction (0 when unknown).
 func survivor_health(id: StringName) -> float:
 	var info: Variant = _survivors.get(id)
 	return float((info as Dictionary)["health"]) if info != null else 0.0
 
-
 func survivor_is(id: StringName, what: StringName) -> bool:
 	var info: Variant = _survivors.get(id)
 	return info != null and bool((info as Dictionary).get(what, false))
-
 
 ## Every living survivor's id.
 func survivor_ids() -> Array[StringName]:
@@ -950,7 +814,6 @@ func survivor_ids() -> Array[StringName]:
 			out.append(id)
 
 	return out
-
 
 func _rebuild_grid() -> void:
 	_pick_crowd()
@@ -985,10 +848,9 @@ func _rebuild_grid() -> void:
 	if native:
 		crowd.fill(_crowd_ids, _crowd_at)
 
-
 var _crowd_ids := PackedInt64Array()
-var _crowd_at := PackedVector3Array()
 
+var _crowd_at := PackedVector3Array()
 
 ## Swaps [member crowd] to the native grid or back when [member ZzConfig.native_crowd] (or the
 ## library) says so; between ticks, so a tool may flip it while a round runs.
@@ -1006,15 +868,16 @@ func _pick_crowd() -> void:
 
 	crowd_native = want
 
-
 ## Where zombies that fell out of the map last stood on its floor, newest last (a few kept), for
 ## a tool or a console asking how they got there.
 var fallen_from: Array[Vector3] = []
+
 ## How each of [member fallen_from] left the floor: "leapt N ticks before", or "walked".
 var fallen_how: PackedStringArray = PackedStringArray()
-var fallen_count: int = 0
-const FALLEN_KEPT := 16
 
+var fallen_count: int = 0
+
+const FALLEN_KEPT := 16
 
 ## Records where a zombie the watch found below the map left the floor, for a tool or console.
 func note_fallen(npc: DotNpcInstance) -> void:
@@ -1034,7 +897,6 @@ func note_fallen(npc: DotNpcInstance) -> void:
 	DotLog.warn(CHANNEL, "a zombie fell out of the map", {"kind": String(npc.def.id) if npc.def != null else "?",
 		"last_on_floor": str(from.snappedf(0.1)), "at": str(npc.position().snappedf(0.1)), "how": how})
 
-
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
 func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 	var out: Array[DotNpcInstance] = []
@@ -1044,7 +906,6 @@ func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
 			out.append(npc)
 
 	return out
-
 
 ## Hostile zombies alive that count as "infected left": everything but a sleeper still sitting. Cached for a second.
 func infected_left() -> int:
@@ -1060,10 +921,8 @@ func infected_left() -> int:
 
 	return _left
 
-
 func _sitting_sleeper(npc: DotNpcInstance) -> bool:
 	return npc.def != null and npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting"
-
 
 ## The live zombie nearest [param point], or null: a stand-in told to hunt the rest of the horde asks this.
 ## A sleeper still sitting is left alone, and so is one the survivors cannot reach.
@@ -1082,7 +941,6 @@ func nearest_zombie(point: Vector3) -> DotNpcInstance:
 			best_gap = gap
 
 	return best
-
 
 ## Tells the rescue where [param npc] is, and acts on its answer: a repath, or a relocation close to the survivors and out of their sight.
 func _rescue_if_stuck(npc: DotNpcInstance) -> void:
@@ -1168,7 +1026,6 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
 		"to": str(spot.snappedf(0.1)), "edge": edge, "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 
-
 ## The distance to, and the id of, the survivor nearest [param at] (INF and an empty id with none).
 func _nearest_survivor(at: Vector3) -> Array:
 	var nearest := INF
@@ -1182,7 +1039,6 @@ func _nearest_survivor(at: Vector3) -> Array:
 			nearest_id = id
 
 	return [nearest, nearest_id]
-
 
 ## Costs up, for the whole horde, the place [param npc] stalled at and the next corner of the path it was on, so later paths go round
 ## them; the pair is kept in [member _last_edge] for the log line.
@@ -1200,7 +1056,6 @@ func _mark_stall(npc: DotNpcInstance) -> void:
 	var there := graph.mark_bad(next, _time + config.stuck_bad_edge_seconds) if next != Vector3.INF else -1
 	stuck_marked += int(here >= 0) + int(there >= 0)
 	_last_edge = "%d>%d" % [here, there]
-
 
 ## Steps [param b] half a metre sideways to its way to [param toward], to the side with room (a corner its path cut); false when both are shut.
 func _nudge_sideways(b: ZzZombieBody, toward: Vector3) -> bool:
@@ -1222,7 +1077,6 @@ func _nudge_sideways(b: ZzZombieBody, toward: Vector3) -> bool:
 
 	return false
 
-
 ## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
 ## there and not along the walk it had.
 func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
@@ -1243,10 +1097,8 @@ func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 	if brain != null and brain.get(&"path") != null:
 		(brain.get(&"path") as DotNpcPath).clear()
 
-
 ## Upward speed (m/s) past which a volume's throw lifts a zombie off the floor as a leap.
 const THROW_LIFT := 0.5
-
 
 ## A push volume's throw: [param velocity] (m/s) as a shove along the floor, else a leap unless it is already moving that way
 ## at least as fast.
@@ -1271,7 +1123,6 @@ func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
 
 	b.leap(velocity)
 
-
 ## Where the zombies round [param npc] are (dot-npc-ai's `neighbours`); spacing itself goes
 ## through [member crowd] without this array ([method ZzZombieBrain.separation]).
 func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
@@ -1285,7 +1136,6 @@ func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
 
 	return out
 
-
 ## Metres from [param at] to the nearest living survivor, flat; INF with nobody.
 func nearest_survivor_distance(at: Vector3) -> float:
 	var best := INF
@@ -1298,7 +1148,6 @@ func nearest_survivor_distance(at: Vector3) -> float:
 			best = minf(best, Vector2(p.x - at.x, p.z - at.z).length())
 
 	return best
-
 
 ## How many survivors are within [param radius] of [param at], up and on their feet.
 func survivors_near(at: Vector3, radius: float, exclude: StringName = &"") -> int:
@@ -1315,7 +1164,6 @@ func survivors_near(at: Vector3, radius: float, exclude: StringName = &"") -> in
 
 	return n
 
-
 ## Whether any living survivor can see [param point] (eye to eye height).
 func seen_by_survivors(point: Vector3, height: float = 1.4) -> bool:
 	for id: StringName in _survivors:
@@ -1329,14 +1177,11 @@ func seen_by_survivors(point: Vector3, height: float = 1.4) -> bool:
 
 	return false
 
-
 func line_clear(from: Vector3, to: Vector3) -> bool:
 	return game.clear_between(from, to)
 
-
 func snap_to_nav(at: Vector3) -> Vector3:
 	return nav.snap(at, 3.0) if nav != null else at
-
 
 ## A zombie's swing landed on [param victim]. Through the game: the difficulty, the down, the
 ## slowdown and the stats are all its.
@@ -1347,72 +1192,57 @@ func melee(npc: DotNpcInstance, victim: StringName, amount: float) -> void:
 	var body := npc.node as ZzZombieBody
 	game.zombie_hit(npc, entity_id_for(npc), victim, amount * (body.limb_attack_scale() if body != null else 1.0))
 
-
 ## Everything a special does that touches a survivor goes through the game, which owns pins
 ## and hazards. These are the names a special's brain calls.
 func pin(npc: DotNpcInstance, victim: StringName, kind: StringName) -> bool:
 	return bool(game.pins.pin(entity_id_for(npc), npc, victim, kind))
-
 
 func eat_finished(npc: DotNpcInstance, victim: StringName) -> void:
 	var entity := entity_id_for(npc)
 	game.pins.release(victim, &"eaten")
 	game.eat_victim(entity, victim)
 
-
 func unpin(npc: DotNpcInstance) -> void:
 	game.pins.release_by(entity_id_for(npc), &"let go")
-
 
 func pinning(npc: DotNpcInstance) -> StringName:
 	return game.pins.victim_of(entity_id_for(npc))
 
-
 func hazard(kind: StringName, at: Vector3, radius: float, seconds: float, amount: float, npc: DotNpcInstance = null) -> void:
 	game.hazards.add(kind, at, radius, seconds, amount, entity_id_for(npc) if npc != null else 0)
-
 
 func projectile(kind: StringName, from: Vector3, velocity: Vector3, npc: DotNpcInstance, amount: float) -> void:
 	game.hazards.launch(kind, from, velocity, entity_id_for(npc) if npc != null else 0, amount)
 
-
 func bile(victim: StringName, seconds: float, by: DotNpcInstance = null) -> void:
 	game.bile_survivor(victim, seconds, entity_id_for(by) if by != null else 0)
 
-
 func knock(victim: StringName, from: Vector3, amount: float, npc: DotNpcInstance) -> void:
 	game.knock_survivor(victim, from, amount, entity_id_for(npc) if npc != null else 0)
-
 
 ## A gravity-gun beam (`beam_zap` or `beam_pull`) drawn on every machine; it does no harm itself.
 func beam(kind: StringName, from: Vector3, to: Vector3) -> void:
 	game.hazards.beam(kind, from, to)
 
-
 ## Hands the oil monster's `goo_*` and `trail_*` numbers (its profile) to the pools.
 func configure_goo(meta: Dictionary) -> void:
 	game.hazards.configure_from_meta(meta)
-
 
 ## Leaves a trail puddle behind [param npc] if it has moved far enough since the last; returns its id or 0.
 func goo_trail(npc: DotNpcInstance) -> int:
 	return game.hazards.trail(entity_id_for(npc), npc.position())
 
-
 func end_goo_trail(npc: DotNpcInstance) -> void:
 	game.hazards.end_trail(entity_id_for(npc))
-
 
 ## The mutant's dive landing: survivors within [param radius] take [param amount] and are thrown.
 func slam(npc: DotNpcInstance, at: Vector3, radius: float, amount: float) -> int:
 	return game.hazards.slam(at, radius, amount, entity_id_for(npc) if npc != null else 0)
 
-
 ## Where the world is below [param at] (Y of the first hit within [param depth]), or [param at].y minus depth.
 func ground_y(at: Vector3, depth: float = 60.0) -> float:
 	var hit: Vector3 = game.ray_hit(at + Vector3(0.0, 0.5, 0.0), at - Vector3(0.0, depth, 0.0))
 	return hit.y if hit != Vector3.INF else at.y - depth
-
 
 ## The nearest loose map prop (a toy's rigid body) within [param radius] of [param at] that weighs
 ## no more than [param max_mass] and is not in [param taken]; null for none.
@@ -1439,7 +1269,6 @@ func loose_prop_near(at: Vector3, radius: float, max_mass: float, taken: Array) 
 
 	return best
 
-
 func now() -> float:
 	return spawner.now() if spawner != null else _time
 
@@ -1458,7 +1287,6 @@ func spread_alert(npc: DotNpcInstance, who: StringName, where: Vector3) -> void:
 		var gap := other.position().distance_to(npc.position())
 		# Nearer ones first, and none at once: the room wakes over half a second.
 		_alerts.append([other.instance_id, _time + 0.12 + gap * 0.05 + _rng.randf() * 0.25, who, where])
-
 
 ## A screamer screamed: everything idle within twice the alert radius wakes, and a mob of
 ## [param size] comes for [param victim] from out of sight. Returns the mob's size.
@@ -1481,7 +1309,6 @@ func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
 	DotLog.debug(CHANNEL, "a scream", {"victim": String(victim), "mob": grown})
 	return spawn_mob(maxi(int(round(float(grown) * mob_size_scale)), 0), victim)
 
-
 func _land_alerts() -> void:
 	if _alerts.is_empty():
 		return
@@ -1500,7 +1327,6 @@ func _land_alerts() -> void:
 
 	_alerts = kept
 
-
 ## Something that draws the crowd: a beeping charge, a flare. Commons within [param radius]
 ## go to it and stay there until [param seconds] pass.
 func lure(at: Vector3, seconds: float, radius: float = 40.0) -> void:
@@ -1510,11 +1336,9 @@ func lure(at: Vector3, seconds: float, radius: float = 40.0) -> void:
 		if _heeds_lures(npc.def.id) and npc.brain != null:
 			npc.brain.call(&"lure_to", at)
 
-
 ## Commons, and the pack monsters (their generated brain answers `lure_to` and `force_target`).
 func _heeds_lures(kind: StringName) -> bool:
 	return kind == ZzNpcs.COMMON or ZzPackList.is_pack_kind(kind)
-
 
 func _advance_lures() -> void:
 	if _lures.is_empty():
@@ -1533,7 +1357,6 @@ func _advance_lures() -> void:
 
 	_lures = kept
 
-
 ## A survivor is covered in bile: every common in reach comes for them, and a mob is called.
 ## A bile jar broken at [param at]: every common within [param radius] comes to it for
 ## [param seconds], and the ones it splashed are drawn covered in it. Commons turning on the
@@ -1545,7 +1368,6 @@ func bile_at(at: Vector3, seconds: float, radius: float) -> void:
 	for npc in spawner.npcs_near(at, config.bile_splash):
 		if npc.def.id == ZzNpcs.COMMON and npc.node is ZzZombieBody:
 			(npc.node as ZzZombieBody).set_flag(ZzZombieBody.FLAG_BILED, true)
-
 
 func bile_on(victim: StringName, seconds: float) -> void:
 	var at := survivor_position(victim)
@@ -1565,12 +1387,10 @@ func bile_on(victim: StringName, seconds: float) -> void:
 	if fresh:
 		spawn_mob(int(round(float(_mob_size()) * 0.8)), victim)
 
-
 func _advance_bile() -> void:
 	for id: StringName in _bile.keys():
 		if float(_bile[id]) <= _time:
 			_bile.erase(id)
-
 
 func is_biled(id: StringName) -> bool:
 	return _bile.has(id)
@@ -1587,7 +1407,6 @@ func _mob_size() -> int:
 
 	return maxi(int(round(size * mob_size_scale)), 1)
 
-
 func _advance_mobs() -> void:
 	if _time < _next_mob:
 		return
@@ -1599,7 +1418,6 @@ func _advance_mobs() -> void:
 
 	_next_mob = _time + interval / maxf(mob_rate_scale, 0.05)
 	spawn_mob(_mob_size())
-
 
 ## A mob of [param size] commons that knows where the team is, out of sight, a few at a time.
 ## [param target] chooses whom they all go for; empty spreads them over the team.
@@ -1632,7 +1450,6 @@ func spawn_mob(size: int, target: StringName = &"") -> int:
 	DotLog.debug(CHANNEL, "a mob is coming", {"size": size, "from": origins.size()})
 	return size
 
-
 ## One common zombie from a map's own spawner at [param at], going for a survivor. False with nobody to go for.
 func spawn_common_at(at: Vector3, maker: int = -1) -> bool:
 	var ids := survivor_ids()
@@ -1642,7 +1459,6 @@ func spawn_common_at(at: Vector3, maker: int = -1) -> bool:
 
 	_pending.append([ZzNpcs.COMMON, at, ids[_rng.randi() % ids.size()], ZzZombieBody.FLAG_MOB, &"mob", maker])
 	return true
-
 
 func _release_pending() -> void:
 	if _pending.is_empty() or _time < _next_pending:
@@ -1675,7 +1491,6 @@ func _release_pending() -> void:
 
 		if npc.brain != null and entry[2] != &"":
 			npc.brain.call(&"force_target", entry[2])
-
 
 ## A point out of every survivor's sight between [param near] and [param far] metres from the
 ## nearest of them, ahead along the route when there is one. INF when there is none.
@@ -1773,7 +1588,6 @@ func spawn_wave(size: int) -> int:
 
 	return size
 
-
 ## A hint the wave can come from: out of sight, at least fifteen metres from everybody, and on
 ## ground that reaches somebody. INF when no hint will do and no point of the graph either.
 func _wave_origin() -> Vector3:
@@ -1797,7 +1611,6 @@ func _wave_origin() -> Vector3:
 	var far := _spawn_point(15.0, 90.0, false)
 	return far if far != Vector3.INF else _last_resort_origin()
 
-
 ## A small map holds nothing 15 m from its team that is out of sight (a house that is all start
 ## area), and a wave with no origin never comes: the farthest ground that reaches somebody does,
 ## seen or not.
@@ -1818,7 +1631,6 @@ func _last_resort_origin() -> Vector3:
 
 	return best
 
-
 ## The map's own commons (its wanderers) still alive are sent at the team, spread round it. A
 ## survival wave calls it as it begins: a wanderer left idle in the far stands holds a place
 ## under the cap the wave needs. Returns how many were sent.
@@ -1838,7 +1650,6 @@ func send_map_commons() -> int:
 
 	return sent
 
-
 ## Commons queued to spawn and not yet out: what a release must leave room for.
 func pending_commons() -> int:
 	var n := 0
@@ -1848,7 +1659,6 @@ func pending_commons() -> int:
 			n += 1
 
 	return n
-
 
 ## Wave zombies still alive, queued, or about to be.
 func wave_alive() -> int:
@@ -1864,7 +1674,6 @@ func wave_alive() -> int:
 
 	return n
 
-
 ## The brutes of the wave still standing.
 func wave_brutes() -> int:
 	var n := 0
@@ -1874,7 +1683,6 @@ func wave_brutes() -> int:
 			n += 1
 
 	return n
-
 
 ## The wave ended on its overtime: what is left of it a long way from everybody (stuck, lost)
 ## is tidied away, and the rest are sent at the team. Returns how many were tidied. A brute
@@ -1898,7 +1706,6 @@ func clear_wave_stragglers(far: float = 30.0) -> int:
 			npc.brain.call(&"force_target", ids[_rng.randi_range(0, ids.size() - 1)])
 
 	return wcull.tidy_far(lost) if wcull != null else 0
-
 
 ## At dawn the dark's own leave: every zombie further than [param far] from every survivor and
 ## chasing nobody goes back to wherever they go by day. Returns how many.
@@ -1940,7 +1747,6 @@ func set_barricades(bounds: Dictionary) -> void:
 					_barricade_cells[key] = []
 				(_barricade_cells[key] as Array).append(id)
 
-
 ## The intact barricade a zombie at [param at] wanting to go [param wish] is pressed against,
 ## or "". Against its face (within `zz_bash_reach` of its box, horizontally) and heading
 ## into it, not along it or away.
@@ -1976,11 +1782,9 @@ func barricade_in_way(at: Vector3, wish: Vector3) -> String:
 
 	return ""
 
-
 func barricade_centre(id: String) -> Vector3:
 	var entry: Variant = barricades.get(id)
 	return (entry as Dictionary)["centre"] if entry != null else Vector3.INF
-
 
 ## A zombie spent [param delta] seconds tearing at barricade [param id]. Through the game, which
 ## owns its strength. A brute's arms are ten of a common's; a special's two.
@@ -2010,7 +1814,6 @@ func _allowed_specials() -> Array[StringName]:
 
 	return out
 
-
 func specials_alive() -> int:
 	var n := 0
 
@@ -2021,7 +1824,6 @@ func specials_alive() -> int:
 		n += spawner.count_of(m.id) if not m.boss else 0
 
 	return n
-
 
 func _advance_specials() -> void:
 	if _time < _next_special:
@@ -2068,7 +1870,6 @@ func _advance_specials() -> void:
 
 	var _made := spawn_special(pool[_rng.randi_range(0, pool.size() - 1)])
 
-
 ## One special, from wherever is worst for the team. Returns it, or null. [param owner] is
 ## `wave` for a wave's own, which the wave counts as left until it is dead.
 func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"special") -> DotNpcInstance:
@@ -2094,7 +1895,6 @@ func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringNam
 	DotLog.debug(CHANNEL, "a special", {"kind": String(kind), "at": str(where)})
 	return npc
 
-
 func _advance_brute() -> void:
 	if _time < _next_brute:
 		return
@@ -2119,7 +1919,6 @@ func _advance_brute() -> void:
 	if _boss_alive() == 0:
 		var _b := spawn_brute()
 
-
 func _boss_alive() -> int:
 	var n := spawner.count_of(ZzNpcs.BRUTE)
 
@@ -2127,7 +1926,6 @@ func _boss_alive() -> int:
 		n += spawner.count_of(m.id)
 
 	return n
-
 
 ## An installed pack's boss, sized like a brute for the team. Returns it, or null.
 func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
@@ -2145,7 +1943,6 @@ func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringN
 	brute_spawned.emit(npc)
 	DotLog.info(CHANNEL, "a pack boss", {"kind": String(kind), "at": str(where)})
 	return npc
-
 
 func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
 	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
@@ -2176,7 +1973,6 @@ func panic(seconds: float) -> void:
 	_next_panic_mob = _time + 2.0
 	DotLog.info(CHANNEL, "panic", {"seconds": seconds})
 
-
 ## Whether a mob is still pouring out, or is on its way: a special's cue that the team is busy.
 func mob_incoming() -> bool:
 	if not _pending.is_empty():
@@ -2188,10 +1984,8 @@ func mob_incoming() -> bool:
 
 	return false
 
-
 func panicking() -> bool:
 	return _time < _panic_until
-
 
 func _advance_panic() -> void:
 	if _time >= _panic_until or _time < _next_panic_mob:
@@ -2241,7 +2035,6 @@ func shove(origin: Vector3, facing: Vector3, reach: float, half_angle_deg: float
 
 	return moved
 
-
 ## A blast: zombies inside stagger away from it. The damage is dot-combat's (`explode`).
 func blast(at: Vector3, radius: float) -> void:
 	for npc in spawner.npcs_near(at, radius):
@@ -2249,13 +2042,11 @@ func blast(at: Vector3, radius: float) -> void:
 			var away := npc.position() - at
 			npc.brain.call(&"stagger", away, 1.2, 9.0)
 
-
 func _rescale_health(npc: DotNpcInstance, factor: float) -> void:
 	var health: DotHealth = npc.node.get_node_or_null(^"Health")
 
 	if health != null:
 		_set_health(npc, health.max_health * factor)
-
 
 func _set_health(npc: DotNpcInstance, amount: float) -> void:
 	var health: DotHealth = npc.node.get_node_or_null(^"Health")
@@ -2276,14 +2067,11 @@ func entity_id_for(npc: DotNpcInstance) -> int:
 
 	return game.entities.id_for_node(npc.node)
 
-
 static func is_npc_entity(entity_id: int) -> bool:
 	return DotEntity.is_kind(entity_id, DotEntity.KIND_NPC)
 
-
 func npc_for_entity(entity_id: int) -> DotNpcInstance:
 	return _by_entity.get(entity_id)
-
 
 ## A zombie's hitboxes: head, body, stomach and, on a riot zombie, its shield.
 func _hitbox_set(def: DotNpcDef, height: float, radius: float) -> DotHitboxSet:
@@ -2337,7 +2125,6 @@ func _hitbox_set(def: DotNpcDef, height: float, radius: float) -> DotHitboxSet:
 
 	return set_node
 
-
 ## Hitboxes and health, sized to the kind: a head a headshot can find, a body.
 func _register_combat(npc: DotNpcInstance) -> void:
 	var opened: DotResult = game.entities.open(
@@ -2381,9 +2168,7 @@ func _register_combat(npc: DotNpcInstance) -> void:
 
 	_by_entity[entity] = npc
 
-
 var _in_limb_hit := false
-
 
 ## A shot that hurt a zombie reaches its limbs, beside the damage it already did: a head shot
 ## takes the head, any other the limb under the point (the head is never taken by a body shot
@@ -2430,7 +2215,6 @@ func limb_hit(damage: DotDamage) -> void:
 	var _applied = game.combat.apply_damage(kill)
 	_in_limb_hit = false
 
-
 ## What a hit does to a limb. Limbs are sized from the kind's base health, so a later wave's or a
 ## brute's real health, and Instakill's boosted damage, would strip them in a hit or two.
 func limb_damage(npc: DotNpcInstance, damage: DotDamage) -> float:
@@ -2449,7 +2233,6 @@ func limb_damage(npc: DotNpcInstance, damage: DotDamage) -> float:
 
 	return amount
 
-
 func _forget_combat(npc: DotNpcInstance) -> void:
 	var entity := entity_id_for(npc)
 
@@ -2461,7 +2244,6 @@ func _forget_combat(npc: DotNpcInstance) -> void:
 
 	game.entities.close(entity, DotEntityTable.REASON_KILLED)
 	_by_entity.erase(entity)
-
 
 func _on_spawned(npc: DotNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
@@ -2481,7 +2263,6 @@ func _on_spawned(npc: DotNpcInstance) -> void:
 
 	zombie_spawned.emit(npc)
 
-
 ## Spawns nearer or further than the stock distances; takes effect at once.
 func set_spawn_distance_scale(scale: float) -> void:
 	spawn_distance_scale = clampf(scale, 0.25, 3.0)
@@ -2490,7 +2271,6 @@ func set_spawn_distance_scale(scale: float) -> void:
 		director.rules.spawn_max_distance = 60.0 * spawn_distance_scale
 		director.rules.spawn_ahead = 35.0 * spawn_distance_scale
 
-
 ## Tells the map's spawner (once) that its zombie is no more.
 func _release_maker_child(npc: DotNpcInstance) -> void:
 	if _maker_of.has(npc.instance_id):
@@ -2498,12 +2278,10 @@ func _release_maker_child(npc: DotNpcInstance) -> void:
 		var _gone := _maker_of.erase(npc.instance_id)
 		maker_child_gone.emit(maker)
 
-
 func _on_removed(npc: DotNpcInstance, _reason: StringName) -> void:
 	_release_maker_child(npc)
 	zombie_removed.emit(npc)
 	_forget_combat(npc)
-
 
 func _on_died(npc: DotNpcInstance, by: StringName) -> void:
 	_release_maker_child(npc)
@@ -2515,7 +2293,6 @@ func _on_died(npc: DotNpcInstance, by: StringName) -> void:
 	if b != null:
 		b.death = decide_death(npc, fatal)
 	zombie_died.emit(npc, by, fatal)
-
 
 ## How [param npc] falls, from the hit that killed it: a headshot or a heavy weapon may throw it,
 ## anything else drops it. Seeded from the zombie and the tick, never `randf()`, so a test can
@@ -2536,7 +2313,6 @@ func decide_death(npc: DotNpcInstance, fatal: DotDamage) -> DotPlayerDeath:
 	return DotPlayerDeath.decide(death_reactions, headshot, amount, direction,
 		DotPlayerDeath.seed_of(npc.seed, tick), weapon)
 
-
 ## dot-combat decided a death; dot-npc has to be told, so the brain hears it and the budget
 ## comes back.
 func _on_entity_killed(entity_id: int, damage: DotDamage) -> void:
@@ -2549,7 +2325,6 @@ func _on_entity_killed(entity_id: int, damage: DotDamage) -> void:
 		return
 
 	var _reported := spawner.report_death(npc.instance_id, game.key_for_entity(damage.attacker))
-
 
 ## A zombie was hurt: its brain hears who did it, its mirror of its health follows, and a
 ## heavy enough hit at close range staggers it.
@@ -2590,10 +2365,8 @@ func _on_damage_applied(damage: DotDamage) -> void:
 func count() -> int:
 	return spawner.world_count() if spawner != null else 0
 
-
 func commons() -> int:
 	return spawner.count_of(ZzNpcs.COMMON) if spawner != null else 0
-
 
 func describe() -> Dictionary:
 	return {
@@ -2608,7 +2381,6 @@ func describe() -> Dictionary:
 		"cull": wcull.describe() if wcull != null else "-",
 		"stuck": "%d repaths, %d nudges, %d points marked, %d relocated, %d removed" % [stuck.repaths, stuck_nudges, stuck_marked, stuck.relocations, stuck.removals],
 	}
-
 
 func describe_lines() -> PackedStringArray:
 	var out := PackedStringArray()
