@@ -97,11 +97,14 @@ var wave_index: int = 0
 ## Barricades this map has: id -> {bounds: AABB, centre: Vector3}. Filled by the game.
 var barricades: Dictionary = {}
 
-## Every living zombie by four-metre cell, built once a tick before anything thinks ([method _rebuild_grid]).
-## Crowd spacing and threat scans ask it instead of the spawner's `npcs_near`, which walks every zombie.
-## By path, like every brain: a pack shell older than the class would not know its name.
+## Every living zombie by four-metre cell, built once a tick ([method _rebuild_grid]) for spacing and threat scans.
+## The script grid (by path: an old pack shell lacks the class name), or dot-sim's `DotSimCrowdGrid` (same answers
+## to the bit) while [member ZzConfig.native_crowd] is on and the library is loaded: untyped, so either answers.
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
-var crowd: CrowdGrid = CrowdGrid.new(GRID)
+const NATIVE_CROWD := &"DotSimCrowdGrid"
+var crowd: Variant = CrowdGrid.new(GRID)
+## Whether [member crowd] is the native grid now.
+var crowd_native: bool = false
 var _crowd_npcs: Array[DotNpcInstance] = []
 var _near_scratch := PackedInt32Array()
 const GRID := 4.0

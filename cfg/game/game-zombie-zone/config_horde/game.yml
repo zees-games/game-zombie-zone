@@ -62,6 +62,8 @@
 # dormant_think_every: 16
 # Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays wi... [0..]
 # path_reuse_thoughts: 0
+# Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in dot-sim's native `DotSi...
+# native_crowd: true
 # Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at ... [0..256]
 # bot_max: 0
 # A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many ticks (st... [1..16]

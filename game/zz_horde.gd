@@ -953,8 +953,14 @@ func survivor_ids() -> Array[StringName]:
 
 
 func _rebuild_grid() -> void:
+	_pick_crowd()
 	crowd.clear()
 	_crowd_npcs.clear()
+	_crowd_ids.clear()
+	_crowd_at.clear()
+	var native := crowd_native
+	# Typed, so the script path pays no dynamic call per zombie.
+	var script_grid: CrowdGrid = null if native else crowd
 	var kill_y := float(_doc.get("kill_y", -30.0))
 
 	for npc in spawner.all_npcs():
@@ -967,8 +973,38 @@ func _rebuild_grid() -> void:
 		if p.y < kill_y or not p.is_finite():
 			continue
 
-		var _i := crowd.add(npc.instance_id, p)
+		if native:
+			_crowd_ids.append(npc.instance_id)
+			_crowd_at.append(p)
+		else:
+			var _i := script_grid.add(npc.instance_id, p)
+
 		_crowd_npcs.append(npc)
+
+	# The native grid takes the whole tick in one call.
+	if native:
+		crowd.fill(_crowd_ids, _crowd_at)
+
+
+var _crowd_ids := PackedInt64Array()
+var _crowd_at := PackedVector3Array()
+
+
+## Swaps [member crowd] to the native grid or back when [member ZzConfig.native_crowd] (or the
+## library) says so; between ticks, so a tool may flip it while a round runs.
+func _pick_crowd() -> void:
+	var want := config != null and config.native_crowd and ClassDB.class_exists(NATIVE_CROWD)
+
+	if want == crowd_native:
+		return
+
+	if want:
+		crowd = ClassDB.instantiate(NATIVE_CROWD)
+		crowd.setup(GRID)
+	else:
+		crowd = CrowdGrid.new(GRID)
+
+	crowd_native = want
 
 
 ## Where zombies that fell out of the map last stood on its floor, newest last (a few kept), for
@@ -1240,7 +1276,7 @@ func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
 ## through [member crowd] without this array ([method ZzZombieBrain.separation]).
 func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
 	var out: Array = []
-	var own := crowd.index_of(npc.instance_id)
+	var own: int = crowd.index_of(npc.instance_id)
 	var here: Vector3 = crowd.position_of(own) if own >= 0 else npc.position()
 
 	for i in crowd.near(here, radius, _near_scratch):

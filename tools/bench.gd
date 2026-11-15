@@ -20,6 +20,13 @@ var _profiler: Node = null
 ## --ab-reuse=N (with --profile): every 64 ticks every brain's `path_reuse_thoughts` flips between 0 and N, and
 ## h.brains/h.bodies are summed per arm, so both arms run in one process on one box (AB lines).
 var _ab_reuse := -1
+## --ab-native (with --profile): every 64 ticks the horde's crowd grid flips between the script (0) and dot-sim's
+## `DotSimCrowdGrid` (1) through `ZzConfig.native_crowd`; h.grid, h.brains and h.bodies are summed per arm (AB lines).
+var _ab_native := false
+## --crowd-parity (with --profile): every tick the live crowd grid's entries are copied into a fresh script grid and a
+## fresh native one, and every zombie's spacing push and two neighbour queries are asked of all three (PARITY line).
+var _crowd_parity := false
+var _parity := {"compared": 0, "differ": 0, "pushes": 0}
 var _ab_us := {}
 var _ab_ticks := {}
 var _ticks := 0
@@ -40,6 +47,10 @@ func _run() -> void:
 			_profile = true
 		elif arg.begins_with("--ab-reuse="):
 			_ab_reuse = arg.trim_prefix("--ab-reuse=").to_int()
+		elif arg == "--ab-native":
+			_ab_native = true
+		elif arg == "--crowd-parity":
+			_crowd_parity = true
 		elif arg.begins_with("--ring="):
 			var r := arg.trim_prefix("--ring=").split(",")
 			_ring = Vector2(r[0].to_float(), r[1].to_float())
@@ -168,6 +179,12 @@ func _run() -> void:
 		for arm: int in _ab_ticks:
 			print("AB reuse=%d h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [arm, float(_ab_us[arm].x) / 1000.0 / maxf(1.0, _ab_ticks[arm]),
 				float(_ab_us[arm].y) / 1000.0 / maxf(1.0, _ab_ticks[arm]), _ab_ticks[arm]])
+		for side: int in _abn_ticks:
+			var n := maxf(1.0, _abn_ticks[side]) * 1000.0
+			print("AB native=%d h.grid %.3f h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [side, _abn_us[side].z / n,
+				_abn_us[side].x / n, _abn_us[side].y / n, _abn_ticks[side]])
+		if _crowd_parity:
+			print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
 		_profiler.free()
 	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0])
 	for m in _monitors:
@@ -336,12 +353,62 @@ func _physics_process(_delta: float) -> void:
 		for npc: DotNpcInstance in (_client.get("game") as ZzGame).horde.spawner.all_npcs():
 			if npc.brain != null:
 				npc.brain.set(&"path_reuse_thoughts", arm)
+	var native_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_native else -1
+	if native_arm >= 0:
+		(_client.get("game") as ZzGame).horde.config.native_crowd = native_arm == 1
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
+	if native_arm >= 0 and _recording:
+		var parts: Dictionary = _profiler.get(&"_tick_parts")
+		_abn_us[native_arm] = _abn_us.get(native_arm, Vector3.ZERO) + Vector3(float(parts.get("h.brains", 0)),
+			float(parts.get("h.bodies", 0)), float(parts.get("h.grid", 0)))
+		_abn_ticks[native_arm] = int(_abn_ticks.get(native_arm, 0)) + 1
+	if _crowd_parity and _recording:
+		_check_crowd((_client.get("game") as ZzGame).horde)
 	if arm >= 0 and _recording:
 		var tick_parts: Dictionary = _profiler.get(&"_tick_parts")
 		_ab_us[arm] = _ab_us.get(arm, Vector2i.ZERO) + Vector2i(int(tick_parts.get("h.brains", 0)), int(tick_parts.get("h.bodies", 0)))
 		_ab_ticks[arm] = int(_ab_ticks.get(arm, 0)) + 1
+
+
+var _abn_us := {}
+var _abn_ticks := {}
+
+
+## The live grid's entries, in its order, into a fresh script grid and a fresh native grid; every entry's push
+## (as a brain asks it, from a little off where it was added) and its 6 m and 32 m neighbours from all three.
+func _check_crowd(horde: Object) -> void:
+	if not ClassDB.class_exists(&"DotSimCrowdGrid"):
+		return
+	var live: Variant = horde.get(&"crowd")
+	var script_grid := DotNpcAiCrowdGrid.new(4.0)
+	var native: Object = ClassDB.instantiate(&"DotSimCrowdGrid")
+	native.call(&"setup", 4.0)
+	var n: int = live.size()
+	for i in n:
+		var _a := script_grid.add(live.id_of(i), live.position_of(i))
+		native.call(&"add", live.id_of(i), live.position_of(i))
+	# One scratch per answer: the script grid fills and returns the one it is given.
+	var scratch := PackedInt32Array()
+	var s6 := PackedInt32Array()
+	var s32 := PackedInt32Array()
+	for i in n:
+		var at: Vector3 = live.position_of(i)
+		if not at.is_finite():
+			continue
+		var from := at + Vector3(0.05 * sin(i), 0.0, 0.05 * cos(i))
+		var right := Vector3(cos(i * 0.7), 0.0, sin(i * 0.7))
+		var id: int = live.id_of(i)
+		var a := script_grid.separation(script_grid.index_of(id), from, 1.1, 2.2, right)
+		var b: Vector3 = native.call(&"separation_of", id, from, 1.1, 2.2, right)
+		var c: Vector3 = live.separation(live.index_of(id), from, 1.1, 2.2, right)
+		var near6 := script_grid.near(at, 6.0, s6)
+		var near32 := script_grid.near(at, 32.0, s32)
+		var same: bool = a == b and a == c and near6 == native.call(&"near", at, 6.0, scratch) \
+			and near32 == native.call(&"near", at, 32.0, scratch) and near32 == PackedInt32Array(live.near(at, 32.0, scratch))
+		_parity["compared"] += 1
+		_parity["pushes"] += 1 if a != Vector3.ZERO else 0
+		_parity["differ"] += 0 if same else 1
 
 
 func _alive(game: ZzGame) -> int:
