@@ -1,4 +1,4 @@
-# Every script parses, then every suite runs. The whole check is in modcommunity/dot-ci,
+# Every script parses, then every suite runs. The whole check is in gamespice-platform/ci,
 # so that fixing it is one commit rather than one per repository; its README says what
 # the inputs are and why a release does not touch the content origin.
 #
@@ -21,7 +21,7 @@ on:
 # would share a concurrency group and cancel itself. A suite added to examples/ goes in one of the two lists.
 jobs:
     validate:
-        uses: modcommunity/dot-ci/.github/workflows/validate.yml@v1
+        uses: gamespice-platform/ci/.github/workflows/validate.yml@v1
         with:
             suite-timeout: 900
             profiles: true
