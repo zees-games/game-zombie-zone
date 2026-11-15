@@ -1520,7 +1520,7 @@ func touch_button(id: StringName, down: bool) -> void:
 				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_CROUCH, down)
 		&"next":
 			if down:
-				_cycle_slot(1)
+				_step_slot(1)
 
 
 ## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
@@ -3136,6 +3136,17 @@ func _key_event(event: InputEvent) -> bool:
 
 ## Steps the carried slots on the previous/next weapon actions; true when the event was one.
 func _wheel_pressed(event: InputEvent) -> bool:
+	return _weapon_wheel().handle_event(event)
+
+
+## Steps the carried slots by [param step] without an input event (the touch "next" button).
+func _step_slot(step: int) -> void:
+	var to: Variant = _weapon_wheel().target(step)
+	if to != null:
+		_slot = int(to)
+
+
+func _weapon_wheel() -> DotWeaponWheel:
 	if _wheel == null:
 		_wheel = DotWeaponWheel.new()
 		_wheel.ring_provider = func() -> Array:
@@ -3145,7 +3156,7 @@ func _wheel_pressed(event: InputEvent) -> bool:
 		_wheel.blocked = func() -> bool:
 			return not _pointer_ours()
 		_wheel.chosen.connect(func(slot: Variant) -> void: _slot = int(slot))
-	return _wheel.handle_event(event)
+	return _wheel
 
 
 func describe() -> Dictionary:
