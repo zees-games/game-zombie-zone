@@ -1,4 +1,4 @@
-extends "zz_client_state.gd"
+extends "zz_client_fitting.gd"
 
 const ZzViewGrip := preload("zz_view_grip.gd")
 const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
@@ -293,7 +293,7 @@ func _read_box_colours() -> void:
 			_box_titles[id] = boxes.title_of(id)
 
 
-# --- Offline ---------------------------------------------------------------
+# Offline
 
 func _start_offline() -> void:
 	_fill_offline_team()
@@ -403,10 +403,9 @@ func _add_noblock_and_workbench() -> void:
 
 ## Follows the server's replicated rule cvars, so this end predicts and draws by the server's rules.
 func _follow_server_rules() -> void:
-	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this
-	# end traces its own shots for tracers and impacts, and on its default 1 against a server
-	# on 0 or 2 they ended in (or went through) a team-mate where the server's did the
-	# opposite. An older shell's link cannot say, and the manager keeps its default.
+	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this end traces its own shots
+	# for tracers and impacts, and on its default 1 against a server on 0 or 2 they ended in (or went through) a
+	# team-mate where the server's did not. An older shell's link cannot say, and the manager keeps its default.
 	if game.combat != null and link != null:
 		var _following := game.combat.follow_cvars(link)
 	# The server's mp_forceview and mp_solidplayers: this end places its own camera and
@@ -1553,285 +1552,6 @@ static func _set_fade_cvar(config: ZzConfig, cvar_name: String, value: String) -
 		config.set(StringName(cvar_name.trim_prefix("zz_")), text.to_int() if cvar_name.ends_with("_fade") else text.to_float())
 
 
-## The key an action is on, as the player has it bound.
-func _key(action: StringName) -> String:
-	if settings != null and settings.bindings != null:
-		var text := settings.bindings.key_for(action)
-		if text != "":
-			return text
-
-	var row := ZzBindings.make().row_for_action(action)
-	return String(row.get("default", action))
-
-
-# --- The Tab board ---------------------------------------------------------
-
-## The Tab board: dot-menu's, with this game's columns. The platform feeds it and holds it on Tab.
-func _dress_board() -> void:
-	if board == null:
-		return
-
-	board.title_text = "Zombie Zone"
-	board.columns = [
-		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
-		{"key": &"name", "title": "Survivor", "width": 3.0},
-		{"key": &"health", "title": "Health", "kind": DotMenuScoreboard.KIND_TEXT},
-		{"key": &"downs", "title": "Downs left", "kind": DotMenuScoreboard.KIND_TEXT},
-		{"key": &"kills", "title": "Kills", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"specials", "title": "Specials", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"points", "title": "Points", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
-	]
-	board.sort_by = &"points"
-	board.decorate = _decorate_row
-	board.prepare = _prepare_board
-
-
-func _decorate_row(row: Dictionary) -> void:
-	if game == null:
-		return
-	var id := ZzNetBridge.player_key(int(row.get("id", 0)))
-	if not game.players.has(id):
-		id = StringName(str(row.get("id", "")))
-	var who: ZzPlayer = game.players.get(id)
-	if who == null:
-		return
-	row["avatar"] = _face(who)
-	row["points"] = who.points
-	row["kills"] = who.commons_killed
-	row["specials"] = who.specials_killed
-	row["team"] = ZzGame.SURVIVORS
-	row["health"] = health_text(who)
-	row["downs"] = downs_text(who, game.config.max_incaps)
-	if int(row.get("ping", -1)) < 0 and who.ping_ms >= 0:
-		row["ping"] = who.ping_ms
-	if who == player:
-		row["you"] = true
-
-
-## A survivor's state for the Tab board, so the team's health is there with the HUD list off.
-static func health_text(who: ZzPlayer) -> String:
-	if who.watching or not who.is_alive():
-		return "dead"
-	if who.is_pinned():
-		return "HELD (%s)" % String(who.pin_kind)
-	if who.is_down():
-		return "DOWN"
-	if who.health != null:
-		return "%d" % int(ceilf(who.health.health))
-	return "-"
-
-
-## Downs left before the next one is death.
-static func downs_text(who: ZzPlayer, max_incaps: int) -> String:
-	if who.watching or not who.is_alive():
-		return "-"
-	var left := max_incaps - who.incaps
-	return "last life" if left <= 0 else str(left)
-
-
-func _prepare_board(snap: Dictionary) -> void:
-	if game == null:
-		return
-	snap["header"] = {"Map": str(game.map_doc.get("name", "")), "Difficulty": game.config.difficulty_name().capitalize()}
-	if game.map != null and game.map.world_credits != "":
-		snap["header"]["Credits"] = game.map.world_credits
-	snap["header"]["Zombies"] = " | ".join([ZzZombieView.CREDITS, ZzMutantView.MUTANT_CREDITS, ZzOilMonsterModel.OIL_MONSTER_CREDITS])
-	var pack_credits := preload("zz_packs.gd").credit_lines()
-	if not pack_credits.is_empty():
-		snap["header"]["Models"] = " | ".join(pack_credits)
-	snap["teams"] = [{"id": ZzGame.SURVIVORS, "name": "Survivors", "color": game.side_colour(ZzGame.SURVIVORS)}]
-
-
-## The board offline: every survivor in the local world. Public so a suite can read it.
-func board_snapshot() -> Dictionary:
-	var rows: Array = []
-	if game != null:
-		for id in game.players:
-			var who: ZzPlayer = game.players[id]
-			rows.append({"id": String(id), "name": who.display_name, "seconds": _seconds_here(), "ping": -1, "bot": who.is_bot})
-	return {"server": {"name": "Zombie Zone", "game": "offline"}, "players": rows}
-
-
-func _seconds_here() -> int:
-	return int((Time.get_ticks_msec() - _started_msec) / 1000)
-
-
-var _portraits: Dictionary = {}
-
-
-func _face(who: ZzPlayer) -> Texture2D:
-	return _portrait(str(who.call("_atlas")))
-
-
-func _portrait(atlas: String) -> Texture2D:
-	if _portraits.has(atlas):
-		return _portraits[atlas]
-
-	var view := SubViewport.new()
-	view.name = "Portrait%d" % _portraits.size()
-	view.size = Vector2i(64, 64)
-	view.own_world_3d = true
-	view.transparent_bg = true
-	view.render_target_update_mode = SubViewport.UPDATE_ONCE
-	add_child(view)
-
-	var figure := ZzFigure.new()
-	view.add_child(figure)
-	figure.build(1.8, atlas, Color.WHITE)
-	figure.global_position = Vector3.ZERO
-
-	var eye := Camera3D.new()
-	eye.fov = 30.0
-	view.add_child(eye)
-	# The people's heads are big: the face is about 1.35 m up a 1.8 m person.
-	eye.look_at_from_position(Vector3(0.0, 1.45, -2.0), Vector3(0.0, 1.35, 0.0), Vector3.UP)
-	eye.current = true
-
-	var texture := view.get_texture()
-	_portraits[atlas] = texture
-	return texture
-
-
-# --- The end of a map: killcam, winner reveal, board ---------------------------
-
-func _build_killcam() -> void:
-	killcam = ZzKillcam.new()
-	killcam.name = "MapKillcam"
-	killcam.players_fn = func() -> Array: return game.players.values() if game != null else []
-	killcam.player_for_fn = func(key: StringName) -> Variant: return game.players.get(key) if game != null else null
-	killcam.zombies_fn = func() -> Array:
-		return world_view.snapshot(player.global_position, 40.0) if world_view != null and player != null else []
-	killcam.replaying_fn = func(on: bool) -> void:
-		if world_view != null:
-			world_view.set_replaying(on)
-	killcam.feet_fn = func(p: ZzPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
-	killcam.colour_fn = func(_p: ZzPlayer) -> Color: return game.side_colour(ZzGame.SURVIVORS)
-	_killcam_icons = ZzShopIcons.new()
-	add_child(_killcam_icons)
-	killcam.weapon_icon_fn = func(id: String) -> Texture2D: return _killcam_icons.icon_for(StringName(id))
-	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
-	killcam.camera_mode_fn = func() -> int: return _killcam_camera
-	killcam.world_mask = game.world_mask()
-	killcam.over.connect(func(_skipped: bool) -> void: _reveal_map())
-	add_child(killcam)
-	winner_reveal = DotWinnerReveal.new()
-	winner_reveal.name = "WinnerReveal"
-	winner_reveal.skip_actions = ZzKillcam.SKIP_ACTIONS
-	winner_reveal.hold_seconds = 4.0
-	winner_reveal.finished.connect(_on_reveal_finished)
-	add_child(winner_reveal)
-
-
-## `mp_killcam_time`, from the server's replicated cvar.
-func _on_killcam_cvar(cvar_name: String, value: String) -> void:
-	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
-		_killcam_sec = clampf(value.to_float(), 0.0, 30.0)
-	elif cvar_name == "mp_killview_camera" and value.strip_edges().is_valid_float():
-		_killcam_camera = DotKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else DotKillViewRules.Camera.EYE
-
-
-## The HUD and the chat window: hidden while the replay or the reveal owns the screen.
-func _screen_furniture() -> Array:
-	return [hud, chat.window if chat != null else null]
-
-
-func _begin_map_end(won: bool, why: String) -> void:
-	_map_won = won
-	_map_why = why
-	_map_ending = true
-
-	if killcam == null:
-		return
-
-	# A won map ends on the last survivor standing in the hold, seen through their own eyes.
-	if won:
-		var holder: ZzPlayer = player if player != null and player.is_alive() else null
-
-		if holder == null:
-			for key: StringName in game.players:
-				if game.players[key].is_alive():
-					holder = game.players[key]
-					break
-
-		if holder != null:
-			killcam.note_moment(holder.player_id, "held on" if game.is_survival() else "made it to the shelter",
-				"THE LAST WAVE" if game.is_survival() else "THE SHELTER")
-
-	killcam.hide_while_playing = _screen_furniture()
-
-	if not killcam.map_ended():
-		return
-
-	DotLog.debug(CHANNEL, "the reveal waits for the killcam")
-
-
-## The survivors by points on a podium, after the killcam and before the board.
-func _reveal_map() -> void:
-	if not _map_ending:
-		return
-
-	var rows: Array = game.players.values()
-	rows.sort_custom(func(a: ZzPlayer, b: ZzPlayer) -> bool: return a.points > b.points)
-	var entries: Array = []
-
-	for who: ZzPlayer in rows.slice(0, 3):
-		entries.append({"name": who.display_name, "score": "%d %s" % [who.points, "point" if who.points == 1 else "points"],
-			"colour": game.side_colour(ZzGame.SURVIVORS)})
-
-	winner_reveal.reduced_motion = settings != null and settings.settings != null and settings.settings.get_bool(&"reduce_motion", false)
-	var shown := winner_reveal.present(entries, {"title": "SURVIVORS WON" if _map_won else "INFECTED WON",
-		"subtitle": _map_why.substr(0, 1).to_upper() + _map_why.substr(1) if _map_why != "" else "Map over", "hint": "Jump to skip"})
-
-	if not shown.ok:
-		_open_map_board()
-		return
-
-	for n: Variant in _screen_furniture():
-		if n is Object and is_instance_valid(n) and (n as Object).get(&"visible") != null:
-			_covered_by_reveal[n] = bool((n as Object).get(&"visible"))
-			(n as Object).set(&"visible", false)
-
-
-func _restore_furniture() -> void:
-	for n: Variant in _covered_by_reveal:
-		if is_instance_valid(n):
-			(n as Object).set(&"visible", _covered_by_reveal[n])
-	_covered_by_reveal.clear()
-
-
-func _on_reveal_finished(_skipped: bool) -> void:
-	_restore_furniture()
-
-	if _map_ending:
-		_open_map_board()
-
-
-func _open_map_board() -> void:
-	if board != null and not board.is_open():
-		board.open()
-		_board_opened = true
-
-
-## A new map: whatever is still up goes, so it never covers the start, and the old frames go.
-func _end_map_presentation() -> void:
-	_map_ending = false
-
-	if killcam != null:
-		killcam.skip()
-		killcam.reset()
-
-	if winner_reveal != null:
-		winner_reveal.skip()
-
-	_restore_furniture()
-
-	if _board_opened and board != null:
-		board.close()
-
-	_board_opened = false
-
-
 # --- Chat, sound, settings ---------------------------------------------------
 
 func _build_chat() -> void:
@@ -1963,18 +1683,6 @@ func _bind_bot_console() -> void:
 	var index := args.find("--bot_difficulty")
 	if index >= 0 and index + 1 < args.size():
 		DotLog.result(CHANNEL, "bot difficulty from the command line", DotBotSettings.of(game).set_difficulty(args[index + 1]))
-
-
-func _suspend_input(suspended: bool) -> void:
-	# The button's release goes to the menu, so the aim is let go here or it sticks up.
-	if suspended:
-		_aiming = false
-
-	if _sampler != null:
-		_sampler.suspended = suspended
-
-	if player != null and player.sampler != null:
-		player.sampler.suspended = suspended
 
 
 ## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
@@ -2419,22 +2127,6 @@ func _on_shop_json(json: String) -> void:
 	_follow_shop_menu()
 
 
-## Whether the local survivor stands within reach of an open trader.
-func _near_trader(only_open := true) -> bool:
-	if player == null or not player.can_act() or not bool(shop_state.get("menu", false)) or (only_open and not bool(shop_state.get("open", false))):
-		return false
-	var feet := player.feet()
-	for at: Variant in shop_state.get("at", []):
-		var a := at as Array
-		if a.size() == 3 and feet.distance_to(Vector3(float(a[0]), float(a[1]), float(a[2]))) <= float(shop_state.get("radius", 3.5)):
-			return true
-	return false
-
-
-func is_shop_open() -> bool:
-	return _shop_menu != null and _shop_menu.is_open()
-
-
 func open_shop() -> void:
 	if _shop_menu == null or not _near_trader():
 		return
@@ -2445,33 +2137,6 @@ func open_shop() -> void:
 	platform.hold_pointer(&"shop")
 	_chat_shown(false)
 	_shop_menu.open(shop_state.get("items", []), player.points, _shop_item_state)
-
-
-## The chat log is its own layer above the HUD and wrote over the menu's lower cards.
-func _chat_shown(shown: bool) -> void:
-	if chat != null and chat.window != null:
-		chat.window.visible = shown
-
-
-func close_shop() -> void:
-	if not is_shop_open():
-		return
-	_shop_menu.close()
-	_chat_shown(true)
-	_suspend_input(false)
-	platform.release_pointer(&"shop")
-
-
-## Closes the menu when its trader goes or its customer leaves; keeps its balance and states current while it is up.
-func _follow_shop_menu() -> void:
-	if not is_shop_open():
-		return
-	if not _near_trader():
-		if not bool(shop_state.get("open", false)) and String(shop_state.get("closed_message", "")) != "":
-			game.notice.emit(String(shop_state["closed_message"]))
-		close_shop()
-		return
-	_shop_menu.refresh(shop_state.get("items", []), player.points)
 
 
 ## "" when [param item] can be bought, else why not (Owned, Full).
@@ -2502,247 +2167,6 @@ func _shop_item_state(item: Dictionary) -> String:
 		return "Owned"
 	return ""
 
-
-# --- The fitting screen --------------------------------------------------------
-
-## The saved fittings, read once from the settings.
-func _saved_fittings() -> Dictionary:
-	if not _fittings_read and settings != null and settings.settings != null:
-		_fittings_read = true
-		_fittings.merge(ZzFittings.parse(settings.settings.get_string(ZzFittings.SETTING)), true)
-	return _fittings
-
-
-## A newly built local rig: it wears the saved fittings from now on, and the server is told
-## them (offline, the game's own rig is fitted directly), since it keeps nothing between maps.
-func _wear_fittings() -> void:
-	if weapons == null or weapons.arsenal.attachments != null:
-		return
-
-	weapons.arsenal.attachments = ZzPacks.attachment_catalogue()
-	var saved := _saved_fittings()
-	ZzFittings.watch(weapons.arsenal, saved)
-	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
-
-	for id: Variant in saved.keys():
-		if not (saved[id] as DotWeaponFitting).is_empty():
-			_send_fitting(saved[id] as DotWeaponFitting)
-
-
-## Tells the authority about [param fitting]; it validates, applies and replicates it.
-func _send_fitting(fitting: DotWeaponFitting) -> void:
-	var base := ZzWeapons.def_of(fitting.weapon_id)
-
-	if base == null:
-		return
-
-	if bridge != null and not _offline:
-		bridge.ask_fit(base.id, ZzPacks.attachment_catalogue().encode(base, fitting))
-	elif game.authoritative and player != null:
-		var fitted: DotResult = game.fit_weapon(player, base.id, fitting)
-
-		if not fitted.ok:
-			game.notice.emit(fitted.error.message)
-
-
-## The server refused a fit and says what it holds: that becomes the saved fitting, is worn,
-## and is what the open menu shows.
-func _on_fitting_resync(weapon_id: StringName, code: int) -> void:
-	var base := ZzWeapons.def_of(weapon_id)
-
-	if base == null or weapons == null:
-		return
-
-	var fitting := ZzPacks.attachment_catalogue().decode(base, code)
-	var saved := _saved_fittings()
-	saved[base.id] = fitting
-
-	if settings != null and settings.settings != null:
-		var _set := settings.settings.set_value(ZzFittings.SETTING, ZzFittings.format(saved))
-		var _flushed := settings.settings.flush()
-
-	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
-	if is_fitting_open():
-		_attach_menu.show_fitting(fitting)
-
-
-func is_fitting_open() -> bool:
-	return _attach_menu != null and _attach_menu.visible
-
-
-## Opens the fitting screen for the gun in hand, or says why not.
-func open_fitting() -> void:
-	if _attach_menu == null or is_fitting_open() or is_shop_open() or weapons == null:
-		return
-
-	var held := weapons.arsenal.current()
-	var base := ZzWeapons.def_of(held.id()) if held != null else null
-	var catalogue := ZzPacks.attachment_catalogue()
-
-	if base == null or base.mounts.is_empty() or catalogue.choices_for(base).values().all(func(list: Array) -> bool: return list.is_empty()):
-		game.notice.emit("Nothing fits this weapon.")
-		return
-
-	_using = false
-	_firing = false
-	_aiming = false
-	_suspend_input(true)
-	platform.hold_pointer(&"fitting")
-	_chat_shown(false)
-	_attach_menu.open(catalogue, base, weapons.arsenal.fitting_at(weapons.arsenal.current_slot()))
-
-
-func close_fitting() -> void:
-	if not is_fitting_open():
-		return
-	_attach_menu.hide()
-	_chat_shown(true)
-	_suspend_input(false)
-	platform.release_pointer(&"fitting")
-
-
-## A row pressed: the new fitting is saved, worn here at once and sent to the authority.
-func _fit_requested(mount: StringName, id: StringName) -> void:
-	var held := weapons.arsenal.current() if weapons != null else null
-	var base := ZzWeapons.def_of(held.id()) if held != null else null
-
-	if base == null:
-		return
-
-	var catalogue := ZzPacks.attachment_catalogue()
-	var toggled := catalogue.toggle(base, weapons.arsenal.fitting_at(weapons.arsenal.current_slot()), mount, id)
-
-	if not toggled.ok:
-		game.notice.emit(toggled.error.message)
-		return
-
-	var fitting := toggled.value as DotWeaponFitting
-	var saved := _saved_fittings()
-	saved[base.id] = fitting
-
-	if settings != null and settings.settings != null:
-		var _set := settings.settings.set_value(ZzFittings.SETTING, ZzFittings.format(saved))
-		var _saved := settings.settings.flush()
-
-	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
-	_send_fitting(fitting)
-	if is_fitting_open():
-		_attach_menu.show_fitting(fitting)
-
-
-func _shop_buy(item_id: String) -> void:
-	if bridge != null and not _offline:
-		bridge.ask_buy(item_id)
-	elif game.shop != null and player != null:
-		var _sold: bool = game.shop.buy(player, item_id)
-		_follow_shop_menu()
-
-
-## Finished prompt lines by (kind, id), rebuilt when the Use key's name or the words change, so a
-## held prompt is the same String every frame instead of a new one.
-var _prompt_lines: Dictionary = {}
-var _prompt_key := ""
-
-
-## [param template] with {k} the Use key, {a} and {b} the words, {n} the number; built on a miss only.
-func _use_line(slot: Vector2i, template: String, a: String = "", b: String = "", n: int = 0) -> String:
-	var key := _key(ZzBindings.USE)
-
-	if key != _prompt_key or _prompt_lines.size() > 96:
-		_prompt_lines.clear()
-		_prompt_key = key
-
-	var held: Variant = _prompt_lines.get(slot)
-
-	if held != null and (held as PackedStringArray)[1] == a and (held as PackedStringArray)[2] == b:
-		return (held as PackedStringArray)[0]
-
-	var line := template.replace("{k}", key).replace("{a}", a).replace("{b}", b).replace("{n}", String.num_int64(n))
-	_prompt_lines[slot] = PackedStringArray([line, a, b])
-	return line
-
-
-func _prompt() -> String:
-	if player == null or not player.can_act():
-		return ""
-
-	var eye := player.eye_position()
-	var aim := player.aim_direction()
-
-	for other in game.survivors():
-		if other != player and other.is_down() and other.feet().distance_to(player.feet()) <= game.config.revive_range + 0.4:
-			return _use_line(Vector2i(1, hash(other.player_id)), "{k} — pick up {a}", other.display_name)
-
-	if player.defibs > 0:
-		for other in game.survivors():
-			if other != player and other.life == ZzPlayer.Life.DEAD \
-					and other.feet().distance_to(player.feet()) <= game.config.defib_range + 0.4:
-				return _use_line(Vector2i(2, hash(other.player_id)), "{k} — hold to shock {a} back", other.display_name)
-
-	var best := ""
-	var best_off := 0.7
-
-	for id: int in world_view._loot:
-		var node: Node3D = world_view._loot[id]
-		var to := node.global_position + Vector3(0.0, 0.25, 0.0) - eye
-		var along := to.dot(aim)
-
-		if along < 0.0 or along > game.config.use_reach + 0.3:
-			continue
-
-		var off := (to - aim * along).length()
-
-		if off < best_off:
-			best_off = off
-			var cost := int(node.get_meta(&"price", 0))
-			best = _use_line(Vector2i(3 + maxi(cost, 0) * 4, id), "{k} — {a} ({n} points)" if cost > 0 else "{k} — {a}",
-				String(node.get_meta(&"label", "pick up")), "", cost)
-
-	if best != "":
-		return best
-
-	var index := game.current_objective()
-
-	if index >= 0 and game.objective_states[index] == &"waiting":
-		var o: Dictionary = (game.map_doc["objectives"] as Array)[index]
-		if o["kind"] == "use" and eye.distance_to(ZzMapDoc.v3(o["at"])) <= float(o["radius"]) + 0.6:
-			return _use_line(Vector2i(-4, index), "{k} — {a}", String(o["label"]))
-
-	# A barricade within reach that is not whole: the same test the server mends by.
-	var mend := game.barricade_to_mend(player)
-
-	if mend >= 0:
-		var entry: Dictionary = (game.map_doc["barricades"] as Array)[mend]
-		var held: Dictionary = game.barricades.get(String(entry["id"]), {})
-		if not held.is_empty():
-			var share := int(round(100.0 * float(held["health"]) / float(held["max"])))
-			return _use_line(Vector2i(5 + share * 4, mend), "{k} — {b} {a} ({n}%)", String(entry.get("label", "the barricade")),
-				"mend" if bool(held["intact"]) else "rebuild", share)
-
-	if game.map != null and game.map.toys != null:
-		var act: String = game.prop_carry.hint(game.map.toys, eye, aim, game.world_mask(), game.prop_carry.max_mass)
-		if act != "":
-			return _use_line(Vector2i(-6, 0), "{k} — {a}", act)
-
-	return ""
-
-
-func _present_effects(delta: float) -> void:
-	if audio != null:
-		audio.listen_from(camera.global_position)
-		audio.keep_walkers(game.players.values())
-		if game.physics != null:
-			audio.follow_roof(delta, camera.global_position, camera.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
-
-	if game.effects != null:
-		game.effects.viewer_position = camera.global_position
-		game.effects.advance(delta)
-
-	if blood != null:
-		blood.advance(delta)
-
-
-# --- Watching, once out -----------------------------------------------------
 
 func is_spectating() -> bool:
 	return player != null and game != null and game.spectate != null \
@@ -2937,13 +2361,6 @@ static func present_frame(
 	return shown
 
 
-static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
-	if remote or body.controller == null:
-		return body.global_position
-
-	return body.controller.render_state().position
-
-
 func _unhandled_input(event: InputEvent) -> void:
 	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
 	if event.is_action_pressed("ui_cancel") and is_shop_open():
@@ -3119,6 +2536,15 @@ func _key_event(event: InputEvent) -> bool:
 		get_tree().create_timer(0.1).timeout.connect(func() -> void: _shoving = false)
 		return true
 
+	if _slot_key(event):
+		return true
+
+	# Previous and next weapon, on the wheel by default; a row moved onto a key lands here.
+	return _wheel_pressed(event)
+
+
+## A slot key pressed: picks the slot, and a second press on the same slot cycles its weapons.
+func _slot_key(event: InputEvent) -> bool:
 	for i in range(ZzBindings.SLOTS.size()):
 		if event.is_action_pressed(ZzBindings.SLOTS[i]):
 			if _slot == i + 1 and weapons != null and weapons.arsenal != null and weapons.arsenal.weapons_in(_slot).size() > 1:
@@ -3126,11 +2552,6 @@ func _key_event(event: InputEvent) -> bool:
 				var _cycled := weapons.arsenal.cycle_slot(game.round_number * 100000 + Engine.get_physics_frames())
 			_slot = i + 1
 			return true
-
-	# Previous and next weapon, on the wheel by default; a row moved onto a key lands here.
-	if _wheel_pressed(event):
-		return true
-
 	return false
 
 

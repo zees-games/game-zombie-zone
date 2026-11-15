@@ -5,10 +5,9 @@ extends DotGameCheckSuite
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
-## [b]Load order matters for leaks.[/b] A script that loads `zz_player_net.gd` before the bridge that
-## preloads it (a suite's own `preload` or `load` of it) leaves about 550 scripts and resources
-## alive at exit, which game.sh fails a suite for ("leaked objects at exit"). Loaded here, first,
-## the bridge brings the player behaviour in the order the game does; read it as `_BridgeFirst.ZzPlayerNet`.
+## [b]Load order matters for leaks.[/b] A script that loads `zz_player_net.gd` before the bridge that preloads it
+## leaves about 550 scripts alive at exit (game.sh fails the suite). Loaded here, first, the bridge brings the
+## player behaviour in the game's order; read it as `_BridgeFirst.ZzPlayerNet`.
 const _BridgeFirst := preload("../game/net/zz_net_bridge.gd")
 
 const TICK_RATE := 64

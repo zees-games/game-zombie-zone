@@ -1,6 +1,7 @@
 extends "zz_suite.gd"
 
 const ZzEvents := preload("../game/net/zz_events.gd")
+const ZzEventsText := preload("../game/net/zz_events_text.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzClasses := preload("../game/zz_classes.gd")
 const ZzPacks := preload("../game/zz_packs.gd")
@@ -195,9 +196,9 @@ func _test_fallback() -> void:
 func _test_wire() -> void:
 	_section("CLASSED crosses the wire and a client applies it; stand-ins draw by weight and take the class's persona")
 	_use_pack()
-	var body := ZzEvents.write_classed(5, &"medic", &"skin_f")
+	var body := ZzEventsText.write_classed(5, &"medic", &"skin_f")
 	var r := DotNetReader.new(body)
-	var got := ZzEvents.read_classed(r)
+	var got := ZzEventsText.read_classed(r)
 	_check(bool(got["ok"]) and int(got["player_id"]) == 5 and got["class_id"] == &"medic" and got["skin"] == &"skin_f", "write and read agree", str(got))
 	_check(ZzEvent.fits(), "every event kind still fits the header")
 	var cgame := await _team(1)

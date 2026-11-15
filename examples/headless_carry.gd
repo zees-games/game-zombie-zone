@@ -2,6 +2,7 @@ extends "zz_suite.gd"
 
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
+const ZzEventsText := preload("../game/net/zz_events_text.gd")
 const ZzCarry := preload("../game/zz_carry.gd")
 const ZzClasses := preload("../game/zz_classes.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -159,9 +160,9 @@ func _test_wire() -> void:
 	var p := game.survivors()[0]
 	var state: Variant = JSON.parse_string(game.carry.state_json(p))
 	_check(state is Dictionary and bool(state["on"]) and float(state["l"]) == 30.0 and (state["slots"] as Dictionary).size() >= 1, "state_json names weight, limit and slots")
-	var body := ZzEvents.write_carry(game.carry.state_json(p))
+	var body := ZzEventsText.write_carry(game.carry.state_json(p))
 	var reader := DotNetReader.new(body)
-	var back := ZzEvents.read_carry(reader)
+	var back := ZzEventsText.read_carry(reader)
 	_check(bool(back["ok"]) and str(back["json"]) == game.carry.state_json(p), "the CARRY event round-trips")
 	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_FIRE_MODE == 256 and ZzNetCommand.ACT_BITS == 12, "ACT_CYCLE and ACT_FIRE_MODE fit the action bits")
 	var parsed := ZzCarry.parse_modifiers("hard=1.15,angry=1.1/0.9/-2,junk")

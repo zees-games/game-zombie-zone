@@ -215,10 +215,9 @@ func _build_physics() -> void:
 		physics = null
 
 
-## The mask of everything a sight line stops on: the world and the furniture.
-## The player's motor mask under `mp_solidplayers`, and the standing hull the others stop at
-## (a player's body has no shape of its own). With the rule on, a stand-in survivor stops at
-## your shoulder instead of filling the screen with its face (the first play test).
+## The mask of everything a sight line stops on: the world and the furniture. The player's motor mask under
+## `mp_solidplayers`, and the standing hull the others stop at (a player's body has no shape of its own), so a
+## stand-in survivor stops at your shoulder instead of filling the screen with its face.
 func _apply_body_mask(player: ZzPlayer) -> void:
 	if physics == null or player == null or player.controller == null:
 		return

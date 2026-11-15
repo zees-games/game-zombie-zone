@@ -10,11 +10,9 @@ const EXIT_PROBE_FLAG := "--exit-probe"
 const EXIT_PROBE_CHECKS := 3
 
 
-## How long the copy may run before it is killed and this probe fails. A copy that is still
-## running this long after it started is hung, and the likeliest reason is the one that says
-## nothing at all: a scene whose script failed to parse never reaches `quit()` and prints
-## nothing. `-- --exit-probe-seconds N` lowers it, which is how the deadline itself is armed —
-## any N shorter than the suite takes is a copy that is still running when it expires.
+## How long the copy may run before it is killed and this probe fails: a copy still running is
+## hung, likeliest a scene whose script failed to parse (it never reaches `quit()`, prints nothing).
+## `-- --exit-probe-seconds N` lowers it, which arms the deadline itself.
 const EXIT_PROBE_SECONDS := 300
 
 
@@ -31,37 +29,12 @@ static func seconds_allowed() -> int:
 
 
 ## Runs this same suite in a fresh process: `[exit code, its stdout, its stderr, whether it
-## had to be killed, the seconds it was allowed]`.
-##
-## [b]A leak is reported after `quit()`, by the engine, where nothing in the process that
-## leaked can read it.[/b] "N ObjectDB instances were leaked at exit" is printed once the
-## scene tree is gone, so the only process that can check a run's exit is another one. On
-## Godot 4.7.2 a script that names itself, loaded after its base, cuts the engine's exit
-## teardown short and every script loaded before it is reported leaked — hundreds of lines
-## a passing run printed for weeks, which is why this is a check now and not a warning.
-##
-## [b]First, before this run opens a port[/b], so the two never contend for a socket — and
-## so this run is always the second one against the same `user://`, which is the other
-## thing no single run can see.
-##
-## [b]Not `OS.execute`.[/b] That blocks until the copy exits, so a copy that hangs held this
-## run for ever; and when the outer `timeout` then killed this run, the copy was left behind
-## holding the suite's directory and port. So the copy is started, polled against a deadline
-## and killed at it. Two deadlines, because Godot dies on SIGTERM without running a line of
-## script — nothing in this process can clean up after it is killed:
-##
-## - coreutils `timeout` wraps the copy where it exists. It is an exec wrapper, not a shell,
-##   and it outlives this process, so a copy orphaned by the outer `timeout` still dies on
-##   time. Its exit status 124 is how its expiry is recognised.
-## - this loop's own deadline, a little later, for a platform without it.
-##
-## `execute_with_pipe` rather than `create_process`, because the latter captures nothing and
-## the whole point is reading what the copy printed. Non-blocking, and drained on every pass
-## rather than once at the end: a pipe holds 64 KiB, and a copy that fills it blocks on its
-## next print — a hang this probe would then report as the suite's own. The copy's stdin is
-## the other end of a pipe this process holds open, which is why every suite turns the
-## server's stdin console off: a reader blocked on it never lets the copy exit.
+## had to be killed, the seconds it was allowed]`. A leak is reported after `quit()` by the
+## engine, so only another process can check a run's exit (see the notes in the body).
 static func run(host: Node) -> Array:
+	# First, before this run opens a port, so the two never contend for a socket and this run is
+	# always the second against the same `user://`, which no single run can see. On Godot 4.7.2 a
+	# script that names itself, loaded after its base, cuts exit teardown short: scripts before it leak.
 	var seconds := seconds_allowed()
 	print("(running this suite once more in a fresh process, to read what it leaves at exit — %d s allowed)" % seconds)
 	var scene := host.scene_file_path if host.scene_file_path != "" else "res://examples/dedicated.tscn"
@@ -70,6 +43,9 @@ static func run(host: Node) -> Array:
 		"--headless", "--path", ProjectSettings.globalize_path("res://"),
 		scene, "--", EXIT_PROBE_FLAG,
 	])
+	# Not OS.execute: it blocks, so a hung copy held this run (and, if the outer `timeout` killed
+	# this run, was left holding the port). Two deadlines, as Godot dies on SIGTERM without running
+	# script: coreutils `timeout` (status 124), and this loop's own, later, where it is missing.
 	var wrapped := false
 	for wrapper: String in ["/usr/bin/timeout", "/bin/timeout"]:
 		if FileAccess.file_exists(wrapper):
@@ -80,6 +56,9 @@ static func run(host: Node) -> Array:
 			wrapped = true
 			break
 
+	# execute_with_pipe, as create_process captures nothing. Drained on every pass: a pipe holds
+	# 64 KiB and a copy that fills it blocks on its next print, which this would report as a hang.
+	# The copy's stdin is a pipe held open here, hence every suite turns the stdin console off.
 	var proc := OS.execute_with_pipe(exe, args, false)
 	if proc.is_empty():
 		return [-1, "", "could not start %s" % exe, false, seconds]

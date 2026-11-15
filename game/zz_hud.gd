@@ -50,10 +50,9 @@ const PLATE_BOTTOM := 206.0
 const AMBER := Color(0.98, 0.84, 0.5)
 
 
-## This game's accent over whichever theme the player picked in the menu: the boxes' amber as
-## the glance pieces' highlight, the health bar's green as "good". The plates, the words and
-## their outline are the theme's (dark by default), so a light or high-contrast theme can
-## change them. Static so a render tool can use it.
+## This game's accent over whichever theme the player picked: the boxes' amber as the glance pieces' highlight, the
+## health bar's green as "good". The plates, words and outline are the theme's (dark by default), so a light or
+## high-contrast theme can change them. Static so a render tool can use it.
 static func piece_theme() -> Theme:
 	var t := Theme.new()
 	var type := DotHudPiece.THEME_TYPE

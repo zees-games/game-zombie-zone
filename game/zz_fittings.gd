@@ -1,18 +1,8 @@
 extends RefCounted
 
-## A survivor's attachment fittings, one per weapon: what the fitting screen saves in the
-## profile's settings, what a client asks the server for, and putting them on an arsenal.
-##
-## [b]Per weapon id, not per slot.[/b] The rifle wears the same red dot whichever slot or
-## shelf it is picked up into, and the fitting outlives the rifle being dropped: the next one
-## found wears it too.
-##
-## [b]Nothing here trusts what it is given.[/b] [method apply_to] puts on only what
-## [method DotWeaponAttachments.conform] keeps, so a fitting saved by another version, or
-## typed into the settings file, degrades rather than refuses; the server validates a fitting
-## outright before it stores one (`ZzGame.fit_weapon`).
-##
-## The text form, the [constant SETTING] value: `m4:optic=zz_red_dot,underbarrel=zz_grip;ak:...`.
+## A survivor's attachment fittings, one per weapon id (not slot; they outlive the weapon being dropped): what the
+## fitting screen saves, what a client asks for, put on an arsenal. [method apply_to] keeps only what
+## [method DotWeaponAttachments.conform] keeps; the server validates (`ZzGame.fit_weapon`). Text form: `m4:optic=x;ak:...`.
 
 const SETTING := &"weapon_fittings"
 ## The setting's length cap, and so how much [method parse] reads.

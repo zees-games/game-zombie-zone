@@ -1,9 +1,9 @@
 extends Node
 
-## The survivors' look, with nothing else in the frame: eight figures built the way the game builds a player (ZzFigure,
-## a seed from a player id), in a row, shot from the front, the back and close on the heads, under a neutral light.
-## The check a per-player palette needs (the first lineup was from behind only, so faces went unchecked).
-##
+## The survivors' look, nothing else in the frame: eight figures built as the game builds a player (ZzFigure, seed
+## from a player id), in a row, shot front, back and close on the heads under a neutral light: the check a
+## per-player palette needs.
+
 ##   tools/lineup.sh [out dir, default res://screenshots/lineup]    # lineup_front.png, lineup_back.png, lineup_heads.png
 ##   tools/lineup.sh --warm                                         # under the yellow light of a warm map
 

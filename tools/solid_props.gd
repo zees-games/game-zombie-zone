@@ -146,10 +146,9 @@ static func _places(doc: Dictionary) -> Array[Vector3]:
 	return out
 
 
-## [param boxes] without those whose centre is inside a brush door's shut panel: the door model, handle or wreath the
-## original parents to the door, which swings away with it. The converter places such a prop as a static stand-in
-## where the door is shut, so its box would wall the very doorway the door opens (zs_krusty_krab_large: 43 boxes of
-## three props on "Door05" shut the basement that holds every post).
+## [param boxes] without those whose centre is inside a brush door's shut panel: the door model, handle or wreath
+## parented to the door swings away with it, and the converter places it as a static stand-in where the door is
+## shut, so its box would wall the doorway (zs_krusty_krab_large: 43 boxes on "Door05" shut the basement of posts).
 static func _clear_of_doors(movers: Array, boxes: Array) -> Array:
 	var panels: Array[AABB] = []
 	for m: Variant in movers:

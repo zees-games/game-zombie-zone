@@ -3,12 +3,9 @@ extends DotGameCheckSuite
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 
-## The horde's crowd grid in dot-sim ([member ZzConfig.native_crowd], on by default) answers exactly as dot-npc-ai's
-## script grid: over seeded crowds (spread, packed, stacked on one spot, either side of zero) both give the same index
-## for every id, the same neighbours in the same order for every query (narrow, and wide enough to walk them all), and
-## the same spacing push to the bit for every zombie, before and after some are forgotten mid-tick. Spacing feeds the
-## brains' steering only; hit registration and the sim's rules are not touched.
-## With no library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
+## The horde's crowd grid in dot-sim ([member ZzConfig.native_crowd], on by default) answers as dot-npc-ai's script
+## grid over seeded crowds: same index, neighbours in order and spacing push to the bit, also after forgetting some.
+## Without the library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 3
 const CHECKS := 9

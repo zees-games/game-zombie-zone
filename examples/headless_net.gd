@@ -6,6 +6,7 @@ const ZzCrawlRules := preload("../game/zz_crawl_rules.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
+const ZzEventsText := preload("../game/net/zz_events_text.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzMechanics := preload("../game/zz_mechanics.gd")
@@ -305,8 +306,8 @@ func _test_the_codec() -> void:
 	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
 	_check(ZzRequest.fits(), "every request kind fits the request's kind field",
 		"%d kinds in %d bits" % [ZzEvents.Ask.size(), ZzRequest.KIND_BITS])
-	_check(ZzEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
-		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), ZzEvents.CHAT_KIND_BITS])
+	_check(ZzEventsText.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
+		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), ZzEventsText.CHAT_KIND_BITS])
 
 	_finished()
 

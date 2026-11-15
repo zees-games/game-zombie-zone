@@ -5,6 +5,7 @@ extends Node
 const ZzConfig := preload("../zz_config.gd")
 const ZzEvent := preload("zz_event.gd")
 const ZzEvents := preload("zz_events.gd")
+const ZzEventsText := preload("zz_events_text.gd")
 const ZzClasses := preload("../zz_classes.gd")
 const ZzNetCommand := preload("zz_net_command.gd")
 const ZzNetLink := preload("zz_net_link.gd")

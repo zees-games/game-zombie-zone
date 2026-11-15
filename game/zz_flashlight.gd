@@ -28,10 +28,9 @@ static func starts_on(cfg: DotFlashlightConfig, map_id: String, doc: Dictionary)
 	return DotFlashlightRules.start_on(cfg, map_id, ambient, mood_of(map_id, doc))
 
 
-## The mood a map document names. Converted maps write "ambient" as a dictionary
-## ({"mood": ..., "indoor": ...}) and hand-made ones may write a string; with neither, the
-## hand-made table decides. Reading the dictionary with str() gave a string no dark mood matched,
-## so ze_biohazard_manor (ambient 0.3, over the floor) started with the light off.
+## The mood a map document names: converted maps write "ambient" as a dictionary ({"mood": ..., "indoor": ...}),
+## hand-made ones a string; with neither, the hand-made table decides. (str() of the dictionary matched no dark
+## mood, so ze_biohazard_manor started with the light off.)
 static func mood_of(map_id: String, doc: Dictionary) -> String:
 	var a: Variant = doc.get("ambient", null)
 	if a is Dictionary:

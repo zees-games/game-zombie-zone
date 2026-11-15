@@ -1,9 +1,8 @@
 extends RefCounted
 
-## The game's end of zz-historical-monsters' host seam (`spawner.set_meta(&"zhm_host", host)`): who a monster may
-## hunt, how its blows land and what it afflicts. Every blow goes through the game (`ZzGame.zombie_hit` /
-## `knock_survivor`), so the difficulty scale, the down, the stats and the team rules apply as to any zombie.
-## Server only. No `class_name`: a mounted pack calls it by method name.
+## The game's end of zz-historical-monsters' host seam (`spawner.set_meta(&"zhm_host", host)`): who a monster may hunt,
+## how its blows land and what it afflicts, all through the game (`ZzGame.zombie_hit` / `knock_survivor`) so difficulty,
+## downs, stats and team rules apply. Server only. No `class_name`: a mounted pack calls it by method name.
 
 const ZzController := preload("zz_controller.gd")
 

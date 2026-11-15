@@ -4,14 +4,9 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzPaths := preload("zz_paths.gd")
 
 ## Every map this server can play, and which one is next.
-##
-## [b]Two sources, and the built-in one is a floor rather than a feature.[/b] The maps are
-## documents read from [member ZzConfig.map_directory] — `maps/`, a link to zombie-zone-maps,
-## in a checkout; a directory in a delivered pack. A server whose directory is missing or empty
-## still has [method practice], so it plays rather than refusing to start.
-##
-## [b]A server reads documents; a client never does.[/b] The map travels in its own event (see
-## [ZzMapDoc]), so nothing here runs on a connected client.
+## [b]Two sources; the built-in one is a floor.[/b] Documents are read from [member ZzConfig.map_directory]
+## (`maps/`, a link to zombie-zone-maps; a directory in a pack); with none, [method practice] plays.
+## [b]A server reads documents; a client never does.[/b] The map travels in its own event ([ZzMapDoc]).
 
 const CHANNEL := "zz.catalogue"
 
@@ -23,10 +18,9 @@ const USER_MAPS := "user://maps"
 ## id -> normalised document.
 var maps: Dictionary = {}
 
-## Where a parsed document is kept between runs ("" keeps none). Reading and normalising the ~40
-## documents was 1.5 s at start; a binary copy keyed on the file's size and time and on the
-## normaliser's own source loads in a fraction of it, and a changed file or a changed [ZzMapDoc]
-## parses again by itself.
+## Where a parsed document is kept between runs ("" keeps none). A binary copy keyed on the file's
+## size and time and the normaliser's source loads in a fraction of the 1.5 s reading ~40 documents
+## took; a changed file or [ZzMapDoc] parses again by itself.
 var doc_cache_dir: String = "user://map_docs"
 var _validator_key: String = ""
 
@@ -35,10 +29,9 @@ var refused: Dictionary = {}
 
 var _order: Array[StringName] = []
 
-## Whether a directory's documents are read as a name and a mode only, and a map's whole
-## document only when it is needed ([method doc]). The browser's memory cannot hold 47 parsed
-## documents (zombie-zone-maps 0.1.16 is 53 MiB of JSON and ran the wasm heap out), and a
-## round plays one map. Off natively, where every document is read up front as it always was.
+## Whether documents are read as a name and a mode only, a map's whole document only when needed
+## ([method doc]): the browser's memory cannot hold 47 parsed documents (53 MiB of JSON), and a
+## round plays one map. Off natively, where every document is read up front.
 var lazy: bool = OS.has_feature("web")
 
 ## Whether a document whose cached copy is current is held as a stand-in too (see [member lazy]):
@@ -60,10 +53,8 @@ var _defs: DotMapCatalogue = DotMapCatalogue.new()
 var _rotation: DotMapRotation = DotMapRotation.of(_defs)
 var _next: int = 0
 
-# --- Workshop maps ----------------------------------------------------------
-# A pack's `map` entry names a ZzMapDoc DOCUMENT in `scene` (the same JSON as maps/), so a
-# subscribed map goes through exactly the validation, nav graph, safe rooms and waves of the
-# game's own. Online the index answers for its session and lists none.
+# Workshop maps: a pack's `map` entry names a ZzMapDoc DOCUMENT in `scene`, so it gets the
+# game's own validation, nav graph, safe rooms and waves. Online the index lists none.
 ## id -> the directory its document was read from (its maps pack's `hulls/` is beside it).
 var roots: Dictionary = {}
 var _index: DotContentIndex = null
@@ -125,10 +116,9 @@ func _read_directory(root: String) -> int:
 	var loaded := 0
 
 	for file in files:
-		# A document the cache holds current was read and validated by this very normaliser on an
-		# earlier start, so its head stands in for it: the whole document (up to 21 MB of JSON, 97 MB
-		# over the pack) is read when a round needs it ([method doc]), not at every start. A document
-		# with no current copy is read, validated and refused or cached exactly as before.
+		# A cached current document was validated by this normaliser earlier, so its head stands in;
+		# the whole (up to 21 MB) is read when a round needs it ([method doc]). One with no current
+		# copy is read, validated and refused or cached as before.
 		if lazy or (stub_from_cache and _cache_current(root, file)):
 			var stub := _peek(root.path_join(file))
 
@@ -243,10 +233,9 @@ func _cache_key(root: String, file: String) -> String:
 	return "%d:%d:%s" % [size, FileAccess.get_modified_time(src), _validator_key]
 
 
-## The head of a document, as a stand-in map: id, name, mode, author, blurb, survivors, flagged
-## `_stub`. Empty when the head does not read as a map document, which is then read whole (and
-## refused with its reason) as ever. The builder writes these keys first; the full document
-## is what [method doc] reads.
+## The head of a document as a stand-in map (id, name, mode, author, blurb, survivors, flagged
+## `_stub`). Empty when it does not read as a map document, which is then read whole and refused
+## with its reason. The full document is what [method doc] reads.
 func _peek(path: String) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 
@@ -280,10 +269,9 @@ func _peek_string(head: String, key: String, fallback: String = "") -> String:
 	return str(value) if value != null else fallback
 
 
-## The whole document of map [param id]: what [member maps] holds, or, for a stand-in, the file
-## read now. Only one such document is kept: reading another puts the last back to its stand-in,
-## so the catalogue's cost is a map's, not the pack's. Empty when there is no such map or its
-## document has gone bad since it was peeked.
+## The whole document of map [param id]: what [member maps] holds, or for a stand-in the file read
+## now. Only one is kept (reading another restores the last to its stand-in). Empty when there is
+## no such map or its document has gone bad since it was peeked.
 func doc(id: StringName) -> Dictionary:
 	var held: Dictionary = maps.get(id, {})
 
@@ -642,14 +630,10 @@ func describe_lines() -> PackedStringArray:
 static var practice_toys: Array = []
 
 
-## One street at night, from a safe room to a safe room.
-##
-## [b]Written here rather than shipped as a file,[/b] so a server with no map directory at all
-## — a fresh clone, a suite — has something to play, and the suites have a map whose every
-## number is in front of them. They lean on these: the start room is x -5..5, z -14..-6; the
-## street is x -9..9 from z -6 to 80 at y 0, with an alley off each side at z 14..18 and 54..58;
-## a barrier (the gate `barrier`) closes the street at z 40 until the switch at (6.5, 1, 36) has
-## been held out; the end room is x -5..5, z 80..90.
+## One street at night, from a safe room to a safe room, written here so a server with no map
+## directory (a fresh clone, a suite) has a map whose every number is in front of the suites:
+## start room x -5..5, z -14..-6; street x -9..9, z -6..80, y 0, alleys at z 14..18 and 54..58;
+## the gate `barrier` closes it at z 40 until the switch at (6.5, 1, 36) is held; end room z 80..90.
 static func practice() -> Dictionary:
 	var boxes: Array = []
 	var h := 6.0

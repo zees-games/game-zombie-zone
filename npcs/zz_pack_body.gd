@@ -1,10 +1,8 @@
 extends Node
 
-## A pack monster's body as its brain sees it: the interface zz-historical-monsters' brain expects of a
-## `ZhmBody` (`action`, `variant`, `setup`, `limb_severed`, `speed_scale()`, `attack_scale()`), backed by this
-## game's [ZzZombieBody], which is what the monster really is. A child of that body, made by the generated
-## brain (see `ZzPackBrains`) for its `_body()`, so it dies with it. No `class_name`: a mounted pack's brain is
-## generated at run time and reaches this by path.
+## A pack monster's body as its brain sees it: what zz-historical-monsters' brain expects of a `ZhmBody` (`action`,
+## `variant`, `setup`, `limb_severed`, `speed_scale()`, `attack_scale()`), backed by this game's [ZzZombieBody] and a
+## child of it, made by the generated brain (`ZzPackBrains`). No `class_name`: a mounted pack reaches it by path.
 
 const ZzZombieBody := preload("zz_zombie_body.gd")
 

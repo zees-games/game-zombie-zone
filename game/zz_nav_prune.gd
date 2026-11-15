@@ -28,11 +28,9 @@ var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
 
 
-## [param required] (spawns, posts) keeps a piece holding one joined to the next such piece by a bridge edge even through a floor.
-## Returns (points dropped, edges dropped); (0, 0) when the world has no collision to ask. Each of
-## [param ladders] is then joined foot to head: its shaft blocks the capsule, and the builder drops a ladder link
-## whose ends a stair link already joined, which this prune may then cut. [param passable] are bodies that block
-## nothing here: the doors that open to whoever walks up ([method ZzMechanics.walk_through_bodies]).
+## [param required] (spawns, posts) keeps a piece holding one joined to the next by a bridge edge even through a floor.
+## Returns (points dropped, edges dropped); (0, 0) when there is no collision to ask. Each of [param ladders] is then
+## joined foot to head, which this prune may cut; [param passable] bodies (doors that open to walkers) block nothing.
 static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = []) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN, passable)

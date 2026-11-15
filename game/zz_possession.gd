@@ -1,9 +1,7 @@
 extends RefCounted
-## A turned survivor's hold on a zombie body: the server feeds their latest command to the body's
-## [DotNpcDrive] each tick, and the zombie's own brain turns it into a walk and a swing
-## ([method ZzZombieBrain._npc_driven]). Server-authoritative: a client only sends its usual command
-## and watches the body (ZzEvents POSSESS names it). The hold ends when the body dies or is gone;
-## the player is then dead, as before, and spectates.
+## A turned survivor's hold on a zombie body: the server feeds their latest command to the body's [DotNpcDrive]
+## each tick and the zombie's brain turns it into a walk and a swing ([method ZzZombieBrain._npc_driven]).
+## Server-authoritative (ZzEvents POSSESS names it); it ends when the body dies, and the player spectates.
 
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzPlayer := preload("zz_player.gd")

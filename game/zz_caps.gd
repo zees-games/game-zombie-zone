@@ -1,10 +1,7 @@
 extends RefCounted
-## The upper bounds the tunable cvars used to clamp to, now settings.
-##
-## Each cvar below has a range [lowest, highest]. The lowest is what the number means (a count is
-## not negative) and stays. The highest was a hard cap; it is now the default of a setting:
-## `cap_overrides` ("zz_waves=0,zz_nights=40"), where 0 is unlimited. A value outside the range is
-## REFUSED with an error naming the cvar and the setting that lifts it, never clamped silently.
+## The tunable cvars' ranges [lowest, highest]: the lowest is what the number means and stays;
+## the highest is the default of the `cap_overrides` setting ("zz_waves=0,zz_nights=40"), 0 unlimited.
+## A value outside is REFUSED, naming the cvar and the setting that lifts it, never clamped.
 
 const RANGES := {
 	"mp_killcam_time": [0.0, 30.0],

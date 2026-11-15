@@ -1,26 +1,11 @@
 extends RefCounted
 
-## Runs a pack's own brain on this game's zombie body. A pack monster is a re-skinned [ZzZombieBody] (the
-## client draws a zombie), but its attacks live in the pack's brain, written for the pack's own body. This
-## writes, per pack brain, a script that extends it by path (a path cannot be named in a `.gd` of ours: the
-## pack may not be installed) and replaces only what touches the body:
-##
-## [codeblock]
-## _body()        the brain's view of its body: ZzPackBody (action, variant, limb scales, limb_severed)
-## steer_toward   writes the body's wish; the horde moves it once a tick (stride, step-up, shoves)
-## halt           wish zero
-## _enter_leap / _tick_leap   a pounce is the body's own leap (ZzZombieBody.leap), landing ends it
-## stagger        what the horde calls for a blast or a shove
-## state          `hunt` read as the game's `chase`
-## [/codeblock]
-##
-## The game's own handles on a brain are answered too: [code]force_target[/code] (bile, the director, a rescue
-## repath: it hunts that survivor whatever it sees), [code]lure_to[/code] (a lure: it goes there and stays while
-## nobody is in its face) and barricade bashing (pressed against boards on the way, it tears at them through the
-## horde, like any zombie).
-##
-## The script is written to `user://zz_pack_brains/` (a real file the spawner can load by path). Server only:
-## clients never run a brain.
+## Runs a pack's own brain on this game's zombie body: a script per brain that extends it by path (the pack may
+## not be installed) and replaces only what touches the body: `_body()` (ZzPackBody), `steer_toward`, `halt`,
+## `_enter_leap` / `_tick_leap`, `stagger` and `state` (`hunt` read as `chase`).
+
+## The game's handles are answered too: `force_target`, `lure_to` and barricade bashing. Written to
+## `user://zz_pack_brains/`; server only, clients never run a brain.
 
 const DIR := "user://zz_pack_brains"
 const ADAPTER := preload("../npcs/zz_pack_body.gd")
@@ -205,10 +190,8 @@ func _tick_leap(_c: DotNpcAiContext) -> void:
 
 
 ## The path of a script that is [param parent] (a pack brain's path) on this game's body; written once per parent.
-## The file is named by its own text: `user://` is shared by every process (and checkout) of this game on a machine, so a
-## name by parent alone let a build with an older template rewrite the file under a newer one's running monster (a tiger
-## that had no `force_target`), and a plain truncate-then-write could be read half written. Equal text is the same file,
-## written whole to a temporary name and renamed into place.
+## Named by its own text (`user://` is shared by every process here: a name by parent alone let an older template
+## rewrite the file under a newer build's monster); written whole to a temporary name, renamed into place.
 static func wrapper_for(parent: String) -> String:
 	var text := SOURCE % [parent, (ADAPTER as Resource).resource_path]
 	var path := "%s/%s.gd" % [DIR, (parent + "\n" + text).md5_text()]

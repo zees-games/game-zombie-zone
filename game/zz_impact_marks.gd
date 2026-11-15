@@ -1,8 +1,7 @@
 extends RefCounted
-## Where a resolved shot left its marks: the surface a round stopped on, both faces of every wall it
-## went through, and each bounce. The authority works them out (a ZZ client never traces a shot; they
-## resolve server-side) and the wire carries them as IMPACT; [method place] draws them.
-## game-fatal-contact draws the same from its predicted shot (arena_presentation.gd, fx.spawn_penetration_decals).
+## Where a resolved shot left its marks: the surface a round stopped on, both faces of each wall it went through, each
+## bounce. The server works them out (a client never traces a shot), the wire carries them as IMPACT, [method place]
+## draws them; game-fatal-contact draws the same from its predicted shot (fx.spawn_penetration_decals).
 
 ## Marks one shot may send: a shotgun volley is a handful of pellets, not a wall of data.
 const MAX_MARKS := 12

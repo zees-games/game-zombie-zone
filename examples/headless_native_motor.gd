@@ -4,11 +4,9 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 
-## A survivor's motor in dot-sim ([member DotFpsMotor.native_tick], on by default) moves exactly as the script motor does:
-## the same seeded inputs on the same course, under every modifier this game puts on a body (limp, tag, boxes, knocks,
-## down, busy), give the same bytes every tick, for the whole tick in one call and for its two halves. The server and a
-## predicting client may then differ in whether the library loaded without a correction. Hit registration is not touched.
-## With no library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
+## A survivor's motor in dot-sim ([member DotFpsMotor.native_tick], on by default) moves as the script motor: same
+## seeded inputs, under every modifier (limp, tag, boxes, knocks, down, busy), same bytes every tick, whole or halved.
+## Without the library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 3
 const CHECKS := 6

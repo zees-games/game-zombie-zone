@@ -108,7 +108,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			if peer_id > 0:
 				_tell(peer_id, ZzEvents.Kind.AMMO, ZzEvents.write_player(session_of(id))))
 		game.notice.connect(func(text: String) -> void:
-			_broadcast(ZzEvents.Kind.NOTICE, ZzEvents.write_notice(text)))
+			_broadcast(ZzEvents.Kind.NOTICE, ZzEventsText.write_notice(text)))
 		game.objective_changed.connect(func(index: int, state: StringName) -> void:
 			_broadcast(ZzEvents.Kind.OBJECTIVE, ZzEvents.write_objective(index, _objective_code(state))))
 		game.gate_opened.connect(func(gate: String) -> void:
@@ -194,10 +194,10 @@ func _serve_player_events() -> void:
 		var peer_id := peer_for_player(session_of(id))
 		var who: ZzPlayer = game.players.get(id)
 		if peer_id > 0 and who != null:
-			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(who))))
+			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEventsText.write_carry(game.carry.state_json(who))))
 	game.shop_changed.connect(func() -> void:
 		if game.shop != null:
-			_broadcast(ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json())))
+			_broadcast(ZzEvents.Kind.SHOP, ZzEventsText.write_shop(game.shop.state_json())))
 
 
 ## Server side: loot, dropped weapons, knives, boxes, the horde, spectators and possession go to the clients.
@@ -632,7 +632,7 @@ func announce_armed(player_id: StringName, weapon_id: StringName) -> void:
 
 ## Says which class somebody is and the skin it gave them.
 func announce_classed(player_id: StringName, class_id: StringName, skin: StringName) -> void:
-	_broadcast(ZzEvents.Kind.CLASSED, ZzEvents.write_classed(session_of(player_id), class_id, skin))
+	_broadcast(ZzEvents.Kind.CLASSED, ZzEventsText.write_classed(session_of(player_id), class_id, skin))
 
 
 # --- Server: the tick ------------------------------------------------------
@@ -825,12 +825,12 @@ func receive_input(peer_id: int, payload: PackedByteArray) -> DotResult:
 ## and both are nobody else's business — a broadcast refusal is a punishment announced to
 ## everybody.
 func notice(peer_id: int, text: String) -> void:
-	_tell(peer_id, ZzEvents.Kind.NOTICE, ZzEvents.write_notice(text))
+	_tell(peer_id, ZzEvents.Kind.NOTICE, ZzEventsText.write_notice(text))
 
 
 ## One routed line to one peer. What [DotGameServices] sends through, via the link.
 func send_chat(peer_id: int, wire: Dictionary) -> void:
-	_tell(peer_id, ZzEvents.Kind.CHAT, ZzEvents.write_chat(wire))
+	_tell(peer_id, ZzEvents.Kind.CHAT, ZzEventsText.write_chat(wire))
 
 
 ## A voice frame, in whichever direction.
@@ -899,7 +899,7 @@ func _on_request(message: DotNetMessage) -> void:
 		ZzEvents.Ask.READY:
 			_admit(peer_id)
 		ZzEvents.Ask.SAY:
-			var said := ZzEvents.read_say(ask.reader())
+			var said := ZzEventsText.read_say(ask.reader())
 
 			if bool(said["ok"]):
 				# Emitted rather than acted on: everything about what a line means is
@@ -908,13 +908,13 @@ func _on_request(message: DotNetMessage) -> void:
 					peer_id, StringName(str(said["channel"])), str(said["text"])
 				)
 		ZzEvents.Ask.BUY:
-			var buying := ZzEvents.read_buy(ask.reader())
+			var buying := ZzEventsText.read_buy(ask.reader())
 			var buyer: Variant = game.players.get(player_key(player_for_peer(peer_id)))
 
 			if bool(buying["ok"]) and buyer != null and game.shop != null:
 				var _sold: bool = game.shop.buy(buyer, str(buying["id"]))
 		ZzEvents.Ask.FIT:
-			_fit_asked(peer_id, ZzEvents.read_fit(ask.reader()))
+			_fit_asked(peer_id, ZzEventsText.read_fit(ask.reader()))
 		ZzEvents.Ask.SPECTATE:
 			var step := ZzEvents.read_ask_spectate(ask.reader())
 
@@ -950,7 +950,7 @@ func _fit_asked(peer_id: int, asked: Dictionary) -> void:
 func _resync_fitting(peer_id: int, player: Variant, base: DotWeaponDef) -> void:
 	var kept: Variant = player.fittings.get(base.id)
 	var code := ZzPacks.attachment_catalogue().encode(base, kept) if kept != null else 0
-	_tell(peer_id, ZzEvents.Kind.FITTING, ZzEvents.write_fit(base.id, code))
+	_tell(peer_id, ZzEvents.Kind.FITTING, ZzEventsText.write_fit(base.id, code))
 
 
 ## Somebody who is out asked to look at somebody else. The server's list, the server's rule.
@@ -1016,13 +1016,13 @@ func _admit(peer_id: int) -> void:
 	for who: StringName in game.players:
 		var classed: ZzPlayer = game.players[who]
 		if classed.class_id != &"":
-			_tell(peer_id, ZzEvents.Kind.CLASSED, ZzEvents.write_classed(session_of(who), classed.class_id, classed.class_skin))
+			_tell(peer_id, ZzEvents.Kind.CLASSED, ZzEventsText.write_classed(session_of(who), classed.class_id, classed.class_skin))
 	if game.shop != null:
-		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEvents.write_shop(game.shop.state_json()))
+		_tell(peer_id, ZzEvents.Kind.SHOP, ZzEventsText.write_shop(game.shop.state_json()))
 	for owner_session: int in _peer_of_player:
 		if int(_peer_of_player[owner_session]) == peer_id and game.players.has(player_key(owner_session)):
 			var mine: ZzPlayer = game.players[player_key(owner_session)]
-			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEvents.write_carry(game.carry.state_json(mine)))
+			_tell(peer_id, ZzEvents.Kind.CARRY, ZzEventsText.write_carry(game.carry.state_json(mine)))
 			# The seat was armed before this READY, so that ARMED reached nobody; the client's load gate waits on it.
 			var held := mine.weapons.current_def() if mine.weapons != null else null
 			_tell(peer_id, ZzEvents.Kind.ARMED, ZzEvents.write_armed(owner_session, held.id if held != null else &""))
@@ -1301,17 +1301,17 @@ func ask_say(channel_id: StringName, text: String) -> void:
 	if text.strip_edges() == "":
 		return
 
-	_ask(ZzEvents.Ask.SAY, ZzEvents.write_say(channel_id, text))
+	_ask(ZzEvents.Ask.SAY, ZzEventsText.write_say(channel_id, text))
 
 
 ## Asks the trader for [param item_id]. Client side.
 func ask_buy(item_id: String) -> void:
-	_ask(ZzEvents.Ask.BUY, ZzEvents.write_buy(item_id))
+	_ask(ZzEvents.Ask.BUY, ZzEventsText.write_buy(item_id))
 
 
 ## Asks the server to fit [param weapon_id] so. Client side; offline the game is told directly.
 func ask_fit(weapon_id: StringName, code: int) -> void:
-	_ask(ZzEvents.Ask.FIT, ZzEvents.write_fit(weapon_id, code))
+	_ask(ZzEvents.Ask.FIT, ZzEventsText.write_fit(weapon_id, code))
 
 
 ## Out, and asking to watch somebody else: +1 next, -1 previous, 0 the other camera.
@@ -1377,19 +1377,19 @@ func _on_event(message: DotNetMessage) -> void:
 		ZzEvents.Kind.ARMED:
 			_apply_armed(reader)
 		ZzEvents.Kind.CHAT:
-			var wire := ZzEvents.read_chat(reader)
+			var wire := ZzEventsText.read_chat(reader)
 
 			if bool(wire["ok"]):
 				chat_received.emit(wire)
 		ZzEvents.Kind.NOTICE:
-			var text := ZzEvents.read_notice(reader)
+			var text := ZzEventsText.read_notice(reader)
 
 			if bool(text["ok"]):
 				notice_received.emit(str(text["text"]))
 		ZzEvents.Kind.SPECTATE:
 			_apply_spectate(reader)
 		ZzEvents.Kind.FITTING:
-			var fit := ZzEvents.read_fit(reader)
+			var fit := ZzEventsText.read_fit(reader)
 
 			if bool(fit["ok"]):
 				fitting_received.emit(fit["id"], int(fit["code"]))
@@ -1675,16 +1675,16 @@ func _on_world_event_last(kind: int, reader: DotNetReader) -> void:
 			if bool(building["ok"]):
 				game.remote_nav = int(building["percent"])
 		ZzEvents.Kind.SHOP:
-			var shop := ZzEvents.read_shop(reader)
+			var shop := ZzEventsText.read_shop(reader)
 			if bool(shop["ok"]):
 				shop_received.emit(str(shop["json"]))
 		ZzEvents.Kind.CLASSED:
-			var classed := ZzEvents.read_classed(reader)
+			var classed := ZzEventsText.read_classed(reader)
 			var holder: ZzPlayer = game.players.get(player_key(int(classed["player_id"]))) if bool(classed["ok"]) and game != null else null
 			if holder != null:
 				game.set_class(holder, classed["class_id"], classed["skin"], ZzClasses.def_of(String(classed["class_id"])))
 		ZzEvents.Kind.CARRY:
-			var carried := ZzEvents.read_carry(reader)
+			var carried := ZzEventsText.read_carry(reader)
 			if bool(carried["ok"]):
 				carry_received.emit(str(carried["json"]))
 		ZzEvents.Kind.AMMO:

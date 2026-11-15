@@ -1,21 +1,23 @@
 extends RefCounted
 
-## shot.sh's orbit camera: a free camera that circles a chosen subject at a distance, one frame per
-## (time, yaw) pair, so a pose can be judged from several sides and at several moments in an animation.
-##
-##   --cam=orbit               turn it on (any view; the view's own free camera is replaced)
-##   --target=holder|victim|pair|point|me   what to keep in frame (default pair: the midpoint of the pinned
-##                             pair; holder / victim are the special and the survivor it holds; point is --at;
-##                             me is the local survivor)
-##   --dist=3.0                metres from the target
-##   --yaw=0,90,180,270        degrees round the target, counter-clockwise seen from above. 0 is on the survivor's
-##                             side of the pair looking back at the holder's front (its face and claws), 180 is
-##                             behind the holder looking at the survivor, 90 / 270 the sides. One frame per value.
-##   --pitch=12                degrees the camera is raised above the target
-##   --lift=1.0                metres above the target's feet that the camera looks at
-##   --times=0.2,0.5,0.9       seconds, after the view's own --seconds wait, at which to save a set of frames
-##                             (default: one set at once). A view like pinned wants a short --seconds with these.
-## Files: <out>_t<time>_y<yaw>.png beside --out.
+## shot.sh's orbit camera: a free camera that circles a chosen subject, one frame per (time, yaw) pair, so a pose
+## can be judged from several sides and moments. The options are in [constant USAGE].
+
+const USAGE := """
+  --cam=orbit               turn it on (any view; the view's own free camera is replaced)
+  --target=holder|victim|pair|point|me   what to keep in frame (default pair: the midpoint of the pinned
+                            pair; holder / victim are the special and the survivor it holds; point is --at;
+                            me is the local survivor)
+  --dist=3.0                metres from the target
+  --yaw=0,90,180,270        degrees round the target, counter-clockwise seen from above. 0 is on the survivor's
+                            side of the pair looking back at the holder's front (its face and claws), 180 is
+                            behind the holder looking at the survivor, 90 / 270 the sides. One frame per value.
+  --pitch=12                degrees the camera is raised above the target
+  --lift=1.0                metres above the target's feet that the camera looks at
+  --times=0.2,0.5,0.9       seconds, after the view's own --seconds wait, at which to save a set of frames
+                            (default: one set at once). A view like pinned wants a short --seconds with these.
+Files: <out>_t<time>_y<yaw>.png beside --out.
+"""
 
 var enabled := false
 var target := "pair"

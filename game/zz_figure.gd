@@ -160,10 +160,9 @@ static func _hat_in_hair(who: DotHumanoidFigure, look: DotHumanoidLook) -> void:
 			(mesh as MeshInstance3D).material_override = _hat_materials[key]
 
 
-## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same.
-## The atlas letter picks the body; skin, hair and clothes are drawn from the natural palettes by [param seed]
-## (a hash of the player's id; 0 takes the atlas's), so two survivors on one body are not twins and nobody is
-## yellow, green or white skinned with near-black hair (the blob under a dim map light).
+## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same. The atlas
+## letter picks the body; skin, hair and clothes are drawn from natural palettes by [param seed] (a hash of the
+## player's id; 0 takes the atlas's), so two survivors on one body are not twins and nobody is blob-dark under dim light.
 static func look_for(atlas_path: String, colour: Color, seed: int = 0) -> DotHumanoidLook:
 	var look := DotHumanoidLook.from_letter(atlas_path)
 	if look == null:

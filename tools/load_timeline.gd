@@ -2,14 +2,9 @@ extends Node
 
 const ZzClientScript := preload("../game/zz_client.gd")
 
-## How long the solo client's loading cover stays up, and which reasons hold it: prints the engine
-## time each gate reason (map, world, weapons, warm-up) clears and when the gate opens, so a change
-## to the load can be compared back to back. Software GL: the CPU side is real, shader compiles are
-## not (use xvfb-run, never --headless, which skips the weapon prewarm).
-##
-## [codeblock]
-## xvfb-run -a godot --path . --rendering-driver opengl3 --resolution 480x270 res://tools/load_timeline.tscn
-## [/codeblock]
+## How long the solo client's loading cover stays up and which reasons hold it: prints the engine time each gate
+## reason (map, world, weapons, warm-up) clears, to compare a change to the load. Software GL: use xvfb-run, never
+## --headless (no weapon prewarm): `xvfb-run -a godot --path . --rendering-driver opengl3 res://tools/load_timeline.tscn`.
 
 
 func _ready() -> void:

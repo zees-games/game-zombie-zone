@@ -1,14 +1,10 @@
 extends RefCounted
 
-## The slide cvars (`zz_slide`, `zz_slide_boost`, `zz_slide_min_speed`, `zz_slide_duration`,
-## `zz_slide_friction`, `zz_slide_cooldown`): their names, members and words are
-## [method DotFpsSlidePreset.cvar_table], written once in dot-player-controller. A slide is part
-## of the predicted motor, so every one is REPLICATED and a client follows it
-## ([method follow_cvars]), the way [ZzCrawlRules] does for the crawl; a client that held other
-## numbers would predict a slide the server does not make.
-##
-## ZZ's slide is the sprint one (only a sprinter holding C slides). `zz_slide_min_speed` 0 means
-## the preset's own floor, just over a plain run ([constant DotFpsSlidePreset.SPRINT_MIN_FACTOR]).
+## The slide cvars (`zz_slide`, `_boost`, `_min_speed`, `_duration`, `_friction`, `_cooldown`): names and words are
+## [method DotFpsSlidePreset.cvar_table]. Part of the predicted motor, so each is REPLICATED and a client follows it
+## ([method follow_cvars]) as [ZzCrawlRules] does the crawl. ZZ's slide is the sprint one (only a sprinter holding C).
+
+## `zz_slide_min_speed` 0 means the preset's floor, just over a run ([constant DotFpsSlidePreset.SPRINT_MIN_FACTOR]).
 ## The slide's top speed is not in the shared table and stays a [ZzConfig] number.
 
 signal changed

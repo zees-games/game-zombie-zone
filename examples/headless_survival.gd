@@ -1,19 +1,12 @@
-extends DotGameCheckSuite
+extends "headless_survival_dormant.gd"
 
-const ZzCatalogue := preload("../game/zz_catalogue.gd")
-const ZzConfig := preload("../game/zz_config.gd")
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
-const ZzGame := preload("../game/zz_game.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
-const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
-const ZzNpcs := preload("../game/zz_npcs.gd")
-const ZzPlayer := preload("../game/zz_player.gd")
 const ZzRespawn := preload("../game/zz_respawn.gd")
 const ZzWaveSets := preload("../game/zz_wave_sets.gd")
-const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 ## Survival maps, held: the three styles a server picks (`zz_survival`), the breather, a wipe,
 ## the barricades, the team a map is built for, and then every big survival map played for a
@@ -34,14 +27,10 @@ const CHECKS := 144
 ## shard's log is there and that together they entered all SECTIONS.
 const SHARDS := {"core_a": [3, 24], "core_b": [4, 38], "core_c": [3, 11], "core_d": [5, 24], "core_e": [3, 19], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
 
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
 ## Allowance on the 64 Hz tick budget for the big maps. On PH's slow shared thread the stadium costs 15.8-16.1 ms CPU with or without the
 ## 72-unit body and nav rebake (05d7567 measured 16.07, 88e574a 15.78) and the mall 15.8-18.6 ms with the box loaded: the box, not a regression.
 const TICK_ALLOWANCE := 1.25
 
-## In the practice street, clear of the cars.
-const STREET := Vector3(0.0, 0.05, 14.0)
 
 ## The big survival maps, and where in each a test window is: a classroom window, a shop
 ## door, a tunnel to the field, a gate. Each is a barricade id and a point inside it.
@@ -50,15 +39,7 @@ const BIG_MAPS := ["zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp"]
 ## Simulated seconds a full team plays a big map for.
 const PLAY_SECONDS := 75.0
 
-var _sections_entered := 0
-var _sections_finished := 0
-var _worlds: Array[ZzGame] = []
-var _linked := false
 
-## The last map decided in the world under test: [won, why]. Read from `round_over`, because
-## with no intermission the next round has begun (and forgotten the decision) by the time a
-## section looks.
-var _result: Array = []
 
 
 func _ready() -> void:
@@ -125,103 +106,6 @@ func _run() -> void:
 		_report_sections(_sections_entered, _sections_finished, SHARDS[shard][0], SHARDS[shard][1])
 
 
-# --- The dormant tier -----------------------------------------------------------------------
-
-## A quiet stadium world: one survivor at the seat, eight commons at fixed offsets up to 130 m out, each sent at the
-## survivor. Returns [world, the zombies that landed more than 70 m away (the dormant tier reaches past 60), survivor, seat].
-func _dormant_world(from: float, every: int) -> Array:
-	var game := await _hold(func(c: ZzConfig) -> void:
-		c.map_ids = PackedStringArray(["zz_stadium"])
-		c.survival_style = 0
-		c.survival_warmup_seconds = 600.0
-		c.dormant_from = from
-		c.dormant_think_every = every, 1, &"zz_stadium")
-	var me: ZzPlayer = game.survivors()[0]
-	var seat: Vector3 = game.map.spawn("survivors", 0)[0]
-	me.place_at(seat, 0.0)
-	var far := []
-	for i in 8:
-		var angle := TAU * float(i) / 8.0
-		var at: Vector3 = game.horde.snap_to_nav(seat + Vector3(cos(angle), 0.0, sin(angle)) * (70.0 + 8.0 * float(i)))
-		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, at, &"test", Basis(Vector3.UP, angle))
-		if npc != null:
-			npc.brain.call(&"force_target", me.player_id)
-			if at.distance_to(seat) > 70.0:
-				far.append(npc)
-	return [game, far, me, seat]
-
-
-func _dormant_positions(far: Array) -> PackedVector3Array:
-	var out := PackedVector3Array()
-	for npc: DotNpcInstance in far:
-		out.append(npc.position())
-	return out
-
-
-## Returns [seconds until the first far zombie has moved 1.5 m, the least distance it gets to the survivor in 20 s, start gap].
-func _dormant_approach(from: float) -> Array:
-	var w := await _dormant_world(from, 16)
-	var game: ZzGame = w[0]
-	var me: ZzPlayer = w[2]
-	var npc: DotNpcInstance = (w[1] as Array)[0]
-	await _sim(game, 1.0)
-	var from_pos: Vector3 = npc.position()
-	var toward := (from_pos - (w[3] as Vector3)).normalized()
-	var placed: Vector3 = game.horde.snap_to_nav(from_pos - toward * 10.0)
-	me.place_at(placed, 0.0)
-	var start := npc.position()
-	var woke_at := -1.0
-	var least := INF
-	var t := 0.0
-	while t < 20.0:
-		await _sim(game, 0.25)
-		t += 0.25
-		if woke_at < 0.0 and npc.position().distance_to(start) > 1.5:
-			woke_at = t
-		least = minf(least, npc.position().distance_to(me.global_position))
-	return [woke_at, least, placed.distance_to(from_pos)]
-
-
-func _test_dormant() -> void:
-	_section("dormant tier: far zombies think rarely, wake when somebody comes, and off changes nothing")
-	if not _linked:
-		print("(no map directory: skipped, and counted)")
-		for i in 6:
-			_check(true, "skipped without maps/")
-		_finished()
-		return
-
-	# Off: the same fixed world twice gives the same positions after 300 ticks, and the tier's other knob is inert.
-	var runs: Array[PackedVector3Array] = []
-	var counts: Array[int] = []
-	for every in [16, 16, 40]:
-		var w := await _dormant_world(0.0, every)
-		var off_game: ZzGame = w[0]
-		for i in 300:
-			off_game.simulate(TICK)
-			if i % 8 == 7:
-				await get_tree().physics_frame
-		runs.append(_dormant_positions(w[1]))
-		counts.append((w[1] as Array).size())
-	_check(counts[0] >= 2, "the stadium world seats far zombies", str(counts))
-	_check(runs[0] == runs[1], "off: the same seed gives the same positions after 300 ticks", str(runs[0].size()))
-	_check(runs[0] == runs[2], "off: zz_dormant_think_every changes nothing (byte-identical positions)")
-
-	# On against off: the survivor is put 10 m from the first far zombie. It must start moving within 2 s and come as near
-	# as it does with the tier off (the minimum over 20 s, so a pass-by or a melee stop does not matter).
-	var off := await _dormant_approach(0.0)
-	var on := await _dormant_approach(70.0)
-	_check(float(on[0]) >= 0.0 and float(on[0]) <= 2.0, "a survivor comes within range and the far zombie starts moving within 2 s",
-		"%.2f s on, %.2f s off" % [on[0], off[0]])
-	_check(float(on[1]) < 3.0 and float(off[1]) < 3.0, "and it reaches him, as it does with the tier off",
-		"%.1f m on, %.1f m off (start gap %.0f m)" % [on[1], off[1], on[2]])
-	_finished()
-
-
-# --- Wave sets ------------------------------------------------------------------------------
-
-## `sv_waves`, the rotation entry and the map document pick a yml wave set; a missing one falls
-## through; none leaves the cvars in charge.
 func _test_wave_sets() -> void:
 	_section("wave sets: sv_waves, rotation entry and map document choose; a missing one falls through")
 	_check(ZzWaveSets.candidates("a", {"waves": "b"}, "c") == ["a", "b", "c"], "candidates: cvar > entry > map document")
@@ -689,12 +573,8 @@ func _test_barricades() -> void:
 		for npc in outsiders:
 			if npc.is_alive() and npc.position().z < box.position.z - 0.3:
 				through_early = true
-	var weakest := ""
-	var torn := INF
-	for bid: String in pair:
-		if float(game.barricades[bid]["health"]) < torn:
-			torn = float(game.barricades[bid]["health"])
-			weakest = bid
+	var weakest := _weakest_of(game, pair)
+	var torn := float(game.barricades[weakest]["health"])
 	_check(torn < start, "the horde comes to the window and tears at it", "%s at %.0f of %.0f" % [weakest, torn, start])
 	_check(not through_early, "and nobody passes it while it stands")
 
@@ -732,6 +612,34 @@ func _test_barricades() -> void:
 		"holding E rebuilds it and builds it back up", "%.0f of %.0f" % [float(held["health"]), float(held["max"])])
 	_check(me.points > 0, "and mending is worth points", str(me.points))
 	_finished()
+
+
+## What the survivors have killed between them.
+func _kills_of(game: ZzGame) -> int:
+	var kills := 0
+	for player in game.survivors():
+		kills += player.commons_killed + player.specials_killed
+	return kills
+
+
+## How many barricades are damaged or down.
+func _barricades_hit(game: ZzGame) -> int:
+	var torn := 0
+	for bid: String in game.barricades:
+		if float(game.barricades[bid]["health"]) < float(game.barricades[bid]["max"]) or not bool(game.barricades[bid]["intact"]):
+			torn += 1
+	return torn
+
+
+## The id among [param ids] whose barricade has the least health.
+func _weakest_of(game: ZzGame, ids: Array) -> String:
+	var weakest := ""
+	var torn := INF
+	for bid: String in ids:
+		if float(game.barricades[bid]["health"]) < torn:
+			torn = float(game.barricades[bid]["health"])
+			weakest = bid
+	return weakest
 
 
 ## Stand-ins fill to the team a map is built for, and the horde's budget is sized for it.
@@ -818,6 +726,25 @@ func _test_map_rows() -> void:
 
 # --- The big maps, played -----------------------------------------------------------------------
 
+
+## [standing, standing near their post or out on a persona job] among the survivors.
+func _team_at_posts(game: ZzGame) -> Array:
+	var standing := 0
+	var at_post := 0
+	# In a breather a stand-in short of ammunition walks to a cache, so only standing counts
+	# then: the camp's minute ended 2 s into wave 1's breather with four of ten at their posts.
+	var in_breather: bool = game.survival != null and game.survival.waves != null \
+		and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET
+	for player in game.survivors():
+		if player.is_up():
+			standing += 1
+			var post: Vector3 = game.bots._hold_of(player)
+			var on_job: bool = String(game.bots.describe_personas().get(String(player.player_id), {}).get("behaviour", "")) != ""
+			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather or on_job:
+				at_post += 1
+	return [standing, at_post]
+
+
 ## A full team of stand-ins on one big map for a minute and a quarter of its first wave: it
 ## builds, its ground carries the horde from the edges to the barricades, the stand-ins hold
 ## their posts and fight, most of them are still standing, and a tick fits.
@@ -858,8 +785,6 @@ func _test_big_map(id: StringName) -> void:
 	var spent := 0
 	var wall_spent := 0
 	var worst := 0
-	var kills := 0
-	var torn := 0
 	var t := 0.0
 	# CPU time (DotGameCheckSuite.cpu_usec), not wall time, so a loaded box (other suites share its CPUs) does not inflate it: the minute is
 	# five windows and the budget is judged on the cheapest one's mean; a real slowdown makes every window slow.
@@ -888,11 +813,8 @@ func _test_big_map(id: StringName) -> void:
 		t += 32.0 * TICK
 		await get_tree().physics_frame
 
-	for player in game.survivors():
-		kills += player.commons_killed + player.specials_killed
-	for bid: String in game.barricades:
-		if float(game.barricades[bid]["health"]) < float(game.barricades[bid]["max"]) or not bool(game.barricades[bid]["intact"]):
-			torn += 1
+	var kills := _kills_of(game)
+	var torn := _barricades_hit(game)
 
 	var held := game.survival_state()
 	# Wave 1 may already be over: since a wave down to its stragglers ends 30 s after its last
@@ -904,19 +826,9 @@ func _test_big_map(id: StringName) -> void:
 	_check(kills > 2, "the stand-ins kill what comes", "%d kills" % kills)
 	_check(torn > 0 or kills > 20, "the horde reaches the barricades", "%d barricades hit, %d kills" % [torn, kills])
 
-	var standing := 0
-	var at_post := 0
-	# In a breather a stand-in short of ammunition walks to a cache, so only standing counts
-	# then: the camp's minute ended 2 s into wave 1's breather with four of ten at their posts.
-	var in_breather: bool = game.survival != null and game.survival.waves != null \
-		and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET
-	for player in game.survivors():
-		if player.is_up():
-			standing += 1
-			var post: Vector3 = game.bots._hold_of(player)
-			var on_job: bool = String(game.bots.describe_personas().get(String(player.player_id), {}).get("behaviour", "")) != ""
-			if Vector2(post.x - player.feet().x, post.z - player.feet().z).length() < 12.0 or in_breather or on_job:
-				at_post += 1
+	var counts := _team_at_posts(game)
+	var standing: int = counts[0]
+	var at_post: int = counts[1]
 	_check(standing >= int(ceil(team * 0.7)) and at_post >= int(ceil(standing * 0.5)),
 		"most of the team is standing, most near their posts or out on a persona job", "%d of %d up, %d near their post" % [standing, team, at_post])
 
@@ -931,261 +843,3 @@ func _test_big_map(id: StringName) -> void:
 
 
 ## Stand-ins never idle while infected remain, and the persona set takes an add and a delete.
-func _test_personas() -> void:
-	_section("bot personas: no idling with infected alive, and profiles added and deleted")
-	var game := await _hold(func(c: ZzConfig) -> void:
-		c.survival_style = 0
-		c.waves = 2
-		c.survival_warmup_seconds = 1.0
-		c.wave_size = 8
-		c.wave_size_per_survivor = 0
-		c.brute_every_waves = 0, 4)
-	var bots: Array[ZzPlayer] = []
-	for bot in game.survivors():
-		bot.is_bot = true
-		bots.append(bot)
-	await _sim(game, 3.0)
-	var left: int = game.horde.infected_left()
-	_check(left > 0, "a wave is on", "%d infected" % left)
-
-	var acted := 0
-	var picked := {}
-	var all_assigned := true
-	for bot in bots:
-		var memory: Dictionary = game.bots._memory(bot)
-		all_assigned = all_assigned and memory.get("persona") is DotBotPersona
-		if game.bots.persona_act(bot, DotFpsCommand.new(), memory):
-			acted += 1
-			picked[String(memory.get("behave", &""))] = true
-	_check(all_assigned, "every stand-in is given a persona from the server's pool")
-	_check(acted == bots.size(), "each acts on a behaviour while infected remain", "%d of %d" % [acted, bots.size()])
-	_check(not picked.is_empty() and picked.keys().all(func(k: String) -> bool: return DotBotPersona.BEHAVIOURS.has(StringName(k))),
-		"and it is one of hunt, loot, hold, support, scout", str(picked.keys()))
-
-	var before: Vector3 = bots[0].feet()
-	await _sim(game, 6.0)
-	var gap: float = bots[0].feet().distance_to(before)
-	_check(gap > 0.5, "they walk rather than stand", "%.1f m" % gap)
-
-	var base := "user://zz_personas_selftest"
-	var runtime := DotProfileRuntime.new()
-	var set: DotProfileSet = game.bot_persona_set()
-	runtime.add_set(set)
-	runtime.save_root = base
-	runtime.permit = func(_actor: Variant, _flag: String) -> bool: return true
-	var ids_before := set.list_ids().size()
-	var added := runtime.handle_request("admin", DotProfileRuntime.make_request("add", DotBotPersona.KIND, "sentry", "", {"weight": 3.0}))
-	game.reload_personas()
-	_check(added.ok and set.has_id("sentry") and set.list_ids().size() == ids_before + 1, "a persona is added through the runtime")
-	_check(game.personas().weight_of(_persona(game, "sentry")) > 0.0, "and the server's pool draws on it after a reload")
-	var removed := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "sentry"))
-	game.reload_personas()
-	_check(removed.ok and not set.has_id("sentry") and _persona(game, "sentry") == null, "and deleted, it leaves the set and the pool")
-	var shipped := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "scout"))
-	game.reload_personas()
-	_check(shipped.ok and _persona(game, "scout") == null and _persona(game, "hunter") != null, "a shipped persona can be deleted and the rest stay")
-	game.config.bot_personas = "hunter:1"
-	_check(game.personas().candidates().size() == 1 and game.personas().candidates()[0].id == &"hunter", "the server's override pins the pool", str(game.personas().describe()))
-	_rm_dir(base)
-	_finished()
-
-
-func _persona(game: ZzGame, id: String) -> DotBotPersona:
-	for p in game.personas().personas:
-		if p.id == StringName(id):
-			return p
-	return null
-
-
-func _rm_dir(dir: String) -> void:
-	if not DirAccess.dir_exists_absolute(dir):
-		return
-	for f in DirAccess.get_files_at(dir):
-		DirAccess.remove_absolute(dir.path_join(f))
-	for d in DirAccess.get_directories_at(dir):
-		_rm_dir(dir.path_join(d))
-	DirAccess.remove_absolute(dir)
-
-
-## An infected that makes no progress toward the survivors is repathed, then put near them.
-func _test_stuck_rescue() -> void:
-	_section("stuck infected: no progress means a repath, then a relocation near the survivors")
-	var game := await _hold(func(c: ZzConfig) -> void:
-		c.survival_style = 0
-		c.waves = 2
-		c.survival_warmup_seconds = 1.0
-		c.wave_size = 8
-		c.wave_size_per_survivor = 0
-		c.stuck_repath_seconds = 5.0
-		c.stuck_relocate_seconds = 12.0
-		c.stuck_low_count = 0
-		c.brute_every_waves = 0, 1)
-	await _sim(game, 3.0)
-	var npc: DotNpcInstance = null
-	for n in game.horde.spawner.npcs_of(game.horde.WAVE):
-		if n.is_alive() and n.node is ZzZombieBody:
-			npc = n
-			break
-	_check(npc != null, "a wave zombie to hold still")
-	if npc == null:
-		for i in 3:
-			_check(false, "skipped: no zombie")
-		_finished()
-		return
-	var body := npc.node as ZzZombieBody
-	body.global_position = STREET + Vector3(0.0, 0.0, 30.0)
-	game.horde.stuck.clear()
-	game.horde._rescue_if_stuck(npc)
-	game.horde._time += 6.0
-	game.horde._rescue_if_stuck(npc)
-	_check(game.horde.stuck.repaths == 1 and game.horde.stuck.relocations == 0, "five seconds without progress repaths it", str(game.horde.stuck.describe()))
-	var from := npc.position()
-	game.horde._time += 8.0
-	game.horde._rescue_if_stuck(npc)
-	_check(game.horde.stuck.relocations == 1 and npc.position().distance_to(from) > 1.0, "twelve without progress relocates it", "%.1f m" % npc.position().distance_to(from))
-	var near := INF
-	for id in game.horde.survivor_ids():
-		near = minf(near, npc.position().distance_to(game.horde.survivor_position(id)))
-	_check(near < from.distance_to(STREET) + 0.1 or near < 60.0, "to somewhere near the survivors", "%.1f m" % near)
-	_finished()
-
-
-
-# --- Helpers -------------------------------------------------------------------------------------
-
-## A survival world with [param count] invulnerable survivors standing in it. The practice street
-## made a survival map (with two caches) unless [param map] names one.
-func _hold(configure: Callable, count: int, map: StringName = &"") -> ZzGame:
-	var game := await _world(func(c: ZzConfig) -> void:
-		c.wanderer_density = 0.0
-		c.sleepers_enabled = false
-		c.specials_base = 0
-		configure.call(c))
-
-	if map == &"":
-		var doc := ZzCatalogue.practice().duplicate(true)
-		doc["id"] = "zz_hold"
-		doc["mode"] = ZzMapDoc.SURVIVAL
-		doc["objectives"] = []
-		doc["caches"] = [[-2.0, 0.0, 10.0], [2.0, 0.0, 10.0]]
-		var checked := ZzMapDoc.validate(doc)
-		var _added := game.catalogue._add(checked.value, "test") if checked.ok else false
-		game.next_map_id = &"zz_hold"
-	else:
-		game.next_map_id = map
-
-	for i in count:
-		var player := game.add_player(StringName("u%d" % (100 + i)), "Holder%d" % i)
-		player.health.invulnerable = true
-
-	game.start()
-	await _sim(game, 0.3)
-
-	for player in game.survivors():
-		player.health.invulnerable = true
-		if map == &"":
-			player.place_at(STREET + Vector3(float(player.get_index() % 3), 0.0, 0.0), 0.0)
-
-	return game
-
-
-## Kills the wave in play until wave [param index] is over.
-func _clear_wave(game: ZzGame, index: int) -> void:
-	for i in 400:
-		if game.survival == null or game.survival.waves.index > index or game.survival.waves.stage == DotNpcDirectorWaves.Stage.DONE:
-			return
-		if game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET and game.survival.waves.index > index:
-			return
-		for npc in game.horde.spawner.npcs_of(game.horde.WAVE):
-			if npc.is_alive():
-				_hurt_npc(game, npc, 5000.0)
-		await _sim(game, 0.25)
-
-
-func _won_with(words: String) -> bool:
-	return _result.size() == 2 and bool(_result[0]) and str(_result[1]).contains(words)
-
-
-func _world(configure: Callable = Callable()) -> ZzGame:
-	for old in _worlds.duplicate():
-		await _dispose(old)
-
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.start_grace_seconds = 1.0
-	config.escape_grace_seconds = 0.0
-
-	if configure.is_valid():
-		configure.call(config)
-
-	var game := ZzGame.new()
-	game.name = "World%d" % _worlds.size()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	_worlds.append(game)
-	_result = []
-	game.round_over.connect(func(_number: int, won: bool, why: String) -> void: _result = [won, why])
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	return game
-
-
-func _dispose(game: ZzGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _sim(game: ZzGame, seconds: float) -> void:
-	var ticks := maxi(int(round(seconds * float(TICK_RATE))), 1)
-
-	for i in ticks:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
-
-	await get_tree().physics_frame
-
-
-func _aim(player: ZzPlayer, target: Vector3) -> void:
-	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
-	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
-	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
-	player.controller.apply_command(command)
-	player.controller.state.yaw = command.yaw
-	player.controller.state.pitch = command.pitch
-
-
-func _hurt(game: ZzGame, player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
-	hit.tick = game.current_tick()
-	var _applied := game.combat.apply_damage(hit)
-
-
-func _hurt_npc(game: ZzGame, npc: DotNpcInstance, amount: float) -> void:
-	var hit := DotDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
-	hit.tick = game.current_tick()
-	var _applied := game.combat.apply_damage(hit)
-
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
