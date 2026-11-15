@@ -1,94 +1,9 @@
-extends DotGameCheckSuite
-
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
-const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const ZzCatalogue := preload("../game/zz_catalogue.gd")
-const ZzEvents := preload("../game/net/zz_events.gd")
-const ZzLampBudget := preload("../game/zz_lamp_budget.gd")
-const ZzMap := preload("../game/zz_map.gd")
-const ZzMechanics := preload("../game/zz_mechanics.gd")
-const ZzPaths := preload("../game/zz_paths.gd")
-const ZzTestToys := preload("zz_test_toys.gd")
-
-## Every map the game can be sent, built the way a server builds it and looked over for the
-## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
-## prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating,
-## an item out of reach, and — the one this game adds — ground the zombies cannot cross.
-##
-## [b]Why this exists apart from `headless_run`.[/b] The maps are generated in
-## zombie-zone-maps by `tools/build_maps.py`, and none of those mistakes stops a map: a
-## doorway the nav graph does not cross is a safe room no zombie ever enters, an objective
-## off the graph is a hold-out the horde never reaches, and a gate that does not cut the
-## graph is a barrier the horde walks through. The renders find the ugly ones; this finds the
-## rest, on every map, every time.
-##
-## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
-## Adding a map adds a section and CHECKS_PER_MAP checks.
-
-const ZzNpcs := preload("../game/zz_npcs.gd")
-
-const MAPS := ["zz_practice", "zz_blackout_1", "zz_blackout_2", "zz_blackout_3", "zz_lot", "zz_chapel", "zz_high_school", "zz_mall", "zz_stadium", "zz_relief_camp", "zs_ravenstreet", "ze_biohazard_manor", "ze_nuke_beta", "ze_runforyourlife_1_v4", "zm_atix_helicopter", "zm_4way_tunnel", "zm_abandoned_mall", "ze_boat_escape", "ze_death_star_escape", "zm_chaos_city", "zm_pathogen"]
-const CHECKS_PER_MAP := 20
-const BAKE_CHECKS := 9
-const WORLD_CHECKS := 4
-const LAMP_CHECKS := 8
-
-## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
-## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
-## does: the delivered maps are checked wherever they are present, which is every machine
-## that has run dot-bootstrap. Sections and checks are counted against this list.
-var _maps: Array = []
-var _worlds_read := 0
-
-## A person's capsule, for "is this spawn clear".
-const RADIUS := 0.4
-const HEIGHT := 1.8
-
-## Fewest survivor spawns a map may have: a team of four starts apart.
-const MIN_SPAWNS := 4
-
-## How far a point that matters (an objective, a route point) may be from the zombies' ground.
-const SNAP := 2.5
-
-var _sections_entered := 0
-var _sections_finished := 0
-
-
-## Shipped world maps whose spawner config was checked (three checks each).
-var _spawner_worlds := 0
-## World maps whose spawner checks were skipped because world/ is not linked.
-var _worlds_skipped := 0
-## Maps whose wire budget cut boxes: each adds the whole-floor check.
-var _nav_extra_maps := 0
-
+extends "headless_maps_base.gd"
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
-
-
-## The shards `game.conf` names: the whole-floor sections once as `core`, the maps dealt round-robin into `m0`..`m3`.
-const SHARD_NAMES := ["core", "m0", "m1", "m2", "m3"]
-const MAP_SHARDS := 4
-const CORE_SECTIONS := 8
-
-
-## The maps this machine has: all of MAPS, or only the practice street where `maps/` is not linked.
-func _linked_maps() -> Array:
-	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
-	return MAPS.duplicate() if linked else ["zz_practice"]
-
-
-func _merge(logs: Array) -> void:
-	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
-	_check(logs.size() == SHARD_NAMES.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
-	var want := CORE_SECTIONS + _linked_maps().size()
-	_check(entered == want, "the shards entered every section (%d of %d)" % [entered, want])
-	_report_sections(1, 1, 1, 2)
-
 
 func _run() -> void:
 	print("zombiezone maps")
@@ -138,31 +53,6 @@ func _run() -> void:
 	_broken = _maps.is_empty()
 	_report_sections(_sections_entered, _sections_finished, sections, checks)
 
-
-
-
-## The height of the nav floor a point stands over, nearest the point's own height. The street maps
-## are flat at y=0, but an exodus map is converted at the source's heights (a deck at 22 m, a
-## stair, a bridge), and the graph's points are at those heights: a target flattened to 0 is 22 m
-## from every point and was "unreached" however well the ground joined.
-func _ground_y(doc: Dictionary, at: Vector3) -> float:
-	var best := 0.0
-	var found := false
-	for f: Array in (doc.get("nav", {}) as Dictionary).get("floors", []):
-		if at.x < float(f[0]) or at.x > float(f[2]) or at.z < float(f[1]) or at.z > float(f[3]):
-			continue
-		var y := float(f[4])
-		if not found or absf(y - at.y) < absf(best - at.y):
-			best = y
-			found = true
-	if doc.has("terrain"):
-		var ground := DotMapTerrain.from_dict(doc["terrain"])
-		var y := (ground.value as DotMapTerrain).height_at(at.x, at.z) if ground.ok else NAN
-		if not is_nan(y) and (not found or absf(y - at.y) < absf(best - at.y)):
-			best = y
-	return best
-
-
 func _test_the_catalogue() -> void:
 	_section("the catalogue")
 	var game := await _world(&"")
@@ -188,10 +78,6 @@ func _test_the_catalogue() -> void:
 		"every map is in it, and no file was refused", "have %s, missing %s, refused %s" % [ids, missing, game.catalogue.refused])
 	await _dispose(game)
 	_finished()
-
-
-const LAZY_CHECKS := 8 + 9
-
 
 ## The browser's catalogue holds a name and a mode per map and reads one whole document at a
 ## time (zombie-zone-maps 0.1.16's 47 maps ran the wasm heap out); native reads every one.
@@ -240,12 +126,6 @@ func _test_lazy_catalogue() -> void:
 	var _dropped := DirAccess.remove_absolute(dir)
 	_finished()
 
-
-## The document keeps every lamp; only the nearest few are lit, and a lamp fades rather than pops.
-const FOOTING_CHECKS := 5
-const ZzFooting := preload("res://game/zz_footing.gd")
-
-
 ## The fall and stuck net (ZzFooting): what counts as out of the map, and that a fallen survivor is put back.
 func _test_footing() -> void:
 	_section("footing")
@@ -267,10 +147,6 @@ func _test_footing() -> void:
 	_check(net.rescued == 0 and net.has_method("forget"), "a fresh net has rescued nobody")
 	await _dispose(game)
 	_finished()
-
-
-const SOLID_PROP_CHECKS := 6
-
 
 ## A map with more solid props than the wire holds keeps them all on the server and sends none.
 func _test_solid_prop_budget() -> void:
@@ -304,7 +180,6 @@ func _test_solid_prop_budget() -> void:
 	_check(kept.ok and ZzMapDoc.wire_form(kept.value).get("solid_props", []).size() == 40, "a small document keeps its solid props on the wire")
 	await _dispose(game)
 	_finished()
-
 
 func _test_lamp_budget() -> void:
 	_section("lamp budget")
@@ -374,14 +249,6 @@ func _test_lamp_budget() -> void:
 	host.queue_free()
 	game.free()
 	_finished()
-
-
-func _visible(lamps: Array[Light3D]) -> int:
-	var n := 0
-	for lamp in lamps:
-		n += 1 if lamp.visible else 0
-	return n
-
 
 ## The committed bakes against the maps as they are now. A map edited without a rebake still
 ## plays (live lamps and a WARN on every client), so nothing else would notice: this does.
@@ -464,7 +331,6 @@ func _test_baked_light() -> void:
 	_check(shadows_set, "set_shadow_cost reaches dot-map's proxy, range and translucent switches and restores them")
 	await _dispose(game)
 	_finished()
-
 
 ## Every converted map's drawn world reads, its movers all have geometry, and a mechanics builds
 ## from them (zombie-zone-maps' tools/check_worlds.py holds the manifest half). Every document
@@ -566,7 +432,6 @@ func _test_worlds() -> void:
 
 	_finished()
 
-
 ## A glTF whose indices reach past its vertices makes the engine log an error per read and name no file; this names it.
 func _test_library_indices() -> void:
 	_section("library models")
@@ -579,7 +444,6 @@ func _test_library_indices() -> void:
 	else:
 		_check(true, "no model library linked: nothing to scan")
 	_finished()
-
 
 func _test_map(id: StringName) -> void:
 	_section(String(id))
@@ -671,33 +535,7 @@ func _test_map(id: StringName) -> void:
 
 	_check(lost.is_empty(), "every item lies where it can be picked up", "; ".join(lost.slice(0, 6)))
 
-	# A shipped world map resolves a spawner config and lays at least one weapon site, each over a floor.
-	if str(doc.get("world", "")) != "" and game.spawners != null and not FileAccess.file_exists(game.map.local_world_prefix() + ".json"):
-		# world/ is never in CI; its sites come from the drawn world, so without it there is nothing to count.
-		_worlds_skipped += 1
-		print("  SKIP  %s: spawner and shelf checks need world/ (not linked), not counted as passed" % doc.get("id", "?"))
-	elif str(doc.get("world", "")) != "" and game.spawners != null:
-		_spawner_worlds += 1
-		game.spawners.start_round(doc)
-		var ours := {}
-		for key: String in ["spawners", "traders"]:
-			for raw: Variant in lay_block(game, doc).get(key, []):
-				ours[StringName(str((raw as Dictionary).get("id", "")))] = true
-		var lay := game.spawners.spawner
-		var weapon_sites := 0
-		var site_floating: Array = []
-		for sid: StringName in lay.site_ids():
-			var laid := lay.site(sid)
-			if laid == null:
-				continue
-			if laid.enabled and laid.pool in [&"field_guns", &"heavy_guns", &"wall_guns", &"crate"]:
-				weapon_sites += 1
-			if ours.has(sid) and not _over_something(game, laid.position):
-				site_floating.append("%s at %s" % [sid, laid.position])
-		var shelves: int = (game.spawners.get("_traders") as Dictionary).size()
-		_check(weapon_sites > 0, "it lays at least one weapon site", str(weapon_sites))
-		_check(site_floating.is_empty(), "every spawner and shelf the config adds stands over something", "; ".join(site_floating.slice(0, 6)))
-		_check(str(doc.get("mode", "")) == "exodus" or shelves > 0, "a survival world has a trader", str(shelves))
+	_spawner_sites(game, doc)
 
 	# The zombies' ground, every gate open: the first spawn reaches everything that matters.
 	var gates := PackedStringArray()
@@ -832,6 +670,12 @@ func _test_map(id: StringName) -> void:
 	_check(cut.is_empty(), "%d barricades, the horde's ground on both sides of each" % (doc.get("barricades", []) as Array).size(),
 		", ".join(cut))
 
+	await _toys(game, doc)
+	await _dispose(game)
+	_finished()
+
+## The map's toys (dot-props', loose only), after two seconds of physics.
+func _toys(game: ZzGame, doc: Dictionary) -> void:
 	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
 	# seconds of physics later every one still where the map put it, not through a floor.
 	var box := game.map.toys
@@ -864,92 +708,37 @@ func _test_map(id: StringName) -> void:
 		if toy.body.global_position.distance_to(toy.rest.origin) > 0.6:
 			strayed.append("%s %d: %s to %s" % [toy.def["id"], toy.index, toy.rest.origin.snapped(Vector3.ONE * 0.1), toy.body.global_position.snapped(Vector3.ONE * 0.1)])
 	_check(strayed.is_empty(), "two seconds on, every toy is still where the map put it", "; ".join(strayed.slice(0, 6)))
-	await _dispose(game)
-	_finished()
 
 
-## A ray down from just over [param at] finds a floor, a table or a prop within half a metre.
-func _over_something(game: ZzGame, at: Vector3) -> bool:
-	var space := game.get_world_3d().direct_space_state
-	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
-	var query := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.3, 0.0), at + Vector3(0.0, -0.5, 0.0), mask)
-	return not space.intersect_ray(query).is_empty()
-
-
-## Why a person could not stand at [param at], or "" when they can.
-func _spawn_fault(game: ZzGame, at: Vector3) -> String:
-	var space := game.get_world_3d().direct_space_state
-	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
-
-	var down := PhysicsRayQueryParameters3D.create(at + Vector3(0.0, 0.5, 0.0), at + Vector3(0.0, -0.6, 0.0), mask)
-	if space.intersect_ray(down).is_empty():
-		return "nothing under it"
-
-	var capsule := CapsuleShape3D.new()
-	capsule.radius = RADIUS
-	capsule.height = HEIGHT
-	var query := PhysicsShapeQueryParameters3D.new()
-	query.shape = capsule
-	query.collision_mask = mask
-	query.transform = Transform3D(Basis.IDENTITY, at + Vector3(0.0, HEIGHT * 0.5 + 0.08, 0.0))
-
-	var hits := space.intersect_shape(query, 4)
-
-	if not hits.is_empty():
-		var what: Array = []
-		for hit: Dictionary in hits:
-			var index := game.map.prop_from_hit(hit["collider"], int(hit["shape"]))
-			what.append(String(game.map.prop_id(index)) if index >= 0 else "a wall")
-		return "in the way: %s" % ", ".join(what)
-
-	return ""
-
-
-func _inside_world(game: ZzGame, point: Vector3) -> bool:
-	var query := PhysicsPointQueryParameters3D.new()
-	query.position = point
-	query.collision_mask = game.physics.layer_mask(&"world")
-	return not game.get_world_3d().direct_space_state.intersect_point(query, 1).is_empty()
-
-
-## A ray down from just inside the prop's base finds a floor, a table or another prop within
-## a few centimetres. A tilted prop is tested from its lowest corner's height.
-func _rests_on_something(game: ZzGame, frame: Transform3D, size: Vector3) -> bool:
-	var space := game.get_world_3d().direct_space_state
-	var mask := game.ground_mask() | game.physics.layer_mask(&"prop")
-	var base := frame.origin
-
-	for x in [-0.3, 0.0, 0.3]:
-		for z in [-0.3, 0.0, 0.3]:
-			var from := frame * Vector3(size.x * x, 0.04, size.z * z)
-			var query := PhysicsRayQueryParameters3D.create(from, Vector3(from.x, base.y - 0.12, from.z), mask)
-			query.hit_from_inside = false
-			if not space.intersect_ray(query).is_empty():
-				return true
-
-	return false
-
-
-func _world(id: StringName, drawn := false) -> ZzGame:
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.map_ids = PackedStringArray([String(id)]) if id != &"" else PackedStringArray()
-
-	var game := ZzGame.new()
-	game.name = "World_%s" % String(id)
-	game.config = config
-	game.tick_rate = 60
-	game.authoritative = true
-	game.draw_world = drawn
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	return game
-
+## The spawner and shelf checks of a shipped world map.
+func _spawner_sites(game: ZzGame, doc: Dictionary) -> void:
+	# A shipped world map resolves a spawner config and lays at least one weapon site, each over a floor.
+	if str(doc.get("world", "")) != "" and game.spawners != null and not FileAccess.file_exists(game.map.local_world_prefix() + ".json"):
+		# world/ is never in CI; its sites come from the drawn world, so without it there is nothing to count.
+		_worlds_skipped += 1
+		print("  SKIP  %s: spawner and shelf checks need world/ (not linked), not counted as passed" % doc.get("id", "?"))
+	elif str(doc.get("world", "")) != "" and game.spawners != null:
+		_spawner_worlds += 1
+		game.spawners.start_round(doc)
+		var ours := {}
+		for key: String in ["spawners", "traders"]:
+			for raw: Variant in lay_block(game, doc).get(key, []):
+				ours[StringName(str((raw as Dictionary).get("id", "")))] = true
+		var lay := game.spawners.spawner
+		var weapon_sites := 0
+		var site_floating: Array = []
+		for sid: StringName in lay.site_ids():
+			var laid := lay.site(sid)
+			if laid == null:
+				continue
+			if laid.enabled and laid.pool in [&"field_guns", &"heavy_guns", &"wall_guns", &"crate"]:
+				weapon_sites += 1
+			if ours.has(sid) and not _over_something(game, laid.position):
+				site_floating.append("%s at %s" % [sid, laid.position])
+		var shelves: int = (game.spawners.get("_traders") as Dictionary).size()
+		_check(weapon_sites > 0, "it lays at least one weapon site", str(weapon_sites))
+		_check(site_floating.is_empty(), "every spawner and shelf the config adds stands over something", "; ".join(site_floating.slice(0, 6)))
+		_check(str(doc.get("mode", "")) == "exodus" or shelves > 0, "a survival world has a trader", str(shelves))
 
 ## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing
 ## in `Drawn` (batched into chunks) and its shapes in `Solid`, so the audit is the lenient one;
@@ -978,26 +767,21 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	# checks that follow ask it about the same spot.
 	await get_tree().physics_frame
 
-
 func _dispose(game: ZzGame) -> void:
 	remove_child(game)
 	game.free()
 	await get_tree().process_frame
 
-
 func _section(name: String) -> void:
 	_sections_entered += 1
 	print(name)
 
-
 func _finished() -> void:
 	_sections_finished += 1
-
 
 ## The `game:` block of the spawner config the map resolved to (its traders and spawners).
 func lay_block(game: ZzGame, _doc: Dictionary) -> Dictionary:
 	return game.spawners.spawner.game_block()
-
 
 ## Whether the graph has the edge a-b (a link through an obstacle that the floors already join round is dropped, so it has none).
 func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
@@ -1008,7 +792,6 @@ func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
 			return true
 
 	return false
-
 
 ## A document the cache holds current is held as a stand-in at the next start, and read whole only
 ## when played; one the cache has nothing current for is read and validated, so a bad one is still

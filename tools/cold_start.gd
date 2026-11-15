@@ -4,16 +4,9 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 
-## Cold start of a round on the real game: how long the world takes to open and start, and what each
-## of the first ticks costs (the map build, the first navigation bake and its annotations).
-##
-## [codeblock]
-## godot --headless --path . res://tools/cold_start.tscn -- --map ze_biohazard_manor --ticks 600 [--cold]
-## [/codeblock]
-##
-## --cold wipes user://nav_bake and user://nav first, so the bake is the first one on the machine.
-## Prints COLDSTART / COLDSLOW / COLDWORST lines; exits 1 when open+start or any tick passes its
-## limit (--max-open-ms, --max-tick-ms; 0 turns a check off).
+## Cold start of a round on the real game: open and start time, and what each of the first ticks costs.
+## Run: godot --headless --path . res://tools/cold_start.tscn -- --map ze_biohazard_manor --ticks 600 [--cold]
+## --cold wipes user://nav_bake and user://nav first. Prints COLDSTART / COLDSLOW / COLDWORST; exits 1 past --max-open-ms or --max-tick-ms (0 is off).
 
 const TICK_RATE := 64
 const MAX_TICK_MS := 1000.0

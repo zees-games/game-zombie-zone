@@ -63,21 +63,7 @@ func _run() -> void:
 	cfg.minutes = float(_arg("minutes", str(cfg.minutes)))
 
 	var max_tick_ms := float(_arg("max-tick-ms", str(MAX_TICK_MS)))
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.map_ids = PackedStringArray([String(map_id)])
-	_game = ZzGame.new()
-	_game.name = "World"
-	_game.config = config
-	_game.tick_rate = TICK_RATE
-	_game.authoritative = true
-	_game.register_service = false
-	_game.next_map_id = map_id
-	add_child(_game)
-	_game.set_physics_process(false)
+	_build_game(map_id)
 	await get_tree().physics_frame
 
 	var doc: Dictionary = _game.catalogue.doc(map_id) if _game.catalogue != null else {}
@@ -107,22 +93,7 @@ func _run() -> void:
 	soak.movers_fn = _movers
 	soak.stats_fn = func() -> Dictionary: return {"kills": _kills, "deaths": _deaths, "damage": _damage}
 	soak.object_count_fn = func() -> int: return int(Performance.get_monitor(Performance.OBJECT_COUNT))
-	soak.step_fn = func(delta: float) -> void:
-		var notes: ZzNavNotes = _game.horde.notes if _game.horde != null else null
-		var baked_before := notes.bake_ms if notes != null else 0.0
-		var began := Time.get_ticks_usec()
-		_game.simulate(delta)
-		var spent := float(Time.get_ticks_usec() - began) / 1000.0
-		if spent > 100.0:
-			print("SLOWTICK %d %.0f ms" % [soak.ticks, spent])
-		# A navigation bake that missed its cache (once per map change) is not the running cost.
-		var cold_bake := notes != null and notes.bake_ms != baked_before and not notes.bake_cached
-		if soak.ticks > BUILD_TICKS and not cold_bake and spent > _worst_ms:
-			_worst_ms = spent
-			_worst_tick = soak.ticks
-		_goals.sample()
-		if _game.horde != null and _game.horde.spawner != null:
-			_peak_alive = maxi(_peak_alive, _game.horde.spawner.all_npcs().size())
+	soak.step_fn = func(delta: float) -> void: _step(soak, delta)
 
 	var delta := 1.0 / float(TICK_RATE)
 	while not soak.is_done():
@@ -161,6 +132,42 @@ func _run() -> void:
 		push_error("could not write %s" % path)
 	await _release_game()
 	get_tree().quit(0 if report["ok"] else 1)
+
+
+func _build_game(map_id: StringName) -> void:
+	var config := ZzConfig.new()
+	config.warmup_seconds = 0.0
+	config.intermission_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.map_ids = PackedStringArray([String(map_id)])
+	_game = ZzGame.new()
+	_game.name = "World"
+	_game.config = config
+	_game.tick_rate = TICK_RATE
+	_game.authoritative = true
+	_game.register_service = false
+	_game.next_map_id = map_id
+	add_child(_game)
+	_game.set_physics_process(false)
+
+
+func _step(soak: DotBotSoak, delta: float) -> void:
+	var notes: ZzNavNotes = _game.horde.notes if _game.horde != null else null
+	var baked_before := notes.bake_ms if notes != null else 0.0
+	var began := Time.get_ticks_usec()
+	_game.simulate(delta)
+	var spent := float(Time.get_ticks_usec() - began) / 1000.0
+	if spent > 100.0:
+		print("SLOWTICK %d %.0f ms" % [soak.ticks, spent])
+	# A navigation bake that missed its cache (once per map change) is not the running cost.
+	var cold_bake := notes != null and notes.bake_ms != baked_before and not notes.bake_cached
+	if soak.ticks > BUILD_TICKS and not cold_bake and spent > _worst_ms:
+		_worst_ms = spent
+		_worst_tick = soak.ticks
+	_goals.sample()
+	if _game.horde != null and _game.horde.spawner != null:
+		_peak_alive = maxi(_peak_alive, _game.horde.spawner.all_npcs().size())
 
 
 func _on_killed(_kind: StringName, _by: StringName, _headshot: bool) -> void:

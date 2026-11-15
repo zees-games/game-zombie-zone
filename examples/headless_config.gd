@@ -72,30 +72,7 @@ func _run() -> void:
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
 
-	var bad := FileAccess.open(ROOT + "_config_bad.json", FileAccess.WRITE)
-	bad.store_string('{"no_such_field": 1}')
-	bad.close()
-	var strict := ZzConfig.make_binder(ZzConfig.new(), ROOT + "_config_bad.json")
-	strict.strict = true
-	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
-	DirAccess.remove_absolute(ROOT + "_config_bad.json")
-
-	var shipped := "res://cfg/game/%s/config_round/game.yml" % GAME
-	var kept := FileAccess.get_file_as_string(shipped)
-	DirAccess.make_dir_recursive_absolute(shipped.get_base_dir())
-	var yml := FileAccess.open(shipped, FileAccess.WRITE)
-	yml.store_string("start_points: 75\nwaves: 6\n")
-	yml.close()
-	var loaded := ZzConfig.new()
-	var from_yml := ZzConfig.make_binder(loaded)
-	from_yml.strict = true
-	var got := from_yml.load_layers()
-	_check(got.ok and loaded.start_points == 75 and loaded.waves == 6 and from_yml.source_of("start_points") != "default",
-		"an exported cfg/game/<game>/config_round/game.yml loads back as defaults", "" if got.ok else got.error.message)
-	yml = FileAccess.open(shipped, FileAccess.WRITE)
-	yml.store_string(kept)
-	yml.close()
-
+	_files_load()
 	_turrets(binder, console, config)
 	_hazards(binder, console, config)
 	_standins(binder, console, config)
@@ -150,6 +127,32 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+func _files_load() -> void:
+	var bad := FileAccess.open(ROOT + "_config_bad.json", FileAccess.WRITE)
+	bad.store_string('{"no_such_field": 1}')
+	bad.close()
+	var strict := ZzConfig.make_binder(ZzConfig.new(), ROOT + "_config_bad.json")
+	strict.strict = true
+	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
+	DirAccess.remove_absolute(ROOT + "_config_bad.json")
+
+	var shipped := "res://cfg/game/%s/config_round/game.yml" % GAME
+	var kept := FileAccess.get_file_as_string(shipped)
+	DirAccess.make_dir_recursive_absolute(shipped.get_base_dir())
+	var yml := FileAccess.open(shipped, FileAccess.WRITE)
+	yml.store_string("start_points: 75\nwaves: 6\n")
+	yml.close()
+	var loaded := ZzConfig.new()
+	var from_yml := ZzConfig.make_binder(loaded)
+	from_yml.strict = true
+	var got := from_yml.load_layers()
+	_check(got.ok and loaded.start_points == 75 and loaded.waves == 6 and from_yml.source_of("start_points") != "default",
+		"an exported cfg/game/<game>/config_round/game.yml loads back as defaults", "" if got.ok else got.error.message)
+	yml = FileAccess.open(shipped, FileAccess.WRITE)
+	yml.store_string(kept)
+	yml.close()
 
 
 func _write_root(rel: String, text: String) -> void:

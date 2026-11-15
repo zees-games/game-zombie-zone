@@ -168,28 +168,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	Engine.physics_ticks_per_second = _rate
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.map_ids = PackedStringArray([String(_map)])
-	config.survival_style = 0
-	config.seed_value = 1
-	for key: String in _cfg:
-		config.set(key, _cfg[key])
-	if _commons > 0:
-		# A fixed crowd whatever the team: the cap is the base alone.
-		config.commons_base = _commons
-		config.commons_per_survivor = 0
-	_game = ZzGame.new()
-	_game.name = "World"
-	_game.config = config
-	_game.tick_rate = _rate
-	_game.authoritative = true
-	_game.register_service = false
-	add_child(_game)
-	_game.set_physics_process(false)
+	_build_game()
 
 	_net = DotNetManager.new()
 	_net.name = "Server"
@@ -371,19 +350,48 @@ func _run() -> void:
 		row["lod"] = _lod.describe()
 	print("RESULT %s" % JSON.stringify(row))
 	if _detail:
-		var per := {}
-		for k: String in _acc:
-			var a: Array = _acc[k]
-			per[k] = {"ms_per_tick": snappedf(float(a[0]) / 1000.0 / float(_detail_ticks), 0.01),
-				"us_each": snappedf(float(a[0]) / float(maxi(int(a[1]), 1)), 0.1),
-				"per_tick": snappedf(float(a[1]) / float(_detail_ticks), 0.1)}
-		# Laps a temporarily instrumented script added to Engine meta "_prof" (usec), as ms per tick.
-		var prof := {}
-		var laps: Dictionary = Engine.get_meta(&"_prof", {})
-		for k: String in laps:
-			prof[k] = snappedf(float(laps[k]) / 1000.0 / float(_detail_ticks), 0.01)
-		print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist, "prof": prof}))
+		_print_detail()
 	get_tree().quit(0)
+
+
+func _build_game() -> void:
+	var config := ZzConfig.new()
+	config.warmup_seconds = 0.0
+	config.intermission_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.map_ids = PackedStringArray([String(_map)])
+	config.survival_style = 0
+	config.seed_value = 1
+	for key: String in _cfg:
+		config.set(key, _cfg[key])
+	if _commons > 0:
+		# A fixed crowd whatever the team: the cap is the base alone.
+		config.commons_base = _commons
+		config.commons_per_survivor = 0
+	_game = ZzGame.new()
+	_game.name = "World"
+	_game.config = config
+	_game.tick_rate = _rate
+	_game.authoritative = true
+	_game.register_service = false
+	add_child(_game)
+	_game.set_physics_process(false)
+
+
+func _print_detail() -> void:
+	var per := {}
+	for k: String in _acc:
+		var a: Array = _acc[k]
+		per[k] = {"ms_per_tick": snappedf(float(a[0]) / 1000.0 / float(_detail_ticks), 0.01),
+			"us_each": snappedf(float(a[0]) / float(maxi(int(a[1]), 1)), 0.1),
+			"per_tick": snappedf(float(a[1]) / float(_detail_ticks), 0.1)}
+	# Laps a temporarily instrumented script added to Engine meta "_prof" (usec), as ms per tick.
+	var prof := {}
+	var laps: Dictionary = Engine.get_meta(&"_prof", {})
+	for k: String in laps:
+		prof[k] = snappedf(float(laps[k]) / 1000.0 / float(_detail_ticks), 0.01)
+	print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist, "prof": prof}))
 
 
 ## One server tick: ZzGame._step's laps, then the manager's pull and snapshot send.
@@ -403,40 +411,7 @@ func _one_tick(tick: int) -> void:
 		g.pins.steer(delta)
 	at = _add("bots", at)
 	for id: StringName in g.players:
-		var player = g.players[id]
-		if player.is_alive() and not player.watching:
-			var owed: float = 0.0
-			if g._bot_motor_asleep(player):
-				owed = -1.0
-			else:
-				owed = g._bot_motor_owed(player, delta)
-			if owed < 0.0:
-				g._advance_water(player, delta)
-				g._advance_hands(player, delta)
-				continue
-			if _detail:
-				var t0 := Time.get_ticks_usec()
-				var body: Object = player.controller.body if player.controller != null else null
-				var q0: int = int(body.get(&"query_count")) if body != null else 0
-				if player.sampler == null:
-					player.step_controller(g._tick, delta + owed)
-					var tm := Time.get_ticks_usec()
-					_accum("player.motor", tm - t0)
-					player.global_position = player.controller.state.position
-					_accum("player.place", Time.get_ticks_usec() - tm)
-				else:
-					player.simulate(g._tick, delta)
-				if body != null:
-					_accum("player.queries", 0)
-					(_acc["player.queries"] as Array)[0] += int(body.get(&"query_count")) - q0
-				var t1 := Time.get_ticks_usec()
-				g._advance_hands(player, delta)
-				_accum("player.simulate", t1 - t0)
-				_accum("player.hands", Time.get_ticks_usec() - t1)
-			else:
-				player.simulate(g._tick, delta + owed)
-				g._advance_water(player, delta)
-				g._advance_hands(player, delta)
+		_step_player(g, g.players[id], delta)
 	at = _add("players", at)
 	var wt := Time.get_ticks_usec()
 	g._advance_weapons()
@@ -559,6 +534,42 @@ func _one_tick(tick: int) -> void:
 		_bridge._broadcast(ZzEvents.Kind.CLOCK, _bridge._clock_body())
 	at = _add("net_snapshot", at)
 	_lap["total"] = at - total_start
+
+
+func _step_player(g: ZzGame, player: Object, delta: float) -> void:
+	if player.is_alive() and not player.watching:
+		var owed: float = 0.0
+		if g._bot_motor_asleep(player):
+			owed = -1.0
+		else:
+			owed = g._bot_motor_owed(player, delta)
+		if owed < 0.0:
+			g._advance_water(player, delta)
+			g._advance_hands(player, delta)
+			return
+		if _detail:
+			var t0 := Time.get_ticks_usec()
+			var body: Object = player.controller.body if player.controller != null else null
+			var q0: int = int(body.get(&"query_count")) if body != null else 0
+			if player.sampler == null:
+				player.step_controller(g._tick, delta + owed)
+				var tm := Time.get_ticks_usec()
+				_accum("player.motor", tm - t0)
+				player.global_position = player.controller.state.position
+				_accum("player.place", Time.get_ticks_usec() - tm)
+			else:
+				player.simulate(g._tick, delta)
+			if body != null:
+				_accum("player.queries", 0)
+				(_acc["player.queries"] as Array)[0] += int(body.get(&"query_count")) - q0
+			var t1 := Time.get_ticks_usec()
+			g._advance_hands(player, delta)
+			_accum("player.simulate", t1 - t0)
+			_accum("player.hands", Time.get_ticks_usec() - t1)
+		else:
+			player.simulate(g._tick, delta + owed)
+			g._advance_water(player, delta)
+			g._advance_hands(player, delta)
 
 
 ## DotNetManager._send_snapshots' inline path (workers 0), the same calls, lapped by part.

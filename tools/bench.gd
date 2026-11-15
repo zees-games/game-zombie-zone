@@ -76,54 +76,7 @@ func _run() -> void:
 		print("VIS ", v.call(&"describe"))
 
 	if "--micro" in OS.get_cmdline_user_args():
-		var g := game
-		var n := 200
-		var t0 := Time.get_ticks_usec()
-		for i in n:
-			g.bots.drive(1.0 / 60.0)
-		print("MICRO bots.drive %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
-		var survs = g.survivors()
-		print("MICRO survivors %d" % survs.size())
-		for pl in survs:
-			var st = pl.controller.state
-			var cm = pl.controller.current_command
-			print("MICRO motor bot=%s up=%s grounded=%s vel=%s move=%s btn=%s prevbtn=%s yawdiff=%s crouch=%s stam=%s mods=%d using=%s" % [pl.is_bot, pl.is_up(), st.is_grounded(), st.velocity, cm.move if cm else "-", cm.buttons if cm else "-", st.previous_buttons, (cm.yaw - st.yaw) if cm else "-", st.crouch_fraction, st.stamina, st.modifiers.size(), pl.using])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			for pl in survs:
-				pl.controller.simulate_tick(1000 + i, 1.0 / 60.0)
-		print("MICRO simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			g._advance_weapons()
-		print("MICRO advance_weapons %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			g._carry_update()
-		print("MICRO carry_update %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			for pl in survs:
-				var _c := g.weapon_command_for(pl)
-		print("MICRO weapon_command_for %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			for pl in survs:
-				var _o = pl.weapons.simulate_tick(g.weapon_command_for(pl), 1000 + i)
-		print("MICRO weapons.simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
-		for pl in survs:
-			var cm := g.weapon_command_for(pl)
-			var sl = pl.weapons.arsenal.current()
-			print("MICRO idle buttons=%d slot=%d idle=%s needs_ctx=%s beh=%s" % [cm.buttons, cm.slot, pl.weapons.arsenal.is_idle_for(cm, pl.weapons._previous_command), sl.behaviour.tick_needs_context() if sl else "-", sl.behaviour.get_script().resource_path.get_file() if sl else "-"])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			for pl in survs:
-				g._advance_hands(pl, 1.0 / 60.0)
-		print("MICRO advance_hands %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
-		t0 = Time.get_ticks_usec()
-		for i in n:
-			g.combat.tick(g._tick, 1.0 / 60.0)
-		print("MICRO combat.tick %.1f us" % [float(Time.get_ticks_usec() - t0) / n])
+		_micro(game)
 		get_tree().quit(0)
 		return
 	if "--physprobe" in OS.get_cmdline_user_args():
@@ -204,6 +157,57 @@ func _run() -> void:
 	var shot := get_viewport().get_texture().get_image()
 	print("saved %s: %s" % [_out, error_string(shot.save_png(path))] if shot != null else "no image (headless)")
 	get_tree().quit(0)
+
+
+func _micro(game: ZzGame) -> void:
+	var g := game
+	var n := 200
+	var t0 := Time.get_ticks_usec()
+	for i in n:
+		g.bots.drive(1.0 / 60.0)
+	print("MICRO bots.drive %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+	var survs = g.survivors()
+	print("MICRO survivors %d" % survs.size())
+	for pl in survs:
+		var st = pl.controller.state
+		var cm = pl.controller.current_command
+		print("MICRO motor bot=%s up=%s grounded=%s vel=%s move=%s btn=%s prevbtn=%s yawdiff=%s crouch=%s stam=%s mods=%d using=%s" % [pl.is_bot, pl.is_up(), st.is_grounded(), st.velocity, cm.move if cm else "-", cm.buttons if cm else "-", st.previous_buttons, (cm.yaw - st.yaw) if cm else "-", st.crouch_fraction, st.stamina, st.modifiers.size(), pl.using])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		for pl in survs:
+			pl.controller.simulate_tick(1000 + i, 1.0 / 60.0)
+	print("MICRO simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		g._advance_weapons()
+	print("MICRO advance_weapons %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		g._carry_update()
+	print("MICRO carry_update %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		for pl in survs:
+			var _c := g.weapon_command_for(pl)
+	print("MICRO weapon_command_for %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		for pl in survs:
+			var _o = pl.weapons.simulate_tick(g.weapon_command_for(pl), 1000 + i)
+	print("MICRO weapons.simulate_tick %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+	for pl in survs:
+		var cm := g.weapon_command_for(pl)
+		var sl = pl.weapons.arsenal.current()
+		print("MICRO idle buttons=%d slot=%d idle=%s needs_ctx=%s beh=%s" % [cm.buttons, cm.slot, pl.weapons.arsenal.is_idle_for(cm, pl.weapons._previous_command), sl.behaviour.tick_needs_context() if sl else "-", sl.behaviour.get_script().resource_path.get_file() if sl else "-"])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		for pl in survs:
+			g._advance_hands(pl, 1.0 / 60.0)
+	print("MICRO advance_hands %.1f us/player" % [float(Time.get_ticks_usec() - t0) / n / survs.size()])
+	t0 = Time.get_ticks_usec()
+	for i in n:
+		g.combat.tick(g._tick, 1.0 / 60.0)
+	print("MICRO combat.tick %.1f us" % [float(Time.get_ticks_usec() - t0) / n])
 
 
 ## --without=shadows,decals,multimesh,lamps,ranged: turns a kind of thing off before measuring, to see what its frames cost.

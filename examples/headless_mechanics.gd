@@ -1,78 +1,10 @@
-extends DotGameCheckSuite
+extends "headless_mechanics_base.gd"
 
-const ZzConfig := preload("../game/zz_config.gd")
-const ZzGame := preload("../game/zz_game.gd")
-const ZzMechanics := preload("../game/zz_mechanics.gd")
-const MapCommands := preload("../game/zz_map_commands.gd")
-const ZzMap := preload("../game/zz_map.gd")
-const ZzLoot := preload("../game/zz_loot.gd")
-const ZzMapObjects := preload("../game/zz_map_objects.gd")
-const ZzEvents := preload("../game/net/zz_events.gd")
-const ZzNpcs := preload("../game/zz_npcs.gd")
-const ZzNavPrune := preload("../game/zz_nav_prune.gd")
-const SolidProps := preload("../tools/solid_props.gd")
-const ZzPlayer := preload("../game/zz_player.gd")
-
-## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
-## survivor up, a door blocks and opens, a button's outputs run after their delays, and a map
-## without a world has no moving parts.
-##
-## [b]Why the doors and links are tried on a made-up world as well.[/b] The real maps' doors are
-## mostly boxes or objective gates; the ones that are movers are driven by one button or by
-## walking up, so the chain (button, delay, relay, volume, lock) is only reachable in a fixture.
-
-const ZzPaths := preload("../game/zz_paths.gd")
-const ZzFooting := preload("../game/zz_footing.gd")
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
-const LIFT_MAP := &"zm_4way_tunnel"
-const SECTIONS := 18
-const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const CHECKS := 155
-
-var _entered := 0
-var _finished := 0
-## Checks of sections that need the drawn worlds, skipped because world/ is not linked (CI).
-var _skipped := 0
-## What the running section passed to _skip_without_world (-1: none), checked against what it ran when world/ is
-## here, so a declared count that drifts fails locally rather than only in CI (release
-## v0.1.30 and v0.1.31 failed validate on it: 77 checks ran, 79 then 83 expected).
-var _declared := -1
-
-
-## A world made of data, for the chain tests: the same calls a DotMapBspMesh answers.
-class FakeWorld extends RefCounted:
-	var ents: Variant = null
-	var model_ids := PackedInt32Array()
-
-	func _init(manifest: Dictionary) -> void:
-		ents = DotMapEntities.from_manifest(manifest)
-		for rec: Dictionary in manifest["movers"]:
-			model_ids.append(int(rec["model"]))
-
-	func entities() -> Variant:
-		return ents
-
-	func models() -> PackedInt32Array:
-		return model_ids
-
-	func hull_shapes(_model: int, _kinds: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:
-		var box := BoxShape3D.new()
-		box.size = Vector3(1.0, 3.0, 2.0)
-		var convex := ConvexPolygonShape3D.new()
-		var pts := PackedVector3Array()
-		for x in [-0.5, 0.5]:
-			for y in [0.0, 3.0]:
-				for z in [-1.0, 1.0]:
-					pts.append(Vector3(x, y, z))
-		convex.points = pts
-		return [{"shape": convex, "kind": "solid", "brush": 0}]
-
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
 	_run.call_deferred()
-
 
 func _run() -> void:
 	print("zombiezone mechanics")
@@ -109,49 +41,6 @@ func _run() -> void:
 		print("SKIPPED: %d checks need world/ (not linked, as in CI); run dot-bootstrap for the full suite" % _skipped)
 	_report_sections(_entered, _finished, SECTIONS, CHECKS - _skipped)
 
-
-## Whether this section is skipped for want of world/ (zombie-zone-maps' drawn worlds, never in CI). Loud and counted,
-## so that a checkout with the worlds still runs every check and a section cannot vanish unnoticed.
-func _skip_without_world(checks: int) -> bool:
-	if DirAccess.dir_exists_absolute(ZzPaths.rebase("res://world")):
-		_declared = checks
-		return false
-
-	_skipped += checks
-	_finished += 1
-	print("  SKIP  %d checks: this section needs world/ (not linked)" % checks)
-	return true
-
-
-func _game(id: StringName, start := false) -> ZzGame:
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.start_grace_seconds = 600.0
-	config.escape_grace_seconds = 0.0
-	config.map_ids = PackedStringArray([String(id)])
-
-	var game := ZzGame.new()
-	game.name = "Mech%s" % id
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-
-	if start:
-		game.next_map_id = id
-		game.start()
-		await get_tree().physics_frame
-
-	return game
-
-
 func _sim(game: ZzGame, ticks: int) -> void:
 	for i in ticks:
 		game.simulate(TICK)
@@ -160,7 +49,6 @@ func _sim(game: ZzGame, ticks: int) -> void:
 			await get_tree().physics_frame
 
 	await get_tree().physics_frame
-
 
 func _test_lift() -> void:
 	_entered += 1
@@ -213,7 +101,6 @@ func _test_lift() -> void:
 		"the state survives the wire", str(wire))
 	game.queue_free()
 	_finished += 1
-
 
 func _test_real_door() -> void:
 	_entered += 1
@@ -274,7 +161,6 @@ func _test_real_door() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## Whether a ray across the thin side of [param zone] meets [param body].
 func _blocks(game: ZzGame, body: StaticBody3D, zone: AABB) -> bool:
 	var space := game.get_world_3d().direct_space_state
@@ -297,7 +183,6 @@ func _blocks(game: ZzGame, body: StaticBody3D, zone: AABB) -> bool:
 		exclude.append(hit["rid"])
 
 	return false
-
 
 ## One button, two doors, a relay and a lock, as data.
 func _fixture() -> Dictionary:
@@ -337,14 +222,12 @@ func _fixture() -> Dictionary:
 		],
 	}
 
-
 func _built() -> ZzMechanics:
 	var mech := ZzMechanics.new()
 	mech.tick_rate = TICK_RATE
 	add_child(mech)
 	mech.build(FakeWorld.new(_fixture()), Callable())
 	return mech
-
 
 ## A shipped map's hinged prop doors: built on a global pack, solid, swung away from whoever opens
 ## them, opened by a zombie as by a survivor, and the side crosses the wire.
@@ -458,7 +341,6 @@ func _test_prop_doors() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## A brush door of a global pack: its hull is a body on the world layer that is posed away when somebody walks up, and
 ## back when they leave; the collision follows the pose (a ray through the doorway meets it shut and passes open).
 func _test_brush_door(game: ZzGame, mech: ZzMechanics) -> void:
@@ -529,7 +411,6 @@ func _test_brush_door(game: ZzGame, mech: ZzMechanics) -> void:
 	var closed_xf := PhysicsServer3D.body_get_state(body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM) as Transform3D
 	_check(closed_xf.is_equal_approx(shut_xf) and _body_covers(game, body, shut_at), "left alone, it closes onto the doorway again")
 
-
 ## Whether a ray down through [param point] meets [param body], past whatever else the world's hulls put above it.
 func _body_covers(game: ZzGame, body: CollisionObject3D, point: Vector3) -> bool:
 	var exclude: Array[RID] = []
@@ -545,14 +426,12 @@ func _body_covers(game: ZzGame, body: CollisionObject3D, point: Vector3) -> bool
 		exclude.append(hit["rid"])
 	return false
 
-
 ## Whether the first thing a ray from [param from] to [param to] meets is [param body].
 func _ray_hits(game: ZzGame, body: CollisionObject3D, from: Vector3, to: Vector3) -> bool:
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.collision_mask = 0xFFFFFFFF
 	var hit := game.get_world_3d().direct_space_state.intersect_ray(query)
 	return not hit.is_empty() and hit["collider"] == body
-
 
 func _test_button_and_delay() -> void:
 	_entered += 1
@@ -591,7 +470,6 @@ func _test_button_and_delay() -> void:
 	client.queue_free()
 	mech.queue_free()
 	_finished += 1
-
 
 func _test_volume_and_unsupported() -> void:
 	_entered += 1
@@ -644,9 +522,7 @@ func _test_volume_and_unsupported() -> void:
 	mech.queue_free()
 	_finished += 1
 
-
 const VOLUME_MAP := &"ze_death_star_escape"
-
 
 func _first_volume(mech: ZzMechanics, kind: String, want_enabled := true, least := -1.0, most := 1e9, filtered := false) -> Dictionary:
 	for t in mech.volume_toggles():
@@ -657,11 +533,9 @@ func _first_volume(mech: ZzMechanics, kind: String, want_enabled := true, least 
 			return t
 	return {}
 
-
 func _volume_spot(t: Dictionary, lift := 0.1) -> Vector3:
 	var box: AABB = (t["vol"] as DotMapVolume).bounds()
 	return Vector3(box.get_center().x, box.position.y + lift, box.get_center().z)
-
 
 ## The map's hurt, teleport, push and gravity volumes, run on the server on a real map: they hurt, move and push survivors and
 ## zombies, a fall below the map kills, and the enabled state of a push or gravity volume survives the wire.
@@ -766,6 +640,14 @@ func _test_volumes() -> void:
 	game.horde.throw_zombie(zombie, Vector3(0.0, 6.0, 0.0))
 	_check(tb.flying and tb.wish == Vector3.ZERO, "and a throw upward still leaps", "flying %s wish %s" % [str(tb.flying), str(tb.wish)])
 
+	await _volumes_push(game, mech)
+
+	game.queue_free()
+	_finished += 1
+
+
+## The push and gravity volumes and the I/O switch of the volumes test, on the map it built.
+func _volumes_push(game: ZzGame, mech: ZzMechanics) -> void:
 	var push := _first_volume(mech, "push", false)
 	if push.is_empty():
 		push = _first_volume(mech, "push")
@@ -796,19 +678,14 @@ func _test_volumes() -> void:
 		wire_ok = wire_ok and bool(wire["ok"]) and int(wire["index"]) == int(push["idx"]) and bool(wire["locked"]) == (not off)
 	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
 
-	game.queue_free()
-	_finished += 1
-
 
 # --- The map's logic (dot-map's DotMapIO under the mechanics) -----------------------------------
 
 func _logic_rec(entity: int, classname: String, targetname: String, keys: Dictionary) -> Dictionary:
 	return {"entity": entity, "classname": classname, "targetname": targetname, "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": keys}
 
-
 func _logic_link(from: int, output: String, target: String, input: String, to: Array, delay := 0.0, param := "") -> Dictionary:
 	return {"from": from, "from_name": "", "output": output, "target": target, "input": input, "param": param, "delay": delay, "times": -1, "special": false, "to": to}
-
 
 func _logic_fixture() -> Dictionary:
 	var fx := _fixture()
@@ -851,7 +728,6 @@ func _logic_fixture() -> Dictionary:
 	]
 	return fx
 
-
 func _logic_mech(fx: Dictionary) -> ZzMechanics:
 	var mech := ZzMechanics.new()
 	mech.tick_rate = TICK_RATE
@@ -859,10 +735,8 @@ func _logic_mech(fx: Dictionary) -> ZzMechanics:
 	mech.build(FakeWorld.new(fx), Callable())
 	return mech
 
-
 func _texts(events: Array) -> Array:
 	return events.filter(func(e: Array) -> bool: return e[0] == "hud_text").map(func(e: Array) -> String: return str(e[1]["message"]))
-
 
 func _test_logic_fixture() -> void:
 	_entered += 1
@@ -921,7 +795,6 @@ func _test_logic_fixture() -> void:
 	_check(npc_spawns == 2, "an NPC maker spawns MaxNPCCount zombies, a second apart, and stops", str(npc_spawns))
 	mech.queue_free()
 	_finished += 1
-
 
 ## The recorded-only classes now act: waves, win/lose, beats, game rules, score, game_ui, the maker's live cap and a brush copy.
 func _test_zz_logic() -> void:
@@ -1002,7 +875,6 @@ func _test_zz_logic() -> void:
 	mech.queue_free()
 	_finished += 1
 
-
 ## Real maps: zs_lens ships waves, win/lose and beats; zm_4way_tunnel ships point_templates of brushes.
 func _test_real_zz_logic() -> void:
 	_entered += 1
@@ -1057,7 +929,6 @@ func _test_real_zz_logic() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## zm_blockfort ships its logic: a counter that triggers a relay that shows text, a random-case modifier and template makers.
 func _test_logic_blockfort() -> void:
 	_entered += 1
@@ -1102,7 +973,6 @@ func _test_logic_blockfort() -> void:
 	_check(_texts(events).size() == 1, "a random case starts one of the round modifiers after its 5 s", str(_texts(events)))
 	game.queue_free()
 	_finished += 1
-
 
 ## ze_death_star_escape in a global pack: the compare that switches the push volumes on later, and the push speed set by the map.
 func _test_logic_death_star() -> void:
@@ -1153,7 +1023,6 @@ func _test_logic_death_star() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## A spritetrail's parentname finds a mover's drawn node (what DotMapFx.trail_target_fn calls).
 func _test_trail_targets() -> void:
 	_entered += 1
@@ -1172,7 +1041,6 @@ func _test_trail_targets() -> void:
 	mech.queue_free()
 	_finished += 1
 
-
 func _test_no_world() -> void:
 	_entered += 1
 	print("maps without a world have no moving parts")
@@ -1183,7 +1051,6 @@ func _test_no_world() -> void:
 		game.queue_free()
 	_check(true, "and no input to press")
 	_finished += 1
-
 
 ## The events dot-map added: a breakable's spawn_object, the ambient fade and spin, and a start point that begins disabled and is switched on by an input.
 func _test_map_events() -> void:
@@ -1286,7 +1153,6 @@ func _test_map_events() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## The footing net on a real round: a survivor under the floor plane, and one pressing into a wall, are put back on ground they stood on.
 func _test_footing_rescue() -> void:
 	_entered += 1
@@ -1339,7 +1205,6 @@ func _test_footing_rescue() -> void:
 	game.queue_free()
 	_finished += 1
 
-
 ## The drawn maps' ladder brushes reach a survivor's controller: standing at the foot of a tall one, looking up and
 ## pressing forward, the survivor climbs one of the four tallest on some face.
 func _test_ladders() -> void:
@@ -1379,7 +1244,6 @@ func _test_ladders() -> void:
 		_check(boxes.size() > 0 and gained > 1.5, "%s: a survivor climbs a ladder" % id, "%d ladder boxes, climbed %.1f m of a %.1f m one" % [boxes.size(), gained, best.size.y])
 		game.queue_free()
 	_finished += 1
-
 
 ## A ladder whose foot stands in water is still a ladder: swimming into its face puts the survivor on it, and the swim
 ## mode does not pull them back off it on the next tick (its own check ran before the ladder's, every tick).
@@ -1421,7 +1285,6 @@ func _test_ladder_from_water() -> void:
 	_check(gained > 1.5, "a survivor climbs a ladder from water", "climbed %.1f m" % gained)
 	game.queue_free()
 	_finished += 1
-
 
 ## sv_falldamage: a hard landing costs health through dot-combat, a short drop and the cvar off cost none.
 func _test_fall_damage() -> void:

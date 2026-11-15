@@ -279,24 +279,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 				npc.brain.set(&"probe_goal", horde.survivor_position(nearest))
 
 		if _trace and tick % 128 == 0:
-			var b = npc.brain.body()
-			var p = npc.brain.get(&"path")
-			print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
-			if b.velocity.length() < 0.5:
-				if p != null:
-					print("      next %s from floor %s" % [str(Array(p.points).slice(0, 4).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))), b.is_on_floor()])
-
-				var hit := KinematicCollision3D.new()
-				var ahead: Vector3 = b.wish.normalized() * 0.4
-
-				if b.test_move(b.global_transform, ahead, hit):
-					var col := hit.get_collider() as Node
-					print("      blocked by %s; ahead hits %s at %s normal %s" % [_blockers(npc), "?" if col == null else "%s/%s" % [col.get_parent().name if col.get_parent() else "", col.name], hit.get_position().snapped(Vector3.ONE * 0.05), hit.get_normal().snapped(Vector3.ONE * 0.1)])
-				else:
-					print("      blocked by %s; ahead clear" % _blockers(npc))
-
-			if p != null and tick % 512 == 256:
-				print("      ahead %s" % str(Array(p.points).slice(0, 6).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))))
+			_trace_print(npc, kind, tick)
 
 		if tick == ticks - 8 * 64:
 			earlier = npc.position()
@@ -330,6 +313,27 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 
 	horde.spawner.remove(npc.instance_id)
 	return best
+
+
+func _trace_print(npc: DotNpcInstance, kind: StringName, tick: int) -> void:
+	var b = npc.brain.body()
+	var p = npc.brain.get(&"path")
+	print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
+	if b.velocity.length() < 0.5:
+		if p != null:
+			print("      next %s from floor %s" % [str(Array(p.points).slice(0, 4).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))), b.is_on_floor()])
+
+		var hit := KinematicCollision3D.new()
+		var ahead: Vector3 = b.wish.normalized() * 0.4
+
+		if b.test_move(b.global_transform, ahead, hit):
+			var col := hit.get_collider() as Node
+			print("      blocked by %s; ahead hits %s at %s normal %s" % [_blockers(npc), "?" if col == null else "%s/%s" % [col.get_parent().name if col.get_parent() else "", col.name], hit.get_position().snapped(Vector3.ONE * 0.05), hit.get_normal().snapped(Vector3.ONE * 0.1)])
+		else:
+			print("      blocked by %s; ahead clear" % _blockers(npc))
+
+	if p != null and tick % 512 == 256:
+		print("      ahead %s" % str(Array(p.points).slice(0, 6).map(func(v: Vector3) -> Vector3: return v.snapped(Vector3.ONE * 0.1))))
 
 
 ## What a shape of the body's size overlaps where it stands, enlarged a little: names of the bodies touching it.

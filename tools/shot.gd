@@ -26,70 +26,7 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if _orbit.take(arg):
 			continue
-		if arg.begins_with("--view="):
-			_view = arg.trim_prefix("--view=")
-		elif arg.begins_with("--action="):
-			_action = arg.trim_prefix("--action=")
-		elif arg == "--board":
-			_board = true
-		elif arg == "--touch=1":
-			DotPlatform.touch_override = 1
-		elif arg.begins_with("--seconds="):
-			_seconds = arg.trim_prefix("--seconds=").to_float()
-		elif arg.begins_with("--out="):
-			_out = arg.trim_prefix("--out=")
-		elif arg.begins_with("--at="):
-			_at = _v3(arg.trim_prefix("--at="))
-		elif arg.begins_with("--look="):
-			_look = _v3(arg.trim_prefix("--look="))
-		elif arg.begins_with("--spawn="):
-			for part in arg.trim_prefix("--spawn=").split(","):
-				var bits := part.split(":")
-				_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
-		elif arg.begins_with("--zombie="):
-			_zombie = StringName(arg.trim_prefix("--zombie="))
-		elif arg.begins_with("--sever="):
-			_sever = arg.trim_prefix("--sever=").split(",", false)
-		elif arg.begins_with("--pin="):
-			_pin = StringName(arg.trim_prefix("--pin="))
-		elif arg == "--pin-me":
-			_pin_me = true
-		elif arg.begins_with("--reaction="):
-			_reaction = StringName(arg.trim_prefix("--reaction="))
-		elif arg == "--as-spawned":
-			_as_spawned = true
-		elif arg == "--alone":
-			_alone = true
-		elif arg.begins_with("--door="):
-			_doors.append(arg.trim_prefix("--door="))
-		elif arg == "--tint":
-			_tint = true
-		elif arg.begins_with("--fire="):
-			_fires.append(arg.trim_prefix("--fire="))
-		elif arg.begins_with("--weapons="):
-			_weapons = arg.trim_prefix("--weapons=").split(",", false)
-		elif arg.begins_with("--frames="):
-			_frame_count = clampi(arg.trim_prefix("--frames=").to_int(), 1, 48)
-		elif arg.begins_with("--aim="):
-			_aim = arg.trim_prefix("--aim=").to_float()
-		elif arg.begins_with("--hard="):
-			_hard = arg.trim_prefix("--hard=").to_int()
-		elif arg == "--flash":
-			_flash = true
-		elif arg.begins_with("--goo="):
-			_goo = arg.trim_prefix("--goo=").to_int()
-		elif arg.begins_with("--box="):
-			_box = StringName(arg.trim_prefix("--box="))
-		elif arg == "--workshop":
-			_subscribe_fixture()
-		elif arg == "--no-bake":
-			ZzMap.use_bakes = false
-		elif arg == "--no-world":
-			ZzMap.use_worlds = false
-		elif arg.begins_with("--cloud-store="):
-			_cloud_store(arg.trim_prefix("--cloud-store="))
-		elif arg.begins_with("--day="):
-			_day = arg.trim_prefix("--day=").to_float()
+		_take_arg(arg)
 
 	_client = ZzClient.new()
 	_client.name = "Client"
@@ -111,6 +48,73 @@ func _ready() -> void:
 		get_tree().quit(0)
 		return
 	_run.call_deferred()
+
+
+func _take_arg(arg: String) -> void:
+	if arg.begins_with("--view="):
+		_view = arg.trim_prefix("--view=")
+	elif arg.begins_with("--action="):
+		_action = arg.trim_prefix("--action=")
+	elif arg == "--board":
+		_board = true
+	elif arg == "--touch=1":
+		DotPlatform.touch_override = 1
+	elif arg.begins_with("--seconds="):
+		_seconds = arg.trim_prefix("--seconds=").to_float()
+	elif arg.begins_with("--out="):
+		_out = arg.trim_prefix("--out=")
+	elif arg.begins_with("--at="):
+		_at = _v3(arg.trim_prefix("--at="))
+	elif arg.begins_with("--look="):
+		_look = _v3(arg.trim_prefix("--look="))
+	elif arg.begins_with("--spawn="):
+		for part in arg.trim_prefix("--spawn=").split(","):
+			var bits := part.split(":")
+			_spawn.append([StringName(bits[0]), bits[1].to_int() if bits.size() > 1 else 1])
+	elif arg.begins_with("--zombie="):
+		_zombie = StringName(arg.trim_prefix("--zombie="))
+	elif arg.begins_with("--sever="):
+		_sever = arg.trim_prefix("--sever=").split(",", false)
+	elif arg.begins_with("--pin="):
+		_pin = StringName(arg.trim_prefix("--pin="))
+	elif arg == "--pin-me":
+		_pin_me = true
+	elif arg.begins_with("--reaction="):
+		_reaction = StringName(arg.trim_prefix("--reaction="))
+	elif arg == "--as-spawned":
+		_as_spawned = true
+	elif arg == "--alone":
+		_alone = true
+	elif arg.begins_with("--door="):
+		_doors.append(arg.trim_prefix("--door="))
+	elif arg == "--tint":
+		_tint = true
+	elif arg.begins_with("--fire="):
+		_fires.append(arg.trim_prefix("--fire="))
+	elif arg.begins_with("--weapons="):
+		_weapons = arg.trim_prefix("--weapons=").split(",", false)
+	elif arg.begins_with("--frames="):
+		_frame_count = clampi(arg.trim_prefix("--frames=").to_int(), 1, 48)
+	elif arg.begins_with("--aim="):
+		_aim = arg.trim_prefix("--aim=").to_float()
+	elif arg.begins_with("--hard="):
+		_hard = arg.trim_prefix("--hard=").to_int()
+	elif arg == "--flash":
+		_flash = true
+	elif arg.begins_with("--goo="):
+		_goo = arg.trim_prefix("--goo=").to_int()
+	elif arg.begins_with("--box="):
+		_box = StringName(arg.trim_prefix("--box="))
+	elif arg == "--workshop":
+		_subscribe_fixture()
+	elif arg == "--no-bake":
+		ZzMap.use_bakes = false
+	elif arg == "--no-world":
+		ZzMap.use_worlds = false
+	elif arg.begins_with("--cloud-store="):
+		_cloud_store(arg.trim_prefix("--cloud-store="))
+	elif arg.begins_with("--day="):
+		_day = arg.trim_prefix("--day=").to_float()
 
 
 ## --workshop: a subscribed pack whose one map is a document (the practice street under another
@@ -355,41 +359,7 @@ func _run() -> void:
 			await _save_extra("_t035")
 			await _seconds_of(maxf(_seconds - 0.35, 0.65))
 		"mutant":
-			# A mutant 9 m off, angry and flying: taking flight at once, then
-			# frames as it cruises, charges and dives (_a, _b, _c, each --seconds apart).
-			_clear_view(game, local, stand)
-			var mut: DotNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(-9.0, 0.0, -5.0)))
-			if mut != null and mut.brain != null:
-				mut.brain.call(&"take_flight", 30.0)
-			# Deterministic: climb to altitude, then fire the guns, then force the dive; frames around each.
-			# Kept on the mutant itself: it flies off, so a camera aimed at a fixed point shows sky.
-			var mut_cam := _free_camera()
-			mut_cam.track_offset = Vector3(-5.0, 1.0, -5.0)
-			mut_cam.track = func() -> Variant: return mut.position() + Vector3(0.0, 1.5, 0.0) if mut != null and mut.node != null else null
-			var brain = mut.brain if mut != null else null
-			var waited := 0.0
-			while brain != null and waited < 15.0 and mut.position().y - stand.y < 7.0:
-				await _seconds_of(0.25)
-				waited += 0.25
-			await _save_extra("_a_altitude")
-			if brain != null:
-				print("mutant altitude: %s state=%s" % [mut.position(), brain.get(&"state")])
-				brain.call(&"zap_now")
-				await _save_extra("_b_zap0")
-				await _seconds_of(0.1)
-				brain.call(&"zap_now")
-				await _save_extra("_b_zap1")
-				brain.call(&"force_dive")
-				await _seconds_of(0.5)
-				await _save_extra("_c_charge")
-				var guard := 0.0
-				while brain.get(&"state") != &"dive" and guard < 8.0:
-					await _seconds_of(0.25)
-					guard += 0.25
-				for suffix in ["_d_dive0", "_e_dive1", "_f_dive2"]:
-					print("mutant %s: %s state=%s" % [suffix, mut.position(), brain.get(&"state")])
-					await _save_extra(suffix)
-					await _seconds_of(0.2)
+			await _view_mutant(game, local, stand)
 		"walk":
 			# A filmstrip of --zombie=<kind> walking at the survivor: a frame every 0.15 s for --seconds,
 			# a camera tracking it from the side (walk_00.. beside --out).
@@ -755,3 +725,41 @@ func _run() -> void:
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	await DotShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
+
+
+func _view_mutant(game: ZzGame, local: Node, stand: Vector3) -> void:
+	# A mutant 9 m off, angry and flying: taking flight at once, then
+	# frames as it cruises, charges and dives (_a, _b, _c, each --seconds apart).
+	_clear_view(game, local, stand)
+	var mut: DotNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(-9.0, 0.0, -5.0)))
+	if mut != null and mut.brain != null:
+		mut.brain.call(&"take_flight", 30.0)
+	# Deterministic: climb to altitude, then fire the guns, then force the dive; frames around each.
+	# Kept on the mutant itself: it flies off, so a camera aimed at a fixed point shows sky.
+	var mut_cam := _free_camera()
+	mut_cam.track_offset = Vector3(-5.0, 1.0, -5.0)
+	mut_cam.track = func() -> Variant: return mut.position() + Vector3(0.0, 1.5, 0.0) if mut != null and mut.node != null else null
+	var brain = mut.brain if mut != null else null
+	var waited := 0.0
+	while brain != null and waited < 15.0 and mut.position().y - stand.y < 7.0:
+		await _seconds_of(0.25)
+		waited += 0.25
+	await _save_extra("_a_altitude")
+	if brain != null:
+		print("mutant altitude: %s state=%s" % [mut.position(), brain.get(&"state")])
+		brain.call(&"zap_now")
+		await _save_extra("_b_zap0")
+		await _seconds_of(0.1)
+		brain.call(&"zap_now")
+		await _save_extra("_b_zap1")
+		brain.call(&"force_dive")
+		await _seconds_of(0.5)
+		await _save_extra("_c_charge")
+		var guard := 0.0
+		while brain.get(&"state") != &"dive" and guard < 8.0:
+			await _seconds_of(0.25)
+			guard += 0.25
+		for suffix in ["_d_dive0", "_e_dive1", "_f_dive2"]:
+			print("mutant %s: %s state=%s" % [suffix, mut.position(), brain.get(&"state")])
+			await _save_extra(suffix)
+			await _seconds_of(0.2)
