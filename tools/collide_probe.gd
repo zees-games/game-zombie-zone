@@ -1,7 +1,6 @@
 extends Node
 ## Compares the drawn world with what the server collides with (dot-core's DotCollisionSweep): drawn floor and walls with no
-## collision, and collision with nothing drawn. fall_probe asks what a capsule does on the collision alone; this asks whether the
-## collision is where the picture says it is.
+## collision, and collision with nothing drawn (fall_probe asks what a capsule does on the collision alone).
 ##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400] [--examples=6] [--max-invisible=N]
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -95,26 +94,7 @@ func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollis
 	var space := map.get_world_3d().direct_space_state
 	var sweep := DotCollisionSweep.new(space, game.physics.collision_mask(&"player"))
 	sweep.examples_per_kind = examples
-	for rec: Dictionary in world.get("surfaces"):
-		if int(rec["model"]) != 0 or rec.get("sky3d", false):
-			continue
-		var tag := &"world"
-		if rec.get("water", false):
-			tag = &"water"
-		elif rec.has("glass"):
-			tag = &"glass"
-		elif rec.get("collide", false):
-			tag = &"displacement"
-		elif rec.get("two_sided", false):
-			tag = &"two_sided"
-		var arrays: Array = world.call(&"surface_arrays", rec)
-		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
-		var faces := PackedVector3Array()
-		faces.resize(idx.size())
-		for i in idx.size():
-			faces[i] = verts[idx[i]]
-		sweep.add_faces(tag, faces)
+	_add_surfaces(sweep, world)
 	# A solid prop collides as a box and is drawn as its stand-in, so the stand-ins (and the boxes the client draws where a model is missing) count as drawn.
 	var props: Node3D = world.call(&"build_props")
 	print("%s: %d prop models missing, %d drawn as boxes of their bounds" % [id, world.get("missing_models"), world.get("missing_proxied")])
@@ -137,6 +117,39 @@ func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollis
 			if p.x >= fl[0] - 0.5 and p.x <= fl[2] + 0.5 and p.z >= fl[1] - 0.5 and p.z <= fl[3] + 0.5 and p.y >= fl[4] - 0.5 and p.y <= fl[4] + 2.0:
 				return true
 		return false
+	var standing := _standing_points(floors, step, stands)
+	_trace_at(space, sweep)
+	sweep.sweep_drawn([&"world", &"displacement", &"two_sided"])
+	sweep.sweep_collision(standing)
+	game.queue_free()
+	await get_tree().physics_frame
+	return sweep
+
+
+func _add_surfaces(sweep: DotCollisionSweep, world: RefCounted) -> void:
+	for rec: Dictionary in world.get("surfaces"):
+		if int(rec["model"]) != 0 or rec.get("sky3d", false):
+			continue
+		var tag := &"world"
+		if rec.get("water", false):
+			tag = &"water"
+		elif rec.has("glass"):
+			tag = &"glass"
+		elif rec.get("collide", false):
+			tag = &"displacement"
+		elif rec.get("two_sided", false):
+			tag = &"two_sided"
+		var arrays: Array = world.call(&"surface_arrays", rec)
+		var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var faces := PackedVector3Array()
+		faces.resize(idx.size())
+		for i in idx.size():
+			faces[i] = verts[idx[i]]
+		sweep.add_faces(tag, faces)
+
+
+func _standing_points(floors: Array, step: float, stands: int) -> PackedVector3Array:
 	var standing := PackedVector3Array()
 	for fl: Array in floors:
 		if fl[2] - fl[0] < 1.0 or fl[3] - fl[1] < 1.0:
@@ -153,14 +166,13 @@ func probe(id: StringName, step: float, stands: int, examples := 6) -> DotCollis
 		for i in stands:
 			thin.append(standing[i * standing.size() / stands])
 		standing = thin
+	return standing
+
+
+func _trace_at(space: PhysicsDirectSpaceState3D, sweep: DotCollisionSweep) -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--at="):
 			var at := Vector3(float(a.substr(5).split(",")[0]), float(a.substr(5).split(",")[1]), float(a.substr(5).split(",")[2]))
 			for d in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD, Vector3.DOWN, Vector3.UP]:
 				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(at, at + d * 4.0, sweep._mask))
 				print("   at %s dir %s: %s" % [at, d, "%s %s at %s" % [hit["collider"].name, hit["collider"].get_parent().name, hit["position"]] if not hit.is_empty() else "nothing"])
-	sweep.sweep_drawn([&"world", &"displacement", &"two_sided"])
-	sweep.sweep_collision(standing)
-	game.queue_free()
-	await get_tree().physics_frame
-	return sweep

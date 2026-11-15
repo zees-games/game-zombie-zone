@@ -12,13 +12,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
-## Optional content packs (game/zz_packs.gd), against a fixture provider because the real packs
-## are separate repositories that may not be installed. The fixture offers a weapon with a
-## definition, a weapon row without one, a special, a boss and a monster named like a built-in.
-##
-## Sections: nothing installed changes nothing; installed, the weapon joins the pool and the
-## monsters the catalogue; yml tuning (weights, exclusions, boss list) is read from the config
-## directory; a real game spawns the special and the boss.
+## Optional content packs (game/zz_packs.gd), against a fixture provider (a weapon with and one without a definition, a special,
+## a boss, a monster named like a built-in): nothing installed changes nothing; installed, the weapon joins the pool and the
+## monsters the catalogue; yml tuning is read from the config directory; a real game spawns the special and the boss.
 
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"

@@ -32,48 +32,14 @@ func _arg(name: String, fallback: String) -> String:
 func _run() -> void:
 	var id := _arg("map", "zz_high_school")
 	var out := _arg("out", "/tmp/zz_nav")
-	var config := ZzConfig.new()
-	config.map_ids = PackedStringArray([id])
-	config.warmup_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.survival_warmup_seconds = 300.0
-	config.wanderer_density = 0.0
-	config.sleepers_enabled = false
-	var game := ZzGame.new()
-	game.config = config
-	game.tick_rate = 64
-	game.authoritative = true
-	game.draw_world = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	var game: ZzGame = await _make_game(id)
 
 	for i in maxi(game.team_size(), 8):
 		var p := game.add_player(StringName("u%d" % i), "B%d" % i)
 		p.is_bot = true
 		p.health.invulnerable = true
 
-	game.start()
-	var notes: ZzNavNotes = game.horde.notes
-	var ticks := 0
-
-	while (notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
-		game.simulate(TICK)
-		ticks += 1
-
-		if ticks % 8 == 0:
-			await get_tree().physics_frame
-
-	var settle := int(float(_arg("seconds", "40")) * 64.0)
-
-	for i in settle:
-		game.simulate(TICK)
-
-		if i % 8 == 7:
-			await get_tree().physics_frame
+	var notes: ZzNavNotes = await _settle(game)
 
 	print(notes.describe())
 	var team: Array[Vector3] = []
@@ -82,35 +48,7 @@ func _run() -> void:
 		team.append(p.feet())
 
 	# The picture of the layer: its own node, so the level can be hidden under it.
-	var layer := Node3D.new()
-	add_child(layer)
-	var debug := DotNpcAiNavDebug.new()
-	layer.add_child(debug)
-	debug.show_annotations(notes.annotations)
-	var lines := ImmediateMesh.new()
-	var drawn := MeshInstance3D.new()
-	drawn.mesh = lines
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.vertex_color_use_as_albedo = true
-	mat.no_depth_test = true
-	drawn.material_override = mat
-	layer.add_child(drawn)
-	lines.surface_begin(Mesh.PRIMITIVE_LINES)
-
-	for route in notes.routes:
-		for k in range(1, route.size()):
-			_line(lines, route[k - 1] + Vector3.UP * 0.5, route[k] + Vector3.UP * 0.5, Color(1.0, 0.9, 0.2, 0.5))
-
-	for c in notes.chokes:
-		var hold: Vector3 = c["hold"]
-		_line(lines, c["at"] + Vector3.UP * 0.3, hold + Vector3.UP * 0.3, Color(0.2, 1.0, 0.3))
-		_cross(lines, hold + Vector3.UP * 0.3, 1.2, Color(0.2, 1.0, 0.3))
-
-	for at in team:
-		_cross(lines, at + Vector3.UP * 0.2, 0.7, Color(0.3, 0.6, 1.0))
-
-	lines.surface_end()
+	var layer := _draw_layer(notes, team)
 	var camera := Camera3D.new()
 	add_child(camera)
 	camera.current = true
@@ -156,6 +94,84 @@ func _run() -> void:
 
 	await _save("%s_hold.png" % out)
 	get_tree().quit()
+
+
+func _make_game(id: String) -> ZzGame:
+	var config := ZzConfig.new()
+	config.map_ids = PackedStringArray([id])
+	config.warmup_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.survival_warmup_seconds = 300.0
+	config.wanderer_density = 0.0
+	config.sleepers_enabled = false
+	var game := ZzGame.new()
+	game.config = config
+	game.tick_rate = 64
+	game.authoritative = true
+	game.draw_world = true
+	game.register_service = false
+	add_child(game)
+	game.set_physics_process(false)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	return game
+
+
+func _settle(game: ZzGame) -> ZzNavNotes:
+	game.start()
+	var notes: ZzNavNotes = game.horde.notes
+	var ticks := 0
+
+	while (notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
+		game.simulate(TICK)
+		ticks += 1
+
+		if ticks % 8 == 0:
+			await get_tree().physics_frame
+
+	var settle := int(float(_arg("seconds", "40")) * 64.0)
+
+	for i in settle:
+		game.simulate(TICK)
+
+		if i % 8 == 7:
+			await get_tree().physics_frame
+	return notes
+
+
+func _draw_layer(notes: ZzNavNotes, team: Array[Vector3]) -> Node3D:
+	# The picture of the layer: its own node, so the level can be hidden under it.
+	var layer := Node3D.new()
+	add_child(layer)
+	var debug := DotNpcAiNavDebug.new()
+	layer.add_child(debug)
+	debug.show_annotations(notes.annotations)
+	var lines := ImmediateMesh.new()
+	var drawn := MeshInstance3D.new()
+	drawn.mesh = lines
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	mat.no_depth_test = true
+	drawn.material_override = mat
+	layer.add_child(drawn)
+	lines.surface_begin(Mesh.PRIMITIVE_LINES)
+
+	for route in notes.routes:
+		for k in range(1, route.size()):
+			_line(lines, route[k - 1] + Vector3.UP * 0.5, route[k] + Vector3.UP * 0.5, Color(1.0, 0.9, 0.2, 0.5))
+
+	for c in notes.chokes:
+		var hold: Vector3 = c["hold"]
+		_line(lines, c["at"] + Vector3.UP * 0.3, hold + Vector3.UP * 0.3, Color(0.2, 1.0, 0.3))
+		_cross(lines, hold + Vector3.UP * 0.3, 1.2, Color(0.2, 1.0, 0.3))
+
+	for at in team:
+		_cross(lines, at + Vector3.UP * 0.2, 0.7, Color(0.3, 0.6, 1.0))
+
+	lines.surface_end()
+	return layer
 
 
 func _save(path: String) -> void:

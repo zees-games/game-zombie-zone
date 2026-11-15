@@ -1,8 +1,7 @@
 extends Node
-## Walks a person's capsule along a line on a converted map, once on its boxes alone and once with
-## the world pack's hulls (`world_collision`): the proof that what the wire budget dropped holds a body.
+## Walks a capsule along a line on a converted map, once on its boxes alone and once with the world pack's hulls
 ##   godot --headless --path . res://tools/hull_walk.tscn -- <map id> x0,y0,z0 x1,y1,z1
-## Prints one line per pass; exits 1 when the pass with hulls dips more than SAG below the line or stops short of its end.
+## Prints a line per pass; exits 1 when the hull pass dips more than SAG below the line or stops short.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")

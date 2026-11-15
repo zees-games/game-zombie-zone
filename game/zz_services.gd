@@ -177,7 +177,7 @@ func _player_of(peer_id: int) -> ZzPlayer:
 	return (game as ZzGame).players.get(ZzNetBridge.player_key(session_id))
 
 
-# --- dot-moderation's live tools ---------------------------------------------
+# dot-moderation's live tools
 
 ## What the admin set means here, one callable per ability. See `DotGameServices`.
 ##

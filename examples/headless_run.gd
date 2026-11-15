@@ -123,7 +123,7 @@ func _run() -> void:
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
-# --- Without a world ------------------------------------------------------------
+# Without a world
 
 func _test_config() -> void:
 	_section("the configuration")
@@ -216,7 +216,7 @@ func _test_box_file() -> void:
 	_finished()
 
 
-# --- The world ----------------------------------------------------------------------
+# The world
 
 func _test_navigation() -> void:
 	_section("the zombies' ground")

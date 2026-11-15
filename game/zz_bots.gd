@@ -254,7 +254,7 @@ func _defib_body(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 
-# --- Acting by persona -----------------------------------------------------------------------
+# Acting by persona
 
 ## With infected left and nothing in sight, acts by the persona's mix: hunt the rest, loot, hold a choke, support a
 ## teammate, scout. Never stands: a pick with nothing to do hands on to the next, and scouting always has somewhere
@@ -413,7 +413,7 @@ func _scout_goal(here: Vector3) -> Vector3:
 	return far[_rng.randi_range(0, far.size() - 1)]
 
 
-# --- Holding a survival map ------------------------------------------------------------------
+# Holding a survival map
 
 var _spawn_posts: Dictionary = {}
 
@@ -687,7 +687,7 @@ func _pulse_trigger(player, command: DotFpsCommand) -> void:
 		command.set_button(ZzNetCommand.BUTTON_FIRE, false)
 
 
-# --- Seeing -----------------------------------------------------------------------------------
+# Seeing
 
 ## The most dangerous zombie this bot can see: a special within reach first, then the nearest.
 ##
@@ -991,7 +991,7 @@ func _sleeper_near(player, reach: float) -> Vector3:
 	return Vector3.INF
 
 
-# --- Moving -----------------------------------------------------------------------------------
+# Moving
 
 ## Aims at a zombie the way a person would: engaged with it from the first tick it is aimed at
 ## (its reaction starts), the view turned onto it at the settings' speed, off by the aim error

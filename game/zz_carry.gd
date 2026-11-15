@@ -90,7 +90,7 @@ func backpack_price(tier: int) -> int:
 	return _prices[tier - 1] if tier >= 1 and tier <= _prices.size() else 0
 
 
-# --- Weapon weights ------------------------------------------------------------
+# Weapon weights
 
 ## Gives every def of [param catalogue] that no profile weighed (`weight:` in `cfg/addon/zee_weapons/weapon/<id>.yml`,
 ## which the workbench edits) the default of its tier.
@@ -108,7 +108,7 @@ static func default_weight(def: DotWeaponDef) -> float:
 	return 5.0
 
 
-# --- What a player carries -----------------------------------------------------
+# What a player carries
 
 ## The owner's view, for the CARRY event and the HUD: weight, limit, backpack and the weapons by slot (in hand first).
 func state_json(player: Object) -> String:

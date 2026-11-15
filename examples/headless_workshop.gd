@@ -7,15 +7,9 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzVote := preload("../game/zz_vote.gd")
 const ZzWorkshop := preload("../game/zz_workshop.gd")
 
-## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex]
-## and never the process's shared one: a solo map is listed on the map menu and the ballot with
-## its pack's name, an online session lists none, a map kind the game does not accept is left
-## out, and the game's own ids win. Choosing one builds it: a pack's map entry names a map DOCUMENT in `scene`, read like the
-## game's own. A malformed document is refused with its reason and listed nowhere.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_workshop.tscn
-## [/codeblock]
+## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex]: a solo map is listed on the map menu
+## and the ballot with its pack's name, an online session lists none, a map kind the game does not accept is left out, the game's own ids win,
+## a pack's map entry builds from the document its `scene` names, and a malformed document is refused. `godot --headless --path . res://examples/headless_workshop.tscn`
 
 const SECTIONS := 8
 const MAP := "fixture_ruin"

@@ -152,7 +152,7 @@ func zap_now() -> int:
 	return _guns.size()
 
 
-# --- Walking ---------------------------------------------------------------------------------
+# Walking
 
 func _walk(b: ZzZombieBody, at: Vector3, _delta: float) -> void:
 	b.hovering = false
@@ -175,7 +175,7 @@ func _walk(b: ZzZombieBody, at: Vector3, _delta: float) -> void:
 		b.anim = ZzZombieBody.Anim.WALK if b.anim != ZzZombieBody.Anim.ZAP else b.anim
 
 
-# --- Flying ----------------------------------------------------------------------------------
+# Flying
 
 func _ground_here() -> float:
 	var h := horde()
@@ -264,7 +264,7 @@ func _recover(b: ZzZombieBody) -> void:
 		go(WALK)
 
 
-# --- Gravity guns ----------------------------------------------------------------------------
+# Gravity guns
 
 func _muzzle(slot: int) -> Vector3:
 	var b := body()

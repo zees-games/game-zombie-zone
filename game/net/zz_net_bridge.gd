@@ -7,7 +7,7 @@ func _exit_tree() -> void:
 		profile_link = null
 
 
-# --- Wiring ----------------------------------------------------------------
+# Wiring
 
 ## [param p_game] and [param p_net], in the shape [DotGameNetcode] calls it.
 func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
@@ -323,7 +323,7 @@ func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
 		link.send_request(payload)
 
 
-# --- Identity --------------------------------------------------------------
+# Identity
 
 static func player_key(session_id: int) -> StringName:
 	return StringName("u%d" % session_id)
@@ -355,7 +355,7 @@ func player_for_peer(peer_id: int) -> int:
 	return int(_player_of_peer.get(peer_id, 0))
 
 
-# --- Server: players -------------------------------------------------------
+# Server: players
 
 ## Puts a connected peer into the game. What [DotGameRoster] calls.
 func add_player(peer_id: int, session_id: int, display_name: String) -> DotResult:
@@ -539,7 +539,7 @@ func _release_entity(session_id: int) -> void:
 	_unregister(behaviour.identity.net_id)
 
 
-# --- Server: the world -----------------------------------------------------
+# Server: the world
 
 ## A new map: the whole document, to everybody, before anything that stands on it.
 func _on_world_rebuilt() -> void:
@@ -563,7 +563,7 @@ func _on_world_rebuilt() -> void:
 	_register_toys()
 
 
-# --- Server: the round -----------------------------------------------------
+# Server: the round
 
 func _on_round_began(number: int, _map_id: StringName) -> void:
 	_broadcast(ZzEvents.Kind.ROUND, ZzEvents.write_round(number, true, false))
@@ -635,7 +635,7 @@ func announce_classed(player_id: StringName, class_id: StringName, skin: StringN
 	_broadcast(ZzEvents.Kind.CLASSED, ZzEventsText.write_classed(session_of(player_id), class_id, skin))
 
 
-# --- Server: the tick ------------------------------------------------------
+# Server: the tick
 
 func server_tick(tick: int) -> void:
 	_tick = tick
@@ -703,7 +703,7 @@ func ensure_game_ticked(tick: int) -> void:
 	for behaviour: ZzToyNet in _toy_nets:
 		behaviour.pull()
 
-# --- The client tick -------------------------------------------------------
+# The client tick
 
 func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, actions: int = 0) -> void:
 	if net == null or net.is_server or game == null:
@@ -766,7 +766,7 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, actions: int 
 			game.remote_survival["left"] = maxf(float(game.remote_survival["left"]) - net.clock.tick_duration(), 0.0)
 
 
-# --- Receiving -------------------------------------------------------------
+# Receiving
 
 func receive_snapshot(payload: PackedByteArray) -> DotResult:
 	if net == null or net.is_server:
@@ -882,7 +882,7 @@ func receive_request(peer_id: int, payload: PackedByteArray) -> DotResult:
 	return net.receive(payload, peer_id)
 
 
-# --- Server: what a joining peer is told -----------------------------------
+# Server: what a joining peer is told
 
 func _on_request(message: DotNetMessage) -> void:
 	var ask := message as ZzRequest
@@ -1290,7 +1290,7 @@ func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	net.send(ZzEvent.new(kind, body), peer_id)
 
 
-# --- Client: what it does with all that ------------------------------------
+# Client: what it does with all that
 
 func ask_ready() -> void:
 	_ask(ZzEvents.Ask.READY, PackedByteArray([0]))
@@ -1704,7 +1704,7 @@ func _on_world_event_last(kind: int, reader: DotNetReader) -> void:
 					bool(hit["killed"]), bool(hit["headshot"]))
 
 
-# --- Zombies -----------------------------------------------------------------
+# Zombies
 
 ## Interest tags a zombie entity carries, and the radii (metres) [method make_interest] gives them.
 const TAG_COMMON := "common"
@@ -2041,7 +2041,7 @@ func _adopt_tick_rate(rate: int) -> void:
 ## [b]Refused with a line, never half built.[/b] A client a format behind the server decodes a
 ## document it cannot read; [ZzMapDoc] says so, and the honest answer is no map and a WARN
 ## rather than a map with holes in it.
-# --- Both ends: the map's toys ---------------------------------------------------
+# Both ends: the map's toys
 
 ## The map's toys on the wire, one behaviour per toy in toy order, and the TOYS event that names
 ## their net ids (kept for a joiner).
@@ -2371,7 +2371,7 @@ func _apply_clock(reader: DotNetReader) -> void:
 			game.objective_progress[index] = game.now() + float(clock["objective_ends"])
 
 
-# --- Reporting -------------------------------------------------------------
+# Reporting
 
 func describe() -> Dictionary:
 	var out := {

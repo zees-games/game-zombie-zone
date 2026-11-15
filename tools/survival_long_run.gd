@@ -355,51 +355,58 @@ func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
 		elif player.is_down():
 			down += 1
 	if _watch_detail:
-		var shown := 0
-		for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
-			if not npc.is_alive() or shown >= 6:
-				continue
-			var nearest = null
-			var best := INF
-			for player in _game.survivors():
-				if player.is_alive() and not player.watching and player.feet().distance_to(npc.position()) < best:
-					best = player.feet().distance_to(npc.position())
-					nearest = player
-			if nearest == null or best > 8.0:
-				continue
-			shown += 1
-			var eye: Vector3 = nearest.eye_position()
-			var chest := npc.position() + Vector3(0.0, 1.2, 0.0)
-			var head := npc.position() + Vector3(0.0, 1.6, 0.0)
-			print("      %s %s at %s, %.1f m from %s at %s; sees chest %s head %s; state %s bashing %s target %s barred '%s'" % [
-				npc.def.id, npc.instance_id, npc.position().snappedf(0.1), best, nearest.display_name, nearest.feet().snappedf(0.1),
-				_game.clear_between(eye, chest), _game.clear_between(eye, head), npc.brain.get(&"state") if npc.brain != null else "-",
-				npc.brain.get(&"bashing") if npc.brain != null else "-", npc.target_id,
-				_game.horde.barricade_in_way(npc.position(), (nearest.feet() - npc.position()).normalized())])
-		# And a few of the far ones, still: what a stalled wave is doing out there.
-		var far_shown := 0
-		for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
-			if not npc.is_alive() or far_shown >= 4 or npc.brain == null:
-				continue
-			var best := INF
-			for player in _game.survivors():
-				if player.is_alive() and not player.watching:
-					best = minf(best, player.feet().distance_to(npc.position()))
-			var body = npc.node
-			if best < 25.0 or body == null or (body as CharacterBody3D).velocity.length() >= 0.2:
-				continue
-			far_shown += 1
-			var path: DotNpcPath = npc.brain.get(&"path")
-			print("      far %s at %s, %.1f m from anybody; state %s forced '%s' target '%s' wish %s floor %s; path %d points%s, next %s, ends %s" % [
-				npc.def.id, npc.position().snappedf(0.1), best, npc.brain.get(&"state"), npc.brain.get(&"forced"), npc.target_id,
-				(body.get(&"wish") as Vector3).snappedf(0.1), (body as CharacterBody3D).is_on_floor(), path.points.size() if path != null else -1,
-				" partial" if path != null and path.partial else "", path.current(Vector3.INF).snappedf(0.1) if path != null else "-",
-				path.points[path.points.size() - 1].snappedf(0.1) if path != null and not path.points.is_empty() else "-"])
+		_print_near_detail()
+		_print_far_still()
 	print("  %5.0f s  %s %d  sent %d/%d alive %d: near %d, 6-25 m %d, 25-60 m %d, further %d; bashing %d, targeted %d, still %d | up %d down %d" % [
 		t, w.stage_name(), w.index, w.sent, w.budget, _game.horde.wave_alive(), near, mid, far, lost, bashing, targeted, still, up, down])
 	if not _refusals.is_empty():
 		print("      refused %s" % _refusals)
 		_refusals.clear()
+
+
+## The few survivors' nearest zombies, with what each can see of them.
+func _print_near_detail() -> void:
+	var shown := 0
+	for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+		if not npc.is_alive() or shown >= 6:
+			continue
+		var nearest = null
+		var best := INF
+		for player in _game.survivors():
+			if player.is_alive() and not player.watching and player.feet().distance_to(npc.position()) < best:
+				best = player.feet().distance_to(npc.position())
+				nearest = player
+		if nearest == null or best > 8.0:
+			continue
+		shown += 1
+		var eye: Vector3 = nearest.eye_position()
+		var chest := npc.position() + Vector3(0.0, 1.2, 0.0)
+		var head := npc.position() + Vector3(0.0, 1.6, 0.0)
+		print("      %s %s at %s, %.1f m from %s at %s; sees chest %s head %s; state %s bashing %s target %s barred '%s'" % [
+			npc.def.id, npc.instance_id, npc.position().snappedf(0.1), best, nearest.display_name, nearest.feet().snappedf(0.1),
+			_game.clear_between(eye, chest), _game.clear_between(eye, head), npc.brain.get(&"state") if npc.brain != null else "-",
+			npc.brain.get(&"bashing") if npc.brain != null else "-", npc.target_id,
+			_game.horde.barricade_in_way(npc.position(), (nearest.feet() - npc.position()).normalized())])
+## And a few of the far ones, still: what a stalled wave is doing out there.
+func _print_far_still() -> void:
+	var far_shown := 0
+	for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+		if not npc.is_alive() or far_shown >= 4 or npc.brain == null:
+			continue
+		var best := INF
+		for player in _game.survivors():
+			if player.is_alive() and not player.watching:
+				best = minf(best, player.feet().distance_to(npc.position()))
+		var body = npc.node
+		if best < 25.0 or body == null or (body as CharacterBody3D).velocity.length() >= 0.2:
+			continue
+		far_shown += 1
+		var path: DotNpcPath = npc.brain.get(&"path")
+		print("      far %s at %s, %.1f m from anybody; state %s forced '%s' target '%s' wish %s floor %s; path %d points%s, next %s, ends %s" % [
+			npc.def.id, npc.position().snappedf(0.1), best, npc.brain.get(&"state"), npc.brain.get(&"forced"), npc.target_id,
+			(body.get(&"wish") as Vector3).snappedf(0.1), (body as CharacterBody3D).is_on_floor(), path.points.size() if path != null else -1,
+			" partial" if path != null and path.partial else "", path.current(Vector3.INF).snappedf(0.1) if path != null else "-",
+			path.points[path.points.size() - 1].snappedf(0.1) if path != null and not path.points.is_empty() else "-"])
 
 
 func _print_exodus_watch(t: float) -> void:

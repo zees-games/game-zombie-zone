@@ -46,46 +46,12 @@ var _present_frames := 0
 
 
 func _initialize() -> void:
-	for arg in OS.get_cmdline_user_args():
-		if arg.begins_with("--set="):
-			_set = arg.trim_prefix("--set=")
-		elif arg.begins_with("--out="):
-			_out = arg.trim_prefix("--out=")
-		elif arg.begins_with("--first="):
-			_first = int(arg.trim_prefix("--first="))
-		elif arg.begins_with("--variants="):
-			_variants = arg.trim_prefix("--variants=").split(",")
-		elif arg.begins_with("--cols="):
-			_cols = arg.trim_prefix("--cols=").split(",")
-		elif arg.begins_with("--kinds="):
-			_kinds = arg.trim_prefix("--kinds=").split(",")
-		elif arg.begins_with("--at="):
-			_at = float(arg.trim_prefix("--at="))
+	_read_args()
 
 	var root := Node3D.new()
 	get_root().add_child(root)
 
-	var env := WorldEnvironment.new()
-	env.environment = Environment.new()
-	env.environment.background_mode = Environment.BG_COLOR
-	env.environment.background_color = Color(0.3, 0.32, 0.36)
-	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.environment.ambient_light_color = Color(0.85, 0.85, 0.9)
-	env.environment.ambient_light_energy = 0.55
-	root.add_child(env)
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-35, 155, 0)
-	sun.light_energy = 1.1
-	root.add_child(sun)
-
-	# A night map's light (a dim blue fill and a low moon), the look no daylit sheet shows.
-	if "--night" in OS.get_cmdline_user_args():
-		env.environment.background_color = Color(0.03, 0.04, 0.08)
-		env.environment.ambient_light_color = Color(0.35, 0.4, 0.6)
-		env.environment.ambient_light_energy = 0.3
-		sun.light_color = Color(0.6, 0.7, 1.0)
-		sun.light_energy = 0.35
+	_light(root)
 
 	var rows: Array = []
 
@@ -152,6 +118,48 @@ func _initialize() -> void:
 	var middle := Vector3(wide * 0.5 - cell.x * 0.5, -tall * 0.5 + cell.y * 0.62, 0.0)
 	camera.look_at_from_position(middle + Vector3(0.0, 6.0, 30.0), middle)
 	get_root().size = Vector2i(1500, int(1500.0 * tall / wide))
+
+
+func _read_args() -> void:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--set="):
+			_set = arg.trim_prefix("--set=")
+		elif arg.begins_with("--out="):
+			_out = arg.trim_prefix("--out=")
+		elif arg.begins_with("--first="):
+			_first = int(arg.trim_prefix("--first="))
+		elif arg.begins_with("--variants="):
+			_variants = arg.trim_prefix("--variants=").split(",")
+		elif arg.begins_with("--cols="):
+			_cols = arg.trim_prefix("--cols=").split(",")
+		elif arg.begins_with("--kinds="):
+			_kinds = arg.trim_prefix("--kinds=").split(",")
+		elif arg.begins_with("--at="):
+			_at = float(arg.trim_prefix("--at="))
+
+
+## A night map's light (a dim blue fill and a low moon), the look no daylit sheet shows.
+func _light(root: Node3D) -> void:
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color(0.3, 0.32, 0.36)
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color(0.85, 0.85, 0.9)
+	env.environment.ambient_light_energy = 0.55
+	root.add_child(env)
+
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-35, 155, 0)
+	sun.light_energy = 1.1
+	root.add_child(sun)
+
+	if "--night" in OS.get_cmdline_user_args():
+		env.environment.background_color = Color(0.03, 0.04, 0.08)
+		env.environment.ambient_light_color = Color(0.35, 0.4, 0.6)
+		env.environment.ambient_light_energy = 0.3
+		sun.light_color = Color(0.6, 0.7, 1.0)
+		sun.light_energy = 0.35
 
 
 ## Each of dot-player-char's reactions as a row, a common falling with it over the columns

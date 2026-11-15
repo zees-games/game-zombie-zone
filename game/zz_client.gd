@@ -399,7 +399,7 @@ func _add_noblock_and_workbench() -> void:
 	platform.add_workbench(wb)
 
 
-# --- Connected -------------------------------------------------------------
+# Connected
 
 ## Follows the server's replicated rule cvars, so this end predicts and draws by the server's rules.
 func _follow_server_rules() -> void:
@@ -610,7 +610,7 @@ func _toy_sound(id: StringName, at: Vector3, strength: float) -> void:
 		var _played := audio.at(id, at, clampf(strength, 0.25, 1.0))
 
 
-# --- What the world, or the server, says --------------------------------------
+# What the world, or the server, says
 
 ## Offline: the world is the authority, so its own signals are what happened. A connected
 ## client hears the same from the bridge and calls the same functions with the same arguments,
@@ -1212,7 +1212,7 @@ func _on_ammo() -> void:
 		var _ding := audio.play(ZzAudio.PICKUP)
 
 
-# --- The weapons, drawn ----------------------------------------------------
+# The weapons, drawn
 
 ## Gives the local rig [param weapon_id], building it the first time. A gun is drawn; a melee
 ## weapon and something to throw are pocketed — what the server's `_draw` decides, mirrored.
@@ -1354,7 +1354,7 @@ func _strip_locally() -> void:
 		weapons.arsenal.ammo().clear()
 
 
-# --- The camera ------------------------------------------------------------
+# The camera
 
 func _build_camera() -> void:
 	if camera != null or player == null:
@@ -1552,7 +1552,7 @@ static func _set_fade_cvar(config: ZzConfig, cvar_name: String, value: String) -
 		config.set(StringName(cvar_name.trim_prefix("zz_")), text.to_int() if cvar_name.ends_with("_fade") else text.to_float())
 
 
-# --- Chat, sound, settings ---------------------------------------------------
+# Chat, sound, settings
 
 func _build_chat() -> void:
 	chat = DotGameChatClient.new()
@@ -1781,7 +1781,7 @@ func _actions() -> int:
 	return out
 
 
-# --- The frame -------------------------------------------------------------
+# The frame
 
 func _physics_process(delta: float) -> void:
 	if _offline:

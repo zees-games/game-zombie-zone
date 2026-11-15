@@ -624,7 +624,7 @@ func describe_lines() -> PackedStringArray:
 	return lines
 
 
-# --- The one built in -------------------------------------------------------
+# The one built in
 
 ## Tests only: loose physics props (dot-props' toys) to put on the practice street; empty in play.
 static var practice_toys: Array = []

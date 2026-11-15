@@ -102,7 +102,7 @@ var net_ping: int = 0
 ## Sitting this map out.
 var net_watching: bool = false
 
-# --- The weapons ------------------------------------------------------------
+# The weapons
 #
 # [b]Seven fields, and the pack's own `all_specs()` names all of them.[/b] GDScript has no
 # dynamic properties, so a spec table that says what to send needs a variable per entry
@@ -126,7 +126,7 @@ var net_reloading: bool = false
 var net_switching: bool = false
 var net_fire_mode: int = 0
 
-# --- An administrator's marks, from the live tools ---------------------------
+# An administrator's marks, from the live tools
 
 ## `ZzPlayer.blinded`. Owner only: see [method _register_net_vars].
 var net_blind: bool = false

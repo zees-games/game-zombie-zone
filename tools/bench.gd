@@ -1,9 +1,8 @@
 extends "shot.gd"
 
-## A fixed-seed frame benchmark: a solo game on one map, N commons kept alive round the
-## survivor (a dead one is replaced), the eyes turning once round per run, every frame timed.
-## Prints one BENCH line (wall, physics, script, render, GPU and render-CPU time, draw calls, objects, primitives) so
-## runs on the same box compare. `tools/bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56`.
+## A fixed-seed frame benchmark: a solo game on one map, N commons kept alive round the survivor, the eyes turning
+## once per run, every frame timed. Prints one BENCH line (wall, physics, script, render, GPU, draws) so runs compare.
+## `tools/bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56`.
 
 var _count := 56
 var _bench_seed := 7

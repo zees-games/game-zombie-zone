@@ -2,15 +2,8 @@ extends "headless_net_late.gd"
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
-## reconciliation all run, in one process, in two physics worlds.
-##
-## [b]What this suite is for is that a client sees the server's world.[/b] The zombies are
-## the server's alone (a client predicts only its own survivor), so every one of them has to
-## arrive, move where the server moves it, and go away when it dies; a down, a pin, a box, a
-## thing on the ground and a gate opening are each a state the HUD and the world view draw,
-## and each is a separate relay in the bridge that nothing else would notice missing.
-##
-## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
+## reconciliation all run in one process. A client must see the server's world: every zombie
+## arrives, moves where the server moves it and goes away when it dies. Sections and checks are both counted.
 
 const SECTIONS := 36
 const CHECKS := 246
@@ -79,7 +72,7 @@ func _run() -> void:
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
-# --- The codec ------------------------------------------------------------------
+# The codec
 
 static func _r(bytes: PackedByteArray) -> DotNetReader:
 	return DotNetReader.new(bytes)
@@ -264,7 +257,7 @@ func _check_codec_effects() -> void:
 	_check(bool(blast["ok"]) and blast["kind"] == &"pipe" and absf(float(blast["radius"]) - 6.0) < 0.05, "BLAST")
 
 
-# --- Bringing both halves up ---------------------------------------------------------
+# Bringing both halves up
 
 func _build() -> bool:
 	_section("bringing both halves up")
@@ -305,13 +298,8 @@ func _build() -> bool:
 	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 
-	_server_bridge = ZzNetBridge.new()
-	_server_bridge.name = "Bridge"
-	server_side.add_child(_server_bridge)
-
-	_client_bridge = ZzNetBridge.new()
-	_client_bridge.name = "Bridge"
-	client_side.add_child(_client_bridge)
+	_server_bridge = _make_bridge(server_side)
+	_client_bridge = _make_bridge(client_side)
 
 	var attached := _server_bridge.attach(_server_game, _server_net)
 	var client_attached := _client_bridge.attach(_client_game, _client_net)
@@ -347,6 +335,13 @@ func _build() -> bool:
 	_check(not _server_game.map_doc.is_empty(), "the server lays its map out on start")
 	_finished()
 	return _failed == failed_before
+
+
+func _make_bridge(side: Node) -> ZzNetBridge:
+	var bridge := ZzNetBridge.new()
+	bridge.name = "Bridge"
+	side.add_child(bridge)
+	return bridge
 
 
 ## What the client's bridge hears, kept in _heard for the sections to read.
@@ -772,12 +767,8 @@ func _test_zombies_replicate() -> void:
 	_check(mirror != null and _client_bridge.zombie_count() == _server_bridge.zombie_count(),
 		"and draws it, and every other zombie the server has", "%d of %d" % [_client_bridge.zombie_count(), _server_bridge.zombie_count()])
 
-	# A common told who to chase screams first, for a time drawn off its seed (0.5 to 1.05 s
-	# when forced), and that seed is the body's Godot object id, which moves whenever anything
-	# earlier in the process allocates one more object. A fixed second from the order counted
-	# the scream into the run: this check passed or failed by which seed an unrelated change
-	# handed it. So: wait out the scream, then time the run, from where it stood (the spawner
-	# moves it off the asked-for point onto the floor plan).
+	# A forced common screams first for a time drawn off its object id, which moves with any
+	# earlier allocation: wait out the scream, then time the run from where it stood.
 	npc.brain.call(&"force_target", server_me.player_id)
 	var screamed := 0
 	while npc.brain.state != &"chase" and screamed < SERVER_TICK_RATE * 2:

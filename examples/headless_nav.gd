@@ -87,7 +87,7 @@ func _run() -> void:
 			_report_sections(_sections_entered, _sections_finished, CORE_SECTIONS, CORE_CHECKS)
 
 
-# --- The graph built off the frame ---------------------------------------------------------------
+# The graph built off the frame
 
 const ASYNC_MAP := "zm_chaos_city"
 
@@ -154,7 +154,7 @@ func _test_async_build() -> void:
 	_finished()
 
 
-# --- The graph ----------------------------------------------------------------------------------
+# The graph
 
 ## Four points high and four low, a drop between: a zombie goes down it, never up, a stand-in
 ## does neither, and a climbing zombie goes both ways.
@@ -291,7 +291,7 @@ func _check_one_way() -> void:
 		"with climbing on the ledge is one piece again, at once; a drop still is not a way up")
 
 
-# --- Exodus -------------------------------------------------------------------------------------
+# Exodus
 
 func _test_exodus() -> void:
 	_section("an exodus map keeps its stand-ins and its follow-the-leader")
@@ -321,7 +321,7 @@ func _test_exodus() -> void:
 	_finished()
 
 
-# --- Holding ------------------------------------------------------------------------------------
+# Holding
 
 ## Stand-ins walk to their places over [constant SETTLE] seconds of no wave: how many of them are
 ## within [constant NEAR] metres of a choke on the horde's way, with the holds on and off.
@@ -393,26 +393,7 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 
 		near += 1
 
-		# Which choke it holds is the one whose place to stand (`hold`, a few metres behind the
-		# choke) is nearest it, not the one whose choke is: on a street where two chokes are a few
-		# metres apart a bot standing behind one is nearer the other's choke, and the count then
-		# flipped between runs on where each stand-in had got to.
-		var mine := -1
-		var mine_d := INF
-
-		for i in notes.chokes.size():
-			var spot: Vector3 = notes.chokes[i]["hold"]
-
-			if spot == Vector3.INF:
-				spot = notes.chokes[i]["at"]
-
-			var d := Vector2(spot.x - p.feet().x, spot.z - p.feet().z).length()
-
-			if d < mine_d:
-				mine_d = d
-				mine = i
-
-		held[mine] = true
+		held[_held_choke(notes, p)] = true
 
 	# Chokes whose places to stand coincide (two on one route can share the one behind them) are one
 	# place to hold, and a spread cannot be asked of fewer places than there are.
@@ -431,10 +412,35 @@ func _settle(id: StringName, holding: bool) -> Dictionary:
 	return out
 
 
-# --- Stuck -------------------------------------------------------------------------------------
+# Stuck
 
 ## A team of stand-ins plays [param id] against its horde for [constant STUCK_SECONDS] (`--stuck-seconds=` to hunt a rare snag), and a
 ## [StuckMeter] says how long movers with a goal stood still.
+
+
+## Which choke it holds is the one whose place to stand (`hold`, a few metres behind the
+## choke) is nearest it, not the one whose choke is: on a street where two chokes are a few
+## metres apart a bot standing behind one is nearer the other's choke, and the count then
+## flipped between runs on where each stand-in had got to.
+func _held_choke(notes: ZzNavNotes, p) -> int:
+	var mine := -1
+	var mine_d := INF
+
+	for i in notes.chokes.size():
+		var spot: Vector3 = notes.chokes[i]["hold"]
+
+		if spot == Vector3.INF:
+			spot = notes.chokes[i]["at"]
+
+		var d := Vector2(spot.x - p.feet().x, spot.z - p.feet().z).length()
+
+		if d < mine_d:
+			mine_d = d
+			mine = i
+
+	return mine
+
+
 func _stuck(id: StringName) -> StuckMeter:
 	var game := await _world(func(c: ZzConfig) -> void:
 		c.map_ids = PackedStringArray([String(id)])
@@ -480,7 +486,7 @@ func _test_stuck(id: StringName) -> void:
 	_finished()
 
 
-# --- Falling back -------------------------------------------------------------------------------
+# Falling back
 
 func _test_fallback() -> void:
 	_section("an overrun choke is given up for the next one toward the post")
@@ -537,7 +543,7 @@ func _test_fallback() -> void:
 	_finished()
 
 
-# --- The horde ----------------------------------------------------------------------------------
+# The horde
 
 ## A wave plays for [constant HORDE_SECONDS] against a team that cannot die: how many different
 ## zombies reached each choke, with the spread on and off.

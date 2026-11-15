@@ -15,9 +15,7 @@ examples/headless_mechanics.gd	1309
 examples/headless_mechanics.gd::_test_map_events	99
 examples/headless_mechanics.gd::_test_prop_doors	109
 examples/headless_mechanics.gd::_test_volumes	105
-examples/headless_nav.gd::_settle	84
-examples/headless_net.gd	1396
-examples/headless_net.gd::_build	81
+examples/headless_net.gd	1387
 examples/headless_net.gd::_test_the_codec	90
 examples/headless_net.gd::_test_the_remote_workbench	100
 examples/headless_packs.gd::_real_packs	88
@@ -27,8 +25,7 @@ examples/headless_run.gd::_test_crates	134
 examples/headless_run.gd::_test_crawling_and_speed_boxes	102
 examples/headless_run.gd::_test_every_kind_animates	88
 examples/headless_run.gd::_test_zombie_drops	94
-examples/headless_survival.gd	845
-examples/headless_survival.gd::_test_barricades	81
+examples/headless_survival.gd	844
 examples/headless_survival.gd::_test_big_map	92
 examples/headless_weapons.gd::_test_spawner	94
 game/net/zz_events.gd	1237
@@ -57,7 +54,7 @@ game/zz_map.gd::_build_boxes	109
 game/zz_map_doc.gd	939
 game/zz_map_doc.gd::validate	399
 game/zz_mechanics.gd	1393
-game/zz_module.gd	1712
+game/zz_module.gd	1693
 game/zz_module.gd::_add_tunables	170
 game/zz_module.gd::_build_vote	122
 game/zz_module.gd::_game_load	182
@@ -71,16 +68,9 @@ game/zz_world_view.gd	1133
 npcs/zz_common_brain.gd::_decide	81
 npcs/zz_zombie_view.gd	1191
 tools/bench.gd::_run	122
-tools/collide_probe.gd::probe	96
 tools/fall_probe.gd::_nav_check	110
 tools/fall_probe.gd::probe	192
-tools/idle_probe.gd::_run	106
-tools/measure_props.gd::_initialize	117
-tools/nav_render.gd::_run	127
 tools/server_probe.gd::_one_tick	139
 tools/server_probe.gd::_run	186
 tools/shot.gd::_run	482
-tools/survival_long_run.gd::_print_watch	84
 tools/survival_long_run.gd::_run	176
-tools/zombie_close.gd::_initialize	89
-tools/zombie_rack.gd::_initialize	107

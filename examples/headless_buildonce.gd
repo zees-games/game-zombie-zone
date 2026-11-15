@@ -4,10 +4,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 
 ## A world opened and started builds its map once; it builds again only when a setting the build reads changed in between.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_buildonce.tscn
-## [/codeblock]
+## `godot --headless --path . res://examples/headless_buildonce.tscn`
 
 const SECTIONS := 2
 const CHECKS := 8

@@ -1,9 +1,8 @@
 extends Node
 
-## Drives the real client with real input events and renders frames, for what no assertion reaches:
-## `--check=trader` (mouse through the trader's menu), `--check=crouch` (Ctrl and C held),
-## `--check=nav` (the navigation meter while a graph builds). Run by tools/verify_ui.sh under xvfb
-## (a display driver: the weapon pictures are null headless). Prints `VERIFY ok|FAIL what`.
+## Drives the real client with real input events and renders frames: `--check=trader` (mouse through the menu), `--check=crouch`
+## (Ctrl and C held), `--check=nav` (the navigation meter while a graph builds). Run by tools/verify_ui.sh under xvfb
+## (a display driver: weapon pictures are null headless). Prints `VERIFY ok|FAIL what`.
 
 const ZzClient := preload("../game/zz_client.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")

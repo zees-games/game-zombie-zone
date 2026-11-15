@@ -3,12 +3,7 @@ extends DotGameCheckSuite
 const ZzMapConfig := preload("../game/zz_map_config.gd")
 
 ## A map's per-map file sets the whitelisted rules, the next map gets the old values back, and a key outside the whitelist is refused.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_mapcfg.tscn
-## [/codeblock]
-##
-## The files are written into a scratch operator root, so the suite does not depend on a shipped map's file; the cvars start away from the values.
+## Files go in a scratch operator root and the cvars start away from the values. `godot --headless --path . res://examples/headless_mapcfg.tscn`
 
 const CHECKS := 8
 

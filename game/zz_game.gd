@@ -178,7 +178,7 @@ func _exit_tree() -> void:
 		DotRegistry.unregister_instance(SERVICE, self)
 
 
-# --- Building -------------------------------------------------------------------------------
+# Building
 
 ## Four layers: the world, the survivors, the furniture and the zombies.
 ##
@@ -1027,7 +1027,7 @@ func _build_horde() -> void:
 		ragdoll_rules.changed.connect(_follow_ragdoll_reactions)
 
 
-# --- Players --------------------------------------------------------------------------------
+# Players
 
 func add_player(player_id: StringName, display_name: String, _wanted_side: int = 0,
 		samples_input: bool = false) -> ZzPlayer:
@@ -1291,7 +1291,7 @@ func _furthest_survivor(except: StringName = &"") -> ZzPlayer:
 	return best
 
 
-# --- The round --------------------------------------------------------------------------------
+# The round
 
 func start() -> void:
 	if not authoritative:
@@ -2062,7 +2062,7 @@ func seconds_left() -> float:
 	return maxf(survival_goal - survival_elapsed, 0.0)
 
 
-# --- Objectives --------------------------------------------------------------------------------
+# Objectives
 
 func _reset_objectives() -> void:
 	objective_states.clear()
@@ -2148,7 +2148,7 @@ func open_gate(gate: String) -> void:
 	gate_opened.emit(gate)
 
 
-# --- Barricades --------------------------------------------------------------------------------
+# Barricades
 
 ## Every barricade back to full, from the map document: at a round's start on the server, and
 ## whenever a client builds a map (it is told any that are not full straight after).
@@ -2405,7 +2405,7 @@ func apply_barricade(id: String, fraction: float, intact: bool) -> void:
 	map.set_barricade(id, intact, fraction)
 
 
-# --- Hands: use, heal, pills, shove ------------------------------------------------------------
+# Hands: use, heal, pills, shove
 
 ## Everything a survivor does with their hands this tick. Server side.
 func _advance_hands(player: ZzPlayer, delta: float) -> void:
@@ -2906,7 +2906,7 @@ func _shove(player: ZzPlayer) -> void:
 	player.shove_ready_at = now() + config.shove_cooldown + tired
 
 
-# --- Hurting survivors --------------------------------------------------------------------------
+# Hurting survivors
 
 ## A zombie's swing landed. The difficulty is applied here, once.
 func zombie_hit(npc: DotNpcInstance, entity: int, victim: StringName, amount: float) -> void:
@@ -3077,7 +3077,7 @@ func explode(at: Vector3, radius: float, amount: float, owner: int, kind: String
 	exploded.emit(at, radius, kind)
 
 
-# --- Health ------------------------------------------------------------------------------------
+# Health
 
 func _on_player_damaged(player: ZzPlayer, damage: DotDamage) -> void:
 	if damage.health_lost <= 0.0:
@@ -3412,7 +3412,7 @@ func _advance_bodies(delta: float) -> void:
 				player.place_at(spot[0], spot[1])
 
 
-# --- Zombies dying ------------------------------------------------------------------------------
+# Zombies dying
 
 func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage) -> void:
 	var kind := npc.def.id
@@ -3456,7 +3456,7 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 	zombie_killed.emit(kind, killer, headshot)
 
 
-# --- Weapons ------------------------------------------------------------------------------------
+# Weapons
 
 ## The weapon table every rig shares (see [method ZzWeapons.shared_catalogue]).
 static func weapon_catalogue() -> DotWeaponCatalogue:
@@ -3816,7 +3816,7 @@ func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
 		player.wanted_slot, arsenal, (player.actions & ZzNetCommand.ACT_AIM) != 0)
 
 
-# --- The tick ------------------------------------------------------------------------------------
+# The tick
 
 func _physics_process(delta: float) -> void:
 	if not authoritative or match_node == null or external_tick:
@@ -3962,7 +3962,7 @@ func _step(delta: float) -> void:
 	match_node.tick(_tick)
 
 
-# --- Toys ----------------------------------------------------------------------
+# Toys
 
 ## Every survivor against the map's toys, after they moved: a walk into a barrel or a ball
 ## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
@@ -4154,7 +4154,7 @@ func set_tick_rate(rate: int) -> bool:
 	return true
 
 
-# --- Asking the world ------------------------------------------------------------------------
+# Asking the world
 
 ## Whether nothing solid is between two points: the walls and the furniture.
 func clear_between(from: Vector3, to: Vector3) -> bool:
@@ -4208,7 +4208,7 @@ func nearest_hazard(at: Vector3, radius: float) -> Vector3:
 	return best
 
 
-# --- Reporting -----------------------------------------------------------------------------------
+# Reporting
 
 func describe() -> Dictionary:
 	var out := {

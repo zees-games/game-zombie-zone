@@ -308,7 +308,7 @@ func delta_for_tick() -> float:
 	return 1.0 / float(maxi(tick_rate, 1))
 
 
-# --- Life -------------------------------------------------------------------
+# Life
 
 ## Not dead. Down counts as alive: they are still in the map, and still a target.
 func is_alive() -> bool:
@@ -498,7 +498,7 @@ func decay_temp(amount: float) -> void:
 	health.health = maxf(health.health - drained, 1.0)
 
 
-# --- Bodies ----------------------------------------------------------------
+# Bodies
 
 ## Where this player's eyes are: standing, crouched, or on the floor.
 ## The weapons' arsenal, under the name dot-weapon's [DotWeaponKnives] reads a player by.
@@ -689,7 +689,7 @@ func retune_slide() -> void:
 		apply_slide(controller.tunables, config, slide_rules)
 
 
-# --- Drawing (client side) --------------------------------------------------
+# Drawing (client side)
 
 ## Draws the beacon at [param at], from an admin's flag. Returns whether it pinged.
 func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) -> bool:

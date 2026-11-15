@@ -142,7 +142,7 @@ func in_state_for() -> float:
 	return now() - state_since
 
 
-# --- Moving ----------------------------------------------------------------------------------
+# Moving
 
 ## Overridden: steering writes the body's wish rather than moving it. See the class notes.
 func steer_toward(to: Vector3, speed: float, _delta: float) -> void:
@@ -214,7 +214,7 @@ func chase_to(at: Vector3, speed: float, spacing: float = 1.1) -> void:
 	go_to(at, speed, spacing)
 
 
-# --- Knowing where survivors are -------------------------------------------------------------
+# Knowing where survivors are
 
 ## The survivor this zombie is after: one it was given, or one it perceived. Empty for none.
 func quarry() -> StringName:
@@ -254,7 +254,7 @@ static func flat_distance(a: Vector3, b: Vector3) -> float:
 	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
-# --- Fighting ------------------------------------------------------------------------------
+# Fighting
 
 ## Starts a swing at [param victim] if one can start now. The hit lands [constant SWING_WINDUP]
 ## later, and only if they are still in reach and in front: a survivor who backs off in time
@@ -365,7 +365,7 @@ func lure_to(at: Vector3) -> void:
 	lure = at
 
 
-# --- The tick --------------------------------------------------------------------------------
+# The tick
 
 func _npc_think(delta: float) -> void:
 	# A horde far off thinks less often (_think_every); its body still moves every tick on the

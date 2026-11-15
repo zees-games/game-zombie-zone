@@ -6,11 +6,8 @@ const ZzMap := preload("../game/zz_map.gd")
 const ZzPaths := preload("../game/zz_paths.gd")
 const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.gd")
 
-## A drawn world awaits dot-map's texture prefetch without stopping the main thread: the map reaches "built" with frames advancing, and a baked texture is preferred when present and a plain decode used otherwise.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_prefetch.tscn
-## [/codeblock]
+## A drawn world awaits dot-map's texture prefetch without stopping the main thread: the map reaches "built" with frames advancing, and a baked
+## texture is preferred when present, a plain decode otherwise. `godot --headless --path . res://examples/headless_prefetch.tscn`
 
 const MAP := &"zm_lila_panic"
 const SECTIONS := 2

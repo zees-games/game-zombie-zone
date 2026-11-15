@@ -398,7 +398,7 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 		DotLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
 
 
-# --- Building --------------------------------------------------------------
+# Building
 
 ## The ground a map is played on, from its document: the nav floors, spawns, route and areas
 ## (x and z, with y the highest floor). Empty when the document names no ground.
@@ -2054,7 +2054,7 @@ static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
 	return p
 
 
-# --- Asking ----------------------------------------------------------------
+# Asking
 
 ## Where seat [param seat] of [param side] (`"survivors"`) starts:
 ## `[position, yaw]`. More people than spawns stand in rings round them, a metre and a bit

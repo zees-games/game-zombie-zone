@@ -97,7 +97,7 @@ func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> 
 	return ragdolls.spawn(figure, death if death != null else DotPlayerDeath.new(), velocity)
 
 
-# --- Zombies -----------------------------------------------------------------
+# Zombies
 
 ## The view class a kind draws with: the mutant and the oil monster have bodies of their own.
 static func view_for(kind: StringName) -> ZzZombieView:
@@ -245,7 +245,7 @@ func zombie_count() -> int:
 	return _zombies.size()
 
 
-# --- Loot ----------------------------------------------------------------------
+# Loot
 
 func add_loot(id: int, kind: StringName, item: StringName, at: Vector3, box_colour: Color = Color(0.8, 0.6, 0.25)) -> void:
 	remove_loot(id)
@@ -386,7 +386,7 @@ func remove_loot(id: int) -> void:
 		node.queue_free()
 
 
-# --- Hazards ---------------------------------------------------------------------
+# Hazards
 
 ## Shows fc-weapons' smoke or fire cloud for a hazard; freed with [param node].
 func _attach_cloud(node: Node3D, fx: int, at: Vector3, radius: float, seconds: float) -> void:
@@ -452,7 +452,7 @@ func add_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: 
 	_hazards[id] = node
 
 
-# --- Turrets ---------------------------------------------------------------------
+# Turrets
 
 const TURRET_MODEL := "res://assets/turret/turret.glb"
 
@@ -557,7 +557,7 @@ func remove_hazard(id: int) -> void:
 		node.queue_free()
 
 
-# --- Thrown things -------------------------------------------------------------------
+# Thrown things
 
 func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 	if kind == &"beam_zap" or kind == &"beam_pull":
@@ -686,7 +686,7 @@ func blast(at: Vector3, radius: float, kind: StringName) -> void:
 		var _boom := audio.at(ZzAudio.SPLAT if bile else ZzAudio.EXPLOSION, at)
 
 
-# --- Tongues ------------------------------------------------------------------
+# Tongues
 
 ## [param victim] is held by [param holder]: a choke draws a tongue between them, and a holder
 ## on the person whose eyes these are ([param at_lens]) is drawn in front of them.
@@ -770,7 +770,7 @@ func unpin(victim: Node3D) -> void:
 	_lens_view = null
 
 
-# --- The frame ---------------------------------------------------------------------
+# The frame
 
 ## The effects the HUD lists; the Hard Box's stacks are what fade the zombies.
 func set_effects(rows: Array) -> void:
@@ -1059,7 +1059,7 @@ func _present_lens_holder() -> void:
 	view.look_at(Vector3(camera.global_position.x, at.y, camera.global_position.z), Vector3.UP)
 
 
-# --- Making things ----------------------------------------------------------------
+# Making things
 
 func _box(size: Vector3, colour: Color) -> MeshInstance3D:
 	var mesh := MeshInstance3D.new()

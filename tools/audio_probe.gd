@@ -1,9 +1,7 @@
 extends Node
 
-## Under xvfb-run (never --headless, whose audio driver is Dummy): does the game make a noise?
-## Bakes the bank as a client does and plays a cue of every kind beside the listener: one made
-## in code (the map starting), one read from a file (a moan), a special's call, a blast, and
-## the horde's music.
+## Under xvfb-run (never --headless: its audio driver is Dummy): does the game make a noise? Bakes the bank as a
+## client does and plays a cue of each kind beside the listener (code-made, file-read, a call, a blast, the music).
 ##   xvfb-run -a godot --path . res://tools/audio_probe.tscn
 
 const ZzAudio := preload("res://game/zz_audio.gd")

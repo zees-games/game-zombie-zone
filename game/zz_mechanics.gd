@@ -450,7 +450,7 @@ func carry(ground_id: int, at: Vector3, tick: int) -> Vector3:
 	return (next * now.affine_inverse()) * at - at
 
 
-# --- Replication ---------------------------------------------------------------------------
+# Replication
 
 ## The state of mover [param index] as `[start tick, fraction in thousandths, direction, locked]`.
 func snapshot(index: int) -> Array:
@@ -494,7 +494,7 @@ func apply_state(index: int, start: int, from_thousandths: int, dir: int, locked
 	_told[index] = true
 
 
-# --- Server side ---------------------------------------------------------------------------
+# Server side
 
 ## Everything back to the round's start. Clients are told each mover that had moved.
 func reset(tick: int) -> void:
@@ -653,7 +653,7 @@ func try_press(eye: Vector3, look: Vector3, reach: float, tick: int) -> bool:
 	return true
 
 
-# --- Outputs and inputs --------------------------------------------------------------------
+# Outputs and inputs
 
 func _fire(entity: int, output: String, tick: int) -> void:
 	if _logic == null:
@@ -795,7 +795,7 @@ func _note_unsupported(what: String) -> void:
 	DotLog.debug(CHANNEL, "an output this map uses is not run", {"what": what})
 
 
-# --- Hurt, push, teleport and gravity ------------------------------------------------------
+# Hurt, push, teleport and gravity
 
 func _build_toggles(world: RefCounted) -> void:
 	_toggle_base = _movers.size()
@@ -1011,7 +1011,7 @@ func volume_toggles() -> Array[Dictionary]:
 	return _toggles
 
 
-# --- The map's logic -------------------------------------------------------------------------
+# The map's logic
 
 func _scale_io(io: DotMapIO, manifest: Variant) -> void:
 	if manifest is Dictionary:
@@ -1179,7 +1179,7 @@ func _on_logic_state(e: DotMapEntity, key: String, value: Variant, _tick: int) -
 		_drop_copy(e.index)
 
 
-# --- Template copies ---------------------------------------------------------------------------
+# Template copies
 
 ## The brush models a point_template names, from the manifest: they are not in the map until it is asked, so they are not drawn
 ## or solid where they stand.
@@ -1345,7 +1345,7 @@ func copies() -> Array:
 	return out
 
 
-# --- Collision pairs ---------------------------------------------------------------------------
+# Collision pairs
 
 ## A logic_collision_pair: the bodies of the two named entities pass through each other, or collide again. Bodies are found by
 ## targetname among the entities a node is bound to.

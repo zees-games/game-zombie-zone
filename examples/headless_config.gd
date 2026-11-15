@@ -1,10 +1,7 @@
 extends DotGameCheckSuite
 
 ## ZzConfig through DotGameConfigBinder: fields, cvars, strict refusal, the diff, yml defaults and the workbench round trip.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_config.tscn
-## [/codeblock]
+## `godot --headless --path . res://examples/headless_config.tscn`
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzMovementCvars := preload("../game/zz_movement_cvars.gd")

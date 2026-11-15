@@ -1,9 +1,8 @@
 extends Node
 
-## Builds each map's horde graph and reports the posts and survivor spawns the graph cannot use:
-## no point within the stand-ins' snap radius ("nopoint"), or a point in a piece the first spawn
-## cannot reach ("island"). `godot --headless --path . res://tools/nav_sweep.tscn -- --all`
-## or `-- --map=zs_goth_house`. `inwall` and `ontop` count graph points inside a box or on a wall's top (tools/nav_walls.gd). A post or spawn on either list is a place a stand-in idles.
+## Builds each map's horde graph and reports the posts and survivor spawns it cannot use: "nopoint" (none in snap
+## radius), "island" (unreachable from the first spawn); `inwall`/`ontop` count points in a box or on a wall top.
+## `godot --headless --path . res://tools/nav_sweep.tscn -- --all` or `-- --map=zs_goth_house`.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")

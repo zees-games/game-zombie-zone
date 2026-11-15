@@ -56,7 +56,7 @@ func _run() -> void:
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
-# --- Sections ----------------------------------------------------------------
+# Sections
 
 ## A delivered game has only what is vendored in assets/, so every model the weapon art table
 ## names must exist here; an unvendored gun loads as bare arms and nothing else fails. The
@@ -557,7 +557,7 @@ func _test_spawner() -> void:
 	_finished()
 
 
-# --- Helpers -----------------------------------------------------------------
+# Helpers
 
 func _reserve(rig: ZeeWeaponRig) -> int:
 	var held := rig.arsenal.current()

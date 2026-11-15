@@ -110,7 +110,7 @@ func _init(p_game: Object) -> void:
 	_rng.seed = 1771
 
 
-# --- Reading -------------------------------------------------------------------------------
+# Reading
 
 func load_file(path: String) -> int:
 	var full := ZzPaths.rebase("res://" + path.trim_prefix("res://"))
@@ -331,7 +331,7 @@ func colour_of(type_id: StringName) -> Color:
 	return Color.html(text) if Color.html_is_valid(text) else Color(0.8, 0.6, 0.25)
 
 
-# --- Dropping -------------------------------------------------------------------------------
+# Dropping
 
 ## A zombie of [param kind] died at [param at]: maybe a box.
 func maybe_drop(kind: StringName, at: Vector3) -> void:
@@ -419,7 +419,7 @@ func _has_use(box: Dictionary) -> bool:
 	return false
 
 
-# --- Carrying ------------------------------------------------------------------------------
+# Carrying
 
 ## What a client is told about a box of [param type_id] on the ground or in a slot: the type when
 ## `box_labels` is on, else one word for every box, so the type never leaves the server.
@@ -462,7 +462,7 @@ func drop_carried(player) -> void:
 	player.carried.clear()
 
 
-# --- Opening -------------------------------------------------------------------------------
+# Opening
 
 ## [param player] opened a box of [param type_id] at [param at].
 func open(type_id: StringName, player, at: Vector3) -> void:
@@ -524,7 +524,7 @@ func run(actions: Array, ctx: Dictionary) -> void:
 		call("_do_" + verb, a, ctx)
 
 
-# --- Whom ------------------------------------------------------------------------------------
+# Whom
 
 func _who(a: Dictionary, ctx: Dictionary) -> Array:
 	var opener = ctx["opener"]
@@ -557,7 +557,7 @@ func _who(a: Dictionary, ctx: Dictionary) -> Array:
 			return [opener] if opener != null and opener.is_alive() else []
 
 
-# --- The verbs: survivors ------------------------------------------------------------------------
+# The verbs: survivors
 
 ## Real health: `amount` points, or `fraction` of what is missing.
 func _do_heal(a: Dictionary, ctx: Dictionary) -> void:
@@ -730,7 +730,7 @@ func _do_shuffle_weapons(a: Dictionary, ctx: Dictionary) -> void:
 			var _armed: bool = game.arm(p, id)
 
 
-# --- The verbs: zombies --------------------------------------------------------------------------
+# The verbs: zombies
 
 ## A mob now: `size` commons, or `scale` times a normal mob.
 func _do_mob(a: Dictionary, ctx: Dictionary) -> void:
@@ -852,7 +852,7 @@ func _do_clear_effects(_a: Dictionary, _ctx: Dictionary) -> void:
 	effects_changed.emit()
 
 
-# --- The verbs: the world ------------------------------------------------------------------------
+# The verbs: the world
 
 ## A blast at the box (or `at`: `random_near`), `radius`, `damage`; survivors take `survivor_scale`.
 func _do_explode(a: Dictionary, ctx: Dictionary) -> void:
@@ -939,7 +939,7 @@ func _do_random(a: Dictionary, ctx: Dictionary) -> void:
 		choices.remove_at(at)
 
 
-# --- Effects -------------------------------------------------------------------------------
+# Effects
 
 ## Adds a handler for [param effect_name] (a script extending zz_box_effect.gd), so a game or a
 ## test can have a named box without editing [constant HANDLERS].

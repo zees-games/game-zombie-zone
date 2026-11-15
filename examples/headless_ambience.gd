@@ -1,10 +1,7 @@
 extends DotGameCheckSuite
 
 ## The creepy ambience in zz: cvars, the shipped sound set, the map to mood choice and the settings.
-##
-## [codeblock]
-## ./game.sh --no-parse test headless_ambience
-## [/codeblock]
+## `./game.sh --no-parse test headless_ambience`
 
 const ZzAudio := preload("../game/zz_audio.gd")
 const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")

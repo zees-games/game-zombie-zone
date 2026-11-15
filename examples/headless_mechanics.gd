@@ -679,7 +679,7 @@ func _volumes_push(game: ZzGame, mech: ZzMechanics) -> void:
 	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
 
 
-# --- The map's logic (dot-map's DotMapIO under the mechanics) -----------------------------------
+# The map's logic (dot-map's DotMapIO under the mechanics)
 
 func _logic_rec(entity: int, classname: String, targetname: String, keys: Dictionary) -> Dictionary:
 	return {"entity": entity, "classname": classname, "targetname": targetname, "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": keys}

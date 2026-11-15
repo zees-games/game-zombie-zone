@@ -4,13 +4,9 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 
-## A real round start on the escape maps: a full team is added, the round begins the way a server
-## begins it, and a few seconds play out with nobody invulnerable. Nobody may be dead (or below
-## the map's kill height) afterwards.
-##
-## [b]Why its own suite.[/b] Dropping a capsule at each spawn point passed on Run For Your Life
-## while every survivor fell to their death on the unrailed bridge: only stand-ins running the
-## route in a real round show it. Armed: it failed (six of eight dead) before the rails.
+## A real round start on the escape maps: a full team is added, the round begins as a server begins it, a few seconds play out
+## with nobody invulnerable, and nobody may be dead or below the kill height. Its own suite because a capsule at each spawn
+## passed while every survivor fell off the unrailed bridge: only stand-ins running the route in a real round show it.
 
 const MAPS := [&"ze_runforyourlife_1_v4", &"ze_nuke_beta"]
 const TICK_RATE := 64

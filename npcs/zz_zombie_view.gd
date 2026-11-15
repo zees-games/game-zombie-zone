@@ -245,7 +245,7 @@ func _capsule() -> Node3D:
 	return mesh
 
 
-# --- What a kind wears ---------------------------------------------------------------------------
+# What a kind wears
 
 ## Puts [param item] on the model, hung off the bone it moves with. Simple shapes in the atlas's
 ## flat-shaded style; each is one more draw call, which is why only specials wear anything.
@@ -392,7 +392,7 @@ func _make_drip() -> CPUParticles3D:
 	return drip
 
 
-# --- The frame -----------------------------------------------------------------------------------
+# The frame
 
 ## The locomotion style for a body moving at [param speed] m/s that was last in [param prior]; a
 ## look's [param gait] overrides [constant GAIT]. Hysteresis keeps a body at the edge from flickering.
@@ -1061,7 +1061,7 @@ func _draw_flags(flags: int) -> void:
 		worn.set_shader_parameter(&"flash", 0.6 if enraged else 0.0)
 
 
-# --- Dying ---------------------------------------------------------------------------------------
+# Dying
 
 ## Starts the fall: [param reaction] is a dot-player-char reaction id the server picked
 ## (`DotPlayerDeath`), [param push] the shot's direction scaled by its strength, [param seed] the

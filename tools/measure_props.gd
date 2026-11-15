@@ -35,59 +35,7 @@ func _initialize() -> void:
 	var tops: Dictionary = {}
 
 	for kit: Dictionary in (spec as Dictionary).get("kits", []):
-		var dir := "res://%s" % str(kit["dir"])
-		var fixed: Array = kit.get("fixed", [])
-		var files := DirAccess.get_files_at(dir)
-		files.sort()
-
-		for file in files:
-			if not file.ends_with(".glb"):
-				continue
-
-			var model := file.get_basename()
-			var scale := _scale_for(model, kit)
-			var packed := load(dir.path_join(file)) as PackedScene
-
-			if packed == null:
-				printerr("could not load ", dir.path_join(file))
-				continue
-
-			var node := packed.instantiate() as Node3D
-			var box := _bounds(node, Transform3D.IDENTITY)
-
-			if box.size == Vector3.ZERO:
-				printerr("no mesh in ", file)
-				node.free()
-				continue
-
-			var size := box.size * scale
-			var centre := box.get_center() * scale
-			var id := "%s_%s" % [str(kit["id"]), _snake(model)]
-			# Doubles for the file (a Vector3 is single precision and writes 0.725 as
-			# 0.725000023841858); the Vector3 only for the pieces' frame.
-			var offset_xyz := [_r(-centre.x), _r(-box.position.y * scale), _r(-centre.z)]
-			var offset := Vector3(offset_xyz[0], offset_xyz[1], offset_xyz[2])
-			# Collision shaped like the model (dot-props' DotPropPieces): a trunk and its
-			# branches, a table's top and legs. Empty for a prop one box fits.
-			var pieces := DotPropPieces.measure(node, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * scale), offset))
-			node.free()
-
-			props.append({
-				"id": id,
-				"title": str(titles.get(model, _title(model))),
-				"kit": str(kit["id"]),
-				"model": "%s/%s" % [str(kit["dir"]), file],
-				"scale": scale,
-				"size": [_r(size.x), _r(size.y), _r(size.z)],
-				# What to add to a model's origin so its footprint is centred on the prop's
-				# position and its base is on the floor.
-				"offset": offset_xyz,
-				"disguise": not fixed.has(model),
-			})
-
-			if not pieces.is_empty():
-				shaped[id] = DotPropPieces.encode(pieces)
-				tops[id] = _tops(pieces, size)
+		_measure_kit(kit, titles, props, shaped, tops)
 
 	props.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a["id"]) < str(b["id"]))
 
@@ -120,6 +68,68 @@ func _initialize() -> void:
 		quit(0)
 		return
 
+	_write_out(text, pieces_text, props, shaped)
+
+	quit(0)
+
+
+func _measure_kit(kit: Dictionary, titles: Dictionary, props: Array, shaped: Dictionary, tops: Dictionary) -> void:
+	var dir := "res://%s" % str(kit["dir"])
+	var fixed: Array = kit.get("fixed", [])
+	var files := DirAccess.get_files_at(dir)
+	files.sort()
+
+	for file in files:
+		if not file.ends_with(".glb"):
+			continue
+
+		var model := file.get_basename()
+		var scale := _scale_for(model, kit)
+		var packed := load(dir.path_join(file)) as PackedScene
+
+		if packed == null:
+			printerr("could not load ", dir.path_join(file))
+			continue
+
+		var node := packed.instantiate() as Node3D
+		var box := _bounds(node, Transform3D.IDENTITY)
+
+		if box.size == Vector3.ZERO:
+			printerr("no mesh in ", file)
+			node.free()
+			continue
+
+		var size := box.size * scale
+		var centre := box.get_center() * scale
+		var id := "%s_%s" % [str(kit["id"]), _snake(model)]
+		# Doubles for the file (a Vector3 is single precision and writes 0.725 as
+		# 0.725000023841858); the Vector3 only for the pieces' frame.
+		var offset_xyz := [_r(-centre.x), _r(-box.position.y * scale), _r(-centre.z)]
+		var offset := Vector3(offset_xyz[0], offset_xyz[1], offset_xyz[2])
+		# Collision shaped like the model (dot-props' DotPropPieces): a trunk and its
+		# branches, a table's top and legs. Empty for a prop one box fits.
+		var pieces := DotPropPieces.measure(node, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * scale), offset))
+		node.free()
+
+		props.append({
+			"id": id,
+			"title": str(titles.get(model, _title(model))),
+			"kit": str(kit["id"]),
+			"model": "%s/%s" % [str(kit["dir"]), file],
+			"scale": scale,
+			"size": [_r(size.x), _r(size.y), _r(size.z)],
+			# What to add to a model's origin so its footprint is centred on the prop's
+			# position and its base is on the floor.
+			"offset": offset_xyz,
+			"disguise": not fixed.has(model),
+		})
+
+		if not pieces.is_empty():
+			shaped[id] = DotPropPieces.encode(pieces)
+			tops[id] = _tops(pieces, size)
+
+
+func _write_out(text: String, pieces_text: String, props: Array, shaped: Dictionary) -> void:
 	var f := FileAccess.open(OUT, FileAccess.WRITE)
 	f.store_string(text)
 	f.close()
@@ -135,8 +145,6 @@ func _initialize() -> void:
 			"" if p["disguise"] else "  (fixed)", "  %d pieces" % count if count > 0 else ""])
 
 	print("wrote %s: %d props; %s: %d shaped, %d pieces" % [OUT, props.size(), PIECES, shaped.size(), total])
-
-	quit(0)
 
 
 ## The part-shaped collision (dot-props' DotPropPieces), one prop a line so a re-measure's diff

@@ -7,12 +7,8 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
-## Blood behind a hit body (zz_blood.gd over dot-fx's DotFxDecals) and which end of a hold's
-## day a map's own light becomes (ZzMapDoc.take_derived_light).
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_look.tscn
-## [/codeblock]
+## Blood behind a hit body (zz_blood.gd over dot-fx's DotFxDecals) and which end of a hold's day a map's own light becomes
+## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
 
 const CHECKS := 31
 

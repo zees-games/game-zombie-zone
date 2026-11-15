@@ -5,10 +5,8 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzSettings := preload("../game/zz_settings.gd")
 
-## The solo map menu (M) with a Workshop map in it, to screenshots/menu_maps_workshop.png.
-## The rows are the game's own `ZzGame.map_rows` over a fixture [DotContentIndex]; nothing is
-## drawn by hand. Run: `xvfb-run -a godot --path . --resolution 1280x800 --script tools/screenshot_workshop.gd`
-## (not `--headless`: a null renderer saves empty frames).
+## The solo map menu (M) with a Workshop map in it, to screenshots/menu_maps_workshop.png, rows from the game's own `ZzGame.map_rows`.
+## `xvfb-run -a godot --path . --resolution 1280x800 --script tools/screenshot_workshop.gd` (not `--headless`: a null renderer saves empty frames).
 
 const OUT := "res://screenshots/menu_maps_workshop.png"
 

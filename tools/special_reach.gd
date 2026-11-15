@@ -1,11 +1,8 @@
 extends Node
 
-## Does each special reach the survivors on a survival map? For every origin (wave hints, the horde's own pick) it asks the
-## graph, with the kind's nav filter, for a path to the nearest survivor, then spawns the kind there and plays `--seconds`
-## (default 40) with the survivors standing at their spawns. Per map and kind: `path` origins with a path / origins,
-## `reached` origins where the body got within reach of a survivor (`!n`: n of the misses had time to walk the whole path and did not, a snag), `t` median seconds to do so.
-## `godot --headless --path . res://tools/special_reach.tscn -- --all|--map=zs_lens [--origins=4] [--seconds=40] [--static] [--ai] [--held] [--trace] [--kinds=brute,riot]`
-## (run it through `./game.sh`'s heavy queue). The common walker leads each row as the control: a snag it shares is the map's, one it does not is the kind's. The nav graph is shared by every kind but the brute (NARROW points excluded).
+## Does each special reach the survivors on a survival map? For every origin it asks the graph (with the kind's nav filter)
+## for a path to the nearest survivor, spawns the kind there and plays `--seconds`. Per map and kind: `path`, `reached` (`!n`: n misses had time to walk the path and did not, a snag), `t` median seconds; the common walker leads as control.
+## `godot --headless --path . res://tools/special_reach.tscn -- --all|--map=zs_lens [--origins=4] [--seconds=40] [--static] [--ai] [--held] [--trace] [--kinds=brute,riot]`, via the heavy queue.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")

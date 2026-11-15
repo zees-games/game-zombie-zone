@@ -232,7 +232,7 @@ static func _read_pos(r: DotNetReader) -> Vector3:
 	return r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 
 
-# --- Hello -----------------------------------------------------------------
+# Hello
 
 static func write_hello(player_id: int, tick_rate: int, server_tick: int, difficulty: int, max_incaps: int) -> PackedByteArray:
 	var w := _w()
@@ -256,7 +256,7 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	}
 
 
-# --- The map -----------------------------------------------------------------
+# The map
 
 ## The map: [ZzMapDoc.encode]'s bytes, as they are. Opaque here, and checked at the other end.
 static func write_toys(map_id: StringName, net_ids: PackedInt64Array) -> PackedByteArray:
@@ -315,7 +315,7 @@ static func read_map_part(r: DotNetReader) -> Dictionary:
 		"ok": r.ok() and count > 0 and count <= MAP_PARTS_MAX and index < count and not piece.is_empty()}
 
 
-# --- Players ---------------------------------------------------------------
+# Players
 
 ## A join, or a change to who somebody is. Appended, never inserted.
 static func write_join(
@@ -437,7 +437,7 @@ static func read_armed(r: DotNetReader) -> Dictionary:
 	return {"player_id": player_id, "weapon_id": StringName(weapon_id), "ok": r.ok()}
 
 
-# --- The map's clock -----------------------------------------------------------
+# The map's clock
 
 ## The clock: the map number, its phase and how long it has been in it, a survival hold's time
 ## and goal (0 for none), who is left, the objective in play and its state.
@@ -542,7 +542,7 @@ static func read_nav(r: DotNetReader) -> Dictionary:
 	return {"percent": -1 if value > 100 else value, "ok": r.ok()}
 
 
-# --- Watching --------------------------------------------------------------
+# Watching
 
 ## A view dot-spectate decided, for the one player it belongs to. Sessions, 0 is nobody.
 static func write_spectate(
@@ -593,7 +593,7 @@ static func read_ask_spectate(r: DotNetReader) -> Dictionary:
 	return {"direction": clampi(raw, 0, 2) - 1, "ok": r.ok()}
 
 
-# --- Zombies -----------------------------------------------------------------
+# Zombies
 
 static func write_npc(net_id: int, kind: StringName, variant: int, at: Vector3) -> PackedByteArray:
 	var w := _w()
@@ -656,7 +656,7 @@ static func read_pin(r: DotNetReader) -> Dictionary:
 	return {"player_id": player_id, "npc": npc_net_id, "kind": StringName(kind), "ok": r.ok()}
 
 
-# --- Things on the ground ------------------------------------------------------
+# Things on the ground
 
 static func write_loot(id: int, kind: StringName, item: StringName, at: Vector3, price: int = 0) -> PackedByteArray:
 	var w := _w()
@@ -807,7 +807,7 @@ static func read_effects(r: DotNetReader) -> Dictionary:
 	return {"effects": rows, "ok": r.ok()}
 
 
-# --- Hazards and thrown things ---------------------------------------------------
+# Hazards and thrown things
 
 static func write_hazard(id: int, kind: StringName, at: Vector3, radius: float, seconds: float) -> PackedByteArray:
 	var w := _w()
@@ -944,7 +944,7 @@ static func read_bile(r: DotNetReader) -> Dictionary:
 	return {"player_id": player_id, "seconds": seconds, "ok": r.ok()}
 
 
-# --- Objectives ----------------------------------------------------------------
+# Objectives
 
 ## An objective changed: its index and state (1 holding, 2 done).
 static func write_objective(index: int, state: int) -> PackedByteArray:

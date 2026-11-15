@@ -1,10 +1,7 @@
 extends SceneTree
 
-## Drops the prop casters from every bake in lightmaps/ (their nodes do not exist at runtime: the
-## props are MultiMeshes; see tools/lightmap_scenes.gd), so a lightmap names only meshes the
-## client builds. Run by tools/bake_lightmaps.sh on the machine that baked, under a display:
-## a texture array saved from a headless process has no pixels.
-##
+## Drops the prop casters from every bake in lightmaps/ (props are MultiMeshes, see lightmap_scenes.gd), so a lightmap names only
+## meshes the client builds. Run by tools/bake_lightmaps.sh under a display (a headless texture array has no pixels).
 ##   godot --path . --script res://tools/lightmap_trim.gd [-- id ...]
 
 

@@ -1,11 +1,7 @@
 extends SceneTree
 
-## Close contact sheet of commons: a row per variant, a column per clip, rendered in a SubViewport of any size
-## (`zombie_rack.gd` is limited to the window's), framed on `--frame=full|head|upper`.
-##
-## [codeblock]
-## xvfb-run -a godot --path . --script tools/zombie_close.gd -- --variants=6,13,20 --cols=idle,walk,run,attack,stagger,death --frame=full --out=res://screenshots/city.png
-## [/codeblock]
+## Close contact sheet of commons: a row per variant, a column per clip, in a SubViewport of any size, framed on `--frame=full|head|upper`.
+## `xvfb-run -a godot --path . --script tools/zombie_close.gd -- --variants=6,13,20 --cols=idle,walk,run,attack,stagger,death --frame=full --out=res://screenshots/city.png`
 
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
@@ -56,6 +52,34 @@ func _initialize() -> void:
 	_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	get_root().add_child(_vp)
 
+	_light(night)
+
+	for r in variants.size():
+		for c in cols.size():
+			var view := ZzZombieView.new()
+			_vp.add_child(view)
+			view.position = Vector3(float(c) * cell.x, -float(r) * cell.y - feet, float(r) * 1.5 + float(c) * 0.3)
+			view.rotation.y = deg_to_rad(150.0 if frame == "full" else 180.0)
+			view.build(kind, int(variants[r]))
+			var anim: int = CLIPS[cols[c]]
+			_cells.append([view, anim])
+
+			if anim == ZzZombieBody.Anim.DEAD:
+				view.die(&"limp", Vector3(0.0, 0.0, -1.0), 1)
+
+	if frame == "full":
+		_add_floors(variants.size(), cell, wide)
+
+	var camera := Camera3D.new()
+	_vp.add_child(camera)
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.size = tall
+	var middle := Vector3(cell.x * (cols.size() - 1) * 0.5, -cell.y * (variants.size() - 1) * 0.5 + (0.95 if frame == "full" else 0.0), 0.0)
+	camera.look_at_from_position(middle + Vector3(0.0, 0.0, 30.0), middle)
+
+
+func _light(night: bool) -> void:
 	var env := WorldEnvironment.new()
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
@@ -76,39 +100,19 @@ func _initialize() -> void:
 
 	_vp.add_child(env)
 	_vp.add_child(sun)
+
+
+func _add_floors(rows: int, cell: Vector2, wide: float) -> void:
 	var ground := StandardMaterial3D.new()
 	ground.albedo_color = Color(0.42, 0.42, 0.4)
-
-	for r in variants.size():
-		for c in cols.size():
-			var view := ZzZombieView.new()
-			_vp.add_child(view)
-			view.position = Vector3(float(c) * cell.x, -float(r) * cell.y - feet, float(r) * 1.5 + float(c) * 0.3)
-			view.rotation.y = deg_to_rad(150.0 if frame == "full" else 180.0)
-			view.build(kind, int(variants[r]))
-			var anim: int = CLIPS[cols[c]]
-			_cells.append([view, anim])
-
-			if anim == ZzZombieBody.Anim.DEAD:
-				view.die(&"limp", Vector3(0.0, 0.0, -1.0), 1)
-
-	if frame == "full":
-		for r in variants.size():
-			var floor_mesh := MeshInstance3D.new()
-			var plane := PlaneMesh.new()
-			plane.size = Vector2(wide, 3.0)
-			floor_mesh.mesh = plane
-			floor_mesh.position = Vector3(cell.x * (cols.size() - 1) * 0.5, -float(r) * cell.y, 0.0)
-			floor_mesh.material_override = ground
-			_vp.add_child(floor_mesh)
-
-	var camera := Camera3D.new()
-	_vp.add_child(camera)
-	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.keep_aspect = Camera3D.KEEP_HEIGHT
-	camera.size = tall
-	var middle := Vector3(cell.x * (cols.size() - 1) * 0.5, -cell.y * (variants.size() - 1) * 0.5 + (0.95 if frame == "full" else 0.0), 0.0)
-	camera.look_at_from_position(middle + Vector3(0.0, 0.0, 30.0), middle)
+	for r in rows:
+		var floor_mesh := MeshInstance3D.new()
+		var plane := PlaneMesh.new()
+		plane.size = Vector2(wide, 3.0)
+		floor_mesh.mesh = plane
+		floor_mesh.position = Vector3(wide * 0.5 - cell.x * 0.5, -float(r) * cell.y, 0.0)
+		floor_mesh.material_override = ground
+		_vp.add_child(floor_mesh)
 
 
 func _process(_delta: float) -> bool:

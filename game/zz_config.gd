@@ -100,7 +100,7 @@ extends "zz_config_base.gd"
 @export_range(1.0, 60.0, 0.5, "or_greater") var gravity: float = 20.0
 @export_range(0.0, 200.0, 1.0, "or_greater") var air_accelerate: float = 12.0
 
-# --- Items -----------------------------------------------------------------
+# Items
 
 @export_group("Items")
 
@@ -136,7 +136,7 @@ extends "zz_config_base.gd"
 ## Metres from the eye an item may be picked up or a box opened.
 @export_range(0.5, 5.0, 0.1, "or_greater") var use_reach: float = 2.2
 
-# --- The shove -------------------------------------------------------------
+# The shove
 
 @export_group("The shove")
 
@@ -151,7 +151,7 @@ extends "zz_config_base.gd"
 ## Damage a shove does to a common, which is nothing much: it is for room, not for killing.
 @export_range(0.0, 100.0, 1.0, "or_greater") var shove_damage: float = 5.0
 
-# --- The horde -------------------------------------------------------------
+# The horde
 
 @export_group("The horde")
 
@@ -235,7 +235,7 @@ extends "zz_config_base.gd"
 ## Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`).
 @export_range(0.1, 5.0, 0.05, "or_greater") var bash_reach: float = 0.75
 
-# --- The specials ----------------------------------------------------------
+# The specials
 
 @export_group("The specials")
 
@@ -285,7 +285,7 @@ extends "zz_config_base.gd"
 ## Whether the crying sleepers a map places are there at all.
 @export var sleepers_enabled: bool = true
 
-# --- Boxes -----------------------------------------------------------------
+# Boxes
 
 @export_group("Boxes")
 
@@ -309,7 +309,7 @@ extends "zz_config_base.gd"
 ## Whether a fast-rolling barrel, crate or tyre also hurts zombies (cvar `zz_roll_damage_zombies`); survivors are always hurt.
 @export var roll_damage_zombies: bool = true
 
-# --- Physics crates (zz_crates.gd) -----------------------------------------
+# Physics crates (zz_crates.gd)
 
 ## Ammo piles and boxes on the ground are rigid bodies: pushed along by survivors and zombies, shot, thrown by blasts (cvar `zz_physics_crates`). 0 keeps them where the map or the drop put them.
 @export var physics_crates: bool = true
@@ -375,7 +375,7 @@ extends "zz_config_base.gd"
 ## Whether boxes exist at all.
 @export var boxes_enabled: bool = true
 
-# --- Turrets ---------------------------------------------------------------
+# Turrets
 
 @export_group("Turrets")
 
@@ -409,7 +409,7 @@ extends "zz_config_base.gd"
 ## Metres down from the eyes the fallback spot is looked for (`zz_turret_foot_reach`).
 @export_range(0.1, 5.0, 0.1, "or_greater") var turret_foot_reach: float = 0.4
 
-# --- Thrown things ---------------------------------------------------------
+# Thrown things
 
 @export_group("Hazards")
 
@@ -437,7 +437,7 @@ extends "zz_config_base.gd"
 ## Damage per second of a burning zombie; a brute takes half (`zz_hazard_burn_dps`).
 @export_range(0.0, 500.0, 1.0, "or_greater") var hazard_burn_dps: float = 18.0
 
-# --- The maps --------------------------------------------------------------
+# The maps
 
 @export_group("Carry weight")
 
@@ -547,7 +547,7 @@ extends "zz_config_base.gd"
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
 
-# --- Netcode ----------------------------------------------------------------
+# Netcode
 
 @export_group("Netcode")
 
@@ -570,7 +570,7 @@ extends "zz_config_base.gd"
 ## Bands past [member net_far_distance], each twice as far and sent half as often (1 is one band).
 @export_range(1, 4, 1, "or_greater") var net_far_tiers: int = 1
 
-# --- Bots ------------------------------------------------------------------
+# Bots
 
 @export_group("Bots")
 
@@ -584,7 +584,7 @@ extends "zz_config_base.gd"
 # How a stand-in aims and how quickly it reacts are dot-bot's `bot_*` settings, shared by every
 # game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...), not numbers of this file.
 
-# --- Stand-in rules --------------------------------------------------------
+# Stand-in rules
 
 @export_group("Stand-in rules")
 
@@ -654,14 +654,14 @@ extends "zz_config_base.gd"
 ## Path points ahead of it a stand-in smooths its route over (`zz_bot_smooth_horizon`).
 @export_range(2, 64, 1, "or_greater") var bot_smooth_horizon: int = 16
 
-# --- Watching --------------------------------------------------------------
+# Watching
 
 @export_group("Watching")
 
 ## Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
 @export_enum("anybody", "own side", "nobody") var spectate_camera: int = 0
 
-# --- Progress --------------------------------------------------------------
+# Progress
 
 @export_group("Progress")
 

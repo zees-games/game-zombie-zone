@@ -24,7 +24,7 @@ const ZzPlayer := preload("zz_player.gd")
 
 const CHANNEL := "zz.progress"
 
-# --- The numbers -------------------------------------------------------------
+# The numbers
 
 const MAPS_PLAYED := &"zz.maps_played"
 ## A campaign map finished alive, and a survival hold survived.
@@ -91,7 +91,7 @@ var _keys: Dictionary = {}
 var _ids: Dictionary = {}
 
 
-# --- The documents -----------------------------------------------------------
+# The documents
 
 ## Shown on the Tab board by default.
 const BOARD_COLUMNS: Array[StringName] = [COMMONS_KILLED, HEADSHOTS, REVIVES, DOWNS]
@@ -212,7 +212,7 @@ static func _sum(
 	return out
 
 
-# --- Building ---------------------------------------------------------------
+# Building
 
 ## [param directory] empty keeps achievement progress in memory; see
 ## [member ZzConfig.progress_directory]. [param report] is [member ZzConfig.report_progress].
@@ -351,7 +351,7 @@ func publish_rank(player_id: StringName) -> void:
 	var _s := rank.publish_lifetime(player_id, stats.session_values(_begin_for(player_id, body)), stats.schema)
 
 
-# --- Counting ---------------------------------------------------------------
+# Counting
 
 ## Files one reading for one person, and starts counting for them the first time.
 ##
@@ -520,7 +520,7 @@ func filed_under(player_id: StringName) -> StringName:
 	return _keys.get(player_id, player_id)
 
 
-# --- What the world reports -------------------------------------------------
+# What the world reports
 
 func on_round_began() -> void:
 	_in_round.clear()

@@ -1,9 +1,7 @@
 extends Node
-## Finds collision nobody can see: rays from eye height over a map's nav floors, spawns and route. A strike on
-## the shot mask (`ZzGame.world_mask`) by a map box (`Solid`) inside an invisible box and no drawn one is a
-## phantom a bullet stops on. `before` counts the clip layer too: what shots met before invisible solids moved to it.
-##   godot --headless --path . res://tools/phantom_rays.tscn -- <map id>[,<map id>...] [--step=3] [--quiet]
-## Exits 1 when any map has a phantom strike on the shot mask.
+## Finds collision nobody can see: rays from eye height over a map's nav floors, spawns and route. A strike on the shot mask
+## by a map `Solid` inside an invisible box and no drawn one is a phantom a bullet stops on (`before` counts the clip layer too).
+##   godot --headless --path . res://tools/phantom_rays.tscn -- <map id>[,<map id>...] [--step=3] [--quiet]; exits 1 on a phantom.
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")

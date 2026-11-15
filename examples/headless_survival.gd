@@ -8,16 +8,9 @@ const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzRespawn := preload("../game/zz_respawn.gd")
 const ZzWaveSets := preload("../game/zz_wave_sets.gd")
 
-## Survival maps, held: the three styles a server picks (`zz_survival`), the breather, a wipe,
-## the barricades, the team a map is built for, and then every big survival map played for a
-## wave by a full team of stand-ins.
-##
-## [b]Why its own suite.[/b] `headless_run` is the rules on the practice street; this is the
-## hold, and the big maps, which take a minute of simulated play each to say anything. The
-## schedule itself (when a wave ends, how they grow) is dot-npc-ai-director's and its own suite
-## holds it; what is checked here is what this game makes of it.
-##
-## Counts sections and checks; the second is the one that matters (dot-settings' story).
+## Survival maps, held: the three styles a server picks, the breather, a wipe, the barricades,
+## the team a map is built for, and every big survival map played for a wave by a full team.
+## Counts sections and checks; the second is the one that matters.
 
 const SECTIONS := 22
 const CHECKS := 144
@@ -154,7 +147,7 @@ func _test_wave_sets() -> void:
 	_finished()
 
 
-# --- Setup time and respawns -----------------------------------------------------------------
+# Setup time and respawns
 
 ## No zombie of any kind, not a sleeper or a wanderer, until the setup time is over.
 func _test_prestart() -> void:
@@ -396,7 +389,7 @@ func _test_respawn() -> void:
 	_finished()
 
 
-# --- The three styles --------------------------------------------------------------------------
+# The three styles
 
 ## Waves: each bigger than the last, a breather between that stands the downed up and restocks
 ## the caches, and the last one cleared wins the map.
@@ -527,7 +520,7 @@ func _test_wipe() -> void:
 	_finished()
 
 
-# --- Barricades --------------------------------------------------------------------------------
+# Barricades
 
 ## A classroom window at the school: the horde comes to it and tears at it, cannot pass while it
 ## stands, comes through when it breaks; a survivor holding E mends and rebuilds it.
@@ -553,17 +546,7 @@ func _test_barricades() -> void:
 		"the map's windows are barricades, standing", "%s %s" % [id, box])
 	# Inside the classroom, a few metres back from the window.
 	me.place_at(Vector3(box.get_center().x, 0.05, 11.0), 0.0)
-	var outside := Vector3(box.get_center().x, 0.0, 19.0)
-	# Fixed offsets, and only those that snapped onto the outside count: a snap to the nearest
-	# nav point can land inside the room, which would read as "through the window".
-	var outsiders := []
-	for i in 8:
-		var offset := Vector3(-3.0 + 6.0 * i / 7.0, 0.0, 3.0 * float(i % 3) / 2.0)
-		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(outside + offset), &"test")
-		if npc != null:
-			npc.brain.call(&"force_target", me.player_id)
-			if npc.position().z >= box.position.z:
-				outsiders.append(npc)
+	var outsiders := _spawn_outsiders(game, me, Vector3(box.get_center().x, 0.0, 19.0), box)
 	# Whichever of the room's two windows the horde's path takes them to.
 	var pair := ["n2_w", "n2_e"]
 	var start := float(game.barricades[id]["health"])
@@ -615,6 +598,22 @@ func _test_barricades() -> void:
 
 
 ## What the survivors have killed between them.
+
+
+## Fixed offsets, and only those that snapped onto the outside count: a snap to the nearest
+## nav point can land inside the room, which would read as "through the window".
+func _spawn_outsiders(game: ZzGame, me: ZzPlayer, outside: Vector3, box: AABB) -> Array:
+	var outsiders := []
+	for i in 8:
+		var offset := Vector3(-3.0 + 6.0 * i / 7.0, 0.0, 3.0 * float(i % 3) / 2.0)
+		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(outside + offset), &"test")
+		if npc != null:
+			npc.brain.call(&"force_target", me.player_id)
+			if npc.position().z >= box.position.z:
+				outsiders.append(npc)
+	return outsiders
+
+
 func _kills_of(game: ZzGame) -> int:
 	var kills := 0
 	for player in game.survivors():
@@ -724,7 +723,7 @@ func _test_map_rows() -> void:
 	_finished()
 
 
-# --- The big maps, played -----------------------------------------------------------------------
+# The big maps, played
 
 
 ## [standing, standing near their post or out on a persona job] among the survivors.
