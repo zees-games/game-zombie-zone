@@ -24,7 +24,7 @@ static func forced_npc_workers() -> int:
 		_forced_workers = v.to_int() if v.is_valid_int() and v.to_int() >= 0 else -1
 		if _forced_workers >= 0:
 			DotParallel.verify = true
-			print("ZzHorde: NPC workers forced to %d with DotParallel.verify" % _forced_workers)
+			DotLog.info(CHANNEL, "NPC workers forced, DotParallel.verify on", {"workers": _forced_workers})
 	return _forced_workers
 
 
