@@ -114,6 +114,7 @@ func _read_directory(root: String) -> int:
 
 	files.sort()
 	var loaded := 0
+	var ahead := _parse_ahead(root, files)
 
 	for file in files:
 		# A cached current document was validated by this normaliser earlier, so its head stands in;
@@ -137,13 +138,17 @@ func _read_directory(root: String) -> int:
 			loaded += 1
 			continue
 
-		var text := FileAccess.get_file_as_string(root.path_join(file))
+		var parsed: DotResult = null
 
-		if text.is_empty():
+		if ahead.has(file):
+			parsed = ahead[file]
+		else:
+			var text := FileAccess.get_file_as_string(root.path_join(file))
+			parsed = ZzMapDoc.parse_json(text, file) if not text.is_empty() else null
+
+		if parsed == null:
 			refused[file] = "empty or unreadable"
 			continue
-
-		var parsed := ZzMapDoc.parse_json(text, file)
 
 		if not parsed.ok:
 			refused[file] = parsed.error.message
@@ -158,6 +163,34 @@ func _read_directory(root: String) -> int:
 			_cache_write(root, file, parsed.value)
 
 	return loaded
+
+
+## Reads and validates, on the worker threads, every document that has no current cached copy: a cold
+## start parses them all, and one after another that is tens of seconds. file -> DotResult (null: empty or unreadable).
+func _parse_ahead(root: String, files: PackedStringArray) -> Dictionary:
+	var todo := PackedStringArray()
+
+	for file in files:
+		if not lazy and not _cache_current(root, file):
+			todo.append(file)
+
+	if todo.size() < 2 or not DotPlatform.has_threads():
+		return {}
+
+	var results: Array = []
+	results.resize(todo.size())
+	var read := func(i: int) -> void:
+		var text := FileAccess.get_file_as_string(root.path_join(todo[i]))
+		results[i] = ZzMapDoc.parse_json(text, todo[i]) if not text.is_empty() else null
+
+	var group := WorkerThreadPool.add_group_task(read, todo.size(), -1, true, "zz map documents")
+	WorkerThreadPool.wait_for_group_task_completion(group)
+	var out := {}
+
+	for i in todo.size():
+		out[todo[i]] = results[i]
+
+	return out
 
 
 ## What the cache holds for [param file] under [param root], or {} when it holds nothing current.

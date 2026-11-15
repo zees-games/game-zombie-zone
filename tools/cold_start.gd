@@ -6,7 +6,7 @@ const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 
 ## Cold start of a round on the real game: open and start time, and what each of the first ticks costs.
 ## Run: godot --headless --path . res://tools/cold_start.tscn -- --map ze_biohazard_manor --ticks 600 [--cold]
-## --cold wipes user://nav_bake and user://nav first. Prints COLDSTART / COLDSLOW / COLDWORST; exits 1 past --max-open-ms or --max-tick-ms (0 is off).
+## --cold wipes user://nav_bake and user://nav first, --cold-docs also user://map_docs. Prints COLDSTART / COLDSLOW / COLDWORST; exits 1 past --max-open-ms or --max-tick-ms (0 is off).
 
 const TICK_RATE := 64
 const MAX_TICK_MS := 1000.0
@@ -54,6 +54,9 @@ func _run() -> void:
 	if OS.get_cmdline_user_args().has("--cold"):
 		_wipe("user://nav_bake")
 		_wipe("user://nav")
+
+	if OS.get_cmdline_user_args().has("--cold-docs"):
+		_wipe("user://map_docs")
 
 	var game := ZzGame.new()
 	game.name = "World"
