@@ -1,5 +1,6 @@
 extends "shot_base.gd"
 
+
 func _cloud_store(spec: String) -> void:
 	var parts := spec.split(",")
 	var config := DotCloudConfig.new()
@@ -251,26 +252,22 @@ func _run() -> void:
 	# Waits past the load cover (slow on a cold GPU box) before any timing starts; capped, so a stuck cover cannot hang the shot.
 	if not await DotShotGate.wait_lifted(get_tree(), _client.get("platform")):
 		printerr("shot: load cover still up after the wait; shooting anyway")
-
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
 	# or from a free camera at --at (`wave_cam`).
 	if _view == "wave" or _view == "wave_cam":
 		await _survival_frame(game, local)
 		return
-
 	# Out of the start room, so the horde is running, and the stand-ins held where they are put.
 	if not _as_spawned:
 		for player in game.survivors():
 			player.is_bot = false
 			player.health.invulnerable = true
-
 	var stand := _at if _at != Vector3.INF else _default_stand(game)
 	# Facing the way the map's first seat faces (a frame that ignores it stares at whatever is
 	# behind that seat's back, which once read as a map that starts you against a wall).
 	if not _as_spawned:
 		local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
-
 	var i := 0
 	for player in game.survivors():
 		if player != local and not _as_spawned:
@@ -280,12 +277,9 @@ func _run() -> void:
 			var on_seat := _alone or (_at == Vector3.INF and stand != Vector3(0.0, 0.05, 12.0))
 			var seat: Array = game.map.spawn("survivors", i)
 			player.place_at(seat[0] if on_seat else stand + Vector3(-1.6 + float(i) * 1.1, 0.0, 1.8), float(seat[1]) if on_seat else 0.0)
-
 	if _look != Vector3.INF:
 		_face(local, _look)
-
 	_drive_mechanics(game)
-
 	if _aim != INF:
 		# Written before anything else runs each frame: the stand-ins' empty commands would
 		# put their pitch back to level.
@@ -295,34 +289,9 @@ func _run() -> void:
 		holder.set(&"players", game.survivors().filter(func(p) -> bool: return p != local))
 		holder.set(&"pitch", _aim)
 		add_child(holder)
-
 	await _seconds_of(0.4)
-
-	for entry: Array in _spawn:
-		for n in int(entry[1]):
-			var at := stand + Vector3(randf_range(-3.0, 3.0), 0.0, -6.0 - randf_range(0.0, 8.0))
-			var npc: DotNpcInstance = game.horde.spawn_brute(at) if entry[0] == ZzNpcs.BRUTE \
-				else game.horde.spawner.spawn(entry[0], game.horde.snap_to_nav(at), &"shot", Basis(Vector3.UP, PI))
-			if npc != null and npc.brain != null and entry[0] == ZzNpcs.COMMON:
-				npc.brain.call(&"force_target", local.player_id)
-			var body: Node3D = npc.node if npc != null else null
-			if body != null and body.get(&"limbs") != null:
-				for limb in _sever:
-					body.limbs.sever(StringName(limb), body.global_position + Vector3(0.0, 1.2, 0.0), Vector3(0.0, 2.0, 1.0))
-
-	if _flash:
-		local.flash_until = game.now() + 600.0
-
-	if _goo > 0:
-		local.goo_stacks = _goo
-		local.goo_until = game.now() + 600.0
-
-	for _stack in _hard:
-		game.boxes.run([{"do": "effect", "name": "hard"}], {"opener": local, "at": stand, "box": &"hard"})
-
-	if _box != &"" and game.boxes != null:
-		var _dropped := game.boxes.drop(_box, stand + Vector3(0.0, 0.0, -2.2))
-
+	_spawn_requested(game, local, stand)
+	_apply_effects(game, local, stand)
 	match _view:
 		"overview":
 			await _frames(6)
@@ -342,37 +311,11 @@ func _run() -> void:
 			else:
 				_free_camera().look_at_from_position(_at, _look)
 		"crates":
-			# A ring of ammo piles and boxes, a blast in the middle, and frames before it and 0.35 s and --seconds after.
-			_clear_view(game, local, stand)
-			var middle := stand + Vector3(0.0, 0.0, -5.0)
-			for n in 8:
-				var a := float(n) * TAU / 8.0
-				var spot := middle + Vector3(cos(a), 0.0, sin(a)) * 1.6
-				var _id := game.loot.add(ZzLoot.AMMO if n % 2 == 0 else ZzLoot.BOX, &"", game.ray_hit(spot + Vector3.UP, spot + Vector3.DOWN * 4.0), 600.0)
-			await _seconds_of(1.0)
-			# Low and close: a crate is 0.3 m, and from the side a launch shows as crates leaving the ring.
-			_free_camera().look_at_from_position(middle + Vector3(3.6, 0.9, -2.4), middle + Vector3(0.0, 0.3, 0.0))
-			await _save_extra("_before")
-			game.explode(middle + Vector3(0.0, 0.3, 0.0), 6.0, 50.0, -1, &"grenade", 0.0)
-			await _save_extra("_t0")
-			await _seconds_of(0.35)
-			await _save_extra("_t035")
-			await _seconds_of(maxf(_seconds - 0.35, 0.65))
+			await _view_crates(game, local, stand)
 		"mutant":
 			await _view_mutant(game, local, stand)
 		"walk":
-			# A filmstrip of --zombie=<kind> walking at the survivor: a frame every 0.15 s for --seconds,
-			# a camera tracking it from the side (walk_00.. beside --out).
-			_clear_view(game, local, stand)
-			var walker: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(2.0, 0.0, -9.0)), &"shot", Basis(Vector3.UP, PI))
-			if walker != null and walker.brain != null:
-				walker.brain.call(&"force_target", local.player_id)
-			var walk_cam := _free_camera()
-			walk_cam.track_offset = Vector3(4.0, 1.2, 0.0)
-			walk_cam.track = func() -> Variant: return walker.position() + Vector3(0.0, 0.9, 0.0) if walker != null and walker.node != null else null
-			for n in int(_seconds / 0.15):
-				await _save_extra("_%02d" % n)
-				await _seconds_of(0.15)
+			await _view_walk(game, local, stand)
 		"fire":
 			# A Molotov pool lit a few metres ahead, from a low three-quarter camera.
 			_clear_view(game, local, stand)
@@ -390,27 +333,7 @@ func _run() -> void:
 			local.health.invulnerable = true
 			await _seconds_of(_seconds)
 		"strike", "strike_down", "pin":
-			# One zombie (--zombie=common|crawler|...) a step from the survivor, swinging at them
-			# standing or, for strike_down, downed; a free camera from the side.
-			if _view == "strike_down":
-				local.health.invulnerable = false
-				var floored := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
-				var _felled = game.combat.apply_damage(floored)
-				local.health.invulnerable = true
-			var foe: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -1.2)), &"shot", Basis(Vector3.UP, PI))
-			if foe != null and foe.brain != null:
-				foe.brain.call(&"force_target", local.player_id)
-			if _view == "pin" and foe != null:
-				var how: StringName = {&"rider": &"ride", &"crawler": &"grab", &"ram": &"carry"}.get(_zombie, &"pounce")
-				print("pin: ", how, " held ", game.horde.pin(foe, local.player_id, how))
-			_orbit.holder = foe
-			_orbit.victim = local if _view == "pin" else null
-			await _seconds_of(_seconds)
-			var mid: Vector3 = local.feet().lerp(foe.position(), 0.5) if foe != null else local.feet()
-			print("strike: survivor ", local.feet(), " zombie ", foe.position() if foe != null else "none", " anim ", foe.node.get(&"anim") if foe != null else "")
-			var side := -1.0 if _view == "pin" else 1.0
-			_free_camera().look_at_from_position(mid + Vector3(3.2 * side, 1.8, 1.2), mid + Vector3(0.0, 0.8 if _view == "pin" else 0.6, 0.0))
-			await _seconds_of(0.2)
+			await _view_strike(game, local, stand)
 		"killcam", "reveal":
 			# The last survivor falls and the map is lost; --seconds is how long after, so ~3 is the
 			# replay and ~9 the podium.
@@ -422,81 +345,11 @@ func _run() -> void:
 			game._decide(false, "the horde took the last survivor")
 			await _seconds_of(_seconds)
 		"ending", "trail":
-			# A map's ending camera 7 m ahead and up, mid-glide (--seconds in); `trail` instead follows a node
-			# the resolver found by name round a circle in front of the eyes, so the ribbon is in the frame.
-			if _view == "ending":
-				game.end_camera_rules.blend = 0.3
-				game.end_camera_rules.orbit = 30.0
-				game.map_ending.emit(true, 1.0, 20.0, stand + Vector3(5.0, 4.0, -7.0))
-			else:
-				# A free camera 5 m from a mover crossing the view at 3 m/s: the ribbon is seen from the side, with the
-				# stand-ins sent away so nothing else fills the frame.
-				_clear_view(game, local, stand)
-				var cam := _free_camera()
-				var eye := stand + Vector3(0.0, 1.7, 0.0)
-				cam.look_at_from_position(eye, eye + Vector3(0.0, 0.25, -5.0))
-				var mover := Node3D.new()
-				mover.name = "shot_mover"
-				game.map.add_child(mover)
-				var trail := DotMapTrail.new()
-				trail.follow = mover
-				trail.lifetime = 1.4
-				trail.start_width = 0.4
-				trail.colour = Color(1.0, 0.6, 0.2)
-				game.map.add_child(trail)
-				var found: Node3D = game.map.find_child("shot_mover", true, false)
-				print("resolved ", found == mover)
-				# Real time, not a count of timer ticks: a slow software frame would otherwise outrun the trail's lifetime.
-				var began := Time.get_ticks_msec()
-				var t := 0.0
-				while t < _seconds:
-					t = float(Time.get_ticks_msec() - began) / 1000.0
-					mover.global_position = eye + Vector3(-3.5 + t * 3.0, 0.4 + sin(t * 5.0) * 0.5, -5.0)
-					await get_tree().create_timer(0.02).timeout
-			await _seconds_of(_seconds if _view == "ending" else 0.0)
+			await _view_ending(game, local, stand)
 		"crawl", "crawl_third", "crawl_down":
-			# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
-			# effects strip is in the frame, and the status line saying you may crawl. The third
-			# person one is the figure's crawl clip, at the server's crawl pace.
-			var ctx := {"opener": local, "at": stand, "box": &"swift"}
-			game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
-			game.boxes.run([{"do": "effect", "name": "crawl_speed"}], {"opener": local, "at": stand, "box": &"lifeline"})
-			local.health.invulnerable = false
-			var wound := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
-			var _hurt = game.combat.apply_damage(wound)
-			local.health.invulnerable = true
-			if _view == "crawl_third":
-				_client.call("toggle_view")
-			Input.action_press(&"dot_fps_forward")
-			await _seconds_of(_seconds)
-			print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
-			Input.action_release(&"dot_fps_forward")
-			if _view == "crawl_down":
-				# The steepest look-down: the arms' edge, and the backpack, may peek in.
-				await _save_extra("_level")
-				local.controller.state.pitch = -89.0
-				if local.sampler != null:
-					local.sampler.look_at_angles(local.controller.state.yaw, -89.0)
-				await _seconds_of(0.3)
+			await _view_crawl(game, local, stand)
 		"deploy", "deploy_third", "deploy_side":
-			_clear_view(game, local, stand)
-			# Carrying a box: --seconds is how long primary fire has been held, of a 4 s deploy
-			# (0 shows it held, 4.6 shows it deployed). deploy_third is the figure's view of it.
-			game.config.box_deploy_seconds = 4.0
-			var _c := game.boxes.carry(local, &"mystery")
-			if _view == "deploy_third":
-				_client.call("toggle_view")
-			await _seconds_of(0.5)
-			if _seconds > 0.6:
-				_client.set("_firing", true)
-				await _seconds_of(_seconds - 0.5)
-			if _view == "deploy_side":
-				# From in front and to one side, where the figure's crate shows.
-				var yaw := deg_to_rad(local.controller.state.yaw)
-				var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
-				var right := Vector3(cos(yaw), 0.0, -sin(yaw))
-				var at: Vector3 = local.feet()
-				_free_camera().look_at_from_position(at + ahead * 2.4 + right * 1.0 + Vector3(0.0, 1.5, 0.0), at + Vector3(0.0, 0.9, 0.0))
+			await _view_deploy(game, local, stand)
 		"boxgun":
 			# A box that grants a weapon, opened on the local survivor: the gun must be drawn after it.
 			_clear_view(game, local, stand)
@@ -523,31 +376,7 @@ func _run() -> void:
 			var _worn := game.wear_backpack(local, 1)
 			await _seconds_of(maxf(_seconds, 1.5))
 		"defib", "defib_third", "defib_ground":
-			# The defibrillator: in hand (first person, or the figure's view), or lying a step ahead.
-			for other in game.survivors():
-				if other != local:
-					other.place_at(stand + Vector3(0.0, 0.0, 400.0), 0.0)
-			if _view == "defib_ground":
-				var _id := game.loot.add(ZzLoot.DEFIB, &"defib", stand + Vector3(0.0, 0.1, -1.4))
-				await _seconds_of(0.6)
-				_face(local, stand + Vector3(0.0, 0.1, -1.4))
-				await _seconds_of(0.4)
-			else:
-				local.defibs = 1
-				if _view == "defib_third":
-					_client.call("toggle_view")
-				await _seconds_of(0.5)
-				game.config.defib_charge_seconds = 4.0
-				var corpse := game.add_player(&"u900", "Fallen")
-				corpse.place_at(stand + Vector3(0.0, 0.0, -1.2), 0.0)
-				corpse.incaps = game.config.max_incaps
-				corpse.health.invulnerable = false
-				var kill := DotDamage.make(0, corpse.entity_id, 9999.0, game.combat.damage_type(&"strike"))
-				var _k = game.combat.apply_damage(kill)
-				await _seconds_of(0.3)
-				game._begin_defib(local, corpse)
-				_client.set("_using", true)
-				await _seconds_of(maxf(_seconds - 0.8, 0.5))
+			await _view_defib(game, local, stand)
 		"trader":
 			# The trader's menu open beside the start trader, the survivor holding some points.
 			game.config.trader_when = 2
@@ -557,166 +386,32 @@ func _run() -> void:
 			_client.call("open_shop")
 			await _seconds_of(maxf(_seconds - 0.5, 0.3))
 		"hit":
-			# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
-			# through dot-combat as a shot would go: the marker and the numbers the client draws
-			# for them. Hurt, with borrowed health over the real, and an objective being held, so
-			# the vitals' bonus and the hold-out clock are in the frame too.
-			await _seconds_of(maxf(_seconds - 0.5, 0.5))
-			# The one nearest the line of sight (straight ahead is -Z), so the number is on screen.
-			var nearest: DotNpcInstance = null
-			var off := INF
-			for npc: DotNpcInstance in game.horde.spawner.all_npcs():
-				var to := npc.position() - stand
-				if npc.is_alive() and to.z < -1.0 and absf(to.x / to.z) < off:
-					off = absf(to.x / to.z)
-					nearest = npc
-			if nearest != null:
-				var victim: int = game.horde.entity_id_for(nearest)
-				var first := DotDamage.make(local.entity_id, victim, 18.0, null)
-				first.point = nearest.position() + Vector3(0.0, 1.2, 0.0)
-				var _a = game.combat.apply_damage(first)
-				var second := DotDamage.make(local.entity_id, victim, 400.0, null)
-				second.point = nearest.position() + Vector3(0.0, 1.6, 0.0)
-				second.hit_group = DotHitGroup.HEAD
-				var _b = game.combat.apply_damage(second)
-			local.health.invulnerable = false
-			local.health.health = 55.0
-			local.temp_health = 25.0
-			var objectives: Array = game.map_doc.get("objectives", [])
-			if not objectives.is_empty():
-				var index := maxi(game.current_objective(), 0)
-				game.objective_states[index] = &"holding"
-				game.objective_progress[index] = game.now() + 45.0
-			await _seconds_of(0.12)
-		"ads":
-			await _ads_frames(game, local)
-			get_tree().quit(0)
-			return
-		"crosshair":
-			await _crosshair_frames(game, local)
-			get_tree().quit(0)
-			return
-		"stamina":
-			await _stamina_frames(local)
-			get_tree().quit(0)
-			return
-		"firemode":
-			await _fire_mode_frames(game, local)
-			get_tree().quit(0)
-			return
-		"held":
-			await _held_third_frames(game, local)
-			get_tree().quit(0)
-			return
-		"weapons":
-			await _weapon_sheets(game, local)
-			get_tree().quit(0)
-			return
-		"reload":
-			await _reload_shots(game, local)
+			await _view_hit(game, local, stand)
+		"ads", "crosshair", "stamina", "firemode", "held", "weapons", "reload":
+			await _standalone_frames(game, local)
 			get_tree().quit(0)
 			return
 		"ragdoll":
-			# A stand-in on their last life killed in front of a free camera, and [member _seconds]
-			# of the fall: `--seconds=0.15`, `0.6` and `2` are the start, the drop and the body at
-			# rest. `--reaction=face_plant` forces one; the push is away from the camera. `--at` is where.
-			var victim = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
-			var feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
-			victim.place_at(feet, 180.0)
-			await _seconds_of(0.3)
-			feet = victim.feet()
-			if _reaction != &"":
-				var weights := PackedStringArray()
-				for id: StringName in DotPlayerDeathReactions.stock().ids():
-					weights.append("%s=%d" % [id, 1 if id == _reaction else 0])
-				var _forced: bool = game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", ",".join(weights))
-			# Your own eyes (and the gun drawn at them) out of the frame, behind the camera.
-			local.place_at(feet + Vector3(0.0, 0.0, 9.0), 0.0)
-			var camera := _free_camera()
-			camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
-			victim.health.invulnerable = false
-			victim.incaps = game.config.max_incaps
-			var slay := DotDamage.make(0, victim.entity_id, 5000.0, game.combat.damage_type(&"strike"))
-			slay.tick = game.current_tick()
-			slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
-			var _killed = game.combat.apply_damage(slay)
-			print("killed %s at %s: %s" % [victim.display_name, feet.snapped(Vector3.ONE * 0.1),
-				victim.death.describe() if victim.death != null else "no fall"])
-			await _seconds_of(_seconds)
-			var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
-			for body: DotPlayerRagdoll in yard.live():
-				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
+			await _view_ragdoll(game, local, stand)
 		"defib_other":
-			await _until_uncovered()
-			# A stand-in charging a defibrillator as a team-mate sees it: from the front (the frame),
-			# from behind (_b) and from the side (_c).
-			var holder = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
-			var spot: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
-			holder.place_at(spot, 180.0)
-			await _settle(holder)
-			spot = holder.feet()
-			local.place_at(spot + Vector3(0.0, 0.0, 9.0), 0.0)
-			var cam := _free_camera()
-			cam.look_at_from_position(spot + Vector3(0.0, 1.5, 2.2), spot + Vector3(0.0, 1.0, 0.0))
-			# The holder turned away (_b), side on (_c) and facing the camera, each held a moment: the
-			# server's tick clears `using`, so it is set again each frame after the physics step.
-			for view: Array in [["_b", 0.0], ["_c", 90.0], ["", 180.0]]:
-				holder.place_at(spot, view[1])
-				for _i in 20:
-					await get_tree().process_frame
-					holder.using = &"defib"
-				if view[0] == "":
-					await _seconds_of(0.1)
-				else:
-					await _save_extra(view[0])
+			await _view_defib_other(game, local, stand)
 		"action":
-			await _until_uncovered()
-			# A stand-in playing an avatar action, from the front, early in the clip.
-			var actor = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
-			var at_feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
-			actor.place_at(at_feet, 180.0)
-			await _settle(actor)
-			at_feet = actor.feet()
-			local.place_at(at_feet + Vector3(0.0, 0.0, 9.0), 0.0)
-			var parts := _action.split(":")
-			var entry: Dictionary = DotAvatarActions.defaults().find(StringName(parts[0]), parts[1])
-			var ok: bool = actor.figure.body_node().play_action(StringName(parts[1]), bool(entry.get("loop", false)), 0.0)
-			print("action %s: played=%s" % [_action, ok])
-			_free_camera().look_at_from_position(at_feet + Vector3(0.0, 1.5, 3.0), at_feet + Vector3(0.0, 1.0, 0.0))
-			# Early and late frames of the clip: <out>_a.png now, the usual frame at the end.
-			await _pin_for(actor, 0.4)
-			await _save_extra("_a")
-			await _pin_for(actor, maxf(_seconds - 0.4, 0.1))
+			await _view_action(game, local, stand)
 		"pinned":
-			var kind := _pin if _pin != &"" else &"pounce"
-			var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
-				&"ride": ZzNpcs.RIDER, &"grab": ZzNpcs.CRAWLER}.get(kind, ZzNpcs.LEAPER)
-			# --pin-me: the special takes you, which is what the lens drawing is for.
-			var friend = local if _pin_me else (game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0])
-			if not _pin_me:
-				friend.place_at(stand + Vector3(0.0, 0.0, -4.0), 180.0)
-			var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + (Vector3(3.5, 0.0, -14.0) if kind == &"choke" else Vector3(0.0, 0.0, -5.0))), &"shot", Basis(Vector3.UP, PI))
-			await _seconds_of(0.3)
-			var _held := game.pins.pin(game.horde.entity_id_for(npc), npc, friend.player_id, kind)
-			_orbit.holder = npc
-			_orbit.victim = friend
-			await _seconds_of(_seconds)
+			await _view_pinned(game, local, stand)
 		_:
 			await _seconds_of(_seconds)
-
 	if _orbit.enabled:
 		_orbit.me = local
 		_orbit.point = _at if _at != Vector3.INF else stand
 		await _orbit_frames()
 		get_tree().quit(0)
 		return
-
 	if _board:
 		var tab := InputEventKey.new()
 		tab.physical_keycode = KEY_TAB
 		tab.pressed = true
 		_client.settings.menu.handle_event(tab)
-
 	await _frames(3)
 	var image := get_viewport().get_texture().get_image()
 	var path := ProjectSettings.globalize_path(_out)
@@ -725,6 +420,345 @@ func _run() -> void:
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	await DotShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
+
+
+func _view_crates(game: ZzGame, local, stand: Vector3) -> void:
+	# A ring of ammo piles and boxes, a blast in the middle, and frames before it and 0.35 s and --seconds after.
+	_clear_view(game, local, stand)
+	var middle := stand + Vector3(0.0, 0.0, -5.0)
+	for n in 8:
+		var a := float(n) * TAU / 8.0
+		var spot := middle + Vector3(cos(a), 0.0, sin(a)) * 1.6
+		var _id := game.loot.add(ZzLoot.AMMO if n % 2 == 0 else ZzLoot.BOX, &"", game.ray_hit(spot + Vector3.UP, spot + Vector3.DOWN * 4.0), 600.0)
+	await _seconds_of(1.0)
+	# Low and close: a crate is 0.3 m, and from the side a launch shows as crates leaving the ring.
+	_free_camera().look_at_from_position(middle + Vector3(3.6, 0.9, -2.4), middle + Vector3(0.0, 0.3, 0.0))
+	await _save_extra("_before")
+	game.explode(middle + Vector3(0.0, 0.3, 0.0), 6.0, 50.0, -1, &"grenade", 0.0)
+	await _save_extra("_t0")
+	await _seconds_of(0.35)
+	await _save_extra("_t035")
+	await _seconds_of(maxf(_seconds - 0.35, 0.65))
+
+
+func _view_walk(game: ZzGame, local, stand: Vector3) -> void:
+	# A filmstrip of --zombie=<kind> walking at the survivor: a frame every 0.15 s for --seconds,
+	# a camera tracking it from the side (walk_00.. beside --out).
+	_clear_view(game, local, stand)
+	var walker: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(2.0, 0.0, -9.0)), &"shot", Basis(Vector3.UP, PI))
+	if walker != null and walker.brain != null:
+		walker.brain.call(&"force_target", local.player_id)
+	var walk_cam := _free_camera()
+	walk_cam.track_offset = Vector3(4.0, 1.2, 0.0)
+	walk_cam.track = func() -> Variant: return walker.position() + Vector3(0.0, 0.9, 0.0) if walker != null and walker.node != null else null
+	for n in int(_seconds / 0.15):
+		await _save_extra("_%02d" % n)
+		await _seconds_of(0.15)
+
+
+func _view_strike(game: ZzGame, local, stand: Vector3) -> void:
+	# One zombie (--zombie=common|crawler|...) a step from the survivor, swinging at them
+	# standing or, for strike_down, downed; a free camera from the side.
+	if _view == "strike_down":
+		local.health.invulnerable = false
+		var floored := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+		var _felled = game.combat.apply_damage(floored)
+		local.health.invulnerable = true
+	var foe: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -1.2)), &"shot", Basis(Vector3.UP, PI))
+	if foe != null and foe.brain != null:
+		foe.brain.call(&"force_target", local.player_id)
+	if _view == "pin" and foe != null:
+		var how: StringName = {&"rider": &"ride", &"crawler": &"grab", &"ram": &"carry"}.get(_zombie, &"pounce")
+		print("pin: ", how, " held ", game.horde.pin(foe, local.player_id, how))
+	_orbit.holder = foe
+	_orbit.victim = local if _view == "pin" else null
+	await _seconds_of(_seconds)
+	var mid: Vector3 = local.feet().lerp(foe.position(), 0.5) if foe != null else local.feet()
+	print("strike: survivor ", local.feet(), " zombie ", foe.position() if foe != null else "none", " anim ", foe.node.get(&"anim") if foe != null else "")
+	var side := -1.0 if _view == "pin" else 1.0
+	_free_camera().look_at_from_position(mid + Vector3(3.2 * side, 1.8, 1.2), mid + Vector3(0.0, 0.8 if _view == "pin" else 0.6, 0.0))
+	await _seconds_of(0.2)
+
+
+func _view_ending(game: ZzGame, local, stand: Vector3) -> void:
+	# A map's ending camera 7 m ahead and up, mid-glide (--seconds in); `trail` instead follows a node
+	# the resolver found by name round a circle in front of the eyes, so the ribbon is in the frame.
+	if _view == "ending":
+		game.end_camera_rules.blend = 0.3
+		game.end_camera_rules.orbit = 30.0
+		game.map_ending.emit(true, 1.0, 20.0, stand + Vector3(5.0, 4.0, -7.0))
+	else:
+		# A free camera 5 m from a mover crossing the view at 3 m/s: the ribbon is seen from the side, with the
+		# stand-ins sent away so nothing else fills the frame.
+		_clear_view(game, local, stand)
+		var cam := _free_camera()
+		var eye := stand + Vector3(0.0, 1.7, 0.0)
+		cam.look_at_from_position(eye, eye + Vector3(0.0, 0.25, -5.0))
+		var mover := Node3D.new()
+		mover.name = "shot_mover"
+		game.map.add_child(mover)
+		var trail := DotMapTrail.new()
+		trail.follow = mover
+		trail.lifetime = 1.4
+		trail.start_width = 0.4
+		trail.colour = Color(1.0, 0.6, 0.2)
+		game.map.add_child(trail)
+		var found: Node3D = game.map.find_child("shot_mover", true, false)
+		print("resolved ", found == mover)
+		# Real time, not a count of timer ticks: a slow software frame would otherwise outrun the trail's lifetime.
+		var began := Time.get_ticks_msec()
+		var t := 0.0
+		while t < _seconds:
+			t = float(Time.get_ticks_msec() - began) / 1000.0
+			mover.global_position = eye + Vector3(-3.5 + t * 3.0, 0.4 + sin(t * 5.0) * 0.5, -5.0)
+			await get_tree().create_timer(0.02).timeout
+	await _seconds_of(_seconds if _view == "ending" else 0.0)
+
+
+func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
+	# Down and crawling: the forward key held, a Swift and a Lifeline box running so the
+	# effects strip is in the frame, and the status line saying you may crawl. The third
+	# person one is the figure's crawl clip, at the server's crawl pace.
+	var ctx := {"opener": local, "at": stand, "box": &"swift"}
+	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
+	game.boxes.run([{"do": "effect", "name": "crawl_speed"}], {"opener": local, "at": stand, "box": &"lifeline"})
+	local.health.invulnerable = false
+	var wound := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	var _hurt = game.combat.apply_damage(wound)
+	local.health.invulnerable = true
+	if _view == "crawl_third":
+		_client.call("toggle_view")
+	Input.action_press(&"dot_fps_forward")
+	await _seconds_of(_seconds)
+	print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
+	Input.action_release(&"dot_fps_forward")
+	if _view == "crawl_down":
+		# The steepest look-down: the arms' edge, and the backpack, may peek in.
+		await _save_extra("_level")
+		local.controller.state.pitch = -89.0
+		if local.sampler != null:
+			local.sampler.look_at_angles(local.controller.state.yaw, -89.0)
+		await _seconds_of(0.3)
+
+
+func _view_deploy(game: ZzGame, local, stand: Vector3) -> void:
+	_clear_view(game, local, stand)
+	# Carrying a box: --seconds is how long primary fire has been held, of a 4 s deploy
+	# (0 shows it held, 4.6 shows it deployed). deploy_third is the figure's view of it.
+	game.config.box_deploy_seconds = 4.0
+	var _c := game.boxes.carry(local, &"mystery")
+	if _view == "deploy_third":
+		_client.call("toggle_view")
+	await _seconds_of(0.5)
+	if _seconds > 0.6:
+		_client.set("_firing", true)
+		await _seconds_of(_seconds - 0.5)
+	if _view == "deploy_side":
+		# From in front and to one side, where the figure's crate shows.
+		var yaw := deg_to_rad(local.controller.state.yaw)
+		var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+		var right := Vector3(cos(yaw), 0.0, -sin(yaw))
+		var at: Vector3 = local.feet()
+		_free_camera().look_at_from_position(at + ahead * 2.4 + right * 1.0 + Vector3(0.0, 1.5, 0.0), at + Vector3(0.0, 0.9, 0.0))
+
+
+func _view_defib(game: ZzGame, local, stand: Vector3) -> void:
+	# The defibrillator: in hand (first person, or the figure's view), or lying a step ahead.
+	for other in game.survivors():
+		if other != local:
+			other.place_at(stand + Vector3(0.0, 0.0, 400.0), 0.0)
+	if _view == "defib_ground":
+		var _id := game.loot.add(ZzLoot.DEFIB, &"defib", stand + Vector3(0.0, 0.1, -1.4))
+		await _seconds_of(0.6)
+		_face(local, stand + Vector3(0.0, 0.1, -1.4))
+		await _seconds_of(0.4)
+	else:
+		local.defibs = 1
+		if _view == "defib_third":
+			_client.call("toggle_view")
+		await _seconds_of(0.5)
+		game.config.defib_charge_seconds = 4.0
+		var corpse := game.add_player(&"u900", "Fallen")
+		corpse.place_at(stand + Vector3(0.0, 0.0, -1.2), 0.0)
+		corpse.incaps = game.config.max_incaps
+		corpse.health.invulnerable = false
+		var kill := DotDamage.make(0, corpse.entity_id, 9999.0, game.combat.damage_type(&"strike"))
+		var _k = game.combat.apply_damage(kill)
+		await _seconds_of(0.3)
+		game._begin_defib(local, corpse)
+		_client.set("_using", true)
+		await _seconds_of(maxf(_seconds - 0.8, 0.5))
+
+
+func _view_hit(game: ZzGame, local, stand: Vector3) -> void:
+	# Two hits the server confirms on the zombie nearest the crosshair, the second a kill to the head,
+	# through dot-combat as a shot would go: the marker and the numbers the client draws
+	# for them. Hurt, with borrowed health over the real, and an objective being held, so
+	# the vitals' bonus and the hold-out clock are in the frame too.
+	await _seconds_of(maxf(_seconds - 0.5, 0.5))
+	# The one nearest the line of sight (straight ahead is -Z), so the number is on screen.
+	var nearest: DotNpcInstance = null
+	var off := INF
+	for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+		var to := npc.position() - stand
+		if npc.is_alive() and to.z < -1.0 and absf(to.x / to.z) < off:
+			off = absf(to.x / to.z)
+			nearest = npc
+	if nearest != null:
+		var victim: int = game.horde.entity_id_for(nearest)
+		var first := DotDamage.make(local.entity_id, victim, 18.0, null)
+		first.point = nearest.position() + Vector3(0.0, 1.2, 0.0)
+		var _a = game.combat.apply_damage(first)
+		var second := DotDamage.make(local.entity_id, victim, 400.0, null)
+		second.point = nearest.position() + Vector3(0.0, 1.6, 0.0)
+		second.hit_group = DotHitGroup.HEAD
+		var _b = game.combat.apply_damage(second)
+	local.health.invulnerable = false
+	local.health.health = 55.0
+	local.temp_health = 25.0
+	var objectives: Array = game.map_doc.get("objectives", [])
+	if not objectives.is_empty():
+		var index := maxi(game.current_objective(), 0)
+		game.objective_states[index] = &"holding"
+		game.objective_progress[index] = game.now() + 45.0
+	await _seconds_of(0.12)
+
+
+func _view_ragdoll(game: ZzGame, local, stand: Vector3) -> void:
+	# A stand-in on their last life killed in front of a free camera, and [member _seconds]
+	# of the fall: `--seconds=0.15`, `0.6` and `2` are the start, the drop and the body at
+	# rest. `--reaction=face_plant` forces one; the push is away from the camera. `--at` is where.
+	var victim = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+	var feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+	victim.place_at(feet, 180.0)
+	await _seconds_of(0.3)
+	feet = victim.feet()
+	if _reaction != &"":
+		var weights := PackedStringArray()
+		for id: StringName in DotPlayerDeathReactions.stock().ids():
+			weights.append("%s=%d" % [id, 1 if id == _reaction else 0])
+		var _forced: bool = game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", ",".join(weights))
+	# Your own eyes (and the gun drawn at them) out of the frame, behind the camera.
+	local.place_at(feet + Vector3(0.0, 0.0, 9.0), 0.0)
+	var camera := _free_camera()
+	camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
+	victim.health.invulnerable = false
+	victim.incaps = game.config.max_incaps
+	var slay := DotDamage.make(0, victim.entity_id, 5000.0, game.combat.damage_type(&"strike"))
+	slay.tick = game.current_tick()
+	slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
+	var _killed = game.combat.apply_damage(slay)
+	print("killed %s at %s: %s" % [victim.display_name, feet.snapped(Vector3.ONE * 0.1),
+		victim.death.describe() if victim.death != null else "no fall"])
+	await _seconds_of(_seconds)
+	var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
+	for body: DotPlayerRagdoll in yard.live():
+		print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
+
+
+func _view_defib_other(game: ZzGame, local, stand: Vector3) -> void:
+	await _until_uncovered()
+	# A stand-in charging a defibrillator as a team-mate sees it: from the front (the frame),
+	# from behind (_b) and from the side (_c).
+	var holder = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+	var spot: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+	holder.place_at(spot, 180.0)
+	await _settle(holder)
+	spot = holder.feet()
+	local.place_at(spot + Vector3(0.0, 0.0, 9.0), 0.0)
+	var cam := _free_camera()
+	cam.look_at_from_position(spot + Vector3(0.0, 1.5, 2.2), spot + Vector3(0.0, 1.0, 0.0))
+	# The holder turned away (_b), side on (_c) and facing the camera, each held a moment: the
+	# server's tick clears `using`, so it is set again each frame after the physics step.
+	for view: Array in [["_b", 0.0], ["_c", 90.0], ["", 180.0]]:
+		holder.place_at(spot, view[1])
+		for _i in 20:
+			await get_tree().process_frame
+			holder.using = &"defib"
+		if view[0] == "":
+			await _seconds_of(0.1)
+		else:
+			await _save_extra(view[0])
+
+
+func _view_action(game: ZzGame, local, stand: Vector3) -> void:
+	await _until_uncovered()
+	# A stand-in playing an avatar action, from the front, early in the clip.
+	var actor = game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0]
+	var at_feet: Vector3 = stand + Vector3(0.0, 0.0, -3.0)
+	actor.place_at(at_feet, 180.0)
+	await _settle(actor)
+	at_feet = actor.feet()
+	local.place_at(at_feet + Vector3(0.0, 0.0, 9.0), 0.0)
+	var parts := _action.split(":")
+	var entry: Dictionary = DotAvatarActions.defaults().find(StringName(parts[0]), parts[1])
+	var ok: bool = actor.figure.body_node().play_action(StringName(parts[1]), bool(entry.get("loop", false)), 0.0)
+	print("action %s: played=%s" % [_action, ok])
+	_free_camera().look_at_from_position(at_feet + Vector3(0.0, 1.5, 3.0), at_feet + Vector3(0.0, 1.0, 0.0))
+	# Early and late frames of the clip: <out>_a.png now, the usual frame at the end.
+	await _pin_for(actor, 0.4)
+	await _save_extra("_a")
+	await _pin_for(actor, maxf(_seconds - 0.4, 0.1))
+
+
+func _view_pinned(game: ZzGame, local, stand: Vector3) -> void:
+	var kind := _pin if _pin != &"" else &"pounce"
+	var special: StringName = {&"pounce": ZzNpcs.LEAPER, &"choke": ZzNpcs.STRANGLER, &"carry": ZzNpcs.RAM,
+		&"ride": ZzNpcs.RIDER, &"grab": ZzNpcs.CRAWLER}.get(kind, ZzNpcs.LEAPER)
+	# --pin-me: the special takes you, which is what the lens drawing is for.
+	var friend = local if _pin_me else (game.survivors()[1] if game.survivors()[0] == local else game.survivors()[0])
+	if not _pin_me:
+		friend.place_at(stand + Vector3(0.0, 0.0, -4.0), 180.0)
+	var npc := game.horde.spawner.spawn(special, game.horde.snap_to_nav(stand + (Vector3(3.5, 0.0, -14.0) if kind == &"choke" else Vector3(0.0, 0.0, -5.0))), &"shot", Basis(Vector3.UP, PI))
+	await _seconds_of(0.3)
+	var _held := game.pins.pin(game.horde.entity_id_for(npc), npc, friend.player_id, kind)
+	_orbit.holder = npc
+	_orbit.victim = friend
+	await _seconds_of(_seconds)
+
+
+func _spawn_requested(game: ZzGame, local, stand: Vector3) -> void:
+	for entry: Array in _spawn:
+		for n in int(entry[1]):
+			var at := stand + Vector3(randf_range(-3.0, 3.0), 0.0, -6.0 - randf_range(0.0, 8.0))
+			var npc: DotNpcInstance = game.horde.spawn_brute(at) if entry[0] == ZzNpcs.BRUTE \
+				else game.horde.spawner.spawn(entry[0], game.horde.snap_to_nav(at), &"shot", Basis(Vector3.UP, PI))
+			if npc != null and npc.brain != null and entry[0] == ZzNpcs.COMMON:
+				npc.brain.call(&"force_target", local.player_id)
+			var body: Node3D = npc.node if npc != null else null
+			if body != null and body.get(&"limbs") != null:
+				for limb in _sever:
+					body.limbs.sever(StringName(limb), body.global_position + Vector3(0.0, 1.2, 0.0), Vector3(0.0, 2.0, 1.0))
+
+
+func _apply_effects(game: ZzGame, local, stand: Vector3) -> void:
+	if _flash:
+		local.flash_until = game.now() + 600.0
+	if _goo > 0:
+		local.goo_stacks = _goo
+		local.goo_until = game.now() + 600.0
+	for _stack in _hard:
+		game.boxes.run([{"do": "effect", "name": "hard"}], {"opener": local, "at": stand, "box": &"hard"})
+	if _box != &"" and game.boxes != null:
+		var _dropped := game.boxes.drop(_box, stand + Vector3(0.0, 0.0, -2.2))
+
+
+func _standalone_frames(game: ZzGame, local) -> void:
+	match _view:
+		"ads":
+			await _ads_frames(game, local)
+		"crosshair":
+			await _crosshair_frames(game, local)
+		"stamina":
+			await _stamina_frames(local)
+		"firemode":
+			await _fire_mode_frames(game, local)
+		"held":
+			await _held_third_frames(game, local)
+		"weapons":
+			await _weapon_sheets(game, local)
+		"reload":
+			await _reload_shots(game, local)
 
 
 func _view_mutant(game: ZzGame, local: Node, stand: Vector3) -> void:

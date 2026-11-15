@@ -5,9 +5,7 @@ const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs
 
 
 func _ready() -> void:
-	# First, before anything can be drawn: the map, the player and the camera all arrive
-	# after this node is in the tree. The platform puts the loading cover up, held until the
-	# player exists and the camera is current, and finds the link.
+	# First, before anything can be drawn: the map, the player and the camera arrive after this node is in the tree. The platform puts the loading cover up, held until the player exists and the camera is current, and finds the link.
 	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
 	_own_map_threads()
 	platform = DotGameClient.new()
@@ -89,11 +87,8 @@ func _own_map_threads() -> void:
 		var _on := MapThreads.apply(-1)
 
 
-# The load gate is the platform's. Covered also means the horde does not act: offline the
-# world ticks itself, so the director, waves, clocks and damage would all work on the survivor
-# in front of a picture; [member ZzGame.hold_clock] steps only the bodies then, which settle
-# onto the floor under the cover with their input off. Connected, the server owns all of that;
-# what is left to hold is this end's sampling and keys, which wait on [method _covered].
+# The load gate is the platform's. Covered also means the horde does not act: offline the world ticks itself, so the director, waves, clocks and damage would work on the survivor in front of a picture;
+# [member ZzGame.hold_clock] steps only the bodies then. Connected, the server owns all of that; what is left to hold is this end's sampling and keys, which wait on [method _covered].
 
 ## Covered from the moment a map starts clearing until it is rebuilt, the first build and every
 ## later one (a vote's, the map menu's, a server's next).
@@ -925,11 +920,8 @@ func _on_death(session_id: int, by: int, why: StringName, by_kind: StringName, w
 	_fall(who)
 
 
-## [param who]'s body falls the way the server picked ([member ZzPlayer.death]), copied from the
-## figure this client draws (a downed survivor's crawl included); the figure itself stays hidden
-## while they are dead ([method ZzPlayer.present_body]). Nobody's figure, nothing: a
-## first-person survivor never had one drawn here. Called from [method _on_death], solo and
-## connected alike, before the next frame hides the figure.
+## [param who]'s body falls the way the server picked ([member ZzPlayer.death]), copied from the figure this client draws (a downed survivor's crawl included); the figure stays hidden while they are dead ([method ZzPlayer.present_body]).
+## Nobody's figure, nothing: a first-person survivor never had one drawn here. Called from [method _on_death], solo and connected alike, before the next frame hides the figure.
 func _fall(who: ZzPlayer) -> void:
 	if who == null or world_view == null or who.figure == null or not who.figure.visible:
 		return
@@ -1162,10 +1154,8 @@ func _on_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot:
 		var _splat := blood.on_body_hit(victim, point, camera.global_position)
 
 
-## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a
-## body the client's presentation ray never meets (a zombie is drawn as a figure and hit through the server's hitboxes). The rig's effects skip a second drawing
-## of a hit the ray already drew. Through `has_method`: an older shell's zee has no
-## `play_body_hit`.
+## The hit drawn on the body the server says was hit: zee's red burst at [param point], for a body the client's presentation ray never meets (a zombie is drawn as a figure and hit through the server's hitboxes).
+## The rig's effects skip a second drawing of a hit the ray already drew. Through `has_method`: an older shell's zee has no `play_body_hit`.
 func _draw_body_hit(rig: Object, point: Vector3) -> void:
 	if rig == null or not is_instance_valid(rig) or not rig.has_method(&"shot_fx"):
 		return
@@ -2023,12 +2013,8 @@ func _aim_sent() -> bool:
 	return _aim_allowed() and (hands.is_aim_held() if hands != null else _aiming)
 
 
-## The main camera's field-of-view multiplier for [param hands], with this machine's scope prefs
-## given to them first. A scope drawn as a lens zooms in its own camera, so the main one stays at
-## the hip's. Duck-typed: zee-weapons gained `resolve_scope_mode` and `view_fov_scale` without
-## raising its API level, and a copied addons/zee_weapons older than that (Windows bootstrap
-## copies, and a copy does not follow a pull) has neither. Calling them anyway raised two script
-## errors every frame and left the camera unzoomed; such hands get the old full-screen zoom.
+## The main camera's field-of-view multiplier for [param hands], with this machine's scope prefs given to them first. A scope drawn as a lens zooms in its own camera, so the main one stays at the hip's.
+## Duck-typed: zee-weapons gained `resolve_scope_mode` and `view_fov_scale` without raising its API level, and an older copied addons/zee_weapons has neither (calling them raised two script errors every frame); such hands get the old full-screen zoom.
 static func scope_view_zoom(hands: Object) -> float:
 	if hands.has_method(&"resolve_scope_mode"):
 		ScopePrefs.apply(hands)
@@ -2060,12 +2046,8 @@ func _present_aim() -> void:
 			hud.set_spread(weapons.arsenal.spread_now(), camera.fov, weapons.arsenal.crosshair_scale())
 
 
-## What E would do now, for the HUD: who you would revive, what you would pick up.
-## The light of a map held by nights, eased toward what the hold says (it ramps through dawn
-## and dusk itself; this only smooths the half-second steps a client is told it in).
-## What water does to the screen and the ears, presentation only: the map's murk when the CAMERA
-## (a third-person or spectator one included) is inside a volume, a splash as the local survivor
-## goes in or climbs out past the waist, and the effects muffled under the surface.
+## What water does to the screen and the ears, presentation only: the map's murk when the CAMERA (a third-person or spectator one included) is inside a volume,
+## a splash as the local survivor goes in or climbs out past the waist, and the effects muffled under the surface.
 func _present_water() -> void:
 	if game == null or game.map == null:
 		return
@@ -2317,12 +2299,8 @@ static func present_frame(
 	if networked:
 		p_net.interpolate_frame(alpha)
 
-	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the
-	# clock stretches and shrinks its ticks while it settles on the server, so a physics frame
-	# now and then runs no tick or two, and drawn at the engine's fraction the eye stood still
-	# on one frame and moved double on the next. `DotFpsController.render_state` reads it from
-	# `render_clock` (dot-player-controller); by name both ways, so a shell older than either
-	# draws as before. Null offline, where every physics frame is one tick.
+	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the clock stretches and shrinks its ticks while it settles on the server, so at the engine's fraction the eye stood still on one frame and moved double on the next.
+	# `DotFpsController.render_state` reads it from `render_clock` (dot-player-controller); by name both ways, so an older shell draws as before. Null offline, where every physics frame is one tick.
 	if own != null and own.controller != null:
 		own.controller.set(&"render_clock", p_net.clock if networked else null)
 

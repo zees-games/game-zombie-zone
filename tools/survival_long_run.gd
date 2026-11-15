@@ -90,73 +90,11 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.map_ids = PackedStringArray([String(_map)])
-	config.survival_style = 0
-	config.difficulty = _difficulty
-	config.seed_value = _seed
-
-	for key: String in _sets:
-		var was: Variant = config.get(key)
-		if was == null:
-			push_error("no setting called %s" % key)
-			get_tree().quit(2)
-			return
-		config.set(key, type_convert(_sets[key], typeof(was)))
-
-	_game = ZzGame.new()
-	_game.name = "World"
-	_game.config = config
-	_game.tick_rate = TICK_RATE
-	_game.authoritative = true
-	_game.register_service = false
-	add_child(_game)
-	_game.set_physics_process(false)
-	await get_tree().physics_frame
-
-	_game.round_over.connect(func(_n: int, won: bool, why: String) -> void:
-		if _result.is_empty():
-			_result = [won, why])
-	_game.player_downed.connect(func(_id: StringName, by: StringName, why: StringName) -> void:
-		_current["downs"] = int(_current.get("downs", 0)) + 1
-		var cause := "friend" if String(by).begins_with("u") else String(by) if by != &"" else String(why)
-		var causes: Dictionary = _current.get_or_add("causes", {})
-		causes[cause] = int(causes.get(cause, 0)) + 1
-		# Where: the post nearest the survivor downed (its index in the map's posts).
-		var who = _game.players.get(_id)
-		if who != null:
-			var spots: Dictionary = _current.get_or_add("down_posts", {})
-			var post := _nearest_post(who.feet())
-			spots[post] = int(spots.get(post, 0)) + 1)
-	_game.player_died.connect(func(_id: StringName, _by: StringName, _why: StringName) -> void:
-		_current["deaths"] = int(_current.get("deaths", 0)) + 1)
-	_game.barricade_changed.connect(func(_id: String, _fraction: float, intact: bool) -> void:
-		if not intact:
-			_current["broken"] = int(_current.get("broken", 0)) + 1
-			var which: Dictionary = _current.get_or_add("broke", {})
-			which[_id] = int(which.get(_id, 0)) + 1)
-
-	if _game.horde != null and _game.horde.spawner != null:
-		_game.horde.spawner.refused.connect(func(owner: StringName, npc_id: StringName, reason: String) -> void:
-			var key := "%s for %s: %s" % [npc_id, owner, reason]
-			_refusals[key] = int(_refusals.get(key, 0)) + 1)
-
-	var team := 0
-	_game.next_map_id = _map
-	# The map's team, as a server with zz_team_from_map fills it.
-	var doc: Dictionary = _game.catalogue.doc(_map) if _game.catalogue != null else {}
-	team = maxi(int(doc.get("survivors", 4)), 1)
-	for i in team:
-		var player := _game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
-		player.is_bot = true
-	_game.start()
-	_stuck = StuckMeter.new(_game)
-
-	print("%s: %d stand-ins, difficulty %s, seed %d, %s" % [_map, team, config.difficulty_name(), _seed, _sets])
+	if not await _make_game():
+		return
+	_connect_signals()
+	var team := _seat_team()
+	print("%s: %d stand-ins, difficulty %s, seed %d, %s" % [_map, team, _game.config.difficulty_name(), _seed, _sets])
 	print("wave  twist      secs   sent  peak  downs deaths broken  up    tick ms mean/worst   wall s   end")
 
 	var t := 0.0
@@ -234,7 +172,85 @@ func _run() -> void:
 
 	if last_stage == DotNpcDirectorWaves.Stage.HORDE and not _current.is_empty() and schedule != null:
 		_close_wave(last_index, t - started_at, schedule, peak, spent, worst, ticks, wall)
+	_print_result(t, team)
+	get_tree().quit(0)
 
+
+func _make_game() -> bool:
+	var config := ZzConfig.new()
+	config.warmup_seconds = 0.0
+	config.intermission_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.map_ids = PackedStringArray([String(_map)])
+	config.survival_style = 0
+	config.difficulty = _difficulty
+	config.seed_value = _seed
+
+	for key: String in _sets:
+		var was: Variant = config.get(key)
+		if was == null:
+			push_error("no setting called %s" % key)
+			get_tree().quit(2)
+			return false
+		config.set(key, type_convert(_sets[key], typeof(was)))
+
+	_game = ZzGame.new()
+	_game.name = "World"
+	_game.config = config
+	_game.tick_rate = TICK_RATE
+	_game.authoritative = true
+	_game.register_service = false
+	add_child(_game)
+	_game.set_physics_process(false)
+	await get_tree().physics_frame
+	return true
+
+
+func _connect_signals() -> void:
+	_game.round_over.connect(func(_n: int, won: bool, why: String) -> void:
+		if _result.is_empty():
+			_result = [won, why])
+	_game.player_downed.connect(func(_id: StringName, by: StringName, why: StringName) -> void:
+		_current["downs"] = int(_current.get("downs", 0)) + 1
+		var cause := "friend" if String(by).begins_with("u") else String(by) if by != &"" else String(why)
+		var causes: Dictionary = _current.get_or_add("causes", {})
+		causes[cause] = int(causes.get(cause, 0)) + 1
+		# Where: the post nearest the survivor downed (its index in the map's posts).
+		var who = _game.players.get(_id)
+		if who != null:
+			var spots: Dictionary = _current.get_or_add("down_posts", {})
+			var post := _nearest_post(who.feet())
+			spots[post] = int(spots.get(post, 0)) + 1)
+	_game.player_died.connect(func(_id: StringName, _by: StringName, _why: StringName) -> void:
+		_current["deaths"] = int(_current.get("deaths", 0)) + 1)
+	_game.barricade_changed.connect(func(_id: String, _fraction: float, intact: bool) -> void:
+		if not intact:
+			_current["broken"] = int(_current.get("broken", 0)) + 1
+			var which: Dictionary = _current.get_or_add("broke", {})
+			which[_id] = int(which.get(_id, 0)) + 1)
+
+	if _game.horde != null and _game.horde.spawner != null:
+		_game.horde.spawner.refused.connect(func(owner: StringName, npc_id: StringName, reason: String) -> void:
+			var key := "%s for %s: %s" % [npc_id, owner, reason]
+			_refusals[key] = int(_refusals.get(key, 0)) + 1)
+
+
+func _seat_team() -> int:
+	var team := 0
+	_game.next_map_id = _map
+	# The map's team, as a server with zz_team_from_map fills it.
+	var doc: Dictionary = _game.catalogue.doc(_map) if _game.catalogue != null else {}
+	team = maxi(int(doc.get("survivors", 4)), 1)
+	for i in team:
+		var player := _game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)
+		player.is_bot = true
+	_game.start()
+	_stuck = StuckMeter.new(_game)
+	return team
+
+
+func _print_result(t: float, team: int) -> void:
 	var won := not _result.is_empty() and bool(_result[0])
 	# Waves this run saw end (not the one it was lost or stopped in), plus those --from skipped.
 	var cleared := _finished_waves + (_from - 1)
@@ -264,7 +280,7 @@ func _run() -> void:
 	print("RESULT %s" % JSON.stringify({"map": String(_map), "team": team, "seed": _seed, "difficulty": _difficulty,
 		"sets": _sets, "won": won, "why": _result[1] if not _result.is_empty() else "", "cleared": cleared,
 		"held": snappedf(t, 0.1), "waves": _waves}))
-	get_tree().quit(0)
+
 
 
 ## ZzGame._step, part by part, timed. Kept in the order `_step` has; a profile, not the game.

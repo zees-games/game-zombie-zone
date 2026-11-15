@@ -77,6 +77,15 @@ const ACK_LAG := 2
 ## --detail: brains timed by kind, players split into simulate and hands, and where the NPCs
 ## stand from the nearest survivor, printed as a DETAIL line after RESULT.
 var _detail := false
+var _wave_set := false
+var _up_at := -1
+var _cap := 0
+var _graph = null
+var _searches0 := 0
+var _wall := 0
+var _physics_ms: Array = []
+var _step_ms: Array = []
+var _idle_ms: Array = []
 var _acc: Dictionary = {}
 var _near_hist: Dictionary = {}
 var _detail_ticks := 0
@@ -169,7 +178,44 @@ func _ready() -> void:
 func _run() -> void:
 	Engine.physics_ticks_per_second = _rate
 	_build_game()
+	if not _start_net():
+		return
+	await get_tree().physics_frame
+	_admit_players()
+	var tick := 0
+	var measured := 0
+	var window := int(_seconds * float(_rate))
+	_wall = Time.get_ticks_msec()
+	var limit := 3600 * _rate
+	while measured < window and tick < limit:
+		tick += 1
+		var measuring := _up_at >= 0
+		_lap = {}
+		if _detail and measuring and _detail_ticks == 0:
+			_acc.clear()
+			_near_hist.clear()
+			Engine.set_meta(&"_prof", {})
+		if measuring:
+			_detail_ticks += 1
+		_one_tick(tick)
+		if measuring:
+			for id in _game.horde.spawner._npcs:
+				var inst: DotNpcInstance = _game.horde.spawner._npcs[id]
+				_engaged += 1 if inst.is_alive() and inst.has_target() else 0
+			measured += 1
+			for k: String in _lap:
+				(_series.get_or_add(k, []) as Array).append(float(_lap[k]) / 1000.0)
+		if tick % 16 == 0:
+			await _frame_wait(measuring)
+		_wave_step(tick)
+	if _up_at < 0 or measured == 0:
+		print("[probe] FAILED to reach the cap or measure (n=%d rate=%d)" % [_n, _rate])
+		get_tree().quit(1)
+		return
+	_report(measured)
 
+
+func _start_net() -> bool:
 	_net = DotNetManager.new()
 	_net.name = "Server"
 	_net.is_server = true
@@ -200,7 +246,7 @@ func _run() -> void:
 	if not attached.ok:
 		push_error("bridge refused: %s" % attached.error)
 		get_tree().quit(2)
-		return
+		return false
 	if not _relevance:
 		_net.interest = DotNetInterestAll.new()
 	# Only what was asked for: otherwise the game's own net_far_* settings stand, as on a server.
@@ -218,8 +264,10 @@ func _run() -> void:
 			_ack_later(peer_id, payload)
 	var _s := _net.start()
 	_net.snapshot_sent.connect(func(_t: int, _n2: int) -> void: _snaps += 1)
-	await get_tree().physics_frame
+	return true
 
+
+func _admit_players() -> void:
 	_game.next_map_id = _map
 	for i in _n:
 		var peer := i + 2
@@ -231,89 +279,59 @@ func _run() -> void:
 		_bridge._admit(peer)
 	_game.start()
 
-	var tick := 0
-	var wave_set := false
-	var up_to_cap_at := -1
-	var measured := 0
-	var window := int(_seconds * float(_rate))
-	var physics_ms: Array = []
-	# The frame split in two: the physics step, and the rest of the engine frame.
-	var step_ms: Array = []
-	var idle_ms: Array = []
-	var searches0 := 0
-	var wall := Time.get_ticks_msec()
-	var cap := 0
-	var limit := 3600 * _rate
-	var path_graph = null
 
-	while measured < window and tick < limit:
-		tick += 1
-		var measuring := up_to_cap_at >= 0
-		_lap = {}
-		if _detail and measuring and _detail_ticks == 0:
-			_acc.clear()
-			_near_hist.clear()
-			Engine.set_meta(&"_prof", {})
-		if measuring:
-			_detail_ticks += 1
-		_one_tick(tick)
-		if measuring:
-			for id in _game.horde.spawner._npcs:
-				var inst: DotNpcInstance = _game.horde.spawner._npcs[id]
-				_engaged += 1 if inst.is_alive() and inst.has_target() else 0
-		if measuring:
-			measured += 1
-			for k: String in _lap:
-				(_series.get_or_add(k, []) as Array).append(float(_lap[k]) / 1000.0)
-		if tick % 16 == 0:
-			var before := Time.get_ticks_usec()
-			await get_tree().physics_frame
-			if measuring:
-				physics_ms.append(float(Time.get_ticks_usec() - before) / 1000.0)
-				# physics_frame is emitted before the step, process_frame after it: the wait to the first is the rest of
-				# the engine frame (idle, render sync), the wait from it to the second is the step (physics nodes and the server).
-				var at_physics := Time.get_ticks_usec()
-				await get_tree().process_frame
-				step_ms.append(float(Time.get_ticks_usec() - at_physics) / 1000.0)
-				idle_ms.append(float(at_physics - before) / 1000.0)
-				# The next batch of ticks runs inside a physics frame again, where the server's tick belongs.
-				await get_tree().physics_frame
-
-		var w: DotNpcDirectorWaves = _game.survival.waves if _game.survival != null else null
-		if w == null:
-			continue
-		if not wave_set and w.stage == DotNpcDirectorWaves.Stage.QUIET:
-			w.index = _wave
-			_game.survival.cleared = _wave - 1
-			wave_set = true
-		if wave_set and up_to_cap_at < 0:
-			cap = _game.config.commons_cap(_n)
-			if _game.horde.commons() >= int(0.9 * cap) or tick > int(_lead * float(_rate)):
-				up_to_cap_at = tick
-				_bytes = 0
-				path_graph = _game.horde.spawner.nav
-				_game.horde.spawner.died.connect(func(_n, _b): _kills += 1)
-				_game.combat.damage_applied.connect(func(d: DotDamage) -> void:
-					if _game.horde.is_npc_entity(d.victim):
-						_dmg_npc += d.health_lost
-					else:
-						_dmg_survivor += d.health_lost)
-				searches0 = path_graph.searches
-
-				for _m in _mutants:
-					_game.horde.spawn_special(&"mutant")
-		if wave_set and _fill and tick % (_rate / 2) == 0:
-			_game.horde.spawn_mob(maxi(cap - _game.horde.commons() - _game.horde.pending_commons(), 0))
-		if tick % (_rate * 20) == 0:
-			print("[probe] tick %d  stage %s  commons %d/%d  wall %.0f s" % [tick, w.stage_name(), _game.horde.commons(), cap, float(Time.get_ticks_msec() - wall) / 1000.0])
-
-	if up_to_cap_at < 0 or measured == 0:
-		print("[probe] FAILED to reach the cap or measure (n=%d rate=%d)" % [_n, _rate])
-		get_tree().quit(1)
+func _frame_wait(measuring: bool) -> void:
+	var before := Time.get_ticks_usec()
+	await get_tree().physics_frame
+	if not measuring:
 		return
+	_physics_ms.append(float(Time.get_ticks_usec() - before) / 1000.0)
+	# physics_frame is emitted before the step, process_frame after it: the wait to the first is the rest of
+	# the engine frame (idle, render sync), the wait from it to the second is the step (physics nodes and the server).
+	var at_physics := Time.get_ticks_usec()
+	await get_tree().process_frame
+	_step_ms.append(float(Time.get_ticks_usec() - at_physics) / 1000.0)
+	_idle_ms.append(float(at_physics - before) / 1000.0)
+	# The next batch of ticks runs inside a physics frame again, where the server's tick belongs.
+	await get_tree().physics_frame
 
-	var searches: int = path_graph.searches - searches0
-	var us_per_search := _search_cost(path_graph)
+
+func _wave_step(tick: int) -> void:
+	var w: DotNpcDirectorWaves = _game.survival.waves if _game.survival != null else null
+	if w == null:
+		return
+	if not _wave_set and w.stage == DotNpcDirectorWaves.Stage.QUIET:
+		w.index = _wave
+		_game.survival.cleared = _wave - 1
+		_wave_set = true
+	if _wave_set and _up_at < 0:
+		_cap = _game.config.commons_cap(_n)
+		if _game.horde.commons() >= int(0.9 * _cap) or tick > int(_lead * float(_rate)):
+			_reach_cap(tick)
+	if _wave_set and _fill and tick % (_rate / 2) == 0:
+		_game.horde.spawn_mob(maxi(_cap - _game.horde.commons() - _game.horde.pending_commons(), 0))
+	if tick % (_rate * 20) == 0:
+		print("[probe] tick %d  stage %s  commons %d/%d  wall %.0f s" % [tick, w.stage_name(), _game.horde.commons(), _cap, float(Time.get_ticks_msec() - _wall) / 1000.0])
+
+
+func _reach_cap(tick: int) -> void:
+	_up_at = tick
+	_bytes = 0
+	_graph = _game.horde.spawner.nav
+	_game.horde.spawner.died.connect(func(_n, _b): _kills += 1)
+	_game.combat.damage_applied.connect(func(d: DotDamage) -> void:
+		if _game.horde.is_npc_entity(d.victim):
+			_dmg_npc += d.health_lost
+		else:
+			_dmg_survivor += d.health_lost)
+	_searches0 = _graph.searches
+	for _m in _mutants:
+		_game.horde.spawn_special(&"mutant")
+
+
+func _report(measured: int) -> void:
+	var searches: int = _graph.searches - _searches0
+	var us_per_search := _search_cost(_graph)
 	var up := 0
 	for p in _game.survivors():
 		if p.is_up():
@@ -332,14 +350,14 @@ func _run() -> void:
 		var seen := _net.interest.relevant_for(_net._observer_for(peer), all_identities, peer, {"tick": 0, "config": _net.config})
 		told += seen.size()
 		asked += 1
-	var row := {"snapshot_rate": _net.config.snapshot_rate, "staggered": _net.config.stagger_snapshots, "acks": _acks, "relevance": _relevance, "far_every": _net.interest.far_every, "far": _net.interest.far_distance, "far_coherent": _net.interest.far_coherent, "far_tiers": _net.interest.far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": cap, "commons": commons, "npcs": npcs, "up": up,
+	var row := {"snapshot_rate": _net.config.snapshot_rate, "staggered": _net.config.stagger_snapshots, "acks": _acks, "relevance": _relevance, "far_every": _net.interest.far_every, "far": _net.interest.far_distance, "far_coherent": _net.interest.far_coherent, "far_tiers": _net.interest.far_tiers, "workers": _workers, "npc_workers": _npc_workers, "native": _net._native_note if _native else "off", "relevant_per_peer": snappedf(float(told) / float(maxi(asked, 1)), 0.1), "entities": all_identities.size(), "n": _n, "rate": _rate, "commons_cap": _cap, "commons": commons, "npcs": npcs, "up": up,
 		"budget_ms": snappedf(1000.0 / float(_rate), 0.01), "ticks": measured,
 		"bytes_per_s_per_peer": int(float(_bytes) / secs),
 		"snapshot_ms": _snapshot_split(),
 		"searches_per_tick": snappedf(float(searches) / float(measured), 0.01),
 		"us_per_search": snappedf(us_per_search, 0.1),
 		"path_ms_derived": snappedf(float(searches) / float(measured) * us_per_search / 1000.0, 0.01),
-		"engine_step_ms": _stats(physics_ms), "engine_physics_ms": _stats(step_ms), "engine_rest_ms": _stats(idle_ms),
+		"engine_step_ms": _stats(_physics_ms), "engine_physics_ms": _stats(_step_ms), "engine_rest_ms": _stats(_idle_ms),
 		"physics_engine": str(ProjectSettings.get_setting("physics/3d/physics_engine", "?")),
 		"physics_thread": bool(ProjectSettings.get_setting("physics/3d/run_on_separate_thread", false)), "rss_peak_mb": _peak_mb(), "phases": {}}
 	for k: String in _series:

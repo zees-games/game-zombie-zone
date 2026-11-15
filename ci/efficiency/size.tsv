@@ -5,7 +5,6 @@ examples/dedicated.gd::_test_a_covered_seat_is_not_harmed	105
 examples/dedicated.gd::_test_rotation_file	100
 examples/dedicated.gd::_test_the_commands	82
 examples/dedicated.gd::_test_the_map_vote	120
-examples/headless_ambience.gd::_run	192
 examples/headless_config.gd::_run	92
 examples/headless_defib.gd::_test_defibrillator	89
 examples/headless_maps.gd	848
@@ -37,8 +36,7 @@ game/zz_bots.gd	1509
 game/zz_bots.gd::_decide	97
 game/zz_bots.gd::_pick_up	107
 game/zz_boxes.gd	1224
-game/zz_catalogue.gd::practice	153
-game/zz_client.gd	2612
+game/zz_client.gd	2590
 game/zz_client.gd::_build_netcode	121
 game/zz_client.gd::_hear_the_world	97
 game/zz_config.gd	834
@@ -69,8 +67,6 @@ npcs/zz_common_brain.gd::_decide	81
 npcs/zz_zombie_view.gd	1191
 tools/bench.gd::_run	122
 tools/fall_probe.gd::_nav_check	110
-tools/fall_probe.gd::probe	192
 tools/server_probe.gd::_one_tick	139
-tools/server_probe.gd::_run	186
-tools/shot.gd::_run	482
-tools/survival_long_run.gd::_run	176
+tools/shot.gd::_run	176
+tools/survival_long_run.gd::_run	85

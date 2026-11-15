@@ -14,11 +14,8 @@ game/net/zz_events.gd::long_block	5
 game/net/zz_net_bridge.gd::history	1
 game/net/zz_net_bridge.gd::long_block	25
 game/net/zz_net_command.gd::long_block	1
-game/net/zz_net_link.gd::history	2
-game/net/zz_net_link.gd::long_block	8
+game/net/zz_net_link.gd::history	1
 game/net/zz_npc_net.gd::long_block	1
-game/net/zz_player_net.gd::history	1
-game/net/zz_player_net.gd::long_block	8
 game/net/zz_request.gd::history	1
 game/net/zz_request.gd::long_block	2
 game/net/zz_toy_net.gd::long_block	1
@@ -36,7 +33,6 @@ game/zz_boxes.gd::long_block	2
 game/zz_carry.gd::long_block	1
 game/zz_catalogue.gd::long_block	2
 game/zz_classes.gd::long_block	1
-game/zz_client.gd::long_block	7
 game/zz_config.gd::long_block	5
 game/zz_controller.gd::long_block	2
 game/zz_crates.gd::long_block	1

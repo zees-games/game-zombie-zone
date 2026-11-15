@@ -635,9 +635,41 @@ static var practice_toys: Array = []
 ## start room x -5..5, z -14..-6; street x -9..9, z -6..80, y 0, alleys at z 14..18 and 54..58;
 ## the gate `barrier` closes it at z 40 until the switch at (6.5, 1, 36) is held; end room z 80..90.
 static func practice() -> Dictionary:
+	var source := {
+		"format": ZzMapDoc.FORMAT,
+		"kind": ZzMapDoc.KIND,
+		"id": String(PRACTICE),
+		"name": "Practice Street",
+		"author": "game-zombie-zone",
+		"blurb": "One street at night. Get from one shelter to the other.",
+		"mode": ZzMapDoc.EXODUS,
+		"kill_y": -20.0,
+		"environment": {
+			"sky_top": [0.02, 0.025, 0.05], "sky_horizon": [0.08, 0.08, 0.11], "ground": [0.03, 0.03, 0.03],
+			"sun_pitch": -40.0, "sun_yaw": 140.0, "sun_energy": 0.12, "sun_colour": [0.6, 0.7, 1.0],
+			"ambient": [0.35, 0.38, 0.5], "ambient_energy": 0.22, "fog": 0.025,
+		},
+		"boxes": _practice_boxes(),
+		"props": _practice_props(),
+		# No physics props (toys) of its own: only prop hunt, murder mystery, hide n seek and
+		# the playground keep them. Tests set [member practice_toys].
+		"toys": practice_toys.duplicate(true),
+		"lights": _practice_lights(),
+	}
+	source.merge(_practice_layout())
+
+	var normalised := ZzMapDoc.validate(source)
+
+	if not normalised.ok:
+		DotLog.error(CHANNEL, "the built-in practice street is refused", {"why": normalised.error.message})
+		return {}
+
+	return normalised.value
+
+
+static func _practice_boxes() -> Array:
 	var boxes: Array = []
 	var h := 6.0
-
 	# The start room: brick, a doorway onto the street at x -1.2..1.2.
 	boxes.append({"at": [0.0, -0.1, -10.0], "size": [10.4, 0.2, 8.4], "mat": "tile"})
 	boxes.append({"at": [0.0, 3.1, -10.0], "size": [10.4, 0.2, 8.4], "mat": "ceiling"})
@@ -647,31 +679,26 @@ static func practice() -> Dictionary:
 	boxes.append({"at": [-3.2, 1.5, -5.9], "size": [4.0, 3.0, 0.2], "mat": "brick"})
 	boxes.append({"at": [3.2, 1.5, -5.9], "size": [4.0, 3.0, 0.2], "mat": "brick"})
 	boxes.append({"at": [0.0, 2.6, -5.9], "size": [2.4, 0.8, 0.2], "mat": "brick"})
-
 	# The start room's frontage closed off either side, out to the street's buildings: the
 	# first smoke run had a stand-in walk round the room's corner and fall out of the map.
 	boxes.append({"at": [-7.15, h * 0.5, -6.1], "size": [3.9, h, 0.2], "mat": "brick"})
 	boxes.append({"at": [7.15, h * 0.5, -6.1], "size": [3.9, h, 0.2], "mat": "brick"})
 	boxes.append({"at": [0.0, h * 0.5 + 1.5, -6.1], "size": [10.4, h - 3.0, 0.2], "mat": "brick"})
-
 	# The street and its pavements.
 	boxes.append({"at": [0.0, -0.1, 37.0], "size": [12.0, 0.2, 86.0], "mat": "asphalt"})
 	boxes.append({"at": [-7.5, -0.1, 37.0], "size": [3.0, 0.2, 86.0], "mat": "sidewalk"})
 	boxes.append({"at": [7.5, -0.1, 37.0], "size": [3.0, 0.2, 86.0], "mat": "sidewalk"})
-
 	# The buildings either side, broken by an alley each side at z 14..18 and 54..58.
 	for side in [-1.0, 1.0]:
 		for span in [[-6.0, 14.0], [18.0, 54.0], [58.0, 80.0]]:
 			var length: float = span[1] - span[0]
 			boxes.append({"at": [side * 9.1, h * 0.5, (span[0] + span[1]) * 0.5], "size": [0.2, h, length], "mat": "brick",
 				"tint": [0.85, 0.8, 0.78] if side < 0.0 else [0.75, 0.75, 0.8]})
-
 		for alley in [16.0, 56.0]:
 			boxes.append({"at": [side * 12.5, -0.1, alley], "size": [7.0, 0.2, 4.0], "mat": "concrete"})
 			boxes.append({"at": [side * 12.5, h * 0.5, alley - 2.1], "size": [7.0, h, 0.2], "mat": "concrete"})
 			boxes.append({"at": [side * 12.5, h * 0.5, alley + 2.1], "size": [7.0, h, 0.2], "mat": "concrete"})
 			boxes.append({"at": [side * 16.1, h * 0.5, alley], "size": [0.2, h, 4.4], "mat": "concrete"})
-
 	# The far end: a wall across the street, with the end room's door in it.
 	boxes.append({"at": [-5.2, h * 0.5, 80.0], "size": [7.8, h, 0.2], "mat": "brick"})
 	boxes.append({"at": [5.2, h * 0.5, 80.0], "size": [7.8, h, 0.2], "mat": "brick"})
@@ -682,11 +709,13 @@ static func practice() -> Dictionary:
 	boxes.append({"at": [0.0, 1.5, 90.2], "size": [10.4, 3.0, 0.2], "mat": "brick"})
 	boxes.append({"at": [-5.2, 1.5, 85.0], "size": [0.2, 3.0, 10.4], "mat": "brick"})
 	boxes.append({"at": [5.2, 1.5, 85.0], "size": [0.2, 3.0, 10.4], "mat": "brick"})
-
 	# The barrier across the street at z 40: a gate the switch opens.
 	boxes.append({"at": [0.0, 1.6, 40.0], "size": [18.0, 3.2, 0.4], "mat": "metal", "tint": [0.85, 0.6, 0.2], "gate": "barrier"})
+	return boxes
 
-	var props: Array = [
+
+static func _practice_props() -> Array:
+	return [
 		{"id": "cars_sedan", "at": [-3.5, 0.0, 6.0], "yaw": 10.0},
 		{"id": "cars_taxi", "at": [3.8, 0.0, 22.0], "yaw": 175.0},
 		{"id": "cars_police", "at": [-2.0, 0.0, 31.0], "yaw": 60.0},
@@ -710,32 +739,19 @@ static func practice() -> Dictionary:
 		{"id": "graveyard_debris-wood", "at": [-5.0, 0.0, 52.0]},
 	]
 
+
+static func _practice_lights() -> Array:
 	var lights: Array = [{"at": [0.0, 2.8, -10.0], "range": 9.0, "energy": 1.2, "colour": [1.0, 0.92, 0.75]},
 		{"at": [0.0, 2.8, 85.0], "range": 9.0, "energy": 1.2, "colour": [1.0, 0.92, 0.75]}]
 
 	for z in [2.0, 20.0, 38.0, 58.0, 74.0]:
 		lights.append({"at": [-6.5 if int(z) % 4 == 2 else 6.5, 3.6, z], "range": 14.0, "energy": 1.4, "colour": [1.0, 0.78, 0.45]})
+	return lights
 
-	var source := {
-		"format": ZzMapDoc.FORMAT,
-		"kind": ZzMapDoc.KIND,
-		"id": String(PRACTICE),
-		"name": "Practice Street",
-		"author": "game-zombie-zone",
-		"blurb": "One street at night. Get from one shelter to the other.",
-		"mode": ZzMapDoc.EXODUS,
-		"kill_y": -20.0,
-		"environment": {
-			"sky_top": [0.02, 0.025, 0.05], "sky_horizon": [0.08, 0.08, 0.11], "ground": [0.03, 0.03, 0.03],
-			"sun_pitch": -40.0, "sun_yaw": 140.0, "sun_energy": 0.12, "sun_colour": [0.6, 0.7, 1.0],
-			"ambient": [0.35, 0.38, 0.5], "ambient_energy": 0.22, "fog": 0.025,
-		},
-		"boxes": boxes,
-		"props": props,
-		# No physics props (toys) of its own: only prop hunt, murder mystery, hide n seek and
-		# the playground keep them. Tests set [member practice_toys].
-		"toys": practice_toys.duplicate(true),
-		"lights": lights,
+
+## The map's spawns, areas, route, nav, items, spawners, objectives: the part of the document with no loops in it.
+static func _practice_layout() -> Dictionary:
+	return {
 		"spawns": {"survivors": [
 			{"at": [-2.0, 0.1, -10.5], "yaw": 180.0}, {"at": [2.0, 0.1, -10.5], "yaw": 180.0},
 			{"at": [-2.0, 0.1, -8.5], "yaw": 180.0}, {"at": [2.0, 0.1, -8.5], "yaw": 180.0},
@@ -779,11 +795,3 @@ static func practice() -> Dictionary:
 		"sleepers": [[-7.4, 0.0, 26.0, 90.0]],
 		"zombie_spawns": [[-14.0, 0.0, 16.0], [14.0, 0.0, 16.0], [-14.0, 0.0, 56.0], [14.0, 0.0, 56.0]],
 	}
-
-	var normalised := ZzMapDoc.validate(source)
-
-	if not normalised.ok:
-		DotLog.error(CHANNEL, "the built-in practice street is refused", {"why": normalised.error.message})
-		return {}
-
-	return normalised.value

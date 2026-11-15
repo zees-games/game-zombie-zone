@@ -8,6 +8,7 @@ const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const CHECKS := 72
 
+
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
@@ -15,7 +16,23 @@ func _ready() -> void:
 
 func _run() -> void:
 	print("game-zombie-zone: ambience")
+	_check_rules()
+	var credits := _check_moods_shipped()
+	var src := _check_map_doc()
+	var audio := _audio_up()
+	_check_mood_table(audio)
+	_check_live_settings(audio)
+	_check_chapel_plays(audio)
+	_check_shipped_maps(audio)
+	_check_object_form(audio, src)
+	await _check_roof(audio)
+	_check_credits(credits)
+	_check_real_sounds(audio)
+	audio.free()
+	_report(CHECKS)
 
+
+func _check_rules() -> void:
 	var rules := ZzAmbientRules.new()
 	var fired := [0]
 	rules.changed.connect(func() -> void: fired[0] += 1)
@@ -30,6 +47,8 @@ func _run() -> void:
 	_check(fired[0] == 5, "every change was announced once", str(fired[0]))
 	_check(rules.describe().has("allowed") and rules.describe()["mood"] == "swamp", "describe lists the values")
 
+
+func _check_moods_shipped() -> String:
 	var doc := JSON.new()
 	var file := FileAccess.get_file_as_string(DotAudioStock.moods_directory() + "/moods.json")
 	_check(doc.parse(file) == OK, "moods.json parses")
@@ -56,7 +75,10 @@ func _run() -> void:
 		if not credits.contains("`" + f + "`"):
 			uncredited.append(f)
 	_check(uncredited.is_empty(), "every file is credited", ", ".join(uncredited))
+	return credits
 
+
+func _check_map_doc() -> Dictionary:
 	var chapel := JSON.new()
 	var read_ok := chapel.parse(FileAccess.get_file_as_string("res://maps/zz_chapel.json")) == OK
 	_check(read_ok, "a map document reads")
@@ -65,13 +87,19 @@ func _run() -> void:
 	var validated := ZzMapDoc.validate(src)
 	_check(validated.ok and (validated.value as Dictionary).get("ambient", "") == "swamp", "validation keeps a map's ambient field",
 		"" if validated.ok else validated.error.message)
+	return src
 
+
+func _audio_up() -> ZzAudio:
 	var audio := ZzAudio.new()
 	add_child(audio)
 	_check(audio.setup().ok, "the audio sets up")
 	_check(audio.ambient != null and audio.ambient.mood_names().size() == 8, "the ambience loaded all eight moods")
 	_check(audio.ambient.config.enabled, "and it is on by default")
+	return audio
 
+
+func _check_mood_table(audio: ZzAudio) -> void:
 	var cases := {
 		&"zz_chapel": &"interior_horror", &"zz_mall": &"indoor_hall", &"zz_blackout_3": &"snow_wind",
 		&"zz_blackout_2": &"industrial", &"zz_lot": &"city_ruins", &"zz_blackout_1": &"outdoor_night",
@@ -89,6 +117,8 @@ func _run() -> void:
 	audio.on_world_sounds({"soundscapes": [{"soundscape": "swamp.frogs"}]})
 	_check(audio.ambient.effective_mood() == &"indoor_hall", "and the document still beats the vote")
 
+
+func _check_live_settings(audio: ZzAudio) -> void:
 	var live := ZzAmbientRules.new()
 	audio.follow_settings(null, live)
 	live.set_cvar("zz_ambient_volume", "0.4")
@@ -102,6 +132,8 @@ func _run() -> void:
 	_check(audio.ambient.config.enabled, "and on again")
 	_check(audio.describe().has("ambient"), "describe carries the ambience")
 
+
+func _check_chapel_plays(audio: ZzAudio) -> void:
 	audio.on_map_doc(&"zz_chapel", {})
 	for _i in 600:
 		audio.ambient.advance(1.0)
@@ -110,6 +142,8 @@ func _run() -> void:
 	_check(d["mood"] == "interior_horror" and int(d["beds"]) == 3, "the chapel plays its three beds", str(d["beds"]))
 	_check(int(d["oneshots_played"]) >= 2 and is_equal_approx(float(d["level"]), 0.4), "and some one-shots, faded in to the server level", str(d["oneshots_played"]))
 
+
+func _check_shipped_maps(audio: ZzAudio) -> void:
 	# Every shipped map document carries a valid ambient field that validation keeps.
 	var shipped := 0
 	var lacking := PackedStringArray()
@@ -142,9 +176,10 @@ func _run() -> void:
 		audio.on_map_doc(StringName(pair[0]), (ZzMapDoc.validate(one).value as Dictionary))
 		_check(audio.ambient.effective_mood() == pair[1] or audio.ambient.effective_mood() == StringName("%s+%s" % [pair[1], (ZzMapDoc.validate(one).value as Dictionary)["ambient"].get("extra", "")]), "%s sounds %s from its document" % [pair[0], pair[1]], str(audio.ambient.effective_mood()))
 
+
+func _check_object_form(audio: ZzAudio, src: Dictionary) -> void:
 	# The object form: indoor mood, extra one-shots, scales.
-	var dict_doc := {"ambient": {"mood": "swamp", "indoor": "cave_tunnel", "volume": 0.5, "frequency": 2.0, "extra": "industrial"}}
-	audio.on_map_doc(&"zz_new_map", dict_doc)
+	audio.on_map_doc(&"zz_new_map", _dict_doc())
 	_check(audio.ambient.effective_mood() == &"swamp+industrial", "an extra set joins the mood's one-shots", str(audio.ambient.effective_mood()))
 	var base_shots := audio.ambient.mood_def(&"swamp").oneshots.size()
 	_check(audio.ambient.mood_def(&"swamp+industrial").oneshots.size() == base_shots + audio.ambient.mood_def(&"industrial").oneshots.size(), "and the beds are the base's")
@@ -160,11 +195,13 @@ func _run() -> void:
 	var kept: Variant = (v2.value as Dictionary).get("ambient") if v2.ok else null
 	_check(kept is Dictionary and kept["volume"] == 2.0 and kept["frequency"] == 0.0 and not kept.has("indoor") and not kept.has("junk"), "validation clamps scales and drops what is not an id", str(kept) + (" " + v2.error.message if not v2.ok else ""))
 
+
+func _check_roof(audio: ZzAudio) -> void:
 	# The switch: a rule off keeps the outdoor mood; the probe flips on agreeing rays only.
 	var gate := ZzAmbientRules.new()
 	audio.follow_settings(null, gate)
 	_check(gate.follows_indoors() and gate.set_cvar("zz_ambient_indoor", "0") and not gate.follows_indoors(), "zz_ambient_indoor gates the switch")
-	audio.on_map_doc(&"zz_new_map", dict_doc)
+	audio.on_map_doc(&"zz_new_map", _dict_doc())
 	var probe := DotAmbienceRoof.new()
 	_check(not probe.feed(true) and probe.feed(true) and probe.roofed, "the roof probe flips on a second agreeing ray")
 	gate.set_cvar("zz_ambient_indoor", "1")
@@ -181,7 +218,7 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var space := get_viewport().world_3d.direct_space_state
-	audio.on_map_doc(&"zz_new_map", dict_doc)
+	audio.on_map_doc(&"zz_new_map", _dict_doc())
 	for _i in 12:
 		audio.follow_roof(0.25, Vector3(0, 1.5, 0), space, 1)
 	_check(audio.ambient.indoors(), "standing under a slab the ambience is indoors")
@@ -194,6 +231,8 @@ func _run() -> void:
 	_check(not audio.ambient.indoors(), "with the cvar off the slab changes nothing")
 	slab.free()
 
+
+func _check_credits(credits: String) -> void:
 	var unlisted: Array[String] = []
 	for dir in DirAccess.get_directories_at(DotAudioStock.moods_directory()):
 		for f in DirAccess.get_files_at(DotAudioStock.moods_directory() + "/" + dir):
@@ -201,10 +240,6 @@ func _run() -> void:
 				unlisted.append(dir + "/" + f)
 	_check(unlisted.is_empty(), "every shipped ambience file is credited: %s" % ", ".join(unlisted))
 	_check(FileAccess.file_exists("res://docs/ambience-audit.md"), "the loudness audit table is kept")
-
-	_check_real_sounds(audio)
-	audio.free()
-	_report(CHECKS)
 
 
 ## The recorded sounds: every variant exists and is credited, and the cues name them.
@@ -228,3 +263,7 @@ func _check_real_sounds(audio: ZzAudio) -> void:
 	_check(audio.cue(&"mutant", &"jet") == &"real_mutant_jet", "the Mutant's jet cue resolves")
 	_check(audio.cue(&"sleeper", &"voice") == &"sleeper", "the sleeper keeps her looping cry")
 	_check(audio.cue(&"nobody", &"idle") == ZzAudio.MOAN, "an unknown kind falls back to the first-generation sound")
+
+
+func _dict_doc() -> Dictionary:
+	return {"ambient": {"mood": "swamp", "indoor": "cave_tunnel", "volume": 0.5, "frequency": 2.0, "extra": "industrial"}}

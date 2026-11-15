@@ -32,6 +32,28 @@ const LINK_REACH := 3.5
 var _game: ZzGame
 var _suggest := false
 var _edges := false
+var _p_map: ZzMap
+var _p_doc: Dictionary
+var _p_space: PhysicsDirectSpaceState3D
+var _p_mask := 0
+var _p_report: Dictionary
+var _p_examples: PackedStringArray
+var _p_causes: Dictionary
+var _p_drawn: Array
+var _p_no_hulls := false
+var _p_kill := 0.0
+var _p_floors: Array
+var _p_samples: Array[Vector3] = []
+var _p_with_hulls: Array[Vector3] = []
+var _p_starts: Array[Vector3] = []
+var _p_start_count := 0
+var _p_picked: Array[Vector3] = []
+var _p_lowest := 0.0
+var _p_bodies: Array[CharacterBody3D] = []
+var _p_put: Array[Vector3] = []
+var _p_shoved: Array[bool] = []
+var _p_skip: Array[bool] = []
+var _p_settled: Array[Vector3] = []
 
 
 static func ids_in_checkout() -> PackedStringArray:
@@ -104,24 +126,36 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 	_game.set_physics_process(false)
 	for i in 8:
 		await get_tree().physics_frame
-	var map := _game.map
-	var doc := map.doc
-	var report := {"points": 0, "holes": 0, "uneven": 0, "inside_solid": 0, "pushed_out": 0, "causes": {}, "dropped": 0, "falls": 0, "embedded": 0, "trapped": 0,
-		"needs_hulls": 0, "nav_points": 0, "nav_void": 0, "islands": 0, "route_off": 0, "doors_blocked": 0, "hulls": map.world_collision.get_child_count() if map.world_collision != null else 0, "examples": PackedStringArray()}
-	var examples: PackedStringArray = report["examples"]
-	var mask: int = _game.physics.collision_mask(&"player")
-	var space := map.get_world_3d().direct_space_state
+	_p_map = _game.map
+	_p_doc = _p_map.doc
+	_p_report = {"points": 0, "holes": 0, "uneven": 0, "inside_solid": 0, "pushed_out": 0, "causes": {}, "dropped": 0, "falls": 0, "embedded": 0, "trapped": 0,
+		"needs_hulls": 0, "nav_points": 0, "nav_void": 0, "islands": 0, "route_off": 0, "doors_blocked": 0, "hulls": _p_map.world_collision.get_child_count() if _p_map.world_collision != null else 0, "examples": PackedStringArray()}
+	_p_examples = _p_report["examples"]
+	_p_mask = _game.physics.collision_mask(&"player")
+	_p_space = _p_map.get_world_3d().direct_space_state
 
-	var kill := map.kill_height()
-	var floors: Array = (doc.get("nav", {}) as Dictionary).get("floors", [])
-	var drawn := _drawn_boxes(doc)
-	var no_hulls: bool = not (doc.get("world_collision", {}) as Dictionary).is_empty() and int(report["hulls"]) == 0
-	var samples: Array[Vector3] = []
-	var with_hulls: Array[Vector3] = []
+	_p_kill = _p_map.kill_height()
+	_p_floors = (_p_doc.get("nav", {}) as Dictionary).get("floors", [])
+	_p_drawn = _drawn_boxes(_p_doc)
+	_p_no_hulls = not (_p_doc.get("world_collision", {}) as Dictionary).is_empty() and int(_p_report["hulls"]) == 0
+	_p_samples = []
+	_p_with_hulls = []
+	_scan_floor(step, drops)
+	await _hull_only_floor()
+	_pick_starts(drops)
+	_nav_phase()
+	await _drop_and_settle()
+	_count_falls()
+	await _probe_trapped()
+	_game.queue_free()
+	await get_tree().physics_frame
+	return _p_report
 
+
+func _scan_floor(step: float, drops: int) -> void:
 	# (c) holes: a ray down over every floor rectangle.
-	var causes: Dictionary = report["causes"]
-	for fl: Array in floors:
+	_p_causes = _p_report["causes"]
+	for fl: Array in _p_floors:
 		var y := float(fl[4])
 		# A sliver is a rounding of the nav, not ground anybody stands on.
 		if float(fl[2]) - float(fl[0]) < 1.0 or float(fl[3]) - float(fl[1]) < 1.0:
@@ -132,155 +166,166 @@ func probe(id: StringName, step: float, drops: int) -> Dictionary:
 			while z < float(fl[3]) or z == float(fl[1]) + step * 0.5:
 				var px := minf(x, float(fl[2]))
 				var pz := minf(z, float(fl[3]))
-				report["points"] += 1
-				var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(
-					Vector3(px, y + RAY_UP, pz), Vector3(px, y - 2.0, pz), mask))
-				if not hit.is_empty() and (hit["collider"] as Node).get_parent() == map.world_collision:
-					with_hulls.append(Vector3(px, y, pz))
+				_p_report["points"] += 1
+				var hit := _p_space.intersect_ray(PhysicsRayQueryParameters3D.create(
+					Vector3(px, y + RAY_UP, pz), Vector3(px, y - 2.0, pz), _p_mask))
+				if not hit.is_empty() and (hit["collider"] as Node).get_parent() == _p_map.world_collision:
+					_p_with_hulls.append(Vector3(px, y, pz))
 				var lower := hit.is_empty() or (hit["position"] as Vector3).y < y - FLOOR_TOLERANCE
 				if lower:
 					# Ground further down is a ramp or a step the nav rectangle rounds; nothing at all is a hole.
-					var deep := space.intersect_ray(PhysicsRayQueryParameters3D.create(
-						Vector3(px, y - 1.0, pz), Vector3(px, kill - 5.0, pz), mask)) if hit.is_empty() else hit
+					var deep := _p_space.intersect_ray(PhysicsRayQueryParameters3D.create(
+						Vector3(px, y - 1.0, pz), Vector3(px, _p_kill - 5.0, pz), _p_mask)) if hit.is_empty() else hit
 					if not deep.is_empty():
-						report["uneven"] += 1
-					elif _embedded(space, Vector3(px, y, pz), mask) != "":
-						report["inside_solid"] += 1
+						_p_report["uneven"] += 1
+					elif _embedded(_p_space, Vector3(px, y, pz), _p_mask) != "":
+						_p_report["inside_solid"] += 1
 					else:
-						var cause := "HOLE_DRAWN" if _under_drawn(drawn, px, pz, y) else ("HOLE_NO_HULLS" if no_hulls else "HOLE_BARE")
-						report["holes"] += 1
-						causes[cause] = int(causes.get(cause, 0)) + 1
-						if examples.size() < 6:
-							examples.append("%s at (%.1f, %.2f, %.1f)" % [cause, px, y, pz])
-				if samples.size() < drops * 3 and int(report["points"]) % maxi(1, int(5.0 / step) * int(5.0 / step)) == 0:
-					samples.append(Vector3(px, y, pz))
+						var cause := "HOLE_DRAWN" if _under_drawn(_p_drawn, px, pz, y) else ("HOLE_NO_HULLS" if _p_no_hulls else "HOLE_BARE")
+						_p_report["holes"] += 1
+						_p_causes[cause] = int(_p_causes.get(cause, 0)) + 1
+						if _p_examples.size() < 6:
+							_p_examples.append("%s at (%.1f, %.2f, %.1f)" % [cause, px, y, pz])
+				if _p_samples.size() < drops * 3 and int(_p_report["points"]) % maxi(1, int(5.0 / step) * int(5.0 / step)) == 0:
+					_p_samples.append(Vector3(px, y, pz))
 				z += step
 			x += step
 
+
+func _hull_only_floor() -> void:
 	# A client that could not load the world pack plays on the boxes alone: how much floor is only a hull?
-	if not with_hulls.is_empty():
-		var layers: Array[int] = [map.world_collision.collision_layer, map.world_clip.collision_layer if map.world_clip != null else 0]
-		map.world_collision.collision_layer = 0
-		if map.world_clip != null:
-			map.world_clip.collision_layer = 0
+	if not _p_with_hulls.is_empty():
+		var layers: Array[int] = [_p_map.world_collision.collision_layer, _p_map.world_clip.collision_layer if _p_map.world_clip != null else 0]
+		_p_map.world_collision.collision_layer = 0
+		if _p_map.world_clip != null:
+			_p_map.world_clip.collision_layer = 0
 		await get_tree().physics_frame
-		for p in with_hulls:
-			var r := space.intersect_ray(PhysicsRayQueryParameters3D.create(p + Vector3.UP * RAY_UP, p - Vector3.UP * FLOOR_TOLERANCE, mask))
+		for p in _p_with_hulls:
+			var r := _p_space.intersect_ray(PhysicsRayQueryParameters3D.create(p + Vector3.UP * RAY_UP, p - Vector3.UP * FLOOR_TOLERANCE, _p_mask))
 			if r.is_empty():
-				report["needs_hulls"] += 1
-		map.world_collision.collision_layer = layers[0]
-		if map.world_clip != null:
-			map.world_clip.collision_layer = layers[1]
+				_p_report["needs_hulls"] += 1
+		_p_map.world_collision.collision_layer = layers[0]
+		if _p_map.world_clip != null:
+			_p_map.world_clip.collision_layer = layers[1]
 		await get_tree().physics_frame
 
-	# Starts, route, horde spawns and posts, then an even share of the floor samples.
-	var starts: Array[Vector3] = []
-	var lowest := INF
-	for fl: Array in floors:
-		lowest = minf(lowest, float(fl[4]))
-	for side: String in (doc.get("spawns", {}) as Dictionary):
-		for entry: Dictionary in doc["spawns"][side]:
-			lowest = minf(lowest, ZzMapDoc.v3(entry["at"]).y)
-	var seats := ((doc.get("spawns", {}) as Dictionary).get("survivors", []) as Array).size()
+
+func _pick_starts(drops: int) -> void:
+	# Starts, route, horde spawns and posts, then an even share of the floor _p_samples.
+	_p_starts = []
+	_p_lowest = INF
+	for fl: Array in _p_floors:
+		_p_lowest = minf(_p_lowest, float(fl[4]))
+	for side: String in (_p_doc.get("spawns", {}) as Dictionary):
+		for entry: Dictionary in _p_doc["spawns"][side]:
+			_p_lowest = minf(_p_lowest, ZzMapDoc.v3(entry["at"]).y)
+	var seats := ((_p_doc.get("spawns", {}) as Dictionary).get("survivors", []) as Array).size()
 	for seat in seats:
-		starts.append(map.spawn("survivors", seat)[0])
-	var start_count := starts.size()
-	# The route's points are the author's path through the map, not ground: some hang in the air, so they are not dropped.
-	var picked: Array[Vector3] = starts.duplicate()
-	var every := maxi(1, samples.size() / maxi(1, drops - picked.size()))
-	for i in range(0, samples.size(), every):
-		picked.append(samples[i])
+		_p_starts.append(_p_map.spawn("survivors", seat)[0])
+	_p_start_count = _p_starts.size()
+	# The route's points are the author's path through the _p_map, not ground: some hang in the air, so they are not dropped.
+	_p_picked = _p_starts.duplicate()
+	var every := maxi(1, _p_samples.size() / maxi(1, drops - _p_picked.size()))
+	for i in range(0, _p_samples.size(), every):
+		_p_picked.append(_p_samples[i])
 
+
+func _nav_phase() -> void:
 	# The zombies' graph: points with no ground under them, and pieces the first survivor start does not reach.
-	var nav := _nav_check(map, space, mask, starts)
-	report["nav_points"] = nav["points"]
-	report["nav_void"] = nav["void"]
-	report["islands"] = nav["islands"]
-	report["route_off"] = nav["route_off"]
-	var shut := _door_walk(map, space, mask)
-	report["doors_blocked"] = shut.size()
+	var nav := _nav_check(_p_map, _p_space, _p_mask, _p_starts)
+	_p_report["nav_points"] = nav["points"]
+	_p_report["nav_void"] = nav["void"]
+	_p_report["islands"] = nav["islands"]
+	_p_report["route_off"] = nav["route_off"]
+	var shut := _door_walk(_p_map, _p_space, _p_mask)
+	_p_report["doors_blocked"] = shut.size()
 	for what: String in shut:
-		if examples.size() < 30:
-			examples.append(what)
+		if _p_examples.size() < 30:
+			_p_examples.append(what)
 	for what: String in nav["examples"]:
-		if examples.size() < 30:
-			examples.append(what)
+		if _p_examples.size() < 30:
+			_p_examples.append(what)
 	if int(nav["void"]) > 0:
-		causes["NAV_VOID"] = int(nav["void"])
+		_p_causes["NAV_VOID"] = int(nav["void"])
 
+
+func _drop_and_settle() -> void:
 	# (a) and (b): drop capsules, let them settle, then try to leave.
-	var bodies: Array[CharacterBody3D] = []
-	var put: Array[Vector3] = []
-	for p in picked:
-		var body := _body(mask)
+	_p_bodies = []
+	_p_put = []
+	for p in _p_picked:
+		var body := _body(_p_mask)
 		add_child(body)
 		body.global_position = p + Vector3.UP * 0.1
-		bodies.append(body)
-		put.append(p)
-	report["dropped"] = bodies.size()
+		_p_bodies.append(body)
+		_p_put.append(p)
+	_p_report["dropped"] = _p_bodies.size()
 	await get_tree().physics_frame
-	var shoved: Array[bool] = []
-	for i in bodies.size():
-		shoved.append(false)
-	var skip: Array[bool] = []
-	for i in bodies.size():
-		var inside := _embedded(space, bodies[i].global_position, mask)
-		skip.append(inside != "")
-		# A grid point inside a prop is the sample's fault; a start or route point inside one is the map's.
-		if inside != "" and i < start_count:
-			report["embedded"] += 1
-			causes["EMBEDDED_" + inside] = int(causes.get("EMBEDDED_" + inside, 0)) + 1
-			if examples.size() < 14:
-				examples.append("EMBEDDED start at %s in %s" % [put[i], inside])
+	_p_shoved = []
+	for i in _p_bodies.size():
+		_p_shoved.append(false)
+	_p_skip = []
+	for i in _p_bodies.size():
+		var inside := _embedded(_p_space, _p_bodies[i].global_position, _p_mask)
+		_p_skip.append(inside != "")
+		# A grid point inside a prop is the sample's fault; a start or route point inside one is the _p_map's.
+		if inside != "" and i < _p_start_count:
+			_p_report["embedded"] += 1
+			_p_causes["EMBEDDED_" + inside] = int(_p_causes.get("EMBEDDED_" + inside, 0)) + 1
+			if _p_examples.size() < 14:
+				_p_examples.append("EMBEDDED start at %s in %s" % [_p_put[i], inside])
 	for f in SETTLE_FRAMES:
-		_fall(bodies, Vector3.ZERO)
+		_fall(_p_bodies, Vector3.ZERO)
 		await get_tree().physics_frame
 		if f == 0:
-			# A sample that depenetrates sideways on its first frame started inside a wall's skin; where it lands says nothing about the map.
-			for i in bodies.size():
-				var d := Vector2(bodies[i].global_position.x - put[i].x, bodies[i].global_position.z - put[i].z).length()
-				shoved[i] = d > 0.15 and i >= start_count
-	var region: AABB = map.playable_region().grow(ZzMap.BOUNDARY_MARGIN + 1.0)
-	var settled: Array[Vector3] = []
-	for i in bodies.size():
-		var at := bodies[i].global_position
-		settled.append(at)
+			# A sample that depenetrates sideways on its first frame started inside a wall's skin; where it lands says nothing about the _p_map.
+			for i in _p_bodies.size():
+				var d := Vector2(_p_bodies[i].global_position.x - _p_put[i].x, _p_bodies[i].global_position.z - _p_put[i].z).length()
+				_p_shoved[i] = d > 0.15 and i >= _p_start_count
+
+
+func _count_falls() -> void:
+	var region: AABB = _p_map.playable_region().grow(ZzMap.BOUNDARY_MARGIN + 1.0)
+	_p_settled = []
+	for i in _p_bodies.size():
+		var at := _p_bodies[i].global_position
+		_p_settled.append(at)
 		var outside := region.size != Vector3.ZERO and not (at.x >= region.position.x and at.x <= region.end.x and at.z >= region.position.z and at.z <= region.end.z)
-		if (at.y < lowest - FELL or at.y < kill or outside or not at.is_finite()) and shoved[i]:
-			report["pushed_out"] += 1
-		elif at.y < lowest - FELL or at.y < kill or outside or not at.is_finite():
-			report["falls"] += 1
-			if examples.size() < 20:
-				examples.append("FELL from %s to %s%s (lowest floor %.1f, kill %.1f)" % [put[i], at, " (outside the walls)" if outside else "", lowest, kill])
-			var under := space.intersect_ray(PhysicsRayQueryParameters3D.create(put[i] + Vector3.UP * RAY_UP, put[i] - Vector3.UP * 1.0, mask))
-			if examples.size() < 20:
-				examples.append("  ray under the drop: %s" % [("%s at y %.2f" % [under["collider"].get_parent().name if under["collider"].get_parent() else under["collider"].name, under["position"].y]) if not under.is_empty() else "nothing"])
-			var kind := "DRAWN" if _under_drawn(drawn, put[i].x, put[i].z, put[i].y) else ("NO_HULLS" if no_hulls else "BARE")
-			causes["FELL_" + kind] = 1 + int(causes.get("FELL_" + kind, 0))
+		if (at.y < _p_lowest - FELL or at.y < _p_kill or outside or not at.is_finite()) and _p_shoved[i]:
+			_p_report["pushed_out"] += 1
+		elif at.y < _p_lowest - FELL or at.y < _p_kill or outside or not at.is_finite():
+			_p_report["falls"] += 1
+			if _p_examples.size() < 20:
+				_p_examples.append("FELL from %s to %s%s (lowest floor %.1f, kill %.1f)" % [_p_put[i], at, " (outside the walls)" if outside else "", _p_lowest, _p_kill])
+			var under := _p_space.intersect_ray(PhysicsRayQueryParameters3D.create(_p_put[i] + Vector3.UP * RAY_UP, _p_put[i] - Vector3.UP * 1.0, _p_mask))
+			if _p_examples.size() < 20:
+				_p_examples.append("  ray under the drop: %s" % [("%s at y %.2f" % [under["collider"].get_parent().name if under["collider"].get_parent() else under["collider"].name, under["position"].y]) if not under.is_empty() else "nothing"])
+			var kind := "DRAWN" if _under_drawn(_p_drawn, _p_put[i].x, _p_put[i].z, _p_put[i].y) else ("NO_HULLS" if _p_no_hulls else "BARE")
+			_p_causes["FELL_" + kind] = 1 + int(_p_causes.get("FELL_" + kind, 0))
+
+
+func _probe_trapped() -> void:
 	var blocked: Array[int] = []
-	blocked.resize(bodies.size())
+	blocked.resize(_p_bodies.size())
 	for k in 8:
 		var dir := Vector3(cos(TAU * k / 8.0), 0.0, sin(TAU * k / 8.0))
-		for i in bodies.size():
-			bodies[i].global_position = settled[i]
-			bodies[i].velocity = Vector3.ZERO
+		for i in _p_bodies.size():
+			_p_bodies[i].global_position = _p_settled[i]
+			_p_bodies[i].velocity = Vector3.ZERO
 		for f in PROBE_FRAMES:
-			_fall(bodies, dir * PROBE_SPEED)
+			_fall(_p_bodies, dir * PROBE_SPEED)
 			await get_tree().physics_frame
-		for i in bodies.size():
-			var d := Vector2(bodies[i].global_position.x - settled[i].x, bodies[i].global_position.z - settled[i].z).length()
+		for i in _p_bodies.size():
+			var d := Vector2(_p_bodies[i].global_position.x - _p_settled[i].x, _p_bodies[i].global_position.z - _p_settled[i].z).length()
 			if d < 0.3:
 				blocked[i] += 1
-	for i in bodies.size():
-		if blocked[i] == 8 and not skip[i] and settled[i].y >= lowest - FELL:
-			report["trapped"] += 1
-			if examples.size() < 26:
-				examples.append("TRAPPED at %s (put at %s)" % [settled[i], put[i]])
-	for b in bodies:
+	for i in _p_bodies.size():
+		if blocked[i] == 8 and not _p_skip[i] and _p_settled[i].y >= _p_lowest - FELL:
+			_p_report["trapped"] += 1
+			if _p_examples.size() < 26:
+				_p_examples.append("TRAPPED at %s (put at %s)" % [_p_settled[i], _p_put[i]])
+	for b in _p_bodies:
 		b.queue_free()
-	_game.queue_free()
-	await get_tree().physics_frame
-	return report
 
 
 ## Whether ground lies within half a nav cell of [param p]: the graph's grid overhangs a ledge by that much, and nobody stands there.

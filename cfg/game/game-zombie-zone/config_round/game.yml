@@ -21,7 +21,7 @@
 # killcam_seconds: 0.0
 # Seconds of warmup before the first round. 0 starts immediately. [0.0..]
 # warmup_seconds: 10.0
-# Seconds the start area holds the director off, unless somebody leaves it first. [0.0..]
+# Seconds the start area holds the director off, unless somebody leaves it first. Leaving starts it, not the ... [0.0..]
 # start_grace_seconds: 60.0
 # Seconds every survivor still standing must be inside the end area for the map to be won. [0.0..]
 # end_hold_seconds: 3.0
@@ -33,7 +33,7 @@
 # survive_seconds: 480.0
 
 # --- Survival
-# How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]):  waves    a breather, then wave a...
+# How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]):  waves a breather, then wave afte...
 # survival_style: 0
 # Waves to clear, or nights to live through. [1..]
 # waves: 10
