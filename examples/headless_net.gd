@@ -181,6 +181,12 @@ func _test_the_codec() -> void:
 		and absf(float(clock["held"]) - 12.5) < 0.1 and int(clock["alive"]) == 4 and int(clock["objective"]) == 0
 		and int(clock["objective_state"]) == 1 and absf(float(clock["grace_left"]) - 17.5) < 0.2, "CLOCK", str(clock))
 
+	var big_hello := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 64, 1234, 2, 300)))
+	_check(bool(big_hello["ok"]) and int(big_hello["max_incaps"]) == 300, "HELLO carries max_incaps above the old 15", str(big_hello))
+	var big_clock := ZzEvents.read_clock(_r(ZzEvents.write_clock(3, 2, 9000.5, 9000.0, 20000.0, 400, true, 0, 1, 20.0, 9500.0)))
+	_check(bool(big_clock["ok"]) and int(big_clock["alive"]) == 400 and absf(float(big_clock["elapsed"]) - 9000.5) < 0.1
+		and absf(float(big_clock["held"]) - 9000.0) < 0.1, "CLOCK carries alive above 255 and seconds above 7200", str(big_clock))
+
 	var npc := ZzEvents.read_npc(_r(ZzEvents.write_npc(77, ZzNpcs.STRANGLER, 513, Vector3(3.5, 0.0, -12.25))))
 	_check(bool(npc["ok"]) and int(npc["net_id"]) == 77 and npc["kind"] == ZzNpcs.STRANGLER and int(npc["variant"]) == 513
 		and (npc["at"] as Vector3).distance_to(Vector3(3.5, 0.0, -12.25)) < 0.05, "NPC", str(npc))

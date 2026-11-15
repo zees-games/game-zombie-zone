@@ -20,7 +20,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 57
+const CHECKS := 62
 
 
 func _ready() -> void:
@@ -102,6 +102,7 @@ func _run() -> void:
 	_batch4(binder, console, config)
 	_layers()
 	_templates(binder)
+	_caps()
 
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
@@ -198,6 +199,22 @@ func _layers() -> void:
 	_check(_child().contains("PROBE ok=false"), "strict: a key in the wrong file is refused")
 	for f in ["config_round", "config_horde"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(ROOT.path_join("game/%s/%s/game.yml" % [GAME, f])))
+
+
+## Old caps are defaults, refused loudly past them, and lifted by cap_overrides (0 = unlimited).
+func _caps() -> void:
+	const Caps := preload("../game/zz_caps.gd")
+	var errors := PackedStringArray()
+	var none := Caps.parse_overrides("", errors)
+	var top := Caps.highest("zz_mob_max", none)
+	_check(errors.is_empty() and is_finite(top), "a default cap is finite", str(top))
+	_check(Caps.refusal("zz_mob_max", top + 1.0, none).contains("cap_overrides"), "past the old cap is refused and names the fix")
+	_check(Caps.refusal("zz_mob_max", top, none) == "", "at the old cap is accepted")
+	var lifted := Caps.parse_overrides("zz_mob_max=0", errors)
+	_check(errors.is_empty() and Caps.refusal("zz_mob_max", top * 100.0, lifted) == "", "cap_overrides =0 lifts the cap")
+	var bad := PackedStringArray()
+	Caps.parse_overrides("zz_mob_max=abc", bad)
+	_check(not bad.is_empty(), "a malformed override fails loudly")
 
 
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.

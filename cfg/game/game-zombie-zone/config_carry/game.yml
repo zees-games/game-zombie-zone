@@ -4,11 +4,11 @@
 # --- Carry weight
 # Master switch for `zz_weight_*`: every weapon has a weight, a survivor a carry limit, and slots may hold se...
 # weight_enabled: true
-# What a survivor with no backpack carries, in weight units (kilograms: a pistol is about 1, a rifle 4). [0.0..1000.0]
+# What a survivor with no backpack carries, in weight units (kilograms: a pistol is about 1, a rifle 4). [0.0..]
 # weight_limit: 14.0
-# Every weapon's weight is multiplied by this, on top of the box modifiers. [0.0..10.0]
+# Every weapon's weight is multiplied by this, on top of the box modifiers. [0.0..]
 # weight_multiplier: 1.0
-# Weapons one slot holds; pressing the slot key again cycles through them. [1..8]
+# Weapons one slot holds; pressing the slot key again cycles through them. [1..]
 # weight_slot_capacity: 2
 # Over the limit (a limit that fell, a box that made weapons heavier): `slow` slows the survivor down, `drop`...
 # weight_over_limit: "slow"

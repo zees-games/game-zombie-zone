@@ -1,5 +1,7 @@
 extends DotConfig
 
+const ZzCapsScript := preload("zz_caps.gd")
+
 ## Every number this game has, layered like every other [DotConfig] in the family:
 ## [code]exported defaults < JSON file < environment < command line[/code].
 ##
@@ -26,32 +28,32 @@ extends DotConfig
 @export_group("The round")
 
 ## Seconds between maps.
-@export_range(0.0, 60.0, 1.0) var intermission_seconds: float = 10.0
+@export_range(0.0, 60.0, 1.0, "or_greater") var intermission_seconds: float = 10.0
 
 ## Seconds of the map's final killcam, added to the intermission (`mp_killcam_time`); 0 is off, the shipped default (the code stays for a server that wants it). Not added when the intermission is 0.
-@export_range(0.0, 30.0, 0.5) var killcam_seconds: float = 0.0
+@export_range(0.0, 30.0, 0.5, "or_greater") var killcam_seconds: float = 0.0
 
 ## Seconds of warmup before the first round. 0 starts immediately.
-@export_range(0.0, 300.0, 1.0) var warmup_seconds: float = 10.0
+@export_range(0.0, 300.0, 1.0, "or_greater") var warmup_seconds: float = 10.0
 
 ## Seconds the start area holds the director off, unless somebody leaves it first.
 ##
 ## [b]Leaving starts it, not the clock.[/b] A team that wants a minute to sort out its weapons
 ## gets it; one that runs out at once is met at once. This is only the ceiling.
-@export_range(0.0, 600.0, 1.0) var start_grace_seconds: float = 60.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var start_grace_seconds: float = 60.0
 
 ## Seconds every survivor still standing must be inside the end area for the map to be won.
-@export_range(0.0, 30.0, 0.5) var end_hold_seconds: float = 3.0
+@export_range(0.0, 30.0, 0.5, "or_greater") var end_hold_seconds: float = 3.0
 
 ## What happens after a map is lost: 0 play it again, 1 move on.
 @export_enum("retry", "next") var map_on_loss: int = 0
 
 ## How many times a lost map is played again before the server moves on regardless.
-@export_range(0, 20, 1) var retries: int = 2
+@export_range(0, 20, 1, "or_greater") var retries: int = 2
 
 ## Seconds a survival map is held for in the `clock` style, when the map does not say. 0: as
 ## long as you can.
-@export_range(0.0, 7200.0, 10.0) var survive_seconds: float = 480.0
+@export_range(0.0, 7200.0, 10.0, "or_greater") var survive_seconds: float = 480.0
 
 # --- Survival ----------------------------------------------------------------
 
@@ -66,15 +68,15 @@ extends DotConfig
 @export_enum("waves", "nights", "clock") var survival_style: int = 0
 
 ## Waves to clear, or nights to live through.
-@export_range(1, 50, 1) var waves: int = 10
-@export_range(1, 20, 1) var nights: int = 5
+@export_range(1, 50, 1, "or_greater") var waves: int = 10
+@export_range(1, 20, 1, "or_greater") var nights: int = 5
 
 ## Seconds of setup before a survival map's first wave or night (buy, position, load out):
 ## no zombie exists until it ends. 0 skips it. Cvar zz_prestart_time.
-@export_range(0.0, 300.0, 1.0) var prestart_seconds: float = 30.0
+@export_range(0.0, 300.0, 1.0, "or_greater") var prestart_seconds: float = 30.0
 
 ## Overrides the prestart when 0 or more (zz_survival_warmup); -1 follows [member prestart_seconds].
-@export_range(-1.0, 300.0, 1.0) var survival_warmup_seconds: float = -1.0
+@export_range(-1.0, 300.0, 1.0, "or_greater") var survival_warmup_seconds: float = -1.0
 
 ## Whether the dead come back as each breather begins (zz_respawn_on_wave_end).
 @export var respawn_on_wave_end: bool = true
@@ -82,24 +84,24 @@ extends DotConfig
 ## Timed respawn (zz_timed_respawn), off by default: a dead survivor returns after
 ## [method ZzRespawn.delay] seconds, replacing the slow rescue clock. See the README.
 @export var timed_respawn: bool = false
-@export_range(0.0, 600.0, 1.0) var respawn_base_seconds: float = 30.0
-@export_range(0.0, 600.0, 1.0) var respawn_min_seconds: float = 8.0
-@export_range(0.0, 600.0, 1.0) var respawn_max_seconds: float = 90.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var respawn_base_seconds: float = 30.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var respawn_min_seconds: float = 8.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var respawn_max_seconds: float = 90.0
 ## Delay multiplier with the whole team up, and with nearly everybody down.
-@export_range(0.0, 10.0, 0.05) var respawn_healthy_scale: float = 0.5
-@export_range(0.0, 10.0, 0.05) var respawn_scarce_scale: float = 2.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var respawn_healthy_scale: float = 0.5
+@export_range(0.0, 10.0, 0.05, "or_greater") var respawn_scarce_scale: float = 2.0
 ## Seconds added per wave after the first.
-@export_range(0.0, 120.0, 1.0) var respawn_per_wave_seconds: float = 2.0
+@export_range(0.0, 120.0, 1.0, "or_greater") var respawn_per_wave_seconds: float = 2.0
 ## Fraction of the delay added per difficulty step above normal (taken off below it).
 @export_range(0.0, 1.0, 0.05) var respawn_difficulty_step: float = 0.0
 ## Seconds the returned survivor cannot be hurt.
-@export_range(0.0, 30.0, 0.5) var respawn_protect_seconds: float = 3.0
+@export_range(0.0, 30.0, 0.5, "or_greater") var respawn_protect_seconds: float = 3.0
 
 ## Seconds into a round after which some survivors turn into zombies (cvar zz_infect_after). 0 is off.
-@export_range(0.0, 600.0, 1.0) var infect_after_seconds: float = 0.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var infect_after_seconds: float = 0.0
 
 ## How many survivors turn (zz_infect_count); the last one never does.
-@export_range(1, 32, 1) var infect_count: int = 1
+@export_range(1, 32, 1, "or_greater") var infect_count: int = 1
 
 ## The zombie kind a turned survivor becomes (zz_infect_kind).
 @export var infect_kind: String = "common"
@@ -110,27 +112,27 @@ func setup_seconds() -> float:
 
 ## Seconds of breather between waves: the downed are up, the dead are back, the caches
 ## restock, and the barricades want mending.
-@export_range(0.0, 300.0, 5.0) var breather_seconds: float = 30.0
+@export_range(0.0, 300.0, 5.0, "or_greater") var breather_seconds: float = 30.0
 
 ## Seconds of day between nights, and of a night.
-@export_range(10.0, 900.0, 5.0) var day_seconds: float = 60.0
-@export_range(10.0, 1800.0, 10.0) var night_seconds: float = 150.0
+@export_range(10.0, 900.0, 5.0, "or_greater") var day_seconds: float = 60.0
+@export_range(10.0, 1800.0, 10.0, "or_greater") var night_seconds: float = 150.0
 
 ## The first wave's commons for one survivor, and how many more for each further survivor.
-@export_range(1, 400, 1) var wave_size: int = 16
-@export_range(0, 50, 1) var wave_size_per_survivor: int = 4
+@export_range(1, 400, 1, "or_greater") var wave_size: int = 16
+@export_range(0, 50, 1, "or_greater") var wave_size_per_survivor: int = 4
 
 ## How much bigger each wave (or harder each night) is than the first, as a share of it, and
 ## the square term that makes the last waves a wall (see [DotNpcDirectorWaves.strength_of]).
-@export_range(0.0, 2.0, 0.01) var wave_growth: float = 0.22
+@export_range(0.0, 2.0, 0.01, "or_greater") var wave_growth: float = 0.22
 @export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.018
 
 ## Specials a wave brings: one from the second wave plus this many for each wave past the
 ## first, for every [member survivors_per_wave_special] survivors (never fewer than one share).
 ## At 0.6 and four a share a team of twelve met thirteen specials in a third-wave hunters twist
 ## and lost (zz-survival-retune-1; docs/survival.md).
-@export_range(0.0, 5.0, 0.05) var wave_specials_growth: float = 0.6
-@export_range(1.0, 32.0, 0.5) var survivors_per_wave_special: float = 6.0
+@export_range(0.0, 5.0, 0.05, "or_greater") var wave_specials_growth: float = 0.6
+@export_range(1.0, 32.0, 0.5, "or_greater") var survivors_per_wave_special: float = 6.0
 
 ## A wave down to this share of the team in stragglers (never fewer than three) ends 30 s after
 ## its last release: a few commons lost in a far corner held every wave to its overtime.
@@ -142,22 +144,22 @@ func setup_seconds() -> float:
 @export_range(0.1, 1.0, 0.05) var wave_alive_share: float = 0.4
 
 ## Health everybody standing gets back in a breather.
-@export_range(0.0, 100.0, 5.0) var breather_heal: float = 30.0
+@export_range(0.0, 100.0, 5.0, "or_greater") var breather_heal: float = 30.0
 
 ## Every this many waves a brute comes with the wave (and two with the last). 0 never.
-@export_range(0, 50, 1) var brute_every_waves: int = 5
+@export_range(0, 50, 1, "or_greater") var brute_every_waves: int = 5
 
 ## Whether waves from the third on draw a twist (sprinters, a swarm, heavies, hunters).
 @export var wave_twists: bool = true
 
 ## A barricade's strength, when the map does not say, and what one zombie's bashing takes off
 ## it a second (a brute's is ten times that).
-@export_range(10.0, 10000.0, 10.0) var barricade_health: float = 500.0
-@export_range(0.0, 200.0, 0.5) var barricade_bash: float = 6.0
+@export_range(10.0, 10000.0, 10.0, "or_greater") var barricade_health: float = 500.0
+@export_range(0.0, 200.0, 0.5, "or_greater") var barricade_bash: float = 6.0
 
 ## What one repair (holding E on a barricade) puts back, and how long it takes.
-@export_range(1.0, 2000.0, 5.0) var barricade_repair: float = 120.0
-@export_range(0.2, 10.0, 0.1) var barricade_repair_seconds: float = 2.0
+@export_range(1.0, 2000.0, 5.0, "or_greater") var barricade_repair: float = 120.0
+@export_range(0.2, 10.0, 0.1, "or_greater") var barricade_repair_seconds: float = 2.0
 
 # --- Trader ------------------------------------------------------------------
 
@@ -167,7 +169,7 @@ func setup_seconds() -> float:
 ## `zz_trader`: 0 no trader on any map, 1 one.
 @export_range(-1, 1) var trader_enabled: int = -1
 ## `zz_trader_when`: 0 the setup period only, 1 setup and a survival map's breathers, 2 always.
-@export_range(-1, 2) var trader_when: int = -1
+@export_range(-1, 2, 1.0, "or_greater") var trader_when: int = -1
 ## `zz_trader_despawn`: 1 the shelf is gone when closed, 0 it stays standing and refuses to sell.
 @export_range(-1, 1) var trader_despawn: int = -1
 ## Per phase, whether the trader sells (1 yes, 0 no, -1 derives it from `zz_trader_when`): `zz_trader_setup` before a map starts and between maps, `zz_trader_grace` in the grace after it starts, `zz_trader_breather` in a survival map's breathers, `zz_trader_round` while the horde is on.
@@ -178,13 +180,13 @@ func setup_seconds() -> float:
 ## `zz_trader_closed_message`: what a survivor is told on E at a closed trader; empty is silent.
 @export var trader_closed_message: String = "Trader closed: round in progress"
 ## `zz_grace_maps`: which maps get the start grace, 0 none, 1 escape (exodus) maps only, 2 every map.
-@export_range(0, 2) var grace_maps: int = 1
+@export_range(0, 2, 1.0, "or_greater") var grace_maps: int = 1
 ## `zz_escape_grace_seconds`: seconds after a map starts with no zombies (none spawn, none are woken, none target anyone). 0 is off. Set before the map starts.
-@export_range(0.0, 600.0, 1.0) var escape_grace_seconds: float = 30.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var escape_grace_seconds: float = 30.0
 ## `zz_grace_hud`: 1 shows "Zombies arrive in 0:23" on the HUD.
 @export_range(0, 1) var grace_hud: int = 1
 ## `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode).
-@export_range(-1, 1000000) var start_points: int = -1
+@export_range(-1, 1000000, 1.0, "or_greater") var start_points: int = -1
 
 # --- Difficulty ------------------------------------------------------------
 
@@ -206,20 +208,20 @@ func setup_seconds() -> float:
 
 ## Playtime under which a player is new, in minutes (lifetime where progress is kept, this
 ## session where it is not). 0 makes nobody new.
-@export_range(0.0, 100000.0, 1.0) var rookie_minutes: float = 120.0
+@export_range(0.0, 100000.0, 1.0, "or_greater") var rookie_minutes: float = 120.0
 
 ## The window, in seconds, that team damage is added up over.
-@export_range(5.0, 3600.0, 1.0) var team_damage_window: float = 60.0
+@export_range(5.0, 3600.0, 1.0, "or_greater") var team_damage_window: float = 60.0
 
 ## Team damage dealt within the window that starts a voteban against the player, through
 ## dot-vote's API. 0 never. Counted before reflection, so a new player being reflected still
 ## runs up their total.
-@export_range(0.0, 100000.0, 5.0) var team_damage_vote: float = 150.0
+@export_range(0.0, 100000.0, 5.0, "or_greater") var team_damage_vote: float = 150.0
 
 ## Team damage within the window that bans the player outright, for [member team_damage_ban_minutes].
 ## 0 never. A hard ceiling: nobody votes on it and staff are not exempt from nothing but staff.
-@export_range(0.0, 100000.0, 5.0) var team_damage_ban: float = 400.0
-@export_range(1.0, 100000.0, 1.0) var team_damage_ban_minutes: float = 30.0
+@export_range(0.0, 100000.0, 5.0, "or_greater") var team_damage_ban: float = 400.0
+@export_range(1.0, 100000.0, 1.0, "or_greater") var team_damage_ban_minutes: float = 30.0
 
 ## Whether humans walk through a barricade (and so can go outside) without breaking it: the
 ## zombies are still held by it and shots still stop on it. `zz_pass_barricades`.
@@ -227,7 +229,7 @@ func setup_seconds() -> float:
 
 ## The team an exodus map is filled to with stand-ins, at least (a survival map says its own).
 ## An exodus is a long walk and four survivors for the whole of it is a lonely one.
-@export_range(0, 24, 1) var exodus_team: int = 8
+@export_range(0, 24, 1, "or_greater") var exodus_team: int = 8
 
 # --- Navigation notes ------------------------------------------------------
 
@@ -240,10 +242,10 @@ func setup_seconds() -> float:
 ## map takes a minute or more to build. 1 builds on one background thread, more split the heavy passes
 ## across that many; 0 (and every platform without threads) builds on the main thread in slices of
 ## [member nav_budget_ms] a tick. `zz_nav_threads`.
-@export_range(0, 16, 1) var nav_threads: int = 2
+@export_range(0, 16, 1, "or_greater") var nav_threads: int = 2
 
 ## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
-@export_range(0.5, 14.0, 0.5) var nav_budget_ms: float = 6.0
+@export_range(0.5, 14.0, 0.5, "or_greater") var nav_budget_ms: float = 6.0
 
 ## Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its
 ## bake, and the bots and the horde use what it finds. Off plays as before the annotations.
@@ -251,10 +253,10 @@ func setup_seconds() -> float:
 @export var nav_notes: bool = true
 
 ## Seconds a zombie may try to move without getting anywhere before it is freed; 0 turns it off. `zz_unstick_seconds`.
-@export_range(0.0, 30.0, 0.5) var unstick_seconds: float = 4.0
+@export_range(0.0, 30.0, 0.5, "or_greater") var unstick_seconds: float = 4.0
 
 ## The longest drop, in metres, a zombie takes off a ledge. `zz_nav_drop`.
-@export_range(1.0, 10.0, 0.5) var nav_drop_max: float = 4.0
+@export_range(1.0, 10.0, 0.5, "or_greater") var nav_drop_max: float = 4.0
 
 ## Whether the zombies step down ledges the annotations found (a balcony is a way in, never a way
 ## up). `zz_zombie_drops`.
@@ -273,7 +275,7 @@ func setup_seconds() -> float:
 @export var squad_pull_reports: bool = true
 
 ## Seconds between a zombie's reads of its squad's sightings (the log keeps them, so this only delays news). 0 reads on every think.
-@export_range(0.0, 2.0, 0.05) var squad_pull_interval: float = 0.15
+@export_range(0.0, 2.0, 0.05, "or_greater") var squad_pull_interval: float = 0.15
 
 ## How far a zombie's goal may move, as a share of the distance to it, before its route is searched again.
 @export_range(0.0, 1.0, 0.05) var repath_drift_ratio: float = 0.25
@@ -283,20 +285,20 @@ func setup_seconds() -> float:
 
 ## Scales the distances past which a zombie thinks and moves less often (6, 20 and 45 m to its
 ## nearest survivor; its body steps every other tick past 30 m). Below 1 is cheaper. `zz_zombie_think_range`.
-@export_range(0.25, 4.0, 0.05) var think_range: float = 1.0
+@export_range(0.25, 4.0, 0.05, "or_greater") var think_range: float = 1.0
 
 ## Metres to the nearest survivor past which a zombie's body moves every second tick (before `think_range`). `zz_body_stride_near`.
-@export_range(5.0, 500.0, 1.0) var body_stride_near: float = 20.0
+@export_range(5.0, 500.0, 1.0, "or_greater") var body_stride_near: float = 20.0
 ## Metres past which a zombie's body moves every fourth tick. `zz_body_stride_far`.
-@export_range(5.0, 500.0, 1.0) var body_stride_far: float = 45.0
+@export_range(5.0, 500.0, 1.0, "or_greater") var body_stride_far: float = 45.0
 ## Metres past which a zombie in the open moves by three rays instead of a capsule sweep, which
 ## costs a tenth; any wall ahead or a missing floor still sweeps. 0 always sweeps.
-@export_range(0.0, 500.0, 1.0) var body_cheap_from: float = 12.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var body_cheap_from: float = 12.0
 
 ## Metres to the nearest survivor past which a zombie is dormant: it thinks every `dormant_think_every` ticks and its body moves every eighth (`think_range` scales it). Meant for 100+ survivors on big maps, where most of the horde is far from everybody. 0 is off. `zz_dormant_from`.
-@export_range(0.0, 1000.0, 1.0) var dormant_from: float = 0.0
+@export_range(0.0, 1000.0, 1.0, "or_greater") var dormant_from: float = 0.0
 ## Ticks a dormant zombie's thought spans (at least 8). `zz_dormant_think_every`.
-@export_range(8, 64, 1) var dormant_think_every: int = 16
+@export_range(8, 64, 1, "or_greater") var dormant_think_every: int = 16
 ## Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays within 2 m of
 ## where it asked, instead of asking the graph again each thought. 0 (the default) asks every thought: on the 56-zombie
 ## bench 4 moved brains -6%, +1%, -3% and -3% on three boxes, inside the noise (docs/survival.md). `zz_path_reuse_thoughts`.
@@ -308,38 +310,38 @@ func setup_seconds() -> float:
 
 ## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
 ## team on a small box is people plus this many. `zz_bot_max`.
-@export_range(0, 256, 1) var bot_max: int = 0
+@export_range(0, 256, 1, "or_greater") var bot_max: int = 0
 
 ## A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many
 ## ticks (staggered per stand-in). 1 ticks every tick; the idle path is cheap since dot-weapon 0.1.39.
 ## `zz_bot_weapon_idle_every`.
-@export_range(1, 16, 1) var bot_weapon_idle_every: int = 1
+@export_range(1, 16, 1, "or_greater") var bot_weapon_idle_every: int = 1
 
 ## A stand-in standing still (grounded, no velocity, nothing pressed, every motor timer at rest)
 ## runs its motor every this many ticks, staggered per stand-in: the tick would change nothing, and
 ## costs 290 us. 1 ticks every tick. `zz_bot_motor_idle_every`.
-@export_range(1, 16, 1) var bot_motor_idle_every: int = 4
+@export_range(1, 16, 1, "or_greater") var bot_motor_idle_every: int = 4
 
 ## A stand-in with no zombie within `bot_calm_radius` and no person within this many metres moves its
 ## motor every second tick with two ticks' time and decides every `bot_decide_every_far` ticks: far
 ## from anyone watching, the same walk costs half. 0 ticks every stand-in fully. `zz_bot_motor_stride_far`.
-@export_range(0.0, 500.0, 1.0) var bot_motor_stride_far: float = 0.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var bot_motor_stride_far: float = 0.0
 
 ## Metres of clear ground from the nearest zombie that make a stand-in calm (see `bot_motor_stride_far`).
-@export_range(4.0, 32.0, 1.0) var bot_calm_radius: float = 18.0
+@export_range(4.0, 32.0, 1.0, "or_greater") var bot_calm_radius: float = 18.0
 
 ## A calm stand-in far from every person decides every this many ticks (staggered). 2 is the pace of
 ## every standing post. `zz_bot_decide_every_far`.
-@export_range(2, 16, 1) var bot_decide_every_far: int = 4
+@export_range(2, 16, 1, "or_greater") var bot_decide_every_far: int = 4
 
 ## A drawn solo world moves the horde once per drawn frame, with up to this many ticks' time,
 ## rather than once per physics step: a slow frame then pays for the crowd once, not once per
 ## catch-up step. 0 keeps it on every step (servers and headless runs always do).
-@export_range(0, 8) var horde_frame_ticks: int = 4
+@export_range(0, 8, 1.0, "or_greater") var horde_frame_ticks: int = 4
 
 ## A drawn solo world's cap on physics steps per drawn frame (the engine's is 8): a frame slower
 ## than this many ticks slows the game instead of spiralling. Online never changes it. 0 keeps 8.
-@export_range(0, 8) var solo_max_steps: int = 3
+@export_range(0, 8, 1.0, "or_greater") var solo_max_steps: int = 3
 
 ## Whether a survival map's stand-ins hold the place behind a choke on the horde's route, in
 ## place of a post at a window. `zz_bot_hold_chokes`.
@@ -347,7 +349,7 @@ func setup_seconds() -> float:
 
 ## Zombies within four and a half metres of a choke that make it overrun: the stand-ins holding it
 ## fall back along the route. `zz_bot_hold_overrun`.
-@export_range(2, 40, 1) var bot_hold_overrun: int = 6
+@export_range(2, 40, 1, "or_greater") var bot_hold_overrun: int = 6
 
 ## Which bot personas the stand-ins are drawn from, as `id:weight,id:weight` (a bare id weighs 1); empty uses every `cfg/.../bot/*.yml` by its own weight. `zz_bot_personas`.
 @export var bot_personas: String = ""
@@ -356,25 +358,25 @@ func setup_seconds() -> float:
 @export var stuck_rescue: bool = true
 
 ## Seconds without getting closer before an infected is repathed. `zz_stuck_repath_seconds`.
-@export_range(1.0, 120.0, 1.0) var stuck_repath_seconds: float = 6.0
+@export_range(1.0, 120.0, 1.0, "or_greater") var stuck_repath_seconds: float = 6.0
 
 ## Seconds without getting closer before it is moved near the survivors, out of sight. `zz_stuck_relocate_seconds`.
-@export_range(2.0, 300.0, 1.0) var stuck_relocate_seconds: float = 14.0
+@export_range(2.0, 300.0, 1.0, "or_greater") var stuck_relocate_seconds: float = 14.0
 
 ## Seconds the places a zombie stalled at cost the whole horde extra to path through.
-@export_range(0.0, 600.0, 1.0) var stuck_bad_edge_seconds: float = 60.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var stuck_bad_edge_seconds: float = 60.0
 
 ## At or under this many infected left, those waits shrink to a third. 0 off. `zz_stuck_low_count`.
-@export_range(0, 100, 1) var stuck_low_count: int = 8
+@export_range(0, 100, 1, "or_greater") var stuck_low_count: int = 8
 
 ## Relocations that changed nothing after which a stuck infected is removed and the wave owes it again. 0 never. `zz_stuck_remove_after`.
-@export_range(0, 10, 1) var stuck_remove_after: int = 2
+@export_range(0, 10, 1, "or_greater") var stuck_remove_after: int = 2
 
 ## Seconds between "stuck infected repathed" log lines; repaths in between are counted and reported on the next line. 0 logs every one. `zz_stuck_log_interval`.
-@export_range(0.0, 300.0, 1.0) var stuck_log_interval: float = 5.0
+@export_range(0.0, 300.0, 1.0, "or_greater") var stuck_log_interval: float = 5.0
 
 ## A graph edge that rises more than this many metres is taken down only (a drop seen from below is a wall). 0 off. `zz_nav_steep`.
-@export_range(0.0, 20.0, 0.1) var nav_steep: float = 1.2
+@export_range(0.0, 20.0, 0.1, "or_greater") var nav_steep: float = 1.2
 
 ## Whether stand-ins pick up the boxes zombies drop and open them. Off leaves every box to the humans. `zz_bot_open_boxes`.
 @export var bot_open_boxes: bool = true
@@ -386,20 +388,20 @@ func setup_seconds() -> float:
 @export var bot_defib: bool = true
 
 ## Metres a stand-in holding a defibrillator will walk to a dead friend's body. `zz_bot_defib_reach`.
-@export_range(1.0, 200.0, 1.0) var bot_defib_reach: float = 40.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var bot_defib_reach: float = 40.0
 
 ## Seconds a stand-in that wants an item or a place may stay put, not firing or using anything, before it gives that goal up (and, with none, is put at its post). 0 off. `zz_bot_idle_seconds`.
-@export_range(0.0, 120.0, 1.0) var bot_idle_seconds: float = 12.0
+@export_range(0.0, 120.0, 1.0, "or_greater") var bot_idle_seconds: float = 12.0
 
 ## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing
 ## ones. The rest hold their posts; with every one walking to a single friend a ram at a dugout
 ## downed all sixteen of the ballpark's team (docs/survival.md). 0: all of them, as an exodus map
 ## does. `zz_bot_helpers`.
-@export_range(0, 16, 1) var bot_helpers: int = 2
+@export_range(0, 16, 1, "or_greater") var bot_helpers: int = 2
 
 ## Metres within which any stand-in answers a pinned or downed friend on a survival map, however
 ## many already are. `zz_bot_helper_radius`.
-@export_range(0.0, 40.0, 0.5) var bot_helper_radius: float = 8.0
+@export_range(0.0, 40.0, 0.5, "or_greater") var bot_helper_radius: float = 8.0
 
 ## The share of the cap a wave may have up at once, for a map that needs more than `wave_alive_share`
 ## (map id to share). The ballpark's cap is so large a team of sixteen cleared every wave a size
@@ -419,7 +421,7 @@ func setup_seconds() -> float:
 
 @export_group("The survivors")
 
-@export_range(1.0, 400.0, 1.0) var max_health: float = 100.0
+@export_range(1.0, 400.0, 1.0, "or_greater") var max_health: float = 100.0
 
 ## The class every survivor starts as (cfg/game/game-zombie-zone/class/<id>.yml, shipped by zz-ply-class-pack, else the built-in survivor). `zz_class_default`.
 @export var class_default: String = "survivor"
@@ -432,52 +434,52 @@ func setup_seconds() -> float:
 
 ## Below this health a survivor limps: slower (by `ZzController.LIMP`, which both ends
 ## register identically, so how much slower is not a server setting), and told so by the screen.
-@export_range(0.0, 100.0, 1.0) var limp_health: float = 40.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var limp_health: float = 40.0
 
 ## Temporary health (pills, a revive) drains this much a second.
-@export_range(0.0, 10.0, 0.01) var temp_decay_per_second: float = 0.27
+@export_range(0.0, 10.0, 0.01, "or_greater") var temp_decay_per_second: float = 0.27
 
 ## Downs a survivor survives before the next one kills: the third time is death.
-@export_range(0, 10, 1) var max_incaps: int = 2
+@export_range(0, 10, 1, "or_greater") var max_incaps: int = 2
 
 ## A downed survivor's pool, and how fast it bleeds away a second.
-@export_range(10.0, 2000.0, 10.0) var downed_health: float = 300.0
+@export_range(10.0, 2000.0, 10.0, "or_greater") var downed_health: float = 300.0
 
 ## Metres per second a downed survivor crawls at (`zz_down_crawl_speed`, also the file key
 ## `downed_crawl_speed`). 0 keeps them where they fell, as downs were before crawling. A run was
 ## 6.2, so the default is a fifth of it: enough to reach a friend, never to escape the horde.
-@export_range(0.0, 6.0, 0.1) var downed_crawl_speed: float = 1.4
-@export_range(0.0, 100.0, 0.1) var downed_bleed_per_second: float = 3.0
+@export_range(0.0, 6.0, 0.1, "or_greater") var downed_crawl_speed: float = 1.4
+@export_range(0.0, 100.0, 0.1, "or_greater") var downed_bleed_per_second: float = 3.0
 
 ## Seconds of holding E to pick somebody up, and the temporary health they get up with.
-@export_range(0.5, 30.0, 0.1) var revive_seconds: float = 5.0
-@export_range(1.0, 100.0, 1.0) var revive_health: float = 30.0
+@export_range(0.5, 30.0, 0.1, "or_greater") var revive_seconds: float = 5.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var revive_health: float = 30.0
 
 ## Metres a reviver may be from the downed.
-@export_range(0.5, 5.0, 0.1) var revive_range: float = 1.9
+@export_range(0.5, 5.0, 0.1, "or_greater") var revive_range: float = 1.9
 
 ## Seconds before a dead survivor is rescued: back in, beside whoever is furthest along, with
 ## half health and a sidearm. 0 never: the dead watch until the map ends.
-@export_range(0.0, 600.0, 5.0) var rescue_seconds: float = 75.0
+@export_range(0.0, 600.0, 5.0, "or_greater") var rescue_seconds: float = 75.0
 
 ## Whether a survivor below the map's floor plane is put back on the last ground they stood on
 ## (`zz_fall_rescue`); off, they die at the kill height.
 @export var fall_rescue: bool = true
 
 ## Seconds a survivor may push on the world without moving before they are put back on the last ground (0 off).
-@export_range(0.0, 600.0, 1.0) var stuck_rescue_seconds: float = 12.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var stuck_rescue_seconds: float = 12.0
 
 ## Seconds between the samples of safe ground the rescue keeps for a survivor (`zz_footing_sample_every`).
-@export_range(0.2, 30.0, 0.1) var footing_sample_every: float = 1.5
+@export_range(0.2, 30.0, 0.1, "or_greater") var footing_sample_every: float = 1.5
 
 ## Metres a survivor must have moved since the last sample before another is kept (`zz_footing_sample_move`).
-@export_range(0.0, 30.0, 0.1) var footing_sample_move: float = 1.5
+@export_range(0.0, 30.0, 0.1, "or_greater") var footing_sample_move: float = 1.5
 
 ## How many safe samples are kept; the rescue puts a survivor back on the oldest (`zz_footing_keep`).
-@export_range(1, 30, 1) var footing_keep: int = 5
+@export_range(1, 30, 1, "or_greater") var footing_keep: int = 5
 
 ## Metres of flat travel under which a survivor pushing on the world counts as not moving (`zz_footing_progress`).
-@export_range(0.05, 5.0, 0.05) var footing_progress: float = 0.6
+@export_range(0.05, 5.0, 0.05, "or_greater") var footing_progress: float = 0.6
 
 ## Cosine of the angle off the crosshair within which a friend counts as aimed at by a medkit (`zz_heal_aim_dot`).
 @export_range(0.0, 1.0, 0.01) var heal_aim_dot: float = 0.82
@@ -489,33 +491,33 @@ func setup_seconds() -> float:
 @export var start_weapons: PackedStringArray = PackedStringArray(["zz_pistol", "zz_knife"])
 
 ## How many medkits and pills each survivor starts a map with.
-@export_range(0, 7, 1) var start_medkits: int = 1
-@export_range(0, 15, 1) var start_pills: int = 0
+@export_range(0, 7, 1, "or_greater") var start_medkits: int = 1
+@export_range(0, 15, 1, "or_greater") var start_pills: int = 0
 
-@export_range(1.0, 20.0, 0.1) var run_speed: float = 4.3
+@export_range(1.0, 20.0, 0.1, "or_greater") var run_speed: float = 4.3
 @export_range(0.1, 1.0, 0.01) var walk_speed_scale: float = 0.45
 
 ## Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_stamina*` in dot-player-controller.
 @export var sprint_enabled: bool = true
-@export_range(1.0, 2.0, 0.01) var sprint_speed_scale: float = 1.45
+@export_range(1.0, 2.0, 0.01, "or_greater") var sprint_speed_scale: float = 1.45
 @export var stamina_enabled: bool = true
-@export_range(0.0, 10.0, 0.01) var stamina_drain: float = 0.2
-@export_range(0.0, 10.0, 0.01) var stamina_recover: float = 0.15
+@export_range(0.0, 10.0, 0.01, "or_greater") var stamina_drain: float = 0.2
+@export_range(0.0, 10.0, 0.01, "or_greater") var stamina_recover: float = 0.15
 @export_range(0.0, 1.0, 0.01) var stamina_resume_at: float = 0.3
-@export_range(0.0, 3.5, 0.05) var stamina_exhaust_delay: float = 1.5
+@export_range(0.0, 3.5, 0.05, "or_greater") var stamina_exhaust_delay: float = 1.5
 ## How strongly the carried share of the weight limit cuts the sprint bonus and raises the drain; 0 off.
-@export_range(0.0, 2.0, 0.01) var sprint_load_speed: float = 1.0
-@export_range(0.0, 4.0, 0.01) var sprint_load_drain: float = 1.0
+@export_range(0.0, 2.0, 0.01, "or_greater") var sprint_load_speed: float = 1.0
+@export_range(0.0, 4.0, 0.01, "or_greater") var sprint_load_drain: float = 1.0
 ## Whether sprinting stops aiming down sights and reloading.
 @export var sprint_blocks_aim: bool = true
 ## Whether Shift toggles sprint instead of being held.
 @export var sprint_toggle: bool = false
 
 ## Slide top speed; the rest of the slide is the `zz_slide*` cvars.
-@export_range(1.0, 30.0, 0.1) var slide_max_speed: float = 10.5
-@export_range(0.1, 5.0, 0.05) var jump_height: float = 1.1
-@export_range(1.0, 60.0, 0.5) var gravity: float = 20.0
-@export_range(0.0, 200.0, 1.0) var air_accelerate: float = 12.0
+@export_range(1.0, 30.0, 0.1, "or_greater") var slide_max_speed: float = 10.5
+@export_range(0.1, 5.0, 0.05, "or_greater") var jump_height: float = 1.1
+@export_range(1.0, 60.0, 0.5, "or_greater") var gravity: float = 20.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var air_accelerate: float = 12.0
 
 # --- Items -----------------------------------------------------------------
 
@@ -523,87 +525,87 @@ func setup_seconds() -> float:
 
 ## A medkit heals this share of what is missing, after this long holding it.
 @export_range(0.1, 1.0, 0.05) var medkit_heal_fraction: float = 0.8
-@export_range(0.5, 20.0, 0.5) var medkit_seconds: float = 4.5
+@export_range(0.5, 20.0, 0.5, "or_greater") var medkit_seconds: float = 4.5
 
 ## Temporary health a bottle of pills gives.
-@export_range(1.0, 100.0, 1.0) var pills_health: float = 50.0
+@export_range(1.0, 100.0, 1.0, "or_greater") var pills_health: float = 50.0
 
 ## The defibrillator: held E at a dead teammate's body shocks them back (a downed one is picked up
 ## by hand as ever). Each key is also a cvar, `zz_defib_*`; see the README.
 ## Whether each survivor starts a map holding one (0 or 1).
 @export_range(0, 1, 1) var start_defibs: int = 0
 ## Seconds E is held at the body, and the metres from it.
-@export_range(0.5, 30.0, 0.1) var defib_charge_seconds: float = 4.0
-@export_range(0.5, 5.0, 0.1) var defib_range: float = 2.0
+@export_range(0.5, 30.0, 0.1, "or_greater") var defib_charge_seconds: float = 4.0
+@export_range(0.5, 5.0, 0.1, "or_greater") var defib_range: float = 2.0
 ## Share of maximum health the revived come back with, and seconds they cannot be hurt.
 @export_range(0.05, 1.0, 0.05) var defib_revive_fraction: float = 0.4
-@export_range(0.0, 15.0, 0.5) var defib_invulnerable_seconds: float = 2.0
+@export_range(0.0, 15.0, 0.5, "or_greater") var defib_invulnerable_seconds: float = 2.0
 ## Revives one item holds, and seconds after a shock before the next try.
 @export_range(1, 7, 1, "or_greater") var defib_charges: int = 1
-@export_range(0.0, 120.0, 0.5) var defib_cooldown_seconds: float = 8.0
+@export_range(0.0, 120.0, 0.5, "or_greater") var defib_cooldown_seconds: float = 8.0
 ## Seconds after death beyond which the body is past saving (0: never).
-@export_range(0.0, 600.0, 1.0) var defib_max_body_age: float = 60.0
+@export_range(0.0, 600.0, 1.0, "or_greater") var defib_max_body_age: float = 60.0
 ## Metres the user may drift while charging before it is interrupted.
-@export_range(0.1, 3.0, 0.1) var defib_move_tolerance: float = 0.6
+@export_range(0.1, 3.0, 0.1, "or_greater") var defib_move_tolerance: float = 0.6
 ## Points the trader asks for a defibrillator, and a trader shelf's defibrillator unless its site names a price (0: not sold; a site's own price wins). `zz_defib_price`.
-@export_range(0, 100000, 10) var defib_price: int = 400
+@export_range(0, 100000, 10, "or_greater") var defib_price: int = 400
 ## Metres from which another survivor hears a defibrillator charging (0: only the user hears it). `zz_defib_hear_range`.
-@export_range(0.0, 100.0, 1.0) var defib_hear_range: float = 25.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var defib_hear_range: float = 25.0
 
 ## Metres from the eye an item may be picked up or a box opened.
-@export_range(0.5, 5.0, 0.1) var use_reach: float = 2.2
+@export_range(0.5, 5.0, 0.1, "or_greater") var use_reach: float = 2.2
 
 # --- The shove -------------------------------------------------------------
 
 @export_group("The shove")
 
 ## Seconds between shoves, and how much each shove in a row adds to it after the fourth.
-@export_range(0.1, 5.0, 0.05) var shove_cooldown: float = 0.7
-@export_range(0.0, 2.0, 0.05) var shove_fatigue: float = 0.35
+@export_range(0.1, 5.0, 0.05, "or_greater") var shove_cooldown: float = 0.7
+@export_range(0.0, 2.0, 0.05, "or_greater") var shove_fatigue: float = 0.35
 
 ## Reach and half-angle of a shove.
-@export_range(0.5, 5.0, 0.1) var shove_range: float = 2.0
+@export_range(0.5, 5.0, 0.1, "or_greater") var shove_range: float = 2.0
 @export_range(10.0, 90.0, 1.0) var shove_half_angle: float = 55.0
 
 ## Damage a shove does to a common, which is nothing much: it is for room, not for killing.
-@export_range(0.0, 100.0, 1.0) var shove_damage: float = 5.0
+@export_range(0.0, 100.0, 1.0, "or_greater") var shove_damage: float = 5.0
 
 # --- The horde -------------------------------------------------------------
 
 @export_group("The horde")
 
 ## Common infected alive at once, for one survivor and for each more.
-@export_range(0, 400, 1) var commons_base: int = 24
-@export_range(0, 50, 1) var commons_per_survivor: int = 6
+@export_range(0, 400, 1, "or_greater") var commons_base: int = 24
+@export_range(0, 50, 1, "or_greater") var commons_per_survivor: int = 6
 ## Most commons alive at once whatever the survivor count; 0 leaves [method commons_cap] uncapped.
-@export_range(0, 2000, 1) var commons_max: int = 0
+@export_range(0, 2000, 1, "or_greater") var commons_max: int = 0
 ## Past sixteen survivors each adds 1 over this of [member commons_per_survivor]: the team, not the horde, sets the server tick there, and a big team is spread over a big map. `zz_commons_far_divisor`.
-@export_range(1, 60, 1) var commons_far_divisor: int = 9
+@export_range(1, 60, 1, "or_greater") var commons_far_divisor: int = 9
 
 ## Commons standing about a map at its start, per hundred square metres of walkable floor.
-@export_range(0.0, 10.0, 0.05) var wanderer_density: float = 0.55
+@export_range(0.0, 10.0, 0.05, "or_greater") var wanderer_density: float = 0.55
 
 ## Seconds between mobs, from and to. A mob is a crowd that knows where you are.
-@export_range(10.0, 900.0, 5.0) var mob_interval_min: float = 90.0
-@export_range(10.0, 900.0, 5.0) var mob_interval_max: float = 180.0
+@export_range(10.0, 900.0, 5.0, "or_greater") var mob_interval_min: float = 90.0
+@export_range(10.0, 900.0, 5.0, "or_greater") var mob_interval_max: float = 180.0
 
 ## Commons in a mob, and how many more for each survivor.
-@export_range(1, 200, 1) var mob_size: int = 14
-@export_range(0, 40, 1) var mob_size_per_survivor: int = 3
+@export_range(1, 200, 1, "or_greater") var mob_size: int = 14
+@export_range(0, 40, 1, "or_greater") var mob_size_per_survivor: int = 3
 
 ## A common's health, speed running and walking, and what its hit does on normal.
-@export_range(1.0, 1000.0, 1.0) var common_health: float = 50.0
-@export_range(1.0, 15.0, 0.1) var common_run_speed: float = 6.3
-@export_range(0.2, 5.0, 0.1) var common_walk_speed: float = 1.1
+@export_range(1.0, 1000.0, 1.0, "or_greater") var common_health: float = 50.0
+@export_range(1.0, 15.0, 0.1, "or_greater") var common_run_speed: float = 6.3
+@export_range(0.2, 5.0, 0.1, "or_greater") var common_walk_speed: float = 1.1
 
 ## How fast a common chases (`zz_common_speed_*`). Scaling on: it starts at `common_speed_base`,
 ## gains `common_speed_per_hard_stack` per Hard Box stack and stops at `common_speed_max`;
 ## `angry_runner_fraction` of the crowd runs at `common_run_speed` while an Angry Box lasts.
 ## Scaling off (`zz_common_speed_scaling 0`) is the old behaviour: every common runs.
 @export var common_speed_scaling: bool = true
-@export_range(0.5, 15.0, 0.1) var common_speed_base: float = 2.2
-@export_range(0.0, 5.0, 0.05) var common_speed_per_hard_stack: float = 0.8
-@export_range(0.5, 15.0, 0.1) var common_speed_max: float = 6.3
+@export_range(0.5, 15.0, 0.1, "or_greater") var common_speed_base: float = 2.2
+@export_range(0.0, 5.0, 0.05, "or_greater") var common_speed_per_hard_stack: float = 0.8
+@export_range(0.5, 15.0, 0.1, "or_greater") var common_speed_max: float = 6.3
 
 ## `zz_mutant_fade*`: mutants (every kind but a common) draw more transparent as Hard Box stacks
 ## rise, `mutant_fade_per_stack` of alpha per stack, never below `mutant_min_alpha`. Drawing only;
@@ -613,91 +615,91 @@ func setup_seconds() -> float:
 @export_range(0.0, 0.5, 0.01) var mutant_fade_per_stack: float = 0.1
 @export_range(0, 1) var common_fade: int = 0
 @export_range(0.0, 1.0, 0.05) var angry_runner_fraction: float = 0.3
-@export_range(0.0, 100.0, 0.5) var common_damage: float = 2.0
+@export_range(0.0, 100.0, 0.5, "or_greater") var common_damage: float = 2.0
 
 ## Seconds between a common's swings.
-@export_range(0.2, 5.0, 0.05) var common_attack_interval: float = 0.9
+@export_range(0.2, 5.0, 0.05, "or_greater") var common_attack_interval: float = 0.9
 
 ## Whether zombies kneel and strike a downed survivor, and the damage that blow does compared to a standing hit.
 @export var down_attack: bool = true
-@export_range(0.0, 10.0, 0.1) var down_attack_damage: float = 1.5
+@export_range(0.0, 10.0, 0.1, "or_greater") var down_attack_damage: float = 1.5
 
 ## Commons that may be on one survivor at once; the rest wait their turn round them.
-@export_range(1, 20, 1) var attackers_per_survivor: int = 6
+@export_range(1, 20, 1, "or_greater") var attackers_per_survivor: int = 6
 
 ## How far gunfire carries to a common, in metres.
-@export_range(0.0, 200.0, 1.0) var gunfire_radius: float = 30.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var gunfire_radius: float = 30.0
 
 ## Whether the director runs the build-up / peak / relax cycle at all. Off: only mobs.
 @export var director_enabled: bool = true
 
 ## Metres a zombie's scream wakes idle commons within, one at a time a beat apart (`zz_alert_radius`).
-@export_range(1.0, 100.0, 0.5) var alert_radius: float = 9.0
+@export_range(1.0, 100.0, 0.5, "or_greater") var alert_radius: float = 9.0
 
 ## Metres within which bile calls every common (`zz_bile_radius`).
-@export_range(1.0, 200.0, 1.0) var bile_radius: float = 45.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var bile_radius: float = 45.0
 
 ## Metres a broken bile jar splashes (`zz_bile_splash`).
-@export_range(0.5, 30.0, 0.5) var bile_splash: float = 4.0
+@export_range(0.5, 30.0, 0.5, "or_greater") var bile_splash: float = 4.0
 
 ## Most zombies of a mob spawned at a time, so a crowd pours out of a doorway (`zz_mob_burst`).
-@export_range(1, 50, 1) var mob_burst: int = 6
+@export_range(1, 50, 1, "or_greater") var mob_burst: int = 6
 
 ## Seconds between those bursts (`zz_mob_burst_seconds`).
-@export_range(0.05, 10.0, 0.05) var mob_burst_seconds: float = 0.4
+@export_range(0.05, 10.0, 0.05, "or_greater") var mob_burst_seconds: float = 0.4
 
 ## Metres commons standing about a map keep from where the team starts (`zz_wanderer_clearance`).
-@export_range(0.0, 200.0, 1.0) var wanderer_clearance: float = 28.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var wanderer_clearance: float = 28.0
 
 ## Metres past a barricade's face a zombie bashes it from: its radius and an arm (`zz_bash_reach`).
-@export_range(0.1, 5.0, 0.05) var bash_reach: float = 0.75
+@export_range(0.1, 5.0, 0.05, "or_greater") var bash_reach: float = 0.75
 
 # --- The specials ----------------------------------------------------------
 
 @export_group("The specials")
 
 ## Special infected alive at once, for one survivor and one more for each this many survivors.
-@export_range(0, 32, 1) var specials_base: int = 2
-@export_range(1.0, 32.0, 0.5) var survivors_per_special: float = 3.0
+@export_range(0, 32, 1, "or_greater") var specials_base: int = 2
+@export_range(1.0, 32.0, 0.5, "or_greater") var survivors_per_special: float = 3.0
 
 ## Seconds between a special dying and the next of any kind, from and to.
-@export_range(1.0, 300.0, 1.0) var special_interval_min: float = 18.0
-@export_range(1.0, 300.0, 1.0) var special_interval_max: float = 40.0
+@export_range(1.0, 300.0, 1.0, "or_greater") var special_interval_min: float = 18.0
+@export_range(1.0, 300.0, 1.0, "or_greater") var special_interval_max: float = 40.0
 
 ## Which specials may spawn, by id. Empty means all of them.
 @export var special_kinds: PackedStringArray = PackedStringArray()
 
 ## Commons a screamer's scream sends at whoever it saw (before survival's growth).
-@export_range(0, 100, 1) var screamer_mob: int = 10
+@export_range(0, 100, 1, "or_greater") var screamer_mob: int = 10
 
 ## Seconds between one screamer's screams.
-@export_range(4.0, 120.0, 1.0) var screamer_cooldown: float = 20.0
+@export_range(4.0, 120.0, 1.0, "or_greater") var screamer_cooldown: float = 20.0
 
 ## What a crawler's hold on an ankle does a second, on normal.
-@export_range(0.0, 50.0, 0.5) var crawler_grab_dps: float = 6.0
+@export_range(0.0, 50.0, 0.5, "or_greater") var crawler_grab_dps: float = 6.0
 
 ## The share of a hit on a riot zombie's shield that gets through (0 none, 1 all of it).
 @export_range(0.0, 1.0, 0.01) var riot_shield: float = 0.1
 
 ## The chance a special roll may pick the mutant at all (rare), and the first wave it can appear on.
 @export_range(0.0, 1.0, 0.01) var mutant_chance: float = 0.12
-@export_range(0, 100, 1) var mutant_min_wave: int = 3
+@export_range(0, 100, 1, "or_greater") var mutant_min_wave: int = 3
 
 ## The oil monster: the chance a special roll may pick it (rare), and the first wave it can appear on. Its slide, spit, goo and trail numbers are its profile's keys (`zz_oil_*`).
 @export_range(0.0, 1.0, 0.01) var oil_monster_chance: float = 0.3
-@export_range(0, 100, 1) var oil_monster_min_wave: int = 2
+@export_range(0, 100, 1, "or_greater") var oil_monster_min_wave: int = 2
 
 ## The black goo a spit leaves on the screen (drawing only, replicated): how much one stack covers, the most the stacks reach (1 is a blackout).
 @export_range(0.0, 1.0, 0.01) var goo_screen_per_stack: float = 0.4
 @export_range(0.0, 1.0, 0.01) var goo_screen_max: float = 0.9
 
 ## Seconds between brutes, from and to, on a campaign map. 0 never.
-@export_range(0.0, 3600.0, 10.0) var brute_interval_min: float = 300.0
-@export_range(0.0, 3600.0, 10.0) var brute_interval_max: float = 480.0
+@export_range(0.0, 3600.0, 10.0, "or_greater") var brute_interval_min: float = 300.0
+@export_range(0.0, 3600.0, 10.0, "or_greater") var brute_interval_max: float = 480.0
 
 ## A brute's health for one survivor, and how much more for each further survivor.
-@export_range(100.0, 50000.0, 50.0) var brute_health: float = 3000.0
-@export_range(0.0, 20000.0, 50.0) var brute_health_per_survivor: float = 900.0
+@export_range(100.0, 50000.0, 50.0, "or_greater") var brute_health: float = 3000.0
+@export_range(0.0, 20000.0, 50.0, "or_greater") var brute_health_per_survivor: float = 900.0
 
 ## Whether the crying sleepers a map places are there at all.
 @export var sleepers_enabled: bool = true
@@ -716,12 +718,12 @@ func setup_seconds() -> float:
 
 ## Seconds of holding E to open a box lying on the ground when nobody can carry one
 ## ([member box_carry] 0), and how long an unopened one lies there.
-@export_range(0.0, 10.0, 0.1) var box_open_seconds: float = 0.8
-@export_range(5.0, 1200.0, 5.0) var box_lifetime: float = 150.0
+@export_range(0.0, 10.0, 0.1, "or_greater") var box_open_seconds: float = 0.8
+@export_range(5.0, 1200.0, 5.0, "or_greater") var box_lifetime: float = 150.0
 
 ## How many boxes a survivor carries (E picks one up into the hands; primary fire held opens it). 0: no carrying, E
 ## opens a box on the ground as it did before boxes could be carried.
-@export_range(0, 6, 1) var box_carry: int = 1
+@export_range(0, 6, 1, "or_greater") var box_carry: int = 1
 
 ## Whether a fast-rolling barrel, crate or tyre also hurts zombies (cvar `zz_roll_damage_zombies`); survivors are always hurt.
 @export var roll_damage_zombies: bool = true
@@ -735,27 +737,27 @@ func setup_seconds() -> float:
 @export var crate_kinds: String = "ammo,box"
 
 ## A crate's mass in kilograms, against a walking survivor's push (`crate_push` scales it) and a blast.
-@export_range(0.25, 200.0, 0.25) var crate_mass: float = 8.0
+@export_range(0.25, 200.0, 0.25, "or_greater") var crate_mass: float = 8.0
 
 ## How hard a walk pushes a crate, against the walker's speed (0: nothing pushes one), and whether zombies push too.
-@export_range(0.0, 4.0, 0.05) var crate_push: float = 1.0
+@export_range(0.0, 4.0, 0.05, "or_greater") var crate_push: float = 1.0
 @export var crate_zombie_push: bool = true
 
 ## How hard a blast throws a crate, against a barrel's blast speed (0: blasts leave crates alone).
-@export_range(0.0, 8.0, 0.05) var crate_blast: float = 1.0
+@export_range(0.0, 8.0, 0.05, "or_greater") var crate_blast: float = 1.0
 
 ## The most crates simulating at once; the longest untouched sleep first. A crate at rest for `crate_sleep_seconds` sleeps (0: the engine's own timer).
-@export_range(1, 256, 1) var crate_max_active: int = 16
-@export_range(0.0, 30.0, 0.1) var crate_sleep_seconds: float = 2.0
+@export_range(1, 256, 1, "or_greater") var crate_max_active: int = 16
+@export_range(0.0, 30.0, 0.1, "or_greater") var crate_sleep_seconds: float = 2.0
 
 ## Times a second the moved crates' places go to clients.
-@export_range(1.0, 30.0, 1.0) var crate_sync_hz: float = 10.0
+@export_range(1.0, 30.0, 1.0, "or_greater") var crate_sync_hz: float = 10.0
 
 ## Most crate bodies in the world; loot laid beyond it lies static, as with `zz_physics_crates 0`.
-@export_range(1, 2048, 1) var crate_max_bodies: int = 128
+@export_range(1, 2048, 1, "or_greater") var crate_max_bodies: int = 128
 
 ## A crate this far below where it last rested has fallen out of the map (a drop over a pit) and is recovered (0: only the map's kill height counts).
-@export_range(0.0, 200.0, 1.0) var crate_fall_limit: float = 15.0
+@export_range(0.0, 200.0, 1.0, "or_greater") var crate_fall_limit: float = 15.0
 
 ## What becomes of a lost crate: back to where it last rested (never rested: gone), or just gone.
 @export_enum("rest", "remove") var crate_lost: int = 0
@@ -764,8 +766,8 @@ func setup_seconds() -> float:
 ## cvar `zz_box_deploy_seconds`, 0.5 to 15), and the radius (metres) the survivor may drift in
 ## meanwhile before it is cancelled. 1 s is quick enough to open one mid-fight; it was 3.5, which
 ## nobody did with a horde about, so boxes were only ever opened in the safe room.
-@export_range(0.5, 15.0, 0.1) var box_deploy_seconds: float = 1.0
-@export_range(0.2, 6.0, 0.1) var box_deploy_radius: float = 1.2
+@export_range(0.5, 15.0, 0.1, "or_greater") var box_deploy_seconds: float = 1.0
+@export_range(0.2, 6.0, 0.1, "or_greater") var box_deploy_radius: float = 1.2
 
 ## Whether a box on the ground and in the slot says what type it is. Off (the default): every
 ## box looks the same and what is in it is a surprise until it is opened; the server never sends
@@ -777,17 +779,17 @@ func setup_seconds() -> float:
 ## its damage (a common simply dies).
 @export var box_instakill_min: float = -1.0
 @export var box_instakill_max: float = -1.0
-@export_range(1.0, 100.0, 0.5) var box_instakill_special_scale: float = 4.0
+@export_range(1.0, 100.0, 0.5, "or_greater") var box_instakill_special_scale: float = 4.0
 
 ## Great Depression box: every shop price is multiplied by this per box in force; its weight-limit cut is `depression` in `zz_weight_modifiers`.
-@export_range(1.0, 10.0, 0.05) var box_depression_price: float = 1.5
+@export_range(1.0, 10.0, 0.05, "or_greater") var box_depression_price: float = 1.5
 
 ## A limb's health follows the zombie's actual health (a later wave's, a brute's), and Instakill's
 ## boosted damage does not reach limbs; off restores the old limb rules (zz_limb_follow_health).
 @export var limb_follow_health: bool = true
 
 ## Boxes lying about at once; past it, the oldest goes.
-@export_range(1, 200, 1) var max_boxes: int = 16
+@export_range(1, 200, 1, "or_greater") var max_boxes: int = 16
 
 ## Whether boxes exist at all.
 @export var boxes_enabled: bool = true
@@ -797,62 +799,62 @@ func setup_seconds() -> float:
 @export_group("Turrets")
 
 ## Turrets one survivor may have out; a further one turns the oldest off rather than refusing the box (`zz_turret_max_per_owner`).
-@export_range(1, 16, 1) var turret_max_per_owner: int = 2
+@export_range(1, 16, 1, "or_greater") var turret_max_per_owner: int = 2
 
 ## What a sentry does when the box outcome's `turret` action leaves the number out (the shipped Turret Box writes its own, so these only matter for a box an owner edits): seconds it stands (`zz_turret_seconds`).
-@export_range(1.0, 600.0, 1.0) var turret_seconds: float = 40.0
+@export_range(1.0, 600.0, 1.0, "or_greater") var turret_seconds: float = 40.0
 
 ## Rounds a sentry carries (`zz_turret_ammo`).
-@export_range(1, 5000, 1) var turret_ammo: int = 220
+@export_range(1, 5000, 1, "or_greater") var turret_ammo: int = 220
 
 ## Damage of one sentry round (`zz_turret_damage`).
-@export_range(0.1, 500.0, 0.1) var turret_damage: float = 14.0
+@export_range(0.1, 500.0, 0.1, "or_greater") var turret_damage: float = 14.0
 
 ## Metres a sentry sees and shoots (`zz_turret_reach`).
-@export_range(1.0, 100.0, 0.5) var turret_reach: float = 20.0
+@export_range(1.0, 100.0, 0.5, "or_greater") var turret_reach: float = 20.0
 
 ## Seconds between a sentry's rounds (`zz_turret_interval`).
-@export_range(0.02, 5.0, 0.01) var turret_interval: float = 0.14
+@export_range(0.02, 5.0, 0.01, "or_greater") var turret_interval: float = 0.14
 
 ## Height of the sentry's muzzle above its base, metres (`zz_turret_muzzle_height`).
-@export_range(0.1, 3.0, 0.05) var turret_muzzle_height: float = 0.85
+@export_range(0.1, 3.0, 0.05, "or_greater") var turret_muzzle_height: float = 0.85
 
 ## Height above a zombie's feet a sentry aims at, so a shot lands on the body and not the feet (`zz_turret_chest_height`).
-@export_range(0.1, 3.0, 0.05) var turret_chest_height: float = 1.1
+@export_range(0.1, 3.0, 0.05, "or_greater") var turret_chest_height: float = 1.1
 
 ## Metres in front of the survivor's eyes a turret may be placed; when that spot is no good the one below the eyes is tried (`zz_turret_place_reach`).
-@export_range(0.5, 10.0, 0.1) var turret_place_reach: float = 2.2
+@export_range(0.5, 10.0, 0.1, "or_greater") var turret_place_reach: float = 2.2
 
 ## Metres down from the eyes the fallback spot is looked for (`zz_turret_foot_reach`).
-@export_range(0.1, 5.0, 0.1) var turret_foot_reach: float = 0.4
+@export_range(0.1, 5.0, 0.1, "or_greater") var turret_foot_reach: float = 0.4
 
 # --- Thrown things ---------------------------------------------------------
 
 @export_group("Hazards")
 
 ## Metres from a goo glob's path within which it hits a survivor's middle (`zz_hazard_goo_hit_radius`).
-@export_range(0.1, 5.0, 0.05) var hazard_goo_hit_radius: float = 1.1
+@export_range(0.1, 5.0, 0.05, "or_greater") var hazard_goo_hit_radius: float = 1.1
 
 ## The same for a thrown rock (`zz_hazard_rock_hit_radius`).
-@export_range(0.1, 5.0, 0.05) var hazard_rock_hit_radius: float = 1.3
+@export_range(0.1, 5.0, 0.05, "or_greater") var hazard_rock_hit_radius: float = 1.3
 
 ## Metres a bile jar draws the horde from (`zz_hazard_bile_lure`).
-@export_range(1.0, 200.0, 1.0) var hazard_bile_lure: float = 35.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var hazard_bile_lure: float = 35.0
 
 ## Seconds a bile jar keeps the horde drawn (`zz_hazard_bile_seconds`).
-@export_range(1.0, 120.0, 1.0) var hazard_bile_seconds: float = 15.0
+@export_range(1.0, 120.0, 1.0, "or_greater") var hazard_bile_seconds: float = 15.0
 
 ## Seconds a pipe charge beeps before it goes off (`zz_hazard_pipe_fuse`).
-@export_range(0.5, 60.0, 0.5) var hazard_pipe_fuse: float = 6.0
+@export_range(0.5, 60.0, 0.5, "or_greater") var hazard_pipe_fuse: float = 6.0
 
 ## Metres a pipe charge lures the horde from (`zz_hazard_pipe_lure`).
-@export_range(1.0, 200.0, 1.0) var hazard_pipe_lure: float = 40.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var hazard_pipe_lure: float = 40.0
 
 ## Seconds a zombie keeps burning once it has left the fire (`zz_hazard_afterburn_seconds`).
-@export_range(0.0, 60.0, 0.5) var hazard_afterburn_seconds: float = 4.0
+@export_range(0.0, 60.0, 0.5, "or_greater") var hazard_afterburn_seconds: float = 4.0
 
 ## Damage per second of a burning zombie; a brute takes half (`zz_hazard_burn_dps`).
-@export_range(0.0, 500.0, 1.0) var hazard_burn_dps: float = 18.0
+@export_range(0.0, 500.0, 1.0, "or_greater") var hazard_burn_dps: float = 18.0
 
 # --- The maps --------------------------------------------------------------
 
@@ -862,13 +864,13 @@ func setup_seconds() -> float:
 @export var weight_enabled: bool = true
 
 ## What a survivor with no backpack carries, in weight units (kilograms: a pistol is about 1, a rifle 4).
-@export_range(0.0, 1000.0, 0.5) var weight_limit: float = 14.0
+@export_range(0.0, 1000.0, 0.5, "or_greater") var weight_limit: float = 14.0
 
 ## Every weapon's weight is multiplied by this, on top of the box modifiers.
-@export_range(0.0, 10.0, 0.05) var weight_multiplier: float = 1.0
+@export_range(0.0, 10.0, 0.05, "or_greater") var weight_multiplier: float = 1.0
 
 ## Weapons one slot holds; pressing the slot key again cycles through them.
-@export_range(1, 8, 1) var weight_slot_capacity: int = 2
+@export_range(1, 8, 1, "or_greater") var weight_slot_capacity: int = 2
 
 ## Over the limit (a limit that fell, a box that made weapons heavier): `slow` slows the survivor down, `drop` makes them drop the heaviest spare weapon.
 @export_enum("slow", "drop") var weight_over_limit: String = "slow"
@@ -888,16 +890,16 @@ func setup_seconds() -> float:
 @export_group("Gore")
 
 ## How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
-@export_range(0, 3, 1) var gore_level: int = 2
+@export_range(0, 3, 1, "or_greater") var gore_level: int = 2
 
 ## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
-@export_range(0, 200, 1) var gore_max_gibs: int = 24
+@export_range(0, 200, 1, "or_greater") var gore_max_gibs: int = 24
 
 ## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
-@export_range(0, 400, 1) var gore_max_wounds: int = 48
+@export_range(0, 400, 1, "or_greater") var gore_max_wounds: int = 48
 
 ## Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 every one the scratching swipe, 2 every one the grapple on the spot. A zombie that strikes on the run keeps its running swing. `zz_attack_anim`.
-@export_range(0, 2, 1) var attack_anim: int = 0
+@export_range(0, 2, 1, "or_greater") var attack_anim: int = 0
 
 @export_group("The maps")
 
@@ -927,13 +929,13 @@ func setup_seconds() -> float:
 @export var lightmaps: bool = true
 
 ## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (dot-map's `DotMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
-@export_range(0.0, 2.0) var light_floor: float = 0.6
+@export_range(0.0, 2.0, 1.0, "or_greater") var light_floor: float = 0.6
 
 ## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
-@export_range(0.0, 2.0) var sun_floor: float = 0.6
+@export_range(0.0, 2.0, 1.0, "or_greater") var sun_floor: float = 0.6
 
 ## Longest side of a texture file decoded from disk for a drawn world; larger ones are halved until they fit (0 keeps them). Store slices are untouched. 1024 saves roughly three quarters of the texture memory. `--zz-map-texture-max=`.
-@export_range(0, 8192, 1) var map_texture_max: int = 2048
+@export_range(0, 8192, 1, "or_greater") var map_texture_max: int = 2048
 
 ## Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every material's surfaces. `--zz-shadow-proxy=`.
 @export var shadow_proxy: bool = true
@@ -946,7 +948,7 @@ func setup_seconds() -> float:
 
 ## Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the old look) is
 ## about twice the draws of 2 on a converted map. `--zz-sun-shadow-splits=`.
-@export_range(1, 4) var sun_shadow_splits: int = 2
+@export_range(1, 4, 1.0, "or_greater") var sun_shadow_splits: int = 2
 
 ## Props whose longest side is under this many metres cast no sun shadow on a client (0: all do, as before). A can's shadow
 ## is a draw call a player never reads. `--zz-prop-shadow-min=`.
@@ -959,7 +961,7 @@ func setup_seconds() -> float:
 @export var prop_max_tris: int = 150000
 
 ## Pixels of error a mesh may show before the engine picks a finer LOD, on a client: higher is coarser and cheaper (1 is the engine's own). `--zz-mesh-lod-threshold=`.
-@export_range(0.0, 16.0) var mesh_lod_threshold: float = 1.0
+@export_range(0.0, 16.0, 1.0, "or_greater") var mesh_lod_threshold: float = 1.0
 
 ## Seed every random choice is drawn from.
 @export var seed_value: int = 20261010
@@ -968,26 +970,31 @@ func setup_seconds() -> float:
 
 @export_group("Netcode")
 
+## The upper bounds the zz_* cvars used to clamp to, as `zz_waves=0,zz_nights=40` (see game/zz_caps.gd
+## for the cvars and their old highest values): 0 is no limit, a cvar not listed keeps its old
+## highest, a value past it is refused with an error, never clamped. Empty keeps every old default.
+@export var cap_overrides: String = ""
+
 ## Metres within which a survivor is sent a common's and a special's updates (live). A client hides
 ## a mirror the server stopped sending, so either can change mid-round.
-@export_range(40.0, 1000.0, 5.0) var net_common_radius: float = 80.0
-@export_range(40.0, 1000.0, 5.0) var net_special_radius: float = 260.0
+@export_range(40.0, 1000.0, 5.0, "or_greater") var net_common_radius: float = 80.0
+@export_range(40.0, 1000.0, 5.0, "or_greater") var net_special_radius: float = 260.0
 ## Anything past [member net_far_distance] metres from a survivor (players included, never their
 ## own) is sent every Nth snapshot only. 1 is off; dot-net's DotNetInterest.far_every.
-@export_range(1, 16, 1) var net_far_every: int = 1
-@export_range(0.0, 1000.0, 5.0) var net_far_distance: float = 40.0
+@export_range(1, 16, 1, "or_greater") var net_far_every: int = 1
+@export_range(0.0, 1000.0, 5.0, "or_greater") var net_far_distance: float = 40.0
 ## Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once
 ## for all of them (DotNetInterest.far_coherent). Off staggers each survivor's turns.
 @export var net_far_coherent: bool = false
 ## Bands past [member net_far_distance], each twice as far and sent half as often (1 is one band).
-@export_range(1, 4, 1) var net_far_tiers: int = 1
+@export_range(1, 4, 1, "or_greater") var net_far_tiers: int = 1
 
 # --- Bots ------------------------------------------------------------------
 
 @export_group("Bots")
 
 ## How many survivors the server keeps in the game by adding stand-ins.
-@export_range(0, 24, 1) var minimum_players: int = 4
+@export_range(0, 24, 1, "or_greater") var minimum_players: int = 4
 
 ## Whether a map that says how big a team it is built for (its `survivors`) raises that number
 ## to it: a high school wants a dozen, a street four.
@@ -1001,19 +1008,19 @@ func setup_seconds() -> float:
 @export_group("Stand-in rules")
 
 ## Metres a stand-in sees a zombie from, and the reach it counts a crowd for the calm check (`zz_bot_sight`).
-@export_range(1.0, 200.0, 1.0) var bot_sight: float = 32.0
+@export_range(1.0, 200.0, 1.0, "or_greater") var bot_sight: float = 32.0
 
 ## How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_ratio`).
 @export_range(1.0, 10.0, 0.05) var bot_upgrade_ratio: float = 1.35
 
 ## Metres inside which a stand-in does not fire a launcher: the blast reaches its owner (`zz_bot_blast_safe`).
-@export_range(0.0, 50.0, 0.5) var bot_blast_safe: float = 9.0
+@export_range(0.0, 50.0, 0.5, "or_greater") var bot_blast_safe: float = 9.0
 
 ## Score added to a launcher when a stand-in ranks the guns it could take (`zz_bot_launcher_bonus`).
-@export_range(0.0, 100000.0, 100.0) var bot_launcher_bonus: float = 10000.0
+@export_range(0.0, 100000.0, 100.0, "or_greater") var bot_launcher_bonus: float = 10000.0
 
 ## Metres from the line of fire a friend's middle may be before a stand-in holds its fire (`zz_bot_friend_clearance`).
-@export_range(0.1, 3.0, 0.05) var bot_friend_clearance: float = 0.7
+@export_range(0.1, 3.0, 0.05, "or_greater") var bot_friend_clearance: float = 0.7
 
 ## Degrees of cone around its aim in which a friend's hitbox counts as in the line of fire (`zz_bot_friend_cone_degrees`).
 @export_range(0.0, 60.0, 0.5) var bot_friend_cone_degrees: float = 14.0
@@ -1022,49 +1029,49 @@ func setup_seconds() -> float:
 @export_range(0.0, 1.0, 0.01) var bot_muzzle_margin: float = 0.08
 
 ## Metres past its target a round that passes bodies is judged for friends behind it (`zz_bot_penetration_reach`).
-@export_range(0.0, 100.0, 0.5) var bot_penetration_reach: float = 8.0
+@export_range(0.0, 100.0, 0.5, "or_greater") var bot_penetration_reach: float = 8.0
 
 ## Metres within which a crowd makes a stand-in shove (`zz_bot_shove_range`).
-@export_range(0.5, 5.0, 0.1) var bot_shove_range: float = 1.7
+@export_range(0.5, 5.0, 0.1, "or_greater") var bot_shove_range: float = 1.7
 
 ## Metres a stand-in lets its leader get before it walks after them (nearer it stays put) (`zz_bot_follow_near`).
-@export_range(0.5, 50.0, 0.5) var bot_follow_near: float = 3.5
+@export_range(0.5, 50.0, 0.5, "or_greater") var bot_follow_near: float = 3.5
 
 ## Metres past which a stand-in always walks after its leader (`zz_bot_follow_far`).
-@export_range(0.5, 100.0, 0.5) var bot_follow_far: float = 6.0
+@export_range(0.5, 100.0, 0.5, "or_greater") var bot_follow_far: float = 6.0
 
 ## Least seconds a picked behaviour lasts before the next is drawn from the persona's mix (`zz_bot_behave_min`).
-@export_range(1.0, 300.0, 1.0) var bot_behave_min: float = 10.0
+@export_range(1.0, 300.0, 1.0, "or_greater") var bot_behave_min: float = 10.0
 
 ## Most seconds a picked behaviour lasts (`zz_bot_behave_max`).
-@export_range(1.0, 300.0, 1.0) var bot_behave_max: float = 22.0
+@export_range(1.0, 300.0, 1.0, "or_greater") var bot_behave_max: float = 22.0
 
 ## Metres a looting stand-in looks for something it wants (`zz_bot_loot_reach`).
-@export_range(1.0, 500.0, 1.0) var bot_loot_reach: float = 90.0
+@export_range(1.0, 500.0, 1.0, "or_greater") var bot_loot_reach: float = 90.0
 
 ## Metres off an item a stand-in takes on (`zz_bot_pick_up_reach`).
-@export_range(0.5, 100.0, 0.5) var bot_pick_up_reach: float = 7.0
+@export_range(0.5, 100.0, 0.5, "or_greater") var bot_pick_up_reach: float = 7.0
 
 ## Seconds a stand-in tries for an item before it leaves it be (`zz_bot_pick_up_give_up`).
-@export_range(1.0, 300.0, 1.0) var bot_pick_up_give_up: float = 15.0
+@export_range(1.0, 300.0, 1.0, "or_greater") var bot_pick_up_give_up: float = 15.0
 
 ## Seconds a stand-in tries for a clear line to an item that is within reach but behind something (`zz_bot_pick_blocked_give_up`).
-@export_range(0.5, 60.0, 0.5) var bot_pick_blocked_give_up: float = 3.0
+@export_range(0.5, 60.0, 0.5, "or_greater") var bot_pick_blocked_give_up: float = 3.0
 
 ## Hops that have not freed a stand-in before the game steps it along (`zz_bot_hops_before_nudge`).
-@export_range(0, 20, 1) var bot_hops_before_nudge: int = 2
+@export_range(0, 20, 1, "or_greater") var bot_hops_before_nudge: int = 2
 
 ## Seconds a stand-in stays put, hopping and stepping, before it is put on clear ground (`zz_bot_stuck_before_relocate`).
-@export_range(1.0, 120.0, 1.0) var bot_stuck_before_relocate: float = 8.0
+@export_range(1.0, 120.0, 1.0, "or_greater") var bot_stuck_before_relocate: float = 8.0
 
 ## Metres from where it began that count as having got away (`zz_bot_stuck_area`).
-@export_range(0.5, 20.0, 0.5) var bot_stuck_area: float = 2.5
+@export_range(0.5, 20.0, 0.5, "or_greater") var bot_stuck_area: float = 2.5
 
 ## Metres a stand-in may jitter and still be stuck (`zz_bot_stuck_radius`).
-@export_range(0.1, 5.0, 0.1) var bot_stuck_radius: float = 0.8
+@export_range(0.1, 5.0, 0.1, "or_greater") var bot_stuck_radius: float = 0.8
 
 ## Path points ahead of it a stand-in smooths its route over (`zz_bot_smooth_horizon`).
-@export_range(2, 64, 1) var bot_smooth_horizon: int = 16
+@export_range(2, 64, 1, "or_greater") var bot_smooth_horizon: int = 16
 
 # --- Watching --------------------------------------------------------------
 
@@ -1150,13 +1157,18 @@ func validate() -> DotResult:
 	if start_weapons.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "Survivors have to start holding something.")
 
-	if box_deploy_seconds < 0.5 or box_deploy_seconds > 15.0:
-		return DotResult.fail(DotError.CODE_INVALID,
-			"box_deploy_seconds is %.2f; it is 0.5 to 15 (the cvar zz_box_deploy_seconds clamps the same)." % box_deploy_seconds)
+	var cap_errors := PackedStringArray()
+	var overrides := ZzCapsScript.parse_overrides(cap_overrides, cap_errors)
+	if not cap_errors.is_empty():
+		return DotResult.fail(DotError.CODE_INVALID, "; ".join(cap_errors))
 
-	if downed_crawl_speed < 0.0 or downed_crawl_speed > 6.0:
+	if box_deploy_seconds < 0.5 or box_deploy_seconds > ZzCapsScript.highest("zz_box_deploy_seconds", overrides):
 		return DotResult.fail(DotError.CODE_INVALID,
-			"downed_crawl_speed is %.2f; it is 0 (stay put) to 6 metres per second." % downed_crawl_speed)
+			"box_deploy_seconds is %.2f; it is 0.5 to 15 (cap_overrides zz_box_deploy_seconds=0 lifts the top)." % box_deploy_seconds)
+
+	if downed_crawl_speed < 0.0 or downed_crawl_speed > ZzCapsScript.highest("zz_downed_crawl_speed", overrides):
+		return DotResult.fail(DotError.CODE_INVALID,
+			"downed_crawl_speed is %.2f; it is 0 (stay put) to 6 metres per second (cap_overrides zz_downed_crawl_speed=0 lifts the top)." % downed_crawl_speed)
 
 	if weight_over_limit != "slow" and weight_over_limit != "drop":
 		return DotResult.fail(DotError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)

@@ -7,6 +7,7 @@ const ZzNetBridge := preload("net/zz_net_bridge.gd")
 const ZzServices := preload("zz_services.gd")
 
 const ZzBots := preload("zz_bots.gd")
+const ZzCaps := preload("zz_caps.gd")
 const ZzGame := preload("zz_game.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzPlayer := preload("zz_player.gd")
@@ -274,8 +275,11 @@ func _game_load() -> DotResult:
 		"Seconds the killcam of a map's last moment plays, added to the intermission (0 for none)",
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 	if killcam != null:
+		var _checked := killcam.with_validator(func(text: String) -> DotResult:
+			var refused := _cap_refusal("mp_killcam_time", text.to_float(), [])
+			return DotResult.success(text) if refused.is_empty() else DotResult.fail(DotError.CODE_INVALID, refused))
 		killcam.changed.connect(func(_old: String, new_value: String) -> void:
-			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
+			world.config.killcam_seconds = new_value.to_float()
 			world.apply_intermission())
 
 	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
@@ -544,10 +548,10 @@ func _add_tunables(world: ZzGame) -> void:
 			_apply_friendly_fire(world))
 	_tunable("zz_rookie_minutes", config.rookie_minutes,
 		"Minutes played under which a player is new and (mode 2) has their team damage reflected; 0 nobody is new",
-		func(value: float) -> void: config.rookie_minutes = clampf(value, 0.0, 100000.0))
+		func(value: float) -> void: config.rookie_minutes = value)
 	_tunable("zz_team_damage_window", config.team_damage_window,
 		"Seconds team damage is added up over for the voteban and the ban",
-		func(value: float) -> void: config.team_damage_window = clampf(value, 5.0, 3600.0))
+		func(value: float) -> void: config.team_damage_window = value)
 	_tunable("zz_team_damage_vote", config.team_damage_vote,
 		"Team damage inside the window that starts a voteban against the player; 0 never",
 		func(value: float) -> void: config.team_damage_vote = maxf(value, 0.0))
@@ -574,24 +578,24 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.bot_defib = value > 0.5)
 	_tunable("zz_bot_defib_reach", config.bot_defib_reach,
 		"Metres a stand-in with a defibrillator walks to a dead friend's body (1 to 200)",
-		func(value: float) -> void: config.bot_defib_reach = clampf(value, 1.0, 200.0))
+		func(value: float) -> void: config.bot_defib_reach = value)
 	_tunable("zz_bot_idle_seconds", config.bot_idle_seconds,
 		"Seconds a stand-in that wants to move or take something may stand still before it gets another goal; 0 off",
-		func(value: float) -> void: config.bot_idle_seconds = clampf(value, 0.0, 120.0))
+		func(value: float) -> void: config.bot_idle_seconds = value)
 	_tunable("zz_nav_cache", 1.0 if config.nav_cache else 0.0,
 		"Keep each built navigation graph on disk and load it next time; 0 builds every time",
 		func(value: float) -> void: config.nav_cache = value > 0.5)
 	_tunable("zz_nav_threads", float(config.nav_threads),
 		"Worker tasks a navigation build uses off the main thread; 0 builds on the main thread in slices",
-		func(value: float) -> void: config.nav_threads = clampi(int(value), 0, 16))
+		func(value: float) -> void: config.nav_threads = int(value))
 	_tunable("zz_nav_budget_ms", config.nav_budget_ms,
 		"Milliseconds a tick a main-thread navigation build may take (zz_nav_threads 0, or no threads)",
-		func(value: float) -> void: config.nav_budget_ms = clampf(value, 0.5, 14.0))
+		func(value: float) -> void: config.nav_budget_ms = value)
 	_tunable("zz_unstick_seconds", config.unstick_seconds,
 		"Seconds a zombie may push without progress before it is nudged free; 0 turns it off",
-		func(value: float) -> void: config.unstick_seconds = clampf(value, 0.0, 30.0))
+		func(value: float) -> void: config.unstick_seconds = value)
 	_tunable("zz_nav_drop", config.nav_drop_max, "The longest drop, in metres, a zombie takes off a ledge",
-		func(value: float) -> void: config.nav_drop_max = clampf(value, 1.0, 10.0))
+		func(value: float) -> void: config.nav_drop_max = value)
 	_tunable("zz_zombie_drops", 1.0 if config.zombie_drops else 0.0,
 		"Zombies step down ledges the annotations found; 0 off",
 		func(value: float) -> void: config.zombie_drops = value > 0.5)
@@ -606,19 +610,19 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.zombie_spread = value > 0.5)
 	_tunable("zz_zombie_think_range", config.think_range,
 		"Scales the distances past which far zombies think and move less often; below 1 is cheaper",
-		func(value: float) -> void: config.think_range = clampf(value, 0.25, 4.0))
+		func(value: float) -> void: config.think_range = value)
 	_tunable("zz_body_stride_near", config.body_stride_near,
 		"Metres past which a zombie's body moves every second tick; lower is cheaper",
-		func(value: float) -> void: config.body_stride_near = clampf(value, 5.0, 500.0))
+		func(value: float) -> void: config.body_stride_near = value)
 	_tunable("zz_body_stride_far", config.body_stride_far,
 		"Metres past which a zombie's body moves every fourth tick; lower is cheaper",
-		func(value: float) -> void: config.body_stride_far = clampf(value, 5.0, 500.0))
+		func(value: float) -> void: config.body_stride_far = value)
 	_tunable("zz_dormant_from", config.dormant_from,
 		"Metres to the nearest survivor past which a zombie thinks every zz_dormant_think_every ticks and moves every eighth; 0 off",
-		func(value: float) -> void: config.dormant_from = clampf(value, 0.0, 1000.0))
+		func(value: float) -> void: config.dormant_from = value)
 	_tunable("zz_dormant_think_every", float(config.dormant_think_every),
 		"Ticks a dormant zombie's thought spans (8 to 64)",
-		func(value: float) -> void: config.dormant_think_every = clampi(int(value), 8, 64))
+		func(value: float) -> void: config.dormant_think_every = int(value))
 	_tunable("zz_path_reuse_thoughts", float(config.path_reuse_thoughts),
 		"Thoughts a zombie keeps its waypoint while its goal drifts under 3 m; 0 asks the graph every thought",
 		func(value: float) -> void: config.path_reuse_thoughts = maxi(int(value), 0))
@@ -630,68 +634,68 @@ func _add_tunables(world: ZzGame) -> void:
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
 	_tunable("zz_bot_hold_overrun", float(config.bot_hold_overrun),
 		"Zombies within 4.5 m of a choke that make it overrun",
-		func(value: float) -> void: config.bot_hold_overrun = clampi(int(value), 2, 40))
+		func(value: float) -> void: config.bot_hold_overrun = int(value))
 	_tunable("zz_bot_helpers", float(config.bot_helpers),
 		"Survival stand-ins that answer a pinned or downed friend (the nearest standing ones); 0 all",
-		func(value: float) -> void: config.bot_helpers = clampi(int(value), 0, 16))
+		func(value: float) -> void: config.bot_helpers = int(value))
 	_tunable("zz_bot_helper_radius", config.bot_helper_radius,
 		"Metres within which any survival stand-in answers a pinned or downed friend",
-		func(value: float) -> void: config.bot_helper_radius = clampf(value, 0.0, 40.0))
+		func(value: float) -> void: config.bot_helper_radius = value)
 	_tunable("zz_max_incaps", float(config.max_incaps), "Downs before the next one is death",
-		func(value: float) -> void: config.max_incaps = clampi(int(value), 0, 10))
+		func(value: float) -> void: config.max_incaps = int(value))
 	_tunable("zz_rescue_seconds", config.rescue_seconds,
 		"Seconds before a dead survivor is rescued beside the team (0 never)",
-		func(value: float) -> void: config.rescue_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.rescue_seconds = value)
 	_tunable("zz_fall_rescue", 1.0 if config.fall_rescue else 0.0,
 		"1: a survivor below the map's floor or outside its walls is put back on the last ground they stood on; 0: they die at the kill height",
 		func(value: float) -> void: config.fall_rescue = value != 0.0)
 	_tunable("zz_stuck_rescue_seconds", config.stuck_rescue_seconds,
 		"Seconds a survivor pushes on the world without moving before they are put back on the last ground (0 off)",
-		func(value: float) -> void: config.stuck_rescue_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.stuck_rescue_seconds = value)
 	_tunable("zz_start_grace", config.start_grace_seconds,
 		"Seconds the start area holds the horde off unless somebody leaves it",
-		func(value: float) -> void: config.start_grace_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.start_grace_seconds = value)
 	_tunable("zz_survive_seconds", config.survive_seconds,
 		"Seconds a survival map is held for when the map does not say (0 endless)",
-		func(value: float) -> void: config.survive_seconds = clampf(value, 0.0, 7200.0))
+		func(value: float) -> void: config.survive_seconds = value)
 	_tunable("zz_map_on_loss", float(config.map_on_loss), "After a lost map: 0 play it again, 1 move on",
 		func(value: float) -> void: config.map_on_loss = clampi(int(value), 0, 1))
 	_tunable("zz_retries", float(config.retries), "Times a lost map is played again before moving on",
-		func(value: float) -> void: config.retries = clampi(int(value), 0, 20))
+		func(value: float) -> void: config.retries = int(value))
 	_tunable("zz_commons", float(config.commons_base), "Commons alive at once for one survivor",
-		func(value: float) -> void: config.commons_base = clampi(int(value), 0, 400))
+		func(value: float) -> void: config.commons_base = int(value))
 	_tunable("zz_commons_far_divisor", float(config.commons_far_divisor), "Past sixteen survivors each adds 1 over this of the per-survivor share",
-		func(value: float) -> void: config.commons_far_divisor = clampi(int(value), 1, 60))
+		func(value: float) -> void: config.commons_far_divisor = int(value))
 	_tunable("zz_commons_per_survivor", float(config.commons_per_survivor), "And for each survivor more",
-		func(value: float) -> void: config.commons_per_survivor = clampi(int(value), 0, 50))
+		func(value: float) -> void: config.commons_per_survivor = int(value))
 	_tunable("zz_wanderers", config.wanderer_density, "Commons standing about a map, per 100 square metres",
-		func(value: float) -> void: config.wanderer_density = clampf(value, 0.0, 10.0))
+		func(value: float) -> void: config.wanderer_density = value)
 	_tunable("zz_mob_min", config.mob_interval_min, "Seconds between mobs, from",
-		func(value: float) -> void: config.mob_interval_min = clampf(value, 10.0, config.mob_interval_max))
+		func(value: float) -> void: config.mob_interval_min = value)
 	_tunable("zz_mob_max", config.mob_interval_max, "Seconds between mobs, to",
-		func(value: float) -> void: config.mob_interval_max = clampf(value, config.mob_interval_min, 900.0))
+		func(value: float) -> void: config.mob_interval_max = value)
 	_tunable("zz_mob_size", float(config.mob_size), "Commons in a mob, for one survivor",
-		func(value: float) -> void: config.mob_size = clampi(int(value), 1, 200))
+		func(value: float) -> void: config.mob_size = int(value))
 	_tunable("zz_specials", float(config.specials_base), "Specials alive at once for one survivor",
-		func(value: float) -> void: config.specials_base = clampi(int(value), 0, 32))
+		func(value: float) -> void: config.specials_base = int(value))
 	_tunable("zz_special_min", config.special_interval_min, "Seconds between specials, from",
-		func(value: float) -> void: config.special_interval_min = clampf(value, 1.0, config.special_interval_max))
+		func(value: float) -> void: config.special_interval_min = value)
 	_tunable("zz_special_max", config.special_interval_max, "Seconds between specials, to",
-		func(value: float) -> void: config.special_interval_max = clampf(value, config.special_interval_min, 300.0))
+		func(value: float) -> void: config.special_interval_max = value)
 	# The specials added with the animated models. Each writes the configuration (the next map's
 	# catalogue) and the live catalogue's definition (the next one spawned), because a brain
 	# reads its numbers from its definition.
 	_tunable("zz_screamer_mob", float(config.screamer_mob), "Commons a screamer's scream sends at whoever it saw",
 		func(value: float) -> void:
-			config.screamer_mob = clampi(int(value), 0, 100)
+			config.screamer_mob = int(value)
 			_set_meta(world, ZzNpcs.SCREAMER, "scream_mob", float(config.screamer_mob)))
 	_tunable("zz_screamer_cooldown", config.screamer_cooldown, "Seconds between one screamer's screams",
 		func(value: float) -> void:
-			config.screamer_cooldown = clampf(value, 4.0, 120.0)
+			config.screamer_cooldown = value
 			_set_meta(world, ZzNpcs.SCREAMER, "scream_cooldown", config.screamer_cooldown))
 	_tunable("zz_crawler_grab_dps", config.crawler_grab_dps, "What a crawler's hold on an ankle does a second, on normal",
 		func(value: float) -> void:
-			config.crawler_grab_dps = clampf(value, 0.0, 50.0)
+			config.crawler_grab_dps = value
 			_set_meta(world, ZzNpcs.CRAWLER, "pin_dps", config.crawler_grab_dps))
 	_tunable("zz_riot_shield", config.riot_shield, "Share of a hit on a riot zombie's shield that gets through (0..1)",
 		func(value: float) -> void:
@@ -716,7 +720,8 @@ func _add_tunables(world: ZzGame) -> void:
 			["fuel", "Seconds of jetpack fuel", 1.0, 120.0], ["angry_health", "Health share below which the mutant gets angry", 0.0, 1.0]]:
 		var key: String = row[0]
 		_tunable("zz_mutant_" + key, float(ZzNpcs._mutant(config).meta[key]), String(row[1]),
-			func(value: float) -> void: _set_meta(world, ZzNpcs.MUTANT, key, clampf(value, float(row[2]), float(row[3]))))
+			func(value: float) -> void: _set_meta(world, ZzNpcs.MUTANT, key, value),
+			[float(row[2]), float(row[3])])
 	_tunable("zz_oil_monster_chance", config.oil_monster_chance, "Chance a special roll may pick the oil monster (0 never)",
 		func(value: float) -> void: config.oil_monster_chance = clampf(value, 0.0, 1.0))
 	_tunable("zz_oil_monster_min_wave", float(config.oil_monster_min_wave), "First wave the oil monster can appear on",
@@ -726,11 +731,12 @@ func _add_tunables(world: ZzGame) -> void:
 	for row: Array in OIL_TUNABLES:
 		var key: String = row[0]
 		_tunable("zz_oil_" + key, float(oil[key]), String(row[1]),
-			func(value: float) -> void: _set_meta(world, ZzNpcs.OIL_MONSTER, key, clampf(value, float(row[2]), float(row[3]))))
+			func(value: float) -> void: _set_meta(world, ZzNpcs.OIL_MONSTER, key, value),
+			[float(row[2]), float(row[3])])
 	_tunable("zz_brute_min", config.brute_interval_min, "Seconds between brutes, from (0 with zz_brute_max 0: never)",
-		func(value: float) -> void: config.brute_interval_min = clampf(value, 0.0, config.brute_interval_max))
+		func(value: float) -> void: config.brute_interval_min = value)
 	_tunable("zz_brute_max", config.brute_interval_max, "Seconds between brutes, to",
-		func(value: float) -> void: config.brute_interval_max = clampf(value, config.brute_interval_min, 3600.0))
+		func(value: float) -> void: config.brute_interval_max = value)
 	_tunable("zz_director", 1.0 if config.director_enabled else 0.0, "Whether the build-up / peak / relax pressure runs",
 		func(value: float) -> void: config.director_enabled = value > 0.5)
 	_tunable("zz_sleepers", 1.0 if config.sleepers_enabled else 0.0, "Whether the maps' sleepers are there (next map)",
@@ -742,47 +748,47 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_box_special", config.box_drop_special, "Chance a special drops a box",
 		func(value: float) -> void: config.box_drop_special = clampf(value, 0.0, 1.0))
 	_tunable("zz_box_carry", float(config.box_carry), "How many boxes a survivor carries (0: E opens them on the ground)",
-		func(value: float) -> void: config.box_carry = clampi(int(value), 0, 6))
+		func(value: float) -> void: config.box_carry = int(value))
 	_tunable("zz_box_deploy_seconds", config.box_deploy_seconds, "Seconds primary fire is held to open a carried box (0.5 to 15, default 1; the config file key is box_deploy_seconds)",
-		func(value: float) -> void: config.box_deploy_seconds = clampf(value, 0.5, 15.0))
+		func(value: float) -> void: config.box_deploy_seconds = value)
 	_tunable("zz_revive_seconds", config.revive_seconds, "Seconds E is held to pick a downed teammate up (0.5 to 30)",
-		func(value: float) -> void: config.revive_seconds = clampf(value, 0.5, 30.0))
+		func(value: float) -> void: config.revive_seconds = value)
 	_tunable("zz_revive_range", config.revive_range, "Metres a reviver may stand from the downed (0.5 to 5)",
-		func(value: float) -> void: config.revive_range = clampf(value, 0.5, 5.0))
+		func(value: float) -> void: config.revive_range = value)
 	_tunable("zz_revive_health", config.revive_health, "Temporary health a revived survivor gets up with (1 to 100)",
-		func(value: float) -> void: config.revive_health = clampf(value, 1.0, 100.0))
+		func(value: float) -> void: config.revive_health = value)
 	_tunable("zz_revive_bleed_per_second", config.downed_bleed_per_second, "Health a downed survivor loses a second until revived (0 to 100; 0 never bleeds out)",
-		func(value: float) -> void: config.downed_bleed_per_second = clampf(value, 0.0, 100.0))
+		func(value: float) -> void: config.downed_bleed_per_second = value)
 	_tunable("zz_defib_start", float(config.start_defibs), "Whether each survivor starts a map holding a defibrillator (0 or 1)",
 		func(value: float) -> void: config.start_defibs = clampi(int(value), 0, 1))
 	_tunable("zz_defib_charge_seconds", config.defib_charge_seconds, "Seconds E is held at a dead teammate's body before the shock (0.5 to 30)",
-		func(value: float) -> void: config.defib_charge_seconds = clampf(value, 0.5, 30.0))
+		func(value: float) -> void: config.defib_charge_seconds = value)
 	_tunable("zz_defib_range", config.defib_range, "Metres from the body a defibrillator works (0.5 to 5)",
-		func(value: float) -> void: config.defib_range = clampf(value, 0.5, 5.0))
+		func(value: float) -> void: config.defib_range = value)
 	_tunable("zz_defib_revive_fraction", config.defib_revive_fraction, "Share of maximum health the revived come back with (0.05 to 1)",
 		func(value: float) -> void: config.defib_revive_fraction = clampf(value, 0.05, 1.0))
 	_tunable("zz_defib_invulnerable_seconds", config.defib_invulnerable_seconds, "Seconds the revived cannot be hurt (0 to 15)",
-		func(value: float) -> void: config.defib_invulnerable_seconds = clampf(value, 0.0, 15.0))
+		func(value: float) -> void: config.defib_invulnerable_seconds = value)
 	_tunable("zz_defib_charges", float(config.defib_charges), "Revives one defibrillator holds (1 or more; applies to ones picked up from now)",
 		func(value: float) -> void: config.defib_charges = maxi(int(value), 1))
 	_tunable("zz_defib_cooldown_seconds", config.defib_cooldown_seconds, "Seconds after a shock before the item may be used again (0 to 120)",
-		func(value: float) -> void: config.defib_cooldown_seconds = clampf(value, 0.0, 120.0))
+		func(value: float) -> void: config.defib_cooldown_seconds = value)
 	_tunable("zz_defib_max_body_age", config.defib_max_body_age, "Seconds after death beyond which the body is past saving (0: never)",
-		func(value: float) -> void: config.defib_max_body_age = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.defib_max_body_age = value)
 	_tunable("zz_defib_move_tolerance", config.defib_move_tolerance, "Metres the user may drift while charging before it is interrupted (0.1 to 3)",
-		func(value: float) -> void: config.defib_move_tolerance = clampf(value, 0.1, 3.0))
+		func(value: float) -> void: config.defib_move_tolerance = value)
 	_tunable("zz_defib_price", float(config.defib_price), "Points the trader asks for a defibrillator, also on trader shelves without a site price (0: not sold)",
-		func(value: float) -> void: config.defib_price = clampi(int(value), 0, 100000))
+		func(value: float) -> void: config.defib_price = int(value))
 	_tunable("zz_defib_hear_range", config.defib_hear_range, "Metres from which other survivors hear a defibrillator charging (0: only its user)",
-		func(value: float) -> void: config.defib_hear_range = clampf(value, 0.0, 100.0))
+		func(value: float) -> void: config.defib_hear_range = value)
 	_tunable("zz_common_speed_scaling", 1.0 if config.common_speed_scaling else 0.0, "Commons chase slowly and speed up with Hard Box stacks (1), or all run at zz_common_run_speed as before (0)",
 		func(value: float) -> void: config.common_speed_scaling = value > 0.5)
 	_tunable("zz_common_speed_base", config.common_speed_base, "A common's chase speed in m/s with no Hard Box stack (0.5 to 15)",
-		func(value: float) -> void: config.common_speed_base = clampf(value, 0.5, 15.0))
+		func(value: float) -> void: config.common_speed_base = value)
 	_tunable("zz_common_speed_per_hard_stack", config.common_speed_per_hard_stack, "m/s a common gains per Hard Box stack (0 to 5)",
-		func(value: float) -> void: config.common_speed_per_hard_stack = clampf(value, 0.0, 5.0))
+		func(value: float) -> void: config.common_speed_per_hard_stack = value)
 	_tunable("zz_common_speed_max", config.common_speed_max, "The fastest a scaled common gets, in m/s (0.5 to 15)",
-		func(value: float) -> void: config.common_speed_max = clampf(value, 0.5, 15.0))
+		func(value: float) -> void: config.common_speed_max = value)
 	_tunable("zz_angry_runner_fraction", config.angry_runner_fraction, "Share of commons that run at full speed while an Angry Box lasts (0 to 1)",
 		func(value: float) -> void: config.angry_runner_fraction = clampf(value, 0.0, 1.0))
 	_tunable("zz_box_labels", 1.0 if config.box_labels else 0.0, "Whether a box says its type before it is opened (default 0: the contents are a surprise, and the type is never sent)",
@@ -792,7 +798,7 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_box_instakill_max", config.box_instakill_max, "Instakill lasts at most this many seconds (negative: the box file's)",
 		func(value: float) -> void: config.box_instakill_max = value)
 	_tunable("zz_box_instakill_special_scale", config.box_instakill_special_scale, "Instakill: what a special takes per hit, as a multiple",
-		func(value: float) -> void: config.box_instakill_special_scale = clampf(value, 1.0, 100.0))
+		func(value: float) -> void: config.box_instakill_special_scale = value)
 	_tunable("zz_limb_follow_health", float(config.limb_follow_health),
 		"1: a limb holds as much as the zombie's real health and Instakill's boost skips limbs; 0: the old rule (later waves and Instakill strip limbs)",
 		func(value: float) -> void: config.limb_follow_health = value > 0.5)
@@ -827,59 +833,59 @@ func _add_tunables(world: ZzGame) -> void:
 			if not world.set_prop_force_override(now):
 				log_info("zz_prop_force is not a JSON object, ignored", {"value": now}))
 	_tunable("zz_prop_carry_mass", world.prop_carry.max_mass, "Heaviest loose prop (kg) a survivor can pick up with the use key",
-		func(value: float) -> void: world.prop_carry.max_mass = clampf(value, 0.0, 500.0))
+		func(value: float) -> void: world.prop_carry.max_mass = value)
 	_tunable("zz_waves", float(config.waves), "Waves a survival map is held for (zz_survival waves)",
-		func(value: float) -> void: config.waves = clampi(int(value), 1, 50))
+		func(value: float) -> void: config.waves = int(value))
 	_tunable("zz_nights", float(config.nights), "Nights a survival map is held for (zz_survival nights)",
-		func(value: float) -> void: config.nights = clampi(int(value), 1, 20))
+		func(value: float) -> void: config.nights = int(value))
 	_tunable("zz_breather", config.breather_seconds, "Seconds of breather between waves",
-		func(value: float) -> void: config.breather_seconds = clampf(value, 0.0, 300.0))
+		func(value: float) -> void: config.breather_seconds = value)
 	_tunable("zz_prestart_time", config.prestart_seconds, "Setup seconds before a survival map's first wave: no zombies until it ends (0 skips)",
-		func(value: float) -> void: config.prestart_seconds = clampf(value, 0.0, 300.0))
+		func(value: float) -> void: config.prestart_seconds = value)
 	_tunable("zz_infect_after", config.infect_after_seconds, "Seconds into a round after which survivors turn into zombies (0 off)",
-		func(value: float) -> void: config.infect_after_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.infect_after_seconds = value)
 	_tunable("zz_infect_count", float(config.infect_count), "How many survivors turn (the last never does)",
-		func(value: float) -> void: config.infect_count = clampi(int(value), 1, 32))
+		func(value: float) -> void: config.infect_count = int(value))
 	_tunable("zz_survival_warmup", config.survival_warmup_seconds, "Overrides zz_prestart_time when 0 or more (-1 follows it)",
-		func(value: float) -> void: config.survival_warmup_seconds = clampf(value, -1.0, 300.0))
+		func(value: float) -> void: config.survival_warmup_seconds = value)
 	_tunable("zz_respawn_on_wave_end", 1.0 if config.respawn_on_wave_end else 0.0, "1: the dead return as each breather begins",
 		func(value: float) -> void: config.respawn_on_wave_end = value >= 0.5)
 	_tunable("zz_timed_respawn", 1.0 if config.timed_respawn else 0.0, "1: a dead survivor returns after a delay (zz_respawn_* )",
 		func(value: float) -> void: config.timed_respawn = value >= 0.5)
 	_tunable("zz_respawn_base", config.respawn_base_seconds, "Timed respawn: base seconds",
-		func(value: float) -> void: config.respawn_base_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.respawn_base_seconds = value)
 	_tunable("zz_respawn_min", config.respawn_min_seconds, "Timed respawn: shortest delay",
-		func(value: float) -> void: config.respawn_min_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.respawn_min_seconds = value)
 	_tunable("zz_respawn_max", config.respawn_max_seconds, "Timed respawn: longest delay",
-		func(value: float) -> void: config.respawn_max_seconds = clampf(value, 0.0, 600.0))
+		func(value: float) -> void: config.respawn_max_seconds = value)
 	_tunable("zz_respawn_healthy_scale", config.respawn_healthy_scale, "Timed respawn: multiplier with the team all up",
-		func(value: float) -> void: config.respawn_healthy_scale = clampf(value, 0.0, 10.0))
+		func(value: float) -> void: config.respawn_healthy_scale = value)
 	_tunable("zz_respawn_scarce_scale", config.respawn_scarce_scale, "Timed respawn: multiplier with few survivors up",
-		func(value: float) -> void: config.respawn_scarce_scale = clampf(value, 0.0, 10.0))
+		func(value: float) -> void: config.respawn_scarce_scale = value)
 	_tunable("zz_respawn_per_wave", config.respawn_per_wave_seconds, "Timed respawn: seconds added per wave after the first",
-		func(value: float) -> void: config.respawn_per_wave_seconds = clampf(value, 0.0, 120.0))
+		func(value: float) -> void: config.respawn_per_wave_seconds = value)
 	_tunable("zz_respawn_difficulty_step", config.respawn_difficulty_step, "Timed respawn: delay fraction per difficulty step above normal",
 		func(value: float) -> void: config.respawn_difficulty_step = clampf(value, 0.0, 1.0))
 	_tunable("zz_respawn_protect", config.respawn_protect_seconds, "Timed respawn: seconds of invulnerability after returning",
-		func(value: float) -> void: config.respawn_protect_seconds = clampf(value, 0.0, 30.0))
+		func(value: float) -> void: config.respawn_protect_seconds = value)
 	_tunable("zz_day_seconds", config.day_seconds, "Seconds of day between nights",
-		func(value: float) -> void: config.day_seconds = clampf(value, 10.0, 900.0))
+		func(value: float) -> void: config.day_seconds = value)
 	_tunable("zz_night_seconds", config.night_seconds, "Seconds a night lasts",
-		func(value: float) -> void: config.night_seconds = clampf(value, 10.0, 1800.0))
+		func(value: float) -> void: config.night_seconds = value)
 	_tunable("zz_wave_size", float(config.wave_size), "The first wave's commons for one survivor",
-		func(value: float) -> void: config.wave_size = clampi(int(value), 1, 400))
+		func(value: float) -> void: config.wave_size = int(value))
 	_tunable("zz_wave_size_per_survivor", float(config.wave_size_per_survivor), "And for each survivor more",
-		func(value: float) -> void: config.wave_size_per_survivor = clampi(int(value), 0, 50))
+		func(value: float) -> void: config.wave_size_per_survivor = int(value))
 	_tunable("zz_wave_growth", config.wave_growth, "How much bigger each wave is than the first, as a share of it",
-		func(value: float) -> void: config.wave_growth = clampf(value, 0.0, 2.0))
+		func(value: float) -> void: config.wave_growth = value)
 	_tunable("zz_wave_twists", 1.0 if config.wave_twists else 0.0, "1: waves from the third draw a twist (sprinters, swarm, heavies, hunters)",
 		func(value: float) -> void: config.wave_twists = value >= 0.5)
 	_tunable("zz_brute_every", float(config.brute_every_waves), "Every this many waves a brute comes (and two with the last); 0 never",
-		func(value: float) -> void: config.brute_every_waves = clampi(int(value), 0, 50))
+		func(value: float) -> void: config.brute_every_waves = int(value))
 	_tunable("zz_barricade_health", config.barricade_health, "A barricade's strength when the map does not say",
-		func(value: float) -> void: config.barricade_health = clampf(value, 10.0, 10000.0))
+		func(value: float) -> void: config.barricade_health = value)
 	_tunable("zz_barricade_bash", config.barricade_bash, "What one zombie's bashing takes off a barricade a second",
-		func(value: float) -> void: config.barricade_bash = clampf(value, 0.0, 200.0))
+		func(value: float) -> void: config.barricade_bash = value)
 	_tunable("zz_team_from_map", 1.0 if config.team_from_map else 0.0,
 		"1: stand-ins fill to the team a map is built for (its survivors) when that is more than bot_quota",
 		func(value: float) -> void: config.team_from_map = value >= 0.5)
@@ -889,7 +895,7 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_min_players", float(config.minimum_players),
 		"Deprecated, sets bot_quota. How many survivors the server keeps in the game with stand-ins",
 		func(value: float) -> void:
-			config.minimum_players = clampi(int(value), 0, 24)
+			config.minimum_players = int(value)
 			if _quota != null and _quota.quota_cvar != null:
 				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
 	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` (easy, medium, hard,
@@ -965,6 +971,18 @@ static func _number(value: float) -> String:
 	return "%d" % int(round(value)) if is_equal_approx(value, round(value)) else "%.3f" % value
 
 
+## Empty when [param value] is inside what the cvar takes, else why not (see [ZzCaps]). The highest
+## is the old hard cap, now the `cap_overrides` setting's default; 0 there is unlimited.
+func _cap_refusal(cvar_name: String, value: float, range_of: Array) -> String:
+	if not (game is ZzGame):
+		return ""
+	var errors := PackedStringArray()
+	var overrides := ZzCaps.parse_overrides((game as ZzGame).config.cap_overrides, errors)
+	if not errors.is_empty():
+		return "; ".join(errors)
+	return ZzCaps.refusal(cvar_name, value, overrides, range_of)
+
+
 ## One cvar, its default taken from the configuration rather than written twice.
 ##
 ## [b]The default is the value the world was built with, and that is the whole point.[/b] A
@@ -973,12 +991,21 @@ static func _number(value: float) -> String:
 ## `ZZ_ROUND_SECONDS=240` would see `zz_round_seconds` report 300 and, worse, would reset
 ## their own setting the moment anything wrote the value back.
 func _tunable(
-	cvar_name: String, current: float, description: String, apply: Callable
+	cvar_name: String, current: float, description: String, apply: Callable, range_of: Array = []
 ) -> void:
 	var cvar := add_cvar(cvar_name, _number(current), description)
 
 	if cvar == null:
 		return
+
+	# A value outside the cvar's range is refused here, loudly (the console reports it, the log
+	# carries it); nothing is clamped silently. See [ZzCaps].
+	var _checked := cvar.with_validator(func(text: String) -> DotResult:
+		var refused := _cap_refusal(cvar_name, text.to_float(), range_of)
+		if refused.is_empty():
+			return DotResult.success(text)
+		log_warn(refused, {"cvar": cvar_name})
+		return DotResult.fail(DotError.CODE_INVALID, refused))
 
 	# The handler must not capture `cvar`: it would be a reference cycle the engine never frees.
 	cvar.changed.connect(func(_old: String, new_value: String) -> void:
@@ -1671,7 +1698,11 @@ func _cmd_spawn(ctx: DotCmdContext) -> void:
 func _spawn_in_tick(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame
 	var kind := StringName(ctx.arg(0)) if ctx.argc() > 0 else &"common"
-	var count := clampi(ctx.arg(1).to_int(), 1, 50) if ctx.argc() > 1 else 1
+	var count := ctx.arg(1).to_int() if ctx.argc() > 1 else 1
+
+	if count < 1:
+		ctx.reply("spawn count is %d; it is 1 or more (no upper limit)." % count)
+		return
 
 	if world == null or world.horde == null or world.horde.catalogue.get_npc(kind) == null:
 		ctx.reply("Which? common, %s, brute, sleeper" % ", ".join(ZzNpcs.SPECIALS))
@@ -1752,7 +1783,11 @@ func _mob_in_tick(ctx: DotCmdContext) -> void:
 		return
 
 	var size := ctx.arg(0).to_int() if ctx.argc() > 0 else world.horde._mob_size()
-	ctx.reply("%d coming." % world.horde.spawn_mob(clampi(size, 1, 200)))
+	if size < 1:
+		ctx.reply("mob size is %d; it is 1 or more (no upper limit)." % size)
+		return
+
+	ctx.reply("%d coming." % world.horde.spawn_mob(size))
 
 
 func _cmd_panic(ctx: DotCmdContext) -> void:
@@ -1762,7 +1797,12 @@ func _cmd_panic(ctx: DotCmdContext) -> void:
 		ctx.reply("No horde.")
 		return
 
-	var seconds := clampf(ctx.arg(0).to_float(), 5.0, 600.0) if ctx.argc() > 0 else 30.0
+	var seconds := ctx.arg(0).to_float() if ctx.argc() > 0 else 30.0
+
+	if seconds < 5.0:
+		ctx.reply("panic seconds is %s; it is 5 or more (no upper limit)." % seconds)
+		return
+
 	world.horde.panic(seconds)
 	ctx.reply("Panic for %d s." % int(seconds))
 

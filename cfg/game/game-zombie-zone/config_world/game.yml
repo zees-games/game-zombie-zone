@@ -2,13 +2,13 @@
 # an operator overrides in cfg/server/game/game-zombie-zone/config_world/game.yml. Layers: defaults < this < env < argv.
 
 # --- Gore
-# How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, ... [0..3]
+# How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, ... [0..]
 # gore_level: 2
-# The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_ma... [0..200]
+# The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_ma... [0..]
 # gore_max_gibs: 24
-# Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; ... [0..400]
+# Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; ... [0..]
 # gore_max_wounds: 48
-# Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 ... [0..2]
+# Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 ... [0..]
 # attack_anim: 0
 
 # --- The maps
@@ -24,11 +24,11 @@
 # vis_mode: ""
 # Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the lit ma...
 # lightmaps: true
-# The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author li... [0.0..2.0]
+# The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author li... [0.0..]
 # light_floor: 0.6
-# The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves ... [0.0..2.0]
+# The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves ... [0.0..]
 # sun_floor: 0.6
-# Longest side of a texture file decoded from disk for a drawn world; larger ones are halved until they fit (... [0..8192]
+# Longest side of a texture file decoded from disk for a drawn world; larger ones are halved until they fit (... [0..]
 # map_texture_max: 2048
 # Whether a drawn world's sun shadow comes from one shadows-only proxy per chunk (cheap) instead of every mat...
 # shadow_proxy: true
@@ -36,7 +36,7 @@
 # shadow_range: 0.0
 # Whether foliage and glass cards cast a sun shadow (costly: their alpha is tested in the shadow pass). Needs...
 # shadow_translucent: false
-# Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the... [1..4]
+# Cascades of the sun's shadow on a client: 1, 2 or 4. Every cascade draws each caster in it again, so 4 (the... [1..]
 # sun_shadow_splits: 2
 # Props whose longest side is under this many metres cast no sun shadow on a client (0: all do, as before). A...
 # prop_shadow_min: 1.2
@@ -44,21 +44,23 @@
 # prop_lod_min_tris: 20000
 # Most triangles a library model's mesh keeps at full detail on a client (0: its own): a scanned tree of 1.6 ...
 # prop_max_tris: 150000
-# Pixels of error a mesh may show before the engine picks a finer LOD, on a client: higher is coarser and che... [0.0..16.0]
+# Pixels of error a mesh may show before the engine picks a finer LOD, on a client: higher is coarser and che... [0.0..]
 # mesh_lod_threshold: 1.0
 # Seed every random choice is drawn from.
 # seed_value: 20261010
 
 # --- Netcode
-# Metres within which a survivor is sent a common's and a special's updates (live). A client hides a mirror t... [40.0..1000.0]
+# The upper bounds the zz_* cvars used to clamp to, as `zz_waves=0,zz_nights=40` (see game/zz_caps.gd for the...
+# cap_overrides: ""
+# Metres within which a survivor is sent a common's and a special's updates (live). A client hides a mirror t... [40.0..]
 # net_common_radius: 80.0
-#  [40.0..1000.0]
+#  [40.0..]
 # net_special_radius: 260.0
-# Anything past net_far_distance metres from a survivor (players included, never their own) is sent every Nth... [1..16]
+# Anything past net_far_distance metres from a survivor (players included, never their own) is sent every Nth... [1..]
 # net_far_every: 1
-#  [0.0..1000.0]
+#  [0.0..]
 # net_far_distance: 40.0
 # Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once for all of t...
 # net_far_coherent: false
-# Bands past net_far_distance, each twice as far and sent half as often (1 is one band). [1..4]
+# Bands past net_far_distance, each twice as far and sent half as often (1 is one band). [1..]
 # net_far_tiers: 1

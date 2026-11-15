@@ -204,9 +204,8 @@ const POS_BITS := 24
 const SPEED_MAX := 80.0
 const SPEED_BITS := 14
 
-## Clocks, in seconds: well past any map.
-const CLOCK_MAX := 7200.0
-const CLOCK_BITS := 18
+## Clock seconds travel as a varint of hundredths: no ceiling (a 3-hour hold, a day), 10 ms steps.
+const CLOCK_STEP := 100.0
 
 const TEAM_BITS := 3
 const PHASE_BITS := 3
@@ -242,7 +241,7 @@ static func write_hello(player_id: int, tick_rate: int, server_tick: int, diffic
 	w.write_uint(tick_rate, 9)
 	w.write_varint(server_tick)
 	w.write_uint(clampi(difficulty, 0, 3), 2)
-	w.write_uint(clampi(max_incaps, 0, 15), 4)
+	w.write_varint(maxi(max_incaps, 0))
 	return w.to_bytes()
 
 
@@ -251,7 +250,7 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	var tick_rate := r.read_uint(9)
 	var server_tick := r.read_varint()
 	var difficulty := r.read_uint(2)
-	var max_incaps := r.read_uint(4)
+	var max_incaps := r.read_varint()
 	return {
 		"player_id": player_id, "tick_rate": tick_rate, "server_tick": server_tick,
 		"difficulty": difficulty, "max_incaps": max_incaps, "ok": r.ok(),
@@ -443,6 +442,14 @@ static func read_armed(r: DotNetReader) -> Dictionary:
 
 ## The clock: the map number, its phase and how long it has been in it, a survival hold's time
 ## and goal (0 for none), who is left, the objective in play and its state.
+static func _write_clock_seconds(w: DotNetWriter, seconds: float) -> void:
+	w.write_varint(maxi(int(round(seconds * CLOCK_STEP)), 0))
+
+
+static func _read_clock_seconds(r: DotNetReader) -> float:
+	return float(r.read_varint()) / CLOCK_STEP
+
+
 static func write_clock(
 	round_number: int, phase: int, elapsed: float, held: float, goal: float,
 	alive: int, playable: bool, objective: int, objective_state: int, objective_ends: float,
@@ -451,30 +458,30 @@ static func write_clock(
 	var w := _w()
 	w.write_varint(round_number)
 	w.write_uint(clampi(phase, 0, 7), PHASE_BITS)
-	w.write_float_range(clampf(elapsed, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
-	w.write_float_range(clampf(held, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
-	w.write_float_range(clampf(goal, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
-	w.write_uint(clampi(alive, 0, 255), 8)
+	_write_clock_seconds(w, elapsed)
+	_write_clock_seconds(w, held)
+	_write_clock_seconds(w, goal)
+	w.write_varint(maxi(alive, 0))
 	w.write_bool(playable)
 	w.write_uint(clampi(objective + 1, 0, 31), 5)
 	w.write_uint(clampi(objective_state, 0, 3), 2)
-	w.write_float_range(clampf(objective_ends, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
-	w.write_float_range(clampf(grace_left, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	_write_clock_seconds(w, objective_ends)
+	_write_clock_seconds(w, grace_left)
 	return w.to_bytes()
 
 
 static func read_clock(r: DotNetReader) -> Dictionary:
 	var round_number := r.read_varint()
 	var phase := r.read_uint(PHASE_BITS)
-	var elapsed := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
-	var held := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
-	var goal := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
-	var alive := r.read_uint(8)
+	var elapsed := _read_clock_seconds(r)
+	var held := _read_clock_seconds(r)
+	var goal := _read_clock_seconds(r)
+	var alive := r.read_varint()
 	var playable := r.read_bool()
 	var objective := r.read_uint(5) - 1
 	var objective_state := r.read_uint(2)
-	var objective_ends := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
-	var grace_left := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
+	var objective_ends := _read_clock_seconds(r)
+	var grace_left := _read_clock_seconds(r)
 	return {
 		"round": round_number, "phase": phase, "elapsed": elapsed, "held": held, "goal": goal,
 		"alive": alive, "playable": playable, "objective": objective,
@@ -493,7 +500,7 @@ static func write_round(number: int, began: bool, won: bool, why: String = "", n
 	w.write_bool(began)
 	w.write_bool(won)
 	w.write_string(why, TEXT_BYTES)
-	w.write_varint(clampi(int(round(next_in * 10.0)) + 1, 0, 36000))
+	w.write_varint(maxi(int(round(next_in * 10.0)) + 1, 0))
 	w.write_string(next_map, TEXT_BYTES)
 	return w.to_bytes()
 
@@ -724,12 +731,9 @@ static func read_weapon_settled(r: DotNetReader) -> Dictionary:
 
 
 ## The most crates one LOOT_MOVED carries (the cap on awake crates is 256).
-const MOVED_MAX := 256
-
-
 static func write_loot_moved(batch: Array) -> PackedByteArray:
 	var w := _w()
-	var n := mini(batch.size(), MOVED_MAX)
+	var n := batch.size()
 	w.write_varint(n)
 	for i in n:
 		var row: Array = batch[i]
@@ -740,9 +744,11 @@ static func write_loot_moved(batch: Array) -> PackedByteArray:
 
 
 static func read_loot_moved(r: DotNetReader) -> Dictionary:
-	var n := mini(r.read_varint(), MOVED_MAX)
+	var n := r.read_varint()
 	var rows: Array = []
 	for i in n:
+		if not r.ok():
+			break
 		var id := r.read_varint()
 		var at := _read_pos(r)
 		var turn := r.read_quaternion(9)
@@ -1089,9 +1095,9 @@ static func write_survival(state: Dictionary) -> PackedByteArray:
 	var w := _w()
 	w.write_uint(clampi(int(state.get("style", 0)), 0, 3), 2)
 	w.write_uint(clampi(int(state.get("stage", 0)), 0, 3), 2)
-	w.write_uint(clampi(int(state.get("index", 0)), 0, 255), 8)
-	w.write_uint(clampi(int(state.get("count", 0)), 0, 255), 8)
-	w.write_float_range(clampf(float(state.get("left", -1.0)) + 1.0, 0.0, CLOCK_MAX), 0.0, CLOCK_MAX, CLOCK_BITS)
+	w.write_varint(maxi(int(state.get("index", 0)), 0))
+	w.write_varint(maxi(int(state.get("count", 0)), 0))
+	_write_clock_seconds(w, float(state.get("left", -1.0)) + 1.0)
 	w.write_varint(maxi(int(state.get("remaining", -1)) + 1, 0))
 	w.write_uint(maxi(TWIST_NAMES.find(str(state.get("twist", ""))), 0), 3)
 	w.write_float_range(clampf(float(state.get("daylight", -1.0)) + 1.0, 0.0, 2.0), 0.0, 2.0, 8)
@@ -1101,9 +1107,9 @@ static func write_survival(state: Dictionary) -> PackedByteArray:
 static func read_survival(r: DotNetReader) -> Dictionary:
 	var style := r.read_uint(2)
 	var stage := r.read_uint(2)
-	var index := r.read_uint(8)
-	var count := r.read_uint(8)
-	var left := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS) - 1.0
+	var index := r.read_varint()
+	var count := r.read_varint()
+	var left := _read_clock_seconds(r) - 1.0
 	var remaining := r.read_varint() - 1
 	var twist := r.read_uint(3)
 	var daylight := r.read_float_range(0.0, 2.0, 8) - 1.0
