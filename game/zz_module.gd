@@ -567,6 +567,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_nav_notes", 1.0 if config.nav_notes else 0.0,
 		"Annotate each map (drops, chokepoints, cover) after its bake and let bots and zombies use it; 0 off",
 		func(value: float) -> void: config.nav_notes = value > 0.5)
+	_tunable("zz_nav_notes_bake_tile", config.nav_notes_bake_tile,
+		"Metres a side of the tiles a navigation bake is cut into; 0 auto (tiles only past the engine's cell limit)",
+		func(value: float) -> void: config.nav_notes_bake_tile = value, [0, 0])
 	_tunable("zz_bot_open_boxes", 1.0 if config.bot_open_boxes else 0.0,
 		"Stand-ins pick up and open the boxes zombies drop; 0 leaves them to the humans",
 		func(value: float) -> void: config.bot_open_boxes = value > 0.5)

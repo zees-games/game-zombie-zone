@@ -1,7 +1,7 @@
 extends Node
 
 ## Prints what the annotations find on each survival map, and how long it takes. A probe, not a
-## suite: `godot --headless --path . res://tools/nav_probe.tscn -- --map=zz_high_school`.
+## suite: `godot --headless --path . res://tools/nav_probe.tscn -- --map=zz_high_school` (or a comma list).
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -10,16 +10,25 @@ const TICK := 1.0 / 64.0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	# --verbose keeps the info and debug lines (the bake's tiles, why it failed).
+	DotLog.set_level(DotLog.Level.DEBUG if OS.get_cmdline_user_args().has("--verbose") else DotLog.Level.ERROR)
 	_run.call_deferred()
 
 
 func _run() -> void:
 	var ids := ["zz_chapel", "zz_high_school", "zz_lot", "zz_mall", "zz_relief_camp", "zz_stadium"]
+	# Ticks to wait for the notes; --ticks=0 waits until they are ready or failed.
+	var limit := 4000
+	# --tile=M bakes in M-metre tiles (zz_nav_notes_bake_tile), to compare a map tiled and whole.
+	var tile := 0.0
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
-			ids = [arg.substr(6)]
+			ids = Array(arg.substr(6).split(","))
+		elif arg.begins_with("--ticks="):
+			limit = arg.substr(8).to_int()
+		elif arg.begins_with("--tile="):
+			tile = arg.substr(7).to_float()
 
 	for id: String in ids:
 		var config := ZzConfig.new()
@@ -27,6 +36,7 @@ func _run() -> void:
 		config.warmup_seconds = 0.0
 		config.minimum_players = 0
 		config.keep_progress = false
+		config.nav_notes_bake_tile = tile
 		var game := ZzGame.new()
 		game.config = config
 		game.tick_rate = 64
@@ -41,7 +51,7 @@ func _run() -> void:
 			p.is_bot = true
 		game.start()
 		var ticks := 0
-		while not game.horde.notes.is_ready() and ticks < 4000 and game.horde.notes.state != 4:
+		while not game.horde.notes.is_ready() and (limit <= 0 or ticks < limit) and game.horde.notes.state != 4:
 			game.simulate(TICK)
 			ticks += 1
 			if ticks % 8 == 0:

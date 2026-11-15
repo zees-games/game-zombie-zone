@@ -252,6 +252,11 @@ func setup_seconds() -> float:
 ## `zz_nav_notes`.
 @export var nav_notes: bool = true
 
+## Side of the square tiles a navigation bake is cut into, metres; 0 = auto: one grid while the map is
+## within the engine's 30 million cells (as before), else 128 m tiles joined into one mesh. A size the
+## engine would refuse fails the bake saying so. `zz_nav_notes_bake_tile`.
+@export_range(0.0, 512.0, 1.0, "or_greater") var nav_notes_bake_tile: float = 0.0
+
 ## Seconds a zombie may try to move without getting anywhere before it is freed; 0 turns it off. `zz_unstick_seconds`.
 @export_range(0.0, 30.0, 0.5, "or_greater") var unstick_seconds: float = 4.0
 

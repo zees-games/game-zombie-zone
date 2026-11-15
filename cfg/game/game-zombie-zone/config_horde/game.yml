@@ -30,6 +30,8 @@
 # nav_budget_ms: 6.0
 # Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its bake, and the bots...
 # nav_notes: true
+# Side of the square tiles a navigation bake is cut into, metres; 0 = auto: one grid while the map is within ... [0.0..]
+# nav_notes_bake_tile: 0.0
 # Seconds a zombie may try to move without getting anywhere before it is freed; 0 turns it off. `zz_unstick_s... [0.0..]
 # unstick_seconds: 4.0
 # The longest drop, in metres, a zombie takes off a ledge. `zz_nav_drop`. [1.0..]

@@ -30,6 +30,7 @@ extends RefCounted
 const CHANNEL := "zz.nav"
 const ZzNavPrune := preload("zz_nav_prune.gd")
 const ZzBody := preload("zz_player_state.gd")
+const ZzNavBake := preload("zz_nav_bake.gd")
 
 enum State { OFF, WAITING, ANNOTATING, READY, FAILED, BAKING }
 
@@ -58,6 +59,11 @@ var choke_routes: int = 768
 var state: State = State.OFF
 var annotations: DotNpcAiNavAnnotations = null
 var bake_ms: float = 0.0
+## The tiles the last bake was cut into (0 for one grid) and their side, metres ([member ZzConfig.nav_notes_bake_tile]).
+var bake_tiles: int = 0
+var bake_tile: float = 0.0
+## Why the last bake failed, empty when it did not.
+var bake_error: String = ""
 ## Names the baked mesh's file in `user://nav_bake` (the map's id); empty keeps no cache.
 var bake_id: String = ""
 ## Whether the last bake came from that cache.
@@ -96,7 +102,7 @@ var _seeds: PackedVector3Array = PackedVector3Array()
 var _frame: int = 0
 var _annotator: DotNpcAiNavAnnotator = null
 var _started_ms: int = 0
-var _bot: DotBotNav = null
+var _bot: ZzNavBake = null
 var _bot_result: DotResult = null
 
 ## npc key -> {"at": choke index or -1, "seen": time}
@@ -154,6 +160,9 @@ func clear() -> void:
 	_world = null
 	drops_applied = 0
 	climbs_applied = 0
+	bake_error = ""
+	bake_tiles = 0
+	bake_tile = 0.0
 
 
 func is_ready() -> bool:
@@ -189,7 +198,9 @@ func tick() -> bool:
 
 
 func _bake() -> bool:
-	var bot := DotBotNav.new()
+	var bot: ZzNavBake = ZzNavBake.new()
+	# A map over the engine's cell limit bakes in tiles joined into one mesh, or fails saying why.
+	bot.tile_size = float(_config.nav_notes_bake_tile)
 
 	# The bake is the round start's biggest single cost (2.4 s on ze_biohazard_manor); the baker
 	# keys its cache on a digest of the parsed geometry, so a changed map re-bakes by itself.
@@ -239,15 +250,18 @@ func _bake_landed() -> bool:
 
 
 func _bake_failed(res: DotResult) -> bool:
+	bake_error = res.error.message
 	DotLog.warn(CHANNEL, "navigation notes: the bake failed", {"why": res.error.message})
 	state = State.FAILED
 	return false
 
 
 ## The bake is in: the annotator takes over (or the cached annotations are the answer).
-func _baked(bot: DotBotNav) -> bool:
+func _baked(bot: ZzNavBake) -> bool:
 	bake_ms = bot.bake_ms
 	bake_cached = bot.last_bake_cached
+	bake_tiles = bot.tiles_used
+	bake_tile = bot.tile_used
 	var mesh := bot.mesh
 	var annotator := DotNpcAiNavAnnotator.new(mesh, _world)
 	annotator.agent_radius = ZzBody.BODY_RADIUS
@@ -695,4 +709,5 @@ func describe() -> Dictionary:
 		"state": State.keys()[state], "chokes": chokes.size(), "found": all_chokes.size(),
 		"routes": routes.size(), "drops": drops_applied, "climbs": climbs_applied,
 		"bake_ms": snappedf(bake_ms, 0.1), "annotate_ms": annotate_ms, "cached": from_cache,
+		"bake_tiles": bake_tiles, "bake_tile": bake_tile, "bake_error": bake_error,
 	}
