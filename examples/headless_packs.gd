@@ -665,32 +665,7 @@ func _real_packs() -> void:
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
 	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 20, "the catalogue is the fourteen built-in kinds and the six monsters")
 
-	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
-	_check(is_equal_approx(_damage_of(&"zz_m4"), 29.0), "a modern weapon carries the pack's damage", "%.1f" % _damage_of(&"zz_m4"))
-	_check(is_equal_approx(_damage_of(&"dagger"), 28.0), "a medieval weapon carries the pack's damage", "%.1f" % _damage_of(&"dagger"))
-	var tiger: DotNpcDef = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
-	_check(tiger != null and is_equal_approx(tiger.max_health, 520.0) and is_equal_approx(float(tiger.meta.get("damage", 0)), 14.0),
-		"a monster's health and damage come from the pack's yml")
-
-	# Tuning: cfg/addon/<pack>/*.yml, name order, a later file wins.
-	_write_real("zz_modern_weapons", "90-test.yml", "m4:\n  damage: 77\n")
-	_write_real("zz_medieval_weapons", "90-test.yml", "dagger:\n  damage: 41\n")
-	_write_real("zz_historical_monsters", "90-test.yml", "tiger:\n  claw:\n    damage: 33.0\n")
-	_write("90-test.yml", "monsters:\n  weights:\n    zhm_bear: 0\n")
-	found = ZzPacks.scan()
-	ZzWeapons.use_packs()
-	_check(is_equal_approx(_damage_of(&"zz_m4"), 77.0), "a modern weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"zz_m4"))
-	_check(is_equal_approx(_damage_of(&"dagger"), 41.0), "a medieval weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"dagger"))
-	_check_game_tier()
-	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
-	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
-	_check(tiger != null and is_equal_approx(float(tiger.meta.get("damage", 0)), 33.0), "a monster's damage follows its cfg yml")
-	_check(ZzPacks.monsters.size() == 5 and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
-	_clean_real()
-	_clean()
-	found = ZzPacks.scan()
-	ZzWeapons.use_packs()
-
+	_check_pack_numbers()
 	# A real game spawns each monster once, and arms a survivor with a weapon from each pack.
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
@@ -731,3 +706,32 @@ func _real_packs() -> void:
 	_pack_handles(game, player)
 	game.queue_free()
 	_finished += 1
+
+
+## Damage, health and tuning: the packs' own yml, the cfg yml over it, and the game's weights.
+func _check_pack_numbers() -> void:
+	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
+	_check(is_equal_approx(_damage_of(&"zz_m4"), 29.0), "a modern weapon carries the pack's damage", "%.1f" % _damage_of(&"zz_m4"))
+	_check(is_equal_approx(_damage_of(&"dagger"), 28.0), "a medieval weapon carries the pack's damage", "%.1f" % _damage_of(&"dagger"))
+	var tiger: DotNpcDef = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
+	_check(tiger != null and is_equal_approx(tiger.max_health, 520.0) and is_equal_approx(float(tiger.meta.get("damage", 0)), 14.0),
+		"a monster's health and damage come from the pack's yml")
+
+	# Tuning: cfg/addon/<pack>/*.yml, name order, a later file wins.
+	_write_real("zz_modern_weapons", "90-test.yml", "m4:\n  damage: 77\n")
+	_write_real("zz_medieval_weapons", "90-test.yml", "dagger:\n  damage: 41\n")
+	_write_real("zz_historical_monsters", "90-test.yml", "tiger:\n  claw:\n    damage: 33.0\n")
+	_write("90-test.yml", "monsters:\n  weights:\n    zhm_bear: 0\n")
+	var _f1 := ZzPacks.scan()
+	ZzWeapons.use_packs()
+	_check(is_equal_approx(_damage_of(&"zz_m4"), 77.0), "a modern weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"zz_m4"))
+	_check(is_equal_approx(_damage_of(&"dagger"), 41.0), "a medieval weapon's damage follows its cfg yml", "%.1f" % _damage_of(&"dagger"))
+	_check_game_tier()
+	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
+	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
+	_check(tiger != null and is_equal_approx(float(tiger.meta.get("damage", 0)), 33.0), "a monster's damage follows its cfg yml")
+	_check(ZzPacks.monsters.size() == 5 and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
+	_clean_real()
+	_clean()
+	var _found := ZzPacks.scan()
+	ZzWeapons.use_packs()
