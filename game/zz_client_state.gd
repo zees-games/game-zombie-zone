@@ -57,7 +57,7 @@ const CHASE_UP := 0.6
 @export var standalone_content: bool = true
 
 ## How many stand-ins an offline map gets beside you.
-@export_range(0, 12, 1) var offline_bots: int = 3
+@export_range(0, 12, 1, "or_greater") var offline_bots: int = 3
 
 var game: ZzGame = null
 var player: ZzPlayer = null

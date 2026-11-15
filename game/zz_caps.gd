@@ -127,3 +127,26 @@ static func refusal(cvar: String, value: float, overrides: Dictionary, range_of:
 		return "%s refuses %s: the highest it takes is %s (set cap_overrides \"%s=0\" for no limit)" % [cvar, value, hi, cvar]
 	return ""
 
+
+## The cvars that come in a low/high pair: cvar -> [the config field of its partner, the partner's cvar, whether this one is the low end].
+## The old setters clamped a low end to the high one and back, silently; now a value that would cross is REFUSED.
+const PAIRS := {
+	"zz_mob_min": ["mob_interval_max", "zz_mob_max", true], "zz_mob_max": ["mob_interval_min", "zz_mob_min", false],
+	"zz_special_min": ["special_interval_max", "zz_special_max", true], "zz_special_max": ["special_interval_min", "zz_special_min", false],
+	"zz_brute_min": ["brute_interval_max", "zz_brute_max", true], "zz_brute_max": ["brute_interval_min", "zz_brute_min", false],
+	"zz_respawn_min": ["respawn_max_seconds", "zz_respawn_max", true], "zz_respawn_max": ["respawn_min_seconds", "zz_respawn_min", false],
+	"zz_common_speed_base": ["common_speed_max", "zz_common_speed_max", true], "zz_common_speed_max": ["common_speed_base", "zz_common_speed_base", false],
+}
+
+
+## Empty when [param value] keeps [param cvar] on its side of [param partner_value], else the refusal to log, naming the fix.
+static func pair_refusal(cvar: String, value: float, partner_value: float) -> String:
+	if not PAIRS.has(cvar):
+		return ""
+	var low: bool = PAIRS[cvar][2]
+	var partner: String = PAIRS[cvar][1]
+	if low and value > partner_value:
+		return "%s refuses %s: it is over %s (%s); raise %s first" % [cvar, value, partner, partner_value, partner]
+	if not low and value < partner_value:
+		return "%s refuses %s: it is under %s (%s); lower %s first" % [cvar, value, partner, partner_value, partner]
+	return ""

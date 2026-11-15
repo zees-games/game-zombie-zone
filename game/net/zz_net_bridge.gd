@@ -1107,10 +1107,10 @@ func _tell_the_world(peer_id: int) -> void:
 
 	for key: int in _sound_last:
 		var kept: Array = _sound_last[key]
-		var fx := key / 65536
+		var fx := key % 4
 		var end := float(kept[1])
-		_tell(peer_id, ZzEvents.Kind.MAP_FX, ZzEvents.write_map_fx(fx, key % 65536, bool(kept[0]), 0.0, end, end) if fx == ZzEvents.MapFx.SPIN
-			else ZzEvents.write_map_fx(fx, key % 65536, bool(kept[0]), 0.0, end * 200.0, end * 200.0))
+		_tell(peer_id, ZzEvents.Kind.MAP_FX, ZzEvents.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end, end) if fx == ZzEvents.MapFx.SPIN
+			else ZzEvents.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end * 200.0, end * 200.0))
 
 	for id: String in game.barricades:
 		var b: Dictionary = game.barricades[id]
@@ -1197,14 +1197,14 @@ var _map_fx_budget := MAP_FX_PER_SECOND
 var _map_fx_at := 0.0
 
 
-## Where each sound's last fade or spin ended, so a joiner hears the state, not the history: `fx * 65536 + entity` -> [flag, end].
+## Where each sound's last fade or spin ended, so a joiner hears the state, not the history: `entity * 4 + fx` -> [flag, end].
+## One entry per (effect, entity) the map has, so it is bounded by the map, not by a number here.
 var _sound_last: Dictionary = {}
-const MAX_SOUNDS_KEPT := 256
 
 
 func _remember_sound(fx: int, entity: int, flag: bool, end: float) -> void:
-	var key := fx * 65536 + clampi(entity, 0, ZzEvents.MAP_FX_ENTITIES)
-	if end >= 0.0 and (_sound_last.has(key) or _sound_last.size() < MAX_SOUNDS_KEPT):
+	var key := maxi(entity, 0) * 4 + fx
+	if end >= 0.0:
 		_sound_last[key] = [flag, end]
 
 

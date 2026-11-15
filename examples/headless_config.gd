@@ -20,7 +20,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 62
+const CHECKS := 65
 
 
 func _ready() -> void:
@@ -215,6 +215,12 @@ func _caps() -> void:
 	var bad := PackedStringArray()
 	Caps.parse_overrides("zz_mob_max=abc", bad)
 	_check(not bad.is_empty(), "a malformed override fails loudly")
+	_check(Caps.pair_refusal("zz_mob_min", 500.0, 120.0).contains("raise zz_mob_max"), "a low end over its high end is refused and names the fix")
+	_check(Caps.pair_refusal("zz_mob_max", 5.0, 30.0).contains("lower zz_mob_min") and Caps.pair_refusal("zz_mob_max", 30.0, 30.0) == "", "a high end under its low end is refused; equal is fine")
+	var cfg := ZzConfig.new()
+	cfg.respawn_min_seconds = 100.0
+	cfg.respawn_max_seconds = 10.0
+	_check(not cfg.validate().ok, "config validation refuses respawn_min over respawn_max")
 
 
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.

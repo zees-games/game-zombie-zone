@@ -149,9 +149,8 @@ enum Kind {
 
 ## What a MAP_FX says.
 enum MapFx { FADE, SPIN, BEAT, END }
-## Most entities a map names by index on the wire, and the longest fade or spin it may ask for.
-const MAP_FX_ENTITIES := 65535
-const MAP_FX_SECONDS := 600.0
+## A MAP_FX names its entity by index and its length in tenths of a second as varints: no limit
+## on either (they were 16 and 13 bits, 65535 entities and 600 s).
 ## A map's ending (`MapFx.END`): the slow motion's scale and length, and the camera point, as far as a client believes them.
 const END_SCALE_MIN := 0.05
 const END_SECONDS_MAX := 15.0
@@ -463,7 +462,7 @@ static func write_clock(
 	_write_clock_seconds(w, goal)
 	w.write_varint(maxi(alive, 0))
 	w.write_bool(playable)
-	w.write_uint(clampi(objective + 1, 0, 31), 5)
+	w.write_varint(maxi(objective + 1, 0))
 	w.write_uint(clampi(objective_state, 0, 3), 2)
 	_write_clock_seconds(w, objective_ends)
 	_write_clock_seconds(w, grace_left)
@@ -478,7 +477,7 @@ static func read_clock(r: DotNetReader) -> Dictionary:
 	var goal := _read_clock_seconds(r)
 	var alive := r.read_varint()
 	var playable := r.read_bool()
-	var objective := r.read_uint(5) - 1
+	var objective := r.read_varint() - 1
 	var objective_state := r.read_uint(2)
 	var objective_ends := _read_clock_seconds(r)
 	var grace_left := _read_clock_seconds(r)
@@ -950,13 +949,13 @@ static func read_bile(r: DotNetReader) -> Dictionary:
 ## An objective changed: its index and state (1 holding, 2 done).
 static func write_objective(index: int, state: int) -> PackedByteArray:
 	var w := _w()
-	w.write_uint(clampi(index, 0, 31), 5)
+	w.write_varint(maxi(index, 0))
 	w.write_uint(clampi(state, 0, 3), 2)
 	return w.to_bytes()
 
 
 static func read_objective(r: DotNetReader) -> Dictionary:
-	var index := r.read_uint(5)
+	var index := r.read_varint()
 	var state := r.read_uint(2)
 	return {"index": index, "state": state, "ok": r.ok()}
 
@@ -1006,9 +1005,9 @@ static func read_copy(r: DotNetReader) -> Dictionary:
 static func write_map_fx(fx: int, entity: int, flag: bool, seconds: float, from: float, to: float) -> PackedByteArray:
 	var w := _w()
 	w.write_uint(fx, 2)
-	w.write_uint(clampi(entity, 0, MAP_FX_ENTITIES), 16)
+	w.write_varint(maxi(entity, 0))
 	w.write_bool(flag)
-	w.write_uint(clampi(int(round(clampf(seconds, 0.0, MAP_FX_SECONDS) * 10.0)), 0, 6000), 13)
+	w.write_varint(0 if is_nan(seconds) or is_inf(seconds) or seconds <= 0.0 else int(round(seconds * 10.0)))
 	w.write_uint(0 if from < 0.0 else clampi(int(round(from)) + 1, 1, 256), 9)
 	w.write_uint(0 if to < 0.0 else clampi(int(round(to)) + 1, 1, 256), 9)
 	return w.to_bytes()
@@ -1064,15 +1063,15 @@ static func read_map_fx(r: DotNetReader) -> Dictionary:
 		var camera: Variant = _read_pos(r) if r.read_bool() else null
 		var e := sane_end(scale, seconds, camera)
 		return {"fx": fx, "won": won, "time_scale": e["time_scale"], "seconds": e["seconds"], "camera": e["camera"], "ok": r.ok()}
-	var entity := r.read_uint(16)
+	var entity := r.read_varint()
 	var flag := r.read_bool()
-	var seconds := float(r.read_uint(13)) / 10.0
+	var seconds := float(r.read_varint()) / 10.0
 	var from := float(r.read_uint(9)) - 1.0
 	var to := float(r.read_uint(9)) - 1.0
 	if fx == MapFx.FADE:
 		from = -1.0 if from < 0.0 else clampf(from / 200.0, 0.0, 1.0)
 		to = -1.0 if to < 0.0 else clampf(to / 200.0, 0.0, 1.0)
-	return {"fx": fx, "entity": entity, "flag": flag, "seconds": clampf(seconds, 0.0, MAP_FX_SECONDS), "from": from, "to": to,
+	return {"fx": fx, "entity": entity, "flag": flag, "seconds": seconds, "from": from, "to": to,
 		"ok": r.ok() and fx <= MapFx.BEAT}
 
 

@@ -980,7 +980,12 @@ func _cap_refusal(cvar_name: String, value: float, range_of: Array) -> String:
 	var overrides := ZzCaps.parse_overrides((game as ZzGame).config.cap_overrides, errors)
 	if not errors.is_empty():
 		return "; ".join(errors)
-	return ZzCaps.refusal(cvar_name, value, overrides, range_of)
+	var refused := ZzCaps.refusal(cvar_name, value, overrides, range_of)
+	if not refused.is_empty():
+		return refused
+	if ZzCaps.PAIRS.has(cvar_name):
+		return ZzCaps.pair_refusal(cvar_name, value, float((game as ZzGame).config.get(ZzCaps.PAIRS[cvar_name][0])))
+	return ""
 
 
 ## One cvar, its default taken from the configuration rather than written twice.

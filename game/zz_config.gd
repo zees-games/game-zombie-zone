@@ -125,7 +125,7 @@ func setup_seconds() -> float:
 ## How much bigger each wave (or harder each night) is than the first, as a share of it, and
 ## the square term that makes the last waves a wall (see [DotNpcDirectorWaves.strength_of]).
 @export_range(0.0, 2.0, 0.01, "or_greater") var wave_growth: float = 0.22
-@export_range(0.0, 0.5, 0.005) var wave_growth_accel: float = 0.018
+@export_range(0.0, 0.5, 0.005, "or_greater") var wave_growth_accel: float = 0.018
 
 ## Specials a wave brings: one from the second wave plus this many for each wave past the
 ## first, for every [member survivors_per_wave_special] survivors (never fewer than one share).
@@ -1011,7 +1011,7 @@ func setup_seconds() -> float:
 @export_range(1.0, 200.0, 1.0, "or_greater") var bot_sight: float = 32.0
 
 ## How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_ratio`).
-@export_range(1.0, 10.0, 0.05) var bot_upgrade_ratio: float = 1.35
+@export_range(1.0, 10.0, 0.05, "or_greater") var bot_upgrade_ratio: float = 1.35
 
 ## Metres inside which a stand-in does not fire a launcher: the blast reaches its owner (`zz_bot_blast_safe`).
 @export_range(0.0, 50.0, 0.5, "or_greater") var bot_blast_safe: float = 9.0
@@ -1138,13 +1138,21 @@ func specials_cap(survivors: int) -> int:
 
 func validate() -> DotResult:
 	if mob_interval_min > mob_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "mob_interval_min is over mob_interval_max.")
+		return DotResult.fail(DotError.CODE_INVALID, "mob_interval_min is over mob_interval_max; raise the max or lower the min.")
 
 	if special_interval_min > special_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "special_interval_min is over special_interval_max.")
+		return DotResult.fail(DotError.CODE_INVALID, "special_interval_min is over special_interval_max; raise the max or lower the min.")
 
 	if brute_interval_min > brute_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "brute_interval_min is over brute_interval_max.")
+		return DotResult.fail(DotError.CODE_INVALID, "brute_interval_min is over brute_interval_max; raise the max or lower the min.")
+
+	if respawn_min_seconds > respawn_max_seconds:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"respawn_min_seconds is over respawn_max_seconds; raise respawn_max_seconds or lower respawn_min_seconds.")
+
+	if common_speed_base > common_speed_max:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"common_speed_base is over common_speed_max; raise common_speed_max or lower common_speed_base.")
 
 	if difficulty < 0 or difficulty > 3:
 		return DotResult.fail(DotError.CODE_INVALID,

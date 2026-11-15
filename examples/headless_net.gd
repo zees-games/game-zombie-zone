@@ -38,7 +38,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 36
-const CHECKS := 244
+const CHECKS := 246
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -198,9 +198,13 @@ func _test_the_codec() -> void:
 	_check(bool(spin["ok"]) and int(spin["fx"]) == ZzEvents.MapFx.SPIN and float(spin["from"]) == 40.0 and float(spin["to"]) == 100.0, "MAP_FX spin", str(spin))
 	var beat := ZzEvents.read_map_fx(_r(ZzEvents.write_map_beat(5, true)))
 	_check(bool(beat["ok"]) and int(beat["fx"]) == ZzEvents.MapFx.BEAT and int(beat["from"]) == 5 and bool(beat["flag"]), "MAP_FX beat", str(beat))
-	var wild := ZzEvents.read_map_fx(_r(ZzEvents.write_map_fade(999999, true, 1.0e9, 7.0, -3.0)))
-	_check(bool(wild["ok"]) and float(wild["seconds"]) <= ZzEvents.MAP_FX_SECONDS and float(wild["from"]) <= 1.0 and float(wild["to"]) == -1.0 and int(wild["entity"]) <= ZzEvents.MAP_FX_ENTITIES,
-		"MAP_FX out-of-range numbers are clamped on both ends", str(wild))
+	var wild := ZzEvents.read_map_fx(_r(ZzEvents.write_map_fade(999999, true, 1.0e6, 7.0, -3.0)))
+	_check(bool(wild["ok"]) and absf(float(wild["seconds"]) - 1.0e6) < 0.1 and float(wild["from"]) <= 1.0 and float(wild["to"]) == -1.0 and int(wild["entity"]) == 999999,
+		"MAP_FX entity and seconds are varints (no 65535 or 600 s limit); volumes are still clamped", str(wild))
+	var objective := ZzEvents.read_objective(_r(ZzEvents.write_objective(40, 2)))
+	_check(bool(objective["ok"]) and int(objective["index"]) == 40 and int(objective["state"]) == 2, "OBJECTIVE index past 31 round-trips", str(objective))
+	var big_obj := ZzEvents.read_clock(_r(ZzEvents.write_clock(1, 2, 1.0, 0.0, 0.0, 1, true, 99, 1, 0.0)))
+	_check(bool(big_obj["ok"]) and int(big_obj["objective"]) == 99, "CLOCK carries an objective index past 30", str(big_obj))
 	_check(not bool(ZzEvents.read_map_fx(_r(PackedByteArray([0xFF])))["ok"]), "MAP_FX: a truncated or unknown body reads as not ok")
 	var ended := ZzEvents.read_map_fx(_r(ZzEvents.write_map_end(true, 0.25, 3.0, Vector3(10.0, 2.0, -5.0))))
 	_check(bool(ended["ok"]) and int(ended["fx"]) == ZzEvents.MapFx.END and bool(ended["won"]) and absf(float(ended["time_scale"]) - 0.25) < 0.01

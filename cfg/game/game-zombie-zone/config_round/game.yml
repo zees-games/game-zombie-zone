@@ -72,7 +72,7 @@
 # wave_size_per_survivor: 4
 # How much bigger each wave (or harder each night) is than the first, as a share of it, and the square term t... [0.0..]
 # wave_growth: 0.22
-#  [0.0..0.5]
+#  [0.0..]
 # wave_growth_accel: 0.018
 # Specials a wave brings: one from the second wave plus this many for each wave past the first, for every sur... [0.0..]
 # wave_specials_growth: 0.6

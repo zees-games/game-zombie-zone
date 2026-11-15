@@ -242,7 +242,7 @@
 # --- Stand-in rules
 # Metres a stand-in sees a zombie from, and the reach it counts a crowd for the calm check (`zz_bot_sight`). [1.0..]
 # bot_sight: 32.0
-# How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_r... [1.0..10.0]
+# How many times higher a gun in the same slot must be rated before a stand-in swaps to it (`zz_bot_upgrade_r... [1.0..]
 # bot_upgrade_ratio: 1.35
 # Metres inside which a stand-in does not fire a launcher: the blast reaches its owner (`zz_bot_blast_safe`). [0.0..]
 # bot_blast_safe: 9.0
