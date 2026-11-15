@@ -98,7 +98,6 @@ func _test_dormant() -> void:
 	_finished()
 
 
-# --- Wave sets ------------------------------------------------------------------------------
 
 ## `sv_waves`, the rotation entry and the map document pick a yml wave set; a missing one falls
 ## through; none leaves the cvars in charge.

@@ -70,7 +70,6 @@ func _follow_shop_menu() -> void:
 	_shop_menu.refresh(shop_state.get("items", []), player.points)
 
 
-# --- The fitting screen --------------------------------------------------------
 
 ## The saved fittings, read once from the settings.
 func _saved_fittings() -> Dictionary:

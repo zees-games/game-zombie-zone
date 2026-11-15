@@ -19,12 +19,8 @@ static func chat_kinds_fit() -> bool:
 
 
 ## One routed line, in [DotChatMessage]'s own wire shape.
-##
-## [b]Field by field rather than `var_to_bytes`, like every other message here.[/b] A
-## dictionary serialised whole is a dictionary whose contents are whatever the sender put
-## in it — including keys a client will happily read — and the widths below are the
-## validation. `x.p` is the one meta field this game carries: the speaker's session id, so
-## a client can colour a line by whose it is.
+## Field by field rather than `var_to_bytes`: the widths below are the validation. `x.p` is the
+## one meta field carried, the speaker's session id, so a client can colour a line by whose it is.
 static func write_chat(wire: Dictionary) -> PackedByteArray:
 	var w := DotNetWriter.new()
 	w.write_varint(int(wire.get("n", 0)))
@@ -76,11 +72,8 @@ static func read_chat(r: DotNetReader) -> Dictionary:
 
 
 ## What a client sends when somebody presses Enter: a channel and a line, and nothing else.
-##
-## [b]No speaker, no time, no colour.[/b] Everything about what a line MEANS is decided on
-## the server — who said it, whether they are gagged, whether they are talking too fast,
-## which channel they may use and who can hear it. A client that sent any of that would be
-## a client that could claim it.
+## No speaker, no time, no colour: the server decides who said it, whether they are gagged or
+## too fast, which channel they may use and who hears it.
 static func write_say(channel_id: StringName, text: String) -> PackedByteArray:
 	var w := DotNetWriter.new()
 	w.write_string(String(channel_id), CHAT_CHANNEL_BYTES)

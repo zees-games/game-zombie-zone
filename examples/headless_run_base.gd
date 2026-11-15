@@ -21,7 +21,6 @@ var _sections_entered := 0
 ## that errs every frame would otherwise pass. The run fails on any.
 var _script_errors := ScriptErrors.new()
 var _sections_finished := 0
-# --- Helpers -----------------------------------------------------------------------
 
 ## The family's rule since the first play test: H opens help in every game, nothing else in
 ## the table is on H, and the Escape menu has Help & commands and Leave.
@@ -448,11 +447,8 @@ func _finished() -> void:
 	_sections_finished += 1
 
 
-## A world on the practice street, stepped by hand. The previous one is freed first: every world
-## here shares ONE physics space, and every map is built at the origin.
-## The HUD draws health, the clock, the kits and confirmed hits through dot-ui's glance
-## pieces, from this world's numbers. A headless viewport is 64 x 64, so the layout is checked
-## as arithmetic and looked at with `tools/shot.sh --view=hit` and `--view=down`.
+## The HUD draws health, the clock, the kits and confirmed hits through dot-ui's glance pieces.
+## A headless viewport is 64 x 64, so the layout is checked as arithmetic (`tools/shot.sh --view=hit`).
 func _test_the_hud() -> void:
 	_section("the HUD: dot-ui's vitals, clock, kits, and hits the server confirmed")
 	var game := await _team(1)
@@ -598,9 +594,8 @@ func _crosshair_alpha(hud: ZzHud) -> float:
 	return c.modulate.a
 
 
-## Christian's first play test (2026-10-11): the team list's missing-glyph boxes, "You is down",
-## the fence lock a black slab, the black void over the street, ten silent seconds after a
-## wipe, and a HUD that should be darker and follow the menu's theme.
+## The first play test's findings: missing-glyph boxes, "You is down", the black fence lock,
+## the black void over the street, ten silent seconds after a wipe, and the HUD theme.
 func _test_the_first_play_test() -> void:
 	_section("the first play test: glyphs, the feed, the fence and its lock, the sky, the wipe, the theme")
 

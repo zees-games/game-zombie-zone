@@ -11,7 +11,6 @@ static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
 	return body.controller.render_state().position
 
 
-# --- The Tab board ---------------------------------------------------------
 
 ## The Tab board: dot-menu's, with this game's columns. The platform feeds it and holds it on Tab.
 func _dress_board() -> void:
@@ -140,7 +139,6 @@ func _portrait(atlas: String) -> Texture2D:
 	return texture
 
 
-# --- The end of a map: killcam, winner reveal, board ---------------------------
 
 func _build_killcam() -> void:
 	killcam = ZzKillcam.new()

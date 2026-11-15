@@ -140,7 +140,6 @@ func _test_stuck_rescue() -> void:
 
 
 
-# --- Helpers -------------------------------------------------------------------------------------
 
 ## A survival world with [param count] invulnerable survivors standing in it. The practice street
 ## made a survival map (with two caches) unless [param map] names one.
