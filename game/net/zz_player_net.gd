@@ -75,8 +75,11 @@ var net_use: float = 0.0
 var net_helped: float = 0.0
 var net_using: int = 0
 
-## Medkits in bits 0 to 2, pills in bits 3 to 6.
+## Medkits held. A varint of its own: zz_medkit_max has no upper limit.
 var net_kits: int = 0
+
+## Pills held. A varint of its own: zz_pills_max has no upper limit.
+var net_pills: int = 0
 
 ## The defibrillator's charges. A varint of its own: zz_defib_charges has no upper limit.
 var net_defibs: int = 0
@@ -187,7 +190,8 @@ func _register_net_vars() -> void:
 	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
 	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
 	replicate(&"net_using", DotNetVar.Type.UINT).bits(4).server_driven()
-	replicate(&"net_kits", DotNetVar.Type.UINT).bits(7).server_driven()
+	replicate(&"net_kits", DotNetVar.Type.VARINT).server_driven()
+	replicate(&"net_pills", DotNetVar.Type.VARINT).server_driven()
 	replicate(&"net_defibs", DotNetVar.Type.VARINT).server_driven()
 	replicate(&"net_status", DotNetVar.Type.UINT).bits(6).server_driven()
 	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5).server_driven()
@@ -283,7 +287,8 @@ func pull() -> void:
 	net_use = player.use_fraction
 	net_helped = player.helped_fraction
 	net_using = maxi(USES.find(player.using), 0)
-	net_kits = mini(player.medkits, 7) | (mini(player.pills, 15) << 3)
+	net_kits = maxi(player.medkits, 0)
+	net_pills = maxi(player.pills, 0)
 	net_defibs = maxi(player.defibs, 0)
 	net_carry = clampi(player.carried_count, 0, 7) | (clampi(player.carried_index, 0, 63) << 3) | (512 if player.box_out else 0)
 	net_status = (1 if player.biled else 0) | (2 if player.burning else 0) | (4 if player.box_blind else 0) | (clampi(player.goo_stacks, 0, 3) << 3) | (32 if player.flashed else 0)
@@ -382,8 +387,8 @@ func _adopt() -> void:
 	player.use_fraction = net_use
 	player.helped_fraction = net_helped
 	player.using = USES[clampi(net_using, 0, USES.size() - 1)]
-	player.medkits = net_kits & 7
-	player.pills = (net_kits >> 3) & 15
+	player.medkits = net_kits
+	player.pills = net_pills
 	player.defibs = net_defibs
 	player.carried_count = net_carry & 7
 	player.carried_index = (net_carry >> 3) & 63

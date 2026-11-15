@@ -2480,9 +2480,9 @@ func _shop_item_state(item: Dictionary) -> String:
 	var weapon := StringName(str(item.get("w", "")))
 	var def := ZzWeapons.def_of(weapon) if weapon != &"" else null
 	if id == "medkit":
-		return "Carrying" if player.medkits >= game.consumables.medkit_max else ""
+		return "Carrying" if game.consumables.medkits_full(player) else ""
 	if id == "pills":
-		return "Carrying" if player.pills >= game.consumables.pills_max else ""
+		return "Carrying" if game.consumables.pills_full(player) else ""
 	if id == "heal":
 		return "Full" if player.health != null and player.health.health >= player.health.max_health else ""
 	if id == "armour":

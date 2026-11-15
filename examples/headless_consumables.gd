@@ -1,12 +1,13 @@
 extends "zz_suite.gd"
 
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const ConsumablesScript := preload("../game/zz_consumables.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
 
 ## Pills and medkits: own stack-limited slots, use on self, heal and give to a friend, and every cvar off.
 
-const SECTIONS := 4
-const CHECKS := 31
+const SECTIONS := 5
+const CHECKS := 39
 
 
 func _ready() -> void:
@@ -22,12 +23,59 @@ func _run() -> void:
 	await _test_self()
 	await _test_heal_others()
 	await _test_give()
+	await _test_limits()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
 
 	await get_tree().process_frame
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
+
+
+## A stand-in for the console variable the module's `add_cvar` returns.
+class FakeCvar:
+	extends RefCounted
+	signal changed(old_value: Variant, new_value: Variant)
+	var value: String = ""
+
+	func get_string() -> String:
+		return value
+
+
+func _test_limits() -> void:
+	_section("limits: defaults keep 3 and 4, 0 = unlimited, no ceiling, a bad value is refused loudly")
+	var game := await _team(1, _quiet)
+	var p := game.survivors()[0]
+	var cons = game.consumables
+	var made: Dictionary = {}
+	var add := func(name: String, value: String, _help: String, _flags: int) -> Object:
+		var cv := FakeCvar.new()
+		cv.value = value
+		made[name] = cv
+		return cv
+	cons.bind_cvars(add, 0)
+	_check(cons.medkit_max == 3 and cons.pills_max == 4, "the defaults are the old 3 and 4")
+	made["zz_medkit_max"].changed.emit("3", "0")
+	made["zz_pills_max"].changed.emit("4", "0")
+	_check(cons.medkit_max == 0 and cons.pills_max == 0, "0 sets unlimited")
+	p.medkits = 0
+	p.pills = 0
+	var all := true
+	for i in 40:
+		all = all and cons.add_medkit(p, false) and cons.add_pills(p, false)
+	_check(all and p.medkits == 40 and p.pills == 40, "unlimited stacks past the old 7 and 15", "%d %d" % [p.medkits, p.pills])
+	made["zz_medkit_max"].changed.emit("0", "100")
+	_check(cons.medkit_max == 100, "a limit above the old 7 is kept")
+	made["zz_medkit_max"].changed.emit("100", "-2")
+	made["zz_pills_max"].changed.emit("0", "lots")
+	_check(cons.medkit_max == 100 and cons.pills_max == 0, "a negative or non-numeric value is refused and the limit kept")
+	cons.medkit_max = 2
+	p.medkits = 2
+	_check(cons.medkits_full(p) and not cons.pills_full(p), "full is judged against the limit, never when unlimited")
+	_check(ConsumablesScript._limit("x", "-1", 5) == 5 and ConsumablesScript._limit("x", " 9 ", 5) == 9, "_limit refuses a negative and trims spaces")
+	var net_src := FileAccess.get_file_as_string("res://game/net/zz_player_net.gd")
+	_check(net_src.contains('replicate(&"net_kits", DotNetVar.Type.VARINT)') and net_src.contains('replicate(&"net_pills", DotNetVar.Type.VARINT)'), "medkits and pills replicate as varints")
+	_finished()
 
 
 ## Two survivors a metre and a half apart, the first looking at the second, the second hurt.

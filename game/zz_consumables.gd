@@ -6,10 +6,7 @@ extends RefCounted
 
 const CHANNEL := "zz.consumables"
 
-## Stack limits (`zz_medkit_max` up to 7, `zz_pills_max` up to 15: what the wire has room for).
-const MEDKIT_CEILING := 7
-const PILLS_CEILING := 15
-
+## `zz_medkit_max`, `zz_pills_max`: stack limits, 0 = unlimited (both replicate as varints).
 var medkit_max: int = 3
 var pills_max: int = 4
 ## `zz_pills_seconds`: how long the key is held to take a pill (0 is instant).
@@ -33,10 +30,10 @@ func _init(p_game: Object) -> void:
 
 ## Registers the cvars ([param add] is the module's `add_cvar`); [param flags] should replicate.
 func bind_cvars(add: Callable, flags: int = 0) -> void:
-	_bind(add, "zz_medkit_max", str(medkit_max), "Medkits a survivor holds at most (1 to 7)", flags,
-		func(v: String) -> void: medkit_max = clampi(v.to_int(), 1, MEDKIT_CEILING))
-	_bind(add, "zz_pills_max", str(pills_max), "Bottles of pills a survivor holds at most (1 to 15)", flags,
-		func(v: String) -> void: pills_max = clampi(v.to_int(), 1, PILLS_CEILING))
+	_bind(add, "zz_medkit_max", str(medkit_max), "Medkits a survivor holds at most (0 = unlimited)", flags,
+		func(v: String) -> void: medkit_max = _limit("zz_medkit_max", v, medkit_max))
+	_bind(add, "zz_pills_max", str(pills_max), "Bottles of pills a survivor holds at most (0 = unlimited)", flags,
+		func(v: String) -> void: pills_max = _limit("zz_pills_max", v, pills_max))
 	_bind(add, "zz_pills_seconds", str(pills_seconds), "Seconds the pills key is held to take a pill (0 is instant)", flags,
 		func(v: String) -> void: pills_seconds = clampf(v.to_float(), 0.0, 20.0))
 	_bind(add, "zz_heal_others", "1" if heal_others else "0", "Let a medkit be used on a friend you aim at (0 or 1)", flags,
@@ -49,6 +46,26 @@ func bind_cvars(add: Callable, flags: int = 0) -> void:
 		func(v: String) -> void: give_medkits = v.strip_edges() != "0")
 	_bind(add, "zz_give_range", str(give_range), "Metres to a friend a hand-over reaches (0.5 to 10)", flags,
 		func(v: String) -> void: give_range = clampf(v.to_float(), 0.5, 10.0))
+
+
+## A stack limit from a cvar string: a whole number from 0 (0 = unlimited). Anything else is refused
+## loudly and the current limit kept.
+static func _limit(cvar: String, text: String, current: int) -> int:
+	var t := text.strip_edges()
+
+	if not t.is_valid_int() or t.to_int() < 0:
+		DotLog.error(CHANNEL, "%s needs a whole number from 0 (0 = unlimited); keeping %d" % [cvar, current], {"value": text})
+		return current
+
+	return t.to_int()
+
+
+func medkits_full(player) -> bool:
+	return medkit_max > 0 and player.medkits >= medkit_max
+
+
+func pills_full(player) -> bool:
+	return pills_max > 0 and player.pills >= pills_max
 
 
 func _bind(add: Callable, name: String, value: String, help: String, flags: int, apply: Callable) -> void:
@@ -64,7 +81,7 @@ func _bind(add: Callable, name: String, value: String, help: String, flags: int,
 
 ## Puts one medkit in the slot; false (and the reason said) when it is full.
 func add_medkit(player, say: bool = true) -> bool:
-	if player.medkits >= medkit_max:
+	if medkits_full(player):
 		if say:
 			game.refused.emit(player.player_id, "Your medkits are full.")
 		return false
@@ -74,7 +91,7 @@ func add_medkit(player, say: bool = true) -> bool:
 
 
 func add_pills(player, say: bool = true) -> bool:
-	if player.pills >= pills_max:
+	if pills_full(player):
 		if say:
 			game.refused.emit(player.player_id, "Your pills are full.")
 		return false

@@ -132,8 +132,8 @@ Pills and medkits have their own slots. These are server settings:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `zz_medkit_max` | 3 | Medkits a survivor holds at most. Currently limited to 1 to 7 |
-| `zz_pills_max` | 4 | Bottles of pills a survivor holds at most. Currently limited to 1 to 15 |
+| `zz_medkit_max` | 3 | Medkits a survivor holds at most. 0 = unlimited; a negative or non-numeric value is refused with an error |
+| `zz_pills_max` | 4 | Bottles of pills a survivor holds at most. 0 = unlimited; a negative or non-numeric value is refused with an error |
 | `zz_pills_seconds`, `zz_heal_range`, `zz_give_range` | see `cvarlist zz_` | How long taking pills takes, and how close you must be to heal or give |
 | `zz_heal_others`, `zz_give_pills`, `zz_give_medkits` | see `cvarlist zz_` | Whether you can heal a friend, or hand them pills or a medkit |
 
