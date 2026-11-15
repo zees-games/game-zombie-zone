@@ -139,7 +139,7 @@ Everything here defaults to the small-server behaviour and changes live (console
 - `sv_threads_npc` (off) with `sv_worker_threads`: runs the horde's perception passes and its repath searches on worker threads; a repath lands at the end of the think that asked it. Decisions and movement stay on the main thread. Not on the web.
 - Physics on its own thread (`physics/3d/run_on_separate_thread`, set by the deploy, not a cvar): a ray or shape query is then safe only inside the physics step. Everything that queries runs in the tick; the admin commands that spawn or drop something (`zz_spawn`, `zz_box`, `zz_mob`) and the map menu's change wait for the next tick through the world's tick gate (dot-physics' `DotTickGate`), so their reply comes a tick later. Boot and module start build the first map before the gate is armed.
 
-`tools/server_probe.tscn` runs with `net_native` and `net_native_interest` on (`--no-native` / `--no-native-interest` for the GDScript path). `tools/server_probe.tscn -- --n=100 --acks --split --far-every=4 --far=15 --workers=4` measures a tick at a given player count.
+`tools/server_probe.tscn` runs with `net_native` and `net_native_interest` on (`--no-native` / `--no-native-interest` for the GDScript path) and builds snapshots on the workers a server takes from `sv_threads_net` and `sv_worker_threads` (`--workers=0` for the inline build, which `--split` needs). `tools/server_probe.tscn -- --n=100 --acks --far-every=4 --far=15` measures a tick at a given player count.
 
 ## Navigation, stand-ins and stuck zombies
 

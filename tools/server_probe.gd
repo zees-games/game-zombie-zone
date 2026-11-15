@@ -47,8 +47,10 @@ var _lead := 90.0
 var _fill := true
 ## --relevance=off sends every entity to every peer (DotNetInterestAll), the before of the lever.
 var _relevance := true
-## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n).
-var _workers := 0
+## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n). Default: the count a server copies in from
+## sv_threads_net (on) and sv_worker_threads, [method DotServerConfig.net_snapshot_workers]. It was 0, an inline
+## build no server runs (zz-snapcost, PH, n=32: net_snapshot 9.18 ms a tick inline, 3.98 on the server's 8 workers).
+var _workers := DotServerConfig.new().net_snapshot_workers()
 ## --npc-workers=N: DotNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server);
 ## deferred_paths is on at every N, as on a server.
 var _npc_workers := 0
