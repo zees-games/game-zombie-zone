@@ -5,6 +5,7 @@ const ZzClientScript := preload("../game/zz_client.gd")
 ## How long the solo client's loading cover stays up and which reasons hold it: prints the engine time each gate
 ## reason (map, world, weapons, warm-up) clears, to compare a change to the load. Software GL: use xvfb-run, never
 ## --headless (no weapon prewarm): `xvfb-run -a godot --path . --rendering-driver opengl3 res://tools/load_timeline.tscn`.
+## `-- --hitch-secs=N` (default 10, 0 = skip) records every frame of 50 ms or more for N seconds after the gate opens.
 
 
 func _ready() -> void:
@@ -13,6 +14,9 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	var cover := DotHitchLog.new()
+	cover.threshold_ms = 50.0
+	cover.start(get_tree())
 	var client: Node = ZzClientScript.new()
 	client.set("force_offline", true)
 	add_child(client)
@@ -30,5 +34,33 @@ func _run() -> void:
 		await get_tree().process_frame
 	var open := bool(gate.call(&"is_open"))
 	print("load_timeline: gate %s %d ms after the client was added" % ["open" if open else "STILL CLOSED at", Time.get_ticks_msec() - began])
+	cover.stop()
+	_print_hitches("under cover", cover)
+	if open:
+		await _watch_after_gate()
 	await get_tree().create_timer(0.5).timeout
 	get_tree().quit(0 if open else 1)
+
+
+func _watch_after_gate() -> void:
+	var secs := 10.0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--hitch-secs="):
+			secs = float(arg.get_slice("=", 1))
+	if secs <= 0.0:
+		return
+	var hitch := DotHitchLog.new()
+	hitch.threshold_ms = 50.0
+	hitch.start(get_tree())
+	await get_tree().create_timer(secs).timeout
+	hitch.stop()
+	_print_hitches("after gate %.0f s" % secs, hitch)
+
+
+func _print_hitches(label: String, hitch: DotHitchLog) -> void:
+	var stall := 0.0
+	for h: Dictionary in hitch.hitches:
+		stall += float(h.ms)
+	print("load_timeline: %s: %d frames, %d hitches, %.0f ms stalled" % [label, hitch.frames, hitch.hitches.size(), stall])
+	for line in hitch.report(12):
+		print("load_timeline: ", line)
