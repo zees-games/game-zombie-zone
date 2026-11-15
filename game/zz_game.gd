@@ -1,6 +1,7 @@
 extends "zz_game_state.gd"
 
 const ZzMovementCvars := preload("zz_movement_cvars.gd")
+const ZzCapsScript := preload("zz_caps.gd")
 
 func ensure_runtime() -> DotProfileRuntime:
 	if profile_runtime == null:
@@ -63,11 +64,24 @@ func _ready() -> void:
 	if config == null:
 		config = ZzConfig.new()
 
+	# The map document limits and the tick rate's top are settings (ZzCaps); an unreadable one is an error, not a default.
+	for why in ZzCapsScript.set_doc_overrides(config.cap_overrides):
+		DotLog.error(CHANNEL, "cap_overrides is not usable", {"why": why})
+
 	var valid := config.validate()
 
 	if not valid.ok:
 		DotLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
 		return
+
+	var pair_why := ZzCapsScript.config_refusal(config)
+	if not pair_why.is_empty():
+		DotLog.error(CHANNEL, "the configuration is not usable", {"why": pair_why})
+		return
+
+	var rate_why := ZzCapsScript.refusal("zz_tick_rate", float(tick_rate), ZzCapsScript.doc_overrides)
+	if not rate_why.is_empty():
+		DotLog.error(CHANNEL, rate_why, {"setting": "tick_rate"})
 
 	_round_seed = config.seed_value
 	var lap := Time.get_ticks_usec()
@@ -4140,7 +4154,13 @@ func delta_for_tick() -> float:
 
 
 func set_tick_rate(rate: int) -> bool:
-	if rate <= 0 or rate == tick_rate:
+	if rate == tick_rate:
+		return false
+
+	var why := ZzCapsScript.refusal("zz_tick_rate", float(rate), ZzCapsScript.doc_overrides)
+
+	if not why.is_empty():
+		DotLog.error(CHANNEL, why, {"setting": "tick_rate"})
 		return false
 
 	tick_rate = rate

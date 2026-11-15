@@ -4,6 +4,7 @@ extends DotGameCheckSuite
 ## `godot --headless --path . res://examples/headless_config.tscn`
 
 const ZzConfig := preload("../game/zz_config.gd")
+const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzMovementCvars := preload("../game/zz_movement_cvars.gd")
 ## One directory per suite process (the probe child is handed its parent's): user:// is shared by
 ## every copy of this project on a box, and two suites at once wrote and deleted each other's cfg files.
@@ -17,7 +18,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 65
+const CHECKS := 72
 
 
 func _ready() -> void:
@@ -221,6 +222,24 @@ func _caps() -> void:
 	cfg.respawn_min_seconds = 100.0
 	cfg.respawn_max_seconds = 10.0
 	_check(not cfg.validate().ok, "config validation refuses respawn_min over respawn_max")
+	_check(Caps.pair_refusal("zz_body_stride_near", 90.0, 45.0).contains("raise zz_body_stride_far"), "a body stride near over far is refused")
+	var strides := ZzConfig.new()
+	strides.body_stride_near = 90.0
+	_check(not Caps.config_refusal(strides).is_empty(), "config refuses body_stride_near over body_stride_far")
+	_check(Caps.refusal("zz_tick_rate", 241.0, none).contains("cap_overrides") and Caps.refusal("zz_tick_rate", 0.0, none) != "" and Caps.refusal("zz_tick_rate", 240.0, none) == "", "tick_rate 1..240 by default, refused loudly outside")
+	_check(Caps.refusal("zz_tick_rate", 480.0, Caps.parse_overrides("zz_tick_rate=0", errors)) == "", "cap_overrides zz_tick_rate=0 lifts the tick rate top")
+	# Map document limits: the old MAX_* are the defaults, 0 lifts one, an over-limit document is refused naming the setting.
+	_check(Caps.doc_limit("zz_map_objectives") == 16, "the objective limit defaults to the old 16")
+	var objs: Array = []
+	for i in 17:
+		objs.append({"kind": "reach", "at": [float(i), 0.0, 0.0], "label": "o%d" % i})
+	var doc := {"format": ZzMapDoc.FORMAT, "kind": ZzMapDoc.KIND, "id": "caps_probe", "mode": "survival", "nav": {"floors": [[-5.0, -5.0, 5.0, 5.0, 0.0]]}, "spawns": {"survivors": [{"at": [0.0, 0.0, 0.0]}]}, "objectives": objs}
+	Caps.set_doc_overrides("")
+	var refused := ZzMapDoc.validate(doc)
+	_check(not refused.ok and str(refused.error.message).contains("zz_map_objectives"), "17 objectives are refused naming zz_map_objectives", str(refused.error.message) if not refused.ok else "accepted")
+	Caps.set_doc_overrides("zz_map_objectives=0")
+	_check(ZzMapDoc.validate(doc).ok, "cap_overrides zz_map_objectives=0 lifts it")
+	Caps.set_doc_overrides("")
 
 
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.

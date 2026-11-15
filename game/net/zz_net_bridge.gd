@@ -2010,7 +2010,7 @@ func _apply_hello(reader: DotNetReader) -> void:
 ## A server never calls this: its rate is `sv_tickrate`, and adopting a peer's would be a
 ## client telling the server how fast to run.
 func _adopt_tick_rate(rate: int) -> void:
-	if net == null or net.is_server or game == null or rate <= 0 or rate == game.tick_rate:
+	if net == null or net.is_server or game == null or rate == game.tick_rate:
 		return
 
 	var before := game.tick_rate

@@ -1,5 +1,7 @@
 extends "zz_map_doc_base.gd"
 
+const ZzCapsScript := preload("zz_caps.gd")
+
 ## The format this build reads. A document written for a later one is refused rather than
 ## half-built.
 const FORMAT := 1
@@ -22,42 +24,6 @@ const WIRE_INFLATED_MAX := 256 * 1024 * 1024
 ## A map's drawn world is the pack `zz_world_<id>` (zombie-zone-maps' tools/build_worlds.py).
 const WORLD_PREFIX := "zz_world_"
 
-const MAX_BOXES := 400000
-
-const MAX_PROPS := 20000
-
-const MAX_TOYS := 96
-
-## Loose props the converter marked (free barrels) and the breakables that hold them up; the drawn world's own.
-const MAX_LOOSE := 256
-
-const MAX_SUPPORTS := 128
-
-## Every lamp of the source is kept (the bake uses all of them); the game lights only the nearest few
-## at once ([constant ZzMap.REALTIME_LAMPS]), so this bounds the document, not the frame.
-const MAX_LIGHTS := 16384
-
-const MAX_WATER := 256
-
-## Solid-prop boxes a document may hold (a safety bound; the largest converted map has a few thousand).
-const MAX_SOLID_PROPS := 200000
-
-const MAX_SPAWNS := 256
-
-const MAX_ITEMS := 4000
-
-const MAX_OBJECTIVES := 16
-
-const MAX_ROUTE := 2048
-
-const MAX_NAV_FLOORS := 50000
-
-const MAX_NAV_LINKS := 50000
-
-const MAX_SLEEPERS := 256
-
-const MAX_AREAS := 64
-
 ## The two ways a map is played. Exodus was called "campaign" until the first play test asked
 ## for a name of its own; a document that still says "campaign" is read as exodus.
 const EXODUS := "exodus"
@@ -65,14 +31,6 @@ const EXODUS := "exodus"
 const SURVIVAL := "survival"
 
 const LEGACY_CAMPAIGN := "campaign"
-
-const MAX_TEAM := 64
-
-const MAX_POSTS := 64
-
-const MAX_CACHES := 32
-
-const MAX_BARRICADES := 96
 
 ## What a mapper may leave lying about. `box` is one of the random boxes (by `id`, or any).
 const ITEM_KINDS: Array[String] = ["weapon", "ammo", "medkit", "pills", "box", "throwable", "defib"]
@@ -213,8 +171,8 @@ static func _nav_block(source: Dictionary, doc: Dictionary) -> String:
 		if not teleports.is_empty():
 			nav["teleports"] = teleports
 
-	if (nav["floors"] as Array).size() > MAX_NAV_FLOORS or (nav["links"] as Array).size() > MAX_NAV_LINKS:
-		return "too many nav floors or links"
+	if (nav["floors"] as Array).size() > ZzCapsScript.doc_limit("zz_map_nav_floors") or (nav["links"] as Array).size() > ZzCapsScript.doc_limit("zz_map_nav_links"):
+		return "%d nav floors and %d links; the most are %d and %d" % [(nav["floors"] as Array).size(), (nav["links"] as Array).size(), ZzCapsScript.doc_limit("zz_map_nav_floors"), ZzCapsScript.doc_limit("zz_map_nav_links")] + ZzCapsScript.lift_hint("zz_map_nav_floors", "zz_map_nav_links")
 
 	var walked := 0
 	if source.has("terrain"):
@@ -296,7 +254,10 @@ static func validate(source: Dictionary) -> DotResult:
 
 	doc["mode"] = mode
 	# 0: the map does not say, and the server's own number stands.
-	doc["survivors"] = clampi(int(source.get("survivors", 0)), 0, MAX_TEAM)
+	var team := maxi(int(source.get("survivors", 0)), 0)
+	if team > ZzCapsScript.doc_limit("zz_map_team"):
+		return _refuse("%d survivors; the most is %d" % [team, ZzCapsScript.doc_limit("zz_map_team")] + ZzCapsScript.lift_hint("zz_map_team"), source)
+	doc["survivors"] = team
 	# Optional: this map's own visibility floor for a drawn world's lit surfaces (see ZzMap.set_light_floor). It only ever lowers the player's setting.
 	if source.has("light_floor") and (source["light_floor"] is float or source["light_floor"] is int):
 		doc["light_floor"] = clampf(float(source["light_floor"]), 0.0, 2.0)
@@ -330,8 +291,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("box %d is not {at, size, mat}" % boxes.size(), source)
 		boxes.append(box)
 
-	if boxes.size() > MAX_BOXES:
-		return _refuse("%d boxes; the most is %d" % [boxes.size(), MAX_BOXES], source)
+	if boxes.size() > ZzCapsScript.doc_limit("zz_map_boxes"):
+		return _refuse("%d boxes; the most is %d" % [boxes.size(), ZzCapsScript.doc_limit("zz_map_boxes")] + ZzCapsScript.lift_hint("zz_map_boxes"), source)
 
 	doc["boxes"] = boxes
 
@@ -342,8 +303,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("prop %d is not {id, at}" % props.size(), source)
 		props.append(prop)
 
-	if props.size() > MAX_PROPS:
-		return _refuse("%d props; the most is %d" % [props.size(), MAX_PROPS], source)
+	if props.size() > ZzCapsScript.doc_limit("zz_map_props"):
+		return _refuse("%d props; the most is %d" % [props.size(), ZzCapsScript.doc_limit("zz_map_props")] + ZzCapsScript.lift_hint("zz_map_props"), source)
 
 	doc["props"] = props
 
@@ -357,8 +318,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
 		toys.append(toy)
 
-	if toys.size() > MAX_TOYS:
-		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
+	if toys.size() > ZzCapsScript.doc_limit("zz_map_toys"):
+		return _refuse("%d toys; the most is %d" % [toys.size(), ZzCapsScript.doc_limit("zz_map_toys")] + ZzCapsScript.lift_hint("zz_map_toys"), source)
 
 	doc["toys"] = toys
 
@@ -374,8 +335,8 @@ static func validate(source: Dictionary) -> DotResult:
 		if not (raw is Dictionary) or (raw as Dictionary).get("bounds", []).size() != 6:
 			return _refuse("support %d has no six bounds" % supports.size(), source)
 		supports.append(raw)
-	if loose.size() > MAX_LOOSE or supports.size() > MAX_SUPPORTS:
-		return _refuse("%d loose props and %d supports; the most are %d and %d" % [loose.size(), supports.size(), MAX_LOOSE, MAX_SUPPORTS], source)
+	if loose.size() > ZzCapsScript.doc_limit("zz_map_loose") or supports.size() > ZzCapsScript.doc_limit("zz_map_supports"):
+		return _refuse("%d loose props and %d supports; the most are %d and %d" % [loose.size(), supports.size(), ZzCapsScript.doc_limit("zz_map_loose"), ZzCapsScript.doc_limit("zz_map_supports")] + ZzCapsScript.lift_hint("zz_map_loose", "zz_map_supports"), source)
 	if not loose.is_empty():
 		doc["loose_toys"] = loose
 	if not supports.is_empty():
@@ -400,8 +361,8 @@ static func validate(source: Dictionary) -> DotResult:
 
 		lights.append(lamp)
 
-	if lights.size() > MAX_LIGHTS:
-		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
+	if lights.size() > ZzCapsScript.doc_limit("zz_map_lights"):
+		return _refuse("%d lights; the most is %d" % [lights.size(), ZzCapsScript.doc_limit("zz_map_lights")] + ZzCapsScript.lift_hint("zz_map_lights"), source)
 
 	doc["lights"] = lights
 
@@ -429,8 +390,8 @@ static func validate(source: Dictionary) -> DotResult:
 			entry["tint"] = _floats(_colour_list(pool["tint"]), 3)
 		water.append(entry)
 
-	if water.size() > MAX_WATER:
-		return _refuse("%d water volumes; the most is %d" % [water.size(), MAX_WATER], source)
+	if water.size() > ZzCapsScript.doc_limit("zz_map_water"):
+		return _refuse("%d water volumes; the most is %d" % [water.size(), ZzCapsScript.doc_limit("zz_map_water")] + ZzCapsScript.lift_hint("zz_map_water"), source)
 
 	if not water.is_empty():
 		doc["water"] = water
@@ -447,8 +408,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("solid prop %d has no volume" % solid_props.size(), source)
 		solid_props.append(rec)
 
-	if solid_props.size() > MAX_SOLID_PROPS:
-		return _refuse("%d solid props; the most is %d" % [solid_props.size(), MAX_SOLID_PROPS], source)
+	if solid_props.size() > ZzCapsScript.doc_limit("zz_map_solid_props"):
+		return _refuse("%d solid props; the most is %d" % [solid_props.size(), ZzCapsScript.doc_limit("zz_map_solid_props")] + ZzCapsScript.lift_hint("zz_map_solid_props"), source)
 
 	if not solid_props.is_empty():
 		doc["solid_props"] = solid_props
@@ -476,8 +437,8 @@ static func validate(source: Dictionary) -> DotResult:
 
 	if list.is_empty():
 		return _refuse("no spawns for the survivors", source)
-	if list.size() > MAX_SPAWNS:
-		return _refuse("%d survivor spawns; the most is %d" % [list.size(), MAX_SPAWNS], source)
+	if list.size() > ZzCapsScript.doc_limit("zz_map_spawns"):
+		return _refuse("%d survivor spawns; the most is %d" % [list.size(), ZzCapsScript.doc_limit("zz_map_spawns")] + ZzCapsScript.lift_hint("zz_map_spawns"), source)
 
 	out_spawns["survivors"] = list
 	doc["spawns"] = out_spawns
@@ -493,8 +454,8 @@ static func validate(source: Dictionary) -> DotResult:
 				if area.is_empty():
 					return _refuse("a %s area is not {min, max}" % side, source)
 				(areas[side] as Array).append(area)
-			if (areas[side] as Array).size() > MAX_AREAS:
-				return _refuse("%d %s areas; the most is %d" % [(areas[side] as Array).size(), side, MAX_AREAS], source)
+			if (areas[side] as Array).size() > ZzCapsScript.doc_limit("zz_map_areas"):
+				return _refuse("%d %s areas; the most is %d" % [(areas[side] as Array).size(), side, ZzCapsScript.doc_limit("zz_map_areas")] + ZzCapsScript.lift_hint("zz_map_areas"), source)
 
 	if mode == EXODUS and (areas["end"] as Array).is_empty():
 		return _refuse("an exodus map needs an end shelter to reach", source)
@@ -505,8 +466,8 @@ static func validate(source: Dictionary) -> DotResult:
 	var route: Array = []
 	for raw: Variant in source.get("route", []):
 		route.append(_floats(raw, 3))
-	if route.size() > MAX_ROUTE:
-		return _refuse("%d route points; the most is %d" % [route.size(), MAX_ROUTE], source)
+	if route.size() > ZzCapsScript.doc_limit("zz_map_route"):
+		return _refuse("%d route points; the most is %d" % [route.size(), ZzCapsScript.doc_limit("zz_map_route")] + ZzCapsScript.lift_hint("zz_map_route"), source)
 	doc["route"] = route
 
 	# --- Navigation ------------------------------------------------------------
@@ -529,8 +490,8 @@ static func validate(source: Dictionary) -> DotResult:
 		if item.has("count"):
 			out_item["count"] = clampi(int(item["count"]), 1, 99)
 		items.append(out_item)
-	if items.size() > MAX_ITEMS:
-		return _refuse("%d items; the most is %d" % [items.size(), MAX_ITEMS], source)
+	if items.size() > ZzCapsScript.doc_limit("zz_map_items"):
+		return _refuse("%d items; the most is %d" % [items.size(), ZzCapsScript.doc_limit("zz_map_items")] + ZzCapsScript.lift_hint("zz_map_items"), source)
 	doc["items"] = items
 
 	var spawners: Array = []
@@ -540,8 +501,8 @@ static func validate(source: Dictionary) -> DotResult:
 		var sp: Dictionary = _as_floats((raw as Dictionary).duplicate(true))
 		sp["at"] = _floats(sp["at"], 3)
 		spawners.append(sp)
-	if spawners.size() > MAX_ITEMS:
-		return _refuse("%d spawners; the most is %d" % [spawners.size(), MAX_ITEMS], source)
+	if spawners.size() > ZzCapsScript.doc_limit("zz_map_items"):
+		return _refuse("%d spawners; the most is %d" % [spawners.size(), ZzCapsScript.doc_limit("zz_map_items")] + ZzCapsScript.lift_hint("zz_map_items"), source)
 	doc["spawners"] = spawners
 
 	var traders: Array = []
@@ -551,8 +512,8 @@ static func validate(source: Dictionary) -> DotResult:
 		var tr: Dictionary = _as_floats((raw as Dictionary).duplicate(true))
 		tr["at"] = _floats(tr["at"], 3)
 		traders.append(tr)
-	if traders.size() > MAX_ITEMS:
-		return _refuse("%d traders; the most is %d" % [traders.size(), MAX_ITEMS], source)
+	if traders.size() > ZzCapsScript.doc_limit("zz_map_items"):
+		return _refuse("%d traders; the most is %d" % [traders.size(), ZzCapsScript.doc_limit("zz_map_items")] + ZzCapsScript.lift_hint("zz_map_items"), source)
 	doc["traders"] = traders
 	doc["mechanics"] = bool(source.get("mechanics", false))
 
@@ -585,16 +546,16 @@ static func validate(source: Dictionary) -> DotResult:
 		if ZzFixtures.PROPS.has(str(o.get("prop", ""))):
 			(objectives.back() as Dictionary)["prop"] = str(o["prop"])
 			(objectives.back() as Dictionary)["yaw"] = _r(float(o.get("yaw", 0.0)))
-	if objectives.size() > MAX_OBJECTIVES:
-		return _refuse("%d objectives; the most is %d" % [objectives.size(), MAX_OBJECTIVES], source)
+	if objectives.size() > ZzCapsScript.doc_limit("zz_map_objectives"):
+		return _refuse("%d objectives; the most is %d" % [objectives.size(), ZzCapsScript.doc_limit("zz_map_objectives")] + ZzCapsScript.lift_hint("zz_map_objectives"), source)
 	doc["objectives"] = objectives
 
 	# --- Sleepers ----------------------------------------------------------------
 	var sleepers: Array = []
 	for raw: Variant in source.get("sleepers", []):
 		sleepers.append(_floats(raw, 4))
-	if sleepers.size() > MAX_SLEEPERS:
-		return _refuse("%d sleepers; the most is %d" % [sleepers.size(), MAX_SLEEPERS], source)
+	if sleepers.size() > ZzCapsScript.doc_limit("zz_map_sleepers"):
+		return _refuse("%d sleepers; the most is %d" % [sleepers.size(), ZzCapsScript.doc_limit("zz_map_sleepers")] + ZzCapsScript.lift_hint("zz_map_sleepers"), source)
 	doc["sleepers"] = sleepers
 
 	# --- Zombie spawn hints ------------------------------------------------------
@@ -610,8 +571,8 @@ static func validate(source: Dictionary) -> DotResult:
 	var caches: Array = []
 	for raw: Variant in source.get("caches", []):
 		caches.append(_floats(raw, 3))
-	if posts.size() > MAX_POSTS or caches.size() > MAX_CACHES:
-		return _refuse("%d posts and %d caches; the most is %d and %d" % [posts.size(), caches.size(), MAX_POSTS, MAX_CACHES], source)
+	if posts.size() > ZzCapsScript.doc_limit("zz_map_posts") or caches.size() > ZzCapsScript.doc_limit("zz_map_caches"):
+		return _refuse("%d posts and %d caches; the most is %d and %d" % [posts.size(), caches.size(), ZzCapsScript.doc_limit("zz_map_posts"), ZzCapsScript.doc_limit("zz_map_caches")] + ZzCapsScript.lift_hint("zz_map_posts", "zz_map_caches"), source)
 	doc["posts"] = posts
 	doc["caches"] = caches
 
@@ -630,8 +591,8 @@ static func validate(source: Dictionary) -> DotResult:
 		if box.has("barricade") and not named.has(box["barricade"]):
 			named[box["barricade"]] = true
 			barricades.append({"id": box["barricade"], "label": "a barricade"})
-	if barricades.size() > MAX_BARRICADES:
-		return _refuse("%d barricades; the most is %d" % [barricades.size(), MAX_BARRICADES], source)
+	if barricades.size() > ZzCapsScript.doc_limit("zz_map_barricades"):
+		return _refuse("%d barricades; the most is %d" % [barricades.size(), ZzCapsScript.doc_limit("zz_map_barricades")] + ZzCapsScript.lift_hint("zz_map_barricades"), source)
 	doc["barricades"] = barricades
 
 	return DotResult.success(doc)

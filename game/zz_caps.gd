@@ -4,6 +4,7 @@ extends RefCounted
 ## A value outside is REFUSED, naming the cvar and the setting that lifts it, never clamped.
 
 const RANGES := {
+	"zz_tick_rate": [1, 240],
 	"mp_killcam_time": [0.0, 30.0],
 	"zz_mob_min": [10.0, 900.0],
 	"zz_mob_max": [10.0, 900.0],
@@ -125,6 +126,40 @@ static func refusal(cvar: String, value: float, overrides: Dictionary, range_of:
 	return ""
 
 
+## What a map document may hold. These were `MAX_*` constants in ZzMapDoc; each is now the default of a
+## `cap_overrides` entry (`zz_map_objectives=0` lifts it), 0 is unlimited, and a document over its limit is
+## REFUSED with an error naming the setting. A document's file format and the wire are unchanged.
+const DOC_LIMITS := {
+	"zz_map_boxes": 400000, "zz_map_props": 20000, "zz_map_toys": 96, "zz_map_loose": 256, "zz_map_supports": 128,
+	"zz_map_lights": 16384, "zz_map_water": 256, "zz_map_solid_props": 200000, "zz_map_spawns": 256, "zz_map_items": 4000,
+	"zz_map_objectives": 16, "zz_map_route": 2048, "zz_map_nav_floors": 50000, "zz_map_nav_links": 50000,
+	"zz_map_sleepers": 256, "zz_map_areas": 64, "zz_map_team": 64, "zz_map_posts": 64, "zz_map_caches": 32,
+	"zz_map_barricades": 96,
+}
+
+## The overrides in force for map documents (`ZzConfig.cap_overrides`, set by ZzGame when it starts).
+static var doc_overrides: Dictionary = {}
+
+
+## Takes `cap_overrides` for the map document limits; the parse errors come back (and are logged by the caller).
+static func set_doc_overrides(text: String) -> PackedStringArray:
+	var errors := PackedStringArray()
+	doc_overrides = parse_overrides(text, errors)
+	return errors
+
+
+## The most of [param key] a document may hold: its default, or the override; 0 is unlimited.
+static func doc_limit(key: String) -> int:
+	var hi: float = float(doc_overrides[key]) if doc_overrides.has(key) else float(DOC_LIMITS[key])
+	return 0x7fffffffffffffff if hi <= 0.0 else int(hi)
+
+
+## The tail of a refusal that names the setting lifting the limit.
+static func lift_hint(key: String, key2: String = "") -> String:
+	var names := key if key2.is_empty() else "%s=0\" or \"%s" % [key, key2]
+	return " (cap_overrides \"%s=0\" lifts the limit)" % names
+
+
 ## The cvars that come in a low/high pair: cvar -> [the config field of its partner, the partner's cvar, whether this one is the low end].
 ## The old setters clamped a low end to the high one and back, silently; now a value that would cross is REFUSED.
 const PAIRS := {
@@ -133,6 +168,7 @@ const PAIRS := {
 	"zz_brute_min": ["brute_interval_max", "zz_brute_max", true], "zz_brute_max": ["brute_interval_min", "zz_brute_min", false],
 	"zz_respawn_min": ["respawn_max_seconds", "zz_respawn_max", true], "zz_respawn_max": ["respawn_min_seconds", "zz_respawn_min", false],
 	"zz_common_speed_base": ["common_speed_max", "zz_common_speed_max", true], "zz_common_speed_max": ["common_speed_base", "zz_common_speed_base", false],
+	"zz_body_stride_near": ["body_stride_far", "zz_body_stride_far", true], "zz_body_stride_far": ["body_stride_near", "zz_body_stride_near", false],
 }
 
 
@@ -146,4 +182,12 @@ static func pair_refusal(cvar: String, value: float, partner_value: float) -> St
 		return "%s refuses %s: it is over %s (%s); raise %s first" % [cvar, value, partner, partner_value, partner]
 	if not low and value < partner_value:
 		return "%s refuses %s: it is under %s (%s); lower %s first" % [cvar, value, partner, partner_value, partner]
+	return ""
+
+
+## Empty when the low/high pairs of [param config] that [method ZzConfig.validate] does not check are in order, else the refusal to log.
+## (The body strides: a near that passed its far made the middle stride unreachable, silently.)
+static func config_refusal(config: Object) -> String:
+	if float(config.get("body_stride_near")) > float(config.get("body_stride_far")):
+		return "body_stride_near is over body_stride_far; raise body_stride_far or lower body_stride_near."
 	return ""
