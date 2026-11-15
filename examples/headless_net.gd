@@ -38,7 +38,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 36
-const CHECKS := 242
+const CHECKS := 244
 
 const CLIENT_PEER := 7
 const SESSION := 42
