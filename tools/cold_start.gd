@@ -35,6 +35,16 @@ func _ms(since: int) -> float:
 	return float(Time.get_ticks_usec() - since) / 1000.0
 
 
+## A round on [param map_id] alone that starts at once, with no players needed and nothing kept.
+func _config(map_id: StringName) -> ZzConfig:
+	var config := ZzConfig.new()
+	config.warmup_seconds = 0.0
+	config.intermission_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.map_ids = PackedStringArray([String(map_id)])
+	return config
+
 func _run() -> void:
 	var map_id := StringName(_arg("map", "ze_biohazard_manor"))
 	var ticks := int(_arg("ticks", "600"))
@@ -45,15 +55,9 @@ func _run() -> void:
 		_wipe("user://nav_bake")
 		_wipe("user://nav")
 
-	var config := ZzConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.keep_progress = false
-	config.map_ids = PackedStringArray([String(map_id)])
 	var game := ZzGame.new()
 	game.name = "World"
-	game.config = config
+	game.config = _config(map_id)
 	game.tick_rate = TICK_RATE
 	game.authoritative = true
 	game.register_service = false
@@ -79,16 +83,21 @@ func _run() -> void:
 	var t_start := _ms(t1)
 	print("COLDSTART open %.0f ms (_ready), start %.0f ms; sections %s map %s" % [t_ready, t_start, game.build_sections, game.map.sections])
 
+	print("COLDHORDE %s" % game.horde.sections)
 	var worst := 0.0
 	var worst_at := 0
 	var delta := 1.0 / float(TICK_RATE)
 	var waited := 0
+	var landed := false
 	var wait_began := Time.get_ticks_usec()
 	for i in range(ticks):
 		game.horde.sections.clear()
 		var began := Time.get_ticks_usec()
 		game.simulate(delta)
 		var spent := _ms(began)
+		if waited > 0 and not game.horde.nav_blocks_play() and not landed:
+			landed = true
+			print("COLDNAVLAND tick %d %.0f ms after %.0f ms wall %s" % [i, spent, _ms(wait_began), game.horde.sections])
 		# The first graph is built off the frame; the ticks until it lands are the cover's.
 		if game.horde.nav_blocks_play():
 			waited += 1

@@ -27,6 +27,13 @@ var workers := 1
 var nav: DotNpcNavData = null
 ## Whether the graph came off the disk.
 var from_cache := false
+## Milliseconds the cache look-up took (read and decode), for the cold start's laps.
+var cache_ms := 0.0
+## `(nav: DotNpcNavData) -> Object`, run on the worker thread once the graph is done: what the game makes of it
+## (its search graph), or null when that must wait for the main thread. Not called on a build stepped on the main thread.
+var make_graph: Callable
+## What [member make_graph] made of [member nav], or null.
+var graph: Object = null
 
 var _step := Step.CACHE
 var _builder: DotNpcNavBuilder = null
@@ -63,6 +70,9 @@ func start_thread() -> void:
 func _run_thread() -> void:
 	while not _cancelled and not step(0.0):
 		pass
+
+	if not _cancelled and _step == Step.DONE and nav != null and make_graph.is_valid():
+		graph = make_graph.call(nav)
 
 	_lock.lock()
 	_finished = true
@@ -176,7 +186,9 @@ func _do_cache() -> void:
 	if cache_path == "" or not FileAccess.file_exists(cache_path):
 		return
 
+	var began := Time.get_ticks_usec()
 	var cached := DotNpcNavData.from_cache_bytes(FileAccess.get_file_as_bytes(cache_path))
+	cache_ms = float(Time.get_ticks_usec() - began) / 1000.0
 
 	if cached != null and cached.matches(digest):
 		nav = cached

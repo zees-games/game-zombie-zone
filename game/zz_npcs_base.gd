@@ -84,6 +84,18 @@ static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
 static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
 static var OIL_MONSTER_BRAIN := ZzPaths.rebase("res://npcs/zz_oil_monster_brain.gd")
 
+## The 27 cells round a point's own, its own first: on a dense graph the point that rules a new one out
+## is nearly always in the same cell, so most points stop at the first look-up. Order changes no answer.
+const _NEIGHBOUR_CELLS: Array[Vector3i] = [
+	Vector3i(0, 0, 0),
+	Vector3i(-1, 0, 0), Vector3i(1, 0, 0), Vector3i(0, 0, -1), Vector3i(0, 0, 1), Vector3i(0, -1, 0), Vector3i(0, 1, 0),
+	Vector3i(-1, 0, -1), Vector3i(-1, 0, 1), Vector3i(1, 0, -1), Vector3i(1, 0, 1),
+	Vector3i(-1, -1, 0), Vector3i(1, -1, 0), Vector3i(0, -1, -1), Vector3i(0, -1, 1),
+	Vector3i(-1, 1, 0), Vector3i(1, 1, 0), Vector3i(0, 1, -1), Vector3i(0, 1, 1),
+	Vector3i(-1, -1, -1), Vector3i(-1, -1, 1), Vector3i(1, -1, -1), Vector3i(1, -1, 1),
+	Vector3i(-1, 1, -1), Vector3i(-1, 1, 1), Vector3i(1, 1, -1), Vector3i(1, 1, 1),
+]
+
 ## The points of [param nav] that pass [param filter], thinned so no two are closer than [param spacing]: what
 ## `DotNpcDirector.set_spawn_points_from_nav` returns, the same points in the same order (the first of two close ones wins), but through a
 ## grid of cells one spacing wide. The director's own loop compares every point with every kept one, which was 0.6 s a round on a big map.
@@ -106,24 +118,19 @@ static func thinned_points(nav: DotNpcNavData, spacing: float, filter: DotNpcNav
 		var cy := floori(point.y / size)
 		var cz := floori(point.z / size)
 		var too_close := false
+		var cell := Vector3i(cx, cy, cz)
 
-		for dx in range(-1, 2):
-			for dy in range(-1, 2):
-				for dz in range(-1, 2):
-					var bucket: Variant = cells.get(Vector3i(cx + dx, cy + dy, cz + dz))
+		for offset in _NEIGHBOUR_CELLS:
+			var bucket: Variant = cells.get(cell + offset)
 
-					if bucket == null:
-						continue
+			if bucket == null:
+				continue
 
-					for other: Vector3 in bucket:
-						if other.distance_squared_to(point) < spacing_sq:
-							too_close = true
-							break
-
-					if too_close:
-						break
-				if too_close:
+			for other: Vector3 in bucket:
+				if other.distance_squared_to(point) < spacing_sq:
+					too_close = true
 					break
+
 			if too_close:
 				break
 
@@ -131,11 +138,10 @@ static func thinned_points(nav: DotNpcNavData, spacing: float, filter: DotNpcNav
 			continue
 
 		kept.append(point)
-		var key := Vector3i(cx, cy, cz)
 
 		# A packed array is a value: it goes back into the dictionary after the append.
-		var bucket_in: PackedVector3Array = cells.get(key, PackedVector3Array())
+		var bucket_in: PackedVector3Array = cells.get(cell, PackedVector3Array())
 		bucket_in.append(point)
-		cells[key] = bucket_in
+		cells[cell] = bucket_in
 
 	return kept

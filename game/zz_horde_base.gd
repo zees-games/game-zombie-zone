@@ -5,6 +5,10 @@ const ZzWatchCull := preload("zz_watch_cull.gd")
 ## What a point inside a push volume costs to arrive at, times the usual.
 const PUSH_COST := 12.0
 
+## Metres a push volume's box is grown by before its points are tested: far more than [method DotMapVolume.contains]'s
+## 0.0001 slack, so the box never turns away a point the planes would take.
+const PUSH_BOX_SLACK := 0.05
+
 ## The mover watch and cull (game/zz_watch_cull.gd), built with each map.
 var wcull: ZzWatchCull = null
 
@@ -77,8 +81,96 @@ func _mark_pushes(graph: DotNpcNavGraph) -> void:
 	if volumes.is_empty():
 		return
 
+	# Each volume's box first: the plane test per brush, for every point of a big map, was a fifth of a second
+	# on the tick the graph lands. A volume with a brush that boxes to nothing keeps the exact test everywhere.
+	var boxes: Array[AABB] = []
+
+	for vol in volumes:
+		boxes.append(vol.bounds().grow(PUSH_BOX_SLACK) if vol.culls_columns() else AABB())
+
 	for p in nav.points:
-		for vol in volumes:
-			if vol.contains(p):
+		for v in volumes.size():
+			if boxes[v].has_volume() and not boxes[v].has_point(p):
+				continue
+
+			if volumes[v].contains(p):
 				var _i := graph.mark_bad(p, INF, PUSH_COST, 0.05)
 				break
+
+## The scenes and brains [method _request_warm] started loading on worker threads.
+var _warm_paths := PackedStringArray()
+
+
+## Starts loading every enabled kind's scene and brain script on worker threads, so the map build
+## and the first graph overlap them (on the main thread, as the spawner's warm() does it, they
+## cost about 0.9 s of a cold start). An older dot-npc without warm() loads them at first spawn.
+func _request_warm() -> void:
+	_drain_warm()
+
+	if not spawner.has_method(&"warm"):
+		return
+
+	for def: DotNpcDef in catalogue.npcs:
+		if def == null or not def.enabled:
+			continue
+
+		for path: String in [def.scene_path, def.brain_script_path]:
+			if path != "" and not _warm_paths.has(path) and ResourceLoader.exists(path):
+				if ResourceLoader.load_threaded_request(path) == OK:
+					_warm_paths.append(path)
+
+
+## Collects and drops any load [method _request_warm] started that no map build took: a threaded
+## load nobody collects stays in the loader, and its objects outlive the game.
+func _drain_warm() -> void:
+	for path in _warm_paths:
+		var _dropped := ResourceLoader.load_threaded_get(path)
+
+	_warm_paths.clear()
+
+
+## Waits for what [method _request_warm] started (only a load still running) and has the spawner
+## hold it all. Before the first zombie of a map; a spawn earlier than this waits in load() itself.
+func _collect_warm() -> void:
+	if not spawner.has_method(&"warm"):
+		return
+
+	# Held here until warm() has taken them, so its load() finds each in the cache.
+	var loaded: Array[Resource] = []
+
+	for path in _warm_paths:
+		if ResourceLoader.load_threaded_get_status(path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			loaded.append(ResourceLoader.load_threaded_get(path))
+
+	_warm_paths.clear()
+	var _warmed = spawner.call(&"warm")
+
+## The zombies' graph for [param data], built on the nav job's thread (half a second of adjacency and pieces that was the
+## first tick of play's): only when the graph needs no physics prune first, which only the main thread may ask.
+static func _graph_off_thread(data: DotNpcNavData) -> ZzNavGraph:
+	if int(data.meta.get("pruned", 0)) < PRUNE_VERSION:
+		return null
+
+	var graph := ZzNavGraph.new()
+	return graph if graph.rebuild(data).ok else null
+
+## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
+func _mark_narrow() -> void:
+	if spawner.nav.has_method(&"mark_narrow"):
+		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
+		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
+		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
+		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
+			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), radius, fit)
+
+## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
+func usable_posts() -> Array:
+	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
+
+## Where a zombie keyed [param key] should walk on its way to [param goal]: through the choke it
+## was given. The goal itself with `zz_zombie_spread` off or no notes.
+func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
+	if not config.zombie_spread:
+		return goal
+
+	return notes.waypoint_for(key, from, goal)

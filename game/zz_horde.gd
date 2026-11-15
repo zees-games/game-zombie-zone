@@ -3,7 +3,9 @@ extends "zz_horde_base.gd"
 func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game = p_game
 	config = p_config
+	var lap := Time.get_ticks_usec()
 	catalogue = ZzNpcs.catalogue(config)
+	lap = ZzLaps.lap(sections, &"setup_catalogue", lap)
 	_rng.seed = config.seed_value
 
 	_world = Node3D.new()
@@ -52,11 +54,13 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	# The host seam of zz-historical-monsters: a monster brain run here hunts and hurts through the game.
 	monster_host = MonsterHost.new(self)
 	spawner.set_meta(&"zhm_host", monster_host)
+	lap = ZzLaps.lap(sections, &"setup_spawner", lap)
 	add_child(spawner)
-	# Every kind's brain compiled now, while the map loads, rather than as a 30 ms hitch the
-	# first time each special comes (an older dot-npc has no warm()).
-	if spawner.has_method(&"warm"):
-		var _warmed = spawner.call(&"warm")
+	lap = ZzLaps.lap(sections, &"setup_spawner_ready", lap)
+	# Every kind's brain compiled while the map loads, rather than as a 30 ms hitch the first time
+	# each special comes: on worker threads from here, held by [method _collect_warm].
+	_request_warm()
+	lap = ZzLaps.lap(sections, &"setup_warm", lap)
 
 	spawner.spawned.connect(_on_spawned)
 	spawner.removed.connect(_on_removed)
@@ -73,6 +77,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 
 	game.combat.entity_killed.connect(_on_entity_killed)
 	game.combat.damage_applied.connect(_on_damage_applied)
+	lap = ZzLaps.lap(sections, &"setup_director", lap)
 	return DotResult.success(self)
 
 ## Builds the horde for a map: its graph, its spawn points, its route, its sleepers, and the
@@ -108,6 +113,8 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 ## What waits on the first graph of a map: its route, its sleepers and wanderers, and the bake.
 func _finish_map_build() -> void:
 	var lap := Time.get_ticks_usec()
+	_collect_warm()
+	lap = ZzLaps.lap(sections, &"collect_warm", lap)
 	_map_nav_pending = false
 	var route := PackedVector3Array()
 	for p: Array in _doc.get("route", []):
@@ -130,8 +137,11 @@ func populate_map() -> void:
 		return
 
 	_populated = true
+	var lap := Time.get_ticks_usec()
 	_place_sleepers()
+	lap = ZzLaps.lap(sections, &"pop_sleepers", lap)
 	_place_wanderers()
+	lap = ZzLaps.lap(sections, &"pop_wanderers", lap)
 
 ## Starts annotating the map's colliders: bake, annotate, and then [method _plan_notes]. Survival
 ## and exodus alike (the zombies' drops and spread are for both); only a survival map's stand-ins
@@ -150,37 +160,23 @@ func _begin_notes() -> void:
 	notes.link_passable = game.map.mechanics.walk_through_bodies() if game.map.mechanics != null else ([] as Array[RID])
 	notes.begin(config, game.map, game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") | game.physics.layer_mask(&"clip"), _note_seeds())
 
-## The graph the spawner built is a plain one; the zombies' is `ZzNavGraph`, which also knows the
-## drops. Swapped in after every rebuild, with the links put back.
-func _adopt_links() -> void:
-	var graph := ZzNavGraph.new()
-
-	if not graph.rebuild(nav).ok:
-		return
-
+## Puts [param graph] (a `ZzNavGraph`, which also knows the drops) in the spawner's hands, after every
+## rebuild, with the links put back.
+func _adopt_links(graph: ZzNavGraph) -> void:
+	var lap := Time.get_ticks_usec()
 	graph.steep = config.nav_steep if config.nav_steep > 0.0 else INF
 	spawner.nav = graph
 
 	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
+	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():
 		notes.apply_links(graph)
 		_mark_narrow()
 
+	lap = ZzLaps.lap(sections, &"links_notes", lap)
 	_mark_pushes(graph)
-
-## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
-func _mark_narrow() -> void:
-	if spawner.nav.has_method(&"mark_narrow"):
-		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
-		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
-		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
-		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,
-			game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop"), radius, fit)
-
-## The map's posts the graph joins to the survivors' start (all of them until a graph is applied).
-func usable_posts() -> Array:
-	return _usable_posts if _usable_posts_for == nav else _doc.get("posts", [])
+	lap = ZzLaps.lap(sections, &"links_pushes", lap)
 
 func _plan_notes() -> void:
 	var posts := PackedVector3Array()
@@ -190,14 +186,6 @@ func _plan_notes() -> void:
 
 	_mark_narrow()
 	notes.plan(spawner.nav, spawn_ground, posts)
-
-## Where a zombie keyed [param key] should walk on its way to [param goal]: through the choke it
-## was given. The goal itself with `zz_zombie_spread` off or no notes.
-func waypoint_for(key: int, from: Vector3, goal: Vector3) -> Vector3:
-	if not config.zombie_spread:
-		return goal
-
-	return notes.waypoint_for(key, from, goal)
 
 ## Set by the hosts (the client and the server), not by a suite: the graph is then built off the
 ## frame ([ZzConfig.nav_threads]) and play waits for the first one ([method nav_blocks_play]).
@@ -252,7 +240,11 @@ func rebuild_navigation() -> DotResult:
 	_drop_nav_job()
 	_nav_started = Time.get_ticks_msec()
 	var threads := config.nav_threads if DotPlatform.has_threads() else 0
-	var job := ZzNpcs.nav_job(nav_doc(), props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
+	var lap := Time.get_ticks_usec()
+	var doc := nav_doc()
+	lap = ZzLaps.lap(sections, &"nav_doc", lap)
+	var job := ZzNpcs.nav_job(doc, props_size, open_gates, blockers, config.nav_cache, nav_async and threads > 0)
+	lap = ZzLaps.lap(sections, &"nav_job", lap)
 	job.workers = maxi(threads, 1)
 
 	if not nav_async:
@@ -263,6 +255,7 @@ func rebuild_navigation() -> DotResult:
 	_nav_job = job
 
 	if threads > 0:
+		job.make_graph = _graph_off_thread
 		job.start_thread()
 
 	DotLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
@@ -296,30 +289,36 @@ func _poll_nav() -> void:
 
 func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	nav = graph
+	sections[&"nav_cache_read"] = snappedf(job.cache_ms, 0.1)
+	sections[&"nav_cache_hit"] = 1.0 if job.from_cache else 0.0
+	sections[&"nav_wall"] = float(Time.get_ticks_msec() - _nav_started)
 	var lap := Time.get_ticks_usec()
+	var ready_graph: ZzNavGraph = job.graph as ZzNavGraph if job.graph != null and (job.graph as ZzNavGraph).data == nav else null
 	_prune_blocked(nav, job)
 	lap = ZzLaps.lap(sections, &"nav_prune", lap)
-	var valid := nav.validate()
-	lap = ZzLaps.lap(sections, &"nav_validate", lap)
+	# Built once (on the job's thread when it can): the spawner's set_nav_data would build a plain graph only to be replaced.
+	var graph_built := ready_graph
+	if graph_built == null:
+		graph_built = ZzNavGraph.new()
+		var valid := graph_built.rebuild(nav)
+		if not valid.ok:
+			return valid.wrap("The map's navigation is not usable")
 
-	if not valid.ok:
-		return valid.wrap("The map's navigation is not usable")
+	sections[&"nav_graph_threaded"] = 1.0 if ready_graph != null else 0.0
+	lap = ZzLaps.lap(sections, &"nav_graph", lap)
 
-	var applied := spawner.set_nav_data(nav)
-	lap = ZzLaps.lap(sections, &"nav_set", lap)
-
-	if not applied.ok:
-		return applied
-
-	_adopt_links()
+	var _cleared := spawner.set_nav_data(null)
+	_adopt_links(graph_built)
 	lap = ZzLaps.lap(sections, &"nav_links", lap)
 	_usable_posts = ZzNpcs.reachable_posts(nav, _doc)
 	_usable_posts_for = nav
 	lap = ZzLaps.lap(sections, &"nav_posts", lap)
 
 	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, DotNpcNavFilter.walking_only())
+	lap = ZzLaps.lap(sections, &"spawns_thin", lap)
 	_add_hinted_spawns()
 	var kept := _keep_out_of_safe_rooms()
+	lap = ZzLaps.lap(sections, &"spawns_rooms", lap)
 	_set_spawn_ground()
 	lap = ZzLaps.lap(sections, &"nav_spawns", lap)
 
@@ -465,6 +464,7 @@ func open_gate(gate: String) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_drop_nav_job()
+		_drain_warm()
 
 func clear() -> void:
 	_drop_nav_job()
