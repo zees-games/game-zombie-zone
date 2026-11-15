@@ -1533,6 +1533,14 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 		sounds.free()
 
 	lap = _lap(stages, "sounds", lap)
+	# Read library models from the store's real folder: under res:// a leftover `.import` with no imported copy
+	# here makes ResourceLoader.exists() true while load() returns null, and the model would become a proxy.
+	if str(world.get(&"model_library")) == "":
+		var store: String = world.call(&"_store_beside_mesh")
+		if store.begins_with("res://"):
+			store = ProjectSettings.globalize_path(store)
+		if DirAccess.dir_exists_absolute(store):
+			world.set(&"model_library", store)
 	var drawn_props: Node3D = world.call(&"build_props")
 	# The document's solid boxes collide whether or not the library models came; draw the ones nothing else shows.
 	if world.has_method(&"draw_unseen_boxes"):
