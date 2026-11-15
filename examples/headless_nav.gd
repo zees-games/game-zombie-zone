@@ -17,11 +17,13 @@ const ZzUnstick := preload("../game/zz_unstick.gd")
 ##
 ## Counts sections and checks (dot-settings' story).
 
-## The suite is three scenes over this script, one per `shard` (game.sh caps a suite at 1200 s and the
-## whole of it ran about 1800): headless_nav (core), headless_nav_holds and headless_nav_waves, which
-## has one section and two checks per wave map. Together 52 sections, 171 checks.
+## The suite is three scenes over this script, one per `shard` (game.sh caps a suite at 1200 s):
+## headless_nav (core), headless_nav_holds and headless_nav_waves, which has one section and two
+## checks per survival map, dealt round-robin into game.sh's shards `w0`..`w<WAVE_SHARDS-1>`.
 @export var shard := "core"
 
+## game.sh's SUITE_SHARDS for headless_nav_waves names exactly these.
+const WAVE_SHARDS := 6
 const CORE_SECTIONS := 12
 const CORE_CHECKS := 74
 const HOLDS_SECTIONS := 10
@@ -127,8 +129,13 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
-	if only == "wave":
-		await _test_wave_origins()
+	# `--only=wave` every survival map, `--only=wave:gm_valley,zz_lot` those.
+	if only == "wave" or only.begins_with("wave:"):
+		if only == "wave":
+			await _test_wave_origins()
+		else:
+			for id in only.substr(5).split(","):
+				await _test_wave_origin(StringName(id))
 		_report()
 		return
 
@@ -174,6 +181,11 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 
+	if shard == "waves" and DotGameShardArgs.is_merge():
+		_merge_waves(DotGameShardArgs.merge_logs())
+		return
+
+	var waves_played: Array[StringName] = []
 	match shard:
 		"holds":
 			for id: String in MAPS:
@@ -182,7 +194,14 @@ func _run() -> void:
 			for id: String in STUCK_BANDS:
 				await _test_stuck(StringName(id))
 		"waves":
-			await _test_wave_origins()
+			var part := DotGameShardArgs.shard()
+			if part != "" and not part in _wave_shard_names():
+				push_error("headless_nav_waves: unknown shard %s (have %s)" % [part, _wave_shard_names()])
+				get_tree().quit(1)
+				return
+			waves_played.assign(DotGameShardArgs.slice(_survival_maps(), part, WAVE_SHARDS, "w"))
+			for id in waves_played:
+				await _test_wave_origin(id)
 		_:
 			_test_graph()
 			await _test_exodus()
@@ -204,7 +223,7 @@ func _run() -> void:
 		"holds":
 			_report_sections(_sections_entered, _sections_finished, HOLDS_SECTIONS, HOLDS_CHECKS)
 		"waves":
-			_report_sections(_sections_entered, _sections_finished, _wave_maps(), 2 * _wave_maps())
+			_report_sections(_sections_entered, _sections_finished, waves_played.size(), 2 * waves_played.size())
 		_:
 			_report_sections(_sections_entered, _sections_finished, CORE_SECTIONS, CORE_CHECKS)
 
@@ -618,12 +637,27 @@ func _survival_maps() -> Array[StringName]:
 		if doc is Dictionary and str(doc.get("mode", "")) == "survival":
 			out.append(StringName(file.get_basename()))
 
-	out.sort()
+	# By name: a plain sort() orders StringNames by their interned address, which differs per process,
+	# and every wave shard must deal the same list.
+	out.sort_custom(func(a: StringName, b: StringName) -> bool: return str(a) < str(b))
 	return out
 
 
-func _wave_maps() -> int:
-	return _survival_maps().size()
+func _wave_shard_names() -> Array:
+	var out := []
+	for i in WAVE_SHARDS:
+		out.append("w%d" % i)
+	return out
+
+
+## The merge run: every shard's log is there and together they entered a section per survival map.
+func _merge_waves(logs: PackedStringArray) -> void:
+	var absent := DotGameShardArgs.missing(logs)
+	_check(logs.size() == WAVE_SHARDS and absent.is_empty(), "every wave shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
+	var entered := DotGameShardArgs.sections_entered(logs)
+	var want := _survival_maps().size()
+	_check(entered == want, "the wave shards entered a section per survival map (%d of %d)" % [entered, want])
+	_report_sections(1, 1, 1, 2)
 
 
 func _test_wave_origins() -> void:

@@ -102,7 +102,7 @@ func _scan(id: StringName, step: float, quiet: bool) -> int:
 					if r.is_empty():
 						continue
 					var clip := ((r["collider"] as Node).name in [&"Clip", &"WorldClip"])
-					if not clip and not (_shape_of(r).shape is BoxShape3D and (r["collider"] as Node).name == &"Solid" and _inside(hidden, r["position"])):
+					if not clip and not (_shape_of(r).shape is BoxShape3D and String((r["collider"] as Node).name).begins_with("Solid") and _inside(hidden, r["position"])):
 						continue
 					if _inside(seen, r["position"]):
 						touching += 1

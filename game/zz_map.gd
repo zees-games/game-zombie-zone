@@ -199,7 +199,14 @@ var authoritative: bool = true
 var toy_rules: DotPropBodyRules = null
 var gravity: float = 20.0
 
+## The world's solid boxes go into bodies of this many shapes each; 0 puts them all in one.
+## Freeing a body's shapes costs time in proportion to the shapes it still holds, so one body
+## of gm_valley's 165,000 boxes took about an hour to free (zz-nav-waves-timeout-1).
+@export var solid_body_shapes := 1024
+
+## The Solid body new boxes go into (the last of [member _solids]).
 var _solid: StaticBody3D = null
+var _solids: Array[StaticBody3D] = []
 var _furniture: StaticBody3D = null
 ## Invisible solids (player clip, nodraw): movers stop at them, shots and sight pass.
 var _clip: StaticBody3D = null
@@ -261,10 +268,7 @@ func build(p_doc: Dictionary) -> DotResult:
 	clear()
 	doc = p_doc
 
-	_solid = StaticBody3D.new()
-	_solid.name = "Solid"
-	add_child(_solid)
-	_put_on(_solid, &"world")
+	_new_solid()
 
 	_furniture = StaticBody3D.new()
 	_furniture.name = "Furniture"
@@ -415,6 +419,7 @@ func clear() -> void:
 	toys = null
 	supports.clear()
 	_solid = null
+	_solids.clear()
 	_furniture = null
 	_clip = null
 	world_clip = null
@@ -511,6 +516,24 @@ func set_underwater(under: bool, tint: Color = Color(0.05, 0.28, 0.36)) -> void:
 		for key: String in _dry_fog:
 			env.set(key, _dry_fog[key])
 		_dry_fog = {}
+
+
+## Starts a Solid body on the world layer: "Solid", then "Solid2", "Solid3"...
+func _new_solid() -> void:
+	_solid = StaticBody3D.new()
+	_solid.name = "Solid" if _solids.is_empty() else "Solid%d" % (_solids.size() + 1)
+	add_child(_solid)
+	_put_on(_solid, &"world")
+	_solids.append(_solid)
+
+
+## Adds a world shape, to a new Solid body once the current one holds [member solid_body_shapes].
+func _add_solid(shape: CollisionShape3D) -> void:
+	if solid_body_shapes < 0:
+		DotLog.error(CHANNEL, "solid_body_shapes is negative; 0 means one body", {"value": solid_body_shapes})
+	elif solid_body_shapes > 0 and _solid.get_child_count() >= solid_body_shapes:
+		_new_solid()
+	_solid.add_child(shape)
 
 
 func _put_on(body: CollisionObject3D, layer: StringName) -> void:
@@ -696,7 +719,7 @@ func _build_boxes() -> void:
 			# shape's meta; "wood_floor", "asphalt" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			if bool(box.get("visible", true)):
-				_solid.add_child(shape)
+				_add_solid(shape)
 			elif _collides_hidden(box, at.y - size.y * 0.5, sky_floor):
 				_clip.add_child(shape)
 			else:
@@ -845,7 +868,7 @@ func _build_terrain() -> void:
 	concave.set_faces(faces)
 	shape.shape = concave
 	shape.set_meta(&"surface", terrain.mat)
-	_solid.add_child(shape)
+	_add_solid(shape)
 	_bounds = box if _bounds == AABB() else _bounds.merge(box)
 	if not draw_world:
 		return
