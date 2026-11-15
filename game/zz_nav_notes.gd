@@ -102,7 +102,7 @@ var _seeds: PackedVector3Array = PackedVector3Array()
 var _frame: int = 0
 var _annotator: DotNpcAiNavAnnotator = null
 var _started_ms: int = 0
-var _bot: ZzNavBake = null
+var _bot: DotBotNav = null
 var _bot_result: DotResult = null
 
 ## npc key -> {"at": choke index or -1, "seen": time}
@@ -198,9 +198,13 @@ func tick() -> bool:
 
 
 func _bake() -> bool:
-	var bot: ZzNavBake = ZzNavBake.new()
 	# A map over the engine's cell limit bakes in tiles joined into one mesh, or fails saying why.
-	bot.tile_size = float(_config.nav_notes_bake_tile)
+	# dot-bot from API level 31 does that itself (agent key "tile"); a shell pinned below it runs
+	# ZzNavBake, this game's copy, until the pin catches up and that file can go.
+	var native_tiles := DotAddonApi.build_level("dot_bot") >= 31
+	var bot: DotBotNav = DotBotNav.new() if native_tiles else ZzNavBake.new()
+	if not native_tiles:
+		bot.set("tile_size", float(_config.nav_notes_bake_tile))
 
 	# The bake is the round start's biggest single cost (2.4 s on ze_biohazard_manor); the baker
 	# keys its cache on a digest of the parsed geometry, so a changed map re-bakes by itself.
@@ -212,6 +216,8 @@ func _bake() -> bool:
 	# The survivors' 72-unit body; the default 0.175 m cell rounds its radius up to 0.525 m and shuts
 	# doors, a 0.1016 m cell is exactly 4 cells of it (dot-bot API level 23; older dot-bot ignores it).
 	var agent := {"radius": ZzBody.BODY_RADIUS, "height": ZzBody.BODY_HEIGHT, "climb": 0.4, "cell": 0.1016, "cell_height": 0.05}
+	if native_tiles:
+		agent["tile"] = float(_config.nav_notes_bake_tile)
 
 	if background and DotPlatform.has_threads():
 		_bot = bot
@@ -257,11 +263,14 @@ func _bake_failed(res: DotResult) -> bool:
 
 
 ## The bake is in: the annotator takes over (or the cached annotations are the answer).
-func _baked(bot: ZzNavBake) -> bool:
+func _baked(bot: DotBotNav) -> bool:
 	bake_ms = bot.bake_ms
 	bake_cached = bot.last_bake_cached
-	bake_tiles = bot.tiles_used
-	bake_tile = bot.tile_used
+	var native := DotAddonApi.build_level("dot_bot") >= 31
+	var cut := "tiles_used" if native else "tiles_cut"
+	var side := "tile_used" if native else "tile_cut"
+	bake_tiles = int(bot.get(cut))
+	bake_tile = float(bot.get(side))
 	var mesh := bot.mesh
 	var annotator := DotNpcAiNavAnnotator.new(mesh, _world)
 	annotator.agent_radius = ZzBody.BODY_RADIUS

@@ -23,8 +23,8 @@ const BORDER_PAD := 3
 var tile_size: float = 0.0
 
 ## The tiles the last bake used (0 for one grid) and their side.
-var tiles_used: int = 0
-var tile_used: float = 0.0
+var tiles_cut: int = 0
+var tile_cut: float = 0.0
 
 ## The tile boxes of the current bake (no border) and the grid they sit on.
 var _tiles: Array[AABB] = []
@@ -117,13 +117,13 @@ func cache_path() -> String:
 	if path.is_empty() or _tiles.is_empty():
 		return path
 
-	return path.trim_suffix(".nav.res") + ".tile%d.nav.res" % roundi(tile_used * 1000.0)
+	return path.trim_suffix(".nav.res") + ".tile%d.nav.res" % roundi(tile_cut * 1000.0)
 
 
 func _parse(root: Node3D, agent: Dictionary, mask: int, bodies: Array) -> DotResult:
 	_tiles.clear()
-	tiles_used = 0
-	tile_used = 0.0
+	tiles_cut = 0
+	tile_cut = 0.0
 	var parsed: DotResult = super(root, agent, mask, bodies)
 
 	if not parsed.ok:
@@ -182,8 +182,8 @@ func _plan(source: NavigationMeshSourceGeometryData3D) -> DotResult:
 		for tx in _counts.x:
 			_tiles.append(AABB(_origin + Vector3(tx * side, 0.0, tz * side), Vector3(side, height, side)))
 
-	tile_used = side
-	tiles_used = _tiles.size()
+	tile_cut = side
+	tiles_cut = _tiles.size()
 	DotLog.info(LOG, "navigation bake: the map is baked in tiles", {
 		"extent": "%.0fx%.0f m" % [bounds.size.x, bounds.size.z], "cells": grid_cells(bounds.size, cell),
 		"tile": snappedf(side, 0.001), "tiles": "%dx%d" % [_counts.x, _counts.y], "border": snappedf(pad, 0.001)})
@@ -243,7 +243,7 @@ func _joined(parts: Array[NavigationMesh]) -> DotResult:
 ## Welds the vertices on the tile lines and splits each seam edge at the other side's vertices, so
 ## the tiles share their edges. Returns how many triangles were split.
 func _stitch(vertices: PackedVector3Array, tris: PackedInt32Array) -> int:
-	var side := tile_used
+	var side := tile_cut
 	var near := mesh.cell_size * 0.25
 	var rise := maxf(mesh.agent_max_climb, mesh.cell_height * 2.0)
 	var count := vertices.size()
