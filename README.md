@@ -141,10 +141,10 @@ The two limits are what the network messages have room for (`game/zz_consumables
 
 ## Getting started
 
-You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:
+You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
 
 ```bash
-git clone https://github.com/modcommunity/dot-bootstrap.git
+git clone https://github.com/gamespice-platform/bootstrap.git
 cd dot-bootstrap
 ./bootstrap.sh
 cd projects/game-zombie-zone
@@ -167,7 +167,7 @@ The maps come from the zombie-zone-maps checkout, which bootstrap links into `ma
 | `./game.sh shot` | Save a screenshot to `screenshots/`. `tools/shot.sh` lists the views |
 | `./game.sh help` | All of the options |
 
-`online` and `server` use [dot-server-deploy](https://github.com/modcommunity/dot-server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
+`online` and `server` use [dot-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
 
@@ -225,13 +225,13 @@ zz_bots 1                      // 0 to turn the stand-ins off
 
 **Setup time and respawns (survival).** A survival map starts with a setup stage of `zz_prestart_time` seconds (the HUD counts it down as "Get ready"): no zombie exists in it, not a sleeper or a wanderer, and the horde and the map's own zombies appear when the first wave begins. `zz_respawn_on_wave_end` brings the dead back beside the team as each breather begins. Timed respawn (`zz_timed_respawn 1`, off by default) replaces the slow rescue clock: a survivor who dies returns after `delay = (base + per_wave x (wave - 1)) x lerp(scarce_scale, healthy_scale, fraction_up) x (1 + difficulty_step x (difficulty - 1))`, clamped to `[min, max]`, where `fraction_up` is the share of the other survivors still alive when they died (a healthy team brings them back sooner, a collapsing one later), and they are invulnerable for `zz_respawn_protect` seconds. The formula is `ZzRespawn.delay` in `game/zz_respawn.gd`. Start-early-when-all-ready is not built.
 
-Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-char](https://github.com/modcommunity/dot-player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
+Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-char](https://github.com/gamespice-platform/player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
 
 **The trader, the navigation graph and the ambience.** Each survivor can start a map with points (`zz_start_points`) and spend them at a trader during the setup window (`zz_trader`, `zz_trader_when`, `zz_trader_despawn`): E near it opens a menu of weapons, grenades, ammo, supplies and deployable boxes, and the server prices and sells ([operators](docs/operators.md#the-trader-at-the-start)). A large map's navigation graph takes a minute or more to build, so a hosted game builds it off the frame (`zz_nav_threads` worker tasks, or `zz_nav_budget_ms` slices with 0), shows a percentage while the round waits to start, and keeps the finished graph in `user://nav_cache` (`zz_nav_cache`, on by default) for the next time. Each map plays a mood of creepy ambience under its sound (`zz_ambient`, `zz_ambient_volume`, `zz_ambient_frequency`, `zz_ambient_mood`); right mouse aims down the sights, with the numbers set in `cfg/addon/zee_weapons/ads.yml` and sent to every player.
 
 Converted maps may carry moving doors and lifts, buttons, timers and counters, and hurt, teleport, push and gravity zones from the source map; the server runs them. Invisible clip boxes stop survivors and zombies but not bullets.
 
-The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
+The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
@@ -318,7 +318,7 @@ Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDI
 | Glass, water, lines | Drawn in code | none | in code |
 | Footsteps | Kenney, Impact Sounds | CC0 | `addons/dot_audio/stock/CREDITS.md` |
 | Ambience under each map (eight moods) | 51 recordings from OpenGameArt, normalised and looped with ffmpeg | CC0 | `addons/dot_audio/stock/moods/CREDITS.md` |
-| Toys (barrels, tyres, balls, a bowling set) | [dot-props](https://github.com/modcommunity/dot-props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
+| Toys (barrels, tyres, balls, a bowling set) | [dot-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
 
 If you made one of these assets and want it removed, open an issue.
 
