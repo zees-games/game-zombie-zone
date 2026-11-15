@@ -20,20 +20,9 @@ const ZzPaths := preload("../game/zz_paths.gd")
 
 const ZzTestToys := preload("zz_test_toys.gd")
 
-## Every map the game can be sent, built the way a server builds it and looked over for the
-## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
-## prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating,
-## an item out of reach, and — the one this game adds — ground the zombies cannot cross.
-##
-## [b]Why this exists apart from `headless_run`.[/b] The maps are generated in
-## zombie-zone-maps by `tools/build_maps.py`, and none of those mistakes stops a map: a
-## doorway the nav graph does not cross is a safe room no zombie ever enters, an objective
-## off the graph is a hold-out the horde never reaches, and a gate that does not cut the
-## graph is a barrier the horde walks through. The renders find the ugly ones; this finds the
-## rest, on every map, every time.
-##
-## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
-## Adding a map adds a section and CHECKS_PER_MAP checks.
+## Every map the game can be sent, built the way a server builds it and looked over for the mistakes a map document makes without any error: a spawn inside a wall or over nothing, a prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating, an item out of reach, and — the one this game adds — ground
+## the zombies cannot cross. [b]Why this exists apart from `headless_run`.[/b] The maps are generated in zombie-zone-maps by `tools/build_maps.py`, and none of those mistakes stops a map: a doorway the nav graph does not cross is a safe room no zombie ever enters, an objective off the graph is a hold-out the horde never reaches, and
+## a gate that does not cut the graph is a barrier the horde walks through. The renders find the ugly ones; this finds the rest, on every map, every time. Sections and checks are both counted; mg-smash-copter's notes say why the second matters. Adding a map adds a section and CHECKS_PER_MAP checks.
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 
@@ -47,10 +36,9 @@ const WORLD_CHECKS := 4
 
 const LAMP_CHECKS := 8
 
-## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not
-## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
-## does: the delivered maps are checked wherever they are present, which is every machine
-## that has run dot-bootstrap. Sections and checks are counted against this list.
+## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not linked in (CI, which clones this
+## repository alone). As mg-deathrun's headless_courses does: the delivered maps are checked wherever they are present, which is
+## every machine that has run dot-bootstrap. Sections and checks are counted against this list.
 var _maps: Array = []
 
 var _worlds_read := 0
@@ -99,10 +87,9 @@ func _merge(logs: Array) -> void:
 	_check(entered == want, "the shards entered every section (%d of %d)" % [entered, want])
 	_report_sections(1, 1, 1, 2)
 
-## The height of the nav floor a point stands over, nearest the point's own height. The street maps
-## are flat at y=0, but an exodus map is converted at the source's heights (a deck at 22 m, a
-## stair, a bridge), and the graph's points are at those heights: a target flattened to 0 is 22 m
-## from every point and was "unreached" however well the ground joined.
+## The height of the nav floor a point stands over, nearest the point's own height. The street maps are flat at y=0, but an exodus
+## map is converted at the source's heights (a deck at 22 m, a stair, a bridge), and the graph's points are at those heights: a
+## target flattened to 0 is 22 m from every point and was "unreached" however well the ground joined.
 func _ground_y(doc: Dictionary, at: Vector3) -> float:
 	var best := 0.0
 	var found := false

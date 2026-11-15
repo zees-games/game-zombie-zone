@@ -24,13 +24,9 @@ const SolidProps := preload("../tools/solid_props.gd")
 
 const ZzPlayer := preload("../game/zz_player.gd")
 
-## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a
-## survivor up, a door blocks and opens, a button's outputs run after their delays, and a map
-## without a world has no moving parts.
-##
-## [b]Why the doors and links are tried on a made-up world as well.[/b] The real maps' doors are
-## mostly boxes or objective gates; the ones that are movers are driven by one button or by
-## walking up, so the chain (button, delay, relay, volume, lock) is only reachable in a fixture.
+## A converted map's lifts, doors, buttons and triggers: a lift on the real 4-way tunnel carries a survivor up, a door blocks and opens, a button's outputs run after their delays,
+## and a map without a world has no moving parts. [b]Why the doors and links are tried on a made-up world as well.[/b] The real maps' doors are mostly boxes or objective gates; the
+## ones that are movers are driven by one button or by walking up, so the chain (button, delay, relay, volume, lock) is only reachable in a fixture.
 
 const ZzPaths := preload("../game/zz_paths.gd")
 

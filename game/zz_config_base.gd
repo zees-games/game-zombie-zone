@@ -2,20 +2,11 @@ extends DotConfig
 
 const ZzCapsScript := preload("zz_caps.gd")
 
-## Every number this game has, layered like every other [DotConfig] in the family:
-## [code]exported defaults < JSON file < environment < command line[/code].
-##
-## [b]Metres and seconds.[/b] The maps are documents in the same units (see [ZzMapDoc]), so a
-## length a mapper writes and a length this file tunes against are the same number.
-##
-## [b]Every rule here is a default, not a decision.[/b] A server owner changes any of them in
-## `user://cfg/zombiezone.json`, an environment variable (`ZZ_DIFFICULTY`) or a flag
-## (`--zz-difficulty`), and the commonly turned ones are cvars as well (see
-## `ZzModule._add_tunables`). The defaults are the co-operative survival genre's: four people,
-## a horde that comes in waves, specials that punish whoever strays, and a down rather than a
-## death for the first two mistakes.
+## Every number this game has, layered like every other [DotConfig] in the family: [code]exported defaults < JSON file < environment < command line[/code]. [b]Metres and seconds.[/b] The maps are documents in the same units (see [ZzMapDoc]), so a length a mapper writes and a
+## length this file tunes against are the same number. [b]Every rule here is a default, not a decision.[/b] A server owner changes any of them in `user://cfg/zombiezone.json`, an environment variable (`ZZ_DIFFICULTY`) or a flag (`--zz-difficulty`), and the commonly turned ones
+## are cvars as well (see `ZzModule._add_tunables`). The defaults are the co-operative survival genre's: four people, a horde that comes in waves, specials that punish whoever strays, and a down rather than a death for the first two mistakes.
 
-# --- The HUD ----------------------------------------------------------------
+# The HUD
 
 @export_group("The HUD")
 ## The top-left list of team-mates with their health bars. Off by default: the Tab board
@@ -23,7 +14,7 @@ const ZzCapsScript := preload("zz_caps.gd")
 ## team. A server setting (`zz_team_roster`, replicated), so every client follows it.
 @export var team_roster: bool = false
 
-# --- The round -------------------------------------------------------------
+# The round
 
 @export_group("The round")
 
@@ -36,10 +27,9 @@ const ZzCapsScript := preload("zz_caps.gd")
 ## Seconds of warmup before the first round. 0 starts immediately.
 @export_range(0.0, 300.0, 1.0, "or_greater") var warmup_seconds: float = 10.0
 
-## Seconds the start area holds the director off, unless somebody leaves it first.
-##
-## [b]Leaving starts it, not the clock.[/b] A team that wants a minute to sort out its weapons
-## gets it; one that runs out at once is met at once. This is only the ceiling.
+## Seconds the start area holds the director off, unless somebody leaves it first. [b]Leaving starts
+## it, not the clock.[/b] A team that wants a minute to sort out its weapons gets it; one that runs out
+## at once is met at once. This is only the ceiling.
 @export_range(0.0, 600.0, 1.0, "or_greater") var start_grace_seconds: float = 60.0
 
 ## Seconds every survivor still standing must be inside the end area for the map to be won.
@@ -55,16 +45,13 @@ const ZzCapsScript := preload("zz_caps.gd")
 ## long as you can.
 @export_range(0.0, 7200.0, 10.0, "or_greater") var survive_seconds: float = 480.0
 
-# --- Survival ----------------------------------------------------------------
+# Survival
 
 @export_group("Survival")
 
-## How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]):
-## [codeblock]
-## waves    a breather, then wave after wave, each a crowd to kill and bigger than the last
-## nights   a day to get ready, then a night to live through, harder every night
-## clock    one stretch of time that gets worse the longer it runs (the old survival)
-## [/codeblock]
+## How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]): [codeblock] waves a breather, then wave after wave,
+## each a crowd to kill and bigger than the last nights a day to get ready, then a night to live through, harder every night
+## clock one stretch of time that gets worse the longer it runs (the old survival) [/codeblock]
 @export_enum("waves", "nights", "clock") var survival_style: int = 0
 
 ## Waves to clear, or nights to live through.
@@ -127,10 +114,9 @@ func setup_seconds() -> float:
 @export_range(0.0, 2.0, 0.01, "or_greater") var wave_growth: float = 0.22
 @export_range(0.0, 0.5, 0.005, "or_greater") var wave_growth_accel: float = 0.018
 
-## Specials a wave brings: one from the second wave plus this many for each wave past the
-## first, for every [member survivors_per_wave_special] survivors (never fewer than one share).
-## At 0.6 and four a share a team of twelve met thirteen specials in a third-wave hunters twist
-## and lost (zz-survival-retune-1; docs/survival.md).
+## Specials a wave brings: one from the second wave plus this many for each wave past the first, for every [member
+## survivors_per_wave_special] survivors (never fewer than one share). At 0.6 and four a share a team of twelve met
+## thirteen specials in a third-wave hunters twist and lost (zz-survival-retune-1; docs/survival.md).
 @export_range(0.0, 5.0, 0.05, "or_greater") var wave_specials_growth: float = 0.6
 @export_range(1.0, 32.0, 0.5, "or_greater") var survivors_per_wave_special: float = 6.0
 
@@ -161,7 +147,7 @@ func setup_seconds() -> float:
 @export_range(1.0, 2000.0, 5.0, "or_greater") var barricade_repair: float = 120.0
 @export_range(0.2, 10.0, 0.1, "or_greater") var barricade_repair_seconds: float = 2.0
 
-# --- Trader ------------------------------------------------------------------
+# Trader
 
 @export_group("Trader")
 
@@ -188,7 +174,7 @@ func setup_seconds() -> float:
 ## `zz_start_points`: the points every survivor starts a map with; -1 reads the file (per difficulty and mode).
 @export_range(-1, 1000000, 1.0, "or_greater") var start_points: int = -1
 
-# --- Difficulty ------------------------------------------------------------
+# Difficulty
 
 @export_group("Difficulty")
 
@@ -200,10 +186,9 @@ func setup_seconds() -> float:
 ## difficulty. The genre's answer to "spray into the crowd your friend is in".
 @export_range(0.0, 1.0, 0.01) var friendly_fire: float = 0.1
 
-## What a teammate's bullet does to you: 0 nothing, 1 the share above (friendly fire), 2 the
-## same but a NEW player's (under [member rookie_minutes] played) is reflected onto themselves
-## and the teammate they hit takes nothing, 3 everybody's is reflected. 2 by default: the player
-## who does not yet know to stop spraying pays for it, and a veteran's slip still hurts a friend.
+## What a teammate's bullet does to you: 0 nothing, 1 the share above (friendly fire), 2 the same but a NEW player's (under [member
+## rookie_minutes] played) is reflected onto themselves and the teammate they hit takes nothing, 3 everybody's is reflected. 2 by default:
+## the player who does not yet know to stop spraying pays for it, and a veteran's slip still hurts a friend.
 @export_enum("off", "on", "reflect new players", "reflect everybody") var friendly_fire_mode: int = 2
 
 ## Playtime under which a player is new, in minutes (lifetime where progress is kept, this
@@ -231,17 +216,16 @@ func setup_seconds() -> float:
 ## An exodus is a long walk and four survivors for the whole of it is a lonely one.
 @export_range(0, 24, 1, "or_greater") var exodus_team: int = 8
 
-# --- Navigation notes ------------------------------------------------------
+# Navigation notes
 
 ## Whether a built navigation graph is kept in `user://nav_cache` and loaded next time, keyed by
 ## the map's contents: a large map takes a minute or more to build and milliseconds to load.
 ## `zz_nav_cache`.
 @export var nav_cache: bool = true
 
-## Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large
-## map takes a minute or more to build. 1 builds on one background thread, more split the heavy passes
-## across that many; 0 (and every platform without threads) builds on the main thread in slices of
-## [member nav_budget_ms] a tick. `zz_nav_threads`.
+## Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes a minute or more
+## to build. 1 builds on one background thread, more split the heavy passes across that many; 0 (and every platform without
+## threads) builds on the main thread in slices of [member nav_budget_ms] a tick. `zz_nav_threads`.
 @export_range(0, 16, 1, "or_greater") var nav_threads: int = 2
 
 ## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
@@ -398,10 +382,9 @@ func setup_seconds() -> float:
 ## Seconds a stand-in that wants an item or a place may stay put, not firing or using anything, before it gives that goal up (and, with none, is put at its post). 0 off. `zz_bot_idle_seconds`.
 @export_range(0.0, 120.0, 1.0, "or_greater") var bot_idle_seconds: float = 12.0
 
-## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing
-## ones. The rest hold their posts; with every one walking to a single friend a ram at a dugout
-## downed all sixteen of the ballpark's team (docs/survival.md). 0: all of them, as an exodus map
-## does. `zz_bot_helpers`.
+## How many stand-ins answer a pinned or downed friend on a survival map: the nearest standing ones. The rest hold
+## their posts; with every one walking to a single friend a ram at a dugout downed all sixteen of the ballpark's
+## team (docs/survival.md). 0: all of them, as an exodus map does. `zz_bot_helpers`.
 @export_range(0, 16, 1, "or_greater") var bot_helpers: int = 2
 
 ## Metres within which any stand-in answers a pinned or downed friend on a survival map, however
@@ -413,13 +396,12 @@ func setup_seconds() -> float:
 ## factor could ask of it; room, not size, is what made its middle waves hard.
 @export var wave_alive_share_by_map: Dictionary = {"zz_stadium": 1.0, "zz_high_school": 0.55}
 
-## A survival map's waves are this many times the size the team asks for (map id to factor; a
-## map not named is 1.0). A bigger team has more guns per zombie than the count per survivor
-## makes up for, and the stand-ins answered the ballpark's every wave until this. `zz_wave_scale_<id>`
-## is not a cvar: it is a measured table (docs/survival.md).
+## A survival map's waves are this many times the size the team asks for (map id to factor; a map not named is 1.0). A bigger
+## team has more guns per zombie than the count per survivor makes up for, and the stand-ins answered the ballpark's every wave
+## until this. `zz_wave_scale_<id>` is not a cvar: it is a measured table (docs/survival.md).
 @export var wave_scale_by_map: Dictionary = {"zz_stadium": 5.0, "zz_high_school": 1.3, "zz_mall": 1.15, "zz_relief_camp": 0.85}
 
 ## The wave set `sv_waves` names (cfg/game/game-zombie-zone/waves/<id>.yml); empty lets the rotation entry, the map document or the cvars above decide.
 @export var waves_set: String = ""
 
-# --- The survivors ---------------------------------------------------------
+# The survivors

@@ -14,30 +14,9 @@ const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
 const ZzNavMeter := preload("zz_nav_meter.gd")
 
-## What a survivor needs on screen, and nothing that would make a dark street less dark.
-##
-## [codeblock]
-## bottom left    your health: real health green, borrowed health white over it; down, a red
-##                bleed bar and how many downs are left; your medkit and pills
-## left           the team: each name, their health, and whether they are up, down, held or dead
-## bottom right   what you are holding and how much is in it
-## top            the objective, a hold-out's clock, a survival map's clock
-## centre         the crosshair, what E would do, the bar of what you are holding E for,
-##                and the bar of somebody picking you up
-## right          what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12")
-## over it all    which way a hit came from; bile, a flash, fire, the last-life grey
-## [/codeblock]
-##
-## [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the
-## action is on NOW, from the same table the menu's Controls page edits.
-##
-## [b]The glance pieces are dot-ui's[/b]: health is a [DotVitals] (borrowed health as its
-## `bonus`, DOWN and DEAD as its `status`), the weapon a [DotAmmoCounter] (an endless reserve
-## as ∞), a hold-out's or a survival map's clock a [DotScoreStrip] under the title, the
-## medkit and pills [DotKeyHints], and every hit the server confirms a [DotHitMarker] and a
-## [DotDamageNumbers] number on the body. The number on the health plate is real health; the
-## borrowed part is the white length after it, which drains, and a number that included it
-## would fall on its own while nobody was hitting you.
+## What a survivor needs on screen, and nothing that would make a dark street less dark. [codeblock] bottom left your health: real health green, borrowed health white over it; down, a red bleed bar and how many downs are left; your medkit and pills left the team: each name, their health, and whether they are up, down, held or dead bottom right what you are holding and how much is in it top the objective, a hold-out's clock, a survival map's clock centre the crosshair, what E would do, the bar of what
+## you are holding E for, and the bar of somebody picking you up right what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12") over it all which way a hit came from; bile, a flash, fire, the last-life grey [/codeblock] [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the action is on NOW, from the same table the menu's Controls page edits. [b]The glance pieces are dot-ui's[/b]: health is a [DotVitals] (borrowed health as its `bonus`, DOWN and DEAD as
+## its `status`), the weapon a [DotAmmoCounter] (an endless reserve as ∞), a hold-out's or a survival map's clock a [DotScoreStrip] under the title, the medkit and pills [DotKeyHints], and every hit the server confirms a [DotHitMarker] and a [DotDamageNumbers] number on the body. The number on the health plate is real health; the borrowed part is the white length after it, which drains, and a number that included it would fall on its own while nobody was hitting you.
 
 const BLIND_FADE_SEC := 0.25
 
@@ -67,10 +46,9 @@ static func piece_theme() -> Theme:
 	t.set_color(&"good", type, HEALTH_COLOUR)
 	return t
 
-## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the
-## theme on the HUD's root now and at every theme change, and applies the player's HUD size.
-## Christian's first play test (2026-10-11) asked for a darker HUD a player can restyle in the
-## menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
+## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the theme on the HUD's root now and at
+## every theme change, and applies the player's HUD size. A play test asked for a darker HUD a player
+## can restyle in the menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
 var _menu: Object = null
 
 func follow_menu(menu: Object) -> void:

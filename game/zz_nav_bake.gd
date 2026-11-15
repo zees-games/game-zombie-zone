@@ -1,21 +1,8 @@
 extends DotBotNav
 
-## [DotBotNav] that bakes a map too big for one Recast grid in tiles and joins them into one mesh.
-##
-## Godot's baker refuses a bake whose cell grid is over 30 million cells ("suspiciously big") while
-## `navigation/baking/use_crash_prevention_checks` is on, and one Recast poly mesh holds under 65535
-## vertices. At ZZ's 0.1016 m cell (the survivors' radius in exactly 4 cells) rp_southside,
-## rp_asheville, gm_boreas, gm_vyten, gm_bigisland and gm_valley are over the first, and a wider cell
-## still baked nothing on rp_southside (the second). So such a map is baked at the same cell in square
-## tiles, each with a border of cells around it the way Recast's tiled meshes are (its regions end
-## exactly on the tile line), and the tiles are joined: the vertices two tiles share on a line are
-## welded, and a tile's edge along the line is split at the other side's vertices, so every seam
-## is a shared edge, the navigation server connects it, and the annotator sees one floor.
-##
-## A map within the budget bakes exactly as before (one grid, same mesh, same cache file). Nothing
-## is clamped: a tile size the engine would refuse, or a negative one, fails the bake saying so.
-##
-## A tiled bake in dot-bot itself would let this override go (nightly dotbot-nav-max-cells-1).
+## [DotBotNav] that bakes a map too big for one Recast grid in tiles and joins them into one mesh. Godot's baker refuses a bake whose cell grid is over 30 million cells ("suspiciously big") while `navigation/baking/use_crash_prevention_checks` is on, and one Recast poly mesh holds under 65535 vertices. At ZZ's 0.1016 m cell (the survivors' radius in exactly 4 cells) rp_southside, rp_asheville, gm_boreas, gm_vyten,
+## gm_bigisland and gm_valley are over the first, and a wider cell still baked nothing on rp_southside (the second). So such a map is baked at the same cell in square tiles, each with a border of cells around it the way Recast's tiled meshes are (its regions end exactly on the tile line), and the tiles are joined: the vertices two tiles share on a line are welded, and a tile's edge along the line is split at the other
+## side's vertices, so every seam is a shared edge, the navigation server connects it, and the annotator sees one floor. A map within the budget bakes exactly as before (one grid, same mesh, same cache file). Nothing is clamped: a tile size the engine would refuse, or a negative one, fails the bake saying so. A tiled bake in dot-bot itself would let this override go (nightly dotbot-nav-max-cells-1).
 
 const LOG := "zz.nav"
 
@@ -299,6 +286,12 @@ func _stitch(vertices: PackedVector3Array, tris: PackedInt32Array) -> int:
 	for i in tris.size():
 		tris[i] = _root_of(rep, tris[i])
 
+	return _split_seams(vertices, tris, on_x, on_z, sorted_x, sorted_z, rise)
+
+
+## Splits each triangle edge along a tile line at the line's other vertices inside it. Returns the splits.
+func _split_seams(vertices: PackedVector3Array, tris: PackedInt32Array, on_x: PackedInt32Array, on_z: PackedInt32Array,
+		sorted_x: Dictionary, sorted_z: Dictionary, rise: float) -> int:
 	# Split: a triangle's edge along a line gains every vertex of the line strictly inside it at its height.
 	var splits := 0
 	var out := PackedInt32Array()
@@ -360,11 +353,9 @@ static func _root_of(rep: PackedInt32Array, i: int) -> int:
 	return i
 
 
-## Welds the [param members] of one line: those in one [param cell] along axis [param along] and within
-## [param rise] of each other's height become one. The cell is the navigation map's own edge-merge
-## cell (its cell size), so no two seam vertices are left for the map to read as one point: the
-## detail mesh puts its edge samples at different places on the two sides of a seam, and two of
-## them a few centimetres apart would otherwise be "more than 2 edges in one rasterization space".
+## Welds the [param members] of one line: those in one [param cell] along axis [param along] and within [param rise] of each other's height become one. The cell is the
+## navigation map's own edge-merge cell (its cell size), so no two seam vertices are left for the map to read as one point: the detail mesh puts its edge samples at different
+## places on the two sides of a seam, and two of them a few centimetres apart would otherwise be "more than 2 edges in one rasterization space".
 static func _weld(members: Array, vertices: PackedVector3Array, rep: PackedInt32Array, along: int, cell: float, rise: float) -> void:
 	members.sort_custom(func(p: int, q: int) -> bool:
 		var cp := floori(vertices[p][along] / cell)

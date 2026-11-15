@@ -22,52 +22,9 @@ const ZzMechanics := preload("zz_mechanics.gd")
 ## Loaded, not preloaded: a client whose dot-map predates it still parses this file and draws a plain sheet.
 const WATER_SHADER_PATH := "res://addons/dot_map/surfaces/liquid.gdshader"
 
-## A map document, built: the building, the furniture, the lights and the sky.
-##
-## [b]The same document on every machine, and a server builds only what collides.[/b] Boxes
-## become one static body of box shapes on the world layer; props become one static body of
-## box shapes on the prop layer, each shape knowing which prop it is. A client also draws them.
-## A server draws nothing, so a dedicated server holds a few thousand shapes and no meshes.
-##
-## [b]Boxes are drawn batched, by material and by twelve-metre chunk.[/b] A school is a
-## thousand boxes, and a mesh per box is a thousand draw calls, which a browser does not give
-## you. One mesh per material is the other extreme and is wrong for a reason only the renderer
-## knows: the compatibility renderer the shell uses lights each mesh with at most eight omni
-## lights, so one floor mesh for the whole school would be lit by eight of its forty lamps and
-## every other room would be dark. A chunk is about a room, which is about a lamp.
-##
-## [b]Props are drawn as [MultiMeshInstance3D]s, one per model mesh.[/b] Two hundred chairs are
-## one draw call per chair mesh, not two hundred. They never move.
-##
-## [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
-## it.[/b] A tree is its trunk, branches and leaf clumps, a table its top and legs (dot-props'
-## [DotPropPieces], measured offline into `props/pieces.json`). What a shot stops on and what a
-## player walks into are the same shapes, so the two can never disagree about where the car is;
-## a zombie still paths round the prop's box, which only keeps it further off.
-##
-## [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an
-## objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`),
-## which come and go: broken by the horde, mended by the survivors ([method set_barricade]),
-## and drawn darker as they weaken so a defender sees which window is about to go.
-##
-## [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by
-## `tools/bake_lightmaps.sh`; dot-lighting's [DotLightBake]). Every opaque box batch carries a
-## second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only),
-## because the bake names its meshes by path and was made from this same code. A bake whose
-## fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
-## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked,
-## the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their
-## shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays
-## live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters
-## only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes), and
-## so are brushed-metal batches (`Shiny_<n>`): a lamp's highlight is what makes metal look like
-## metal and a lightmap holds diffuse light only, so metal stays live-lit. Everything that moves
-## (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by the LightmapGI probes
-## plus the live lamps. A lightmap ignores the Environment's ambient, and a closed room has no sky
-## for the bake's own sky term to show, so the bake makes every surface emit the ambient colour
-## (tools/lightmap_scenes.gd, `EMIT_BY_MAP`): the flat fill the live map has, with occlusion.
-## What a day raises is carried by `BAKED_DAY_EXPOSURE`. Glass and water are not in the bake. A
-## server never loads one ([member draw_world] is false).
+## A map document, built: the building, the furniture, the lights and the sky. [b]The same document on every machine, and a server builds only what collides.[/b] Boxes become one static body of box shapes on the world layer; props become one static body of box shapes on the prop layer, each shape knowing which prop it is. A client also draws them. A server draws nothing, so a dedicated server holds a few thousand shapes and no meshes. [b]Boxes are drawn batched, by material and by twelve-metre chunk.[/b] A school is a thousand boxes, and a mesh per box is a thousand draw calls, which a browser does not give you. One mesh per material is the other extreme and is wrong for a reason only the renderer knows: the compatibility renderer the shell uses lights each mesh with at most eight omni lights, so one floor mesh for the whole school would be lit by eight of its forty lamps and every other room would be dark. A chunk is about a room, which is about a lamp. [b]Props are drawn as [MultiMeshInstance3D]s, one per model mesh.[/b] Two hundred chairs are one draw call per chair mesh, not two hundred. They never move. [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
+## it.[/b] A tree is its trunk, branches and leaf clumps, a table its top and legs (dot-props' [DotPropPieces], measured offline into `props/pieces.json`). What a shot stops on and what a player walks into are the same shapes, so the two can never disagree about where the car is; a zombie still paths round the prop's box, which only keeps it further off. [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`), which come and go: broken by the horde, mended by the survivors ([method set_barricade]), and drawn darker as they weaken so a defender sees which window is about to go. [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by `tools/bake_lightmaps.sh`; dot-lighting's [DotLightBake]). Every opaque box batch carries a second UV set ([DotLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only), because the bake names its meshes by path and was made from this same code. A bake whose fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
+## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked, the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes), and so are brushed-metal batches (`Shiny_<n>`): a lamp's highlight is what makes metal look like metal and a lightmap holds diffuse light only, so metal stays live-lit. Everything that moves (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by the LightmapGI probes plus the live lamps. A lightmap ignores the Environment's ambient, and a closed room has no sky for the bake's own sky term to show, so the bake makes every surface emit the ambient colour (tools/lightmap_scenes.gd, `EMIT_BY_MAP`): the flat fill the live map has, with occlusion. What a day raises is carried by `BAKED_DAY_EXPOSURE`. Glass and water are not in the bake. A server never loads one ([member draw_world] is false).
 
 const CHANNEL := "zz.map"
 
@@ -84,10 +41,9 @@ const GROUND_DEPTH := 1.8
 ## A hidden box with no `kind` (an older document) this far above everything playable is a sky box.
 const SKY_CLEARANCE := 30.0
 
-## How far past the playable ground (the nav floors, spawns and route) the invisible boundary
-## stands, its thickness, and how far above the highest floor it reaches. A converted map's
-## boxes run far past what is walked on (ze_jurassicpark: 500 m of terrain round a 240 m play
-## area), and nothing stopped a survivor going out to the edge of the world.
+## How far past the playable ground (the nav floors, spawns and route) the invisible boundary stands, its thickness, and how far
+## above the highest floor it reaches. A converted map's boxes run far past what is walked on (ze_jurassicpark: 500 m of terrain
+## round a 240 m play area), and nothing stopped a survivor going out to the edge of the world.
 const BOUNDARY_MARGIN := 8.0
 
 const BOUNDARY_THICKNESS := 4.0

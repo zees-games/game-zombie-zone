@@ -227,28 +227,6 @@ func _wire_identity() -> void:
 	hook_post("player_avatar_changed", _on_profile)
 	hook_post("player_renamed", _on_profile)
 
-## What a session looks like: what dot-platform resolved for them, or the stock person.
-##
-## [b]Through the platform module's `player_for`, and never the hub by a key made here.[/b]
-## The hub keys a player by their scoped profile key, which only admission knows; a lookup
-## by `u<session>` finds nobody, every time, and falls through to stock — which reads as
-## "this player has no avatar" rather than as a wrong key. Duck-typed, because a server
-## without dot-platform is a configuration.
-func _avatar_for(session_id: int) -> DotAvatar:
-	var session := server.session_by_userid(session_id) if server != null else null
-	var platform: Object = server.modules.get_module("platform") \
-		if server != null and server.modules != null else null
-
-	if session != null and platform != null and platform.has_method("player_for"):
-		var player: Variant = platform.call("player_for", session)
-
-		if player is Object and (player as Object).get("avatar") is DotAvatar:
-			return (player as Object).get("avatar") as DotAvatar
-
-	if identity != null and identity.has_method("avatar_for"):
-		return identity.call("avatar_for", String(ZzNetBridge.player_key(session_id)))
-
-	return null
 
 func _on_profile(event: DotEvent) -> void:
 	var session_id := event.get_int("userid")
@@ -319,9 +297,6 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_nav_notes", 1.0 if config.nav_notes else 0.0,
 		"Annotate each map (drops, chokepoints, cover) after its bake and let bots and zombies use it; 0 off",
 		func(value: float) -> void: config.nav_notes = value > 0.5)
-	_tunable("zz_nav_notes_bake_tile", config.nav_notes_bake_tile,
-		"Metres a side of the tiles a navigation bake is cut into; 0 auto (tiles only past the engine's cell limit)",
-		func(value: float) -> void: config.nav_notes_bake_tile = value, [0, 0])
 	_tunable("zz_bot_open_boxes", 1.0 if config.bot_open_boxes else 0.0,
 		"Stand-ins pick up and open the boxes zombies drop; 0 leaves them to the humans",
 		func(value: float) -> void: config.bot_open_boxes = value > 0.5)
@@ -642,6 +617,9 @@ func _add_tunables_survival(world: ZzGame) -> void:
 
 func _add_tunables_survival_2(world: ZzGame) -> void:
 	var config := world.config
+	_tunable("zz_nav_notes_bake_tile", config.nav_notes_bake_tile,
+		"Metres a side of the tiles a navigation bake is cut into; 0 auto (tiles only past the engine's cell limit)",
+		func(value: float) -> void: config.nav_notes_bake_tile = value, [0, 0])
 
 	_tunable("zz_respawn_per_wave", config.respawn_per_wave_seconds, "Timed respawn: seconds added per wave after the first",
 		func(value: float) -> void: config.respawn_per_wave_seconds = value)

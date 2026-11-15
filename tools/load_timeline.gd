@@ -2,10 +2,9 @@ extends Node
 
 const ZzClientScript := preload("../game/zz_client.gd")
 
-## How long the solo client's loading cover stays up and which reasons hold it: prints the engine time each gate
-## reason (map, world, weapons, warm-up) clears, to compare a change to the load. Software GL: use xvfb-run, never
-## --headless (no weapon prewarm): `xvfb-run -a godot --path . --rendering-driver opengl3 res://tools/load_timeline.tscn`.
-## `-- --hitch-secs=N` (default 10, 0 = skip) records every frame of 50 ms or more for N seconds after the gate opens.
+## How long the solo client's loading cover stays up and which reasons hold it: prints the engine time each gate reason (map, world, weapons, warm-up) clears, to
+## compare a change to the load. Software GL: use xvfb-run, never --headless (no weapon prewarm): `xvfb-run -a godot --path . --rendering-driver opengl3
+## res://tools/load_timeline.tscn`. `-- --hitch-secs=N` (default 10, 0 = skip) records every frame of 50 ms or more for N seconds after the gate opens.
 
 
 func _ready() -> void:
