@@ -18,7 +18,7 @@ const ZzHazards := preload("../game/zz_hazards.gd")
 ## Stands in for the game: ZzTurrets reads only its `config`.
 class FakeGame:
 	var config = null
-const CHECKS := 72
+const CHECKS := 76
 
 
 func _ready() -> void:
@@ -225,7 +225,7 @@ func _caps() -> void:
 	_check(Caps.pair_refusal("zz_body_stride_near", 90.0, 45.0).contains("raise zz_body_stride_far"), "a body stride near over far is refused")
 	var strides := ZzConfig.new()
 	strides.body_stride_near = 90.0
-	_check(not Caps.config_refusal(strides).is_empty(), "config refuses body_stride_near over body_stride_far")
+	_check(not strides.validate().ok and str(strides.validate().error.message).contains("body_stride_far"), "config validation refuses body_stride_near over body_stride_far")
 	_check(Caps.refusal("zz_tick_rate", 241.0, none).contains("cap_overrides") and Caps.refusal("zz_tick_rate", 0.0, none) != "" and Caps.refusal("zz_tick_rate", 240.0, none) == "", "tick_rate 1..240 by default, refused loudly outside")
 	_check(Caps.refusal("zz_tick_rate", 480.0, Caps.parse_overrides("zz_tick_rate=0", errors)) == "", "cap_overrides zz_tick_rate=0 lifts the tick rate top")
 	# Map document limits: the old MAX_* are the defaults, 0 lifts one, an over-limit document is refused naming the setting.
@@ -240,6 +240,15 @@ func _caps() -> void:
 	Caps.set_doc_overrides("zz_map_objectives=0")
 	_check(ZzMapDoc.validate(doc).ok, "cap_overrides zz_map_objectives=0 lifts it")
 	Caps.set_doc_overrides("")
+	# A server tells its clients its effective limits; a client with default limits adopts them.
+	Caps.set_doc_overrides("zz_map_objectives=0,zz_tick_rate=480")
+	var told := Caps.advertise()
+	Caps.set_doc_overrides("")
+	_check(told.contains("zz_map_objectives=0") and told.contains("zz_tick_rate=480") and told.contains("zz_map_spawns=256"), "advertise lists the effective map limits and the tick rate top", told)
+	_check(Caps.adopt_advertised(told).is_empty() and Caps.doc_limit("zz_map_objectives") > 16 and Caps.refusal("zz_tick_rate", 400.0, Caps.doc_overrides) == "", "a client adopts what its server advertises")
+	_check(not Caps.adopt_advertised("zz_map_objectives=banana").is_empty() and Caps.doc_limit("zz_map_objectives") > 16, "an unreadable advertisement is an error and changes nothing")
+	Caps.set_doc_overrides("")
+	_check(Caps.doc_limit("zz_map_objectives") == 16, "limits are back to the defaults")
 
 
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.

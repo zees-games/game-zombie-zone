@@ -234,13 +234,16 @@ static func _read_pos(r: DotNetReader) -> Vector3:
 
 # Hello
 
-static func write_hello(player_id: int, tick_rate: int, server_tick: int, difficulty: int, max_incaps: int) -> PackedByteArray:
+static func write_hello(player_id: int, tick_rate: int, server_tick: int, difficulty: int, max_incaps: int, caps: String = "") -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
 	w.write_uint(tick_rate, 9)
 	w.write_varint(server_tick)
 	w.write_uint(clampi(difficulty, 0, 3), 2)
 	w.write_varint(maxi(max_incaps, 0))
+	# Appended after the first release: the server's map limits and tick rate top (ZzCaps.advertise). An older
+	# reader stops before it, an older writer sends none; never truncated (the length is the string's own).
+	w.write_string(caps, caps.to_utf8_buffer().size())
 	return w.to_bytes()
 
 
@@ -250,9 +253,10 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	var server_tick := r.read_varint()
 	var difficulty := r.read_uint(2)
 	var max_incaps := r.read_varint()
+	var caps := r.read_string(1 << 16) if r.ok() and not r.at_end() else ""
 	return {
 		"player_id": player_id, "tick_rate": tick_rate, "server_tick": server_tick,
-		"difficulty": difficulty, "max_incaps": max_incaps, "ok": r.ok(),
+		"difficulty": difficulty, "max_incaps": max_incaps, "caps": caps, "ok": r.ok(),
 	}
 
 

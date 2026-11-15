@@ -1,5 +1,7 @@
 extends "zz_net_bridge_state.gd"
 
+const ZzCaps := preload("../zz_caps.gd")
+
 func _exit_tree() -> void:
 	# The link and the runtime hold each other through broadcast; left, both outlive the process's exit.
 	if profile_link != null:
@@ -992,7 +994,7 @@ func _admit(peer_id: int) -> void:
 	var session_id := int(_player_of_peer[peer_id])
 
 	_tell(peer_id, ZzEvents.Kind.HELLO, ZzEvents.write_hello(
-		session_id, game.tick_rate, net.clock.tick, game.config.difficulty, game.config.max_incaps
+		session_id, game.tick_rate, net.clock.tick, game.config.difficulty, game.config.max_incaps, ZzCaps.advertise()
 	))
 
 	if profile_link != null:
@@ -1976,6 +1978,11 @@ func _apply_hello(reader: DotNetReader) -> void:
 		return
 
 	local_player_id = int(hello["player_id"])
+
+	# The server's map limits and tick rate top, before the tick rate and any map are checked against them.
+	if not String(hello["caps"]).is_empty() and not net.is_server:
+		for why in ZzCaps.adopt_advertised(String(hello["caps"])):
+			DotLog.error(CHANNEL, "the server's limits are not usable", {"why": why})
 
 	# [b]The server's tick rate, before anything is derived from it.[/b] Another game in
 	# this family shipped with HELLO carrying this and nothing reading it: a browser client

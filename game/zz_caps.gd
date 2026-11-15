@@ -185,9 +185,27 @@ static func pair_refusal(cvar: String, value: float, partner_value: float) -> St
 	return ""
 
 
-## Empty when the low/high pairs of [param config] that [method ZzConfig.validate] does not check are in order, else the refusal to log.
-## (The body strides: a near that passed its far made the middle stride unreachable, silently.)
-static func config_refusal(config: Object) -> String:
-	if float(config.get("body_stride_near")) > float(config.get("body_stride_far")):
-		return "body_stride_near is over body_stride_far; raise body_stride_far or lower body_stride_near."
-	return ""
+
+## The limits a server tells its clients (HELLO): every zz_map_* limit and the tick rate's top, as
+## effective values in `cap_overrides` form (0 unlimited), so a client accepts a map or a rate its
+## server allows instead of refusing it under its own defaults.
+static func advertise() -> String:
+	var parts := PackedStringArray()
+	for key in DOC_LIMITS:
+		parts.append("%s=%d" % [key, 0 if doc_limit(key) == 0x7fffffffffffffff else doc_limit(key)])
+	var rate := highest("zz_tick_rate", doc_overrides)
+	parts.append("zz_tick_rate=%d" % (0 if rate == INF else int(rate)))
+	return ",".join(parts)
+
+
+## A client takes its server's [method advertise]d limits over its own for those keys (the rest of its
+## `cap_overrides` stays). A text that does not parse comes back as errors and changes nothing.
+static func adopt_advertised(text: String) -> PackedStringArray:
+	var errors := PackedStringArray()
+	var told := parse_overrides(text, errors)
+	if not errors.is_empty():
+		return errors
+	for key in told:
+		if DOC_LIMITS.has(key) or key == "zz_tick_rate":
+			doc_overrides[key] = told[key]
+	return errors

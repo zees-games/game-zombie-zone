@@ -96,6 +96,36 @@ dot-team's block rules are on when the addon is linked: survivors pass through e
 
 Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/addon/zee_weapons/ads.yml` is the shipped default and `cfg/server/addons/zee_weapons/ads.yml` overrides it per server. Under `ads: default:` the keys are `enabled`, `aim_time` and `zoom` (0 takes the weapon's own art; zoom is a field-of-view multiplier), `move_speed_multiplier` (walk pace while aimed, 0.8), `spread_multiplier` (0.6), `sway_multiplier` (0.5), `toggle` (hold or press-to-toggle), `view_scale` and `view_shift_x/y/z` (the drawn gun's size and offset); a `weapons:` block overrides only the keys it lists, by weapon id. **The numbers the simulation reads cross to every client** as the replicated cvar `zee_ads_rules` (a JSON line: `enabled`, `aim_time`, `move_speed_multiplier` and `spread_multiplier`, default and per weapon), so a client predicts the server's pace and spread; set it live with `zee_ads_rules '<json>'`, or edit the yml. The other keys (`zoom`, `sway_multiplier`, `toggle`, `view_*`) are the player's view and stay local. **The wire changed**: the aim bit is `ZzNetCommand.ACT_AIM` and `ACT_BITS` went from 5 to 6, so a client and a server must be the same build (the server applies the pace and the tighter spread from that bit, and the client predicts the same pace).
 
+## Limits and `cap_overrides`
+
+`cap_overrides` (a `game.yml` setting, `config_world`) lifts or sets the highest value of a limit, as `zz_waves=0,zz_map_objectives=0,zz_tick_rate=480`: `0` is no limit, a key not listed keeps its default, and a value or a map past a limit is refused with an error naming the key, never clamped. An entry that is not `<key>=<number>` is an error too. Besides the capped cvars (`game/zz_caps.gd` `RANGES`, each with its [low, high]; only the high end can be set) there are these keys:
+
+| Key | Default |
+| --- | --- |
+| `zz_map_boxes` | 400000 |
+| `zz_map_props` | 20000 |
+| `zz_map_toys` | 96 |
+| `zz_map_loose` | 256 |
+| `zz_map_supports` | 128 |
+| `zz_map_lights` | 16384 |
+| `zz_map_water` | 256 |
+| `zz_map_solid_props` | 200000 |
+| `zz_map_spawns` | 256 |
+| `zz_map_items` | 4000 |
+| `zz_map_objectives` | 16 |
+| `zz_map_route` | 2048 |
+| `zz_map_nav_floors` | 50000 |
+| `zz_map_nav_links` | 50000 |
+| `zz_map_sleepers` | 256 |
+| `zz_map_areas` | 64 |
+| `zz_map_team` | 64 |
+| `zz_map_posts` | 64 |
+| `zz_map_caches` | 32 |
+| `zz_map_barricades` | 96 |
+| `zz_tick_rate` | 240 (lowest 1) |
+
+The `zz_map_*` keys are how many of each a map document may hold; the file format and the wire are unchanged. The server tells every client its `zz_map_*` limits and its `zz_tick_rate` top in HELLO (an additive trailing field: an older client ignores it, an older server sends none and the client keeps its own), so a client with default limits builds a bigger map and runs the faster rate a lifted server sends. `body_stride_near` over `body_stride_far` is refused when the configuration is validated.
+
 ## Large servers: players, the horde and threads
 
 Everything here defaults to the small-server behaviour and changes live (console, rcon, the workbench's Game settings, or a key in `cfg/server/game/game-zombie-zone/config/game.yml`).

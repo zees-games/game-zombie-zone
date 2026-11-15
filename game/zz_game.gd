@@ -74,11 +74,6 @@ func _ready() -> void:
 		DotLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
 		return
 
-	var pair_why := ZzCapsScript.config_refusal(config)
-	if not pair_why.is_empty():
-		DotLog.error(CHANNEL, "the configuration is not usable", {"why": pair_why})
-		return
-
 	var rate_why := ZzCapsScript.refusal("zz_tick_rate", float(tick_rate), ZzCapsScript.doc_overrides)
 	if not rate_why.is_empty():
 		DotLog.error(CHANNEL, rate_why, {"setting": "tick_rate"})

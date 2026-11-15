@@ -6,7 +6,7 @@ extends "headless_net_late.gd"
 ## arrives, moves where the server moves it and goes away when it dies. Sections and checks are both counted.
 
 const SECTIONS := 36
-const CHECKS := 246
+const CHECKS := 248
 
 
 func _ready() -> void:
@@ -101,6 +101,10 @@ func _test_the_codec() -> void:
 	_check(bool(hello["ok"]) and int(hello["player_id"]) == SESSION and int(hello["tick_rate"]) == 64
 		and int(hello["server_tick"]) == 1234 and int(hello["difficulty"]) == 2 and int(hello["max_incaps"]) == 3,
 		"HELLO", str(hello))
+
+	var hello_caps := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 64, 1234, 2, 3, "zz_map_objectives=0,zz_tick_rate=480")))
+	_check(bool(hello_caps["ok"]) and str(hello_caps["caps"]) == "zz_map_objectives=0,zz_tick_rate=480" and int(hello_caps["max_incaps"]) == 3, "HELLO carries the server's advertised limits", str(hello_caps))
+	_check(str(hello["caps"]).is_empty(), "a HELLO without limits reads as none")
 
 	var doc := ZzCatalogue.practice()
 	var sent := ZzEvents.read_map(_r(ZzEvents.write_map(ZzMapDoc.encode(doc))))

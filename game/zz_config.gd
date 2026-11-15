@@ -551,9 +551,10 @@ extends "zz_config_base.gd"
 
 @export_group("Netcode")
 
-## The upper bounds the zz_* cvars clamped to, as `zz_waves=0,zz_nights=40` (see game/zz_caps.gd
-## for the cvars and their old highest values): 0 is no limit, a cvar not listed keeps its old
-## highest, a value past it is refused with an error, never clamped. Empty keeps every old default.
+## Highest of the capped zz_* cvars, the zz_map_* map limits and zz_tick_rate, `zz_waves=0,zz_map_objectives=0`: 0 is none.
+## docs/operators.md lists every key and default (game/zz_caps.gd has them); a key not listed keeps its
+## default, a value past it is refused with an error, never clamped. The server tells clients its zz_map_* limits and
+## zz_tick_rate, so a client takes a map or a rate the server allows. Empty keeps every default.
 @export var cap_overrides: String = ""
 
 ## Metres within which a survivor is sent a common's and a special's updates (live). A client hides
@@ -726,6 +727,10 @@ func validate() -> DotResult:
 
 	if brute_interval_min > brute_interval_max:
 		return DotResult.fail(DotError.CODE_INVALID, "brute_interval_min is over brute_interval_max; raise the max or lower the min.")
+
+	if body_stride_near > body_stride_far:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"body_stride_near is over body_stride_far; raise body_stride_far or lower body_stride_near.")
 
 	if respawn_min_seconds > respawn_max_seconds:
 		return DotResult.fail(DotError.CODE_INVALID,
