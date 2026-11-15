@@ -66,7 +66,7 @@ func _run() -> void:
 	game.set_physics_process(false)
 	await get_tree().physics_frame
 	game.next_map_id = _map
-	var doc: Dictionary = game.catalogue.maps.get(_map, {})
+	var doc: Dictionary = game.catalogue.doc(_map)
 	var team := maxi(int(doc.get("survivors", 4)), 1)
 
 	for i in team:

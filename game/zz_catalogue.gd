@@ -41,6 +41,11 @@ var _order: Array[StringName] = []
 ## round plays one map. Off natively, where every document is read up front as it always was.
 var lazy: bool = OS.has_feature("web")
 
+## Whether a document whose cached copy is current is held as a stand-in too (see [member lazy]):
+## the copy proves it validated, so it is read whole only when played. Off: every document is
+## loaded at start. Skipped when [member doc_cache_dir] is "".
+var stub_from_cache: bool = true
+
 ## id -> the file a stub was peeked from, and the stubs themselves (what [member maps] holds
 ## for a map whose document is not read), so a map that was read can be put back.
 var _files: Dictionary = {}
@@ -120,7 +125,11 @@ func _read_directory(root: String) -> int:
 	var loaded := 0
 
 	for file in files:
-		if lazy:
+		# A document the cache holds current was read and validated by this very normaliser on an
+		# earlier start, so its head stands in for it: the whole document (up to 21 MB of JSON, 97 MB
+		# over the pack) is read when a round needs it ([method doc]), not at every start. A document
+		# with no current copy is read, validated and refused or cached exactly as before.
+		if lazy or (stub_from_cache and _cache_current(root, file)):
 			var stub := _peek(root.path_join(file))
 
 			if not stub.is_empty() and _add(stub, file):
@@ -180,6 +189,22 @@ func _cache_read(root: String, file: String) -> Dictionary:
 
 	var doc: Variant = f.get_var()
 	return doc if typeof(doc) == TYPE_DICTIONARY else {}
+
+
+## Whether the cache holds a copy of [param file] that is current, without loading it.
+func _cache_current(root: String, file: String) -> bool:
+	var path := _cache_path(root, file)
+
+	if path == "" or not FileAccess.file_exists(path):
+		return false
+
+	var f := FileAccess.open(path, FileAccess.READ)
+
+	if f == null:
+		return false
+
+	var head: Variant = f.get_var()
+	return typeof(head) == TYPE_STRING and head == _cache_key(root, file)
 
 
 func _cache_write(root: String, file: String, doc: Dictionary) -> void:
@@ -269,7 +294,14 @@ func doc(id: StringName) -> Dictionary:
 		if other != id and maps.has(other) and not maps[other].get("_stub", false):
 			_hold(other, _stubs[other])
 
-	var parsed := ZzMapDoc.parse_json(FileAccess.get_file_as_string(str(_files[id])), str(_files[id]))
+	var file := str(_files[id])
+	var cached := _cache_read(str(roots[id]), file.get_file()) if not lazy and roots.has(id) else {}
+
+	if not cached.is_empty() and str(cached.get("id", "")) == String(id):
+		_hold(id, cached)
+		return cached
+
+	var parsed := ZzMapDoc.parse_json(FileAccess.get_file_as_string(file), file)
 
 	if not parsed.ok:
 		refused[str(_files[id]).get_file()] = parsed.error.message

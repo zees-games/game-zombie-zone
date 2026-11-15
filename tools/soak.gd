@@ -80,7 +80,7 @@ func _run() -> void:
 	_game.set_physics_process(false)
 	await get_tree().physics_frame
 
-	var doc: Dictionary = _game.catalogue.maps.get(map_id, {}) if _game.catalogue != null else {}
+	var doc: Dictionary = _game.catalogue.doc(map_id) if _game.catalogue != null else {}
 	if doc.is_empty():
 		await _release_game()
 		_fail("no map %s" % map_id)

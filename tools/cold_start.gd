@@ -73,7 +73,7 @@ func _run() -> void:
 	var t_ready := _ms(t0)
 	await get_tree().physics_frame
 
-	var doc: Dictionary = game.catalogue.maps.get(map_id, {}) if game.catalogue != null else {}
+	var doc: Dictionary = game.catalogue.doc(map_id) if game.catalogue != null else {}
 	if doc.is_empty():
 		printerr("COLDSTART no map %s" % map_id)
 		get_tree().quit(2)

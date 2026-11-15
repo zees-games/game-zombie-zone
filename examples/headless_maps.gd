@@ -190,7 +190,7 @@ func _test_the_catalogue() -> void:
 	_finished()
 
 
-const LAZY_CHECKS := 8
+const LAZY_CHECKS := 8 + 9
 
 
 ## The browser's catalogue holds a name and a mode per map and reads one whole document at a
@@ -213,6 +213,7 @@ func _test_lazy_catalogue() -> void:
 
 	var eager := ZzCatalogue.new()
 	eager.lazy = false
+	eager.stub_from_cache = false
 	var lazy := ZzCatalogue.new()
 	lazy.lazy = true
 	_check(eager.add_directory(dir) == 2 and lazy.add_directory(dir) == 2, "both read the two documents")
@@ -230,6 +231,7 @@ func _test_lazy_catalogue() -> void:
 	var drawn := lazy.next_map(PackedStringArray(["lz_a"]), false, null, &"")
 	_check(drawn.has("boxes") and str(drawn["id"]) == "lz_a", "the next-map draw hands back a whole document")
 	_check(lazy.playable(PackedStringArray()).size() == 2, "both are playable")
+	_test_cached_stubs(dir)
 	var gone := DirAccess.open(dir)
 
 	for file in gone.get_files():
@@ -399,7 +401,7 @@ func _test_baked_light() -> void:
 			unbaked.append(id)
 			continue
 		var map := ZzMap.new()
-		map.doc = game.catalogue.maps.get(StringName(id), {})
+		map.doc = game.catalogue.doc(StringName(id))
 		var data := load(path) as LightmapGIData
 		baked.append(id)
 		# The bake step trims the prop casters (tools/lightmap_trim.gd): a client builds no such node.
@@ -1006,3 +1008,58 @@ func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
 			return true
 
 	return false
+
+
+## A document the cache holds current is held as a stand-in at the next start, and read whole only
+## when played; one the cache has nothing current for is read and validated, so a bad one is still
+## refused up front. Nine checks.
+func _test_cached_stubs(dir: String) -> void:
+	var cache := dir + "_cache"
+	var _c := DirAccess.make_dir_recursive_absolute(cache)
+	var first := ZzCatalogue.new()
+	first.doc_cache_dir = cache
+	_check(first.add_directory(dir) == 2 and not (first.maps[&"lz_a"] as Dictionary).has("_stub"),
+		"the first start reads every document whole and caches it")
+	var again := ZzCatalogue.new()
+	again.doc_cache_dir = cache
+	_check(again.add_directory(dir) == 2 and (again.maps[&"lz_a"] as Dictionary).get("_stub", false)
+		and (again.maps[&"lz_b"] as Dictionary).get("_stub", false), "the next start holds both as stand-ins")
+	_check(again.display_name(&"lz_a") == "Lazy lz_a" and again.playable(PackedStringArray()).size() == 2,
+		"a stand-in still names and offers the map")
+	var whole := again.doc(&"lz_a")
+	_check(whole.has("boxes") and ZzMapDoc.digest(whole) == ZzMapDoc.digest(first.maps[&"lz_a"]),
+		"doc() hands back the whole document, the one the first start read")
+	var off := ZzCatalogue.new()
+	off.doc_cache_dir = cache
+	off.stub_from_cache = false
+	var _n := off.add_directory(dir)
+	_check(not (off.maps[&"lz_a"] as Dictionary).has("_stub"), "stub_from_cache off reads every document up front")
+	# A changed file has no current copy: it is read whole, validated and the copy replaced.
+	var path := dir.path_join("lz_a.json")
+	var text := FileAccess.get_file_as_string(path)
+	var changed := FileAccess.open(path, FileAccess.WRITE)
+	changed.store_string(text.replace("Lazy lz_a", "Lazy lz_a changed"))
+	changed.close()
+	var stale := ZzCatalogue.new()
+	stale.doc_cache_dir = cache
+	var _m := stale.add_directory(dir)
+	_check(not (stale.maps[&"lz_a"] as Dictionary).has("_stub") and (stale.maps[&"lz_b"] as Dictionary).get("_stub", false),
+		"a changed file is read whole again, an unchanged one stays a stand-in")
+	_check(str(stale.maps[&"lz_a"]["name"]) == "Lazy lz_a changed", "and the new text is what the catalogue holds")
+	# A file that does not validate is never cached, so it is refused at every start.
+	var bad := FileAccess.open(dir.path_join("lz_bad.json"), FileAccess.WRITE)
+	bad.store_string(text.replace("\"id\": \"lz_a\"", "\"id\": \"Not An Id\""))
+	bad.close()
+
+	for _i in 2:
+		var refusing := ZzCatalogue.new()
+		refusing.doc_cache_dir = cache
+		var _r := refusing.add_directory(dir)
+		_check(refusing.refused.has("lz_bad.json"), "an invalid document is refused at start %d" % (_i + 1))
+
+	var gone := DirAccess.open(cache)
+
+	for file in gone.get_files():
+		var _removed := gone.remove(file)
+
+	var _dropped := DirAccess.remove_absolute(cache)

@@ -148,7 +148,7 @@ func _run() -> void:
 	var team := 0
 	_game.next_map_id = _map
 	# The map's team, as a server with zz_team_from_map fills it.
-	var doc: Dictionary = _game.catalogue.maps.get(_map, {}) if _game.catalogue != null else {}
+	var doc: Dictionary = _game.catalogue.doc(_map) if _game.catalogue != null else {}
 	team = maxi(int(doc.get("survivors", 4)), 1)
 	for i in team:
 		var player := _game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)

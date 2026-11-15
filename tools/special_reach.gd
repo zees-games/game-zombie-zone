@@ -409,7 +409,7 @@ func _built(id: String) -> Node:
 	game.set_physics_process(false)
 	await get_tree().physics_frame
 	game.next_map_id = StringName(id)
-	var doc: Dictionary = game.catalogue.maps.get(StringName(id), {})
+	var doc: Dictionary = game.catalogue.doc(StringName(id))
 
 	for i in maxi(int(doc.get("survivors", 4)), 1):
 		var player = game.add_player(StringName("u%d" % (100 + i)), "Bot%d" % i)

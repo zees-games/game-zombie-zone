@@ -94,7 +94,7 @@ func _run() -> void:
 		map.draw_world = true
 		add_child(map)
 		ZzMap.use_bakes = false
-		var built := map.build(catalogue.maps[id])
+		var built := map.build(catalogue.doc(id))
 
 		if not built.ok:
 			printerr("LIGHTMAP_SCENE fail %s %s" % [id, built.error.message])
