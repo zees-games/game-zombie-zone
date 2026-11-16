@@ -471,6 +471,23 @@ func _add(doc: Dictionary, origin: String) -> bool:
 	return true
 
 
+## id -> the user://maps file of each map dropped this run (ZzMapDrop), which a later drop may replace.
+var dropped: Dictionary = {}
+
+
+## A map dropped on the game (ZzMapDrop): [param document], already checked by [method ZzMapDoc.parse_json] and
+## copied to [param path] in [constant USER_MAPS], joins at once, whole (never a stand-in), replacing an earlier drop.
+func add_dropped(document: Dictionary, path: String) -> void:
+	dropped[StringName(str(document["id"]))] = path
+	var id := StringName(str(document["id"]))
+	maps[id] = document
+	roots[id] = USER_MAPS
+	var _was_file := _files.erase(id)
+	var _was_stub := _stubs.erase(id)
+	var _was_refused := refused.erase(path.get_file())
+	_rebuild_order()
+
+
 func _rebuild_order() -> void:
 	_order.clear()
 

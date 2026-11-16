@@ -66,6 +66,7 @@ func _ready() -> void:
 	_build_chat()
 	_build_audio()
 	_build_settings()
+	map_drop = ZzMapDrop.attach(self, game, _say_drop)
 	_build_touch()
 	_build_killcam()
 	_build_world_view()
@@ -289,6 +290,14 @@ func _read_box_colours() -> void:
 
 
 # Offline
+
+## A dropped map's line: in the chat, or the log before there is one.
+func _say_drop(line: String) -> void:
+	if chat != null:
+		chat.notice(line)
+	else:
+		print(line)
+
 
 func _start_offline() -> void:
 	_fill_offline_team()

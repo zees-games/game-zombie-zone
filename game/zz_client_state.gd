@@ -18,6 +18,7 @@ const ZzBlood := preload("zz_blood.gd")
 const ZzBreakFx := preload("zz_break_fx.gd")
 const ZzServices := preload("zz_services.gd")
 const ZzNetBridge := preload("net/zz_net_bridge.gd")
+const ZzMapDrop := preload("zz_map_drop.gd")
 const ZzNetCommand := preload("net/zz_net_command.gd")
 const ZzConfig := preload("zz_config.gd")
 const ZzGame := preload("zz_game.gd")
@@ -60,6 +61,8 @@ const CHASE_UP := 0.6
 @export_range(0, 12, 1, "or_greater") var offline_bots: int = 3
 
 var game: ZzGame = null
+## Maps dropped on the window or the executable, or named by --map-path= (null on dot-map older than API 26).
+var map_drop: Node = null
 var player: ZzPlayer = null
 ## The flashlight on the eye and the other survivors' beams (dot-flashlight); the server owns on/off.
 var flash: DotFlashlight = null
