@@ -6,7 +6,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 
 ## A survivor's motor in dot-sim ([member DotFpsMotor.native_tick], on by default) moves as the script motor: same
 ## seeded inputs, under every modifier (limp, tag, boxes, knocks, down, busy), same bytes every tick, whole or halved.
-## Without the library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
+## Without the library the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 3
 const CHECKS := 6
@@ -33,7 +33,7 @@ func _run() -> void:
 	var loaded := DotFpsPhysicsBody.native_full_available()
 	if not loaded:
 		print("  dot-sim's motor module is not loaded: the native half is skipped")
-		_check(OS.get_environment("DOT_SIM_REQUIRE_NATIVE") != "1", "the library is loaded (DOT_SIM_REQUIRE_NATIVE=1)")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, SECTIONS - 2, 2)
 		return

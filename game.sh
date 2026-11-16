@@ -23,7 +23,7 @@
 #   --no-parse       skip the parse pass in `test`
 #
 # `online` and `server` use dot-server-deploy, found next to this repository (or at
-# $DOT_SERVER_DEPLOY). dot-bootstrap puts it there. Both rebuild this game's pack first, so
+# GS_SERVER_DEPLOY). dot-bootstrap puts it there. Both rebuild this game's pack first, so
 # what you play is what is on disk now.
 #
 # The same script is in every game repository; only the settings below differ. It is
@@ -107,8 +107,8 @@ Run dot-bootstrap, or in a git worktree: tools/link_worktree.sh <main checkout>"
 }
 
 deploy_dir() {
-    local dir="${DOT_SERVER_DEPLOY:-$ROOT/../dot-server-deploy}"
-    [ -x "$dir/server" ] || die "dot-server-deploy not found at $dir (run its ./setup.sh, or set DOT_SERVER_DEPLOY)." 2
+    local dir="${GS_SERVER_DEPLOY:-${DOT_SERVER_DEPLOY:-$ROOT/../dot-server-deploy}}"
+    [ -x "$dir/server" ] || die "dot-server-deploy not found at $dir (run its ./setup.sh, or set GS_SERVER_DEPLOY)." 2
     (cd "$dir" && pwd)
 }
 
@@ -122,10 +122,10 @@ pack_all() {
         echo "packing $id"
         (cd "$deploy" && ./server pack "$id" --source "$ROOT/../$repo") >/dev/null || die "could not pack $id"
     done
-    if [ "${DOT_PACK_ETC2_ASTC:-0}" = 1 ]; then
+    if [ "${GS_PACK_ETC2_ASTC:-${DOT_PACK_ETC2_ASTC:-0}}" = 1 ]; then
         # Mobile browsers: ETC2/ASTC variants too (bigger pack). dot-bootstrap's tool; default stays desktop only.
-        local mob="${DOT_BOOTSTRAP:-$ROOT/../dot-bootstrap}/tools/import-mobile.sh"
-        [ -x "$mob" ] || die "DOT_PACK_ETC2_ASTC=1 needs dot-bootstrap's tools/import-mobile.sh beside this game." 2
+        local mob="${GS_BOOTSTRAP:-${DOT_BOOTSTRAP:-$ROOT/../dot-bootstrap}}/tools/import-mobile.sh"
+        [ -x "$mob" ] || die "GS_PACK_ETC2_ASTC=1 needs dot-bootstrap's tools/import-mobile.sh beside this game." 2
         "$mob" "$GODOT" . >/dev/null 2>&1 || die "mobile import failed"
     else
         "$GODOT" --headless --path . --import >/dev/null 2>&1

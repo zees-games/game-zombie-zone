@@ -5,7 +5,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 
 ## The horde's crowd grid in dot-sim ([member ZzConfig.native_crowd], on by default) answers as dot-npc-ai's script
 ## grid over seeded crowds: same index, neighbours in order and spacing push to the bit, also after forgetting some.
-## Without the library the native half is skipped; [code]DOT_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
+## Without the library the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 3
 const CHECKS := 9
@@ -30,7 +30,7 @@ func _run() -> void:
 	_check(ZzConfig.new().native_crowd, "ZzConfig.native_crowd is on by default")
 	if not ClassDB.class_exists(NATIVE):
 		print("  dot-sim's crowd module is not loaded: the native half is skipped")
-		_check(OS.get_environment("DOT_SIM_REQUIRE_NATIVE") != "1", "the library is loaded (DOT_SIM_REQUIRE_NATIVE=1)")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, SECTIONS - 2, 2)
 		return
