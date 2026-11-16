@@ -527,6 +527,7 @@ func _advance_strike(striking: bool, delta: float) -> void:
 ## Sets the playback rate of a walk or run from the ground speed, so a planted foot stands still.
 func _pace_to_ground() -> void:
 	var clip := _want_clip
+	_paced = false
 	if clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"crawl":
 		var natural := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}[clip] as float
 		natural *= float(_look["height"]) / 1.75
@@ -543,16 +544,20 @@ func _pace_to_ground() -> void:
 				_want_rate = clampf(_speed / (natural * _stride), 0.35, cap)
 			else:
 				_want_rate = clampf(_speed / natural, 0.7, 1.8)
+			_paced = true
 
 
 ## Swaps a generic clip for the real animation-library one when the body has it.
 func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> void:
-	# Each common keeps its own tempo (plus or minus 15%) so a crowd does not step together.
 	_ual = false
 
 	if UAL_FOR.has(_want_clip) and _has(UAL_FOR[_want_clip]):
 		_want_clip = UAL_FOR[_want_clip]
-		_want_rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
+		# Each body keeps its own tempo (plus or minus 15%) so a crowd does not sway together, but not on a walk or run
+		# paced to the ground: there the rate is what keeps a planted foot still, and the body's own start phase
+		# already keeps a crowd out of step.
+		if not _paced:
+			_want_rate *= 0.85 + 0.3 * float((variant >> 3) & 15) / 15.0
 		_ual = true
 
 		if striking and _want_clip == &"ual_zombie_scratch":
@@ -837,6 +842,8 @@ func _pitch_limb(bone: String, angle: float) -> void:
 ## The shamble over the walk clip: stooped, head hung and lolling, short uneven steps with one foot
 ## dragged, the torso and hips rolling with each step. Numbers are per look ([constant SHAMBLE]).
 var _ual := false
+## The clip's rate was set from the ground speed this frame (_pace_to_ground), so a planted foot stands still.
+var _paced := false
 var _hit_left := 0.0
 var _hit_head := false
 var _rise_left := 0.0
