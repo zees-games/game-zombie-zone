@@ -140,6 +140,10 @@ func _ready() -> void:
 		for root in solo_map_dirs("maps"):
 			var _added := catalogue.add_directory(root)
 		var _rotation := load_rotation()
+		if authoritative and catalogue.maps.is_empty():
+			# A server with nothing to play is broken, not quiet: an old pack, or the map packs never installed.
+			DotLog.error(CHANNEL, "this game has no maps: nothing to play", {"directory": config.map_directory,
+				"fix": "install the map packs this version names (Reinstall the server), or publish a version that ships them"})
 		lap = _lap(&"catalogue", lap)
 		# Laid out now, not on the first round: a warmup on an empty world is indistinguishable
 		# from a map that failed to load.
@@ -1445,6 +1449,12 @@ func change_map_now(id: StringName) -> DotResult:
 		_lay_out_map()
 	DotLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
 	return DotResult.success(id)
+
+
+## The host's startup map (server.yml `map:`, `+map`, `sv_map`), duck-typed by dot-server-deploy's host,
+## which cannot name this game's classes: the same path as `map <id>` and the map menu.
+func start_on_map(id: StringName) -> DotResult:
+	return await change_map_in_tick(id)
 
 
 ## [method change_map_now] from a handler that runs between ticks (the map menu's `change_fn`):
