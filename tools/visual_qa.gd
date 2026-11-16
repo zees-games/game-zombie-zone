@@ -41,6 +41,9 @@ const SECONDS := {"idle": 1.0, "draw": 1.4, "sprint": 1.8, "ads": 1.6, "fire": 1
 ## view_pop_m: a hand or weapon part jumping between frames in the eye's frame; view_kick_m: the same while firing (a recoil
 ## kick is one impulse at any fps); hidden_frames: the weapon gone from the view outside a draw.
 const LIMITS := {"view_pop_m": 0.04, "view_kick_m": 0.09, "hidden_frames": 3}
+## A move is a pop only when it is this many times both neighbouring frames' moves: a draw, an aim or a reload moves a part
+## fast but smoothly, a pop is one frame's jump out of a still or slow pose.
+const POP_SPIKE := 2.5
 const PER_STEP: PackedStringArray = ["view_pop_m"]
 const PER_COUNT: PackedStringArray = ["hidden_frames"]
 ## The infected's pace on the stage: zz_npcs.gd's common walk and run. A special's own pace differs, so only the common one's
@@ -249,7 +252,14 @@ func _outside_view(main: Camera3D) -> SubViewport:
 
 ## shot_base.gd's _hold_exact: armed, its slot picked, then cycled until it is the one in hand.
 func _hold(id: StringName) -> bool:
+	# The capture holds every weapon in turn: the carry weight limit (the rig's, once armed) would refuse the heavy ones.
+	var rig: Object = _local.get("weapons")
+	if rig != null and (rig.get("arsenal") as Object).get("carry") != null:
+		(rig.get("arsenal") as Object).get("carry").set("enabled", false)
 	if not _game.call("arm", _local, id):
+		var why := String(_game.get("arm_failure"))
+		if not why.is_empty():
+			printerr("visual_qa: %s not armed: %s" % [id, why])
 		return false
 	var def := ZzWeapons.def_of(id)
 	_client.set("_slot", def.slot)
@@ -483,13 +493,18 @@ func _finish(count: int) -> void:
 		var top_at := -1
 		for n in range(1, _frames.size()):
 			var h := float(_frames[n].get("hop", 0.0))
+			var before := float(_frames[n - 1].get("hop", 0.0))
+			var after := float(_frames[n + 1].get("hop", 0.0)) if n + 1 < _frames.size() else 0.0
+			if h < POP_SPIKE * maxf(before, after):
+				continue
 			if h > top:
 				top = h
 				top_at = n
 		worst["view_hop_m"] = snappedf(top, 0.001)
 		if top > cap:
 			fail.append("view pop %.3f m > %.3f at #%d (%s)" % [top, cap, top_at, _frames[top_at].get("part", "")])
-		if _clip != "draw" and _subject != "avatar":
+		# Fists are bare hands: there is no weapon to hide.
+		if _clip != "draw" and _subject != "avatar" and _subject != "fists":
 			var run := 0
 			var longest := 0
 			var at := -1
