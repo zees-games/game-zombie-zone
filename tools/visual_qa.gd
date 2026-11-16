@@ -1,12 +1,12 @@
 extends SceneTree
 
-## The animation review (docs/anim-review.md), FC's loop on Zombie Zone: every weapon's clips in the survivor's hands, the
+## Zombie Zone's visual QA capture (docs/visual-qa.md; the loop is dot-game's docs/visual-qa.md): every weapon's clips in the survivor's hands, the
 ## survivor's own locomotion, and every infected kind's walk, run, attack, flinch and death, each saved frame by frame in three
-## views at --fps (60 by default) for tools/anim_review_shot.sh to turn into contact sheets and side-by-side clips.
+## views at --fps (60 by default) for tools/visual_qa_shot.sh (dot-game's shot tool) to turn into contact sheets and clips.
 ##   survivor: f = first person (the main viewport), t = behind-right of your own body, o = an opponent four metres in front.
 ##   infected: f = the victim's eye in front of it, t = behind-right, o = its right side in profile.
-## Per clip it prints `ANIMREVIEW {json}` (the verdict) and `ANIMFRAMES {json}` (every frame's numbers) on stdout.
-## User args: --out DIR --fps N [--only id,id|all|none] [--anims a,b] [--avatar] [--zombies kind,kind|all].
+## Per clip it prints `VISUALQA {json}` (the shared verdict line) and `ANIMFRAMES {json}` (every frame's numbers) on stdout.
+## User args: --out DIR --fps N [--only id,id|all|none] [--clips a,b] [--avatar] [--zombies kind,kind|all].
 ## --zombies runs the infected on a bare stage instead of the survivor in the offline client (one process cannot hold both).
 
 const ZzWeapons := preload("../game/zz_weapons.gd")
@@ -50,7 +50,7 @@ const ZOMBIE_SPEED := {"walk": 1.1, "run": 6.3, "attack": 0.0, "flinch": 0.0, "d
 var fps := 60
 ## Seconds to wait for the map's delivered world before capturing anyway (it fails loudly).
 const WORLD_WAIT_S := 400.0
-var _out := "res://screenshots/anim_review"
+var _out := "res://screenshots/visual_qa"
 var _only := "all"
 var _anims: PackedStringArray = []
 var _avatar := false
@@ -100,7 +100,7 @@ func _initialize() -> void:
 				fps = int(value)
 			"--only":
 				_only = value
-			"--anims":
+			"--anims", "--clips":
 				_anims = value.split(",", false)
 			"--zombies":
 				if value == "all":
@@ -117,7 +117,7 @@ func _initialize() -> void:
 				continue
 		i += 2
 	if fps < 15:
-		printerr("anim_review: --fps must be at least 15, not %d" % fps)
+		printerr("visual_qa: --fps must be at least 15, not %d" % fps)
 		quit(2)
 		return
 	if not _zombies.is_empty():
@@ -176,14 +176,14 @@ func _run_survivor() -> void:
 	# every frame, after which the outside views' THIRD comes a frame late: off for the capture, put back after.
 	var store: Object = (_client.get("settings") as Object).get("settings")
 	var legs: Variant = store.call("chosen_value", DotOwnBodySetting.KEY)
-	var _off: DotResult = store.call("set_value", DotOwnBodySetting.KEY, false, &"anim_review")
+	var _off: DotResult = store.call("set_value", DotOwnBodySetting.KEY, false, &"visual_qa")
 	# The delivered world draws after the round starts (bench.gd waits the same way): stood on before it, you fall.
 	var map: Object = _game.get("map")
 	var waited := 0
 	while not bool(map.get("world_drawn")) and str((map.get("doc") as Dictionary).get("world", "")) != "":
 		waited += 1
 		if waited > _count(WORLD_WAIT_S):
-			push_error("anim_review: the map's world was not drawn after %.0f s" % WORLD_WAIT_S)
+			push_error("visual_qa: the map's world was not drawn after %.0f s" % WORLD_WAIT_S)
 			break
 		await process_frame
 	var seat: Array = map.call("spawn", "survivors", 0)
@@ -227,7 +227,7 @@ func _run_survivor() -> void:
 		else:
 			_missing("all", "could not bring %s into hand" % held)
 	_release_all()
-	var _back: DotResult = store.call("set_value", DotOwnBodySetting.KEY, legs, &"anim_review")
+	var _back: DotResult = store.call("set_value", DotOwnBodySetting.KEY, legs, &"visual_qa")
 	_done = true
 
 
@@ -339,7 +339,7 @@ func _apply_buttons() -> void:
 
 
 func _missing(clip: String, why: String) -> void:
-	print("ANIMREVIEW " + JSON.stringify({"weapon": _subject, "anim": clip, "status": "missing", "why": why}))
+	print("VISUALQA " + JSON.stringify({"item": _subject, "clip": clip, "status": "skip", "why": why}))
 
 
 # --- capture --------------------------------------------------------------------------------------------------------------
@@ -514,10 +514,10 @@ func _finish(count: int) -> void:
 			notes.append(line)
 		else:
 			fail.append(line)
-	var verdict := {"weapon": _subject, "anim": _clip, "frames": count, "fps": fps, "pass": fail.is_empty(), "fail": fail,
+	var verdict := {"item": _subject, "clip": _clip, "frames": count, "fps": fps, "pass": fail.is_empty(), "fail": fail,
 		"notes": notes, "worst": worst}
-	print("ANIMREVIEW " + JSON.stringify(verdict))
-	print("ANIMFRAMES " + JSON.stringify({"weapon": _subject, "anim": _clip, "frames": _frames}))
+	print("VISUALQA " + JSON.stringify(verdict))
+	print("ANIMFRAMES " + JSON.stringify({"item": _subject, "clip": _clip, "frames": _frames}))
 
 
 # --- the infected ---------------------------------------------------------------------------------------------------------
