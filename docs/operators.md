@@ -124,7 +124,7 @@ Aiming down the sights (right mouse) is zee-dot-weapons' `ZeeAdsRules`: `cfg/add
 | `zz_map_barricades` | 96 |
 | `zz_tick_rate` | 240 (lowest 1) |
 
-The `zz_map_*` keys are how many of each a map document may hold; the file format and the wire are unchanged. The server tells every client its `zz_map_*` limits and its `zz_tick_rate` top in HELLO (an additive trailing field: an older client ignores it, an older server sends none and the client keeps its own), so a client with default limits builds a bigger map and runs the faster rate a lifted server sends. `body_stride_near` over `body_stride_far` is refused when the configuration is validated.
+The `zz_map_*` keys are how many of each a map document may hold; the file format and the wire are unchanged. The server tells every client its `zz_map_*` limits and its `zz_tick_rate` top in HELLO (an additive trailing field: an older client ignores it, an older server sends none and the client keeps its own; a tick rate over 511, which the 9-bit HELLO field cannot hold, is written as 0 there, which an older client refuses, and whole in one more trailing field after the limits, never truncated), so a client with default limits builds a bigger map and runs the faster rate a lifted server sends. `body_stride_near` over `body_stride_far` is refused when the configuration is validated.
 
 ## Large servers: players, the horde and threads
 

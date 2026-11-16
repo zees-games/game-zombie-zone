@@ -234,16 +234,28 @@ static func _read_pos(r: DotNetReader) -> Vector3:
 
 # Hello
 
+## Largest tick_rate the 9-bit field carries; above it the rate travels in a trailing varint after the caps.
+const HELLO_RATE_MAX := 511
+
 static func write_hello(player_id: int, tick_rate: int, server_tick: int, difficulty: int, max_incaps: int, caps: String = "") -> PackedByteArray:
+	if tick_rate < 1:
+		push_error("ZzEvents.write_hello: tick_rate %d is not a rate; HELLO not written" % tick_rate)
+		return PackedByteArray()
 	var w := _w()
 	w.write_varint(player_id)
-	w.write_uint(tick_rate, 9)
+	# 9 bits hold 1..511. A lifted zz_tick_rate above that is never truncated: the 9 bits then say 0, which an
+	# older client refuses loudly (no rate is 0), and the real rate follows the caps string.
+	w.write_uint(tick_rate if tick_rate <= HELLO_RATE_MAX else 0, 9)
 	w.write_varint(server_tick)
 	w.write_uint(clampi(difficulty, 0, 3), 2)
 	w.write_varint(maxi(max_incaps, 0))
 	# Appended after the first release: the server's map limits and tick rate top (ZzCaps.advertise). An older
 	# reader stops before it, an older writer sends none; never truncated (the length is the string's own).
 	w.write_string(caps, caps.to_utf8_buffer().size())
+	# Appended after the caps: the tick rate when it does not fit the 9 bits. Absent up to 511, so every other HELLO
+	# is byte-for-byte what it was, and an older reader stops before it.
+	if tick_rate > HELLO_RATE_MAX:
+		w.write_varint(tick_rate)
 	return w.to_bytes()
 
 
@@ -254,9 +266,16 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	var difficulty := r.read_uint(2)
 	var max_incaps := r.read_varint()
 	var caps := r.read_string(1 << 16) if r.ok() and not r.at_end() else ""
+	var wide_ok := true
+	if r.ok() and not r.at_end():
+		var wide := r.read_varint()
+		wide_ok = wide > HELLO_RATE_MAX
+		if wide_ok:
+			tick_rate = wide
+	# A rate of 0 with no wide field is a server that lifted the rate and wrote it somewhere this reader cannot see.
 	return {
 		"player_id": player_id, "tick_rate": tick_rate, "server_tick": server_tick,
-		"difficulty": difficulty, "max_incaps": max_incaps, "caps": caps, "ok": r.ok(),
+		"difficulty": difficulty, "max_incaps": max_incaps, "caps": caps, "ok": r.ok() and wide_ok and tick_rate >= 1,
 	}
 
 

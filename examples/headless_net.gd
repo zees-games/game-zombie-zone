@@ -6,7 +6,7 @@ extends "headless_net_late.gd"
 ## arrives, moves where the server moves it and goes away when it dies. Sections and checks are both counted.
 
 const SECTIONS := 36
-const CHECKS := 248
+const CHECKS := 253
 
 
 func _ready() -> void:
@@ -105,6 +105,18 @@ func _test_the_codec() -> void:
 	var hello_caps := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 64, 1234, 2, 3, "zz_map_objectives=0,zz_tick_rate=480")))
 	_check(bool(hello_caps["ok"]) and str(hello_caps["caps"]) == "zz_map_objectives=0,zz_tick_rate=480" and int(hello_caps["max_incaps"]) == 3, "HELLO carries the server's advertised limits", str(hello_caps))
 	_check(str(hello["caps"]).is_empty(), "a HELLO without limits reads as none")
+
+	var wide_hello := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 600, 1234, 2, 3, "zz_tick_rate=0")))
+	_check(bool(wide_hello["ok"]) and int(wide_hello["tick_rate"]) == 600 and str(wide_hello["caps"]) == "zz_tick_rate=0" and int(wide_hello["max_incaps"]) == 3, "HELLO carries a tick rate above 511 whole", str(wide_hello))
+	var edge_hello := ZzEvents.read_hello(_r(ZzEvents.write_hello(SESSION, 511, 1234, 2, 3)))
+	_check(bool(edge_hello["ok"]) and int(edge_hello["tick_rate"]) == 511, "HELLO 511 stays in the 9 bits", str(edge_hello))
+	_check(ZzEvents.write_hello(SESSION, 511, 1, 2, 3, "x").size() < ZzEvents.write_hello(SESSION, 512, 1, 2, 3, "x").size(), "HELLO at or under 511 has no extra field")
+	# An older client reads the 9 bits and stops: it must see 0 (refused by its rate check), never a truncated rate.
+	var old_r := _r(ZzEvents.write_hello(SESSION, 600, 1234, 2, 3, "zz_tick_rate=0"))
+	old_r.read_varint()
+	_check(old_r.read_uint(9) == 0, "an older reader sees 0 for a rate over 511, not 600 & 511")
+	var cut := ZzEvents.write_hello(SESSION, 600, 1234, 2, 3, "x")
+	_check(not bool(ZzEvents.read_hello(_r(cut.slice(0, cut.size() - 2)))["ok"]), "a cut-off wide HELLO is refused")
 
 	var doc := ZzCatalogue.practice()
 	var sent := ZzEvents.read_map(_r(ZzEvents.write_map(ZzMapDoc.encode(doc))))
