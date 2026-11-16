@@ -2034,7 +2034,7 @@ static func scope_view_zoom(hands: Object) -> float:
 
 ## weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the HUD
 ## fades its dot and shows a scope. Nobody aims down, held, dead, watching, in third person or
-## with the pointer free. Presentation only, as in the arena: the server's shot ignores it.
+## with the pointer free. Presentation only, as in Fatal Contact: the server's shot ignores it.
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	if hands != null:

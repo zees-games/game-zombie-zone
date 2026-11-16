@@ -119,5 +119,3 @@ Thumbs.db
 /reports/**/*.import
 /addons/dot_flashlight
 
-# Optional weapon pack (not a required dependency, so no leading slash)
-addons/arena_weapons

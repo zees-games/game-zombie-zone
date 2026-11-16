@@ -12,7 +12,7 @@ extends RefCounted
 ## the number keys pick a slot.
 ##
 ## [b]The right mouse button aims down the sights[/b] (zee's `ZeeViewModel.aim`, the family's
-## Aim row, as in the arena). It shoved until 2026-10-12, when the family gained aiming; the
+## Aim row, as in Fatal Contact). It shoved until 2026-10-12, when the family gained aiming; the
 ## shove kept F, which it always had.
 ##
 ## [b]H is help, in every game of the family[/b] (dot-menu adds the row). The medkit was on H

@@ -185,6 +185,11 @@ func _game_commands(world: ZzGame) -> void:
 		add_command(name, _cmd_reload, "Read the map directory again (from the next map)")
 	for name in world.command_names("zz_map"):
 		add_command(name, _cmd_map, "Play a map next: zz_map <id> (when this one ends)", "")
+	# The plain names every Source admin types: `map <id>` changes the map now (the map menu's path), `maps` lists them.
+	for name in world.command_names("map"):
+		add_command(name, _cmd_map_now, "Change the map now: map <id>", DotAdminFlags.CHANGEMAP)
+	for name in world.command_names("maps"):
+		add_command(name, _cmd_maps, "List the maps, and any refused file")
 	add_command("zz_rotation", _cmd_rotation,
 		"zz_rotation [name]: switch to a rotation in maps.yml, or list them", DotAdminFlags.CHANGEMAP)
 	add_command("zz_maps_reload", _cmd_maps_reload, "Re-read maps.yml", DotAdminFlags.CHANGEMAP)
@@ -1292,6 +1297,25 @@ func _cmd_map(ctx: DotCmdContext) -> void:
 
 	world.next_map_id = id
 	ctx.reply("%s is next, from the end of this round." % String(id))
+
+## `map <id>`: the map changes now, through the same path as the map menu ([method ZzGame.change_map_in_tick]).
+func _cmd_map_now(ctx: DotCmdContext) -> void:
+	var world := game as ZzGame
+	var id := StringName(ctx.arg(0)) if ctx.argc() > 0 else &""
+
+	if world == null or world.catalogue == null:
+		ctx.reply("No world.")
+		return
+
+	if id == &"" or not world.catalogue.playable(world.config.map_ids).has(id):
+		ctx.reply("Which map? %s" % ", ".join(world.catalogue.playable(world.config.map_ids)))
+		return
+
+	ctx.reply("Changing to %s." % String(id))
+	var changed: DotResult = await world.change_map_in_tick(id)
+
+	if not changed.ok:
+		DotLog.error("mod.zz", "map: the change was refused", {"map": String(id), "why": changed.error.message})
 
 func _cmd_rotation(ctx: DotCmdContext) -> void:
 	var world := game as ZzGame

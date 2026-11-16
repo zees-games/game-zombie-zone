@@ -1,25 +1,21 @@
 extends RefCounted
 
-## fc-weapons' smoke and fire clouds, reached by path because the pack is optional (no pack: no cloud).
+## The game's own smoke and fire clouds (game/grenades/zz_grenade_cloud.gd), shown for hazards and grenades.
 
 const SMOKE := 0
 const FIRE := 1
-const _PATHS := preload("zz_paths.gd")
-const SCRIPT := "res://addons/arena_weapons/aw_grenade_fx.gd"
+const ZzGrenadeCloud := preload("grenades/zz_grenade_cloud.gd")
 
 
-## The pack's AwGrenadeFx script, or null when it is not mounted.
-static func script() -> GDScript:
-	var path: String = _PATHS.rebase(SCRIPT)
-	return load(path) as GDScript if ResourceLoader.exists(path) else null
+## Registers the cloud effects on [param catalogue].
+static func add_defs(catalogue: DotFxCatalogue) -> void:
+	ZzGrenadeCloud.add_defs(catalogue)
 
 
-## The cloud node spawned on [param fx], or null (no pack, no effects layer).
+## The cloud node spawned on [param fx], or null when there is no effects layer.
 static func show(fx: DotFxManager, tree: SceneTree, kind: int, at: Vector3, radius: float, seconds: float) -> Node:
-	var aw := script()
-
-	if aw == null or fx == null:
+	if fx == null:
 		return null
 
 	var info := {"fx": kind, "seconds": seconds, "radius": radius, "position": at, "victim": 0}
-	return aw.call(&"show", fx, tree, info, 0) as Node
+	return ZzGrenadeCloud.show(fx, tree, info, 0)

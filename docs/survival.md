@@ -391,7 +391,7 @@ Profile at 100 survivors, 64 Hz, `GPU_OFFLOAD=0`, VM load 2 to 4: total 45.0 ms 
 | 64 | 64 | 30 | 25.7 / 32.3 | 4.39 | 3.91 | 2.75 | 4.97 | 4.8 | 53 |
 | 100 | 64 | off | 45.0 / 51.8 | 7.99 | 8.68 | 4.76 | 6.57 | 9.5 | 80 |
 
-**Read this as: the far lever is not worth turning on, and what is left is not a cheaper tick.** Even sleeping every far stand-in, the three stand-in phases still cost about 21 ms at 100 survivors because most of them are near a human or a zombie in this arena. Getting to 15.6 ms at 100 needs fewer simulated stand-ins per server (a server of fifty survivors and fifty stand-ins), not a cheaper one. 33 Hz was not re-measured on this build: the heavy queue was full of other suites, so that number stays open.
+**Read this as: the far lever is not worth turning on, and what is left is not a cheaper tick.** Even sleeping every far stand-in, the three stand-in phases still cost about 21 ms at 100 survivors because most of them are near a human or a zombie on this map. Getting to 15.6 ms at 100 needs fewer simulated stand-ins per server (a server of fifty survivors and fifty stand-ins), not a cheaper one. 33 Hz was not re-measured on this build: the heavy queue was full of other suites, so that number stays open.
 
 ## Stuck movers by map
 

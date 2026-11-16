@@ -2,7 +2,7 @@ extends RefCounted
 
 ## The on-screen buttons of a phone: dot-ui's [DotTouchButtons] over the HUD, wired to the client's own
 ## buttons ([method ZzClient.touch_button]). The sampler's stick and look drag are dot-player-controller's
-## [DotFpsTouchSampler]; this is only the buttons. Same shape as arena's, with this game's hands added.
+## [DotFpsTouchSampler]; this is only the buttons. Same shape as Fatal Contact's, with this game's hands added.
 
 const SelfScript := preload("zz_touch.gd")
 

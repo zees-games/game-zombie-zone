@@ -18,7 +18,7 @@ const _Probe := preload("dedicated_exit_probe.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 14
-const CHECKS := 114
+const CHECKS := 116
 
 const SERVER_DIR := "user://zz_dedicated"
 const TICK_RATE := 60
@@ -247,6 +247,8 @@ func _test_the_commands() -> void:
 	_section("the console")
 	_check(_said(_run_command("zz_status"), "zombiezone"), "zz_status says what the round is doing")
 	_check(_said(_run_command("zz_maps"), "zz_practice"), "zz_maps lists the maps")
+	_check(_said(_run_command("maps"), "zz_practice"), "the plain maps lists them too")
+	_check(_said(_run_command("map"), "Which map?"), "the plain map is this game's (it asks which, naming the maps)")
 	_check(_said(_run_command("zz_boxes"), "explosive"), "zz_boxes lists the box types")
 	_check(_said(_run_command("zz_net"), "bridge"), "zz_net says what the netcode is doing")
 

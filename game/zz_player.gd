@@ -228,7 +228,7 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 
 ## Slide, ZZ's way: only a sprinter holding C slides (see [ZzSlideRules]). A walk, a plain run or a
 ## crouch alone never does, because [code]slide_requires_sprint[/code] wants the sprint button and the
-## minimum speed sits above a plain run. Arena leaves both at the addon default, so it is unchanged.
+## minimum speed sits above a plain run. Fatal Contact leaves both at the addon default, so it is unchanged.
 static func apply_slide(t: DotFpsTunables, p_config: ZzConfig, p_slide: ZzSlideRules = null) -> void:
 	var rules := p_slide if p_slide != null else ZzSlideRules.new()
 	rules.apply(t, p_config.slide_max_speed if p_config != null else t.slide_max_speed, p_config != null and p_config.sprint_enabled)

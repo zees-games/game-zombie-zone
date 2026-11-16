@@ -3,24 +3,25 @@ extends RefCounted
 const CHANNEL := "zz.grenades"
 const ZzHazards := preload("zz_hazards.gd")
 const ZzNpcs := preload("zz_npcs.gd")
-const ZzPaths := preload("zz_paths.gd")
 
-## Thrown grenades of fc-weapons (frag, sticky, flash, smoke, incendiary), flown and blown on the server.
-## The pack is optional and reached by path; its events become damage, a fire area, a lure and a replicated cloud or flash.
+const ZzGrenade := preload("grenades/zz_grenade.gd")
+const ZzGrenadeRules := preload("grenades/zz_grenade_rules.gd")
+const ZzUtilityZones := preload("grenades/zz_utility_zones.gd")
 
-const DIR := "res://addons/arena_weapons/"
+## Thrown grenades with a `kind` (frag, sticky, flash, smoke, incendiary), flown and blown on the server.
+## The code is the game's own (game/grenades/), so no other game's weapon addon is needed; a weapon pack only
+## supplies the rows. Its events become damage, a fire area, a lure and a replicated cloud or flash.
+
 const FLASH := &"flash"
 const SMOKE := &"smoke"
 
 var game = null
-var rules: Object = null
+var rules: ZzGrenadeRules = ZzGrenadeRules.new()
 
-var _grenade: GDScript = null
-## fc-weapons' AwUtilityZones (API 4): victims, line of sight, blind ledger and fire pulses as the thrower.
-var zones: Object = null
+## Victims, line of sight, blind ledger and fire pulses as the thrower.
+var zones: ZzUtilityZones = null
 ## id -> {g, def}
 var _flying: Dictionary = {}
-var _loaded := false
 ## `{at, reach, until}` of each going-off grenade and burning fire: who [member zones] may hurt or blind.
 var _spots: Array[Dictionary] = []
 ## hazard area id -> dot-npc sight blocker id, for the smoke clouds up
@@ -29,57 +30,23 @@ var _blockers: Dictionary = {}
 
 func _init(p_game: Object) -> void:
 	game = p_game
-
-
-## True when the pack is mounted and the weapon [param def] is one of its grenades.
-func handles(def: DotWeaponDef) -> bool:
-	if def == null or not def.params.has(&"kind") or not _load():
-		return false
-
-	return true
-
-
-func _load() -> bool:
-	if _loaded:
-		return _grenade != null
-
-	_loaded = true
-	var paths := ["aw_grenade.gd", "aw_utility_zones.gd", "aw_grenade_rules.gd"]
-
-	for file: String in paths:
-		if _path(file).is_empty():
-			return false
-
-	_grenade = load(_path(paths[0]))
-	var zones_script: GDScript = load(_path(paths[1]))
-	rules = (load(_path(paths[2])) as GDScript).new()
-
-	if _grenade == null or zones_script == null:
-		return false
-
-	zones = zones_script.new()
-	zones.set(&"rules", rules)
-	zones.set(&"victims", _victims_at_large)
-	zones.set(&"los", zones_script.call(&"los_from_ray", _blocked))
-	zones.set(&"damage", _damage)
+	zones = ZzUtilityZones.new()
+	zones.rules = rules
+	zones.victims = _victims_at_large
+	zones.los = ZzUtilityZones.los_from_ray(_blocked)
+	zones.damage = _damage
 	# The blast's own damage goes through the same callable, so a frag, a fire pulse and a flash's victims share one rule.
-	zones.set(&"apply_blast_damage", true)
-	return true
+	zones.apply_blast_damage = true
 
 
-## The host's copy of an fc-weapons file first: loading a bundled copy of a class the host already declares errors "hides a global script class".
-func _path(file: String) -> String:
-	for path: String in [DIR + file, ZzPaths.rebase(DIR + file)]:
-		if ResourceLoader.exists(path):
-			return path
-
-	return ""
+## True when the weapon [param def] is a grenade this file flies (its row names a `kind`).
+func handles(def: DotWeaponDef) -> bool:
+	return def != null and def.params.has(&"kind")
 
 
 ## Registers the `sv_grenade_*` cvars ([param add] is the module's `add_cvar`).
 func bind_cvars(add: Callable, flags: int = 0) -> void:
-	if _load():
-		var _bound: Variant = rules.call(&"bind_cvars", add, flags)
+	var _bound: Variant = rules.call(&"bind_cvars", add, flags)
 
 
 func count() -> int:
@@ -88,7 +55,7 @@ func count() -> int:
 
 ## Takes a thrown spawn: flies it from the next tick, and tells clients to draw the arc.
 func throw(player: Object, spawn: DotWeaponSpawn, def: DotWeaponDef) -> void:
-	var g: Object = _grenade.call(&"from_spawn", spawn, def, rules)
+	var g: Object = ZzGrenade.from_spawn(spawn, def, rules)
 	# The clients draw the arc under the hazards' gravity, so the server flies it under the same.
 	g.set(&"gravity", ZzHazards.GRAVITY * spawn.gravity_scale)
 	g.set(&"owner_entity", player.entity_id)
@@ -146,7 +113,7 @@ func _trace(from: Vector3, to: Vector3) -> Dictionary:
 	return {} if hit.is_empty() else {"position": hit["position"], "normal": hit["normal"]}
 
 
-## World geometry only, as AwUtilityZones.los_from_ray wants it: true when the ray hits.
+## World geometry only, as ZzUtilityZones.los_from_ray wants it: true when the ray hits.
 func _blocked(from: Vector3, direction: Vector3, dist: float) -> bool:
 	return game.ray_hit(from, from + direction * dist) != Vector3.INF
 
@@ -173,7 +140,7 @@ func _go_off(id: int, g: Object, def: DotWeaponDef) -> void:
 		game.horde.lure(at, blinded, reach)
 
 
-## Every survivor and zombie near a going-off grenade or a fire still burning, as AwUtilityZones wants them.
+## Every survivor and zombie near a going-off grenade or a fire still burning, as ZzUtilityZones wants them.
 func _victims_at_large() -> Array:
 	var out: Array = []
 	var seen := {}

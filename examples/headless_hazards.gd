@@ -95,7 +95,7 @@ func _test_caps_and_trail() -> void:
 	_finished()
 
 
-func _oil_arena(gap: float, tune: Dictionary = {}, mates: int = 0) -> Array:
+func _oil_ring(gap: float, tune: Dictionary = {}, mates: int = 0) -> Array:
 	var game := await _team(1 + mates, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
@@ -133,7 +133,7 @@ func _test_oil_catalogue() -> void:
 
 func _test_oil_trail() -> void:
 	_section("oil monster: slides toward the survivor and leaves a damaging, slowing trail")
-	var a := await _oil_arena(14.0, {"spit_cooldown": 999.0, "spit_range": 0.0})
+	var a := await _oil_ring(14.0, {"spit_cooldown": 999.0, "spit_range": 0.0})
 	var game: ZzGame = a[0]
 	var oil: DotNpcInstance = a[2]
 	await _sim(game, 5.0)
@@ -153,7 +153,7 @@ func _test_oil_trail() -> void:
 
 func _test_oil_spit() -> void:
 	_section("oil monster: a spit hurts, blinds the screen, mirrors on the wire and leaves a puddle")
-	var a := await _oil_arena(14.0, {"reach": 0.5, "spit_cooldown": 999.0, "spit_windup": 0.1, "trail_spacing": 999.0})
+	var a := await _oil_ring(14.0, {"reach": 0.5, "spit_cooldown": 999.0, "spit_windup": 0.1, "trail_spacing": 999.0})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
 	var hp := me.health.health
@@ -208,7 +208,7 @@ func _test_oil_eat() -> void:
 		and ZzPins.eat_phase(1.5, meta)["phase"] == &"bite" and ZzPins.eat_phase(2.5, meta)["phase"] == &"swallow", "phases follow the profile clock")
 	_check(is_equal_approx(ZzPins.eat_total(meta), 2.8) and ZzPins.eat_phase(2.8, meta)["done"], "and the total is their sum")
 	# 1: an uninterrupted meal.
-	var a := await _oil_arena(1.8, tune, 1)
+	var a := await _oil_ring(1.8, tune, 1)
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
 	var oil: DotNpcInstance = a[2]
@@ -237,7 +237,7 @@ func _test_oil_eat() -> void:
 		str(deaths))
 	_check(game.pins.pins.is_empty(), "and no pin is left")
 	# 2: interrupted.
-	var b := await _oil_arena(1.8, tune, 1)
+	var b := await _oil_ring(1.8, tune, 1)
 	game = b[0]
 	me = b[1]
 	oil = b[2]
@@ -258,7 +258,7 @@ func _test_oil_eat() -> void:
 	game.pins.shoved(me.player_id)
 	_check(game.pins.kind_of(me.player_id) == &"", "no pin remains")
 	# 3: not edible when up, or when healthy.
-	var c := await _oil_arena(1.8, tune)
+	var c := await _oil_ring(1.8, tune)
 	game = c[0]
 	me = c[1]
 	await _sim(game, 2.0)

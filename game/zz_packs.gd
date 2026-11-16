@@ -45,6 +45,9 @@ const RESERVED: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloat
 const TIERS_ALL: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]
 
 const DEFAULTS := {
+	# Addon directories with a spawn_provider.gd that are not loaded as packs: another game's weapon addon
+	# (Fatal Contact's, on a server that hosts both games) is never part of this game. Each skip is logged.
+	"skip": ["fc_weapons", "arena_weapons"],
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
@@ -117,6 +120,10 @@ static func scan(from: String = "") -> int:
 
 	for dir_name in ZeePackScan.provider_dirs(base, PROVIDER_FILE):
 		if not only.is_empty() and not only.has(dir_name):
+			continue
+
+		if (config.get("skip", []) as Array).has(dir_name):
+			DotLog.info(CHANNEL, "pack skipped: listed in packs skip (not this game's)", {"dir": dir_name})
 			continue
 
 		var path := "%s/%s/%s" % [base, dir_name, PROVIDER_FILE]

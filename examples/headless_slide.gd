@@ -5,7 +5,7 @@ const ZzPlayer := preload("../game/zz_player.gd")
 const ZzSlideRules := preload("../game/zz_slide_rules.gd")
 
 ## Slide in Zombie Zone: only a sprinter holding C slides. A walk, a plain run or a crouch alone
-## never does. (Arena keeps the addon default and slides at a run; its own suite holds that.)
+## never does. (Fatal Contact keeps the addon default and slides at a run; its own suite holds that.)
 
 const SECTIONS := 3
 const CHECKS := 18

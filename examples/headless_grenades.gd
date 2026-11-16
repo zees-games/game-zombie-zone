@@ -5,7 +5,8 @@ const ZzPacks := preload("../game/zz_packs.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
-## fc-weapons' grenades flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction. Counts sections AND checks.
+## The game's own grenade code (game/grenades/) flown and blown on the server: damage, fire, smoke, flash, the zombies' reaction.
+## The five kinds are rows built here from zz-modern-weapons' frag, so no other game's weapon addon is linked. Counts sections AND checks.
 
 const SECTIONS := 10
 const CHECKS := 42
@@ -23,8 +24,8 @@ func _ready() -> void:
 func _run() -> void:
 	print("zombiezone grenades")
 	print("")
-	if not FileAccess.file_exists("res://addons/arena_weapons/%s" % ZzPacks.PROVIDER_FILE):
-		print("SKIPPED: arena_weapons is an optional pack and is not linked; run dot-bootstrap for the full suite")
+	if ZzWeapons.def_of(&"zz_frag") == null:
+		print("SKIPPED: zz-modern-weapons is not linked (its frag is the base of the test rows); run dot-bootstrap for the full suite")
 		get_tree().quit(0)
 		return
 	await _test_which_weapons()
@@ -46,12 +47,12 @@ func _run() -> void:
 
 
 func _test_which_weapons() -> void:
-	_section("only the pack's grenades are routed")
+	_section("only rows that name a grenade kind are routed")
 	var game := await _team(1)
 	var routed := true
 
-	for id: StringName in [&"aw_frag", &"aw_sticky", &"aw_flash", &"aw_smoke", &"aw_incendiary"]:
-		routed = routed and game.grenades.handles(ZzWeapons.def_of(id))
+	for id: StringName in [&"gr_frag", &"gr_sticky", &"gr_flash", &"gr_smoke", &"gr_incendiary"]:
+		routed = routed and game.grenades.handles(_def(id))
 
 	_check(routed, "frag, sticky, flash, smoke and incendiary are all grenades to the game")
 	_check(not game.grenades.handles(null) and not game.grenades.handles(ZzWeapons.def_of(&"zz_vss")), "a gun, or nothing, is not")
@@ -66,7 +67,7 @@ func _test_frag() -> void:
 	var bangs: Array = []
 	game.exploded.connect(func(at: Vector3, _r: float, _k: StringName) -> void: bangs.append(at))
 	var before := me.health.health
-	_throw(game, me, &"aw_frag", SPOT + Vector3(0.0, 0.6, 0.0), Vector3.ZERO)
+	_throw(game, me, &"gr_frag", SPOT + Vector3(0.0, 0.6, 0.0), Vector3.ZERO)
 	_check(game.grenades.count() == 1, "a throw is in flight")
 	await _sim(game, 4.0)
 	_check(game.grenades.count() == 0 and bangs.size() == 1, "it went off once and is gone", str(bangs.size()))
@@ -76,10 +77,10 @@ func _test_frag() -> void:
 	await _sim(game, 0.5)
 	var victim := game.horde.nearest_zombie(at)
 	_check(spawned and victim != null and victim.is_alive(), "a zombie stands at the next bang")
-	_throw(game, me, &"aw_frag", victim.position() + Vector3(0.0, 0.6, 0.0), Vector3.ZERO)
+	_throw(game, me, &"gr_frag", victim.position() + Vector3(0.0, 0.6, 0.0), Vector3.ZERO)
 	await _sim(game, 4.0)
 	_check(victim != null and not victim.is_alive(), "the frag killed it through the combat path")
-	_throw(game, me, &"aw_frag", SPOT + Vector3(0.0, 2.0, 0.0), Vector3.ZERO)
+	_throw(game, me, &"gr_frag", SPOT + Vector3(0.0, 2.0, 0.0), Vector3.ZERO)
 	game.grenades.clear()
 	_check(game.grenades.count() == 0, "clear() drops what is in flight")
 	_finished()
@@ -94,7 +95,7 @@ func _test_fire_smoke_flash() -> void:
 	game.hazards.area_added.connect(func(_id: int, kind: StringName, _at: Vector3, _r: float, _s: float) -> void: kinds.append(kind))
 	var at := SPOT + Vector3(0.0, 0.6, 6.0)
 
-	for id: StringName in [&"aw_incendiary", &"aw_smoke", &"aw_flash"]:
+	for id: StringName in [&"gr_incendiary", &"gr_smoke", &"gr_flash"]:
 		_throw(game, me, id, at, Vector3.ZERO)
 		await _sim(game, 4.0)
 
@@ -117,7 +118,7 @@ func _test_flash_lures() -> void:
 	var lured: Array = []
 	var original := game.horde.lure
 	game.horde.set_meta(&"zz_probe", true)
-	_throw(game, me, &"aw_flash", at, Vector3.ZERO)
+	_throw(game, me, &"gr_flash", at, Vector3.ZERO)
 	await _sim(game, 4.0)
 	_check(game.grenades.count() == 0 and original.is_valid(), "the flash went off with the horde present", str(lured.size()))
 	_finished()
@@ -156,7 +157,7 @@ func _test_flash_blinds_zombie() -> void:
 		return
 
 	var at: Vector3 = npc.position() + Vector3(0.0, 0.6, -1.5)
-	_throw(game, me, &"aw_flash", at, Vector3.ZERO)
+	_throw(game, me, &"gr_flash", at, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(npc.blind_until > game.horde.now(), "the flash blinded it", "%.2f vs %.2f" % [npc.blind_until, game.horde.now()])
 	_check(not _sees(game, npc, me), "a blind zombie does not see a survivor in the open")
@@ -178,7 +179,7 @@ func _test_smoke_blocks_sight() -> void:
 		return
 
 	var mid := SPOT + Vector3(0.0, 0.6, 3.0)
-	_throw(game, me, &"aw_smoke", mid, Vector3.ZERO)
+	_throw(game, me, &"gr_smoke", mid, Vector3.ZERO)
 	await _sim(game, 1.0)
 	_check(not _sees(game, npc, me), "with the cloud between them it does not")
 	var area := game.grenades._blockers.keys()
@@ -194,14 +195,14 @@ func _test_flash_whites_survivor() -> void:
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
 	var ahead := me.eye_position() + me.aim_direction() * 3.0
-	_throw(game, me, &"aw_flash", ahead, Vector3.ZERO)
+	_throw(game, me, &"gr_flash", ahead, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(me.flashed, "facing it, the survivor is flashed")
 	_check(me.flash_strength > 0.0 and me.flash_strength < 1.0, "the blind is scaled by distance, not full (%.2f)" % me.flash_strength)
 	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
 	_check(not me.flashed, "and it wears off")
 	var behind := me.eye_position() - me.aim_direction() * 3.0
-	_throw(game, me, &"aw_flash", behind, Vector3.ZERO)
+	_throw(game, me, &"gr_flash", behind, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(not me.flashed, "facing away, they are not")
 	_finished()
@@ -222,7 +223,7 @@ func _test_bot_smoke() -> void:
 	game.bots._memory(me).erase("threat_until")
 	_check(game.bots._sees(me, game.bots._aim_point(npc)), "before the smoke the stand-in sees it")
 	_check(game.bots._threat(me) == npc, "and picks it as a threat")
-	_throw(game, me, &"aw_smoke", SPOT + Vector3(0.0, 0.6, 3.0), Vector3.ZERO)
+	_throw(game, me, &"gr_smoke", SPOT + Vector3(0.0, 0.6, 3.0), Vector3.ZERO)
 	await _sim(game, 1.0)
 	game.bots._memory(me).erase("threat_until")
 	_check(not game.bots._sees(me, game.bots._aim_point(npc)), "with the cloud between them it does not")
@@ -247,7 +248,7 @@ func _test_bot_flash() -> void:
 
 	game.bots._memory(me).erase("threat_until")
 	_check(game.bots._threat(me) == npc, "before the flash it has a threat")
-	_throw(game, me, &"aw_flash", me.eye_position() + me.aim_direction() * 3.0, Vector3.ZERO)
+	_throw(game, me, &"gr_flash", me.eye_position() + me.aim_direction() * 3.0, Vector3.ZERO)
 	await _sim(game, 0.3)
 	_check(me.flashed, "the stand-in is flashed")
 	_check(game.bots._threat(me) == null, "a blind stand-in has no threat")
@@ -268,7 +269,7 @@ func _test_bounce_is_announced() -> void:
 	me.place_at(SPOT, 0.0)
 	var heard: Array = []
 	game.hazards.bounced.connect(func(id: int, at: Vector3, v: Vector3) -> void: heard.append([id, at, v]))
-	_throw(game, me, &"aw_frag", SPOT + Vector3(0.0, 1.5, 0.0), Vector3(0.0, -6.0, 0.0), game.tick_rate * 3)
+	_throw(game, me, &"gr_frag", SPOT + Vector3(0.0, 1.5, 0.0), Vector3(0.0, -6.0, 0.0), game.tick_rate * 3)
 	await _sim(game, 1.0)
 	_check(heard.size() >= 1, "a grenade thrown at the floor announces a bounce", str(heard.size()))
 	if not heard.is_empty():
@@ -282,7 +283,7 @@ func _test_bounce_is_announced() -> void:
 
 
 func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity: Vector3, fuse: int = 4) -> void:
-	var def := ZzWeapons.def_of(id)
+	var def := _def(id)
 	var _routed: bool = game.grenades.handles(def)
 	var b := def.tuning as DotWeaponBallistics
 	var s := DotWeaponSpawn.new()
@@ -306,3 +307,43 @@ func _team(count: int) -> ZzGame:
 	game.start()
 	await _sim(game, 0.25)
 	return game
+
+
+## A grenade row of [param id] (`gr_<kind>`, `gr_sticky` is a frag that sticks), from zz-modern-weapons' frag.
+func _def(id: StringName) -> DotWeaponDef:
+	if _rows.has(id):
+		return _rows[id]
+
+	var def := (ZzWeapons.def_of(&"zz_frag") as DotWeaponDef).duplicate(true) as DotWeaponDef
+	def.id = id
+	def.params = def.params.duplicate(true)
+	if def.tuning != null:
+		def.tuning = def.tuning.duplicate(true) as DotWeaponTuning
+	var b := def.tuning as DotWeaponBallistics
+	var kind := String(id).trim_prefix("gr_")
+
+	match kind:
+		"sticky":
+			def.params[&"kind"] = &"frag"
+			def.params[&"sticks"] = true
+		"flash", "smoke":
+			def.params[&"kind"] = StringName(kind)
+			def.params[&"effect_radius"] = 12.0 if kind == "flash" else 4.5
+			if b != null:
+				b.splash_radius = 0.0
+				b.splash_damage = 0.0
+		"incendiary":
+			def.params[&"kind"] = &"incendiary"
+			def.params[&"explode_on_impact"] = true
+			def.params[&"effect_radius"] = 3.5
+			if b != null:
+				b.splash_radius = 3.0
+				b.splash_damage = 25.0
+		_:
+			def.params[&"kind"] = &"frag"
+
+	_rows[id] = def
+	return def
+
+
+var _rows: Dictionary = {}

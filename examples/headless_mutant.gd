@@ -43,7 +43,7 @@ func _run() -> void:
 
 
 ## A world with one survivor at SPOT and a mutant [param gap] metres up the street from it.
-func _arena(gap: float, tune: Dictionary = {}) -> Array:
+func _ring(gap: float, tune: Dictionary = {}) -> Array:
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
@@ -79,7 +79,7 @@ func _test_catalogue() -> void:
 
 func _test_zap() -> void:
 	_section("a gun zaps a survivor: a visible beam and damage")
-	var a := await _arena(12.0, {"prop_chance": 0.0, "fly_from": 999.0, "zap_interval": 0.5})
+	var a := await _ring(12.0, {"prop_chance": 0.0, "fly_from": 999.0, "zap_interval": 0.5})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
 	var before := me.health.health
@@ -92,7 +92,7 @@ func _test_zap() -> void:
 
 func _test_props() -> void:
 	_section("a gun drags a loose prop in, holds it and throws it")
-	var a := await _arena(10.0, {"prop_chance": 1.0, "fly_from": 999.0, "hold_time": 0.5})
+	var a := await _ring(10.0, {"prop_chance": 1.0, "fly_from": 999.0, "hold_time": 0.5})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
 	var toy: DotPropBody = game.map.toys.add_toy(&"barrel", SPOT + Vector3(0.0, 0.6, 6.0))
@@ -112,7 +112,7 @@ func _test_props() -> void:
 
 func _test_guns_off() -> void:
 	_section("a gun shot off falls away and stops working")
-	var a := await _arena(12.0, {"prop_chance": 0.0, "fly_from": 999.0, "zap_interval": 0.4})
+	var a := await _ring(12.0, {"prop_chance": 0.0, "fly_from": 999.0, "zap_interval": 0.4})
 	var game: ZzGame = a[0]
 	var body := a[2].node as ZzZombieBody
 	var limbs := body.limbs
@@ -130,7 +130,7 @@ func _test_guns_off() -> void:
 
 func _test_jetpack() -> void:
 	_section("the jetpack lifts it toward a far survivor; shot out, it falls and never flies again")
-	var a := await _arena(40.0, {"fly_from": 10.0, "prop_chance": 0.0})
+	var a := await _ring(40.0, {"fly_from": 10.0, "prop_chance": 0.0})
 	var game: ZzGame = a[0]
 	var body := a[2].node as ZzZombieBody
 	await _sim(game, 5.0)
@@ -146,7 +146,7 @@ func _test_jetpack() -> void:
 
 func _test_dive() -> void:
 	_section("angry and airborne it charges up, dives and slams the ground")
-	var a := await _arena(30.0, {"fly_from": 10.0, "prop_chance": 0.0, "charge_time": 0.8, "zap_interval": 99.0})
+	var a := await _ring(30.0, {"fly_from": 10.0, "prop_chance": 0.0, "charge_time": 0.8, "zap_interval": 99.0})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
 	a[2].health = a[2].def.max_health * 0.25

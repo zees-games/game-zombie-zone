@@ -861,9 +861,7 @@ func _build_effects() -> void:
 
 	ZzImpactMarks.add_def(fx, ZzPaths.rebase("res://scenes/fx/bullet_hole.tscn"))
 
-	var aw_fx: GDScript = ZzGrenadeFx.script()
-	if aw_fx != null:
-		aw_fx.call(&"add_defs", fx)
+	ZzGrenadeFx.add_defs(fx)
 
 	effects = DotFxManager.new()
 	effects.name = "Effects"
