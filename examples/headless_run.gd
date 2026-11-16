@@ -2351,8 +2351,8 @@ func _test_water() -> void:
 	var made := game.water_rules.bind_cvars(recorder, 4, 1)
 	_check(made.is_empty() and added.size() == ZzWaterRules.VARS.size() and added["zz_water"] == 4 and added["zz_water_drown_seconds"] == 1,
 		"every setting is a cvar, the ones a client predicts replicated", str(added.size()))
-	_check(not game.water_rules.set_cvar("zz_water_swim_speed", "fast") and game.water_rules.set_cvar("zz_water_swim_speed", "99")
-		and game.water_rules.swim_speed <= 12.0, "junk is refused and a huge speed clamped")
+	_check(not game.water_rules.set_cvar("zz_water_swim_speed", "fast") and not game.water_rules.set_cvar("zz_water_swim_speed", "99")
+		and game.water_rules.swim_speed <= 12.0, "junk and an out-of-range speed are refused")
 	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= DotFpsNetSync.MODIFIER_BITS,
 		"the wading modifier fits the motor's modifier bits", str(me.controller.motor.modifier_defs.size()))
 	_finished()

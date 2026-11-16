@@ -260,8 +260,9 @@ func _test_the_client_platform() -> void:
 		and (-turned.basis.z).dot((focus - turned.origin).normalized()) > 0.999,
 		"orbiting keeps its distance and keeps looking at them")
 	var rules: ZzEndCameraRules = client.game.end_camera_rules
-	_check(rules.set_cvar("zz_end_camera_orbit", "500") and rules.orbit == 90.0 and not rules.set_cvar("zz_end_camera_orbit", "x") and not rules.set_cvar("zz_nope", "1"),
-		"the cvars clamp and refuse what is not theirs")
+	_check(not rules.set_cvar("zz_end_camera_orbit", "500") and rules.orbit != 500.0 and rules.set_cvar("zz_end_camera_orbit", "90") and rules.orbit == 90.0
+		and not rules.set_cvar("zz_end_camera_orbit", "x") and not rules.set_cvar("zz_nope", "1"),
+		"the cvars refuse out-of-range values and what is not theirs")
 	rules.blend = 0.05
 	client.game.map_ending.emit(true, 1.0, 0.0, null)
 	for _i in 5:

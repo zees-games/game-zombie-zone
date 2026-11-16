@@ -94,7 +94,11 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 
 	var member: String = (rows[cvar_name] as Array)[0]
 	var limits: Array = LIMITS[member]
-	var clamped := clampf(text.to_float(), float(limits[0]), float(limits[1]))
+	var clamped := text.to_float()
+
+	if clamped < float(limits[0]) or clamped > float(limits[1]):
+		push_warning("%s: %s is outside %s..%s; refused, keeping %s" % [cvar_name, text, limits[0], limits[1], get(member)])
+		return false
 
 	if not is_equal_approx(clamped, float(get(member))):
 		set(member, clamped)

@@ -67,7 +67,8 @@ func _test_tunables() -> void:
 	_check(rules.set_cvar("zz_slide", "0"), "zz_slide is a cvar")
 	_check(not ZzPlayer.tunables_for(ZzConfig.new(), null, rules).slide_enabled, "zz_slide 0 turns it off")
 	_check(not rules.set_cvar("zz_slide_nope", "1") and not rules.set_cvar("zz_slide_boost", "fast"), "an unknown name or a non-number is refused")
-	_check(rules.set_cvar("zz_slide_boost", "99") and is_equal_approx(rules.slide_boost, 20.0), "a value is clamped to its range")
+	var boost_before := rules.slide_boost
+	_check(not rules.set_cvar("zz_slide_boost", "99") and is_equal_approx(rules.slide_boost, boost_before), "an out-of-range value is refused, not clamped")
 	rules.set_cvar("zz_slide", "1")
 	rules.set_cvar("zz_slide_boost", "4")
 	rules.set_cvar("zz_slide_min_speed", "9")

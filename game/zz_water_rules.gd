@@ -111,7 +111,11 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 		if row[0] != cvar_name:
 			continue
 
-		var clamped := clampf(text.to_float(), float(row[2]), float(row[3]))
+		var clamped := text.to_float()
+
+		if clamped < float(row[2]) or clamped > float(row[3]):
+			push_warning("%s: %s is outside %s..%s; refused, keeping %s" % [cvar_name, text, row[2], row[3], get(key)])
+			return false
 
 		if is_equal_approx(clamped, float(get(key))):
 			return true

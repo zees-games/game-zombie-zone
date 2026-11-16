@@ -539,7 +539,7 @@ func apply_friendly_fire() -> void:
 		return
 
 	combat.rules.friendly_fire = config.friendly_fire_scale() > 0.0
-	combat.rules.friendly_scale = clampf(config.friendly_fire_scale(), 0.0, 2.0)
+	combat.rules.friendly_scale = maxf(config.friendly_fire_scale(), 0.0)
 	if friendly_fire_changed.is_valid():
 		friendly_fire_changed.call(combat.rules.friendly_fire)
 
@@ -722,7 +722,7 @@ func _build_combat() -> void:
 
 	var damage_rules := DotDamageRules.new()
 	damage_rules.friendly_fire = config.friendly_fire_scale() > 0.0
-	damage_rules.friendly_scale = clampf(config.friendly_fire_scale(), 0.0, 2.0)
+	damage_rules.friendly_scale = maxf(config.friendly_fire_scale(), 0.0)
 	damage_rules.self_damage = true
 	damage_rules.hit_groups = true
 	combat.rules = damage_rules

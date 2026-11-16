@@ -50,7 +50,11 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 			continue
 		if not text.is_valid_float():
 			return false
-		set(key, clampf(text.to_float(), float(row[2]), float(row[3])))
+		var parsed := text.to_float()
+		if parsed < float(row[2]) or parsed > float(row[3]):
+			push_warning("%s: %s is outside %s..%s; refused, keeping %s" % [cvar_name, text, row[2], row[3], get(key)])
+			return false
+		set(key, parsed)
 		return true
 	return false
 

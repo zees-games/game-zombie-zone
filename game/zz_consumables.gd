@@ -34,18 +34,18 @@ func bind_cvars(add: Callable, flags: int = 0) -> void:
 		func(v: String) -> void: medkit_max = _limit("zz_medkit_max", v, medkit_max))
 	_bind(add, "zz_pills_max", str(pills_max), "Bottles of pills a survivor holds at most (0 = unlimited)", flags,
 		func(v: String) -> void: pills_max = _limit("zz_pills_max", v, pills_max))
-	_bind(add, "zz_pills_seconds", str(pills_seconds), "Seconds the pills key is held to take a pill (0 is instant)", flags,
-		func(v: String) -> void: pills_seconds = clampf(v.to_float(), 0.0, 20.0))
+	_bind(add, "zz_pills_seconds", str(pills_seconds), "Seconds the pills key is held to take a pill (0 is instant, no ceiling)", flags,
+		func(v: String) -> void: pills_seconds = _floor_at("zz_pills_seconds", v, 0.0, pills_seconds))
 	_bind(add, "zz_heal_others", "1" if heal_others else "0", "Let a medkit be used on a friend you aim at (0 or 1)", flags,
 		func(v: String) -> void: heal_others = v.strip_edges() != "0")
-	_bind(add, "zz_heal_range", str(heal_range), "Metres to a friend a medkit reaches (0.5 to 10)", flags,
-		func(v: String) -> void: heal_range = clampf(v.to_float(), 0.5, 10.0))
+	_bind(add, "zz_heal_range", str(heal_range), "Metres to a friend a medkit reaches (at least 0.5, no ceiling)", flags,
+		func(v: String) -> void: heal_range = _floor_at("zz_heal_range", v, 0.5, heal_range))
 	_bind(add, "zz_give_pills", "1" if give_pills else "0", "Let a survivor hand a bottle of pills to a friend (0 or 1)", flags,
 		func(v: String) -> void: give_pills = v.strip_edges() != "0")
 	_bind(add, "zz_give_medkits", "1" if give_medkits else "0", "Let a survivor hand a medkit to a friend (0 or 1)", flags,
 		func(v: String) -> void: give_medkits = v.strip_edges() != "0")
-	_bind(add, "zz_give_range", str(give_range), "Metres to a friend a hand-over reaches (0.5 to 10)", flags,
-		func(v: String) -> void: give_range = clampf(v.to_float(), 0.5, 10.0))
+	_bind(add, "zz_give_range", str(give_range), "Metres to a friend a hand-over reaches (at least 0.5, no ceiling)", flags,
+		func(v: String) -> void: give_range = _floor_at("zz_give_range", v, 0.5, give_range))
 
 
 ## A stack limit from a cvar string: a whole number from 0 (0 = unlimited). Anything else is refused
@@ -58,6 +58,16 @@ static func _limit(cvar: String, text: String, current: int) -> int:
 		return current
 
 	return t.to_int()
+
+
+static func _floor_at(cvar: String, text: String, lowest: float, current: float) -> float:
+	var t := text.strip_edges()
+
+	if not t.is_valid_float() or t.to_float() < lowest:
+		DotLog.error(CHANNEL, "%s needs a number of at least %s (no ceiling); keeping %s" % [cvar, lowest, current], {"value": text})
+		return current
+
+	return t.to_float()
 
 
 func medkits_full(player) -> bool:

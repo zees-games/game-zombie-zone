@@ -99,7 +99,7 @@ func _ensure() -> bool:
 func _apply_rules() -> void:
 	var cfg: ZzConfig = game.config
 	_box.rules.enabled = cfg.physics_crates
-	_box.rules.max_awake = clampi(cfg.crate_max_active, 1, 256)
+	_box.rules.max_awake = maxi(cfg.crate_max_active, 1)
 	_box.rules.push_scale = cfg.crate_push
 	_box.sleep_after = cfg.crate_sleep_seconds
 	_box.fall_limit = cfg.crate_fall_limit
