@@ -36,6 +36,8 @@ static func body_mask(physics: Object) -> int:
 
 var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
+## The capsule's centre above the feet ([constant LIFT] plus half its height), set by [method _setup].
+var _rise := Vector3.ZERO
 
 
 ## [param required] (spawns, posts) keeps a piece holding one joined to the next by a bridge edge even through a floor.
@@ -147,6 +149,7 @@ func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float, passable
 	shape.height = HEIGHT - LIFT
 	_query.shape = shape
 	_query.collision_mask = mask
+	_rise = Vector3.UP * (LIFT + shape.height * 0.5)
 
 
 func _point_blocked(p: Vector3) -> bool:
@@ -156,13 +159,19 @@ func _point_blocked(p: Vector3) -> bool:
 func _edge_blocked(a: Vector3, b: Vector3) -> bool:
 	var steps := int(ceil(a.distance_to(b) / EDGE_STEP))
 
+	var space := _space
+	var query := _query
+	var rise := _rise
+
 	for i in range(1, steps):
-		if _hit(a.lerp(b, float(i) / steps)):
+		query.transform = Transform3D(Basis.IDENTITY, a.lerp(b, float(i) / steps) + rise)
+
+		if not space.intersect_shape(query, 1).is_empty():
 			return true
 
 	return false
 
 
 func _hit(p: Vector3) -> bool:
-	_query.transform = Transform3D(Basis.IDENTITY, p + Vector3.UP * (LIFT + (_query.shape as CapsuleShape3D).height * 0.5))
+	_query.transform = Transform3D(Basis.IDENTITY, p + _rise)
 	return not _space.intersect_shape(_query, 1).is_empty()

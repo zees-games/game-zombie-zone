@@ -93,7 +93,9 @@ func _run() -> void:
 	var waited := 0
 	var landed := false
 	var wait_began := Time.get_ticks_usec()
-	for i in range(ticks):
+	var i := -1
+	while i < ticks - 1:
+		i += 1
 		game.horde.sections.clear()
 		var began := Time.get_ticks_usec()
 		game.simulate(delta)
@@ -104,6 +106,7 @@ func _run() -> void:
 		# The first graph is built off the frame; the ticks until it lands are the cover's.
 		if game.horde.nav_blocks_play():
 			waited += 1
+			i -= 1
 			if waited % 16 == 0:
 				await get_tree().physics_frame
 			continue
@@ -116,6 +119,9 @@ func _run() -> void:
 		if i % 32 == 31:
 			await get_tree().physics_frame
 	var opened := t_ready + t_start
+	var nav = game.horde.nav
+	var digest := hash([nav.points, nav.edges]) if nav != null else 0
+	print("COLDDIGEST points %d edges %d hash %d spawns %d" % [nav.point_count(), nav.edge_count(), digest, game.horde.director.spawn_points.size()] if nav != null else "none")
 	print("COLDNAV first graph waited %d ticks, %.0f ms wall" % [waited, _ms(wait_began)])
 	print("COLDWORST %.0f ms at tick %d; open+start %.0f ms" % [worst, worst_at, opened])
 	var fail := (max_tick > 0.0 and worst > max_tick) or (max_open > 0.0 and opened > max_open)
