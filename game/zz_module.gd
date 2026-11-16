@@ -31,12 +31,9 @@ func _game_load() -> DotResult:
 		roster.changed.connect(func(_old: String, new_value: String) -> void:
 			world.config.team_roster = new_value.strip_edges() == "1")
 
-	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a team-mate
-	# holding the muzzle (the default), 2 every team-mate in the line. dot-combat's cvar,
-	# defined there once for every game; live from the next shot, and a value the operator set
-	# first (argv, content.yml) is read back. NOTIFY, because players should know; REPLICATED,
-	# because every client's own manager predicts its tracers under it (the client follows it
-	# through its link, see the client's _build_netcode).
+	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a team-mate holding
+	# the muzzle (default), 2 every one in the line. dot-combat's cvar, live from the next shot; NOTIFY,
+	# and REPLICATED because every client's manager predicts its tracers under it.
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 		_reconcile_friendly_fire(world, _passthrough)
@@ -62,10 +59,9 @@ func _game_load() -> DotResult:
 		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay DotKillcamFraming)",
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
-	# dot-player-controller's mp_forceview (first or third person: the player's choice, or one
-	# held) and mp_solidplayers (survivors and stand-ins block each other, 1 by default).
-	# REPLICATED: the client places its own camera under the first and predicts its own
-	# player under the second.
+	# dot-player-controller's mp_forceview (the player's choice, or one held) and mp_solidplayers
+	# (survivors and stand-ins block each other, 1 by default). REPLICATED: the client places its camera
+	# under the first and predicts its player under the second.
 	var _views := world.view_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
@@ -147,19 +143,14 @@ func _game_load() -> DotResult:
 		"Automatic stand-ins: 1 keeps as many as bot_quota and bot_quota_mode say, 0 none at all."
 	)
 
-	# [b]How many is dot-server's [DotBotQuota], so `bot_quota` and `bot_quota_mode` mean the
-	# same thing on every server in the family.[/b] The default is this game's own minimum
-	# (`minimum_players`, from the config file) in fill mode, which is the rule it ran before
-	# the policy was shared: stand-ins top the round up to that many players, a person who
-	# joins takes a stand-in's place, and the stand-in comes back when they leave. `zz_bots`
-	# stays the switch it always was, so a server config that sets it means what it meant.
+	# How many is dot-server's [DotBotQuota], so `bot_quota` and `bot_quota_mode` mean the same on every
+	# server in the family. Default: this game's `minimum_players` in fill mode; `zz_bots` stays the
+	# switch it always was.
 	_quota = DotBotQuota.install(self, world.config.minimum_players)
 
-	# [b]Started here and not in the world's own `_ready`.[/b] `start()` builds the map and puts
-	# everybody on it, and a world that did that before the bridge existed would have built a
-	# map with nothing listening to `world_rebuilt` — one the server knows about and no client
-	# is ever told about. Invisible floors: a player stands on nothing and the server says they
-	# are fine.
+	# Started here, not in the world's `_ready`: `start()` builds the map, and before the bridge exists
+	# nothing listens to `world_rebuilt`, so the server knows a map no client is told about (invisible
+	# floors).
 	var _delivered: int = await _add_delivered_maps(world)
 
 	# The vote was built above, before these arrived; read without them, its list held only
@@ -238,14 +229,9 @@ func _on_profile(event: DotEvent) -> void:
 
 	link.refresh_player(session_id, session.display_name, _avatar_for(session_id))
 
-## The numbers an operator is actually going to want to change, as cvars.
-##
-## [b]Live, and each one writes through to the configuration the world already reads.[/b] A
-## server owner finds their server's balance by moving one of them between rounds with people
-## watching; a JSON file and a restart is a balance nobody tunes.
-##
-## [b]Pacing changes the next clock, not the one running.[/b] `zz_mob_min` moving does not send a
-## mob now; it changes when the next one is drawn. `zz_difficulty` is live for every hit.
+## The numbers an operator will want to change, as cvars: live, each writing through to the
+## configuration the world already reads. Pacing changes the next clock, not the one running;
+## `zz_difficulty` is live for every hit.
 func _add_tunables(world: ZzGame) -> void:
 	var config := world.config
 
@@ -657,11 +643,9 @@ func _add_tunables_survival_2(world: ZzGame) -> void:
 			config.minimum_players = int(value)
 			if _quota != null and _quota.quota_cvar != null:
 				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
-	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` (easy, medium, hard,
-	# nightmare; medium by default) and every `bot_*` setting it bundles, the names every game in
-	# the family uses. On the game as metadata, where ZzBots reads it; never the registry, since
-	# two servers in one process must not share it. `zz_bot_reaction` stays as the old name for
-	# `bot_reaction`, so a server config that set it still means what it meant.
+	# How the stand-ins aim and shoot is dot-bot's: `bot_difficulty` and the `bot_*` settings it bundles.
+	# Kept as game metadata, where ZzBots reads it, never the registry (two servers in one process).
+	# `zz_bot_reaction` stays as the old name for `bot_reaction`.
 	var bot_settings := DotBotSettings.of(game)
 	var _bot_cvars := bot_settings.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
 	_tunable("zz_bot_reaction", bot_settings.profile.reaction, "Deprecated, sets bot_reaction. Seconds a stand-in takes to react to a zombie",
@@ -717,13 +701,9 @@ var _admin_rng_game: Object = null
 func _apply_friendly_fire(world: ZzGame) -> void:
 	world.apply_friendly_fire()
 
-## A number as an operator would type it: `34`, not `34.000000`.
-##
-## [b]Not `%g`, which GDScript's format strings do not have.[/b] It is accepted by the parser
-## and fails at RUNTIME with "unsupported format character" — inside `_game_load`, which is
-## the one place in the module sequence that unwinds everything above it. The symptom in
-## game-buses-from-hell was a server whose netcode came up, logged that it was ready, and
-## then reported that the game would not load.
+## A number as an operator would type it: `34`, not `34.000000`. Not `%g`: GDScript's format strings
+## parse it and fail at RUNTIME inside `_game_load`, which unwinds the module sequence (a server that
+## logged ready, then reported the game would not load).
 static func _number(value: float) -> String:
 	return "%d" % int(round(value)) if is_equal_approx(value, round(value)) else "%.3f" % value
 
@@ -743,13 +723,9 @@ func _cap_refusal(cvar_name: String, value: float, range_of: Array) -> String:
 		return ZzCaps.pair_refusal(cvar_name, value, float((game as ZzGame).config.get(ZzCaps.PAIRS[cvar_name][0])))
 	return ""
 
-## One cvar, its default taken from the configuration rather than written twice.
-##
-## [b]The default is the value the world was built with, and that is the whole point.[/b] A
-## cvar declared with a literal default is a second copy of a number that
-## `defaults < JSON < environment < argv` has already decided — so an operator who set
-## `ZZ_ROUND_SECONDS=240` would see `zz_round_seconds` report 300 and, worse, would reset
-## their own setting the moment anything wrote the value back.
+## One cvar, its default taken from the configuration rather than written twice: a literal default
+## would be a second copy of what `defaults < JSON < environment < argv` decided, so `ZZ_ROUND_SECONDS=240`
+## would report 300 and reset itself when written back.
 func _tunable(
 	cvar_name: String, current: float, description: String, apply: Callable, range_of: Array = []
 ) -> void:
@@ -773,11 +749,9 @@ func _tunable(
 		log_info("a tunable changed", {"cvar": cvar_name, "now": new_value})
 	)
 
-## [b]Nothing to undo.[/b] The commands are the module's own and [DotModule] removes them;
-## the netcode, the bridge and the roster are [DotGameModule]'s and it tears them down in
-## the reverse order it built them. The world is NOT this module's to free: it was in the
-## tree before the module loaded, and a server can unload and reload a game module without
-## the map going away, which is what `module reload` is for.
+## Nothing to undo: the commands are the module's own and [DotModule] removes them, the netcode,
+## bridge and roster are [DotGameModule]'s. The world is NOT this module's to free: it predates the
+## module, and `module reload` must not take the map away.
 func _game_unload() -> void:
 	_bot_ids.clear()
 
@@ -798,12 +772,9 @@ func _game_hibernation(hibernating: bool) -> void:
 	if not hibernating and vote != null:
 		vote.note_woke()
 
-## Keeps enough people in the round for there to be one.
-##
-## [b]A team, not one person against the horde.[/b] Everything about the genre — the downs that
-## need a friend, the specials that need somebody to shove them off — assumes four; a server
-## with one person on it fills the rest with stand-ins, and takes one out the moment a person
-## takes their place.
+## Keeps enough people in the round for there to be one: the downs and specials assume a team of four,
+## so a server with one person fills the rest with stand-ins and takes one out when a person
+## takes the place.
 func _game_tick(_tick: int, delta: float) -> void:
 	_follow_npc_threads()
 
@@ -852,10 +823,9 @@ func _keep_the_round_full() -> void:
 	if world == null or bridge == null or _quota == null:
 		return
 
-	# People only. A stand-in is not one, and neither is a bot somebody put in by hand through
-	# the bridge (a test, an admin): those are never in `_bot_ids` either, so they are left
-	# alone and outside the count. A leaver is gone from `players` the moment the bridge
-	# removes them, so nobody half-disconnected is counted.
+	# People only. A stand-in is not one, nor a bot put in by hand through the bridge (a test, an admin):
+	# those are never in `_bot_ids`, so they stay outside the count. A leaver is gone from `players` at
+	# once, so nobody half-disconnected is counted.
 	var humans := 0
 
 	for id: StringName in world.players:
@@ -876,10 +846,8 @@ func _keep_the_round_full() -> void:
 		var slots: int = server.config.max_players if server != null and server.config != null else -1
 		wanted = _quota.wanted(humans, slots)
 
-		# A map built for a dozen raises the count to a dozen, in fill mode (the default): the
-		# school with four people in it is a school with forty windows nobody is at. The
-		# operator's bot_quota still wins when it is higher, and `zz_team_from_map 0` turns
-		# this off.
+		# A map built for a dozen raises the count to a dozen in fill mode (the default); the operator's
+		# bot_quota still wins when higher, and `zz_team_from_map 0` turns this off.
 		if _quota.mode() == DotBotQuota.Mode.FILL and world.team_size() > _quota.quota():
 			wanted = DotBotQuota.compute(DotBotQuota.Mode.FILL, world.team_size(), humans, slots,
 				_quota.empty_cvar == null or _quota.empty_cvar.get_bool())
@@ -901,10 +869,9 @@ func _keep_the_round_full() -> void:
 		var leaving: StringName = _bot_ids.pop_back()
 		bridge.call("remove_player", ZzNetBridge.session_of(leaving))
 
-## Names for the stand-ins, so a scoreboard of four of them is readable: one nobody in
-## [param world] has yet, from this game's own survivors through dot-bot's [DotBotNames] (which
-## never doubles one up and is the same from run to run). Drawn at random, it once gave a
-## dedicated run three called Odell.
+## Names for the stand-ins, so a scoreboard of four is readable: one nobody in [param world] has yet,
+## from this game's survivors through dot-bot's [DotBotNames] (never doubles one up, same from run
+## to run). Random drawing once gave a dedicated run three called Odell.
 static func _bot_name(world: ZzGame) -> String:
 	var taken: Array = []
 
@@ -913,13 +880,9 @@ static func _bot_name(world: ZzGame) -> String:
 
 	return DotBotNames.pick(taken, world.players.size(), ZzBots.BOT_NAMES)
 
-## Joins the bridge's chat seam to the services layer's router.
-##
-## [b]Here rather than in either of them, because this is the only object that holds
-## both.[/b] The bridge knows what arrived on the wire and nothing about what a line means;
-## the services layer knows the rules and nothing about the wire. That separation is why a
-## client cannot send a line with somebody else's name on it: what crosses is a channel id
-## and a string, and everything else is decided on this side.
+## Joins the bridge's chat seam to the services layer's router, here because this is the only object
+## holding both: the bridge knows the wire, the services know the rules, so a client cannot send a
+## line with somebody else's name (only a channel id and a string cross).
 func _wire_chat() -> void:
 	if bridge == null or services == null:
 		return
@@ -927,13 +890,9 @@ func _wire_chat() -> void:
 	bridge.connect("say_requested", _on_say_requested)
 	services.connect("command_entered", _on_chat_command)
 
-## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
-##
-## [b]Opened [member ZzVote.open_after_sec] into the last round on a map and applied when that
-## round ends[/b]; see [code]game/zz_vote.gd[/code]. A server owner turns it off or reshapes it
-## in `user://cfg/zombiezone_vote.json` or `game.yml`'s `metadata: map_vote:`, keyed as dot-vote's
-## [DotVoteRules]. A vote that cannot be built is a WARN and the rotation alone, never a server
-## that will not start.
+## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`. Opened
+## [member ZzVote.open_after_sec] into the last round, applied when it ends (game/zz_vote.gd); tuned in
+## `user://cfg/zombiezone_vote.json` or `game.yml`; one that cannot be built is a WARN, never a halt.
 func _build_vote(world: ZzGame) -> void:
 	if world.catalogue == null:
 		return
@@ -1057,10 +1016,9 @@ func _build_vote(world: ZzGame) -> void:
 				vote.forget_voter(StringName(str(session.userid)))
 		)
 
-## Votebans, dot-vote's `DotVoteBans`, and the two things team damage asks of them: a vote
-## ([member ZzConfig.team_damage_vote]) and an outright ban ([member ZzConfig.team_damage_ban]).
-## Loaded by path so a host whose dot-vote predates them runs without; a game never names the
-## class. Voter ids are the session's userid, the same as the map vote's.
+## Votebans, dot-vote's `DotVoteBans`, for team damage: a vote ([member ZzConfig.team_damage_vote])
+## and a ban ([member ZzConfig.team_damage_ban]). Loaded by path so a host whose dot-vote predates
+## them runs without; voter ids are the session's userid.
 func _build_voteban(world: ZzGame) -> void:
 	var path := "res://addons/dot_vote/runtime/dot_vote_bans.gd"
 
@@ -1201,11 +1159,8 @@ func _attach_visibility(world: ZzGame) -> void:
 		mesh = read.value if read.ok else null
 	var _on: Variant = call(&"use_map_visibility", mesh)
 
-## An achievement is told to the one person who earned it.
-##
-## [b]As a notice, which a client already draws in its chat box[/b], rather than a new event
-## kind: an unlock is text for one player, which is exactly what a notice is — and a stand-in
-## never earns one, because [ZzProgress] does not count them.
+## An achievement is told to the one person who earned it, as a notice (a client already draws it in
+## chat) rather than a new event kind; a stand-in never earns one ([ZzProgress] skips them).
 func _wire_progress(world: ZzGame) -> void:
 	if bridge == null:
 		return
@@ -1258,11 +1213,9 @@ func _on_say_requested(peer_id: int, channel_id: StringName, text: String) -> vo
 	# to the server.
 	bridge.call("notice", peer_id, said.error.message)
 
-## A `!command` typed into chat. Run through the console as the person who typed it.
-##
-## [b]As THEM, not as the server.[/b] `run_command_as_uid` builds a context with that
-## player's own flags, so `!kick` from somebody without the flag is refused by the same file
-## that refuses it at the console — rather than by this function having an opinion.
+## A `!command` typed into chat, run through the console as THEM, not the server:
+## `run_command_as_uid` builds a context with the player's own flags, so the refusal is the same
+## file's that refuses it at the console.
 func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) -> void:
 	if server == null:
 		return

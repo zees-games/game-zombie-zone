@@ -252,23 +252,9 @@ func _serve_item_events() -> void:
 		game.possession.changed.connect(_on_possession_changed)
 
 
-## Hands dot-combat the two callables that make lag compensation real.
-##
-## [b]Two lines, and without them the setting is a lie.[/b] dot-combat names no dot-net type
-## — the whole point of the seam — so it takes a rewind and a restore as [Callable]s and,
-## unset, says so once at boot and then resolves every shot against the present anyway. A
-## game that left the flag on and the callables unset would report lag compensation as
-## enabled, do nothing, and cost the next reader an afternoon; this family calls that
-## "produced correctly and consumed by nothing" and it is its second most repeated bug.
-##
-## dot-net already records the history: `DotNetManager.server_tick` calls
-## `history.record(identities, tick)` once a snapshot. There is nothing to build.
-##
-## [b]The shooter is not excluded, and that is safe here rather than an oversight.[/b]
-## `DotNetHistory.rewind` can leave one entity alone so that rewinding does not move the
-## shooter's own muzzle — but `resolve_shot` fixes `shot.origin` before it rewinds anything,
-## so the muzzle has already been decided, and the resolver refuses self damage separately.
-## What excluding would buy is one fewer entity moved and put back.
+## Hands dot-combat the rewind and restore callables that make lag compensation real: unset, it
+## resolves every shot against the present while the flag claims otherwise. The shooter is not excluded:
+## `resolve_shot` fixes `shot.origin` before it rewinds, and the resolver refuses self damage.
 func _wire_lag_compensation() -> void:
 	if game.combat == null or net == null:
 		return
@@ -289,12 +275,8 @@ func _wire_lag_compensation() -> void:
 	})
 
 
-## Opens the link under [param parent], whose NAME is half the RPC routing.
-##
-## A [DotServer] on one end and a [DotClientLink] on the other, both called `Server`, with
-## this node under each: Godot routes an RPC by the receiver's node path, so a link opened
-## anywhere else is addressed by a path the other end does not have and every message lands
-## nowhere, with no error on either side.
+## Opens the link under [param parent], whose NAME is half the RPC routing: Godot routes an RPC by
+## node path, so a link not under a `Server` node on both ends lands every message nowhere, silently.
 func open_link(parent: Node) -> void:
 	if parent == null or link != null:
 		return
@@ -306,13 +288,9 @@ func open_link(parent: Node) -> void:
 	DotGameLink.attach(link, parent, self, ZzNetLink.NODE_NAME)
 
 
-## How every dot-net message reaches a peer.
-##
-## [b]Routed by DELIVERY, not by kind.[/b] Snapshots are unreliable and go on the snapshot
-## call; everything else is reliable, and which reliable call it is depends on which end is
-## sending — the server has events, the client has requests. Sending them all as events
-## works on a server and silently drops every client request, which is a client that
-## connects, draws, and can never ask for anything.
+## How every dot-net message reaches a peer, routed by DELIVERY: snapshots on the unreliable call,
+## the rest reliable by direction (server events, client requests). Sending all as events silently
+## drops every client request.
 func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
 	if link == null:
 		return
@@ -384,11 +362,8 @@ func add_player(peer_id: int, session_id: int, display_name: String) -> DotResul
 	return DotResult.success(player)
 
 
-## Somebody the world drives itself: a stand-in, or a test's player.
-##
-## [b]The same entity a peer gets, with a peer id of zero.[/b] A bot is replicated, scored
-## and crushed exactly like a person — what it does not have is a socket — and that is the
-## whole of the difference.
+## Somebody the world drives itself: a stand-in, or a test's player. The same entity a peer gets,
+## with a peer id of zero; replicated, scored and crushed like a person, just without a socket.
 func add_bot(display_name: String, team: int = 0) -> ZzPlayer:
 	if net == null or not net.is_server or game == null:
 		return null
@@ -425,9 +400,8 @@ func remove_player(session_id: int) -> void:
 	_ready_peers.erase(peer_id)
 
 	# Released BEFORE the game is told: `game.remove_player` emits `player_removed`, which
-	# `_on_player_removed` answers by releasing the entity and broadcasting the LEAVE.
-	# Releasing first empties `_behaviours`, so that handler finds nothing and this stays
-	# the one place a leaving player is announced.
+	# `_on_player_removed` answers by releasing and broadcasting the LEAVE. Releasing first empties
+	# `_behaviours`, so this stays the one place a leaving player is announced.
 	_release_entity(session_id)
 	game.remove_player(player_key(session_id))
 
@@ -451,11 +425,9 @@ func _on_player_added(id: StringName) -> void:
 	if _behaviours.has(session_id):
 		return
 
-	# [b]Every id on the wire is `u<session>`, and anything else parses back to zero.[/b] A
-	# world that added a player called `bot` would replicate it under session 0 — which is
-	# also dot-net's broadcast address — and a second one would silently replace the first
-	# in this table. Refused with a line rather than accepted quietly: the symptom otherwise
-	# is one stand-in playing and the other standing still for ever.
+	# Every id on the wire is `u<session>`; anything else parses back to zero, dot-net's broadcast
+	# address, and a second such player would silently replace the first here. Refused with a line
+	# instead of accepted quietly.
 	if player_key(session_id) != id:
 		DotLog.warn(CHANNEL, "a player whose id is not a session key is not replicated", {
 			"id": String(id), "hint": "use add_bot() or ZzNetBridge.player_key()",
@@ -588,11 +560,8 @@ func _on_player_died(player_id: StringName, by: StringName, why: StringName) -> 
 	))
 
 
-## A view changed on the server. Told to its owner and to nobody else.
-##
-## [b]To the one peer, because a camera is private.[/b] Who somebody is watching is a fact
-## about them that nobody else has any business knowing — and a stand-in, whose peer is
-## zero, is told nothing, which `_tell` guarantees rather than this.
+## A view changed on the server, told to its owner only: who somebody watches is private, and a
+## stand-in (peer zero) is told nothing, which `_tell` guarantees.
 func _on_spectate_changed(key: String) -> void:
 	var player_id := StringName(key)
 
@@ -658,10 +627,9 @@ func server_tick(tick: int) -> void:
 
 		_unregistered_in_tick.clear()
 
-	# Belt and braces: `net.server_tick` drives the entities, and the first player behaviour
-	# through calls `ensure_game_ticked`. A server with nobody on it has no behaviours at
-	# all, and a world that only ticked when somebody was connected is a server whose round
-	# clock stops between players — which looks like the server having hung.
+	# Belt and braces: `net.server_tick` drives the entities, but a server with nobody on it has no
+	# behaviours, and a world that only ticked with somebody connected stops its round clock between
+	# players, which looks like a hang.
 	ensure_game_ticked(tick)
 
 	if tick % CLOCK_EVERY == 0:
@@ -820,12 +788,8 @@ func receive_input(peer_id: int, payload: PackedByteArray) -> DotResult:
 	return pushed
 
 
-## Text for one player: a refusal, a rate limit, a command's reply.
-##
-## [b]To the one person who asked, and that is the whole reason this is a method.[/b] "You
-## are talking too fast" and "you are gagged" are the two commonest things a server says,
-## and both are nobody else's business — a broadcast refusal is a punishment announced to
-## everybody.
+## Text for one player: a refusal, a rate limit, a command's reply. To the one who asked, because
+## 'you are gagged' is nobody else's business and a broadcast refusal is a punishment announced.
 func notice(peer_id: int, text: String) -> void:
 	_tell(peer_id, ZzEvents.Kind.NOTICE, ZzEventsText.write_notice(text))
 
@@ -835,12 +799,9 @@ func send_chat(peer_id: int, wire: Dictionary) -> void:
 	_tell(peer_id, ZzEvents.Kind.CHAT, ZzEventsText.write_chat(wire))
 
 
-## A voice frame, in whichever direction.
-##
-## [b]Not a [ZzEvent].[/b] Voice is fifty packets a second and every event here is reliable,
-## so a talk spurt would put a hundred retransmittable messages in front of a down. It also does not go through [DotNetManager]: the message registry seals a
-## message set and hashes it, and adding a fifty-hertz opaque blob buys nothing — the packet
-## has its own header, sequence and validation in [DotVoicePacket].
+## A voice frame, in either direction. Not a [ZzEvent]: fifty reliable packets a second would queue
+## in front of a down, and it skips [DotNetManager]'s sealed message set; [DotVoicePacket] has its own
+## header, sequence and validation.
 func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 	if payload.is_empty():
 		return DotResult.fail(DotError.CODE_INVALID, "An empty voice frame.")
@@ -854,11 +815,9 @@ func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 				DotError.CODE_FORBIDDEN, "That peer has nobody in the world."
 			)
 
-		# [b]One path or the other, never both.[/b] [DotGameModule] assigns
-		# `voice_relay_fn` to the services layer's `relay_voice`; a game that ALSO connected
-		# `voice_requested` to the same router would relay every frame twice — a doubled
-		# talk spurt, a doubled rate limit, and a sequence number the jitter buffer sees go
-		# backwards.
+		# One path or the other, never both: [DotGameModule] assigns `voice_relay_fn`, so also connecting
+		# `voice_requested` to the same router would relay every frame twice (doubled spurt, doubled rate
+		# limit, a sequence the jitter buffer sees go backwards).
 		if voice_relay_fn.is_valid():
 			voice_relay_fn.call(peer_id, payload)
 		else:
@@ -955,11 +914,8 @@ func _resync_fitting(peer_id: int, player: Variant, base: DotWeaponDef) -> void:
 	_tell(peer_id, ZzEvents.Kind.FITTING, ZzEventsText.write_fit(base.id, code))
 
 
-## Somebody who is out asked to look at somebody else. The server's list, the server's rule.
-##
-## [b]A refusal goes back as a notice rather than being dropped.[/b] "This server only lets
-## you watch your own side" is the answer to a key that did nothing, and a key that silently
-## does nothing is reported as broken.
+## Somebody who is out asked to look at somebody else; the server's list, the server's rule. A refusal
+## goes back as a notice, because a key that silently does nothing is reported as broken.
 func _spectate_step(peer_id: int, direction: int) -> void:
 	var session_id := player_for_peer(peer_id)
 
@@ -972,12 +928,9 @@ func _spectate_step(peer_id: int, direction: int) -> void:
 		notice(peer_id, moved.error.message)
 
 
-## Everything in the world, to one peer, once its own copy exists.
-##
-## [b]On READY and not on connect, and the difference is a whole join's worth of
-## messages.[/b] dot-server's signon finishes and THEN the client builds its scene; a server
-## that started talking at connect is one whose JOIN and MAP land on a node that does not
-## exist yet and are lost, one "Node not found" per call.
+## Everything in the world, to one peer, once its own copy exists: on READY, not on connect, because
+## signon finishes and THEN the client builds its scene, so an earlier JOIN and MAP land on a node
+## that does not exist yet and are lost.
 func _admit(peer_id: int) -> void:
 	if peer_id <= 0:
 		return
@@ -1142,13 +1095,9 @@ func _join_body(session_id: int) -> PackedByteArray:
 	)
 
 
-## Tells everybody who somebody is now: a profile that arrived after they were seated, a
-## wardrobe change, an operator's rename. Server only.
-##
-## [b]Through JOIN, which a client already applies to a player it has.[/b] A second message
-## for "this person changed" would be a second thing a joiner has to be told and a second
-## order two of them can arrive in; a JOIN is idempotent and already carries all of it.
-## An empty [param display_name] keeps the one they have.
+## Tells everybody who somebody is now: a late profile, a wardrobe change, an operator's rename.
+## Server only. Through JOIN, which a client already applies idempotently to a player it has; an empty
+## [param display_name] keeps the current one.
 func refresh_player(session_id: int, display_name: String, avatar: DotAvatar) -> bool:
 	if net == null or not net.is_server or game == null:
 		return false
@@ -1166,12 +1115,9 @@ func refresh_player(session_id: int, display_name: String, avatar: DotAvatar) ->
 	return true
 
 
-## To every peer that has said it is ready, and to nobody else.
-##
-## [b]An empty body is dropped rather than sent.[/b] It means an encoder was handed
-## something that had already gone — a player whose entity was released before the LEAVE was
-## written — and a zero-length event decodes on the far end as a valid message about
-## nothing, which is the truncation bug this family has already paid for once.
+## To every peer that has said it is ready, and to nobody else. An empty body is dropped, not sent:
+## it means an encoder was handed something already gone, and a zero-length event decodes as a valid
+## message about nothing (the truncation bug).
 func _weapon_drop_body(id: int, state: Dictionary, at: Transform3D, velocity: Vector3, seconds: float, rest: bool) -> PackedByteArray:
 	return ZzEvents.write_weapon_drop(id, StringName(state["id"]), int(state.get("magazine", 0)),
 		int(state.get("reserve", 0)), at, velocity, seconds, rest)
@@ -1280,11 +1226,8 @@ func _splat_for_others(shooter: StringName, shooter_peer: int, point: Vector3) -
 		var _sent := splat(point, who.eye_position(), shooter_peer)
 
 
-## One peer, and never zero.
-##
-## `net.send(msg, 0)` is a BROADCAST in dot-net, so a helper that passed a missing peer id
-## straight through would send one player's private message to everybody. game-hungario
-## shipped exactly that.
+## One peer, and never zero: `net.send(msg, 0)` is a BROADCAST in dot-net, so a missing peer id
+## passed straight through would send one player's private message to everybody.
 func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	if peer_id <= 0 or net == null or body.is_empty():
 		return
@@ -1711,10 +1654,9 @@ func _on_world_event_last(kind: int, reader: DotNetReader) -> void:
 ## Interest tags a zombie entity carries, and the radii (metres) [method make_interest] gives them.
 const TAG_COMMON := "common"
 const TAG_SPECIAL := "special"
-## A common is a body in a crowd: the fog (0.008 on the biggest map) has taken half of it by 80 m,
-## and a horde spawns within 60 m of a survivor (`spawn_max_distance`), so the ones past this are
-## ones nobody is fighting. A designer's number: the cost of too small is a zombie that appears
-## at the edge of the dark, of too large is the snapshot (docs/survival.md).
+## A common is a body in a crowd: fog has taken half of it by 80 m and a horde spawns within 60 m
+## (`spawn_max_distance`), so past this nobody fights it. Too small pops a zombie at the edge of the
+## dark, too large costs snapshot bytes (docs/survival.md).
 const COMMON_RADIUS := 80.0
 ## A special is a threat the team plans around (a rider heard before it is seen, a sleeper), so it
 ## is told from further out. There are a handful, not hundreds, so the width costs little.
@@ -1730,13 +1672,9 @@ const ZOMBIE_LINGER_SEC := 3.0
 const STALE_MSEC := 1000
 const NEAR_KEPT := 30.0
 
-## The server's interest rule. [b]What is always relevant, and why.[/b] Players (four to a few
-## dozen; a teammate's outline, health and position are the HUD), the boss (one entity), and
-## everything the world announces by event rather than by snapshot. Zombies are by distance,
-## because they were 274 of the 302 ms a tick at 128 survivors (docs/survival.md): each peer was
-## sent every one of them. Not [DotNetInterestGrid]: it has one radius for everything, and a
-## special needs a wider one than a common; [DotNetInterestDistance] has one per tag, and its
-## query over a few hundred entities is cached for a quarter of a second per peer.
+## The server's interest rule. Always relevant: players, the boss, and everything announced by event.
+## Zombies are by distance (274 of 302 ms a tick at 128 survivors went to sending all of them,
+## docs/survival.md), by tag through [DotNetInterestDistance] since a special needs a wider radius.
 static func make_interest(config: ZzConfig = null) -> DotNetInterest:
 	var interest := DotNetInterestDistance.new()
 	interest.radius = DEFAULT_RADIUS
@@ -1984,15 +1922,9 @@ func _apply_hello(reader: DotNetReader) -> void:
 		for why in ZzCaps.adopt_advertised(String(hello["caps"])):
 			DotLog.error(CHANNEL, "the server's limits are not usable", {"why": why})
 
-	# [b]The server's tick rate, before anything is derived from it.[/b] Another game in
-	# this family shipped with HELLO carrying this and nothing reading it: a browser client
-	# counted at the 60 its export declared against a server on 128, so the correction rate
-	# was 0.96 and every replicated time was out by 128/60. Produced correctly and consumed
-	# by nothing, and invisible to a one-process suite because one process has one engine
-	# rate and both ends agree whatever the wire says.
-	#
-	# Before `sync_from_server`, because the clock converts its error and its lead through
-	# `tick_rate` and would otherwise do that arithmetic at the old rate.
+	# The server's tick rate, before anything is derived from it, and before `sync_from_server`, since
+	# the clock converts its error and lead through `tick_rate`. HELLO carrying it with nothing reading it
+	# once left a client at 60 against a server on 128, every replicated time out by 128/60.
 	_adopt_tick_rate(int(hello["tick_rate"]))
 
 	var rtt := float(rtt_source.call()) if rtt_source.is_valid() else 0.0
@@ -2006,16 +1938,9 @@ func _apply_hello(reader: DotNetReader) -> void:
 	hello_received.emit(local_player_id)
 
 
-## Puts the whole client — the world, every controller and the ENGINE — on the server's rate.
-##
-## That last one is not cosmetic. Measured in another game in this family at 60 against 128:
-## the simulation stayed correct, because the clock is asked how many ticks a frame is worth
-## — it just ran them in bursts of two and three, and the camera advanced 74 mm on six frames
-## out of seven and 112 mm on the seventh. A 47% change in apparent speed, eight times a
-## second.
-##
-## A server never calls this: its rate is `sv_tickrate`, and adopting a peer's would be a
-## client telling the server how fast to run.
+## Puts the whole client (world, controllers and the ENGINE) on the server's rate. The engine too: a
+## 60 against 128 mismatch ran the ticks in bursts and changed apparent speed 47 % eight times a
+## second. A server never calls this: its rate is `sv_tickrate`.
 func _adopt_tick_rate(rate: int) -> void:
 	if net == null or net.is_server or game == null or rate == game.tick_rate:
 		return
@@ -2043,12 +1968,8 @@ func _adopt_tick_rate(rate: int) -> void:
 	})
 
 
-## The map, which on a client is a document it builds exactly as the server did.
-##
-## [b]Refused with a line, never half built.[/b] A client a format behind the server decodes a
-## document it cannot read; [ZzMapDoc] says so, and the honest answer is no map and a WARN
-## rather than a map with holes in it.
-# Both ends: the map's toys
+## The map, which on a client is a document built exactly as the server did. Refused with a line,
+## never half built: a client a format behind gets no map and a WARN rather than a map with holes.
 
 ## The map's toys on the wire, one behaviour per toy in toy order, and the TOYS event that names
 ## their net ids (kept for a joiner).
@@ -2138,12 +2059,9 @@ func _release_toys() -> void:
 	_toy_nets.clear()
 
 
-## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys
-## for that map exist yet or not. [b]A client must know every entity a snapshot carries[/b]:
-## dot-net stops reading a snapshot at the first one it does not know (a body cannot be skipped
-## without its declarations), so a toy mirror missing while the client loads the map, or ever,
-## on a client left on another map, was every player after it frozen. Paired with its toy
-## by index as soon as both are here.
+## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys exist yet.
+## A client must know every entity a snapshot carries: dot-net stops reading at the first unknown
+## one, so a missing mirror froze every player after it. Paired with its toy by index once both are here.
 func _apply_toys(told: Dictionary) -> void:
 	if net == null or net.is_server:
 		return
@@ -2279,22 +2197,9 @@ func _apply_join(reader: DotNetReader) -> void:
 		player.sampler = null
 		player.samples_input = false
 
-		# [b]This client's own player is owned by this client, and nobody else's is.[/b]
-		# Until 2026-09-25 every mirror was built with owner 0, this client's own included,
-		# so `is_owner` was false for the local player, `registry.predicted()` was empty and
-		# `client_tick` simulated nobody: the player moved only when a snapshot came back, a
-		# round trip behind the keys, and the camera — drawn from `render_state`, a blend
-		# against a previous tick the controller never recorded — lurched between where the
-		# player was last teleported and where the server had them. Every check passed
-		# anyway, because a client adopting the server's answer also agrees with the server.
-		#
-		# By session and not by a peer id on the wire: JOIN does not carry one, and what
-		# `is_owner` compares is the owner against THIS registry's local peer — so the local
-		# peer id is the only right value whatever the server calls the connection, and the
-		# wire (and therefore a published pack's server half) is unchanged. HELLO, which sets
-		# `local_player_id`, is sent before every JOIN in `_admit` on the same reliable
-		# channel; [method _apply_hello] still claims a player that got here first, because
-		# an order is a property of the server, not of this file.
+		# This client's own player is owned by this client, nobody else's: with owner 0 for all,
+		# `is_owner` was false, `client_tick` predicted nobody and the camera lurched. By session, not a wire
+		# peer id (JOIN carries none); [method _apply_hello] still claims a player that got here first.
 		var identity := _build_entity(player, _mirror_owner(session_id))
 		var registered := net.registry.register(
 			identity, int(join["net_id"]), net.clock.tick, net.config
@@ -2314,14 +2219,9 @@ func _apply_join(reader: DotNetReader) -> void:
 	roster_changed.emit(session_id)
 
 
-## Who owns a mirrored player on this client: this client, if it is this client's own
-## player, and the server's 0 otherwise.
-##
-## [b]Never the local peer for anybody else[/b], or this client would predict a person whose
-## keys it never had. And a client whose local peer is 0 claims nothing: 0 is the server's
-## owner id, and on such a registry dot-net's `is_owner` (owner == local peer) is already true
-## of every owner-0 mirror — which this function cannot undo, and which no client here runs
-## into, because `ZzClient` takes its id from the multiplayer API and that never answers 0.
+## Who owns a mirrored player on this client: this client if it is its own player, else the server's 0.
+## Never the local peer for anybody else, or it would predict a person whose keys it never had; a client
+## whose local peer is 0 claims nothing (0 is the server's owner id; `ZzClient` never gets 0).
 func _mirror_owner(session_id: int) -> int:
 	if net == null or net.local_peer_id <= 0:
 		return 0
@@ -2332,12 +2232,9 @@ func _mirror_owner(session_id: int) -> int:
 	return 0
 
 
-## The local player's mirror, claimed if it arrived before HELLO said whose it was.
-##
-## Not the order `_admit` sends in, and that is why it is belt and braces rather than a path
-## this game takes: a JOIN that reached this peer before its HELLO would otherwise leave the
-## local player unpredicted for the rest of the session, with every check still passing —
-## which is the bug [method _apply_join] documents.
+## The local player's mirror, claimed if it arrived before HELLO said whose it was. Belt and braces:
+## `_admit` sends HELLO first, but a JOIN ahead of it would leave the local player unpredicted for the
+## session with every check still passing (see [method _apply_join]).
 func _claim_local_player() -> void:
 	var mine: ZzPlayerNet = _behaviours.get(local_player_id)
 

@@ -89,6 +89,32 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+## Thirty-two ticks from time [param t]: returns Vector3i(cost spent, worst tick cost, ticks stepped).
+func _step_block(t: float) -> Vector3i:
+	var spent := 0
+	var worst := 0
+	var ticks := 0
+	for i in 32:
+		if _watch > 0.0:
+			_stuck.sample()
+		var before := Time.get_ticks_usec()
+		if _profile:
+			_profiled_step()
+		else:
+			_game.simulate(TICK)
+		var cost := Time.get_ticks_usec() - before
+		# Not the map's first tick (the round starting: the nav graph, the map built).
+		if _profile and _result.is_empty() and t >= 1.0:
+			_keep_spike(cost, t + float(i) * TICK)
+		spent += cost
+		# Not the tick the hold ended in: a decided round loads the next map in it (one to
+		# two seconds), which is a map start, not the crowd's cost.
+		if _result.is_empty():
+			worst = maxi(worst, cost)
+		ticks += 1
+	return Vector3i(spent, worst, ticks)
+
+
 func _run() -> void:
 	if not await _make_game():
 		return
@@ -109,24 +135,10 @@ func _run() -> void:
 	var started_at := 0.0
 
 	while t < _cap and _result.is_empty():
-		for i in 32:
-			if _watch > 0.0:
-				_stuck.sample()
-			var before := Time.get_ticks_usec()
-			if _profile:
-				_profiled_step()
-			else:
-				_game.simulate(TICK)
-			var cost := Time.get_ticks_usec() - before
-			# Not the map's first tick (the round starting: the nav graph, the map built).
-			if _profile and _result.is_empty() and t >= 1.0:
-				_keep_spike(cost, t + float(i) * TICK)
-			spent += cost
-			# Not the tick the hold ended in: a decided round loads the next map in it (one to
-			# two seconds), which is a map start, not the crowd's cost.
-			if _result.is_empty():
-				worst = maxi(worst, cost)
-			ticks += 1
+		var block := _step_block(t)
+		spent += block.x
+		worst = maxi(worst, block.y)
+		ticks += block.z
 		t += 32.0 * TICK
 		await get_tree().physics_frame
 

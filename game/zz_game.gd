@@ -169,12 +169,9 @@ func _wire_rules() -> void:
 		pass_rules.changed.connect(_on_body_rules_changed)
 
 
-## The `<pack>/<subdir>` directories of the map packs a host running this game with no server
-## has mounted for it: the client shell's Solo play, which fetches the packs a server owner
-## would name (dot-server-deploy's `client/solo.json`) because a tab has no server to name
-## them. Read the way the module reads its server's ([DotGameContent]). Empty everywhere else:
-## a server, a suite, a run from the repository. Looked up by name and duck-typed, because a
-## delivered game may not name a host's class.
+## Map-pack `<pack>/<subdir>` directories a host with no server has mounted (the client shell's
+## Solo play, per dot-server-deploy's `client/solo.json`). Read as the module reads its server's.
+## Empty elsewhere. Duck-typed: a delivered game may not name a host's class.
 static func solo_map_dirs(subdir: String) -> PackedStringArray:
 	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
 	if host == null or not host.has_method(&"map_dirs"):
@@ -189,15 +186,9 @@ func _exit_tree() -> void:
 
 # Building
 
-## Four layers: the world, the survivors, the furniture and the zombies.
-##
-## [b]Survivors do not collide with zombies, and that is the netcode's call, not the
-## design's.[/b] A survivor's movement is predicted and a zombie is drawn a few ticks in the
-## past; a capsule the client cannot see where the server has it is a survivor stopped by
-## nothing on their screen and corrected every tick. The crowd still blocks you — by hitting
-## you: every common's hit slows you (`ZzController.TAGGED`), which is the genre's own answer.
-## Zombies collide with the world and the furniture, and not with each other: a crowd is kept
-## apart by steering, which is smooth, rather than by bodies, which jam in doorways.
+## Four layers: the world, the survivors, the furniture and the zombies. Survivors do not collide
+## with zombies: that is the netcode's call (predicted survivor vs zombie drawn in the past); the crowd
+## blocks by hitting (`ZzController.TAGGED`). Zombies skip each other: steering, not bodies.
 func _build_physics() -> void:
 	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary", &"clip"])
 
@@ -764,12 +755,8 @@ static func _type(id: StringName, armour_share: float) -> DotDamageType:
 	return t
 
 
-## What a box's damage boost does, and nothing else: the difficulty is applied where a zombie's
-## hit is made (see [method zombie_hit]), because it scales what zombies do, not what anybody
-## does to them.
 ## Turns dot-combat's applied damage into [signal hit_landed] for a survivor hitting a zombie.
-## Friendly fire is not a confirmation anybody wants a marker for, and a hit that took nothing
-## (a dead body, an immune zombie) did not land.
+## Friendly fire and a hit that took nothing (dead body, immune zombie) did not land.
 func _on_hit_landed(damage: DotDamage) -> void:
 	if not authoritative or damage.refused or damage.health_lost <= 0.0 \
 			or not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
@@ -831,11 +818,9 @@ func can_be_harmed(player_id: StringName) -> bool:
 	return not harm_gate.is_valid() or bool(harm_gate.call(player_id))
 
 
-## A survivor's bullet or blast reached another survivor, at [param damage]'s amount (the
-## friendly-fire scale already applied). It is added to the shooter's window first, so a new
-## player being reflected still runs up the total that earns a voteban or a ban, and then, when
-## the shooter's damage is reflected, it lands on the shooter instead: the one who was hit takes
-## nothing. Server only.
+## A survivor's bullet or blast reached another survivor, at [param damage] (friendly-fire scale applied).
+## Counted in the shooter's window first (voteban/ban total), then reflected onto the shooter if
+## reflection is on: the one hit takes nothing. Server only.
 func _team_damage_hit(damage: DotDamage) -> void:
 	var by := player_for_entity(damage.attacker)
 	var victim := player_for_entity(damage.victim)
@@ -1306,10 +1291,9 @@ func start() -> void:
 	if not authoritative:
 		return
 
-	# A map laid out when the world opened, before the module added the delivered maps, is the
-	# practice street; if the server now has maps it would rather play, the first map is one of
-	# those. Found by dot-server-deploy's zombiezone_client: a delivered server read six maps and
-	# played the one built in.
+	# A map laid out before the module added the delivered maps is the practice street; if the
+	# server now has maps it would rather play, the first map is one of those (zombiezone_client
+	# found a server reading six maps and playing the built-in one).
 	if not map_doc.is_empty() and catalogue != null and next_map_id == &"" \
 			and not catalogue.playable(config.map_ids).has(StringName(str(map_doc.get("id", "")))):
 		map_doc = {}
@@ -1427,10 +1411,8 @@ func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 	DotLog.info(CHANNEL, "map over", {"number": number, "won": _won, "why": _why, "next": String(next_map_id)})
 
 
-## Every map this server plays, as the map menu (M) lists them: `{id, name, mode, detail,
-## current}`, exodus or survival as the mode and the blurb under it, with the team it is built
-## for. Solo the client's list, online the server's (the module hands it to dot-vote's map
-## menu), so both say the same.
+## Every map this server plays, for the map menu (M): `{id, name, mode, detail, current}`.
+## Solo the client's list, online the server's (via dot-vote's map menu), so both say the same.
 func map_rows() -> Array:
 	var out: Array = []
 	if catalogue == null:
@@ -1451,10 +1433,9 @@ func map_rows() -> Array:
 	return out
 
 
-## The map menu's change: [param id] now, not after this map. The next map is set and a fresh
-## round begins on it (dot-match's `begin_round_now`: the map called off is neither won nor
-## lost, and its retries are forgotten); with no match running it is simply built. Authority
-## only.
+## The map menu's change: [param id] now. The next map is set and a fresh round begins
+## (dot-match `begin_round_now`: the map called off is neither won nor lost); with no match
+## running it is simply built. Authority only.
 func change_map_now(id: StringName) -> DotResult:
 	if not authoritative:
 		return DotResult.fail(DotError.CODE_STATE, "Only the server changes the map.")
@@ -3275,10 +3256,9 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 
-## The fall a survivor's death gets: dot-player-char's reaction rule over the server's weights,
-## seeded from the player and the tick. The killing hit's direction when it had one, else away
-## from whoever did it (a zombie's claw carries none); bleeding out and falling push nothing.
-## A friend's gun is a weapon def, so a heavy one may launch the body as it would a zombie.
+## The fall a survivor's death gets: dot-player-char's reaction rule, seeded from player and tick.
+## Killing hit's direction, else away from the killer; bleeding out and falling push nothing.
+## A heavy friend's weapon may launch the body as it would a zombie.
 func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
 	var direction := Vector3.ZERO
 	var headshot := false
@@ -3515,10 +3495,9 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 	return true
 
 
-## Fits [param weapon_id] the way [param fitting] says, for [param player], now and whenever
-## they hold one later (an empty fitting takes everything off). The server's check of what a
-## client asks: the fitting must be legal for the weapon's base def in the shared attachment
-## catalogue, or it is refused whole. The stats follow from the arsenal (`DotWeaponArsenal.fit`).
+## Fits [param weapon_id] per [param fitting] for [param player], now and on later holds.
+## Server's check of a client's ask: legal for the base def in the shared attachment catalogue,
+## or refused whole. Stats follow from `DotWeaponArsenal.fit`.
 func fit_weapon(player: ZzPlayer, weapon_id: StringName, fitting: DotWeaponFitting) -> DotResult:
 	var base := ZzWeapons.def_of(weapon_id) if player != null and fitting != null else null
 
@@ -3764,13 +3743,8 @@ func _bot_weapon_idle(player: ZzPlayer, command: DotWeaponCommand) -> bool:
 	return (_tick + hash(player.entity_id)) % every != 0
 
 
-## What a weapon put into the world, as one of [ZzHazards]' projectiles.
-##
-## [b]dot-weapon spawns nothing; it says what should exist.[/b] Until this was here every
-## grenade, sticky charge and rocket in the game was a use that cost ammunition and did
-## nothing at all: `_advance_weapons` resolved `outcome.shots` and dropped `outcome.spawns`.
-## A pack says what a throwable is by its tags (`molotov`, `pipe_bomb`, `bile`, as
-## zed-dot-weapons' are), so a pack the game has never heard of still throws the right thing;
+## What a weapon put into the world, as one of [ZzHazards]' projectiles. dot-weapon spawns nothing,
+## it says what should exist; a throwable is known by its tags (`molotov`, `pipe_bomb`, `bile`),
 ## anything else explosive is a grenade on its fuse, or on contact without one.
 func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
 	var def := ZzWeapons.def_of(spawn.id)
@@ -3973,10 +3947,8 @@ func _step(delta: float) -> void:
 
 # Toys
 
-## Every survivor against the map's toys, after they moved: a walk into a barrel or a ball
-## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
-## Zombies walk through them: a crowd that shoved barrels about would be a crowd steering
-## round its own debris.
+## Every survivor against the map's toys after they moved: a walk into a barrel or ball sends it
+## on; then the box's own tick. Server side. Zombies walk through them.
 func _advance_toys(delta: float) -> void:
 	if map == null or map.toys == null or map.toys.count() == 0:
 		return

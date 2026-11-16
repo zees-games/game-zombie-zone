@@ -439,69 +439,86 @@ func _one_tick(tick: int) -> void:
 	g._advance_toys(delta)
 	wt = _lap_logic("logic.toys", wt)
 	at = _add("logic", at)
-	var h = g.horde
-	if h != null:
-		h._time += delta
-		var ht := Time.get_ticks_usec()
-		h._rebuild_candidates()
-		ht = _lap_logic("horde.candidates", ht)
-		h._rebuild_grid()
-		ht = _lap_logic("horde.grid", ht)
-		h.spawner.set_candidates(h._candidates)
-		h._land_alerts()
-		ht = _lap_logic("horde.alerts", ht)
-		h._advance_lures()
-		h._advance_bile()
-		ht = _lap_logic("horde.lures_bile", ht)
-		at = _add("horde_other", at)
-		var sp: DotNpcSpawner = h.spawner
-		sp._now += delta
-		sp._ticks += 1
-		sp.deferred_paths = true  # as ZzHorde.setup sets it in every game
-		sp.sense_workers = _npc_workers
-		sp.path_workers = _npc_workers
-		sp.think_workers = _npc_workers
-		if _lod == null and not _cvars.is_empty():
-			var console := DotConsole.new()
-			add_child(console)
-			DotGameNpcLod.ensure_cvars(console)
-			for name: String in _cvars:
-				console.set_cvar(name, _cvars[name])
-			_lod = DotGameNpcLod.attach(self, console, sp)
-		if _lod != null:
-			_lod.follow(delta)
-		sp._perception.perceive()
-		at = _add("senses", at)
-		if _detail:
-			_think_detail(sp, delta)
+	if g.horde != null:
+		at = _tick_horde(g.horde, delta, at)
+	at = _tick_logic_tail(g, delta, at)
+	at = _tick_net(tick, at)
+	_lap["total"] = at - total_start
+
+
+## The horde's share of a tick: its candidates, grid, alerts and lures, then the brains.
+func _tick_horde(h, delta: float, at: int) -> int:
+	h._time += delta
+	var ht := Time.get_ticks_usec()
+	h._rebuild_candidates()
+	ht = _lap_logic("horde.candidates", ht)
+	h._rebuild_grid()
+	ht = _lap_logic("horde.grid", ht)
+	h.spawner.set_candidates(h._candidates)
+	h._land_alerts()
+	ht = _lap_logic("horde.alerts", ht)
+	h._advance_lures()
+	h._advance_bile()
+	ht = _lap_logic("horde.lures_bile", ht)
+	at = _add("horde_other", at)
+	return _tick_horde_npcs(h, delta, at)
+
+
+## The spawner: senses, brains, the bodies, then the horde's own pacing.
+func _tick_horde_npcs(h, delta: float, at: int) -> int:
+	var sp: DotNpcSpawner = h.spawner
+	sp._now += delta
+	sp._ticks += 1
+	sp.deferred_paths = true  # as ZzHorde.setup sets it in every game
+	sp.sense_workers = _npc_workers
+	sp.path_workers = _npc_workers
+	sp.think_workers = _npc_workers
+	if _lod == null and not _cvars.is_empty():
+		var console := DotConsole.new()
+		add_child(console)
+		DotGameNpcLod.ensure_cvars(console)
+		for name: String in _cvars:
+			console.set_cvar(name, _cvars[name])
+		_lod = DotGameNpcLod.attach(self, console, sp)
+	if _lod != null:
+		_lod.follow(delta)
+	sp._perception.perceive()
+	at = _add("senses", at)
+	if _detail:
+		_think_detail(sp, delta)
+	else:
+		sp._think(delta)
+	at = _add("brains", at)
+	sp._perception.reclaim()
+	var speed: float = h.zombie_speed_scale * h.wave_speed_scale
+	at = _add("horde_other", at)
+	for npc: DotNpcInstance in sp.all_npcs():
+		if npc.is_alive() and npc.node != null and npc.node.has_method(&"tick"):
+			npc.node.speed_scale = speed
+			npc.node.tick(delta)
+	at = _add("bodies", at)
+	var ht := Time.get_ticks_usec()
+	h.squads.prune()
+	h._release_pending()
+	ht = _lap_logic("horde.prune_release", ht)
+	if h.pacing:
+		if h.waves_mode:
+			h._advance_panic()
 		else:
-			sp._think(delta)
-		at = _add("brains", at)
-		sp._perception.reclaim()
-		var speed: float = h.zombie_speed_scale * h.wave_speed_scale
-		at = _add("horde_other", at)
-		for npc: DotNpcInstance in sp.all_npcs():
-			if npc.is_alive() and npc.node != null and npc.node.has_method(&"tick"):
-				npc.node.speed_scale = speed
-				npc.node.tick(delta)
-		at = _add("bodies", at)
-		ht = Time.get_ticks_usec()
-		h.squads.prune()
-		h._release_pending()
-		ht = _lap_logic("horde.prune_release", ht)
-		if h.pacing:
-			if h.waves_mode:
-				h._advance_panic()
-			else:
-				h._advance_mobs()
-				ht = _lap_logic("horde.mobs", ht)
-				h._advance_specials()
-				ht = _lap_logic("horde.specials", ht)
-				h._advance_brute()
-				ht = _lap_logic("horde.brute", ht)
-				h._advance_panic()
-				ht = _lap_logic("horde.panic", ht)
-		at = _add("horde_other", at)
+			h._advance_mobs()
+			ht = _lap_logic("horde.mobs", ht)
+			h._advance_specials()
+			ht = _lap_logic("horde.specials", ht)
+			h._advance_brute()
+			ht = _lap_logic("horde.brute", ht)
+			h._advance_panic()
+			ht = _lap_logic("horde.panic", ht)
+	at = _add("horde_other", at)
+	return at
+
+
+## ZzGame._step's tail: pins, hazards, boxes, loot, bodies, combat, spectators and the match.
+func _tick_logic_tail(g: ZzGame, delta: float, at: int) -> int:
 	var lt := Time.get_ticks_usec()
 	if g.pins != null:
 		g.pins.advance(delta)
@@ -524,7 +541,11 @@ func _one_tick(tick: int) -> void:
 		g.match_node.tick(g._tick)
 	lt = _lap_logic("logic.spectate_match", lt)
 	at = _add("logic", at)
+	return at
 
+
+## The manager's half of net.server_tick: the entities' pull, then the snapshots.
+func _tick_net(tick: int, at: int) -> int:
 	# The manager's half of net.server_tick, apart: the entities' pull, then the snapshots.
 	_net.clock.tick = maxi(_net.clock.tick, tick)
 	var identities := _net.registry.all()
@@ -553,7 +574,7 @@ func _one_tick(tick: int) -> void:
 	if tick % ZzNetBridge.CLOCK_EVERY == 0:
 		_bridge._broadcast(ZzEvents.Kind.CLOCK, _bridge._clock_body())
 	at = _add("net_snapshot", at)
-	_lap["total"] = at - total_start
+	return at
 
 
 func _step_player(g: ZzGame, player: Object, delta: float) -> void:

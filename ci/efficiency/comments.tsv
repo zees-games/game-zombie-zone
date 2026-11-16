@@ -11,8 +11,6 @@ examples/headless_weapons.gd::long_block	1
 game/net/zz_event.gd::history	1
 game/net/zz_event.gd::long_block	3
 game/net/zz_events.gd::long_block	5
-game/net/zz_net_bridge.gd::history	1
-game/net/zz_net_bridge.gd::long_block	25
 game/net/zz_net_command.gd::long_block	1
 game/net/zz_net_link.gd::history	1
 game/net/zz_npc_net.gd::long_block	1
@@ -44,8 +42,6 @@ game/zz_figure.gd::long_block	2
 game/zz_fixtures.gd::history	1
 game/zz_fixtures.gd::long_block	2
 game/zz_footing.gd::long_block	1
-game/zz_game.gd::history	1
-game/zz_game.gd::long_block	11
 game/zz_hazards.gd::long_block	1
 game/zz_horde.gd::banner	11
 game/zz_horde.gd::long_block	8
@@ -58,7 +54,6 @@ game/zz_map_doc.gd::banner	9
 game/zz_materials.gd::long_block	5
 game/zz_mechanics.gd::history	1
 game/zz_mechanics.gd::long_block	2
-game/zz_module.gd::long_block	18
 game/zz_nav_graph.gd::long_block	1
 game/zz_nav_job.gd::long_block	1
 game/zz_nav_notes.gd::banner	3
@@ -118,8 +113,7 @@ tools/measure_props.gd::long_block	2
 tools/nav_render.gd::long_block	1
 tools/render_cover.gd::long_block	1
 tools/server_probe.gd::long_block	1
-tools/shot.gd::history	1
-tools/shot.gd::long_block	2
+tools/shot.gd::long_block	1
 tools/soak.gd::long_block	1
 tools/solid_props.gd::long_block	1
 tools/stuck_meter.gd::long_block	1

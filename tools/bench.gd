@@ -34,7 +34,7 @@ var _load_s := 0.0
 var _monitors: Array[PackedFloat64Array] = []
 
 
-func _run() -> void:
+func _read_args() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--zombies="):
 			_count = arg.trim_prefix("--zombies=").to_int()
@@ -53,6 +53,37 @@ func _run() -> void:
 		elif arg.begins_with("--ring="):
 			var r := arg.trim_prefix("--ring=").split(",")
 			_ring = Vector2(r[0].to_float(), r[1].to_float())
+
+
+## The PROFILE, AB and PARITY lines of a --profile run, then the profiler freed.
+func _print_profile() -> void:
+	var parts: Dictionary = _profiler.get(&"_parts")
+	for part: String in parts:
+		print("PROFILE %-10s %.3f ms/tick" % [part, float(parts[part]) / 1000.0 / maxf(1.0, _ticks)])
+	for arm: int in _ab_ticks:
+		print("AB reuse=%d h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [arm, float(_ab_us[arm].x) / 1000.0 / maxf(1.0, _ab_ticks[arm]),
+			float(_ab_us[arm].y) / 1000.0 / maxf(1.0, _ab_ticks[arm]), _ab_ticks[arm]])
+	for side: int in _abn_ticks:
+		var n := maxf(1.0, _abn_ticks[side]) * 1000.0
+		print("AB native=%d h.grid %.3f h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [side, _abn_us[side].z / n,
+			_abn_us[side].x / n, _abn_us[side].y / n, _abn_ticks[side]])
+	if _crowd_parity:
+		print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
+	_profiler.free()
+
+
+## The ticks and engine monitors, averaged over the measured frames.
+func _print_monitors(game: ZzGame) -> void:
+	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0])
+	for m in _monitors:
+		for i in 5:
+			sums[i] += m[i] / maxf(1.0, _monitors.size())
+	print("TICKS game_tick_ms_per_frame=%.2f (of phys_ms; the rest is the engine step and other nodes)" % (float(game.tick_us_total - _tick_us_at_warm) / 1000.0 / maxf(1.0, _monitors.size())))
+	print("MONITORS physics_process_ms=%.2f (the frame's slowest step) active_3d=%.1f pairs=%.1f islands=%.1f horde_frame_ms=%.2f" % [sums[0], sums[1], sums[2], sums[3], sums[4]])
+
+
+func _run() -> void:
+	_read_args()
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
 	var waited := 0.0
@@ -114,48 +145,42 @@ func _run() -> void:
 		if _recording and not was_recording:
 			_tick_us_at_warm = game.tick_us_total
 		if _recording:
-			draws.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
-			objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
-			prims.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
-			alive_sum += _alive(game)
-			_monitors.append(PackedFloat64Array([Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
-				Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS), Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS),
-				Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT), float(game.horde_frame_us) / 1000.0]))
-			gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp))
-			cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu())
+			alive_sum += _record_frame(game, vp, draws, objects, prims, gpu, cpu)
 	_clock.stop()
 	if _profiler != null:
-		var parts: Dictionary = _profiler.get(&"_parts")
-		for part: String in parts:
-			print("PROFILE %-10s %.3f ms/tick" % [part, float(parts[part]) / 1000.0 / maxf(1.0, _ticks)])
-		for arm: int in _ab_ticks:
-			print("AB reuse=%d h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [arm, float(_ab_us[arm].x) / 1000.0 / maxf(1.0, _ab_ticks[arm]),
-				float(_ab_us[arm].y) / 1000.0 / maxf(1.0, _ab_ticks[arm]), _ab_ticks[arm]])
-		for side: int in _abn_ticks:
-			var n := maxf(1.0, _abn_ticks[side]) * 1000.0
-			print("AB native=%d h.grid %.3f h.brains %.3f h.bodies %.3f ms/tick over %d ticks" % [side, _abn_us[side].z / n,
-				_abn_us[side].x / n, _abn_us[side].y / n, _abn_ticks[side]])
-		if _crowd_parity:
-			print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
-		_profiler.free()
-	var sums := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0])
-	for m in _monitors:
-		for i in 5:
-			sums[i] += m[i] / maxf(1.0, _monitors.size())
-	print("TICKS game_tick_ms_per_frame=%.2f (of phys_ms; the rest is the engine step and other nodes)" % (float(game.tick_us_total - _tick_us_at_warm) / 1000.0 / maxf(1.0, _monitors.size())))
-	print("MONITORS physics_process_ms=%.2f (the frame's slowest step) active_3d=%.1f pairs=%.1f islands=%.1f horde_frame_ms=%.2f" % [sums[0], sums[1], sums[2], sums[3], sums[4]])
+		_print_profile()
+	_print_monitors(game)
 	if "--census" in OS.get_cmdline_user_args():
 		_census()
 	if "--bodyprobe" in OS.get_cmdline_user_args():
 		_body_probe(game, local)
 	_report(draws, objects, prims, float(alive_sum) / maxf(1.0, draws.size()), game, gpu, cpu)
-	# The last frame, to look at: the numbers say nothing about what a crowd detail level looks like.
+	_save_last_frame()
+	get_tree().quit(0)
+
+
+## One measured frame's render counts, physics monitors and GPU/CPU times; returns the crowd alive.
+func _record_frame(game: ZzGame, vp: RID, draws: PackedInt32Array, objects: PackedInt32Array, prims: PackedInt32Array, gpu: PackedFloat64Array, cpu: PackedFloat64Array) -> int:
+	var alive := 0
+	draws.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME))
+	objects.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+	prims.append(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME))
+	alive += _alive(game)
+	_monitors.append(PackedFloat64Array([Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+		Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS), Performance.get_monitor(Performance.PHYSICS_3D_COLLISION_PAIRS),
+		Performance.get_monitor(Performance.PHYSICS_3D_ISLAND_COUNT), float(game.horde_frame_us) / 1000.0]))
+	gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(vp))
+	cpu.append(RenderingServer.viewport_get_measured_render_time_cpu(vp) + RenderingServer.get_frame_setup_time_cpu())
+	return alive
+
+
+## The last frame, to look at: the numbers say nothing about what a crowd detail level looks like.
+func _save_last_frame() -> void:
 	var path := ProjectSettings.globalize_path(_out)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
-	# Headless has no image: the save errored and the quit below never ran, so a bench held its slot until the timeout.
+	# Headless has no image: the save errored and the quit after it never ran, so a bench held its slot until the timeout.
 	var shot := get_viewport().get_texture().get_image()
 	print("saved %s: %s" % [_out, error_string(shot.save_png(path))] if shot != null else "no image (headless)")
-	get_tree().quit(0)
 
 
 func _micro(game: ZzGame) -> void:
