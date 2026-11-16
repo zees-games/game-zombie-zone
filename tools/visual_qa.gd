@@ -4,7 +4,9 @@ extends SceneTree
 ## survivor's own locomotion, and every infected kind's walk, run, attack, flinch and death, each saved frame by frame in three
 ## views at --fps (60 by default) for tools/visual_qa_shot.sh (dot-game's shot tool) to turn into contact sheets and clips.
 ##   survivor: f = first person (the main viewport), t = behind-right of your own body, o = an opponent four metres in front.
-##   infected: f = the victim's eye in front of it, t = behind-right, o = its right side in profile.
+##   infected: f = the victim's eye in front of it, t = behind-right, o = an opponent four metres in front.
+## The outside views and frame saving are dot-game's DotGameVisualQaViews. The scene itself stays here, not a DotGameVisualQaCapture:
+## the survivor is staged in the real offline client, which needs awaited setup (client start, world draw, weapon switch).
 ## Per clip it prints `VISUALQA {json}` (the shared verdict line) and `ANIMFRAMES {json}` (every frame's numbers) on stdout.
 ## User args: --out DIR --fps N [--only id,id|all|none] [--clips a,b] [--avatar] [--zombies kind,kind|all].
 ## --zombies runs the infected on a bare stage instead of the survivor in the offline client (one process cannot hold both).
@@ -15,9 +17,6 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const BODY_LAYER := 1 << 18
 const VIEW_LAYER := 1 << 19
 const ALL_LAYERS := 0xFFFFF
-## The opponent's view: this far in front of you, eyes at this height, looking at your chest (FC's numbers).
-const OPPONENT_AT := Vector3(0.4, 1.6, -4.0)
-const BEHIND_RIGHT := Vector3(1.4, 1.5, 2.0)
 ## Where the survivor stands for every clip (tools/filmstrip_scenarios.json's defaults: open ground on the offline map).
 const WEAPON_CLIPS: PackedStringArray = ["idle", "draw", "sprint", "ads", "fire", "reload"]
 ## A clip that needs a magazine or a sight: melee and thrown weapons have neither.
@@ -66,10 +65,7 @@ var _started := false
 var _stand := Vector3.ZERO
 var _stand_yaw := 0.0
 var _done := false
-var _tp_view: SubViewport = null
-var _tp_cam: Camera3D = null
-var _op_view: SubViewport = null
-var _op_cam: Camera3D = null
+var _views := DotGameVisualQaViews.new()
 var _eye: Camera3D = null
 var _frames: Array[Dictionary] = []
 var _body := DotClipMetrics.new()
@@ -88,6 +84,8 @@ var _zpos := Vector3.ZERO
 var _zanim := 0
 var _zspeed := 0.0
 var _zkind: StringName = &""
+## Set once the infected dies: a body lying down is not judged on its feet touching the floor.
+var _zdead := false
 
 
 func _initialize() -> void:
@@ -198,10 +196,7 @@ func _run_survivor() -> void:
 			other.get("health").set("invulnerable", true)
 			other.call("place_at", _stand + Vector3(0.0, 0.0, 400.0), 0.0)
 	var cam := _client.get("camera") as Camera3D
-	_tp_view = _outside_view(cam)
-	_tp_cam = _tp_view.get_child(0) as Camera3D
-	_op_view = _outside_view(cam)
-	_op_cam = _op_view.get_child(0) as Camera3D
+	_views.setup(root, root.world_3d, cam.environment if cam != null else null)
 	await _wait(1.0)
 	var ids: Array[StringName] = []
 	if _only == "all":
@@ -218,7 +213,8 @@ func _run_survivor() -> void:
 			continue
 		var gun := not (ZzWeapons.tier_of(id) in NO_GUN_TIERS)
 		for clip in clips:
-			if clip in NEEDS_GUN and not gun:
+			# --clips is shared with the infected (walk, die): a weapon takes only its own clips.
+			if not WEAPON_CLIPS.has(clip) or (clip in NEEDS_GUN and not gun):
 				continue
 			await _weapon_clip(id, clip)
 	if _avatar:
@@ -232,22 +228,6 @@ func _run_survivor() -> void:
 	_release_all()
 	var _back: DotResult = store.call("set_value", DotOwnBodySetting.KEY, legs, &"visual_qa")
 	_done = true
-
-
-## A 480x540 view of the shared world that sees your body and the world gun but not the first-person view model.
-func _outside_view(main: Camera3D) -> SubViewport:
-	var view := SubViewport.new()
-	view.size = Vector2i(480, 540)
-	view.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	view.world_3d = root.world_3d
-	root.add_child(view)
-	var cam := Camera3D.new()
-	cam.fov = 50.0
-	cam.cull_mask = ALL_LAYERS & ~VIEW_LAYER
-	if main != null:
-		cam.environment = main.environment
-	view.add_child(cam)
-	return view
 
 
 ## shot_base.gd's _hold_exact: armed, its slot picked, then cycled until it is the one in hand.
@@ -378,9 +358,9 @@ func _capture(clip: String, count: int, step: Callable) -> void:
 		_stage()
 		_frames.append(_sample(i))
 		await RenderingServer.frame_post_draw
-		var _f0 := root.get_viewport().get_texture().get_image().save_jpg("%s/f_%03d.jpg" % [dir, i], 0.9)
-		var _t0 := _tp_view.get_texture().get_image().save_jpg("%s/t_%03d.jpg" % [dir, i], 0.9)
-		var _o0 := _op_view.get_texture().get_image().save_jpg("%s/o_%03d.jpg" % [dir, i], 0.9)
+		var saved := _views.save(dir, i, root.get_viewport())
+		if not saved.ok:
+			printerr("visual_qa: %s" % str(saved.error))
 	_finish(count)
 
 
@@ -404,19 +384,8 @@ func _stage() -> void:
 	var _shown: bool = _local.call("present_body", false, feet, _game.call("side_colour", 1), false)
 	var figure: Node = _local.get("figure")
 	if figure != null:
-		_tag(figure, BODY_LAYER)
-	var yaw := deg_to_rad(float(_local.get("controller").get("state").get("yaw")))
-	_tp_cam.global_position = feet + Basis(Vector3.UP, yaw) * BEHIND_RIGHT
-	_tp_cam.look_at(feet + Vector3(0.0, 1.1, 0.0))
-	_op_cam.global_position = feet + Basis(Vector3.UP, yaw) * OPPONENT_AT
-	_op_cam.look_at(feet + Vector3(0.0, 1.3, 0.0))
-
-
-func _tag(node: Node, layer: int) -> void:
-	if node is VisualInstance3D:
-		(node as VisualInstance3D).layers = layer
-	for child in node.get_children():
-		_tag(child, layer)
+		var _tagged := DotGameVisualQaViews.tag_layers(figure, BODY_LAYER)
+	_views.place(feet, deg_to_rad(float(_local.get("controller").get("state").get("yaw"))))
 
 
 ## One frame's numbers: the largest hop of a hand or weapon part in the eye's frame, whether the weapon shows, where the
@@ -425,7 +394,7 @@ func _sample(i: int) -> Dictionary:
 	var t := float(i) / float(fps)
 	var out := {"t": snappedf(t, 0.001)}
 	if _zombie != null:
-		_body.add(_body.pose_sample(t, _zombie_skeleton(), _zpos, true))
+		_body.add(_body.pose_sample(t, _zombie_skeleton(), _zpos, not _zdead))
 		return out
 	var feet: Vector3 = _local.call("feet")
 	var figure: Node = _local.get("figure")
@@ -525,7 +494,7 @@ func _finish(count: int) -> void:
 			continue
 		var line := "%s %s > %s %s" % [check, str(row.get("value")), str(row.get("limit")), String(row.get("note", ""))]
 		# Foot slide is judged where the stage pace is the body's own: the survivor's, and the common infected's.
-		if check == "slide" and _zombie != null and _zkind != &"common":
+		if check == "foot_slide" and _zombie != null and _zkind != &"common":
 			notes.append(line)
 		else:
 			fail.append(line)
@@ -568,10 +537,7 @@ func _run_zombies() -> void:
 	_eye.fov = 70.0
 	root.add_child(_eye)
 	_eye.make_current()
-	_tp_view = _outside_view(null)
-	_tp_cam = _tp_view.get_child(0) as Camera3D
-	_op_view = _outside_view(null)
-	_op_cam = _op_view.get_child(0) as Camera3D
+	_views.setup(root, root.world_3d)
 	var body: GDScript = load("res://npcs/zz_zombie_body.gd")
 	var anim_enum: Dictionary = body.get_script_constant_map()["Anim"]
 	var clips: PackedStringArray = _anims if not _anims.is_empty() else ZOMBIE_CLIPS
@@ -592,11 +558,13 @@ func _run_zombies() -> void:
 				await process_frame
 			var flinch_at: Array[int] = [_count(0.4), _count(1.1)]
 			var die_at := _count(0.4)
+			_zdead = false
 			await _capture(clip, _count(float(SECONDS["z_" + clip])), func(i: int) -> void:
 				if clip == "flinch" and i in flinch_at:
 					_zombie.call("flinch")
 				elif clip == "die" and i == die_at:
 					_zombie.call("die", &"limp", Vector3(-1.0, 0.0, 0.0), 1)
+					_zdead = true
 					# The view plays its death only while the body says DEAD, as the server's does from then on.
 					_zanim = int(anim_enum["DEAD"])
 				_zpos.x += _zspeed / float(fps)
@@ -631,9 +599,7 @@ func _zombie_skeleton() -> Skeleton3D:
 	return _skeleton
 
 
-## The infected faces +x: the victim stands 1.8 m ahead of it at eye height, the others behind-right and at its right side.
+## The infected faces +x (yaw -90 degrees): the victim stands 1.8 m ahead of it at eye height; the outside views are the shared ones.
 func _stage_zombie() -> void:
-	var facing := Basis(Vector3.UP, deg_to_rad(-90.0))
 	_eye.look_at_from_position(_zpos + Vector3(1.8, 1.6, 0.0), _zpos + Vector3(0.0, 1.3, 0.0))
-	_tp_cam.look_at_from_position(_zpos + facing * BEHIND_RIGHT, _zpos + Vector3(0.0, 1.0, 0.0))
-	_op_cam.look_at_from_position(_zpos + facing * Vector3(3.2, 1.1, 0.0), _zpos + Vector3(0.0, 0.9, 0.0))
+	_views.place(_zpos, deg_to_rad(-90.0))
