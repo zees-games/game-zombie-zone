@@ -216,6 +216,9 @@ func _bake() -> bool:
 	# The survivors' 72-unit body; the default 0.175 m cell rounds its radius up to 0.525 m and shuts
 	# doors, a 0.1016 m cell is exactly 4 cells of it (dot-bot API level 23; older dot-bot ignores it).
 	var agent := {"radius": ZzBody.BODY_RADIUS, "height": ZzBody.BODY_HEIGHT, "climb": 0.4, "cell": 0.1016, "cell_height": 0.05}
+	# The map's edge-merge cell at its finest, so two edges a tenth of a cell apart stop counting as
+	# one (fewer edge errors from the engine; dot-bot API level 33, older dot-bot ignores the key).
+	agent["merge_scale"] = 0.01
 	if native_tiles:
 		agent["tile"] = float(_config.nav_notes_bake_tile)
 
