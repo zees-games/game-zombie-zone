@@ -73,6 +73,7 @@ var _skeleton: Skeleton3D = null
 var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
 var _last_wall := 0.0
+var _was_scoped := false
 var _subject := ""
 var _clip := ""
 ## What the client is told this frame (it reads its own input members every frame, so they are written every frame).
@@ -411,6 +412,10 @@ func _sample(i: int) -> Dictionary:
 	var weapon = model.call("weapon_node")
 	var shown: bool = is_instance_valid(weapon) and (weapon as Node3D).is_visible_in_tree()
 	out["shown"] = shown
+	# Through a scope the gun is not drawn on purpose (the scope picture is the view) and the zoom moves the camera: neither is a defect of the gun.
+	var scoped: bool = (model.has_method("is_scoped") and bool(model.call("is_scoped"))) \
+		or (model.has_method("scope_picture_up") and bool(model.call("scope_picture_up")))
+	out["scoped"] = scoped
 	if shown:
 		out["weapon"] = _v((inverse * (weapon as Node3D).global_transform).origin)
 		var muzzle: Transform3D = model.call("muzzle_transform")
@@ -441,10 +446,11 @@ func _sample(i: int) -> Dictionary:
 			where = String(_parts[n].name)
 	# The wall retract is a timed swing, not a pop: a frame where it moved is not judged.
 	out["wall"] = snappedf(wall, 0.001)
-	if absf(wall - _last_wall) <= 0.0001:
+	if absf(wall - _last_wall) <= 0.0001 and not scoped and not _was_scoped:
 		out["hop"] = snappedf(hop, 0.0001)
 		out["part"] = where
 	_last_wall = wall
+	_was_scoped = scoped
 	return out
 
 
@@ -478,7 +484,7 @@ func _finish(count: int) -> void:
 			var longest := 0
 			var at := -1
 			for n in _frames.size():
-				run = 0 if _frames[n].get("shown", true) else run + 1
+				run = 0 if (_frames[n].get("shown", true) or _frames[n].get("scoped", false)) else run + 1
 				if run > longest:
 					longest = run
 					at = n
