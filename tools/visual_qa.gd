@@ -284,6 +284,18 @@ func _weapon_clip(id: StringName, clip: String) -> void:
 			await _capture(clip, count, func(i: int) -> void:
 				_fire = i >= _count(0.1) and i < _count(0.9))
 		"reload":
+			# A full magazine refuses the reload and the clip filmed a still gun: spend two rounds first, off camera, so the
+			# clip is a partial reload whatever ran before it (a by-the-round reload of two shells, a magazine swap).
+			var arsenal: DotWeaponArsenal = (_client.get("weapons") as Object).get("arsenal")
+			for _shot in 6:
+				var now := arsenal.current()
+				if now == null or now.magazine_space() >= 2 or now.magazine <= 1:
+					break
+				_fire = true
+				await _wait(0.1)
+				_fire = false
+				await _wait(0.7)
+			await _wait(0.6)
 			await _capture(clip, count, func(i: int) -> void:
 				_reload = i >= _count(0.1) and i < _count(0.2))
 		_:
@@ -420,6 +432,21 @@ func _sample(i: int) -> Dictionary:
 		out["weapon"] = _v((inverse * (weapon as Node3D).global_transform).origin)
 		var muzzle: Transform3D = model.call("muzzle_transform")
 		out["muzzle"] = _v(inverse * muzzle.origin)
+	# The authored motions' clocks, so a hop can be laid against the draw or the reload phase that made it.
+	var pose: Dictionary = (model.call("describe") as Dictionary).get("pose", {})
+	out["deploy"] = snappedf(float(pose.get("deploy", 1.0)), 0.001)
+	out["reload"] = snappedf(float(pose.get("reload", 0.0)), 0.001)
+	var seq = model.call("reload_sequence") if model.has_method("reload_sequence") else null
+	# Rounds in the drawn gun and in the world's: a by-the-round reload that stops early shows here, not in the pose.
+	var player = _client.get("player")
+	var rig = player.get("view_rig") if player != null else null
+	if rig != null and rig.get("arsenal") != null and rig.arsenal.current() != null:
+		out["mag"] = int(rig.arsenal.current().magazine)
+	var truth = _client.get("weapons")
+	if truth != null and truth.get("arsenal") != null and truth.arsenal.current() != null:
+		out["truth_mag"] = int(truth.arsenal.current().magazine)
+	if seq != null:
+		out["phase"] = String(seq.call("phase_at", out["reload"]))
 	var stale := _parts.is_empty()
 	for part in _parts:
 		if not is_instance_valid(part):
