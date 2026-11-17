@@ -668,6 +668,7 @@ func tick(delta: float, ticks: int = 1) -> void:
 	spawner.tick(delta)
 	brains_now = null
 	brains_crowd = null
+	brains_steer = null
 
 	var speed := zombie_speed_scale * wave_speed_scale
 
@@ -825,6 +826,7 @@ func survivor_ids() -> Array[StringName]:
 func _feed_brains() -> void:
 	brains_now = brains_native
 	brains_crowd = crowd if brains_native != null and crowd_native else null
+	brains_steer = brains_native if brains_native != null and brains_native.has_method(&"steer_step") else null
 
 	if brains_native == null:
 		return
@@ -841,6 +843,7 @@ func _feed_brains() -> void:
 
 	if not bool(brains_native.call(&"set_survivors", _brain_ids, _brain_at, _brain_flags)):
 		brains_now = null
+		brains_steer = null
 		return
 
 	var stacks := hard_stacks()

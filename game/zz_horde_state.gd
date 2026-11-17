@@ -114,6 +114,8 @@ var brains_native: Object = null
 ## by hand gets the script): [member brains_native], and the native crowd for the spaced heading when it is on too.
 var brains_now: Object = null
 var brains_crowd: Variant = null
+## [member brains_now] while its library steers too ([code]steer_step[/code]; an older one only plans), else null.
+var brains_steer: Object = null
 ## Re-run the script beside every native answer and count; the script's answer is the one used (bench
 ## `--brains-verify`, `headless_native_brains`).
 var brains_verify: bool = false

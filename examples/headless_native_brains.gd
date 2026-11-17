@@ -10,11 +10,13 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## worlds: the commons' chase plan (whom, whether the forced survivor is spent, where, how fast, how far, how near a
 ## swing lands) under Hard Box stacks, Angry runners, downed, dead and missing survivors, crawlers and burning bodies,
 ## and every zombie's spaced heading off the native crowd, stacked bodies included, all to the bit. The script plan
-## is checked against the calls it replaced (quarry, survivor_at, _chase_speed, strikes_down) too. Without the library
+## is checked against the calls it replaced (quarry, survivor_at, _chase_speed, strikes_down) too. The fused steer
+## ([code]steer_step[/code]: the heading, wish, eased turn, look and progress watch) leaves every body, character and
+## brain as the script's steer does, stuck ones and paths gone rough included. Without the library
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
-const SECTIONS := 4
-const CHECKS := 10
+const SECTIONS := 5
+const CHECKS := 13
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -59,7 +61,7 @@ func _run() -> void:
 		print("  dot-sim's zombie module is not loaded: the native half is skipped")
 		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
-		_report_sections(_entered, _finished, SECTIONS - 3, 2)
+		_report_sections(_entered, _finished, 1, 2)
 		return
 	_check(true, "the library has the zombie brains and the crowd")
 	_finished += 1
@@ -91,6 +93,23 @@ func _run() -> void:
 		"an id the grid lacks answers INF, so the brain keeps the script")
 	_check(heads["decided"] > 3000 and heads["pushed"] > 500 and heads["still"] > 5,
 		"the headings were pushed by neighbours and some cancelled to nothing", str(heads))
+	_finished += 1
+
+	_entered += 1
+	print("seeded worlds, the native steer against the script's")
+	var steers := {"bad": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
+	var tp := {"bad": 0, "n": 0}
+	for s in SEEDS:
+		_turn_probe(s, tp)
+	_check(tp["bad"] == 0, "the native turn_view is the character's to the bit, overshoot and its decay included",
+		"%d of %d differ" % [tp["bad"], tp["n"]])
+	for s in SEEDS:
+		_steers(s, steers)
+	_check(steers["bad"] == 0, "every native steer leaves the body, the turn, the cruise and the watch as the script's",
+		"%d of %d differ" % [steers["bad"], steers["steered"] + steers["still"]])
+	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
+			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
+		"the steers turned, overshot, stood still, reset their watch, got stuck and went rough", str(steers))
 	_finished += 1
 
 	_entered += 1
@@ -305,6 +324,179 @@ func _headings(s: int, heads: Dictionary) -> void:
 				heads["pushed"] += 1
 
 
+## [code]turn_view[/code] of the library against [method DotNpcAiCharacter.turn_view], turns half done and overshoots
+## armed or decaying, for characters of every tuning.
+func _turn_probe(s: int, tp: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9100 + s
+	_fresh_world()
+	var h := _horde(rng)
+	var _c := _commons(rng, h, 2)
+	_survivors(rng, h)
+	h._feed_brains()
+	var n: Object = h.brains_now
+	for i in 400:
+		var c := DotNpcAiCharacter.new()
+		c.seed_value = rng.randi()
+		c.view_turn_deg = rng.randf_range(30.0, 1440.0)
+		c.view_factor = rng.randf_range(0.05, 1.0)
+		c.overshoot = [0.0, 0.4, rng.randf()][rng.randi() % 3]
+		c._peak_turn = [0.0, rng.randf_range(0.0, PI)][rng.randi() % 2]
+		c._turns = rng.randi_range(0, 9)
+		c._over_amt = [0.0, rng.randf_range(-0.3, 0.3)][rng.randi() % 2]
+		c._over_axis = [Vector3.UP, Vector3.DOWN][rng.randi() % 2]
+		var cur := Vector3(rng.randf_range(-1, 1), 0.0, rng.randf_range(-1, 1))
+		var want := Vector3(rng.randf_range(-1, 1), 0.0, rng.randf_range(-1, 1))
+		var delta: float = [1.0 / 60.0, rng.randf_range(0.001, 0.25)][rng.randi() % 2]
+		var st := [c._peak_turn, c._over_amt, c._over_axis, c._turns]
+		var o: PackedFloat64Array = n.call(&"turn_view", c, cur, want, delta)
+		var f := c.turn_view(cur, want, delta)
+		tp["n"] += 1
+		var got := [Vector3(o[0], o[1], o[2]), o[3], o[4], int(o[5]), Vector3(o[6], o[7], o[8])]
+		var expected := [f, c._peak_turn, c._over_amt, c._turns, c._over_axis]
+		if got != expected:
+			tp["bad"] += 1
+			if tp["bad"] <= 3:
+				print("  TURN in %s cur %s want %s delta %s vf %s vtd %s os %s seed %s" % [var_to_str(st), var_to_str(cur),
+					var_to_str(want), var_to_str(delta), var_to_str(c.view_factor), var_to_str(c.view_turn_deg),
+					var_to_str(c.overshoot), c.seed_value])
+				print("    got %s exp %s" % [var_to_str(got), var_to_str(expected)])
+
+
+## What a steer leaves behind: the body's transform and wish, the character's turn, the brain's cruise and watch.
+func _steer_state(brain: Object) -> Array:
+	var b: ZzZombieBody = brain.npc.node
+	var c: DotNpcAiCharacter = brain.character
+	var rough: float = brain.path.rough_until if brain.path != null else 0.0
+	return [b.global_transform, b.wish, c._peak_turn, c._over_amt, c._over_axis, c._turns, brain._cruise_to,
+		brain._cruise_dest, brain._progress_at, brain._progress_since, rough]
+
+
+func _put_state(brain: Object, st: Array) -> void:
+	var b: ZzZombieBody = brain.npc.node
+	var c: DotNpcAiCharacter = brain.character
+	b.global_transform = st[0]
+	b.wish = st[1]
+	c._peak_turn = st[2]
+	c._over_amt = st[3]
+	c._over_axis = st[4]
+	c._turns = st[5]
+	brain._cruise_to = st[6]
+	brain._cruise_dest = st[7]
+	brain._progress_at = st[8]
+	brain._progress_since = st[9]
+	if brain.path != null:
+		brain.path.rough_until = st[10]
+
+
+## Each common steered twice from the same state, once through [code]steer_step[/code] (applied) and once through
+## the script's own steer, with characters of every tuning, turns half done, bodies stacked or at their goal, and
+## watches fresh, moving, stale and stuck.
+func _steers(s: int, steers: Dictionary) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6200 + s
+	_fresh_world()
+	var h := _horde(rng)
+	var commons := _commons(rng, h, rng.randi_range(2, 60))
+	_survivors(rng, h)
+	h._feed_brains()
+	var grid: Object = ClassDB.instantiate(NATIVE_CROWD)
+	grid.call(&"setup", 4.0)
+	h.crowd = grid
+	h.crowd_native = true
+	var ctx := DotNpcAiContext.new()
+	for brain: Object in commons:
+		var c := DotNpcAiCharacter.new()
+		c.seed_value = rng.randi()
+		c.view_turn_deg = rng.randf_range(30.0, 1440.0)
+		c.view_factor = rng.randf_range(0.05, 1.0)
+		c.overshoot = [0.0, 0.4, rng.randf()][rng.randi() % 3]
+		brain.character = c
+		brain.context = ctx
+		brain.stuck_seconds = rng.randf_range(0.5, 2.0)
+		if rng.randf() < 0.5:
+			brain.path = DotNpcPath.new()
+	for p in PASSES:
+		var ids := PackedInt64Array()
+		var at := PackedVector3Array()
+		for brain: Object in commons:
+			var body: Node3D = brain.npc.node
+			if rng.randf() < 0.1:
+				body.global_position = (commons[0].npc.node as Node3D).global_position
+			elif rng.randf() < 0.5:
+				body.global_position = Vector3(rng.randf_range(-12, 12), rng.randf_range(-0.5, 1.0), rng.randf_range(-12, 12))
+			body.rotation = Vector3(0.0, rng.randf_range(-PI, PI), 0.0)
+			ids.append(brain.npc.instance_id)
+			at.append(brain.npc.position())
+		grid.call(&"fill", ids, at)
+		ctx.delta = [0.0, 1.0 / 60.0, rng.randf_range(0.001, 0.25)][rng.randi() % 3]
+		ctx.now = 10.0 * p + rng.randf_range(0.0, 5.0)
+		for brain: Object in commons:
+			var here: Vector3 = brain.npc.position()
+			var to := Vector3(rng.randf_range(-30, 30), rng.randf_range(-1, 2), rng.randf_range(-30, 30))
+			match rng.randi() % 10:
+				0:
+					to = here
+				1:
+					to = here + Vector3(rng.randf_range(-1.5, 1.5), 0.0, rng.randf_range(-1.5, 1.5))
+			brain._facing_at_tick = [Vector3.ZERO, (brain.npc.node as Node3D).global_transform.basis.z,
+				Vector3(rng.randf_range(-1, 1), 0.0, rng.randf_range(-1, 1))][rng.randi() % 3]
+			var c: DotNpcAiCharacter = brain.character
+			c._peak_turn = [0.0, rng.randf_range(0.0, PI)][rng.randi() % 2]
+			c._turns = rng.randi_range(0, 9)
+			c._over_amt = [0.0, rng.randf_range(-0.3, 0.3)][rng.randi() % 2]
+			match rng.randi() % 4:
+				0:
+					brain._progress_at = Vector3.INF
+				1:
+					brain._progress_at = here + Vector3(rng.randf_range(-0.4, 0.4), 0.0, rng.randf_range(-0.4, 0.4))
+					brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
+				2:
+					brain._progress_at = here + Vector3(rng.randf_range(-3, 3), 0.0, rng.randf_range(-3, 3))
+					brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
+				3:
+					brain._progress_at = here
+					brain._progress_since = ctx.now - 10.0
+			var spacing: float = [1.1, 1.6, rng.randf_range(0.3, 3.0)][rng.randi() % 3]
+			var speed := rng.randf_range(0.5, 8.0)
+			var before := _steer_state(brain)
+			# Both steers start from a transform just set: look_at keeps the body's scale through get_scale, which a
+			# set transform answers from the basis and a set rotation from its cache, an ulp apart.
+			_put_state(brain, before)
+			h.brains_crowd = null
+			brain.steer_with_spacing(to, speed, ctx.delta, spacing)
+			var script := _steer_state(brain)
+			_put_state(brain, before)
+			h.brains_crowd = grid
+			var steered: int = h.brains_now.call(&"steered")
+			brain.steer_with_spacing(to, speed, ctx.delta, spacing)
+			var native := _steer_state(brain)
+			if int(h.brains_now.call(&"steered")) == steered:
+				steers["bad"] += 1
+				if steers["bad"] <= 3:
+					print("  the native steer did not run")
+			elif native != script:
+				steers["bad"] += 1
+				if steers["bad"] <= 3:
+					for i in script.size():
+						if script[i] != native[i]:
+							print("  differ at %d: script %s native %s" % [i, var_to_str(script[i]), var_to_str(native[i])])
+			if script[1] == before[1] and script[0] == before[0]:
+				steers["still"] += 1
+			else:
+				steers["steered"] += 1
+			if script[2] != before[2] or script[5] != before[5]:
+				steers["turned"] += 1
+			if script[3] != 0.0 and script[3] != before[3]:
+				steers["overshot"] += 1
+			if script[9] != before[9]:
+				steers["reset"] += 1
+			if script[10] != before[10]:
+				steers["rough"] += 1
+			elif before[8] != Vector3.INF and script[9] == before[9] and ctx.now - before[9] >= brain.stuck_seconds:
+				steers["stuck"] += 1
+
+
 ## The horde's [member ZzHorde.brains_verify]: both run, the script's answer is kept, every pair counted.
 func _verify() -> bool:
 	var decided := 0
@@ -325,13 +517,21 @@ func _verify() -> bool:
 		h.crowd = native_grid
 		h.crowd_native = true
 		h.brains_crowd = native_grid
+		var ctx := DotNpcAiContext.new()
+		for brain: Object in commons:
+			brain.character = DotNpcAiCharacter.new()
+			brain.character.seed_value = rng.randi()
+			brain.context = ctx
 		for p in 3:
+			ctx.delta = 1.0 / 60.0
+			ctx.now = 1.0 + p
 			for brain: Object in commons:
 				var b: ZzZombieBody = brain.npc.node
 				var plan: PackedFloat64Array = brain._chase_plan(b)
 				if plan != brain._chase_plan_script(b):
 					mismatches += 1000
 				var _dir: Vector3 = brain._spaced_direction(brain.npc.position(), Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), 1.1)
+				brain.steer_with_spacing(Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), rng.randf_range(1.0, 6.0), ctx.delta, 1.1)
 			_survivors(rng, h)
 			h._feed_brains()
 		decided += h.brains_decided

@@ -220,6 +220,114 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	return grid.separation(own, here, spacing, spacing * 2.0, right)
 
 
+## dot-npc-ai's steer, with everything after the path in one native call when the horde has its brains and
+## crowd grid ([code]DotSimZombieBrains.steer_step[/code]): the spaced heading, the body's wish, the eased turn,
+## the look and the progress watch, a dozen script calls apart. The script's own body ([method _steer_rest]) is
+## the fallback, and under [code]brains_verify[/code] it runs instead and each native answer is checked against it.
+func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
+	var h := horde()
+	var b := body()
+
+	if h == null or b == null or character == null or context == null or npc == null or not npc.is_alive():
+		super(to, speed, delta, spacing)
+		return
+
+	var brains: Variant = h.get(&"brains_steer")
+	var grid: Variant = h.get(&"brains_crowd")
+
+	if brains == null or grid == null or _avoider() != null:
+		super(to, speed, delta, spacing)
+		return
+
+	var goal := _steer_goal(to)
+
+	if goal == Vector3.INF:
+		_cruise_dest = to
+		return
+
+	var now := _world_now()
+	var verify := bool(h.get(&"brains_verify"))
+	var out: PackedFloat64Array = brains.steer_step(grid, npc.instance_id, self, character, b, goal, to,
+		spacing, speed, context.delta, now, not verify)
+
+	if out[0] < 0.0:
+		_steer_rest(goal, to, speed, delta, spacing)
+		return
+
+	if verify:
+		_verify_steer(h, b, out, goal, to, speed, delta, spacing, now)
+		return
+
+	if out[1] == 2.0 and path != null and path.has_method(&"go_rough"):
+		path.call(&"go_rough", now, 4.0)
+		_progress_at = Vector3(out[16], out[17], out[18])
+		_progress_since = now
+
+
+## dot-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.
+func _steer_rest(goal: Vector3, to: Vector3, speed: float, delta: float, spacing: float) -> void:
+	var here := npc.position()
+	var direction := _spaced_direction(here, goal, spacing)
+
+	if direction.length() < 0.001:
+		return
+
+	var av := _avoider()
+	if av != null:
+		var tier := scheduler.tier_of(self) if scheduler != null and is_instance_valid(scheduler) else 0
+		var safe: Vector3 = av.steer(npc.instance_id, npc, direction.normalized() * speed, tier)
+		if safe.length() > 0.001:
+			direction = safe.normalized()
+
+	steer_toward(here + direction * 4.0, speed, delta)
+	_cruise_to = goal
+	_cruise_dest = to
+	_watch_progress(here, to)
+
+
+## [code]brains_verify[/code]: the script steers, and the native answer [param out] (asked without applying) is
+## tallied against what it wrote: the wish, the turn state, the body's transform, the cruise and the watch.
+func _verify_steer(h: Object, b: ZzZombieBody, out: PackedFloat64Array, goal: Vector3, to: Vector3,
+		speed: float, delta: float, spacing: float, now: float) -> void:
+	var t0 := b.global_transform
+	# Set back as it is, so the script's look_at starts where the native one's below does: a Node3D whose transform was
+	# just set has no cached scale, and look_at keeps its scale through get_scale, an ulp off the cached one.
+	b.global_transform = t0
+	var wish0 := b.wish
+	var at0 := _progress_at
+	var since0 := _progress_since
+	_steer_rest(goal, to, speed, delta, spacing)
+	var t1 := b.global_transform
+	var want := t0
+	var same := true
+
+	if out[0] == 0.0:
+		same = b.wish == wish0 and t1 == t0 and _progress_at == at0 and _progress_since == since0
+	else:
+		if out[6] == 1.0:
+			b.global_transform = t0
+			b.look_at(Vector3(out[7], out[8], out[9]), Vector3.UP)
+			want = b.global_transform
+			b.global_transform = t1
+		var wish := Vector3(out[3], out[4], out[5]) if out[2] == 1.0 else wish0
+		same = (b.wish == wish and t1 == want
+			and character._peak_turn == out[10] and character._over_amt == out[11]
+			and character._turns == int(out[12])
+			and character._over_axis == Vector3(out[13], out[14], out[15])
+			and _cruise_to == goal and _cruise_dest == to)
+		if out[1] == 1.0:
+			same = same and _progress_at == Vector3(out[16], out[17], out[18]) and _progress_since == now
+		elif out[1] == 0.0:
+			same = same and _progress_at == at0 and _progress_since == since0
+
+	if not same and int(h.get(&"brains_mismatches")) < 8:
+		print("BRAINS steer mismatch: native %s | wish %s turn %s %s %d %s progress %s %s | xf %s want %s cruise %s goal %s" % [out,
+			b.wish, character._peak_turn, character._over_amt, character._turns, character._over_axis,
+			_progress_at, _progress_since, t1, want, _cruise_to, goal])
+
+	h.call(&"brains_tally", same)
+
+
 ## Walks the graph to [param to], kept apart from the crowd.
 func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 	steer_with_spacing(to, speed, context.delta if context != null else 0.016, spacing)
@@ -236,7 +344,9 @@ func _take_ladder() -> void:
 		return
 
 	var here := npc.position()
-	var ladder := int(h.call(&"ladder_for", here, _cruise_to))
+	# ZzHorde.ladder_for's own first test, here: almost every steer is level and skips the call.
+	var level := _cruise_to == Vector3.INF or _cruise_to.y - here.y <= ZzZombieBody.STEP_UP
+	var ladder := -1 if level else int(h.call(&"ladder_for", here, _cruise_to))
 
 	if ladder >= 0 and bool(h.call(&"on_ladder", ladder, here)):
 		b.climb_top = float(h.call(&"ladder_top", ladder, _cruise_to))

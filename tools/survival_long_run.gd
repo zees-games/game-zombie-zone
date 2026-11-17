@@ -485,6 +485,7 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	sp._think(delta)
 	h.brains_now = null
 	h.brains_crowd = null
+	h.brains_steer = null
 	at = _part("h.brains", at)
 	sp._perception.reclaim()
 	at = _part("h.reclaim", at)
