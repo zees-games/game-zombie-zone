@@ -125,14 +125,14 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			_broadcast(ZzEvents.Kind.COPY, ZzEvents.write_copy(id, model, offset, alive, slot)))
 		game.map_sound_fade.connect(func(entity: int, fading_in: bool, seconds: float, from: float, to: float) -> void:
 			_remember_sound(ZzEvents.MapFx.FADE, entity, fading_in, to)
-			_map_fx(ZzEvents.write_map_fade(entity, fading_in, seconds, from, to)))
+			_map_fx(ZzEventsMapFx.write_map_fade(entity, fading_in, seconds, from, to)))
 		game.map_sound_spin.connect(func(entity: int, seconds: float, from: float, to: float) -> void:
 			_remember_sound(ZzEvents.MapFx.SPIN, entity, true, to)
-			_map_fx(ZzEvents.write_map_spin(entity, seconds, from, to)))
+			_map_fx(ZzEventsMapFx.write_map_spin(entity, seconds, from, to)))
 		game.map_beat.connect(func(beat: int, downbeat: bool) -> void:
-			_map_fx(ZzEvents.write_map_beat(beat, downbeat)))
+			_map_fx(ZzEventsMapFx.write_map_beat(beat, downbeat)))
 		game.map_ending.connect(func(won: bool, time_scale: float, seconds: float, camera: Variant) -> void:
-			_broadcast(ZzEvents.Kind.MAP_FX, ZzEvents.write_map_end(won, time_scale, seconds, camera)))
+			_broadcast(ZzEvents.Kind.MAP_FX, ZzEventsMapFx.write_map_end(won, time_scale, seconds, camera)))
 		game.barricade_changed.connect(func(id: String, fraction: float, intact: bool) -> void:
 			_broadcast(ZzEvents.Kind.BARRICADE, ZzEvents.write_barricade(id, fraction, intact)))
 		game.survival_changed.connect(func() -> void:
@@ -1064,8 +1064,8 @@ func _tell_the_world(peer_id: int) -> void:
 		var kept: Array = _sound_last[key]
 		var fx := key % 4
 		var end := float(kept[1])
-		_tell(peer_id, ZzEvents.Kind.MAP_FX, ZzEvents.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end, end) if fx == ZzEvents.MapFx.SPIN
-			else ZzEvents.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end * 200.0, end * 200.0))
+		_tell(peer_id, ZzEvents.Kind.MAP_FX, ZzEventsMapFx.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end, end) if fx == ZzEvents.MapFx.SPIN
+			else ZzEventsMapFx.write_map_fx(fx, key / 4, bool(kept[0]), 0.0, end * 200.0, end * 200.0))
 
 	for id: String in game.barricades:
 		var b: Dictionary = game.barricades[id]
@@ -1577,7 +1577,7 @@ func _on_world_event_more(kind: int, reader: DotNetReader) -> void:
 			if bool(cp["ok"]) and game.map != null:
 				game.map.apply_copy(int(cp["id"]), int(cp["model"]), cp["offset"], bool(cp["alive"]), int(cp["mover"]))
 		ZzEvents.Kind.MAP_FX:
-			var fx := ZzEvents.read_map_fx(reader)
+			var fx := ZzEventsMapFx.read_map_fx(reader)
 			if bool(fx["ok"]):
 				match int(fx["fx"]):
 					ZzEvents.MapFx.FADE:

@@ -3,6 +3,7 @@ extends Node
 ## The declarations of [zz_client.gd]: constants, signals and variables, so the file that extends this holds behaviour only.
 
 const ZzEvents := preload("net/zz_events.gd")
+const ZzEventsMapFx := preload("net/zz_events_map_fx.gd")
 const ZzAudio := preload("zz_audio.gd")
 const ZzBindings := preload("zz_bindings.gd")
 const ZzBots := preload("zz_bots.gd")

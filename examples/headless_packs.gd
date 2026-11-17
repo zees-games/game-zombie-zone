@@ -661,7 +661,6 @@ func _real_packs() -> void:
 		"six monsters: five specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
 	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 20, "the catalogue is the fourteen built-in kinds and the six monsters")
-
 	_check_pack_numbers()
 	# A real game spawns each monster once, and arms a survivor with a weapon from each pack.
 	var config := ZzConfig.new()
