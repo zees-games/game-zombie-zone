@@ -244,6 +244,7 @@ func _test_ladder_climb() -> void:
 	_section("a zombie climbs a ladder to the survivor on the floor above")
 	if not _linked:
 		_check(true, "skipped without maps/")
+		_check(true, "skipped without maps/")
 		_finished()
 		return
 
