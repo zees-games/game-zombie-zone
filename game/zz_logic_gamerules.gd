@@ -5,7 +5,8 @@ extends DotMapEntity
 ## logged once and left alone.
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(p_io: RefCounted) -> void:
+	var io: DotMapIO = p_io
 	if not enabled:
 		return
 	for k: String in keys:

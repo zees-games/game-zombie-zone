@@ -4,7 +4,8 @@ extends DotMapEntity
 ## (`hud_text`), to everyone (spawnflag 1) or to the activator when one is known.
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(p_io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+	var io: DotMapIO = p_io
 	match name:
 		"display":
 			if enabled:

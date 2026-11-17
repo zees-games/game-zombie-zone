@@ -10,12 +10,14 @@ var _gen := 0
 var _armed := false
 
 
-func on_map_spawn(io: DotMapIO) -> void:
+func on_map_spawn(p_io: RefCounted) -> void:
+	var io: DotMapIO = p_io
 	if enabled:
 		_arm(io)
 
 
-func _input(io: DotMapIO, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(p_io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+	var io: DotMapIO = p_io
 	match name:
 		"spawn":
 			_spawn(io, activator)
@@ -43,7 +45,8 @@ func _input(io: DotMapIO, name: String, param: String, activator: Variant, _call
 
 
 ## One of this maker's zombies died, was removed, or could not be placed.
-func child_gone(io: DotMapIO) -> void:
+func child_gone(p_io: RefCounted) -> void:
+	var io: DotMapIO = p_io
 	_live = maxi(_live - 1, 0)
 	if _live == 0:
 		fire(io, "OnAllLiveChildrenDead", null)
@@ -56,7 +59,8 @@ func live() -> int:
 	return _live
 
 
-func _enabled_changed(io: DotMapIO, on: bool) -> void:
+func _enabled_changed(p_io: RefCounted, on: bool) -> void:
+	var io: DotMapIO = p_io
 	_gen += 1
 	_armed = false
 	if on:

@@ -1819,7 +1819,7 @@ func _on_zombie_removed(npc: DotNpcInstance, _reason: StringName) -> void:
 	if behaviour == null or behaviour.identity == null or net == null:
 		return
 
-	var net_id := behaviour.identity.net_id
+	var net_id: int = behaviour.identity.net_id
 	_unregister(net_id)
 	var body := npc.node as ZzZombieBody
 	var death: DotPlayerDeath = body.death if killed and body != null and is_instance_valid(body) else null

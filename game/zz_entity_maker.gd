@@ -3,7 +3,8 @@ extends DotMapEntity
 ## env_entity_maker: ForceSpawn runs the named point_template; the game places what the copies are.
 
 
-func _input(io: DotMapIO, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+func _input(p_io: RefCounted, name: String, _param: String, activator: Variant, _caller: Variant) -> bool:
+	var io: DotMapIO = p_io
 	if name != "forcespawn" and name != "forcespawnatentityorigin":
 		return false
 	if not enabled:
