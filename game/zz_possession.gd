@@ -101,6 +101,11 @@ const CAMERA_WALL_MARGIN := 0.3
 
 ## Where the follow camera of a driven body may sit: `want`, or short of the first wall on the way from
 ## `focus` (kept CAMERA_WALL_MARGIN off it), so the lens never ends up inside a hull or a beam.
+static func camera_at(camera: Camera3D, mask: int, focus: Vector3, look: Basis, back: float, exclude: Array[RID] = []) -> Transform3D:
+	return Transform3D(look, camera_spot(camera.get_world_3d().direct_space_state, mask, focus, focus + look.z * back, exclude))
+
+
+## The spot, from [param focus] toward [param want], the lens may sit at: [param want] unless a wall is in the way.
 static func camera_spot(space: PhysicsDirectSpaceState3D, mask: int, focus: Vector3, want: Vector3, exclude: Array[RID] = []) -> Vector3:
 	if space == null:
 		return want

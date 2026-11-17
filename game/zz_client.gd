@@ -1,7 +1,6 @@
 extends "zz_client_ending.gd"
 
 const ZzViewGrip := preload("zz_view_grip.gd")
-const ZzPossession := preload("zz_possession.gd")
 const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
 
 
@@ -2155,9 +2154,7 @@ func _drive_possessed_camera() -> bool:
 	var state := player.controller.state
 	var look := Basis.from_euler(Vector3(deg_to_rad(state.pitch), deg_to_rad(state.yaw), 0.0))
 	var focus := body.global_position + Vector3(0.0, POSSESS_UP, 0.0)
-	var spot := ZzPossession.camera_spot(camera.get_world_3d().direct_space_state, game.world_mask(), focus,
-			focus + look.z * POSSESS_BACK, [player.get_rid()])
-	camera.global_transform = Transform3D(look, spot)
+	camera.global_transform = preload("zz_possession.gd").camera_at(camera, game.world_mask(), focus, look, POSSESS_BACK, [player.get_rid()])
 
 	if hud != null:
 		hud.set_watching("You are a zombie")
