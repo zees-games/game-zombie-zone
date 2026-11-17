@@ -145,6 +145,29 @@ static func parse_json(text: String, origin: String = "") -> DotResult:
 
 	return validate(json.data as Dictionary)
 
+## The map's own world part of [method validate] into `doc`: the refusal text, or "" when it reads.
+static func _world_block(source: Dictionary, doc: Dictionary) -> String:
+	var world := str(source.get("world", ""))
+	if world != "":
+		if not world.begins_with(WORLD_PREFIX) or not _is_id(world):
+			return "world '%s' is not %s<id>" % [world, WORLD_PREFIX]
+		doc["world"] = world
+		# What the server resolved it to (`<owner>/<pack>@<version>`), sent in MAP: the same pack
+		# name, so a key from the wire can only name this map's world.
+		var key := str(source.get("world_key", ""))
+		if key != "" and _world_key_ok(key, world):
+			doc["world_key"] = key
+		# Which of the world's hulls collide where the boxes' budget dropped brushes (ZzMap.attach_world_collision).
+		var wc: Variant = source.get("world_collision", {})
+		if wc is Dictionary and not (wc as Dictionary).is_empty():
+			doc["world_collision"] = {"models": _ints(wc.get("models", [])), "flat": _ints(wc.get("flat", [])),
+					"flat_height": float(wc.get("flat_height", 0.5)), "skip": _boxes(wc.get("skip", []))}
+			for crop_key: String in ["within", "band"]:
+				if wc.has(crop_key) and wc[crop_key] is Array:
+					doc["world_collision"][crop_key] = (wc[crop_key] as Array).map(func(v: Variant) -> float: return float(v))
+	return ""
+
+
 ## The navigation and terrain part of [method validate] into `doc`: the refusal text, or "" when it reads.
 static func _nav_block(source: Dictionary, doc: Dictionary) -> String:
 	var nav_in: Variant = source.get("nav", {})
@@ -225,24 +248,9 @@ static func validate(source: Dictionary) -> DotResult:
 
 	# The map's own drawn geometry, a pack of its own (ZzMap.load_world); without it the boxes are
 	# drawn. Only a name the converter makes, so a document cannot point a client at any pack.
-	var world := str(source.get("world", ""))
-	if world != "":
-		if not world.begins_with(WORLD_PREFIX) or not _is_id(world):
-			return _refuse("world '%s' is not %s<id>" % [world, WORLD_PREFIX], source)
-		doc["world"] = world
-		# What the server resolved it to (`<owner>/<pack>@<version>`), sent in MAP: the same pack
-		# name, so a key from the wire can only name this map's world.
-		var key := str(source.get("world_key", ""))
-		if key != "" and _world_key_ok(key, world):
-			doc["world_key"] = key
-		# Which of the world's hulls collide where the boxes' budget dropped brushes (ZzMap.attach_world_collision).
-		var wc: Variant = source.get("world_collision", {})
-		if wc is Dictionary and not (wc as Dictionary).is_empty():
-			doc["world_collision"] = {"models": _ints(wc.get("models", [])), "flat": _ints(wc.get("flat", [])),
-					"flat_height": float(wc.get("flat_height", 0.5)), "skip": _boxes(wc.get("skip", []))}
-			for crop_key: String in ["within", "band"]:
-				if wc.has(crop_key) and wc[crop_key] is Array:
-					doc["world_collision"][crop_key] = (wc[crop_key] as Array).map(func(v: Variant) -> float: return float(v))
+	var world_why := _world_block(source, doc)
+	if world_why != "":
+		return _refuse(world_why, source)
 
 	var mode := str(source.get("mode", EXODUS))
 
@@ -827,15 +835,6 @@ static func _colour_list(value: Variant) -> Array:
 static func _r(value: float) -> float:
 	return snappedf(value, 0.001)
 
-## The numbers of a list as ints; anything else in it is dropped.
-static func _ints(value: Variant) -> Array:
-	var out: Array = []
-	if value is Array:
-		for v: Variant in value:
-			if v is int or v is float:
-				out.append(int(v))
-	return out
-
 ## The six-number boxes (`[x0, y0, z0, x1, y1, z1]`) of a list; a malformed one is dropped.
 static func _boxes(value: Variant) -> Array:
 	var out: Array = []
@@ -845,22 +844,6 @@ static func _boxes(value: Variant) -> Array:
 			if f is Array and (f as Array).size() == 6:
 				out.append(f)
 	return out
-
-## Whether [param key] is `<owner>/<world>@<version>` for exactly [param world].
-static func _world_key_ok(key: String, world: String) -> bool:
-	var slash := key.find("/")
-	var at := key.rfind("@")
-	if slash <= 0 or at <= slash or key.length() > 160:
-		return false
-	var owner := key.substr(0, slash)
-	var version := key.substr(at + 1)
-	if key.substr(slash + 1, at - slash - 1) != world or version.is_empty():
-		return false
-	for part: String in [owner, version]:
-		for character in part:
-			if not (character in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-.+"):
-				return false
-	return not owner.contains("..") and not version.contains("..")
 
 ## An `ambient` field in its safe form: a mood id, or a dictionary of ids and clamped scales; "" for nothing usable.
 static func _ambient(raw: Variant) -> Variant:
@@ -882,17 +865,6 @@ static func _ambient(raw: Variant) -> Variant:
 	if src.has("frequency") and (src["frequency"] is float or src["frequency"] is int):
 		out["frequency"] = clampf(float(src["frequency"]), 0.0, 4.0)
 	return mood if out.size() == 1 else out
-
-static func _is_id(id: String) -> bool:
-	if id.is_empty() or id.length() > 48:
-		return false
-
-	for character in id:
-		if not (character >= "a" and character <= "z") and not (character >= "0" and character <= "9") \
-				and character != "_":
-			return false
-
-	return true
 
 static func _refuse(why: String, doc: Dictionary) -> DotResult:
 	return DotResult.fail(

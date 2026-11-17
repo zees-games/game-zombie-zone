@@ -1728,8 +1728,8 @@ func _build_environment() -> void:
 	var lighting := Node3D.new()
 	lighting.name = "Lighting"
 	add_child(lighting)
-	_sun = DotLightRig.apply(lighting, DotLightDocument.from_dictionary(light_document(env_doc)),
-		light_profile(float(env_doc["ambient_energy"])))
+	_sun = DotLightRig.apply(lighting, DotLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)),
+		ZzMapLight.light_profile(float(env_doc["ambient_energy"])))
 
 	if _sun != null:
 		# The map's own angle, in Godot's degrees as the map document has always written it,
@@ -1743,8 +1743,8 @@ func _build_environment() -> void:
 		# The rig never draws a sun under 0.35, a floor for daylight worlds; a night map's
 		# moon there lit every street like an overcast afternoon. The map's own strength, on
 		# the rig's curve, without the floor.
-		var profile := light_profile(float(env_doc["ambient_energy"]))
-		var brightness := float(light_document(env_doc)["sun"]["brightness"])
+		var profile := ZzMapLight.light_profile(float(env_doc["ambient_energy"]))
+		var brightness := float(ZzMapLight.light_document(env_doc)["sun"]["brightness"])
 		_sun.light_energy = clampf(sqrt(brightness / profile.brightness_reference), 0.0, 2.0)
 
 	for node in lighting.get_children():
@@ -1815,8 +1815,8 @@ func _capture_day() -> void:
 	_night_light = _light_values(_sun, _environment, _fill)
 	var day_doc: Dictionary = doc.get("day_environment", ZzMapDoc.DEFAULT_ENV)
 	var scratch := Node3D.new()
-	var day_sun := DotLightRig.apply(scratch, DotLightDocument.from_dictionary(light_document(day_doc)),
-		light_profile(float(day_doc["ambient_energy"])))
+	var day_sun := DotLightRig.apply(scratch, DotLightDocument.from_dictionary(ZzMapLight.light_document(day_doc)),
+		ZzMapLight.light_profile(float(day_doc["ambient_energy"])))
 	var day_env: WorldEnvironment = null
 
 	for node in scratch.get_children():
@@ -1833,8 +1833,8 @@ func _capture_day() -> void:
 			(sky.sky_material as ProceduralSkyMaterial).sky_cover_modulate = Color(1.0, 1.0, 1.0, 0.0)
 		day_sun.rotation_degrees = Vector3(float(day_doc["sun_pitch"]), float(day_doc["sun_yaw"]), 0.0)
 		var day_fill := _aim_fill(scratch, day_doc, day_sun)
-		var profile := light_profile(float(day_doc["ambient_energy"]))
-		var brightness := float(light_document(day_doc)["sun"]["brightness"])
+		var profile := ZzMapLight.light_profile(float(day_doc["ambient_energy"]))
+		var brightness := float(ZzMapLight.light_document(day_doc)["sun"]["brightness"])
 		day_sun.light_energy = clampf(sqrt(brightness / profile.brightness_reference), 0.0, 2.0)
 		_day_light = _light_values(day_sun, day_env, day_fill)
 
@@ -1847,8 +1847,8 @@ static func _aim_fill(lighting: Node, env_doc: Dictionary, sun: DirectionalLight
 	var fill := lighting.get_node_or_null("Fill") as DirectionalLight3D
 	if fill == null:
 		return null
-	var aimed := DotLightRig.fill(DotLightDocument.from_dictionary(light_document(env_doc)), sun.rotation,
-		light_profile(float(env_doc["ambient_energy"])))
+	var aimed := DotLightRig.fill(DotLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)), sun.rotation,
+		ZzMapLight.light_profile(float(env_doc["ambient_energy"])))
 	fill.rotation = aimed.rotation
 	aimed.free()
 	return fill
@@ -1903,82 +1903,6 @@ func set_daylight(amount: float) -> void:
 func daylight() -> float:
 	return _daylight
 
-## The dot-lighting document a map's `environment` describes.
-##
-## [b]The sun is the map's, at the map's strength[/b]: 380 (game-fatal-contact's daylight) times the
-## square of `sun_energy`, which for a night map's 0.12 is a faint moon (drawn below the rig's
-## floor, see [method _build_environment]) and leaves the lamps to light the street. [b]The fill is the map's
-## ambient hue taken halfway to neutral and brought up to a pale value[/b]: a night map's
-## ambient is a deep blue that, at the strength the dark needs to stay readable, tinted
-## everything navy and lost every zombie against every wall; halfway keeps the moonlit cool
-## (and the pier's dusk rose) without the cast. [b]The fog is the map's own darkness from
-## 14 m[/b]: its horizon colour, reaching full at about 2 / `fog` metres further on and never
-## quite opaque, so what comes out of the dark comes out of it at a distance a survivor can
-## still shoot, and the map's `fog` (the chapel's 0.05 is twice the street's) still says how
-## thick. Source units (metres / 0.01905), as the rig reads them.
-static func light_document(env_doc: Dictionary) -> Dictionary:
-	var sun := ZzMapDoc.colour(env_doc["sun_colour"])
-	var horizon := ZzMapDoc.colour(env_doc["sky_horizon"])
-	var ambient := ZzMapDoc.colour(env_doc["ambient"])
-	var peak := maxf(maxf(ambient.r, ambient.g), maxf(ambient.b, 0.01))
-	var fill := Color(ambient.r / peak, ambient.g / peak, ambient.b / peak).lerp(Color(1.0, 1.0, 1.0), 0.5) * 0.9
-	var energy := float(env_doc["sun_energy"])
-	var fog := maxf(float(env_doc["fog"]), 0.01)
-	var start := 14.0
-	var end := start + 2.0 / fog
-	var thickest := clampf(fog * 20.0, 0.35, 0.85)
-	if env_doc.has("fog_start"):
-		# Clear air from a converted day map (ZzMapDoc.environment_from_world): a thin haze far off.
-		start = float(env_doc["fog_start"])
-		end = maxf(float(env_doc.get("fog_end", start * 10.0)), start + 1.0)
-		thickest = 0.25
-	return {
-		"sun": {
-			"colour": [sun.r, sun.g, sun.b],
-			"brightness": 380.0 * energy * energy,
-			"spread_degrees": 1.0,
-			"ambient_colour": [fill.r, fill.g, fill.b],
-		},
-		"fog": {
-			"enabled": true,
-			"colour": [horizon.r, horizon.g, horizon.b],
-			"start": start / 0.01905,
-			"end": end / 0.01905,
-			"max_density": thickest,
-		},
-	}
-
-## What this machine draws of a map's light: dot-lighting's `painted()` (API level 3), the
-## family's profile for hand-built worlds, with the map's ambient and fill.
-##
-## [b]Shadows stay on in the browser[/b], unlike dot-lighting's `web()`: a moonlit street
-## without them is every face lit alike, and the boxes are batched into a few dozen meshes.
-## `painted()` matches its light to the renderer (the Compatibility renderer this game and the
-## client shell use has no headroom above white), lowers the exposure, grades, and trades
-## ambient for a shadowless fill from the side the sun is not on, turned with the map's sun
-## ([method _aim_fill]) and blended between night and day with it ([method set_daylight]).
-##
-## [b]The ambient is the map's `ambient_energy` times [constant AMBIENT] of `painted()`'s, the
-## fill times [constant FILL][/b], chosen from rendered frames under Compatibility (the
-## family's 4 and 2.8 scaled by this game's old 1.2 against their 1.4): a night street stays
-## dusky with the lamps pooling and a zombie a dark figure against a lighter wall, and the
-## school by day loses the glare that washed its field white.
-const AMBIENT := 3.4
-
-const FILL := 2.4
-
-static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
-	var p := DotLightProfile.painted()
-	p.sun_shadows = true
-	p.ambient_energy *= ambient_energy * AMBIENT
-	p.fill_energy *= ambient_energy * FILL
-	# Less contrast than painted()'s 1.12: the grade pivots at mid grey, and dark props and
-	# zombies in shade went to black at 1.12.
-	p.contrast = 1.04
-	# Glow only from what is brighter than white (the lamps, the fires), not from every
-	# pale wall.
-	p.glow_threshold = 1.0
-	return p
 
 
 # Asking

@@ -1,4 +1,4 @@
-extends "zz_game_state.gd"
+extends "zz_game_services.gd"
 
 const ZzMovementCvars := preload("zz_movement_cvars.gd")
 const ZzCapsScript := preload("zz_caps.gd")
@@ -106,39 +106,13 @@ func _ready() -> void:
 	lap = _lap(&"combat_etc", lap)
 
 	if authoritative:
-		pins = ZzPins.new(self)
-		hazards = ZzHazards.new(self)
-		turrets = ZzTurrets.new(self)
-		hazards.exploded.connect(func(at: Vector3, radius: float, kind: StringName) -> void:
-			exploded.emit(at, radius, kind))
+		_build_services(box_profile_set())
 		# A pipe bomb, a propane tank, a molotov's burst: the map's toys thrown from it.
 		var _toys := exploded.connect(_on_exploded_near_toys)
-		loot = ZzLoot.new(self)
-		crates = ZzCrates.new(self)
-		var _cm := crates.moved_many.connect(func(batch: Array) -> void: loot.moved_many.emit(batch))
-		spawners = ZzSpawners.new(self)
-		spawners.load_config()
-		shop = ZzShop.new(self)
-		loot.removed.connect(spawners.on_loot_removed)
-		drops = ZzDrops.new(self)
-		map_objects = ZzMapObjects.new(self)
-		drops.load_config()
-		boxes = ZzBoxes.new(self)
-		var _loaded_boxes := boxes.load_file(config.box_file)
-		var _box_profiles := boxes.overlay_profiles(box_profile_set())
-		bots = ZzBots.new(self)
 		lap = _lap(&"auth_services", lap)
 		_build_horde()
 		lap = _lap(&"horde", lap)
-		catalogue = ZzCatalogue.new()
-		# Subscribed (solo) pack maps are map documents and join the catalogue; online none.
-		catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
-			ZzWorkshop.accepted_map_kinds())
-		var _loaded := catalogue.load_from(config.map_directory)
-		# Solo in the client shell: the map packs it mounted for this game, which a server
-		# would have named. See [method solo_map_dirs].
-		for root in solo_map_dirs("maps"):
-			var _added := catalogue.add_directory(root)
+		_load_catalogue(solo_map_dirs("maps"))
 		var _rotation := load_rotation()
 		if authoritative and catalogue.maps.is_empty():
 			# A server with nothing to play is broken, not quiet: an old pack, or the map packs never installed.

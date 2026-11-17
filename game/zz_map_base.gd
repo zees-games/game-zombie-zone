@@ -1,6 +1,7 @@
 extends Node3D
 
 const ZzMapDoc := preload("zz_map_doc.gd")
+const ZzMapLight := preload("zz_map_light.gd")
 
 const ZzLaps := preload("zz_laps.gd")
 
