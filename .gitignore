@@ -85,7 +85,9 @@
 /addons/zz_ply_class_pack
 
 # Fatal Contact's weapon addon is never a Zombie Zone dependency: a stray link to it stays out of the repository.
-/addons/arena_weapons
+# The trailing * keeps dot-ci's resolve-deps (which reads every bare /addons/<name> line as a dependency) from cloning it.
+/addons/fc_weapons*
+/addons/arena_weapons*
 
 # Exports
 build/
