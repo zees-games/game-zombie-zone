@@ -31,6 +31,14 @@ var _ab_senses := false
 ## --senses-verify (with --profile): every perception pass runs native and script and counts the NPCs whose
 ## target or timestamps differ (PARITY senses line); the script's answers are the ones kept.
 var _senses_verify := false
+## --ab-brains (with --profile): every 64 ticks the zombies' brains flip between the script (0) and dot-sim's
+## `DotSimZombieBrains` (1) through `ZzConfig.native_brains`; h.brains is summed per arm (AB lines).
+var _ab_brains := false
+## --brains-verify (with --profile): every native chase plan and spaced heading is also worked out in script and the
+## pairs that differ counted (PARITY brains line); the script's answers are the ones kept.
+var _brains_verify := false
+var _abb_us := {}
+var _abb_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
@@ -60,6 +68,10 @@ func _read_args() -> void:
 			_ab_senses = true
 		elif arg == "--senses-verify":
 			_senses_verify = true
+		elif arg == "--ab-brains":
+			_ab_brains = true
+		elif arg == "--brains-verify":
+			_brains_verify = true
 		elif arg == "--crowd-parity":
 			_crowd_parity = true
 		elif arg.begins_with("--ring="):
@@ -86,6 +98,13 @@ func _print_profile() -> void:
 		var senses: DotNpcSenses = (_client.get("game") as ZzGame).horde.senses
 		print("PARITY senses decided=%d mismatches=%d checks=%d casts=%d native=%s" % [senses.native_decided,
 			senses.native_mismatches, senses.sight_checks, senses.los_casts, ClassDB.class_exists(&"DotSimSenses")])
+	for side: int in _abb_ticks:
+		print("AB brains=%d h.brains %.3f ms/tick over %d ticks" % [side,
+			float(_abb_us[side]) / 1000.0 / maxf(1.0, _abb_ticks[side]), _abb_ticks[side]])
+	if _brains_verify:
+		var horde: Node = (_client.get("game") as ZzGame).horde
+		print("PARITY brains decided=%d mismatches=%d native=%s" % [horde.get(&"brains_decided"),
+			horde.get(&"brains_mismatches"), ClassDB.class_exists(&"DotSimZombieBrains")])
 	if _crowd_parity:
 		print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
 	_profiler.free()
@@ -408,11 +427,19 @@ func _physics_process(_delta: float) -> void:
 		(_client.get("game") as ZzGame).horde.config.native_senses = senses_arm == 1
 	if _senses_verify:
 		(_client.get("game") as ZzGame).horde.senses.native_verify = true
+	var brains_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_brains else -1
+	if brains_arm >= 0:
+		(_client.get("game") as ZzGame).horde.config.native_brains = brains_arm == 1
+	if _brains_verify:
+		(_client.get("game") as ZzGame).horde.brains_verify = true
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
 		_abs_us[senses_arm] = int(_abs_us.get(senses_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.senses", 0))
 		_abs_ticks[senses_arm] = int(_abs_ticks.get(senses_arm, 0)) + 1
+	if brains_arm >= 0 and _recording:
+		_abb_us[brains_arm] = int(_abb_us.get(brains_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
+		_abb_ticks[brains_arm] = int(_abb_ticks.get(brains_arm, 0)) + 1
 	if native_arm >= 0 and _recording:
 		var parts: Dictionary = _profiler.get(&"_tick_parts")
 		_abn_us[native_arm] = _abn_us.get(native_arm, Vector3.ZERO) + Vector3(float(parts.get("h.brains", 0)),

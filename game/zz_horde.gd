@@ -659,12 +659,15 @@ func tick(delta: float, ticks: int = 1) -> void:
 	_rebuild_candidates()
 	_keep_reaching()
 	_rebuild_grid()
+	_feed_brains()
 	spawner.set_candidates(_candidates)
 	_land_alerts()
 	_advance_lures()
 	_advance_bile()
 	monster_host.tick()
 	spawner.tick(delta)
+	brains_now = null
+	brains_crowd = null
 
 	var speed := zombie_speed_scale * wave_speed_scale
 
@@ -817,6 +820,42 @@ func survivor_ids() -> Array[StringName]:
 
 	return out
 
+## The native brains' survivor table and chase rules for this tick, off [code]_survivors[/code] and the boxes: what
+## `zz_common_brain.gd`'s `_chase_plan` reads instead of quarry, survivor_position, survivor_is and common_chase_speed.
+func _feed_brains() -> void:
+	brains_now = brains_native
+	brains_crowd = crowd if brains_native != null and crowd_native else null
+
+	if brains_native == null:
+		return
+
+	_brain_ids.clear()
+	_brain_at.clear()
+	_brain_flags.clear()
+
+	for id: StringName in _survivors:
+		var facts: Dictionary = _survivors[id]
+		_brain_ids.append(id)
+		_brain_at.append(facts["position"])
+		_brain_flags.append((1 if bool(facts["alive"]) else 0) | (2 if bool(facts.get("down", false)) else 0))
+
+	if not bool(brains_native.call(&"set_survivors", _brain_ids, _brain_at, _brain_flags)):
+		brains_now = null
+		return
+
+	var stacks := hard_stacks()
+	var angry: bool = game != null and game.boxes != null and game.boxes.is_active(&"angry")
+	var down_attack: bool = game != null and bool(game.config.down_attack)
+	brains_native.call(&"set_rules", ZzNpcs.common_chase_speed(config, stacks, false),
+		ZzNpcs.common_chase_speed(config, stacks, true), angry, config.angry_runner_fraction, down_attack)
+
+## One native answer checked against the script ([member brains_verify]).
+func brains_tally(same: bool) -> void:
+	brains_decided += 1
+
+	if not same:
+		brains_mismatches += 1
+
 func _rebuild_grid() -> void:
 	_pick_crowd()
 	crowd.clear()
@@ -855,11 +894,16 @@ var _crowd_ids := PackedInt64Array()
 var _crowd_at := PackedVector3Array()
 
 ## Swaps [member crowd] to the native grid or back when [member ZzConfig.native_crowd] (or the
-## library) says so, and the senses' native pass with [member ZzConfig.native_senses]; between ticks,
-## so a tool may flip either while a round runs.
+## library) says so, the senses' native pass with [member ZzConfig.native_senses], and the brains'
+## with [member ZzConfig.native_brains]; between ticks, so a tool may flip any while a round runs.
 func _pick_crowd() -> void:
 	if senses != null:
 		senses.native_enabled = config != null and config.native_senses
+
+	var brains := config != null and config.native_brains and ClassDB.class_exists(NATIVE_BRAINS)
+
+	if brains != (brains_native != null):
+		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null
 
 	var want := config != null and config.native_crowd and ClassDB.class_exists(NATIVE_CROWD)
 

@@ -480,7 +480,11 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	sp._ticks += 1
 	sp._perception.perceive()
 	at = _part("h.senses", at)
+	# The native brains' survivor table, fed here so its cost lands in h.brains; it is live only for this think.
+	h._feed_brains()
 	sp._think(delta)
+	h.brains_now = null
+	h.brains_crowd = null
 	at = _part("h.brains", at)
 	sp._perception.reclaim()
 	at = _part("h.reclaim", at)

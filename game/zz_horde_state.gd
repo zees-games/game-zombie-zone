@@ -105,6 +105,23 @@ const NATIVE_CROWD := &"DotSimCrowdGrid"
 var crowd: Variant = CrowdGrid.new(GRID)
 ## Whether [member crowd] is the native grid now.
 var crowd_native: bool = false
+
+## dot-sim's `DotSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
+## the commons' chase plan off a survivor table fed once a tick ([code]_feed_brains[/code]).
+const NATIVE_BRAINS := &"DotSimZombieBrains"
+var brains_native: Object = null
+## What a brain asks while the brains think in [method tick] (null outside it, so a tool or suite that calls a brain
+## by hand gets the script): [member brains_native], and the native crowd for the spaced heading when it is on too.
+var brains_now: Object = null
+var brains_crowd: Variant = null
+## Re-run the script beside every native answer and count; the script's answer is the one used (bench
+## `--brains-verify`, `headless_native_brains`).
+var brains_verify: bool = false
+var brains_decided: int = 0
+var brains_mismatches: int = 0
+var _brain_ids: Array[StringName] = []
+var _brain_at := PackedVector3Array()
+var _brain_flags := PackedInt32Array()
 var _crowd_npcs: Array[DotNpcInstance] = []
 var _near_scratch := PackedInt32Array()
 const GRID := 4.0

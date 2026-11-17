@@ -180,6 +180,29 @@ func neighbours(radius: float) -> Array:
 	return h.call(&"neighbour_positions", npc, radius * 2.0)
 
 
+## [method steer_with_spacing]'s heading (seek, crowd push, blend) in one call to dot-sim's
+## `DotSimCrowdGrid.spaced_direction` while the horde's brains and crowd are both native; the script otherwise,
+## and beside it under the horde's `brains_verify`, whose answer is then the one used.
+func _spaced_direction(here: Vector3, goal: Vector3, spacing: float) -> Vector3:
+	var h := horde()
+	var grid: Variant = h.get(&"brains_crowd") if h != null and npc != null and npc.is_alive() else null
+
+	if grid == null:
+		return super(here, goal, spacing)
+
+	var native: Vector3 = grid.spaced_direction(npc.instance_id, here, goal, spacing, npc.facing())
+
+	if native == Vector3.INF:
+		return super(here, goal, spacing)
+
+	if bool(h.get(&"brains_verify")):
+		var script := super(here, goal, spacing)
+		h.call(&"brains_tally", script == native)
+		return script
+
+	return native
+
+
 ## Spacing straight off the horde's crowd grid: the same push as [method neighbours] fed to
 ## `DotNpcAiSteering.separate`, without building the array each think.
 func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:

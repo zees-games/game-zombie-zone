@@ -45,6 +45,13 @@ const STUCK_SECONDS := 1.2
 ## Hops that have not freed it before it is stepped along instead.
 const HOPS_BEFORE_NUDGE := 2
 
+## [method _chase_plan]'s first value: chasing the forced survivor, its own target, nobody, or one it has no place for.
+## The same codes as dot-sim's `DotSimZombieBrains`.
+const PLAN_FORCED := 0.0
+const PLAN_TARGET := 1.0
+const PLAN_NOBODY := -1.0
+const PLAN_LOST := -2.0
+
 var idle_kind: int = Idle.STAND
 var home: Vector3 = Vector3.ZERO
 
@@ -243,28 +250,89 @@ func _chase_speed() -> float:
 	return float(h.call(&"common_chase_speed", runner_roll)) if h != null else npc.def.move_speed
 
 
-## One tick of the fight. False when there is nobody to fight.
-func _chase(b: ZzZombieBody) -> bool:
-	var target := quarry()
+## This tick's chase as [code][code, dropped, at.x, at.y, at.z, speed, gap, reach][/code]: whom ([code]PLAN_*[/code]),
+## whether [member forced] is spent, where they stand, how fast and how far, and how near a swing lands. In dot-sim's
+## `DotSimZombieBrains` while the horde has one ([member ZzConfig.native_brains]); the script below otherwise, and
+## beside it under the horde's `brains_verify`, whose answer is then the one used.
+func _chase_plan(b: ZzZombieBody) -> PackedFloat64Array:
+	var h := horde()
+	var native: Object = h.get(&"brains_now") if h != null else null
+
+	if native == null:
+		return _chase_plan_script(b)
+
+	var plan: PackedFloat64Array = native.call(&"plan_chase", forced, npc.target_id if npc.has_target() else &"",
+		pace, runner_roll, tune(&"reach", 1.55), b.has_flag(ZzZombieBody.FLAG_BURNING), b.kind == &"crawler",
+		npc.position())
+
+	if bool(h.get(&"brains_verify")):
+		var script := _chase_plan_script(b)
+		h.call(&"brains_tally", script == plan)
+		return script
+
+	return plan
+
+
+## [method _chase_plan] in script: [method quarry], [method survivor_at], [method _chase_speed] and
+## [method strikes_down] as they were, without spending [member forced] (the caller does).
+func _chase_plan_script(b: ZzZombieBody) -> PackedFloat64Array:
+	var h := horde()
+	var plan := PackedFloat64Array([PLAN_NOBODY, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+	var target: StringName = &""
+
+	if forced != &"" and h != null and bool(h.call(&"survivor_alive", forced)):
+		plan[0] = PLAN_FORCED
+		target = forced
+	else:
+		plan[1] = 1.0 if forced != &"" else 0.0
+
+		if npc != null and npc.has_target() and npc.target_id != &"":
+			plan[0] = PLAN_TARGET
+			target = npc.target_id
 
 	if target == &"":
-		return false
+		return plan
 
 	var at := survivor_at(target)
 
 	if at == Vector3.INF:
-		return false
+		plan[0] = PLAN_LOST
+		return plan
 
 	var speed := _chase_speed() * pace
 
 	if b.has_flag(ZzZombieBody.FLAG_BURNING):
 		speed *= 1.2
 
-	var gap := flat_distance(npc.position(), at)
 	var reach := tune(&"reach", 1.55)
 
 	if strikes_down(target):
 		reach = minf(reach, 1.1)
+
+	plan[2] = at.x
+	plan[3] = at.y
+	plan[4] = at.z
+	plan[5] = speed
+	plan[6] = flat_distance(npc.position(), at)
+	plan[7] = reach
+	return plan
+
+
+## One tick of the fight. False when there is nobody to fight.
+func _chase(b: ZzZombieBody) -> bool:
+	var plan := _chase_plan(b)
+
+	if plan[1] > 0.5:
+		forced = &""
+
+	if plan[0] < 0.0:
+		return false
+
+	var target: StringName = forced if plan[0] == PLAN_FORCED else npc.target_id
+	var at := Vector3(plan[2], plan[3], plan[4])
+	var speed := plan[5]
+	var gap := plan[6]
+	var reach := plan[7]
 
 	# Close enough to matter: only the slot holders go in, the rest hold the ring. A forced
 	# zombie (a mob, bile) skips the queue: a mob is supposed to swamp you.
