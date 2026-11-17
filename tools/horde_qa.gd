@@ -60,6 +60,9 @@ func _map(id: StringName) -> void:
 	var nav: ZzNavGraph = game.horde.spawner.nav
 	var doc: Dictionary = game.horde.get(&"_doc")
 	print("== %s: %d graph points, %d ladder boxes, %d ladder links" % [id, nav.data.points.size(), game.horde.ladders().size(), nav.ladder_count])
+	for box: AABB in game.horde.ladders():
+		print("  ladder foot %s top %.2f, foot->top %s" % [box.get_center() - Vector3(0.0, box.size.y / 2.0, 0.0), box.end.y,
+			_reaches(nav, game.horde.snap_to_nav(box.get_center() - Vector3(0.0, box.size.y / 2.0, 0.0)), game.horde.snap_to_nav(box.get_center() + Vector3(0.0, box.size.y / 2.0, 0.0)))])
 	var spawns: Array = doc.get("zombie_spawns", [])
 	var survivors: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
 	# A trapped zombie spawn reaches no survivor spawn; a cut survivor spawn is one some zombie spawn cannot path to.
