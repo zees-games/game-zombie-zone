@@ -62,18 +62,26 @@ func _map(id: StringName) -> void:
 	print("== %s: %d graph points, %d ladder boxes, %d ladder links" % [id, nav.data.points.size(), game.horde.ladders().size(), nav.ladder_count])
 	var spawns: Array = doc.get("zombie_spawns", [])
 	var survivors: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
+	# A trapped zombie spawn reaches no survivor spawn; a cut survivor spawn is one some zombie spawn cannot path to.
 	var trapped := 0
+	var cut: Dictionary = {}
 	for s: Variant in spawns:
 		var from: Vector3 = game.horde.snap_to_nav(ZzMapDoc.v3(s))
-		var cut := 0
+		var reached := 0
 		for t: Dictionary in survivors:
-			if not _reaches(nav, from, game.horde.snap_to_nav(ZzMapDoc.v3(t["at"]))):
-				cut += 1
-		if cut > 0:
+			var to: Vector3 = game.horde.snap_to_nav(ZzMapDoc.v3(t["at"]))
+			if _reaches(nav, from, to):
+				reached += 1
+			else:
+				cut[to] = int(cut.get(to, 0)) + 1
+		if reached == 0:
 			trapped += 1
-			print("  TRAPPED spawn %s (map %s): %d of %d survivor spawns unreachable" % [from, ZzMapDoc.v3(s), cut, survivors.size()])
-	print("  zombie spawns: %d, survivor spawns %d, trapped %d" % [spawns.size(), survivors.size(), trapped])
-	_bad = _bad or trapped > 0
+			print("  TRAPPED spawn %s (map %s): reaches none of %d survivor spawns" % [from, ZzMapDoc.v3(s), survivors.size()])
+	for to: Vector3 in cut:
+		var back := spawns.filter(func(s: Variant) -> bool: return _reaches(nav, to, game.horde.snap_to_nav(ZzMapDoc.v3(s)))).size()
+		print("  CUT survivor spawn %s: %d of %d zombie spawns cannot path to it (it paths back to %d)" % [to, cut[to], spawns.size(), back])
+	print("  zombie spawns: %d, survivor spawns %d, trapped %d, survivor spawns cut off %d" % [spawns.size(), survivors.size(), trapped, cut.size()])
+	_bad = _bad or trapped > 0 or not cut.is_empty()
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _seed
