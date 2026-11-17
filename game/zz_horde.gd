@@ -169,12 +169,10 @@ func _adopt_links(graph: ZzNavGraph) -> void:
 	var lap := Time.get_ticks_usec()
 	graph.steep = config.nav_steep if config.nav_steep > 0.0 else INF
 	spawner.nav = graph
-
 	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
 	graph.allow_ladders = config.zombie_ladder_speed > 0.0
 	var passable: Array[RID] = game.map.mechanics.walk_through_bodies() if game.map != null and game.map.mechanics != null else ([] as Array[RID])
-	var side := ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), passable)
-	var _rungs := graph.apply_ladders(ladders(), side)
+	var _rungs := graph.apply_ladders(ladders(), ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), passable))
 	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():
