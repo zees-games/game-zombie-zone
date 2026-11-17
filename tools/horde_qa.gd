@@ -99,7 +99,7 @@ func _map(id: StringName) -> void:
 			_watch(m)
 	meter.rescue = str(game.horde.describe().get("stuck", "-"))
 	meter.freeze()
-	_report(id, movers, meter)
+	_summarize(id, movers, meter)
 	await _dispose(game)
 
 
@@ -133,7 +133,7 @@ func _watch(m: Dictionary) -> void:
 		trail.pop_front()
 
 
-func _report(id: StringName, movers: Array[Dictionary], meter: StuckMeter) -> void:
+func _summarize(id: StringName, movers: Array[Dictionary], meter: StuckMeter) -> void:
 	var climbers := 0
 	var reached := 0
 	var islands := 0
