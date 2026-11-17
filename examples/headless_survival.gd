@@ -2,7 +2,6 @@ extends "headless_survival_possession.gd"
 
 const ZzEvent := preload("../game/net/zz_event.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
-const ZzEventsSurvival := preload("../game/net/zz_events_survival.gd")
 const ZzHud := preload("../game/zz_hud.gd")
 const ZzLoot := preload("../game/zz_loot.gd")
 const ZzRespawn := preload("../game/zz_respawn.gd")
@@ -558,14 +557,14 @@ func _test_team_size() -> void:
 func _test_the_wire() -> void:
 	_section("the hold and the barricades on the wire")
 	var held := {"style": 1, "stage": 2, "index": 3, "count": 5, "left": 42.5, "remaining": -1, "twist": "swarm", "daylight": 0.0}
-	var back := ZzEventsSurvival.read(DotNetReader.new(ZzEventsSurvival.write(held)))
+	var back := ZzEvents.read_survival(DotNetReader.new(ZzEvents.write_survival(held)))
 	_check(bool(back["ok"]) and int(back["index"]) == 3 and int(back["count"]) == 5 and absf(float(back["left"]) - 42.5) < 0.1
 		and str(back["twist"]) == "swarm" and int(back["remaining"]) == -1 and float(back["daylight"]) < 0.01,
 		"SURVIVAL reads back what was written", str(back))
 	held["left"] = -1.0
 	held["remaining"] = 37
 	held["daylight"] = -1.0
-	back = ZzEventsSurvival.read(DotNetReader.new(ZzEventsSurvival.write(held)))
+	back = ZzEvents.read_survival(DotNetReader.new(ZzEvents.write_survival(held)))
 	_check(float(back["left"]) == -1.0 and int(back["remaining"]) == 37 and float(back["daylight"]) == -1.0,
 		"including 'none' for a clock and the light", str(back))
 	var bar := ZzEvents.read_barricade(DotNetReader.new(ZzEvents.write_barricade("gym_doors", 0.5, true)))
