@@ -154,6 +154,16 @@ func _take_ladder() -> void:
 	if ladder >= 0 and ZzLadders.touching(boxes[ladder], here):
 		b.climb_top = ZzLadders.top(boxes[ladder], _cruise_to)
 		b.climb_speed = float(h.call(&"ladder_speed"))
+
+		if here.y < boxes[ladder].end.y and ZzLadders.flat_off(boxes[ladder], here) > 0.0:
+			# Climbing from beside the ladder (TOUCH): into its column, not at the corner past its top, which pulled a
+			# climber under the deck beside a hatch and held it there.
+			var into: Vector3 = boxes[ladder].get_center() - here
+			into.y = 0.0
+
+			if into.length() > 0.05:
+				b.wish = into.normalized() * maxf(b.wish.length(), 1.0)
+
 		return
 
 	if b.climb_top - here.y > LADDER_FINISH:
