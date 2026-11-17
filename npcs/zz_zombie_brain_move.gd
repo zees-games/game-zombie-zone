@@ -4,6 +4,7 @@ extends "res://addons/dot_npc_ai/runtime/dot_npc_ai_brain.gd"
 ## step with its `brains_verify` check). Split out so each half stays a size a reader can hold.
 
 const ZzZombieBody := preload("zz_zombie_body.gd")
+const CHANNEL := "zz.zombie_brain"
 
 ## Where the horde publishes itself on the spawner, so a brain built from a path can reach it.
 const HORDE_META := &"zz_horde"
@@ -102,10 +103,9 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	return grid.separation(own, here, spacing, spacing * 2.0, right)
 
 
-## dot-npc-ai's steer, with everything after the path in one native call when the horde has its brains and
-## crowd grid ([code]DotSimZombieBrains.steer_walk[/code], or [code]steer_step[/code] on a dot-sim without it): the spaced heading, the body's wish, the eased turn,
-## the look and the progress watch, a dozen script calls apart. The script's own body ([method _steer_rest]) is
-## the fallback, and under [code]brains_verify[/code] it runs instead and each native answer is checked against it.
+## dot-npc-ai's steer with everything after the path in one native call ([code]DotSimZombieBrains.steer_walk[/code], else
+## [code]steer_step[/code]): heading, wish, turn, look and progress watch. [method _steer_rest] is the fallback, and under
+## [code]brains_verify[/code] it runs instead and each native answer is checked against it.
 func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
 	var h := horde()
 	var b := body()
@@ -219,9 +219,9 @@ func _verify_steer(h: Object, b: ZzZombieBody, out: PackedFloat64Array, goal: Ve
 		elif out[1] == 0.0:
 			same = same and _progress_at == at0 and _progress_since == since0
 
-	if not same and int(h.get(&"brains_mismatches")) < 8:
-		print("BRAINS steer mismatch: native %s | wish %s turn %s %s %d %s progress %s %s | xf %s want %s cruise %s goal %s" % [out,
-			b.wish, character._peak_turn, character._over_amt, character._turns, character._over_axis,
-			_progress_at, _progress_since, t1, want, _cruise_to, goal])
+	if not same:
+		DotLog.debug(CHANNEL, "native steer differs from the script's", {"native": str(out), "wish": str(b.wish),
+			"turn": str([character._peak_turn, character._over_amt, character._turns, character._over_axis]),
+			"progress": str([_progress_at, _progress_since]), "xf": str(t1), "want": str(want), "cruise": str(_cruise_to), "goal": str(goal)})
 
 	h.call(&"brains_tally", same)

@@ -272,11 +272,9 @@ const LADDER_OVER := 1.6
 ## A steep plain edge with both ends this close to a ladder's box (flat, metres) is that ladder.
 const LADDER_COLUMN := 3.0
 
-## Puts the map's ladder brushes [param boxes] (metres, world) on the graph: each joins the point nearest its foot to the
-## point nearest its top, found the way the graph's own ladder edges were (`ZzNavPrune.join_ladders`, `ZzNpcs.with_ladders`),
-## and every steep plain edge with both ends in a ladder's column is one too. Returns how many ladder links are on it.
-## [param side] (`ZzNavPrune.ladder_side`, `func(box: AABB, p: Vector3) -> bool`) keeps every end on the ladder's side
-## of the wall it is mounted on; without it any point in reach is an end.
+## Puts the ladder brushes [param boxes] (metres, world) on the graph: foot point to top point, as `ZzNavPrune.join_ladders`
+## finds them, plus every steep plain edge inside a ladder's column; returns the ladder link count. [param side]
+## (`ZzNavPrune.ladder_side`) keeps each end on the ladder's side of its wall; without it any point in reach is an end.
 func apply_ladders(boxes: Array[AABB], side: Callable = Callable()) -> int:
 	for box: AABB in boxes:
 		var mid := box.get_center()

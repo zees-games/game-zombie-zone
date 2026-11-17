@@ -89,11 +89,9 @@ static func _ladder_end(nav: DotNpcNavData, at: Vector3, over: float, box: AABB,
 		return rise >= -LADDER_HEIGHT and rise <= over and (not side.is_valid() or bool(side.call(box, nav.points[p]))))
 
 
-## `func(box: AABB, p: Vector3) -> bool`: whether graph point [param p] reaches ladder [param box] without a wall
-## between them: flat rays [constant LADDER_SIDE_RISES] over p to the ladder's middle hit nothing in [param mask] before the ladder's face.
-## A ladder bolted to the outside of a hull is otherwise joined to the floor inside it, and a zombie climbs the hull's
-## inner face into the deck above (zm_roy_the_ship). A head end over the ladder's top also needs the climb's column open
-## up to it: a ladder that stops under a closed deck is not a way onto that deck.
+## `func(box: AABB, p: Vector3) -> bool`: whether point [param p] reaches ladder [param box] with no wall between (flat rays
+## [constant LADDER_SIDE_RISES] over p to the ladder hit nothing in [param mask]), so a ladder outside a hull is not joined to
+## the floor inside it (zm_roy_the_ship); a head end over the top also needs the climb's column open up to it.
 static func ladder_side(space: PhysicsDirectSpaceState3D, mask: int, passable: Array[RID] = []) -> Callable:
 	if space == null or mask == 0:
 		return Callable()
