@@ -241,6 +241,14 @@ func _ragdoll(view: ZzZombieView, death: DotPlayerDeath) -> bool:
 	ragdolls.rules.collision_mask = ragdoll_mask
 	return ragdolls.spawn(view, death) != null
 
+## The bodies of the living zombies drawn now, for the phone's crosshair test (a dead one is dropped at once).
+func live_bodies() -> Array:
+	var out: Array = []
+	for key: int in _zombies:
+		out.append((_zombies[key] as Dictionary)["body"])
+	return out
+
+
 func zombie_count() -> int:
 	return _zombies.size()
 

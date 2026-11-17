@@ -256,3 +256,6 @@ On in Zombie Zone (`zz_weight_enabled 1`; the addon itself is off for any other 
 
 A weapon's own weight is `weight:` in its profile (workbench: the weapon's Weight field).
 
+## Phones
+
+A touch client draws dot-mobile's overlay (stick, drag-look, Fire, Jump, Duck, Reload, Next, Use, Heal) over the HUD, driving the client's own sampler (`game/zz_touch.gd`). The server governs it with dot-mobile's replicated cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`); auto-fire is allowed by default, so a touch player starts with it (`sv_autofire_desktop` extends it to keyboard players). Auto-fire holds the trigger on a living zombie under the crosshair and lets go on another survivor, a dead one, or a wall in front. A zombie on a client is a mirror with no collision, so the test is analytic (`ZzTouch.crosshair_kind`) plus one physics ray for walls. `examples/headless_touch` holds the layout, the overlay and the crosshair.

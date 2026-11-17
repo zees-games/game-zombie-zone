@@ -1,8 +1,8 @@
 extends RefCounted
 
-## The on-screen buttons of a phone: dot-ui's [DotTouchButtons] over the HUD, wired to the client's own
-## buttons ([method ZzClient.touch_button]). The sampler's stick and look drag are dot-player-controller's
-## [DotFpsTouchSampler]; this is only the buttons. Same shape as Fatal Contact's, with this game's hands added.
+## The phone's controls: dot-mobile's stick, drag-look and buttons over the HUD, driving the client's own
+## [DotFpsTouchSampler]. Fire is read through [method is_held], so a thumb and auto-fire take the Fire key's path.
+## The server's `sv_mobile_*`, `sv_aim_assist*` and `sv_autofire*` cvars ([member ZzGameState.mobile_rules]) govern it.
 
 const SelfScript := preload("zz_touch.gd")
 
@@ -10,8 +10,8 @@ const SelfScript := preload("zz_touch.gd")
 ## button is 48 px across, thumb size, and the cluster still sits above the ammunition plate.
 const LAYOUT: Array[Dictionary] = [
 	{"id": &"fire", "label": "FIRE", "offset": Vector2(86, 150), "radius": 52.0},
-	{"id": &"jump", "label": "JUMP", "offset": Vector2(200, 130), "radius": 42.0},
-	{"id": &"crouch", "label": "DUCK", "offset": Vector2(60, 272), "radius": 36.0},
+	{"id": &"jump", "label": "JUMP", "offset": Vector2(200, 130), "radius": 42.0, "hold": DotFpsCommand.BUTTON_JUMP},
+	{"id": &"crouch", "label": "DUCK", "offset": Vector2(60, 272), "radius": 36.0, "hold": DotFpsCommand.BUTTON_CROUCH},
 	{"id": &"reload", "label": "R", "offset": Vector2(170, 244), "radius": 36.0},
 	{"id": &"next", "label": "NEXT", "offset": Vector2(268, 200), "radius": 36.0},
 	{"id": &"use", "label": "USE", "offset": Vector2(290, 90), "radius": 36.0},
@@ -21,42 +21,201 @@ const LAYOUT: Array[Dictionary] = [
 ## How far left of the right edge the HUD's weight readout moves, in HUD units, to clear the cluster.
 const WEIGHT_SHIFT := 330.0
 
-var buttons: DotTouchButtons = null
+## Aim assist's candidates: within this many degrees of the crosshair and metres, each checked for a wall.
+const ASSIST_CONE_DEG := 10.0
+const ASSIST_RANGE := 80.0
+## The crosshair test looks no further than this, and takes a survivor to stand this tall and this wide.
+const SIGHT_RANGE := 120.0
+const PLAYER_HEIGHT := 1.8
+const PLAYER_RADIUS := 0.4
+
+var controls: DotMobileControls = null
+## dot-ui's buttons inside the overlay, for the shell's DPI fit.
+var buttons: DotTouchButtons:
+	get:
+		return controls.buttons if controls != null else null
+
 var _client: Node = null
-var _menu_button: Control = null
 
 
-## Builds the buttons under [param host] (the HUD's screen) when the device has touch; null otherwise.
-static func build(client: Node, host: Control, menu_button: Control = null) -> RefCounted:
-	if not DotPlatform.has_touch():
-		return null
+## Builds the overlay under [param host] (the HUD), following [param rules] (the server's). Never null.
+static func build(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobileRules, menu_button: Control = null) -> RefCounted:
 	var made: RefCounted = (SelfScript as GDScript).new()
-	made.call(&"_setup", client, host, menu_button)
+	made.call(&"_setup", client, host, sampler, rules, menu_button)
 	return made
 
 
-func _setup(client: Node, host: Control, menu_button: Control) -> void:
+func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobileRules, menu_button: Control) -> void:
 	_client = client
-	buttons = DotTouchButtons.new()
-	buttons.name = "TouchButtons"
-	buttons.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	buttons.set_buttons(LAYOUT.duplicate())
-	buttons.button_down.connect(func(id: StringName) -> void: client.call(&"touch_button", id, true))
-	buttons.button_up.connect(func(id: StringName) -> void: client.call(&"touch_button", id, false))
-	host.add_child(buttons)
-	_menu_button = menu_button
+	controls = DotMobileControls.new()
+	controls.name = "TouchControls"
+	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if rules != null:
+		controls.rules = rules
+	if menu_button != null:
+		controls.ignore_fn = func(at: Vector2) -> bool:
+			return menu_button.visible and menu_button.get_global_rect().has_point(at)
+	controls.setup(sampler, LAYOUT)
+	controls.crosshair_fn = _crosshair
+	controls.targets_fn = _assist_targets
+	controls.eye_fn = _eye
+	host.add_child(controls)
 
 
+## Hands the overlay the sampler now in use (offline, the player's own; online, the client's), sized to [param width].
+func attach(sampler: DotFpsSampler, _width: float = 0.0) -> void:
+	if controls != null and sampler != null:
+		controls.setup(sampler, LAYOUT)
 
-## Whether [param at] is on a button or the menu button, so the sampler's look drag leaves it alone.
-func covers(at: Vector2) -> bool:
-	return buttons != null and (buttons.contains_point(at) or _menu_button != null and _menu_button.visible \
-		and _menu_button.get_global_rect().has_point(at))
+
+## A declared button held by a thumb, or Fire held by auto-fire.
+func is_held(id: StringName) -> bool:
+	return controls != null and controls.is_held(id)
 
 
-## Makes [param sampler] a touch sampler that ignores presses on the buttons, sized to [param width].
-func attach(sampler: DotFpsSampler, width: float) -> void:
-	if sampler is DotFpsTouchSampler:
-		(sampler as DotFpsTouchSampler).ignore_fn = covers
-		(sampler as DotFpsTouchSampler).set_screen_width(width)
+## True when the overlay is up and forwards [param event] itself, or [param event] is the mouse Godot emulates
+## from a touch, which would turn the view a second time.
+func takes(event: InputEvent) -> bool:
+	if controls == null or not controls.touch:
+		return false
+	return controls.takes(event) or (event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION)
+
+
+func active() -> bool:
+	return controls != null and controls.touch
+
+
+## Called every frame by the client: pauses under a menu, the shop or a spectate, and matches auto-fire to the gun in hand.
+func sync(busy: bool, gun: DotWeaponDef) -> void:
+	if controls == null:
+		return
+	controls.paused = busy
+	controls.autofire.automatic = gun == null or gun.is_continuous()
+
+
+func describe() -> Dictionary:
+	return controls.describe() if controls != null else {"built": false}
+
+
+func _camera() -> Camera3D:
+	return _client.get_viewport().get_camera_3d() if is_instance_valid(_client) and _client.is_inside_tree() else null
+
+
+func _me() -> Node:
+	return _client.get(&"player") if is_instance_valid(_client) else null
+
+
+func _game() -> Object:
+	return _client.get(&"game") if is_instance_valid(_client) else null
+
+
+func _eye() -> Vector3:
+	var cam := _camera()
+	return cam.global_position if cam != null else Vector3.ZERO
+
+
+func _crosshair() -> int:
+	var cam := _camera()
+	var game := _game()
+	if cam == null or game == null:
+		return DotMobileAutoFire.TARGET_NONE
+	return crosshair_kind(cam.global_position, -cam.global_basis.z, _me(), _others(game), _zombies(), _space(cam),
+		int(game.call(&"world_mask")))
+
+
+func _assist_targets() -> PackedVector3Array:
+	var cam := _camera()
+	var game := _game()
+	if cam == null or game == null:
+		return PackedVector3Array()
+	return assist_targets(cam.global_position, -cam.global_basis.z, _zombies(), _space(cam), int(game.call(&"world_mask")))
+
+
+func _space(cam: Camera3D) -> PhysicsDirectSpaceState3D:
+	return cam.get_world_3d().direct_space_state
+
+
+func _others(game: Object) -> Array:
+	var all: Variant = game.get(&"players")
+	return (all as Dictionary).values() if all is Dictionary else []
+
+
+func _zombies() -> Array:
+	var view: Object = _client.get(&"world_view") if is_instance_valid(_client) else null
+	return view.call(&"live_bodies") if view != null else []
+
+
+## What the crosshair is on: the nearest body the camera's ray passes through. ENEMY for a living zombie, FRIEND for
+## another survivor or a dead one (never shot), NONE when nothing is or a wall is in front. A zombie a client sees is a
+## mirror with no collision, so the test is analytic (a vertical capsule), plus at most one physics ray for walls.
+static func crosshair_kind(eye: Vector3, forward: Vector3, me: Object, others: Array, zombies: Array,
+		space: PhysicsDirectSpaceState3D, mask: int) -> int:
+	var best_t := INF
+	var best_enemy := false
+	var best_aim := Vector3.ZERO
+	for p: Node3D in others:
+		if p == me or not _shown(p):
+			continue
+		var feet := p.global_position
+		var t := _ray_hit(eye, forward, feet, PLAYER_HEIGHT, PLAYER_RADIUS)
+		if t >= 0.0 and t < best_t:
+			best_t = t
+			best_enemy = false
+	for z: Node3D in zombies:
+		if not _shown(z):
+			continue
+		var height := float(z.get(&"height"))
+		var t := _ray_hit(eye, forward, z.global_position, height, float(z.get(&"radius")))
+		if t >= 0.0 and t < best_t:
+			best_t = t
+			best_enemy = true
+			best_aim = z.global_position + Vector3(0.0, height * 0.6, 0.0)
+	if best_t == INF:
+		return DotMobileAutoFire.TARGET_NONE
+	if not best_enemy:
+		return DotMobileAutoFire.TARGET_FRIEND
+	if _blocked(space, mask, eye, best_aim):
+		return DotMobileAutoFire.TARGET_NONE
+	return DotMobileAutoFire.TARGET_ENEMY
+
+
+## The chests of living zombies near the crosshair with no wall between, for aim assist.
+static func assist_targets(eye: Vector3, forward: Vector3, zombies: Array, space: PhysicsDirectSpaceState3D,
+		mask: int) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var cos_cone := cos(deg_to_rad(ASSIST_CONE_DEG))
+	for z: Node3D in zombies:
+		if not _shown(z):
+			continue
+		var at := z.global_position + Vector3(0.0, float(z.get(&"height")) * 0.6, 0.0)
+		var to := at - eye
+		var dist := to.length()
+		if dist < 0.01 or dist > ASSIST_RANGE or forward.dot(to / dist) < cos_cone:
+			continue
+		if not _blocked(space, mask, eye, at):
+			out.append(at)
+	return out
+
+
+## Distance along the ray to the point nearest the upright capsule's axis when the ray passes within [param radius] of
+## it, in front of the eye and within [constant SIGHT_RANGE]; -1 when it does not.
+static func _ray_hit(from: Vector3, dir: Vector3, feet: Vector3, height: float, radius: float) -> float:
+	var w := from - feet
+	var denom := height * (dir.y * dir.y - 1.0)
+	var s := 0.5 if absf(denom) < 0.0001 else (dir.y * dir.dot(w) - w.y) / denom
+	s = clampf(s, 0.0, 1.0)
+	var on_segment := feet + Vector3(0.0, height * s, 0.0)
+	var t := dir.dot(on_segment - from)
+	if t <= 0.0 or t > SIGHT_RANGE:
+		return -1.0
+	return t if (from + dir * t).distance_to(on_segment) <= radius else -1.0
+
+
+static func _shown(p: Node3D) -> bool:
+	return is_instance_valid(p) and p.is_inside_tree() and p.is_visible_in_tree()
+
+
+static func _blocked(space: PhysicsDirectSpaceState3D, mask: int, from: Vector3, to: Vector3) -> bool:
+	if space == null or mask == 0:
+		return false
+	return not space.intersect_ray(PhysicsRayQueryParameters3D.create(from, to, mask)).is_empty()

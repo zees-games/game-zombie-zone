@@ -424,6 +424,7 @@ func _follow_server_rules() -> void:
 		var _solid := game.body_rules.follow_cvars(link)
 		var _passing := game.pass_rules.follow_cvars(link)
 		var _crawling := game.crawl_rules.follow_cvars(link)
+		var _mobile := game.mobile_rules.follow_cvars(link)
 		var _sliding := game.slide_rules.follow_cvars(link)
 		var _downed_rules := game.downed_rules.follow_cvars(link)
 		var _ads := game.ads_rules.follow_cvars(link)
@@ -594,8 +595,8 @@ func _adopt(candidate: ZzPlayer) -> void:
 	# sample (see `ZzPlayer.command_stamp`); connected, they go onto the command sent.
 	if _offline:
 		player.command_stamp = _stamp
-		if _touch != null:
-			_touch.call(&"attach", player.sampler, hud.get_viewport().get_visible_rect().size.x)
+		if _touch != null and player.sampler != null:
+			_touch.call(&"attach", player.sampler)
 
 	if settings != null:
 		settings.bind_camera(self, &"base_fov")
@@ -1492,36 +1493,38 @@ func _build_touch() -> void:
 	var menu_button: Control = null
 	if settings != null and settings.menu != null:
 		menu_button = (settings.menu as DotMenu).menu_button
-	_touch = ZzTouch.build(self, hud.screen(), menu_button)
-	if _touch != null:
-		_touch.call(&"attach", _sampler, hud.get_viewport().get_visible_rect().size.x)
+	# Built on every client: a server may give auto-fire to keyboard players too (`sv_autofire_desktop`).
+	_touch = ZzTouch.build(self, hud.screen(), _sampler, game.mobile_rules, menu_button)
+	_touch.controls.button_pressed.connect(touch_button.bind(true))
+	_touch.controls.button_released.connect(touch_button.bind(false))
+	if DotPlatform.has_touch():
 		hud.shift_weight_left(ZzTouch.WEIGHT_SHIFT)
 		# dot-game's DotGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
 		if platform != null and platform.has_method(&"fit_touch_buttons"):
 			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), ZzTouch.LAYOUT)
 
 
-## A touch button went down or up: the same flags the keys set.
+## A touch button went down or up: the same flags the keys set. Fire is read through [method _fire_held] and jump
+## and duck are held on the sampler by the overlay itself.
 func touch_button(id: StringName, down: bool) -> void:
-	var sampler: DotFpsSampler = player.sampler if _offline and player != null and player.sampler != null else _sampler
 	match id:
-		&"fire":
-			_firing = down and not is_spectating()
 		&"reload":
 			_reloading = down
 		&"use":
 			_using = down
 		&"heal":
 			_healing = down
-		&"jump":
-			if sampler is DotFpsTouchSampler:
-				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_JUMP, down)
-		&"crouch":
-			if sampler is DotFpsTouchSampler:
-				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_CROUCH, down)
 		&"next":
 			if down:
 				_step_slot(1)
+
+
+## Whether the trigger is down: the Fire key or mouse, a thumb on the Fire button, or auto-fire. A phone's emulated
+## mouse is dropped before it gets here ([method _unhandled_input]), and a spectator never fires.
+func _fire_held() -> bool:
+	if is_spectating():
+		return false
+	return _firing or (_touch != null and bool(_touch.call(&"is_held", &"fire")))
 
 
 ## The server's `zz_team_roster`: whether the HUD draws the team-mate list, read now and on
@@ -1844,7 +1847,7 @@ func _stamp(command: DotFpsCommand) -> void:
 	if command == null:
 		return
 
-	command.set_button(ZzNetCommand.BUTTON_FIRE, _firing)
+	command.set_button(ZzNetCommand.BUTTON_FIRE, _fire_held())
 	command.set_button(ZzNetCommand.BUTTON_SHOVE, _shoving)
 	command.set_button(ZzNetCommand.BUTTON_RELOAD, _reloading)
 
@@ -1854,17 +1857,28 @@ func _drive_view_model(_command: DotFpsCommand) -> void:
 	if weapons == null or player == null:
 		return
 
-	var _outcome := player.drive_view_rig(_firing, _reloading, _slot,
+	var _outcome := player.drive_view_rig(_fire_held(), _reloading, _slot,
 		game.round_number * 100000 + Engine.get_physics_frames(), 1.0 / float(maxi(Engine.physics_ticks_per_second, 1)),
 		_aim_sent())
 
 
 ## Whether the player sees their own legs in first person: the client-only `cl_legs` setting.
+## True while the overlay should be down: a menu or the shop has the screen, input is blocked, or this player watches.
+func _touch_busy() -> bool:
+	return is_spectating() or is_shop_open() or (platform != null and platform.is_input_blocked())
+
+
+func _gun_in_hand() -> DotWeaponDef:
+	return weapons.arsenal.current_def() if weapons != null and weapons.arsenal != null else null
+
+
 func _own_legs() -> bool:
 	return settings != null and settings.settings != null and settings.settings.get_bool(DotOwnBodySetting.KEY, DotOwnBodySetting.DEFAULT)
 
 
 func _process(delta: float) -> void:
+	if _touch != null:
+		_touch.call(&"sync", _touch_busy(), _gun_in_hand())
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes(), _own_legs())
 	# After the frame's poses, so the position the server just applied is the one judged and no frame of the void is drawn.
 	_guard_placed()
@@ -2392,14 +2406,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# A phone's finger: the sampler steers and looks, the buttons are the HUD's. The mouse the
 	# engine makes from a touch is not a click.
-	if _touch != null:
-		if event is InputEventScreenTouch or event is InputEventScreenDrag:
-			var touched: DotFpsSampler = player.sampler if _offline and player != null and player.sampler != null else _sampler
-			if touched != null and player != null:
-				touched.handle_event(event)
-			return
-		if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
-			return
+	if _touch != null and bool(_touch.call(&"takes", event)):
+		return
 
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton

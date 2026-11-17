@@ -311,6 +311,17 @@ var footing: ZzFooting = ZzFooting.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
+## dot-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the
+## module (REPLICATED), followed by the client's overlay. Auto-fire is allowed here, so a touch player starts with it.
+var mobile_rules: DotMobileRules = _make_mobile_rules()
+
+
+static func _make_mobile_rules() -> DotMobileRules:
+	var rules := DotMobileRules.new()
+	rules.autofire = DotMobileRules.ALLOWED
+	return rules
+
+
 ## `zz_slide*`: the slide's numbers ([ZzSlideRules]). REPLICATED and followed by a client, which predicts its own slide.
 var slide_rules: ZzSlideRules = ZzSlideRules.new()
 

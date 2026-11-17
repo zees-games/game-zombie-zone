@@ -91,6 +91,11 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# dot-mobile's touch, aim assist and auto-fire rules: REPLICATED, the overlay on a phone follows them.
+	var _mobile := world.mobile_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
 	# The slide's numbers (dot-player-controller's cvar table under `zz_slide`): REPLICATED, a client predicts its own slide.
 	var _slide := world.slide_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
