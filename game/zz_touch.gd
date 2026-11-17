@@ -33,6 +33,9 @@ const LAYOUT_PORTRAIT: Array[Dictionary] = [
 ## How far left of the right edge the HUD's weight readout moves, in HUD units, to clear the cluster.
 const WEIGHT_SHIFT := 410.0
 
+## How far the health plate lifts, in HUD units, to clear the thumbstick (none in portrait, where the stick sits lower).
+const PLATE_LIFT := 100.0
+
 ## The button layout for a screen of [param size]: portrait gets the compact arc.
 static func layout_for(size: Vector2) -> Array[Dictionary]:
 	return LAYOUT_PORTRAIT if size.y > size.x else LAYOUT
@@ -41,6 +44,16 @@ static func layout_for(size: Vector2) -> Array[Dictionary]:
 ## How far the weight readout moves left on a screen of [param size]; none in portrait, where the cluster sits above it.
 static func weight_shift_for(size: Vector2) -> float:
 	return 0.0 if size.y > size.x else WEIGHT_SHIFT
+
+
+## How far the health plate lifts on a screen of [param size].
+static func plate_lift_for(size: Vector2) -> float:
+	return 0.0 if size.y > size.x else PLATE_LIFT
+
+
+## The health plate's lift for the host's current screen.
+func plate_lift() -> float:
+	return plate_lift_for(_host.get_viewport_rect().size) if _host != null and _host.is_inside_tree() else PLATE_LIFT
 
 
 ## Aim assist's candidates: within this many degrees of the crosshair and metres, each checked for a wall.

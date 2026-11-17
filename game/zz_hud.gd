@@ -15,6 +15,17 @@ func shift_weight_left(px: float) -> void:
 		c.offset_left -= px
 		c.offset_right -= px
 
+## Lifts the health plate, its stamina bar and the kits stacked over it [param px] HUD units, clear of the
+## touch thumbstick that sits over the bottom-left corner on a phone.
+func lift_plate(px: float) -> void:
+	screen()
+	_plate_lift = px
+	for c: Control in [vitals, stamina_bar]:
+		c.offset_top -= px
+		c.offset_bottom -= px
+
+var _plate_lift := 0.0
+
 func bind(p_game: ZzGame, p_player: ZzPlayer) -> void:
 	game = p_game
 	player = p_player
@@ -553,7 +564,7 @@ func _draw_health() -> void:
 	var rows := _kit_rows
 
 	# Stacked upward from the plate: the kits' rows, then the line about downs.
-	var plate_top := -PLATE_BOTTOM - 56.0
+	var plate_top := -PLATE_BOTTOM - 56.0 - _plate_lift
 	kits.offset_bottom = plate_top - 4.0
 	kits.offset_top = kits.offset_bottom - kits.row_height * rows.size()
 	_status.offset_bottom = kits.offset_top - 2.0
