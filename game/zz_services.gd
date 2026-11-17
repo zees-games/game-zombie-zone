@@ -27,6 +27,26 @@ const PROXIMITY_RANGE := 20.0
 ## The bridge, for the roster lookup [method _position_of] needs. Set before [method setup].
 var bridge: ZzNetBridge = null
 
+## Peers handed the chat backlog this seating; the roster's add_peer and the bridge's READY can come in either order.
+var _backlog_given: Dictionary = {}
+
+
+
+## Only once the client has said READY: the backlog sent at signon landed on a node it had not built yet.
+func _peer_can_receive(peer_id: int) -> bool:
+	return bridge == null or bridge.is_peer_ready(peer_id)
+
+
+func send_backlog(peer_id: int) -> void:
+	if _backlog_given.has(peer_id):
+		return
+	_backlog_given[peer_id] = true
+	super.send_backlog(peer_id)
+
+
+func remove_peer(peer_id: int) -> void:
+	_backlog_given.erase(peer_id)
+	super.remove_peer(peer_id)
 
 func _services_name() -> String:
 	return "zombiezone"
@@ -425,6 +445,9 @@ func setup(p_server: DotServer, p_game: Object, p_link: Object) -> DotResult:
 			if not keep.has(action):
 				keep.append(action)
 		mod_tools.set("persist_on_respawn", keep)
+
+	if bridge != null and not bridge.peer_admitted.is_connected(send_backlog):
+		bridge.peer_admitted.connect(send_backlog)
 
 	if game is ZzGame and not (game as ZzGame).round_began.is_connected(_on_round_began_for_tools):
 		(game as ZzGame).round_began.connect(_on_round_began_for_tools)

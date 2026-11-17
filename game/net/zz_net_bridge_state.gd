@@ -134,6 +134,8 @@ signal say_requested(peer_id: int, channel_id: StringName, text: String)
 ## A voice frame arrived. Server side; the payload is unparsed and must not be trusted —
 ## [method DotVoiceRouter.relay] is what stamps the speaker, from the peer id below.
 signal voice_requested(peer_id: int, payload: PackedByteArray)
+## Server: [param peer_id] said READY and has been told the world; it can receive from here on.
+signal peer_admitted(peer_id: int)
 
 ## Client side: one routed line, and one voice frame.
 signal chat_received(wire: Dictionary)
@@ -154,6 +156,9 @@ var rtt_source: Callable = Callable()
 ## Where a voice frame goes on the server. Assigned by [DotGameModule] to the services
 ## layer's `relay_voice`, because the bridge is the only thing that names both ends.
 var voice_relay_fn: Callable = Callable()
+
+## Server: messages to a peer not yet READY, dropped rather than sent to a link it has not built.
+var unready_dropped: int = 0
 
 ## `func(session_id: int) -> DotAvatar`: what a player looks like, asked once as they are
 ## seated. Assigned by the module, which is what has the identity layer; unset, or answering

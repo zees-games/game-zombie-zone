@@ -135,7 +135,8 @@ func send_voice(peer_id: int, payload: PackedByteArray) -> void:
 	if loopback.is_valid():
 		loopback.call(&"voice", peer_id if is_server else 1, payload)
 	elif is_server:
-		if peer_id > 0:
+		# The voice router knows a peer from signon, before its client has built this node.
+		if peer_id > 0 and (bridge == null or not bridge.has_method(&"is_peer_ready") or bridge.call(&"is_peer_ready", peer_id)):
 			_net_voice.rpc_id(peer_id, payload)
 	else:
 		_net_voice.rpc_id(1, payload)

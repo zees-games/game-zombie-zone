@@ -986,6 +986,8 @@ func _admit(peer_id: int) -> void:
 	if _nav_sent >= 0:
 		_tell(peer_id, ZzEvents.Kind.NAV, ZzEvents.write_nav(_nav_sent))
 
+	peer_admitted.emit(peer_id)
+
 
 ## Last percent of the navigation build sent, -1 when none was running.
 var _nav_sent: int = -1
@@ -1232,7 +1234,18 @@ func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	if peer_id <= 0 or net == null or body.is_empty():
 		return
 
+	# Not before READY: a client builds `Server/ZombieZone` after signon, so anything sooner is a
+	# "Node not found" on its console and lost. Chat said meanwhile reaches it as the backlog.
+	if net.is_server and not _ready_peers.has(peer_id):
+		unready_dropped += 1
+		return
+
 	net.send(ZzEvent.new(kind, body), peer_id)
+
+
+## Whether [param peer_id] has said READY, so has a link to receive on.
+func is_peer_ready(peer_id: int) -> bool:
+	return _ready_peers.has(peer_id)
 
 
 # Client: what it does with all that
@@ -2283,6 +2296,7 @@ func describe() -> Dictionary:
 		"players": _behaviours.size(),
 		"zombies": zombie_count(),
 		"ready_peers": _ready_peers.size(),
+		"unready_dropped": unready_dropped,
 		"tick": _tick,
 	}
 
