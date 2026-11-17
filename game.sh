@@ -19,8 +19,8 @@
 #
 # Options (before the command):
 #   --godot PATH     the Godot 4.7 binary to use (default: $GODOT, then godot on PATH)
-#   --timeout SEC    the longest one test suite may run (default 1200; headless_nav gets 3600
-#                    unless you pass this)
+#   --timeout SEC    the longest one test suite may run (default 1200; headless_nav gets at least 3300
+#                    unless you pass a larger --timeout)
 #   --no-parse       skip the parse pass in `test`
 #
 # `online` and `server` use dot-server-deploy, found next to this repository (or at
@@ -40,9 +40,6 @@ GAME_NAME="Zombie Zone"
 PACK="zombiezone"
 EXTRA_PACKS="zombiezone_maps:zombie-zone-maps"
 SUITES="headless_propforce headless_propcarry headless_classes headless_config headless_workbench headless_mapcfg headless_look headless_touch headless_run headless_maps headless_mapdrop headless_workshop headless_net headless_weapons dedicated headless_survival headless_nav headless_nav_holds headless_nav_waves headless_start headless_buildonce headless_packs headless_mechanics headless_defib headless_ambience headless_arsenal headless_carry headless_mutant headless_gait headless_sprint headless_hazards headless_collide headless_prefetch headless_downed headless_weapon_drop headless_stats headless_consumables headless_grenades headless_native_motor headless_native_crowd headless_native_senses headless_native_brains"
-# A suite that legitimately needs at least this long, as name=seconds; a larger --timeout still wins.
-# headless_nav runs about 17 min on staging02, past the 1200 s default.
-MIN_TIMEOUTS="headless_nav=3300"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail
@@ -52,10 +49,10 @@ cd "$ROOT" || exit 1
 
 GODOT="${GODOT:-godot}"
 TIMEOUT=1200
-TIMEOUT_SET=0
-# Suites that legitimately outrun the default (headless_nav bakes navmeshes: ~3300 s measured).
-declare -A SUITE_TIMEOUT=([headless_nav]=3600)
 PARSE=1
+# A suite that legitimately needs at least this long, as name=seconds; a larger --timeout still wins.
+# headless_nav runs about 17 min on staging02, past the 1200 s default.
+MIN_TIMEOUTS="headless_nav=3300"
 # tools/verify_ui.sh checks that drive the real client under xvfb.
 UI_CHECKS="trader crouch nav"
 # A suite too long for one run, as name=shard,shard,...: `test NAME` plays each shard as its own
@@ -75,8 +72,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --godot) GODOT="${2:?--godot needs a path}"; shift 2 ;;
         --godot=*) GODOT="${1#*=}"; shift ;;
-        --timeout) TIMEOUT="${2:?--timeout needs seconds}"; TIMEOUT_SET=1; shift 2 ;;
-        --timeout=*) TIMEOUT="${1#*=}"; TIMEOUT_SET=1; shift ;;
+        --timeout) TIMEOUT="${2:?--timeout needs seconds}"; shift 2 ;;
+        --timeout=*) TIMEOUT="${1#*=}"; shift ;;
         --no-parse) PARSE=0; shift ;;
         -h|--help|help) usage; exit 0 ;;
         *) break ;;
@@ -159,15 +156,15 @@ run_suite() {
         *.merge) extra=(--merge $(for _s in $(shards_of "$base"); do printf '.godot/test-logs/%s.%s.log ' "$base" "$_s"; done) "$@") ;;
         *.*) extra=(--shard "${scene#*.}" "$@") ;;
     esac
-    local log out status summary limit="$TIMEOUT" _m
-    # Per-suite floor from MIN_TIMEOUTS (name=seconds); the larger of it and --timeout wins.
-    for _m in $MIN_TIMEOUTS; do
-        if [ "${_m%%=*}" = "$base" ] && [ "${_m#*=}" -gt "$limit" ]; then limit="${_m#*=}"; fi
-    done
+    local log out status summary
     [ -f "examples/$base.tscn" ] || { printf '  %s??%s   %s: no examples/%s.tscn\n' "$YLW" "$OFF" "$scene" "$base"; return 1; }
     mkdir -p .godot/test-logs
     log=".godot/test-logs/$scene.log"
     [ -t 1 ] && printf '  ..   %s' "$scene"
+    local limit="$TIMEOUT" mkv
+    for mkv in $MIN_TIMEOUTS; do
+        [ "${mkv%%=*}" = "$base" ] && [ "$limit" -lt "${mkv#*=}" ] && limit="${mkv#*=}"
+    done
     timeout "$limit" "$GODOT" --headless --path . "res://examples/$base.tscn" ${extra[@]+-- "${extra[@]}"} >"$log" 2>&1
     status=$?
     summary="$(grep -Eo '[0-9]+ (passed|checks), [0-9]+ failed' "$log" | tail -1)"
