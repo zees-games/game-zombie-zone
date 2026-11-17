@@ -1569,6 +1569,9 @@ func _build_chat() -> void:
 	]
 	chat.max_length = ZzServices.chat_rules().max_length
 	chat.voice_config = ZzServices.voice_format()
+	# A phone: three narrow rows in the corner, clear of the thumbstick and buttons.
+	if DotPlatform.has_touch():
+		chat.window_settings = {"max_lines": 3, "width": 200.0, "margin_left": 12.0, "margin_bottom": 8.0}
 	add_child(chat)
 
 

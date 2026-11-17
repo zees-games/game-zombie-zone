@@ -19,7 +19,7 @@ const LAYOUT: Array[Dictionary] = [
 ]
 
 ## How far left of the right edge the HUD's weight readout moves, in HUD units, to clear the cluster.
-const WEIGHT_SHIFT := 330.0
+const WEIGHT_SHIFT := 410.0
 
 ## Aim assist's candidates: within this many degrees of the crosshair and metres, each checked for a wall.
 const ASSIST_CONE_DEG := 10.0
