@@ -15,10 +15,10 @@ heavy: waiting for a build slot (241s). Held by:
   christian@x-tmc-dev02 pid 3300915 since 01:06:22: /home/christian/godot/dot-cloud/tools/publish_pack.sh --source /home/christian/godot/mg-deathrun-maps --id mg-deathrun-maps --version 1.0.0 --dry-run --out /tmp/claude-1000/-home-christian-godot/b661fc09-b700-42ac-bb7e-29ea120ac1cf/scratchpad/out --l
   christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
 heavy: waiting for a build slot (301s). Held by:
-  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-arena tools/screenshot.sh dm_box --feel --weapons=pistol:2
+  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-fatal-contact tools/screenshot.sh dm_box --feel --weapons=pistol:2
   christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
 heavy: waiting for a build slot (361s). Held by:
-  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-arena tools/screenshot.sh dm_box --feel --weapons=pistol:2
+  christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-fatal-contact tools/screenshot.sh dm_box --feel --weapons=pistol:2
   christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
 heavy: waiting for a build slot (421s). Held by:
   christian@x-tmc-dev02 pid 3291059 since 01:09:07: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
