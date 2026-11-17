@@ -193,6 +193,10 @@ func _reach_map(id: String) -> PackedStringArray:
 	graph.relabel()
 	out.append("  as a zombie (drops down only):")
 	out.append_array(_reach_causes(graph, [] as Array[Vector3], zombies, posts))
+	var ladders: Array = _game.map.mechanics.ladder_boxes() if _game.map != null and _game.map.mechanics != null else []
+	out.append("  ladders: %d boxes, %d graph links" % [ladders.size(), int(graph.get(&"ladder_count")) if &"ladder_count" in graph else 0])
+	for box: AABB in ladders:
+		out.append("    ladder %s to %s" % [_f(box.position), _f(box.end)])
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--near="):
 			out.append_array(_near_dump(graph, arg.substr(7)))
@@ -314,7 +318,21 @@ func _near_dump(graph: DotNpcNavGraph, arg: String) -> PackedStringArray:
 				what = "hit at %s: %s %s" % [_f2(p), c.name, "?" if cs == null else "%s at %s" % [box.size if box != null else cs.shape.get_class(), _f2(cs.global_position)]]
 				break
 		out.append("    cut %s - %s: %s" % [_f2(cut[k]), _f2(cut[k + 1]), what])
+	# What stands where a point should be: the ground under `at` and every body a capsule there touches.
+	var ground := _on_ground(space, query.collision_mask, at)
+	var stood := space.intersect_shape(_query_at(query, ground), 8)
+	out.append("    stand at %s (ground %s): %d bodies" % [_f2(at), _f2(ground), stood.size()])
+	for hit: Dictionary in stood:
+		var c := hit["collider"] as CollisionObject3D
+		var cs := c.shape_owner_get_owner(c.shape_find_owner(int(hit["shape"]))) as CollisionShape3D if c != null else null
+		var box := cs.shape as BoxShape3D if cs != null else null
+		out.append("      %s %s" % [c.name if c != null else "?", "?" if cs == null else "%s at %s yaw %.0f" % [box.size if box != null else cs.shape.get_class(), _f2(cs.global_position), rad_to_deg(cs.global_rotation.y)]])
 	return out
+
+
+func _query_at(query: PhysicsShapeQueryParameters3D, p: Vector3) -> PhysicsShapeQueryParameters3D:
+	query.transform = Transform3D(Basis.IDENTITY, p + Vector3.UP * (LIFT + shape_half(query)))
+	return query
 
 
 func _free_game() -> void:

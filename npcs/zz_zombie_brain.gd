@@ -200,6 +200,41 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 ## Walks the graph to [param to], kept apart from the crowd.
 func go_to(to: Vector3, speed: float, spacing: float = 1.1) -> void:
 	steer_with_spacing(to, speed, context.delta if context != null else 0.016, spacing)
+	_take_ladder()
+
+
+## Near a ladder whose top the path's next corner is above: to its foot, then up it ([member ZzZombieBody.climb_top]).
+## Asked of the horde each time it steers, so a zombie pushed off the ladder or turned round lets go.
+func _take_ladder() -> void:
+	var b := body()
+	var h := horde()
+
+	if b == null or h == null or b.flying:
+		return
+
+	var here := npc.position()
+	var ladder := int(h.call(&"ladder_for", here, _cruise_to))
+
+	if ladder >= 0 and bool(h.call(&"on_ladder", ladder, here)):
+		b.climb_top = float(h.call(&"ladder_top", ladder, _cruise_to))
+		b.climb_speed = float(h.call(&"ladder_speed"))
+		return
+
+	if b.climb_top - here.y > LADDER_FINISH:
+		# Off the ladder or no longer going up it; the last stretch to the lip is finished whatever the corner says.
+		b.climb_top = -INF
+
+	if ladder >= 0 and not b.climbing():
+		# The corner is up the ladder: walk to the ladder, not at the wall under the corner.
+		var to: Vector3 = (h.call(&"ladder_box", ladder) as AABB).get_center() - here
+		to.y = 0.0
+
+		if to.length() > 0.05:
+			b.wish = to.normalized() * maxf(b.wish.length(), 1.0)
+
+
+## The last metres of a climb a zombie finishes even once its next corner is level with it.
+const LADDER_FINISH := 1.0
 
 
 ## Closes on [param at], by way of the choke the horde gave this zombie when it is a long way off
@@ -513,7 +548,8 @@ func _unstick_watch(delta: float) -> void:
 
 	var here := npc.position()
 
-	if _watch_at == Vector3.INF or flat_distance(here, _watch_at) > WATCH_RADIUS:
+	# Up or down counts as getting somewhere: a zombie on a ladder moves straight up.
+	if _watch_at == Vector3.INF or flat_distance(here, _watch_at) > WATCH_RADIUS or absf(here.y - _watch_at.y) > WATCH_RADIUS:
 		_watch_at = here
 		_watch_for = 0.0
 		_watch_stage = 0

@@ -14,8 +14,8 @@ extends "headless_nav_mend.gd"
 
 ## game.sh's SUITE_SHARDS for headless_nav_waves names exactly these.
 const WAVE_SHARDS := 6
-const CORE_SECTIONS := 12
-const CORE_CHECKS := 74
+const CORE_SECTIONS := 13
+const CORE_CHECKS := 79
 const HOLDS_SECTIONS := 10
 const HOLDS_CHECKS := 40
 
@@ -71,6 +71,7 @@ func _run() -> void:
 			await _test_async_build()
 			await _test_mend_gap()
 			await _test_hop_wedge()
+			await _test_ladder_climb()
 			await _test_unstick_steps()
 			await _test_lure_crowd()
 			_test_thin_props()
@@ -222,6 +223,25 @@ func _test_graph() -> void:
 	graph.allow_climb = true
 	_check(not graph.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
 		"and is taken, both ways, when they do")
+	graph.allow_climb = false
+
+	# A ladder is a two-way link: up the rungs as well as down, while zz_zombie_ladder_speed is over 0.
+	var ladder := ZzNavGraph.new()
+	var _rebuilt := ladder.rebuild(data)
+	ladder.add_ladder(low[1], high[1])
+	ladder.relabel()
+	var rungs_up := ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5)
+	var rungs_down := ladder.find_path(Vector3(0.0, 3.0, 0.0), Vector3(2.0, 0.0, 6.0), 0.5)
+	_check(not rungs_up.is_empty() and not rungs_down.is_empty(), "a zombie climbs a ladder up and down",
+		"%d up, %d down" % [rungs_up.size(), rungs_down.size()])
+	var standing := ladder.filter
+	ladder.filter = ladder.bot_filter
+	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
+		"a stand-in's search leaves the ladder to its own climbing")
+	ladder.filter = standing
+	ladder.allow_ladders = false
+	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
+		"and with zz_zombie_ladder_speed 0 the ladder is off the graph")
 	_check_one_way()
 	_finished()
 
@@ -755,6 +775,12 @@ func _dev_only(only: String) -> bool:
 	if only == "mend":
 		await _test_mend_gap()
 		get_tree().quit(0)
+		return true
+
+	if only == "ladder":
+		_test_graph()
+		await _test_ladder_climb()
+		_report()
 		return true
 
 	if only == "thin":

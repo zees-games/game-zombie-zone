@@ -168,6 +168,22 @@ var last_floor_at: Vector3 = Vector3.INF
 ## Ticks since it last leapt (a special's jump, a common's climb), for the same question.
 var ticks_since_leap: int = 1 << 30
 
+## Up a ladder: the height (world, feet) it climbs to, -INF when it is not on one. Set by the brain from the horde's
+## ladders ([code]ZzHorde.ladder_top[/code]) each time it steers; the body rises at [member climb_speed] with no gravity
+## until its feet reach it, then walks on. A zombie's graph takes a ladder both ways only because of this.
+var climb_top: float = -INF
+
+## Metres a second up a ladder (`zz_zombie_ladder_speed`).
+var climb_speed: float = 3.0
+
+## Of its wish, the share it keeps sideways while it climbs: into the ladder, and over the lip at the top.
+const CLIMB_DRIFT := 0.5
+
+
+## Whether it is on a ladder now.
+func climbing() -> bool:
+	return climb_top > global_position.y and climb_speed > 0.0 and not flying and not hovering
+
 
 ## Sets [member stride], spreading the strided bodies over the ticks rather than all moving on
 ## the same one.
@@ -226,6 +242,17 @@ func advance(delta: float, ticks: int = 1) -> void:
 		return
 
 	var horizontal := wish * speed_scale + push
+
+	if climbing():
+		velocity = Vector3(horizontal.x * CLIMB_DRIFT, climb_speed, horizontal.z * CLIMB_DRIFT)
+		var _climbed := _sweep(ticks)
+		push = push.move_toward(Vector3.ZERO, PUSH_DECAY * delta * maxf(push.length(), 1.0))
+
+		if global_position.y >= climb_top:
+			climb_top = -INF
+			velocity.y = 0.0
+
+		return
 
 	# Standing still on the floor (tearing at a barricade, swinging, waiting its turn on the
 	# ring): nothing to move, so no sweep. Half a big wave stands at the windows, and a
@@ -344,6 +371,7 @@ func _sweep(ticks: int) -> bool:
 
 
 func leap(launch: Vector3) -> void:
+	climb_top = -INF
 	ticks_since_leap = 0
 	flying = true
 	velocity = launch

@@ -323,6 +323,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_zombie_climb", 1.0 if config.zombie_climb else 0.0,
 		"Zombies climb the jump ups as well (a held tower is no longer safe); 0 off",
 		func(value: float) -> void: config.zombie_climb = value > 0.5)
+	_tunable("zz_zombie_ladder_speed", config.zombie_ladder_speed,
+		"Metres a second a zombie climbs a ladder, which lets the horde up the map's ladders; 0 keeps them off ladders (takes effect on the next graph)",
+		func(value: float) -> void: config.zombie_ladder_speed = value)
 	_tunable("zz_zombie_detail", 1.0,
 		"Bruises and sores on the specials' skin (client look only); 0 draws the plain colour",
 		func(value: float) -> void: ZzZombieView.detail = value > 0.5)

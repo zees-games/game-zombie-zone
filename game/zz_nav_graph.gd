@@ -9,7 +9,7 @@ extends DotNpcNavGraph
 ## adjacency, and are read three ways:
 ##
 ## [codeblock]
-## a zombie        every drop, downward only (jump ups too, both ways, when `allow_climb`)
+## a zombie        every drop, downward only (jump ups too, both ways, when `allow_climb`); ladders both ways (`allow_ladders`)
 ## a stand-in      none: it walks the stairs the map has, and never falls off a balcony
 ## [/codeblock]
 ##
@@ -33,6 +33,18 @@ var allow_climb: bool = false:
 			if not _component.is_empty():
 				_label_components()
 
+## Whether a zombie climbs the map's ladders (`zz_zombie_ladder_speed` over 0): the ladder links ([method apply_ladders]) go
+## both ways, where a plain edge that steep is down only.
+var allow_ladders: bool = true:
+	set(value):
+		if value != allow_ladders:
+			allow_ladders = value
+			_native.clear()
+			_patched.clear()
+
+			if not _component.is_empty():
+				_label_components()
+
 ## A plain edge that rises more than this is a drop seen from above: the importer's links join two levels with one undirected
 ## edge, and a zombie cannot step back up a 2 m drop (the ship's, where commons stood under it pressing at a wall). Down only,
 ## up only with [member allow_climb].
@@ -43,6 +55,12 @@ var _down: Dictionary = {}
 
 ## from index -> the points a jump up leads to (a climb).
 var _up: Dictionary = {}
+
+## from index -> the points a ladder joins it to, either way round (both ends are listed).
+var _ladder: Dictionary = {}
+
+## Ladder links in this graph (each counted once), for suites and describe.
+var ladder_count: int = 0
 
 ## from index -> the points a trigger_teleport pad there sends a body to. One way, and for every filter: a stand-in
 ## steps on a pad as readily as a zombie, and bot_filter bypasses the drops.
@@ -226,6 +244,73 @@ func add_climb(low: int, high: int) -> void:
 	_patched.clear()
 
 
+## A ladder between graph points [param a] and [param b]: a zombie climbs it up and down while [member allow_ladders].
+func add_ladder(a: int, b: int) -> void:
+	if a == b or (_ladder.get(a, PackedInt32Array()) as PackedInt32Array).has(b):
+		return
+
+	_append(_ladder, a, b)
+	_append(_ladder, b, a)
+	_linked[a] = true
+	_linked[b] = true
+	ladder_count += 1
+	_native.clear()
+	_patched.clear()
+
+
+## How far from a ladder's foot or top its end point may be: the prune's join (`ZzNavPrune.LADDER_REACH`) and the
+## builder's link (`ZzNpcs.LADDER_REACH`), in that order. Not preloaded: zz_npcs.gd preloads this file.
+const LADDER_REACHES: Array[float] = [3.0, 6.5]
+
+## How far off a ladder end's height a point may be (`ZzNpcs.LADDER_HEIGHT`), and the least rise that is a climb (`ZzNavPrune.CLIMB`).
+const LADDER_HEIGHT := 1.5
+const LADDER_CLIMB := 0.6
+
+## A steep plain edge with both ends this close to a ladder's box (flat, metres) is that ladder.
+const LADDER_COLUMN := 3.0
+
+## Puts the map's ladder brushes [param boxes] (metres, world) on the graph: each joins the point nearest its foot to the
+## point nearest its top, found the way the graph's own ladder edges were (`ZzNavPrune.join_ladders`, `ZzNpcs.with_ladders`),
+## and every steep plain edge with both ends in a ladder's column is one too. Returns how many ladder links are on it.
+func apply_ladders(boxes: Array[AABB]) -> int:
+	for box: AABB in boxes:
+		var mid := box.get_center()
+
+		for reach: float in LADDER_REACHES:
+			var foot := _ladder_end(Vector3(mid.x, box.position.y + 0.1, mid.z), reach)
+			var head := _ladder_end(Vector3(mid.x, box.end.y, mid.z), reach)
+
+			if foot >= 0 and head >= 0 and data.points[head].y - data.points[foot].y > LADDER_CLIMB:
+				add_ladder(foot, head)
+
+	for i in data.points.size():
+		var here := data.points[i]
+
+		for to in super.neighbours(i):
+			if to > i and absf(data.points[to].y - here.y) > steep:
+				for box: AABB in boxes:
+					if _in_column(box, here) and _in_column(box, data.points[to]):
+						add_ladder(i, to)
+						break
+
+	if ladder_count > 0:
+		relabel()
+
+	return ladder_count
+
+
+func _ladder_end(at: Vector3, reach: float) -> int:
+	return data.nearest_point_where(at, reach, func(p: int) -> bool: return absf(data.points[p].y - at.y) <= LADDER_HEIGHT)
+
+
+## Whether [param p] stands by [param box] (within [constant LADDER_COLUMN] of it flat, between its foot and top).
+func _in_column(box: AABB, p: Vector3) -> bool:
+	var reach := LADDER_COLUMN
+	var height := LADDER_HEIGHT
+	return p.x >= box.position.x - reach and p.x <= box.end.x + reach and p.z >= box.position.z - reach and p.z <= box.end.z + reach \
+		and p.y >= box.position.y - height and p.y <= box.end.y + height
+
+
 ## A one-way teleport from the pad point [param from] to [param to]. Both are graph points.
 func add_teleport(from: int, to: int) -> void:
 	_append(_tele, from, to)
@@ -260,7 +345,7 @@ const TELE_REACH := 2.0
 
 
 func has_links() -> bool:
-	return drop_count > 0 or up_count > 0 or tele_count > 0
+	return drop_count > 0 or up_count > 0 or tele_count > 0 or ladder_count > 0
 
 
 ## Labels the components again once every link is in: a drop can join two pieces of the map.
@@ -452,7 +537,7 @@ func is_link(a: int, b: int) -> bool:
 		return true
 
 	var u: PackedInt32Array = _up.get(a, PackedInt32Array())
-	return u.has(b) or (_up.get(b, PackedInt32Array()) as PackedInt32Array).has(a)
+	return u.has(b) or (_up.get(b, PackedInt32Array()) as PackedInt32Array).has(a) or (_ladder.get(a, PackedInt32Array()) as PackedInt32Array).has(b)
 
 
 func neighbours(index: int) -> PackedInt32Array:
@@ -490,6 +575,11 @@ func _neighbours_walk(index: int) -> PackedInt32Array:
 
 	if allow_climb:
 		for to in _up.get(index, PackedInt32Array()) as PackedInt32Array:
+			if not out.has(to):
+				out.append(to)
+
+	if allow_ladders:
+		for to in _ladder.get(index, PackedInt32Array()) as PackedInt32Array:
 			if not out.has(to):
 				out.append(to)
 
@@ -554,5 +644,11 @@ func _native_for(with: DotNpcNavFilter) -> AStar3D:
 		for from: int in _up:
 			for to in _up[from] as PackedInt32Array:
 				astar.connect_points(from, to, false)
+
+	if allow_ladders:
+		for from: int in _ladder:
+			for to in _ladder[from] as PackedInt32Array:
+				if astar.has_point(from) and astar.has_point(to):
+					astar.connect_points(from, to, false)
 
 	return astar

@@ -234,6 +234,70 @@ func _test_hop_wedge() -> void:
 	_finished()
 
 
+## The ship's lower deck by its ladders and the main deck over them: two floors 5.7 m apart that only the ladders join.
+const LADDER_FOOT := Vector3(-45.5, 4.3, -21.0)
+const LADDER_DECK := Vector3(-45.5, 10.0, -21.0)
+
+## A common on the ship's lower deck, its quarry on the main deck above: it reaches the deck up a ladder
+## (`zz_zombie_ladder_speed`) instead of standing below forever, which it did while ladders were not on its graph.
+func _test_ladder_climb() -> void:
+	_section("a zombie climbs a ladder to the survivor on the floor above")
+	if not _linked:
+		_check(true, "skipped without maps/")
+		_finished()
+		return
+
+	var game := await _world(func(c: ZzConfig) -> void:
+		c.map_ids = PackedStringArray(["zm_roy_the_ship"])
+		c.survival_warmup_seconds = 600.0
+		c.wanderer_density = 0.0
+		c.sleepers_enabled = false)
+	var quarry := game.add_player(&"u200", "Deckhand")
+	quarry.health.invulnerable = true
+	game.start()
+	var ticks := 0
+
+	while (game.horde.notes.state < ZzNavNotes.State.READY or game.horde.plan_pending()) and ticks < 20000:
+		game.simulate(TICK)
+		ticks += 1
+
+		if ticks % 8 == 0:
+			await get_tree().physics_frame
+
+	var nav: ZzNavGraph = game.horde.spawner.nav
+	var saved := nav.filter
+	nav.filter = null
+	var with_rungs := nav.find_path(LADDER_FOOT, LADDER_DECK, 1.0)
+	var rungs_partial := nav.last_partial
+	nav.allow_ladders = false
+	var without := nav.find_path(LADDER_FOOT, LADDER_DECK, 1.0)
+	var without_partial := nav.last_partial
+	nav.allow_ladders = true
+	nav.filter = saved
+	_check(not with_rungs.is_empty() and not rungs_partial and (without.is_empty() or without_partial),
+		"the zombies' graph goes from the lower deck to the main deck by the ladders, and not without them",
+		"with %d points (partial %s), without %d (partial %s), %d ladder links" % [with_rungs.size(), rungs_partial, without.size(), without_partial, nav.ladder_count])
+	quarry.place_at(LADDER_DECK, 0.0)
+	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, LADDER_FOOT, &"test")
+	npc.brain.call(&"force_target", &"u200")
+	var highest := LADDER_FOOT.y
+	var closest := INF
+
+	for step in 80:
+		await _sim(game, 0.5)
+		if not npc.is_alive():
+			break
+		highest = maxf(highest, npc.position().y)
+		closest = minf(closest, npc.position().distance_to(quarry.global_position))
+		if closest < 2.5:
+			break
+
+	_check(npc.is_alive() and highest > LADDER_DECK.y - 0.5 and closest < 2.5, "it is on the deck beside the survivor within 40 s",
+		"rose to %.1f m (deck %.1f), closest %.1f m, ladders on the graph %d" % [highest, LADDER_DECK.y, closest, int(game.horde.spawner.nav.get(&"ladder_count"))])
+	await _dispose(game)
+	_finished()
+
+
 ## Where a brute stood wedged among the school's furniture for 36 s (its goal was behind it).
 const BRUTE_CORNER := Vector3(17.73, 0.02, 8.08)
 

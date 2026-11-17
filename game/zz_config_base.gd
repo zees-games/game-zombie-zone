@@ -255,6 +255,11 @@ func setup_seconds() -> float:
 ## tower is defensible. `zz_zombie_climb`.
 @export var zombie_climb: bool = false
 
+## Metres a second a zombie climbs a ladder brush, which puts the map's ladders on its graph both ways (a deck reached only
+## by a ladder is no longer out of its reach). 0 leaves ladders to the survivors: down only for a zombie, as a drop.
+## `zz_zombie_ladder_speed`.
+@export_range(0.0, 10.0, 0.5, "or_greater") var zombie_ladder_speed: float = 3.0
+
 ## Whether each zombie is sent through one of the chokes on the way, the least used, so a horde
 ## arrives by every way in and not down one in a line. `zz_zombie_spread`.
 @export var zombie_spread: bool = true

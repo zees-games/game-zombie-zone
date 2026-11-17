@@ -168,6 +168,8 @@ func _adopt_links(graph: ZzNavGraph) -> void:
 	spawner.nav = graph
 
 	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
+	graph.allow_ladders = config.zombie_ladder_speed > 0.0
+	var _rungs := graph.apply_ladders(_ladders())
 	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():
@@ -1139,6 +1141,79 @@ func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
 			out.append(crowd.position_of(i))
 
 	return out
+
+## The map's ladder brushes (boxes, metres), empty without a map.
+func _ladders() -> Array[AABB]:
+	if game != null and game.map != null and game.map.mechanics != null:
+		return game.map.mechanics.ladder_boxes()
+
+	return [] as Array[AABB]
+
+
+## How far a body's centre may stand off a ladder's box (beside it, metres) and climb it: a brute's radius and a bit.
+const LADDER_TOUCH := 1.0
+
+## How far off a ladder (flat, metres) a zombie whose next corner is above makes for the ladder first: the graph joins a
+## ladder to points this far from it (`ZzNavGraph.LADDER_COLUMN`).
+const LADDER_APPROACH := 3.0
+
+## How far above a ladder's top a zombie climbs to reach the corner it is going to: the lip of the deck a short ladder
+## stops under, which a player jumps the last of.
+const LADDER_OVER := 1.6
+
+## The ladder (an index into the map's ladder boxes) a zombie at [param here] whose next corner is [param goal] goes up:
+## within [constant LADDER_APPROACH] of it, between its foot and its top, with the corner over a step above. -1 for none,
+## and always with ladders off (`zz_zombie_ladder_speed` 0).
+func ladder_for(here: Vector3, goal: Vector3) -> int:
+	if config.zombie_ladder_speed <= 0.0 or goal == Vector3.INF or goal.y - here.y <= ZzZombieBody.STEP_UP:
+		return -1
+
+	var boxes := _ladders()
+	var best := -1
+	var nearest := INF
+
+	for i in boxes.size():
+		var box := boxes[i]
+
+		if here.y < box.position.y - 1.0 or here.y > box.end.y:
+			continue
+
+		var off := _flat_off(box, here)
+
+		if off <= LADDER_APPROACH and off < nearest:
+			nearest = off
+			best = i
+
+	return best
+
+
+## The ladder box [param index] of [method ladder_for].
+func ladder_box(index: int) -> AABB:
+	return _ladders()[index]
+
+
+## Whether a body at [param here] is close enough to ladder [param index] to climb it.
+func on_ladder(index: int, here: Vector3) -> bool:
+	return _flat_off(_ladders()[index], here) <= LADDER_TOUCH
+
+
+## The height a zombie on ladder [param index] climbs to for its next corner [param goal]: the corner's, no higher than
+## [constant LADDER_OVER] over the ladder's top.
+func ladder_top(index: int, goal: Vector3) -> float:
+	return minf(goal.y + 0.1, _ladders()[index].end.y + LADDER_OVER)
+
+
+## Flat metres from [param box] to [param p] (0 inside it).
+static func _flat_off(box: AABB, p: Vector3) -> float:
+	var dx := maxf(maxf(box.position.x - p.x, p.x - box.end.x), 0.0)
+	var dz := maxf(maxf(box.position.z - p.z, p.z - box.end.z), 0.0)
+	return Vector2(dx, dz).length()
+
+
+## Metres a second a zombie climbs a ladder (`zz_zombie_ladder_speed`).
+func ladder_speed() -> float:
+	return config.zombie_ladder_speed
+
 
 ## Metres from [param at] to the nearest living survivor, flat; INF with nobody.
 func nearest_survivor_distance(at: Vector3) -> float:
