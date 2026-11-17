@@ -1496,6 +1496,9 @@ func _build_touch() -> void:
 	if _touch != null:
 		_touch.call(&"attach", _sampler, hud.get_viewport().get_visible_rect().size.x)
 		hud.shift_weight_left(ZzTouch.WEIGHT_SHIFT)
+		# dot-game's DotGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
+		if platform != null and platform.has_method(&"fit_touch_buttons"):
+			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), ZzTouch.LAYOUT)
 
 
 ## A touch button went down or up: the same flags the keys set.

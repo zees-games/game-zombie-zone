@@ -6,11 +6,12 @@ const ZzBreakFx := preload("../game/zz_break_fx.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzTouch := preload("../game/zz_touch.gd")
 
 ## Blood behind a hit body (zz_blood.gd over dot-fx's DotFxDecals) and which end of a hold's day a map's own light becomes
 ## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
 
-const CHECKS := 31
+const CHECKS := 35
 
 
 
@@ -25,6 +26,7 @@ func _run() -> void:
 	_splinters()
 	_light()
 	_fade()
+	_touch_fit()
 	_report(CHECKS)
 
 
@@ -163,3 +165,27 @@ func _fade() -> void:
 	_check((a.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override == solid, "back to solid: the shared look returns")
 	a.queue_free()
 	b.queue_free()
+
+
+## The phone's buttons through dot-game's DotGameScreenFit (what ZzClient._build_touch hands to fit_touch_buttons):
+## every one at least 44 real px across on a landscape phone.
+func _touch_fit() -> void:
+	for phone: Vector2i in [Vector2i(844, 390), Vector2i(667, 375)]:
+		var fit := DotGameScreenFit.new()
+		fit.size_override = phone
+		fit.dpi_override = 160.0
+		fit.attach(get_tree().root)
+		var host := Control.new()
+		add_child(host)
+		var buttons := DotTouchButtons.new()
+		buttons.set_buttons(ZzTouch.LAYOUT.duplicate())
+		host.add_child(buttons)
+		var k := fit.fit_buttons(buttons, ZzTouch.LAYOUT)
+		var stretch := float(fit.plan.get("stretch", 0.0))
+		var smallest := INF
+		for b: Dictionary in ZzTouch.LAYOUT:
+			smallest = minf(smallest, buttons.radius_of(b["id"]) * 2.0 * stretch)
+		_check(buttons.button_scale == k and fit.describe()["buttons"] == 1, "the fit holds the touch buttons at %dx%d" % [phone.x, phone.y])
+		_check(smallest >= 43.99, "every touch button is at least 44 real px across at %dx%d (smallest %.1f)" % [phone.x, phone.y, smallest])
+		fit.detach()
+		host.free()
