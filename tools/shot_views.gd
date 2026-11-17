@@ -174,15 +174,22 @@ func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
 	var cmd := DotFpsCommand.new()
 	cmd.yaw = 180.0
 	holder.input_move = cmd
-	var at: Vector3 = game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -7.0))
-	var npc: DotNpcInstance = game.horde.spawner.spawn(_zombie, at, &"shot", Basis(Vector3.UP, PI))
-	print("possess: ", _zombie, " held ", game.possession.possess(holder, npc) if npc != null else false)
-	# The horde stands still while the map's nav bakes (a big map takes seconds): wait it out, up to 60 s.
+	# The horde stands still while the map's nav bakes (a big map takes seconds): wait it out (up to 60 s)
+	# before snapping the spawn to it, or a ship's zombie lands in the sea.
 	var waited := 0
 	while bool(game.horde.get(&"_map_nav_pending")) and waited < 3600:
 		await get_tree().process_frame
 		game.horde.tick(1.0 / 64.0)
 		waited += 1
+	# 7 m ahead, else to a side or behind, where the graph is: a ship's bow has only sea 7 m ahead.
+	var at: Vector3 = stand
+	for ahead: Vector3 in [Vector3(0.0, 0.0, -7.0), Vector3(-7.0, 0.0, 0.0), Vector3(7.0, 0.0, 0.0), Vector3(0.0, 0.0, 7.0)]:
+		if game.horde.nav != null and game.horde.nav.data.is_navigable(stand + ahead, 3.0):
+			at = stand + ahead
+			break
+	at = game.horde.snap_to_nav(at)
+	var npc: DotNpcInstance = game.horde.spawner.spawn(_zombie, at, &"shot", Basis(Vector3.UP, PI))
+	print("possess: ", _zombie, " held ", game.possession.possess(holder, npc) if npc != null else false)
 	var cam := _free_camera()
 	var look_pitch := [0.0]
 	cam.track = func() -> Variant:
