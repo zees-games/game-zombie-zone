@@ -1,5 +1,7 @@
 extends "shot_views.gd"
 
+const _BenchCrowd := preload("bench_sim_crowd.gd")
+
 
 func _cloud_store(spec: String) -> void:
 	var parts := spec.split(",")
@@ -152,29 +154,11 @@ static func _v3(text: String) -> Vector3:
 	return Vector3(parts[0].to_float(), parts[1].to_float(), parts[2].to_float()) if parts.size() == 3 else Vector3.INF
 
 
-## Where everybody is put when --at is not given: the practice street's open ground at z 12, or
-## the first survivor seat on a map with nothing under that point. A converted street has a
-## void there, and a frame taken from it showed the whole team falling, which read as a broken
-## map when it was only this tool standing them in the air (zz-ravenstreet-1).
+## Where everybody is put when --at is not given (tools/bench_sim_crowd.gd's rule, which a hosted bench's server
+## half uses too): the practice street's open ground at z 12, or the first survivor seat where that point is not on
+## ground inside the map's navigation (zz-ravenstreet-1: a frame of the whole team falling from a void).
 func _default_stand(game: ZzGame) -> Vector3:
-	var usual := Vector3(0.0, 0.05, 12.0)
-	var space := game.get_world_3d().direct_space_state
-	var mask := game.physics.layer_mask(&"world")
-	var down := PhysicsRayQueryParameters3D.create(usual + Vector3(0.0, 1.0, 0.0), usual + Vector3(0.0, -0.6, 0.0), mask)
-
-	# Ground under it is not enough: a converted yard's slab runs past its own fence, and the
-	# point can be on the slab's rim, outside every floor the map has (a frame of the whole team
-	# falling, again). It must also be in a floor of the map's own navigation.
-	var inside := false
-	for f in ((game.map.doc.get("nav", {}) as Dictionary).get("floors", []) as Array):
-		if usual.x >= float(f[0]) and usual.x <= float(f[2]) and usual.z >= float(f[1]) and usual.z <= float(f[3]):
-			inside = true
-
-	if inside and not space.intersect_ray(down).is_empty():
-		return usual
-
-	var seat: Vector3 = game.map.spawn("survivors", 0)[0]
-	return seat + Vector3(0.0, 0.05, 0.0)
+	return _BenchCrowd.default_stand(game)
 
 
 ## Waits for the delivered world (and its art slice, hundreds of MB), as a player does.

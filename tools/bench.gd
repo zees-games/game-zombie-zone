@@ -5,6 +5,7 @@ extends "shot.gd"
 ## `tools/bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56`.
 
 const _ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
+const _SimHost := preload("../game/zz_sim_host.gd")
 
 var _count := 56
 var _bench_seed := 7
@@ -74,6 +75,23 @@ var _ticks := 0
 var _load_s := 0.0
 ## Engine monitors per measured frame: physics-process ms (the scripts' _physics_process), active bodies, pairs, islands.
 var _monitors: Array[PackedFloat64Array] = []
+## --sim_host=1: the game runs in the client's server process (game/zz_sim_host.gd); the crowd is kept there by
+## tools/bench_sim_crowd.gd and this end only draws, so the frame numbers are the client's alone.
+var _hosted := false
+## Seconds the hosted game may take to appear on this end (its server's boot and the join). 0 waits without end.
+var _host_wait_sec := 300.0
+
+
+func _ready() -> void:
+	_hosted = _SimHost.arg_in(OS.get_cmdline_user_args(), "--sim_host") == "1"
+	if _hosted:
+		_read_args()
+		var at := _SimHost.arg_in(OS.get_cmdline_user_args(), "--at")
+		_SimHost.extra_args = PackedStringArray(["--bench_crowd=%d" % _count, "--bench_seed=%d" % _bench_seed,
+			"--bench_ring=%s,%s" % [_ring.x, _ring.y]])
+		if at != "":
+			_SimHost.extra_args.append("--bench_at=%s" % at)
+	super()
 
 
 func _read_args() -> void:
@@ -184,6 +202,19 @@ func _print_monitors(game: ZzGame) -> void:
 func _run() -> void:
 	_read_args()
 	var game: ZzGame = _client.get("game")
+	# A hosted client builds its world only once its server is up and joined.
+	var t0 := Time.get_ticks_msec()
+	while game == null:
+		if _host_wait_sec > 0.0 and Time.get_ticks_msec() - t0 > int(_host_wait_sec * 1000.0):
+			push_error("bench: no game after %.0f s" % _host_wait_sec)
+			get_tree().quit(1)
+			return
+		await get_tree().process_frame
+		game = _client.get("game")
+	if _hosted and _client.get("_sim_host") == null:
+		push_error("bench: --sim_host=1 but the sim host did not start (see user://logs/sim_server.log)")
+		get_tree().quit(1)
+		return
 	await _until_a_round(game)
 	var waited := 0.0
 	while not game.map.world_drawn and str(game.map.doc.get("world", "")) != "" and waited < 400.0:
@@ -192,10 +223,15 @@ func _run() -> void:
 	print("BENCH world_drawn=%s after %.0f s" % [game.map.world_drawn, waited])
 	_load_s = Time.get_ticks_msec() / 1000.0
 	var local = _client.get("player")
-	for player in game.survivors():
-		player.health.invulnerable = true
-	var stand: Vector3 = _at if _at != Vector3.INF else _default_stand(game)
-	local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
+	var stand := Vector3.ZERO
+	if _hosted:
+		# The server half (tools/bench_sim_crowd.gd) makes everyone unkillable and puts the survivor at the stand.
+		await _seconds_of(2.0)
+	else:
+		for player in game.survivors():
+			player.health.invulnerable = true
+		stand = _at if _at != Vector3.INF else _default_stand(game)
+		local.place_at(stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
 	await _seconds_of(1.0)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--without="):
@@ -211,6 +247,10 @@ func _run() -> void:
 	if "--physprobe" in OS.get_cmdline_user_args():
 		_phys_probe(local)
 		get_tree().quit(0)
+		return
+	if _profile and _hosted:
+		push_error("bench: --profile steps the in-process world; it does not combine with --sim_host=1")
+		get_tree().quit(1)
 		return
 	if _profile:
 		_profiler = (load("res://tools/survival_long_run.gd") as GDScript).new()
@@ -232,7 +272,8 @@ func _run() -> void:
 	var prims := PackedInt32Array()
 	var alive_sum := 0
 	while Time.get_ticks_msec() - began < total_ms:
-		_keep_crowd(game, local, stand, rng)
+		if not _hosted:
+			_keep_crowd(game, local, stand, rng)
 		var t := float(Time.get_ticks_msec() - began) / total_ms
 		local.controller.state.yaw = start_yaw + 360.0 * t
 		local.controller.state.pitch = -4.0
@@ -582,6 +623,8 @@ func _check_crowd(horde: Object) -> void:
 
 
 func _alive(game: ZzGame) -> int:
+	if _hosted:
+		return (_client.get("bridge") as Object).call(&"zombie_count")
 	return game.horde.spawner.all_npcs().size()
 
 
@@ -622,11 +665,11 @@ func _report(draws: PackedInt32Array, objects: PackedInt32Array, prims: PackedIn
 			out.append(float(v))
 		return out
 	var wall_mean: float = mean.call(cols[0])
-	print("BENCH map=%s zombies=%d alive=%.1f frames=%d fps=%.1f wall_ms=%.2f p50=%.2f p99=%.2f phys_ms=%.2f steps=%.2f script_ms=%.2f render_ms=%.2f gpu_ms=%.2f rcpu_ms=%.2f draws=%.0f objects=%.0f prims_k=%.0f nodes=%d" % [
+	print("BENCH map=%s zombies=%d alive=%.1f frames=%d fps=%.1f wall_ms=%.2f p50=%.2f p99=%.2f phys_ms=%.2f steps=%.2f script_ms=%.2f render_ms=%.2f gpu_ms=%.2f rcpu_ms=%.2f draws=%.0f objects=%.0f prims_k=%.0f nodes=%d sim_host=%d" % [
 		game.map.doc.get("id", "?"), _count, alive, _rows.size(), 1000.0 / maxf(0.001, wall_mean), wall_mean,
 		p.call(cols[0], 0.5), p.call(cols[0], 0.99), mean.call(cols[1]), mean.call(cols[4]), mean.call(cols[2]), mean.call(cols[3]), mean.call(gpu), mean.call(cpu),
 		mean.call(as_f.call(draws)), mean.call(as_f.call(objects)), mean.call(as_f.call(prims)) / 1000.0,
-		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT))])
+		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)), 1 if _hosted else 0])
 	_print_perf(game, cols[0], mean.call(cols[1]), mean.call(as_f.call(draws)), p)
 
 

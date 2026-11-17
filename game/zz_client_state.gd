@@ -10,6 +10,7 @@ const ZzBots := preload("zz_bots.gd")
 const ZzCarry := preload("zz_carry.gd")
 const ZzTouch := preload("zz_touch.gd")
 const ZzPrewarm := preload("zz_prewarm.gd")
+const ZzSimHost := preload("zz_sim_host.gd")
 const ZzBoxes := preload("zz_boxes.gd")
 const ZzBoxHands := preload("zz_box_hands.gd")
 const ZzDefibHands := preload("zz_defib_hands.gd")
@@ -90,6 +91,8 @@ var gate: DotLoadGate = null
 ## dot-game's client platform: the cover, settings and menu, console, Tab, M, the pointer, the
 ## input block and the browser's filesystem flush.
 var platform: DotGameClient = null
+## `--sim_host 1`: the solo game as a loopback server process this client joined ([ZzSimHost]), else null.
+var _sim_host: ZzSimHost = null
 var camera: Camera3D = null
 var hud: ZzHud = null
 var board: DotMenuScoreboard = null
