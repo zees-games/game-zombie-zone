@@ -116,6 +116,13 @@ var brains_now: Object = null
 var brains_crowd: Variant = null
 ## [member brains_now] while its library steers too ([code]steer_step[/code]; an older one only plans), else null.
 var brains_steer: Object = null
+## [member brains_now] while it holds this map's barricades ([code]set_barricades[/code]; an older library has none),
+## else null: what [code]_bash_if_barred[/code] asks instead of [method barricade_in_way].
+var brains_barred: Object = null
+## The native brains [method set_barricades] last handed the barricades to, so a new one gets them too.
+var _barricades_native: Object = null
+## The bash reach it was handed with: the script reads the config's each time, so a changed one leaves it to the script.
+var _barricades_reach: float = 0.0
 ## Re-run the script beside every native answer and count; the script's answer is the one used (bench
 ## `--brains-verify`, `headless_native_brains`).
 var brains_verify: bool = false

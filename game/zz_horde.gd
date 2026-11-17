@@ -669,9 +669,7 @@ func tick(delta: float, ticks: int = 1) -> void:
 	_advance_bile()
 	monster_host.tick()
 	spawner.tick(delta)
-	brains_now = null
-	brains_crowd = null
-	brains_steer = null
+	ZzBrainsFeed.clear(self)
 
 	var speed := zombie_speed_scale * wave_speed_scale
 
@@ -887,6 +885,7 @@ func _pick_crowd() -> void:
 
 	if brains != (brains_native != null):
 		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null
+		ZzBrainsFeed.push_barricades(self)
 
 	var want := config != null and config.native_crowd and ClassDB.class_exists(NATIVE_CROWD)
 
@@ -1792,6 +1791,7 @@ func set_barricades(bounds: Dictionary) -> void:
 				if not _barricade_cells.has(key):
 					_barricade_cells[key] = []
 				(_barricade_cells[key] as Array).append(id)
+	ZzBrainsFeed.push_barricades(self)
 
 ## The intact barricade a zombie at [param at] wanting to go [param wish] is pressed against,
 ## or "". Against its face (within `zz_bash_reach` of its box, horizontally) and heading

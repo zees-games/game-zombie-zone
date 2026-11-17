@@ -15,9 +15,20 @@ static var _steer_walks: int = -1
 ## Whether the horde's dot-sim has [code]walk[/code], the whole move in one call (-1 until asked; 0 also turns it off,
 ## as `tools/bench.gd --ab-move` does).
 static var _walks: int = -1
+## Whether the horde's dot-sim decides too: [code]chase[/code] (the commons' whole chase choice), [code]nearest[/code]
+## and [code]barricade_in_way[/code] (-1 until asked; 0 also turns them off, as `tools/bench.gd --ab-decide` does).
+static var _decides: int = -1
 ## What [method _walk] hands dot-sim, kept so a move fills them in place rather than building them.
 var _walk_s := PackedFloat64Array()
 var _walk_n := PackedInt64Array()
+
+## Whether [param native] (the horde's brains this tick) answers the decide calls ([member _decides]).
+static func _decides_with(native: Object) -> bool:
+	if _decides < 0:
+		_decides = 1 if native.has_method(&"chase") else 0
+
+	return _decides == 1
+
 
 ## The horde this zombie belongs to. Duck-typed: see `zz_horde.gd`.
 func horde() -> Object:

@@ -5,6 +5,7 @@ const ZzHorde := preload("../game/zz_horde.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const CommonBrain := preload("../npcs/zz_common_brain.gd")
 const ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
+const DecideCases := preload("zz_native_decide_cases.gd")
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 
 ## The zombies' brains in dot-sim ([member ZzConfig.native_brains], on by default) decide as the script over seeded
@@ -13,11 +14,14 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## and every zombie's spaced heading off the native crowd, stacked bodies included, all to the bit. The script plan
 ## is checked against the calls it replaced (quarry, survivor_at, _chase_speed, strikes_down) too. The fused steer
 ## ([code]steer_walk[/code], and [code]steer_step[/code] that reads and writes the brain itself: the heading, wish,
-## eased turn, look and progress watch) leaves every body, character and brain as the script's steer does, stuck ones and paths gone rough included. Without the library
+## eased turn, look and progress watch) leaves every body, character and brain as the script's steer does, stuck ones and paths gone rough included. The
+## native decide (`chase`: the plan and what the common does with it, whether it asks for a slot; `barricade_in_way`
+## off the horde's barricades; `nearest`) answers as `_chase_choice`, `ZzHorde.barricade_in_way` and
+## `nearest_survivor_distance` do, pressed against boards, inside them and clear, mid-swing or not. Without the library
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
-const SECTIONS := 6
-const CHECKS := 18
+const SECTIONS := 7
+const CHECKS := 24
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -99,6 +103,11 @@ func _run() -> void:
 	_entered += 1
 	print("seeded worlds, the native steer against the script's")
 	_check_steers()
+	_finished += 1
+
+	_entered += 1
+	print("seeded worlds, the native chase choice, barricade check and nearest survivor against the script's")
+	_check_decides()
 	_finished += 1
 
 	_entered += 1
@@ -328,6 +337,10 @@ func _plans(s: int, bad: Dictionary, counted: Dictionary) -> void:
 			if script[0] >= 0.0 and h.is_runner(brain.runner_roll) and h.config.common_speed_scaling:
 				counted["runner"] += 1
 			_roll_common(rng, brain)
+
+
+func _check_decides() -> void:
+	DecideCases.check(self, SEEDS, PASSES)
 
 
 ## Two crowds over the same bodies, one script grid and one native; the brain asks each for its heading.
@@ -720,6 +733,7 @@ func _verify() -> bool:
 		var h := _horde(rng)
 		h.brains_verify = true
 		var commons := _commons(rng, h, rng.randi_range(10, 40))
+		h.set_barricades(DecideCases.barricade_bounds(rng))
 		_survivors(rng, h)
 		h._feed_brains()
 		var native_grid: Object = ClassDB.instantiate(NATIVE_CROWD)
@@ -750,6 +764,12 @@ func _verify() -> bool:
 				var plan: PackedFloat64Array = brain._chase_plan(b)
 				if plan != brain._chase_plan_script(b):
 					mismatches += 1000
+				brain._swing_at = INF if rng.randf() < 0.7 else ctx.now
+				b.wish = Vector3(rng.randf_range(-4, 4), 0.0, rng.randf_range(-4, 4))
+				if brain._chase_decide(b) != brain._chase_choice(brain._chase_plan_script(b)):
+					mismatches += 1000
+				var _barred: String = brain._barred(h, b)
+				var _near: float = brain._nearest_survivor(h)
 				var _dir: Vector3 = brain._spaced_direction(brain.npc.position(), Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), 1.1)
 				brain.steer_with_spacing(Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), rng.randf_range(1.0, 6.0), ctx.delta, 1.1)
 			_survivors(rng, h)

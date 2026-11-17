@@ -579,7 +579,7 @@ func _bash_if_barred(delta: float) -> void:
 	if h == null or b == null or npc == null or not npc.is_alive() or b.wish.length() < 0.5 or b.flying:
 		return
 
-	var barred: String = h.call(&"barricade_in_way", npc.position(), b.wish)
+	var barred := _barred(h, b)
 
 	if barred == "":
 		return
@@ -590,6 +590,42 @@ func _bash_if_barred(delta: float) -> void:
 	face(h.call(&"barricade_centre", barred) - npc.position())
 	b.anim = ZzZombieBody.Anim.ATTACK
 	h.call(&"bash", barred, npc, delta)
+
+
+## The barricade [param b] is pressed against, or "": from the native table ([code]brains_barred[/code]) while the
+## brains decide natively, checked against the horde's script under its `brains_verify`, whose answer is then used.
+func _barred(h: Object, b: ZzZombieBody) -> String:
+	var native: Object = h.get(&"brains_barred")
+
+	if native == null or not _decides_with(native):
+		return h.call(&"barricade_in_way", npc.position(), b.wish)
+
+	var barred: String = native.call(&"barricade_in_way", npc.position(), b.wish)
+
+	if bool(h.get(&"brains_verify")):
+		var script: String = h.call(&"barricade_in_way", npc.position(), b.wish)
+		h.call(&"brains_tally", script == barred)
+		return script
+
+	return barred
+
+
+## Flat metres to the nearest living survivor, INF with nobody: dot-sim's [code]nearest[/code] off the tick's
+## survivor table while the brains decide natively, the horde's script otherwise (and beside it under `brains_verify`).
+func _nearest_survivor(h: Object) -> float:
+	var native: Object = h.get(&"brains_now")
+
+	if native == null or not _decides_with(native):
+		return float(h.call(&"nearest_survivor_distance", npc.position()))
+
+	var near: float = native.call(&"nearest", npc.position())
+
+	if bool(h.get(&"brains_verify")):
+		var script := float(h.call(&"nearest_survivor_distance", npc.position()))
+		h.call(&"brains_tally", script == near)
+		return script
+
+	return near
 
 
 ## 1, 2 or 4: how many ticks this zombie's thought spans, by how far the nearest survivor is
@@ -624,7 +660,7 @@ func _think_every() -> int:
 		var config: Variant = h.get(&"config")
 		var scale := float(config.think_range) if config != null else 1.0
 		# Distances are compared divided by `ZzConfig.think_range` (zz_zombie_think_range).
-		_nearest = float(h.call(&"nearest_survivor_distance", npc.position())) / scale
+		_nearest = _nearest_survivor(h) / scale
 		var b := body()
 		if b != null:
 			var near := float(config.body_stride_near) if config != null else BODY_STRIDE_FROM

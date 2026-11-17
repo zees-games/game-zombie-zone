@@ -36,8 +36,8 @@ var _senses_verify := false
 ## --ab-brains (with --profile): every 64 ticks the zombies' brains flip between the script (0) and dot-sim's
 ## `DotSimZombieBrains` (1) through `ZzConfig.native_brains`; h.brains is summed per arm (AB lines).
 var _ab_brains := false
-## --brains-verify (with --profile): every native chase plan and spaced heading is also worked out in script and the
-## pairs that differ counted (PARITY brains line); the script's answers are the ones kept.
+## --brains-verify (with --profile): every native chase choice, barricade check, nearest survivor and spaced heading is
+## also worked out in script and the pairs that differ counted (PARITY brains line); the script's answers are kept.
 var _brains_verify := false
 var _abb_us := {}
 var _abb_ticks := {}
@@ -60,6 +60,11 @@ var _abw_ticks := {}
 var _ab_move := false
 var _abm_us := {}
 var _abm_ticks := {}
+## --ab-decide (with --profile): every 64 ticks the commons' chase choice, barricade check and nearest survivor flip
+## between the script (0) and dot-sim's `chase`, `barricade_in_way` and `nearest` (1); h.brains is summed per arm.
+var _ab_decide := false
+var _abd_us := {}
+var _abd_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
@@ -105,6 +110,11 @@ func _read_args() -> void:
 			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk"):
 				push_error("bench: --ab-move needs a dot-sim build with DotSimZombieBrains.walk")
 				get_tree().quit(1)
+		elif arg == "--ab-decide":
+			_ab_decide = true
+			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"chase"):
+				push_error("bench: --ab-decide needs a dot-sim build with DotSimZombieBrains.chase")
+				get_tree().quit(1)
 		elif arg == "--pacing-verify":
 			_pacing_verify = true
 		elif arg == "--crowd-parity":
@@ -149,6 +159,9 @@ func _print_profile() -> void:
 	for side: int in _abm_ticks:
 		print("AB move=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abm_us[side]) / 1000.0 / maxf(1.0, _abm_ticks[side]), _abm_ticks[side]])
+	for side: int in _abd_ticks:
+		print("AB decide=%d h.brains %.3f ms/tick over %d ticks" % [side,
+			float(_abd_us[side]) / 1000.0 / maxf(1.0, _abd_ticks[side]), _abd_ticks[side]])
 	if _pacing_verify:
 		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
 		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
@@ -492,6 +505,9 @@ func _physics_process(_delta: float) -> void:
 	var move_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_move else -1
 	if move_arm >= 0:
 		_ZombieMove._walks = move_arm
+	var decide_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_decide else -1
+	if decide_arm >= 0:
+		_ZombieMove._decides = decide_arm
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
@@ -506,6 +522,9 @@ func _physics_process(_delta: float) -> void:
 	if move_arm >= 0 and _recording:
 		_abm_us[move_arm] = int(_abm_us.get(move_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abm_ticks[move_arm] = int(_abm_ticks.get(move_arm, 0)) + 1
+	if decide_arm >= 0 and _recording:
+		_abd_us[decide_arm] = int(_abd_us.get(decide_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
+		_abd_ticks[decide_arm] = int(_abd_ticks.get(decide_arm, 0)) + 1
 	if pacing_arm >= 0 and _recording:
 		_abp_us[pacing_arm] = int(_abp_us.get(pacing_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abp_ticks[pacing_arm] = int(_abp_ticks.get(pacing_arm, 0)) + 1

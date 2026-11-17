@@ -51,6 +51,11 @@ const PLAN_FORCED := 0.0
 const PLAN_TARGET := 1.0
 const PLAN_NOBODY := -1.0
 const PLAN_LOST := -2.0
+## [method _chase_decide]'s act: no quarry; halt, face and swing; run at it; drift at it mid-swing.
+const ACT_NONE := 0.0
+const ACT_HIT := 1.0
+const ACT_CHASE := 2.0
+const ACT_SLOW := 3.0
 
 var idle_kind: int = Idle.STAND
 var home: Vector3 = Vector3.ZERO
@@ -318,9 +323,55 @@ func _chase_plan_script(b: ZzZombieBody) -> PackedFloat64Array:
 	return plan
 
 
+## This tick's chase choice: [method _chase_plan]'s eight values, the act ([code]ACT_*[/code]) and 1 when it must ask
+## [method claim_attack_slot] first. dot-sim's `chase` while the brains decide natively ([code]_decides[/code]), else
+## the script's; under `brains_verify` both, and the script's answer is used.
+func _chase_decide(b: ZzZombieBody) -> PackedFloat64Array:
+	var h := horde()
+	var native: Object = h.get(&"brains_now") if h != null else null
+
+	if native == null or not _decides_with(native):
+		return _chase_choice(_chase_plan(b))
+
+	var flags := (1 if b.has_flag(ZzZombieBody.FLAG_BURNING) else 0) | (2 if b.kind == &"crawler" else 0) \
+			| (4 if swinging() else 0)
+	var out: PackedFloat64Array = native.call(&"chase", forced, npc.target_id if npc.has_target() else &"", pace,
+		runner_roll, tune(&"reach", 1.55), ring, flags, npc.position())
+
+	if bool(h.get(&"brains_verify")):
+		var script := _chase_choice(_chase_plan_script(b))
+		h.call(&"brains_tally", script == out)
+		return script
+
+	return out
+
+
+## [param plan] with the script's choice after it, as [method _chase_decide] answers. Close enough to matter, only
+## the slot holders go in and the rest hold the ring; a forced zombie (a mob, bile) skips the queue, a mob is
+## supposed to swamp you ([member forced] outlives the plan only when it is the one chased).
+func _chase_choice(plan: PackedFloat64Array) -> PackedFloat64Array:
+	var out := plan.duplicate()
+	out.append(ACT_NONE)
+	out.append(0.0)
+
+	if plan[0] < 0.0:
+		return out
+
+	out[9] = 1.0 if plan[0] != PLAN_FORCED and plan[6] <= ring + 3.0 else 0.0
+
+	if plan[6] <= plan[7] and absf(npc.position().y - plan[3]) < 1.6:
+		out[8] = ACT_HIT
+	elif not swinging():
+		out[8] = ACT_CHASE
+	else:
+		out[8] = ACT_SLOW
+
+	return out
+
+
 ## One tick of the fight. False when there is nobody to fight.
 func _chase(b: ZzZombieBody) -> bool:
-	var plan := _chase_plan(b)
+	var plan := _chase_decide(b)
 
 	if plan[1] > 0.5:
 		forced = &""
@@ -331,20 +382,15 @@ func _chase(b: ZzZombieBody) -> bool:
 	var target: StringName = forced if plan[0] == PLAN_FORCED else npc.target_id
 	var at := Vector3(plan[2], plan[3], plan[4])
 	var speed := plan[5]
-	var gap := plan[6]
-	var reach := plan[7]
+	var act := plan[8]
 
-	# Close enough to matter: only the slot holders go in, the rest hold the ring. A forced
-	# zombie (a mob, bile) skips the queue: a mob is supposed to swamp you.
-	var attacking := forced != &"" or gap > ring + 3.0 or claim_attack_slot()
-
-	if attacking:
-		if gap <= reach and absf(npc.position().y - at.y) < 1.6:
+	if plan[9] < 0.5 or claim_attack_slot():
+		if act == ACT_HIT:
 			halt()
 			face(at - npc.position())
 			if not swinging():
 				var _swung := swing_at(target)
-		elif not swinging():
+		elif act == ACT_CHASE:
 			chase_to(at, speed)
 			b.anim = ZzZombieBody.Anim.RUN
 		else:
