@@ -84,6 +84,9 @@
 # bootstrap-optional
 /addons/zz_ply_class_pack
 
+# Fatal Contact's weapon addon is never a Zombie Zone dependency: a stray link to it stays out of the repository.
+/addons/arena_weapons
+
 # Exports
 build/
 export_presets.cfg
