@@ -12,6 +12,12 @@ const HORDE_META := &"zz_horde"
 var _horde: Object = null
 ## Whether the horde's dot-sim has [code]steer_walk[/code] (-1 until asked; one library a process).
 static var _steer_walks: int = -1
+## Whether the horde's dot-sim has [code]walk[/code], the whole move in one call (-1 until asked; 0 also turns it off,
+## as `tools/bench.gd --ab-move` does).
+static var _walks: int = -1
+## What [method _walk] hands dot-sim, kept so a move fills them in place rather than building them.
+var _walk_s := PackedFloat64Array()
+var _walk_n := PackedInt64Array()
 
 ## The horde this zombie belongs to. Duck-typed: see `zz_horde.gd`.
 func horde() -> Object:
@@ -103,9 +109,9 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	return grid.separation(own, here, spacing, spacing * 2.0, right)
 
 
-## dot-npc-ai's steer with everything after the path in one native call ([code]DotSimZombieBrains.steer_walk[/code], else
-## [code]steer_step[/code]): heading, wish, turn, look and progress watch. [method _steer_rest] is the fallback, and under
-## [code]brains_verify[/code] it runs instead and each native answer is checked against it.
+## dot-npc-ai's steer in one native call: the whole move ([code]DotSimZombieBrains.walk[/code], path then steer) when
+## the path is not due, else everything after the path ([code]steer_walk[/code], else [code]steer_step[/code]). The
+## script ([method _steer_rest]) is the fallback, and under [code]brains_verify[/code] each native answer is checked.
 func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
 	var h := horde()
 	var b := body()
@@ -121,8 +127,19 @@ func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float 
 		super(to, speed, delta, spacing)
 		return
 
-	var goal := _steer_goal(to)
+	if _walks < 0:
+		_walks = 1 if (brains as Object).has_method(&"walk") else 0
 
+	if _walks == 1 and _walk_native(h, b, brains, grid, to, speed, delta, spacing):
+		return
+
+	_steer_from(h, b, brains, grid, _steer_goal(to), to, speed, delta, spacing)
+
+
+## The steer after [method _steer_goal] for [param goal]: [code]steer_walk[/code] (or [code]steer_step[/code]), or the
+## script.
+func _steer_from(h: Object, b: ZzZombieBody, brains: Object, grid: Object, goal: Vector3, to: Vector3, speed: float,
+		delta: float, spacing: float) -> void:
 	if goal == Vector3.INF:
 		_cruise_dest = to
 		return
@@ -131,7 +148,7 @@ func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float 
 	var verify := bool(h.get(&"brains_verify"))
 
 	if _steer_walks < 0:
-		_steer_walks = 1 if (brains as Object).has_method(&"steer_walk") else 0
+		_steer_walks = 1 if brains.has_method(&"steer_walk") else 0
 
 	var out: PackedFloat64Array
 	if _steer_walks == 1:
@@ -161,6 +178,113 @@ func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float 
 		path.call(&"go_rough", now, 4.0)
 		_progress_at = Vector3(out[16], out[17], out[18])
 		_progress_since = now
+
+
+## The whole move in one [code]DotSimZombieBrains.walk[/code]: dot-npc-ai's [code]_steer_goal[/code] (dot-npc's
+## [code]path_toward[/code]: its repath test and the path's advance) and then the steer, with the brain's, character's,
+## path's and spawner's members handed in by value and the answer written back here. Only where the script's own
+## [code]_steer_goal[/code] is exactly [code]path_toward[/code] (a nav graph and a path, no scheduler, no path reuse);
+## false there, with nothing done, and the caller steers as before. A path due a repath goes to the script's
+## [code]path_toward[/code] (which queues or searches) and the steer after it, as [method _steer_from].
+func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: Vector3, speed: float, delta: float,
+		spacing: float) -> bool:
+	var p := path
+	var sp := director as DotNpcSpawner
+	# _path_goal's own way to path_toward, with its scheduler probe taken only where it cannot find one.
+	if p == null or sp == null or path_reuse_thoughts > 0 or scheduler != null or _sched_probe <= 1 \
+			or not sp.has_nav():
+		return false
+
+	_path_denied = false
+	_sched()
+	var now := _world_now()
+	var verify := bool(h.get(&"brains_verify"))
+	var c := character
+	if _walk_s.size() != 32:
+		_walk_s.resize(32)
+		_walk_n.resize(4)
+	_walk_s[0] = to.x
+	_walk_s[1] = to.y
+	_walk_s[2] = to.z
+	_walk_s[3] = spacing
+	_walk_s[4] = speed
+	_walk_s[5] = context.delta
+	_walk_s[6] = now
+	_walk_s[7] = _facing_at_tick.x
+	_walk_s[8] = _facing_at_tick.y
+	_walk_s[9] = _facing_at_tick.z
+	_walk_s[10] = _progress_at.x
+	_walk_s[11] = _progress_at.y
+	_walk_s[12] = _progress_at.z
+	_walk_s[13] = _progress_since
+	_walk_s[14] = stuck_seconds
+	_walk_s[15] = c._peak_turn
+	_walk_s[16] = c._over_amt
+	_walk_s[17] = c._over_axis.x
+	_walk_s[18] = c._over_axis.y
+	_walk_s[19] = c._over_axis.z
+	_walk_s[20] = c.view_factor
+	_walk_s[21] = c.view_turn_deg
+	_walk_s[22] = c.overshoot
+	_walk_s[23] = p.arrive_radius
+	_walk_s[24] = p.computed_at
+	_walk_s[25] = p.goal_at_compute.x
+	_walk_s[26] = p.goal_at_compute.y
+	_walk_s[27] = p.goal_at_compute.z
+	_walk_s[28] = sp.repath_drift
+	_walk_s[29] = sp.repath_interval
+	_walk_s[30] = sp.repath_drift_ratio
+	_walk_s[31] = sp.repath_interval_per_m
+	_walk_n[0] = c._turns
+	_walk_n[1] = c.seed_value
+	_walk_n[2] = p.index
+	_walk_n[3] = 1 if p.partial else 0
+
+	var out: PackedFloat64Array = brains.walk(grid, npc.instance_id, b, p.points, _walk_s, _walk_n, not verify)
+
+	if out[0] < 0.0:
+		# Due a repath (or no answer): path_toward as _asked_goal asks it, then the steer as before.
+		var asked := _as_goal(sp.path_toward(npc, p, to))
+		_steer_from(h, b, brains, grid, asked if asked != Vector3.INF else to, to, speed, delta, spacing)
+		return true
+
+	var goal := Vector3(out[20], out[21], out[22])
+
+	if verify:
+		var index0 := p.index
+		var asked := _as_goal(sp.path_toward(npc, p, to))
+		var same := asked == goal and p.index == int(out[19]) and _waypoint == goal
+		if not same:
+			DotLog.debug(CHANNEL, "native walk differs from the script's", {"native": str([goal, int(out[19])]),
+				"script": str([asked, p.index, _waypoint]), "was": index0})
+		h.call(&"brains_tally", same)
+		_verify_steer(h, b, out, asked if asked != Vector3.INF else to, to, speed, delta, spacing, now)
+		return true
+
+	p.index = int(out[19])
+	_waypoint = goal
+
+	if out[0] != 1.0:
+		return true
+
+	if out[2] == 1.0:
+		b.wish = Vector3(out[3], out[4], out[5])
+	c._peak_turn = out[10]
+	c._over_amt = out[11]
+	c._turns = int(out[12])
+	c._over_axis = Vector3(out[13], out[14], out[15])
+	_cruise_to = goal
+	_cruise_dest = to
+
+	if out[1] == 1.0:
+		_progress_at = Vector3(out[16], out[17], out[18])
+		_progress_since = now
+	elif out[1] == 2.0:
+		p.go_rough(now, 4.0)
+		_progress_at = Vector3(out[16], out[17], out[18])
+		_progress_since = now
+
+	return true
 
 
 ## dot-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.

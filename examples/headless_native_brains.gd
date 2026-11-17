@@ -17,7 +17,7 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 6
-const CHECKS := 17
+const CHECKS := 18
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -425,8 +425,16 @@ func _steer_state(brain: Object) -> Array:
 	var b: ZzZombieBody = brain.npc.node
 	var c: DotNpcAiCharacter = brain.character
 	var rough: float = brain.path.rough_until if brain.path != null else 0.0
-	return [b.global_transform, b.wish, c._peak_turn, c._over_amt, c._over_axis, c._turns, brain._cruise_to,
-		brain._cruise_dest, brain._progress_at, brain._progress_since, rough]
+	var index: int = brain.path.index if brain.path != null else -99
+	var st := [b.global_transform, b.wish, c._peak_turn, c._over_amt, c._over_axis, c._turns, brain._cruise_to,
+		brain._cruise_dest, brain._progress_at, brain._progress_since, rough, index, brain._waypoint]
+	# The rest of the path: a stuck steer goes rough (its points dropped, its arrive radius cut), and a due one's
+	# search reads is_rough, which puts the radius back.
+	var p: DotNpcPath = brain.path
+	if p != null:
+		st.append_array([p.points.duplicate(), p.arrive_radius, p._arrive_before, p.computed_at, p.goal_at_compute,
+			p.partial])
+	return st
 
 
 func _put_state(brain: Object, st: Array) -> void:
@@ -444,11 +452,20 @@ func _put_state(brain: Object, st: Array) -> void:
 	brain._progress_since = st[9]
 	if brain.path != null:
 		brain.path.rough_until = st[10]
+		brain.path.index = st[11]
+		brain.path.points = (st[13] as PackedVector3Array).duplicate()
+		brain.path.arrive_radius = st[14]
+		brain.path._arrive_before = st[15]
+		brain.path.computed_at = st[16]
+		brain.path.goal_at_compute = st[17]
+		brain.path.partial = st[18]
+	brain._waypoint = st[12]
 
 
 ## The native steer against the script's over seeded worlds, and the native turn_view beside it.
 func _check_steers() -> void:
-	var steers := {"bad": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
+	var steers := {"bad": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0,
+		"moved": 0, "due": 0, "advanced": 0, "ended": 0}
 	var tp := {"bad": 0, "n": 0}
 	for s in SEEDS:
 		_turn_probe(s, tp)
@@ -460,6 +477,10 @@ func _check_steers() -> void:
 		"%d of %d differ" % [steers["bad"], steers["steered"] + steers["still"]])
 	_check(not ClassDB.class_has_method(NATIVE, &"steer_walk") or steers["walked"] > 3000,
 		"the steers went through steer_walk as well as steer_step", str(steers))
+	_check(not ClassDB.class_has_method(NATIVE, &"walk") or (steers["moved"] > 1500 and steers["due"] > 300
+			and steers["advanced"] > 200 and steers["ended"] > 50),
+		"the whole move went through walk: paths walked, due, advanced past their corners and run to their end",
+		str(steers))
 	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
 			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
 		"the steers turned, overshot, stood still, reset their watch, got stuck and went rough", str(steers))
@@ -481,7 +502,12 @@ func _steers(s: int, steers: Dictionary) -> void:
 	h.crowd = grid
 	h.crowd_native = true
 	var ctx := DotNpcAiContext.new()
+	var sp := _nav_spawner(rng)
 	_tune_characters(rng, commons, ctx)
+	for brain: Object in commons:
+		if brain.path != null and rng.randf() < 0.8:
+			brain.director = sp
+			brain._sched_probe = 1 << 30
 	for p in PASSES:
 		var ids := PackedInt64Array()
 		var at := PackedVector3Array()
@@ -497,8 +523,10 @@ func _steers(s: int, steers: Dictionary) -> void:
 		grid.call(&"fill", ids, at)
 		ctx.delta = [0.0, 1.0 / 60.0, rng.randf_range(0.001, 0.25)][rng.randi() % 3]
 		ctx.now = 10.0 * p + rng.randf_range(0.0, 5.0)
+		sp._now = ctx.now
 		for brain: Object in commons:
 			var kase := _steer_case(rng, brain, ctx)
+			_path_case(rng, brain, kase[0], ctx)
 			var to: Vector3 = kase[0]
 			var spacing: float = kase[1]
 			var speed: float = kase[2]
@@ -512,6 +540,10 @@ func _steers(s: int, steers: Dictionary) -> void:
 			h.brains_crowd = grid
 			_native_steers(h, brain, before, script, kase, ctx, steers)
 			_tally_steer(steers, brain, ctx, before, script)
+			if brain.director == sp:
+				_put_state(brain, before)
+				_tally_path(steers, brain, sp, kase[0], before, script)
+	sp.free()
 
 
 ## One common's native steer from [param before], through [code]steer_walk[/code] when the library has it and
@@ -519,14 +551,20 @@ func _steers(s: int, steers: Dictionary) -> void:
 func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase: Array, ctx: DotNpcAiContext,
 		steers: Dictionary) -> void:
 	var walks: Array = [1, 0] if h.brains_now.has_method(&"steer_walk") else [0]
+	if h.brains_now.has_method(&"walk"):
+		walks.push_front(2)
 	for walk: int in walks:
 		_put_state(brain, before)
-		ZombieMove._steer_walks = walk
+		# 2 is the whole move (walk, then steer_walk after a due path), 1 the path in script and steer_walk.
+		ZombieMove._steer_walks = mini(walk, 1)
+		ZombieMove._walks = 1 if walk == 2 else 0
 		var steered: int = h.brains_now.call(&"steered")
 		brain.steer_with_spacing(kase[0], kase[2], ctx.delta, kase[1])
 		var native := _steer_state(brain)
 		if walk == 1:
 			steers["walked"] += 1
+		elif walk == 2 and brain.director != null:
+			steers["moved"] += 1
 		if int(h.brains_now.call(&"steered")) == steered:
 			steers["bad"] += 1
 			if steers["bad"] <= 3:
@@ -539,6 +577,71 @@ func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase
 						print("  walk %d differ at %d: script %s native %s" % [walk, i, var_to_str(script[i]),
 							var_to_str(native[i])])
 	ZombieMove._steer_walks = -1
+	ZombieMove._walks = -1
+
+
+## A spawner with a two-point nav graph (so it has navigation) whose repaths are deferred, with repath tuning rolled.
+func _nav_spawner(rng: RandomNumberGenerator) -> DotNpcSpawner:
+	var data := DotNpcNavData.new()
+	data.map_id = &"walk_probe"
+	data.source_digest = "walk_probe"
+	var a := data.add_point(Vector3.ZERO)
+	var b := data.add_point(Vector3(1.0, 0.0, 0.0))
+	var _c := data.connect_points(a, b)
+	var sp := DotNpcSpawner.new()
+	sp.nav = DotNpcNavGraph.new(data)
+	assert(sp.has_nav())
+	# A due path is queued for a search, which reads the snap radius (the spawner's own default; it never enters the tree).
+	sp.limits = DotNpcLimits.new()
+	sp.deferred_paths = true
+	sp.repath_drift = [0.0, 2.5, rng.randf_range(0.5, 6.0)][rng.randi() % 3]
+	sp.repath_interval = [0.0, 1.5, rng.randf_range(0.2, 4.0)][rng.randi() % 3]
+	sp.repath_drift_ratio = [0.0, rng.randf_range(0.05, 0.5)][rng.randi() % 2]
+	sp.repath_interval_per_m = [0.0, rng.randf_range(0.01, 0.2)][rng.randi() % 2]
+	return sp
+
+
+## A pathed common's path put in a state of the pass: empty, fresh or stale, walked part way, to its end or past it,
+## partial or not, corners near the body (to be passed) and far, its goal moved or not.
+func _path_case(rng: RandomNumberGenerator, brain: Object, to: Vector3, ctx: DotNpcAiContext) -> void:
+	var p: DotNpcPath = brain.path
+	if p == null:
+		return
+	var here: Vector3 = brain.npc.position()
+	var pts := PackedVector3Array()
+	var n: int = [0, rng.randi_range(1, 3), rng.randi_range(2, 9)][rng.randi() % 3]
+	var at := here
+	for i in n:
+		var step := rng.randf_range(0.2, 1.5) if rng.randf() < 0.5 else rng.randf_range(1.5, 8.0)
+		at += Vector3(rng.randf_range(-1, 1), rng.randf_range(-0.6, 0.6), rng.randf_range(-1, 1)).normalized() * step
+		pts.append(at)
+	p.points = pts
+	p.index = [0, rng.randi_range(0, n + 1), n, -1][rng.randi() % 4] if n > 0 else 0
+	p.arrive_radius = [1.2, rng.randf_range(0.3, 3.0)][rng.randi() % 2]
+	p.computed_at = ctx.now - [0.0, rng.randf_range(0.0, 1.0), rng.randf_range(0.0, 6.0)][rng.randi() % 3]
+	p.goal_at_compute = to + [Vector3.ZERO, Vector3(rng.randf_range(-6, 6), 0.0, rng.randf_range(-6, 6))][rng.randi() % 2]
+	p.partial = rng.randf() < 0.3
+
+
+## Counts what the script's path step did for a pathed common (due, passed corners, ran to its end).
+func _tally_path(steers: Dictionary, brain: Object, sp: DotNpcSpawner, to: Vector3, before: Array, script: Array) -> void:
+	var p: DotNpcPath = brain.path
+	var saved: int = p.index
+	p.index = before[11]
+	var drift := sp.repath_drift
+	var interval := sp.repath_interval
+	if sp.repath_drift_ratio > 0.0 or sp.repath_interval_per_m > 0.0:
+		var gap: float = brain.npc.position().distance_to(to)
+		drift = maxf(drift, sp.repath_drift_ratio * gap)
+		interval = maxf(interval, sp.repath_interval_per_m * gap)
+	var due := p.needs_repath(sp.now(), to, interval, drift)
+	p.index = saved
+	if due:
+		steers["due"] += 1
+	elif script[11] > before[11]:
+		steers["advanced"] += 1
+		if script[11] >= p.points.size():
+			steers["ended"] += 1
 
 
 ## Each common's character, tuned at random and given a path or not.
@@ -627,15 +730,23 @@ func _verify() -> bool:
 		h.crowd_native = true
 		h.brains_crowd = native_grid
 		var ctx := DotNpcAiContext.new()
+		var sp := _nav_spawner(rng)
 		for brain: Object in commons:
 			brain.character = DotNpcAiCharacter.new()
 			brain.character.seed_value = rng.randi()
 			brain.context = ctx
+			if rng.randf() < 0.6:
+				brain.path = DotNpcPath.new()
+				brain.director = sp
+				brain._sched_probe = 1 << 30
 		for p in 3:
 			ctx.delta = 1.0 / 60.0
 			ctx.now = 1.0 + p
+			sp._now = ctx.now
 			for brain: Object in commons:
 				var b: ZzZombieBody = brain.npc.node
+				if brain.path != null:
+					_path_case(rng, brain, Vector3(rng.randf_range(-20, 20), 0, rng.randf_range(-20, 20)), ctx)
 				var plan: PackedFloat64Array = brain._chase_plan(b)
 				if plan != brain._chase_plan_script(b):
 					mismatches += 1000
@@ -645,5 +756,6 @@ func _verify() -> bool:
 			h._feed_brains()
 		decided += h.brains_decided
 		mismatches += h.brains_mismatches
+		sp.free()
 	print("  %d decided, %d mismatches" % [decided, mismatches])
 	return decided > 500 and mismatches == 0

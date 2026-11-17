@@ -55,6 +55,11 @@ var _abp_ticks := {}
 var _ab_walk := false
 var _abw_us := {}
 var _abw_ticks := {}
+## --ab-move (with --profile): every 64 ticks the zombie move flips between the script's path step plus `steer_walk`
+## (0) and dot-sim's `walk` (1, the path step and the steer in one call); h.brains is summed per arm (AB lines).
+var _ab_move := false
+var _abm_us := {}
+var _abm_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
@@ -94,6 +99,11 @@ func _read_args() -> void:
 			_ab_walk = true
 			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"steer_walk"):
 				push_error("bench: --ab-walk needs a dot-sim build with DotSimZombieBrains.steer_walk")
+				get_tree().quit(1)
+		elif arg == "--ab-move":
+			_ab_move = true
+			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk"):
+				push_error("bench: --ab-move needs a dot-sim build with DotSimZombieBrains.walk")
 				get_tree().quit(1)
 		elif arg == "--pacing-verify":
 			_pacing_verify = true
@@ -136,6 +146,9 @@ func _print_profile() -> void:
 	for side: int in _abw_ticks:
 		print("AB walk=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abw_us[side]) / 1000.0 / maxf(1.0, _abw_ticks[side]), _abw_ticks[side]])
+	for side: int in _abm_ticks:
+		print("AB move=%d h.brains %.3f ms/tick over %d ticks" % [side,
+			float(_abm_us[side]) / 1000.0 / maxf(1.0, _abm_ticks[side]), _abm_ticks[side]])
 	if _pacing_verify:
 		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
 		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
@@ -476,6 +489,9 @@ func _physics_process(_delta: float) -> void:
 	var walk_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_walk else -1
 	if walk_arm >= 0:
 		_ZombieMove._steer_walks = walk_arm
+	var move_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_move else -1
+	if move_arm >= 0:
+		_ZombieMove._walks = move_arm
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
@@ -487,6 +503,9 @@ func _physics_process(_delta: float) -> void:
 	if walk_arm >= 0 and _recording:
 		_abw_us[walk_arm] = int(_abw_us.get(walk_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abw_ticks[walk_arm] = int(_abw_ticks.get(walk_arm, 0)) + 1
+	if move_arm >= 0 and _recording:
+		_abm_us[move_arm] = int(_abm_us.get(move_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
+		_abm_ticks[move_arm] = int(_abm_ticks.get(move_arm, 0)) + 1
 	if pacing_arm >= 0 and _recording:
 		_abp_us[pacing_arm] = int(_abp_us.get(pacing_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abp_ticks[pacing_arm] = int(_abp_ticks.get(pacing_arm, 0)) + 1
