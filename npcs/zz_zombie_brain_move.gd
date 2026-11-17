@@ -199,6 +199,36 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 	_sched()
 	var now := _world_now()
 	var verify := bool(h.get(&"brains_verify"))
+	_walk_pack(sp, to, speed, spacing, now)
+
+	var out: PackedFloat64Array = brains.walk(grid, npc.instance_id, b, p.points, _walk_s, _walk_n, not verify)
+
+	if out[0] < 0.0:
+		# Due a repath (or no answer): path_toward as _asked_goal asks it, then the steer as before.
+		var asked := _as_goal(sp.path_toward(npc, p, to))
+		_steer_from(h, b, brains, grid, asked if asked != Vector3.INF else to, to, speed, delta, spacing)
+		return true
+
+	var goal := Vector3(out[20], out[21], out[22])
+
+	if verify:
+		var index0 := p.index
+		var asked := _as_goal(sp.path_toward(npc, p, to))
+		var same := asked == goal and p.index == int(out[19]) and _waypoint == goal
+		if not same:
+			DotLog.debug(CHANNEL, "native walk differs from the script's", {"native": str([goal, int(out[19])]),
+				"script": str([asked, p.index, _waypoint]), "was": index0})
+		h.call(&"brains_tally", same)
+		_verify_steer(h, b, out, asked if asked != Vector3.INF else to, to, speed, delta, spacing, now)
+		return true
+
+	_walk_apply(p, b, out, goal, to, now)
+	return true
+
+
+## The members [method _walk_native] hands [code]walk[/code] by value.
+func _walk_pack(sp: DotNpcSpawner, to: Vector3, speed: float, spacing: float, now: float) -> void:
+	var p := path
 	var c := character
 	if _walk_s.size() != 32:
 		_walk_s.resize(32)
@@ -240,32 +270,15 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 	_walk_n[2] = p.index
 	_walk_n[3] = 1 if p.partial else 0
 
-	var out: PackedFloat64Array = brains.walk(grid, npc.instance_id, b, p.points, _walk_s, _walk_n, not verify)
 
-	if out[0] < 0.0:
-		# Due a repath (or no answer): path_toward as _asked_goal asks it, then the steer as before.
-		var asked := _as_goal(sp.path_toward(npc, p, to))
-		_steer_from(h, b, brains, grid, asked if asked != Vector3.INF else to, to, speed, delta, spacing)
-		return true
-
-	var goal := Vector3(out[20], out[21], out[22])
-
-	if verify:
-		var index0 := p.index
-		var asked := _as_goal(sp.path_toward(npc, p, to))
-		var same := asked == goal and p.index == int(out[19]) and _waypoint == goal
-		if not same:
-			DotLog.debug(CHANNEL, "native walk differs from the script's", {"native": str([goal, int(out[19])]),
-				"script": str([asked, p.index, _waypoint]), "was": index0})
-		h.call(&"brains_tally", same)
-		_verify_steer(h, b, out, asked if asked != Vector3.INF else to, to, speed, delta, spacing, now)
-		return true
-
+## What [code]walk[/code] answered, written back to the path, the character and this brain.
+func _walk_apply(p: DotNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: Vector3, to: Vector3, now: float) -> void:
+	var c := character
 	p.index = int(out[19])
 	_waypoint = goal
 
 	if out[0] != 1.0:
-		return true
+		return
 
 	if out[2] == 1.0:
 		b.wish = Vector3(out[3], out[4], out[5])
@@ -283,8 +296,6 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 		p.go_rough(now, 4.0)
 		_progress_at = Vector3(out[16], out[17], out[18])
 		_progress_since = now
-
-	return true
 
 
 ## dot-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.
