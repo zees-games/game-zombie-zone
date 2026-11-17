@@ -2,6 +2,8 @@ extends "shot_base.gd"
 
 ## The shot tool's scripted views: one function per --view that needs more than a camera, split from shot.gd.
 
+const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+
 
 func _view_overview(game: ZzGame, local, stand: Vector3) -> void:
 	await _frames(6)
@@ -146,6 +148,69 @@ func _view_strike(game: ZzGame, local, stand: Vector3) -> void:
 	var side := -1.0 if _view == "pin" else 1.0
 	_free_camera().look_at_from_position(mid + Vector3(3.2 * side, 1.8, 1.2), mid + Vector3(0.0, 0.8 if _view == "pin" else 0.6, 0.0))
 	await _seconds_of(0.2)
+
+
+func _drive_for(game: ZzGame, seconds: float) -> void:
+	# The shot's world is not in its play phase, so the held body's drive is fed here, a tick a frame.
+	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		game.possession.tick(1.0 / 64.0)
+		game.horde.tick(1.0 / 64.0)
+
+
+func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
+	# A turned survivor driving --zombie=<kind> (rider, brute, spitter, leaper, ram): the client's follow camera
+	# (behind, looking where the holder's yaw and pitch say) at rest, turned, looking up and down, then the shove
+	# key pressed, a frame after each (_a_rest .. _g_ability2). The rider leaps at the survivor in front.
+	_clear_view(game, local, stand)
+	var holder = null
+	for other in game.survivors():
+		if other != local:
+			holder = other
+			break
+	if game.possession == null:
+		game.possession = load("res://game/zz_possession.gd").new(game)
+	var cmd := DotFpsCommand.new()
+	cmd.yaw = 180.0
+	holder.input_move = cmd
+	var at: Vector3 = game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -7.0))
+	var npc: DotNpcInstance = game.horde.spawner.spawn(_zombie, at, &"shot", Basis(Vector3.UP, PI))
+	print("possess: ", _zombie, " held ", game.possession.possess(holder, npc) if npc != null else false)
+	# The horde stands still while the map's nav bakes (a big map takes seconds): wait it out, up to 60 s.
+	var waited := 0
+	while bool(game.horde.get(&"_map_nav_pending")) and waited < 3600:
+		await get_tree().process_frame
+		game.horde.tick(1.0 / 64.0)
+		waited += 1
+	var cam := _free_camera()
+	var look_pitch := [0.0]
+	cam.track = func() -> Variant:
+		if npc == null or npc.node == null:
+			return null
+		var basis := Basis.from_euler(Vector3(deg_to_rad(look_pitch[0]), deg_to_rad(cmd.yaw), 0.0))
+		cam.track_offset = basis.z * 3.6
+		return npc.position() + Vector3(0.0, 2.1, 0.0)
+	await _drive_for(game, 0.6)
+	await _save_extra("_a_rest")
+	cmd.yaw = 270.0
+	await _drive_for(game, 0.8)
+	await _save_extra("_b_turned")
+	cmd.yaw = 180.0
+	for step in [["_c_up", 40.0], ["_d_down", -45.0]]:
+		cmd.pitch = step[1]
+		look_pitch[0] = step[1]
+		await _drive_for(game, 0.4)
+		await _save_extra(step[0])
+	cmd.pitch = 0.0
+	look_pitch[0] = 0.0
+	cmd.set_button(ZzNetCommand.BUTTON_SHOVE, true)
+	await _drive_for(game, 0.15)
+	cmd.set_button(ZzNetCommand.BUTTON_SHOVE, false)
+	for suffix in ["_e_ability0", "_f_ability1", "_g_ability2"]:
+		await _drive_for(game, 0.35)
+		print("possess ", suffix, ": ", npc.position() if npc != null else "gone", " anim ", npc.node.get(&"anim") if npc != null and npc.node != null else "")
+		await _save_extra(suffix)
 
 
 func _view_ending(game: ZzGame, local, stand: Vector3) -> void:

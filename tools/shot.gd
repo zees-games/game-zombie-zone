@@ -288,6 +288,8 @@ func _run() -> void:
 			await _view_strike(game, local, stand)
 		"killcam", "reveal":
 			await _view_killcam(game, local, stand)
+		"possess":
+			await _view_possess(game, local, stand)
 		"ending", "trail":
 			await _view_ending(game, local, stand)
 		"crawl", "crawl_third", "crawl_down":
@@ -386,7 +388,7 @@ func _spawn_requested(game: ZzGame, local, stand: Vector3) -> void:
 	for entry: Array in _spawn:
 		for n in int(entry[1]):
 			var at := stand + Vector3(randf_range(-3.0, 3.0), 0.0, -6.0 - randf_range(0.0, 8.0))
-			var npc: DotNpcInstance = game.horde.spawn_brute(at) if entry[0] == ZzNpcs.BRUTE \
+			var npc: DotNpcInstance = game.horde.call(&"spawn_brute", at) if entry[0] == ZzNpcs.BRUTE \
 				else game.horde.spawner.spawn(entry[0], game.horde.snap_to_nav(at), &"shot", Basis(Vector3.UP, PI))
 			if npc != null and npc.brain != null and entry[0] == ZzNpcs.COMMON:
 				npc.brain.call(&"force_target", local.player_id)
