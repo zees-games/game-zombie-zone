@@ -297,6 +297,11 @@ func setup_seconds() -> float:
 ## script grid, which false (or no library, the web) keeps. `zz_native_crowd`.
 @export var native_crowd: bool = true
 
+## dot-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in dot-sim's `DotSimSenses`
+## when the library is loaded: the same targets at the same moments as the script, which false (or no
+## library, the web) keeps. `zz_native_senses`.
+@export var native_senses: bool = true
+
 ## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
 ## team on a small box is people plus this many. `zz_bot_max`.
 @export_range(0, 256, 1, "or_greater") var bot_max: int = 0

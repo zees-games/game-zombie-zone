@@ -853,8 +853,12 @@ var _crowd_ids := PackedInt64Array()
 var _crowd_at := PackedVector3Array()
 
 ## Swaps [member crowd] to the native grid or back when [member ZzConfig.native_crowd] (or the
-## library) says so; between ticks, so a tool may flip it while a round runs.
+## library) says so, and the senses' native pass with [member ZzConfig.native_senses]; between ticks,
+## so a tool may flip either while a round runs.
 func _pick_crowd() -> void:
+	if senses != null:
+		senses.native_enabled = config != null and config.native_senses
+
 	var want := config != null and config.native_crowd and ClassDB.class_exists(NATIVE_CROWD)
 
 	if want == crowd_native:

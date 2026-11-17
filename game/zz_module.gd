@@ -350,6 +350,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_native_crowd", 1.0 if config.native_crowd else 0.0,
 		"The horde's crowd grid runs in dot-sim's native library when loaded (the same answers); 0 keeps the script",
 		func(value: float) -> void: config.native_crowd = value > 0.5)
+	_tunable("zz_native_senses", 1.0 if config.native_senses else 0.0,
+		"Zombie senses run in dot-sim's native library when loaded (the same targets); 0 keeps the script",
+		func(value: float) -> void: config.native_senses = value > 0.5)
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
@@ -1559,6 +1562,7 @@ const HAND_FIELDS := {
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
 	"zz_dormant_from": "dormant_from", "zz_dormant_think_every": "dormant_think_every",
 	"zz_path_reuse_thoughts": "path_reuse_thoughts", "zz_native_crowd": "native_crowd",
+	"zz_native_senses": "native_senses",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
 	"zz_commons_far_divisor": "commons_far_divisor",
 }

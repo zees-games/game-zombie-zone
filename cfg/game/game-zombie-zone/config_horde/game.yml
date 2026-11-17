@@ -232,6 +232,8 @@
 # path_reuse_thoughts: 0
 # Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in dot-sim's native `DotSi...
 # native_crowd: true
+# dot-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in dot-sim's `DotSimSenses` wh...
+# native_senses: true
 # Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at ... [0..]
 # bot_max: 0
 # A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many ticks (st... [1..]
