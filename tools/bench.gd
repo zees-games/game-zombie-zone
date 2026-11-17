@@ -4,6 +4,8 @@ extends "shot.gd"
 ## once per run, every frame timed. Prints one BENCH line (wall, physics, script, render, GPU, draws) so runs compare.
 ## `tools/bench.sh --zz-map-ids=zm_abandoned_mall --zombies=56`.
 
+const _ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
+
 var _count := 56
 var _bench_seed := 7
 var _measure := 20.0
@@ -48,6 +50,11 @@ var _ab_pacing := false
 var _pacing_verify := false
 var _abp_us := {}
 var _abp_ticks := {}
+## --ab-walk (with --profile): every 64 ticks the zombie steer flips between dot-sim's `steer_step` (0, the brain's
+## watch read through Object.get) and `steer_walk` (1, the watch passed in); h.brains is summed per arm (AB lines).
+var _ab_walk := false
+var _abw_us := {}
+var _abw_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
@@ -83,6 +90,11 @@ func _read_args() -> void:
 			_brains_verify = true
 		elif arg == "--ab-pacing":
 			_ab_pacing = true
+		elif arg == "--ab-walk":
+			_ab_walk = true
+			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"steer_walk"):
+				push_error("bench: --ab-walk needs a dot-sim build with DotSimZombieBrains.steer_walk")
+				get_tree().quit(1)
 		elif arg == "--pacing-verify":
 			_pacing_verify = true
 		elif arg == "--crowd-parity":
@@ -121,6 +133,9 @@ func _print_profile() -> void:
 	for side: int in _abp_ticks:
 		print("AB pacing=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abp_us[side]) / 1000.0 / maxf(1.0, _abp_ticks[side]), _abp_ticks[side]])
+	for side: int in _abw_ticks:
+		print("AB walk=%d h.brains %.3f ms/tick over %d ticks" % [side,
+			float(_abw_us[side]) / 1000.0 / maxf(1.0, _abw_ticks[side]), _abw_ticks[side]])
 	if _pacing_verify:
 		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
 		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
@@ -458,6 +473,9 @@ func _physics_process(_delta: float) -> void:
 	if _pacing_verify:
 		(_client.get("game") as ZzGame).horde.config.native_pacing = true
 		(_client.get("game") as ZzGame).horde.spawner.set(&"pacing_verify", true)
+	var walk_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_walk else -1
+	if walk_arm >= 0:
+		_ZombieMove._steer_walks = walk_arm
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
@@ -466,6 +484,9 @@ func _physics_process(_delta: float) -> void:
 	if brains_arm >= 0 and _recording:
 		_abb_us[brains_arm] = int(_abb_us.get(brains_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abb_ticks[brains_arm] = int(_abb_ticks.get(brains_arm, 0)) + 1
+	if walk_arm >= 0 and _recording:
+		_abw_us[walk_arm] = int(_abw_us.get(walk_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
+		_abw_ticks[walk_arm] = int(_abw_ticks.get(walk_arm, 0)) + 1
 	if pacing_arm >= 0 and _recording:
 		_abp_us[pacing_arm] = int(_abp_us.get(pacing_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abp_ticks[pacing_arm] = int(_abp_ticks.get(pacing_arm, 0)) + 1
