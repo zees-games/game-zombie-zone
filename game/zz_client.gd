@@ -1423,10 +1423,10 @@ func _build_touch() -> void:
 	_touch.controls.button_pressed.connect(touch_button.bind(true))
 	_touch.controls.button_released.connect(touch_button.bind(false))
 	if DotPlatform.has_touch():
-		hud.shift_weight_left(ZzTouch.WEIGHT_SHIFT)
+		hud.shift_weight_left(_touch.weight_shift())
 		# dot-game's DotGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
 		if platform != null and platform.has_method(&"fit_touch_buttons"):
-			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), ZzTouch.LAYOUT)
+			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), _touch.layout())
 
 
 ## A touch button went down or up: the same flags the keys set. Fire is read through [method _fire_held] and jump

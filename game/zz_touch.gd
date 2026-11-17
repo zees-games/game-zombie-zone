@@ -18,8 +18,30 @@ const LAYOUT: Array[Dictionary] = [
 	{"id": &"heal", "label": "HEAL", "offset": Vector2(280, 300), "radius": 30.0},
 ]
 
+## A portrait phone: the same buttons in a tighter arc above the weight readout and the ammunition plate, so none
+## sits on the health panel or the readout.
+const LAYOUT_PORTRAIT: Array[Dictionary] = [
+	{"id": &"fire", "label": "FIRE", "offset": Vector2(70, 340), "radius": 44.0},
+	{"id": &"jump", "label": "JUMP", "offset": Vector2(175, 310), "radius": 36.0, "hold": DotFpsCommand.BUTTON_JUMP},
+	{"id": &"crouch", "label": "DUCK", "offset": Vector2(50, 450), "radius": 30.0, "hold": DotFpsCommand.BUTTON_CROUCH},
+	{"id": &"reload", "label": "R", "offset": Vector2(135, 435), "radius": 30.0},
+	{"id": &"next", "label": "NEXT", "offset": Vector2(225, 385), "radius": 30.0},
+	{"id": &"use", "label": "USE", "offset": Vector2(225, 490), "radius": 30.0},
+	{"id": &"heal", "label": "HEAL", "offset": Vector2(60, 550), "radius": 26.0},
+]
+
 ## How far left of the right edge the HUD's weight readout moves, in HUD units, to clear the cluster.
 const WEIGHT_SHIFT := 410.0
+
+## The button layout for a screen of [param size]: portrait gets the compact arc.
+static func layout_for(size: Vector2) -> Array[Dictionary]:
+	return LAYOUT_PORTRAIT if size.y > size.x else LAYOUT
+
+
+## How far the weight readout moves left on a screen of [param size]; none in portrait, where the cluster sits above it.
+static func weight_shift_for(size: Vector2) -> float:
+	return 0.0 if size.y > size.x else WEIGHT_SHIFT
+
 
 ## Aim assist's candidates: within this many degrees of the crosshair and metres, each checked for a wall.
 const ASSIST_CONE_DEG := 10.0
@@ -36,6 +58,17 @@ var buttons: DotTouchButtons:
 		return controls.buttons if controls != null else null
 
 var _client: Node = null
+var _host: Control = null
+
+
+## The layout for the host's current screen.
+func layout() -> Array[Dictionary]:
+	return layout_for(_host.get_viewport_rect().size) if _host != null and _host.is_inside_tree() else LAYOUT
+
+
+## The weight readout's shift for the host's current screen.
+func weight_shift() -> float:
+	return weight_shift_for(_host.get_viewport_rect().size) if _host != null and _host.is_inside_tree() else WEIGHT_SHIFT
 
 
 ## Builds the overlay under [param host] (the HUD), following [param rules] (the server's). Never null.
@@ -47,6 +80,7 @@ static func build(client: Node, host: Control, sampler: DotFpsSampler, rules: Do
 
 func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobileRules, menu_button: Control) -> void:
 	_client = client
+	_host = host
 	controls = DotMobileControls.new()
 	controls.name = "TouchControls"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -55,7 +89,7 @@ func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobil
 	if menu_button != null:
 		controls.ignore_fn = func(at: Vector2) -> bool:
 			return menu_button.visible and menu_button.get_global_rect().has_point(at)
-	controls.setup(sampler, LAYOUT)
+	controls.setup(sampler, layout())
 	controls.crosshair_fn = _crosshair
 	controls.targets_fn = _assist_targets
 	controls.eye_fn = _eye
@@ -65,7 +99,7 @@ func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobil
 ## Hands the overlay the sampler now in use (offline, the player's own; online, the client's), sized to [param width].
 func attach(sampler: DotFpsSampler, _width: float = 0.0) -> void:
 	if controls != null and sampler != null:
-		controls.setup(sampler, LAYOUT)
+		controls.setup(sampler, layout())
 
 
 ## A declared button held by a thumb, or Fire held by auto-fire.
