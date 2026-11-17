@@ -529,11 +529,11 @@ func _pace_to_ground() -> void:
 	var clip := _want_clip
 	_paced = false
 	if clip == &"walk" or clip == &"run" or clip == &"run_arms" or clip == &"crawl":
-		var natural := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}[clip] as float
+		var natural := float(NATURAL_PACE[clip])
 		natural *= float(_look["height"]) / 1.75
 		if _speed > 0.2 and _want_rate > 0.0:
 			if clip == &"walk" and _gait == GAIT_SHAMBLE:
-				var sh := shamble_numbers(_look)
+				var sh := _shamble_of()
 				# A planted foot must stand still on the ground, so stride times rate equals the ground speed:
 				# short steps are taken quicker, and the stride lengthens where the rate would pass its cap.
 				natural = 1.8 * float(_look["height"]) / 1.75 if _ual else natural
@@ -752,14 +752,30 @@ func _lift_pelvis(up: Vector3) -> void:
 	var above := _skeleton.get_bone_parent(pelvis)
 	var base := _skeleton.get_bone_rest(pelvis).origin
 	var playing := _anim.get_animation(_qualified(_clip)) if _anim != null and _anim.has_animation(_qualified(_clip)) else null
-	var suffix := ":" + _skeleton.get_bone_name(pelvis)
-	for t in (playing.get_track_count() if playing != null else 0):
-		if playing.track_get_type(t) == Animation.TYPE_POSITION_3D and String(playing.track_get_path(t)).ends_with(suffix):
+	if playing != null:
+		var t := pelvis_track(playing, _skeleton.get_bone_name(pelvis))
+		if t >= 0:
 			base = playing.position_track_interpolate(t, _anim.current_animation_position)
-			break
 	if above >= 0:
 		up = DotHumanoidIk.global_pose(_skeleton, above).basis.inverse() * up
 	_skeleton.set_bone_pose_position(pelvis, base + up)
+
+
+## The position track of [param bone] in [param clip], or -1: found once per clip and bone, since
+## scanning a clip's tracks by path on every posed frame was much of a shambling body's pose cost.
+static func pelvis_track(clip: Animation, bone: String) -> int:
+	var by_bone: Dictionary = _pelvis_tracks.get(clip, {})
+	if by_bone.has(bone):
+		return int(by_bone[bone])
+	var found := -1
+	var suffix := ":" + bone
+	for t in clip.get_track_count():
+		if clip.track_get_type(t) == Animation.TYPE_POSITION_3D and String(clip.track_get_path(t)).ends_with(suffix):
+			found = t
+			break
+	by_bone[bone] = found
+	_pelvis_tracks[clip] = by_bone
+	return found
 
 
 ## A standing clip's legs: the bone the thighs hang from back on the clip's key (or rest), then
@@ -823,6 +839,14 @@ static func shamble_numbers(look: Dictionary) -> Dictionary:
 	return out
 
 
+## [method shamble_numbers] of this body's look, worked out again only when the look changes.
+func _shamble_of() -> Dictionary:
+	if not is_same(_shamble_src, _look):
+		_shamble_src = _look
+		_shamble_n = shamble_numbers(_look)
+	return _shamble_n
+
+
 ## Pulls a limb bone's pose back toward its rest by [param keep] (1 leaves the clip's swing alone).
 func _damp(bone: String, keep: float) -> void:
 	var index: int = _limbs.get(bone, -1)
@@ -842,6 +866,11 @@ func _pitch_limb(bone: String, angle: float) -> void:
 ## The shamble over the walk clip: stooped, head hung and lolling, short uneven steps with one foot
 ## dragged, the torso and hips rolling with each step. Numbers are per look ([constant SHAMBLE]).
 var _ual := false
+## [method shamble_numbers] of the look [member _shamble_src], kept while the look is the same one.
+var _shamble_n: Dictionary = SHAMBLE
+var _shamble_src: Variant = null
+## Metres a second each paced clip covers at rate 1 for a 1.75 m body.
+const NATURAL_PACE := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.2}
 ## The clip's rate was set from the ground speed this frame (_pace_to_ground), so a planted foot stands still.
 var _paced := false
 var _hit_left := 0.0
@@ -854,7 +883,7 @@ var _stride := 0.4
 
 func _pose_shamble() -> void:
 	var k := _shamble
-	var n := shamble_numbers(_look)
+	var n := _shamble_of()
 	var length := maxf(_anim.current_animation_length, 0.01) if _anim != null else 1.0
 	var phase := (_anim.current_animation_position / length) if _anim != null else 0.0
 	var roll := sin(phase * TAU)

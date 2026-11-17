@@ -341,6 +341,8 @@ var _death_from: Transform3D = Transform3D.IDENTITY
 
 static var _scenes: Dictionary = {}
 static var _libraries: Dictionary = {}
+## Per clip, per bone name: its position track ([method pelvis_track]).
+static var _pelvis_tracks: Dictionary = {}
 ## Per-kind bruises and sores on the specials' flat skin (`zz_zombie_detail`; 0 draws the plain look).
 static var detail := true
 ## Which standing swing the commons use (`zz_attack_anim`): 0 a mix by body, 1 always the swipe, 2 always the grapple.
