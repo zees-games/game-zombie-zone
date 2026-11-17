@@ -184,18 +184,7 @@ func _test_graph() -> void:
 	_check(DotNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
 	_check_cache_key()
 
-	# The grid thinning of spawn points keeps what the director's own loop keeps, in its order.
-	var cloud := DotNpcNavData.new()
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	for _i in 900:
-		var _p := cloud.add_point(Vector3(rng.randf_range(0.0, 60.0), rng.randf_range(0.0, 6.0), rng.randf_range(0.0, 60.0)))
-	var director := DotNpcDirector.new()
-	var _n := director.set_spawn_points_from_nav(cloud, 6.0, null)
-	var thinned := ZzNpcs.thinned_points(cloud, 6.0, null)
-	var expected := director.spawn_points
-	director.free()
-	_check(thinned.size() > 10 and thinned == expected, "thinned spawn points equal the director's", "%d vs %d" % [thinned.size(), expected.size()])
+	_check_thinned_spawns()
 
 	var graph := ZzNavGraph.new()
 	var built := graph.rebuild(data)
@@ -224,24 +213,7 @@ func _test_graph() -> void:
 	_check(not graph.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
 		"and is taken, both ways, when they do")
 	graph.allow_climb = false
-
-	# A ladder is a two-way link: up the rungs as well as down, while zz_zombie_ladder_speed is over 0.
-	var ladder := ZzNavGraph.new()
-	var _rebuilt := ladder.rebuild(data)
-	ladder.add_ladder(low[1], high[1])
-	ladder.relabel()
-	var rungs_up := ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5)
-	var rungs_down := ladder.find_path(Vector3(0.0, 3.0, 0.0), Vector3(2.0, 0.0, 6.0), 0.5)
-	_check(not rungs_up.is_empty() and not rungs_down.is_empty(), "a zombie climbs a ladder up and down",
-		"%d up, %d down" % [rungs_up.size(), rungs_down.size()])
-	var standing := ladder.filter
-	ladder.filter = ladder.bot_filter
-	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
-		"a stand-in's search leaves the ladder to its own climbing")
-	ladder.filter = standing
-	ladder.allow_ladders = false
-	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
-		"and with zz_zombie_ladder_speed 0 the ladder is off the graph")
+	_check_ladder_link(data, low, high)
 	_check_one_way()
 	_finished()
 
@@ -258,60 +230,6 @@ func _check_cache_key() -> void:
 	_check(ZzNpcs.digest_of(keyed) != ZzNpcs.digest_of(fewer), "a change of the colliding world hulls is another cache")
 	_check(ZzNpcs.digest_of(keyed) != ZzNpcs.digest_of(no_prop), "and so is a change of the solid props")
 
-
-## The pieces are a zombie's, and a zombie's edges are one way. [method _test_graph]'s graph numbers its high floor first,
-## the one order a forward flood labels right; Roy Highway's deck was numbered after the street and its two zombie
-## spawns were refused the way down they had.
-func _check_one_way() -> void:
-	var late := DotNpcNavData.new()
-	late.map_id = &"late_test"
-	late.source_digest = "test"
-	late.grid_spacing = 1.0
-	var foot := PackedInt32Array()
-	var top := PackedInt32Array()
-	var roof := PackedInt32Array()
-
-	for i in 3:
-		foot.append(late.add_point(Vector3(float(i), 0.0, 6.0)))
-
-	for i in 3:
-		top.append(late.add_point(Vector3(float(i), 3.0, 0.0)))
-
-	for i in 2:
-		roof.append(late.add_point(Vector3(float(i), 6.0, -6.0)))
-
-	for i in 2:
-		var _c := late.connect_points(foot[i], foot[i + 1])
-		var _d := late.connect_points(top[i], top[i + 1])
-
-	var _e := late.connect_points(roof[0], roof[1])
-	# A plain edge 3 m high: the importer's link down a ledge, which a zombie takes down only.
-	var _f := late.connect_points(top[2], foot[0])
-	var one_way := ZzNavGraph.new()
-	var late_built := one_way.rebuild(late)
-	_check(late_built.ok, "the late graph builds", "" if late_built.ok else late_built.error.message)
-	_check(not one_way.find_path(Vector3(0.0, 3.0, 0.0), Vector3(2.0, 0.0, 6.0), 0.5).is_empty(),
-		"a zombie walks down a ledge whose top is numbered after its foot")
-	_check(one_way.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(), "and still not up it")
-	_check(one_way.connected(top[0], foot[2]) and not one_way.connected(foot[2], top[0]),
-		"the pieces say the same: the top reaches the foot, the foot not the top")
-	var short := one_way.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5, true)
-	_check(one_way.last_partial and short.size() >= 2 and short[short.size() - 1].distance_to(Vector3(0.0, 0.0, 6.0)) < 0.1,
-		"a partial path up it ends at the foot of the ledge", str(short))
-
-	one_way.add_drop(roof[1], top[0])
-	one_way.relabel()
-	_check(one_way.connected(roof[0], foot[2]) and not one_way.connected(top[0], roof[0]),
-		"a drop numbered last reaches through two pieces, and nothing reaches back up it")
-	_check(not one_way.find_path(Vector3(0.0, 6.0, -6.0), Vector3(2.0, 0.0, 6.0), 0.5).is_empty(),
-		"and the zombie on the roof walks all the way down")
-
-	one_way.allow_climb = true
-	_check(one_way.connected(foot[2], top[0]) and not one_way.connected(foot[2], roof[0]),
-		"with climbing on the ledge is one piece again, at once; a drop still is not a way up")
-
-
-# Exodus
 
 func _test_exodus() -> void:
 	_section("an exodus map keeps its stand-ins and its follow-the-leader")

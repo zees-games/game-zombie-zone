@@ -150,6 +150,8 @@ func _test_rejoin() -> void:
 	_check(after == 5.0, "a flush after the rejoin adds only the new session", str(after))
 	var _w3: DotResult = await tracker.flush()
 	_check((await tracker.store.values_for(key)).value.get_value(heads) == 5.0, "a second flush adds nothing")
+	# The file store writes once per flush on a worker; finish() is the write a fresh process would find.
+	tracker.store.finish()
 	var reread := DotStatsStoreFile.new(path)
 	reread.schema = tracker.schema
 	_check((await reread.values_for(key)).value.get_value(heads) == 5.0, "the file holds the same total for a fresh process")

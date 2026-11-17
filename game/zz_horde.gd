@@ -1,5 +1,8 @@
 extends "zz_horde_base.gd"
 
+const ZzBrainsFeed := preload("zz_brains_feed.gd")
+const ZzZombieHitboxes := preload("zz_zombie_hitboxes.gd")
+
 func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game = p_game
 	config = p_config
@@ -169,7 +172,7 @@ func _adopt_links(graph: ZzNavGraph) -> void:
 
 	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
 	graph.allow_ladders = config.zombie_ladder_speed > 0.0
-	var _rungs := graph.apply_ladders(_ladders())
+	var _rungs := graph.apply_ladders(ladders())
 	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():
@@ -824,33 +827,7 @@ func survivor_ids() -> Array[StringName]:
 ## The native brains' survivor table and chase rules for this tick, off [code]_survivors[/code] and the boxes: what
 ## `zz_common_brain.gd`'s `_chase_plan` reads instead of quarry, survivor_position, survivor_is and common_chase_speed.
 func _feed_brains() -> void:
-	brains_now = brains_native
-	brains_crowd = crowd if brains_native != null and crowd_native else null
-	brains_steer = brains_native if brains_native != null and brains_native.has_method(&"steer_step") else null
-
-	if brains_native == null:
-		return
-
-	_brain_ids.clear()
-	_brain_at.clear()
-	_brain_flags.clear()
-
-	for id: StringName in _survivors:
-		var facts: Dictionary = _survivors[id]
-		_brain_ids.append(id)
-		_brain_at.append(facts["position"])
-		_brain_flags.append((1 if bool(facts["alive"]) else 0) | (2 if bool(facts.get("down", false)) else 0))
-
-	if not bool(brains_native.call(&"set_survivors", _brain_ids, _brain_at, _brain_flags)):
-		brains_now = null
-		brains_steer = null
-		return
-
-	var stacks := hard_stacks()
-	var angry: bool = game != null and game.boxes != null and game.boxes.is_active(&"angry")
-	var down_attack: bool = game != null and bool(game.config.down_attack)
-	brains_native.call(&"set_rules", ZzNpcs.common_chase_speed(config, stacks, false),
-		ZzNpcs.common_chase_speed(config, stacks, true), angry, config.angry_runner_fraction, down_attack)
+	ZzBrainsFeed.feed(self)
 
 ## One native answer checked against the script ([member brains_verify]).
 func brains_tally(same: bool) -> void:
@@ -1193,71 +1170,11 @@ func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
 	return out
 
 ## The map's ladder brushes (boxes, metres), empty without a map.
-func _ladders() -> Array[AABB]:
+func ladders() -> Array[AABB]:
 	if game != null and game.map != null and game.map.mechanics != null:
 		return game.map.mechanics.ladder_boxes()
 
 	return [] as Array[AABB]
-
-
-## How far a body's centre may stand off a ladder's box (beside it, metres) and climb it: a brute's radius and a bit.
-const LADDER_TOUCH := 1.0
-
-## How far off a ladder (flat, metres) a zombie whose next corner is above makes for the ladder first: the graph joins a
-## ladder to points this far from it (`ZzNavGraph.LADDER_COLUMN`).
-const LADDER_APPROACH := 3.0
-
-## How far above a ladder's top a zombie climbs to reach the corner it is going to: the lip of the deck a short ladder
-## stops under, which a player jumps the last of.
-const LADDER_OVER := 1.6
-
-## The ladder (an index into the map's ladder boxes) a zombie at [param here] whose next corner is [param goal] goes up:
-## within [constant LADDER_APPROACH] of it, between its foot and its top, with the corner over a step above. -1 for none,
-## and always with ladders off (`zz_zombie_ladder_speed` 0).
-func ladder_for(here: Vector3, goal: Vector3) -> int:
-	if config.zombie_ladder_speed <= 0.0 or goal == Vector3.INF or goal.y - here.y <= ZzZombieBody.STEP_UP:
-		return -1
-
-	var boxes := _ladders()
-	var best := -1
-	var nearest := INF
-
-	for i in boxes.size():
-		var box := boxes[i]
-
-		if here.y < box.position.y - 1.0 or here.y > box.end.y:
-			continue
-
-		var off := _flat_off(box, here)
-
-		if off <= LADDER_APPROACH and off < nearest:
-			nearest = off
-			best = i
-
-	return best
-
-
-## The ladder box [param index] of [method ladder_for].
-func ladder_box(index: int) -> AABB:
-	return _ladders()[index]
-
-
-## Whether a body at [param here] is close enough to ladder [param index] to climb it.
-func on_ladder(index: int, here: Vector3) -> bool:
-	return _flat_off(_ladders()[index], here) <= LADDER_TOUCH
-
-
-## The height a zombie on ladder [param index] climbs to for its next corner [param goal]: the corner's, no higher than
-## [constant LADDER_OVER] over the ladder's top.
-func ladder_top(index: int, goal: Vector3) -> float:
-	return minf(goal.y + 0.1, _ladders()[index].end.y + LADDER_OVER)
-
-
-## Flat metres from [param box] to [param p] (0 inside it).
-static func _flat_off(box: AABB, p: Vector3) -> float:
-	var dx := maxf(maxf(box.position.x - p.x, p.x - box.end.x), 0.0)
-	var dz := maxf(maxf(box.position.z - p.z, p.z - box.end.z), 0.0)
-	return Vector2(dx, dz).length()
 
 
 ## Metres a second a zombie climbs a ladder (`zz_zombie_ladder_speed`).
@@ -2202,58 +2119,6 @@ static func is_npc_entity(entity_id: int) -> bool:
 func npc_for_entity(entity_id: int) -> DotNpcInstance:
 	return _by_entity.get(entity_id)
 
-## A zombie's hitboxes: head, body, stomach and, on a riot zombie, its shield.
-func _hitbox_set(def: DotNpcDef, height: float, radius: float) -> DotHitboxSet:
-	var set_node := DotHitboxSet.new()
-	set_node.name = "Hitboxes"
-	set_node.bounds_offset = Vector3(0.0, height * 0.5, 0.0)
-	set_node.bounds_radius = height
-
-	var head := DotHitbox.new()
-	head.name = "Head"
-	head.group = DotHitGroup.HEAD
-	head.shape = DotHitbox.Shape.SPHERE
-	head.radius = clampf(radius * 0.7, 0.18, 0.4)
-	head.position = Vector3(0.0, height - head.radius * 1.1, 0.0)
-	head.precedence = 10
-	set_node.add_child(head)
-
-	var chest := DotHitbox.new()
-	chest.name = "Body"
-	chest.group = DotHitGroup.CHEST
-	chest.shape = DotHitbox.Shape.CAPSULE
-	chest.radius = radius + 0.06
-	chest.height = height * 0.82
-	chest.position = Vector3(0.0, height * 0.41, 0.0)
-	set_node.add_child(chest)
-
-	# The belly is a zone of its own (dot-combat's stomach), a band of the body that wins over the
-	# capsule; with mp_hitzones 0 the resolver folds it into chest, so damage is unchanged.
-	var stomach := DotHitbox.new()
-	stomach.name = "Stomach"
-	stomach.group = DotHitGroup.STOMACH
-	stomach.shape = DotHitbox.Shape.BOX
-	stomach.half_extents = Vector3(radius + 0.06, height * (ZzZombieLimbs.STOMACH_TOP - ZzZombieLimbs.STOMACH_BOTTOM) * 0.5, radius + 0.06)
-	stomach.position = Vector3(0.0, height * (ZzZombieLimbs.STOMACH_TOP + ZzZombieLimbs.STOMACH_BOTTOM) * 0.5, 0.0)
-	stomach.precedence = 5
-	set_node.add_child(stomach)
-
-	# A riot zombie's shield: a hitbox of its own in front of it, nearer the gun than its body,
-	# so a frontal shot stops there (nearest entry wins in dot-combat) and does `shield` of its
-	# damage. From the side or behind, the body is nearer and takes it all.
-	if def.meta.has("shield"):
-		var shield := DotHitbox.new()
-		shield.name = "Shield"
-		shield.group = DotHitGroup.CHEST
-		shield.shape = DotHitbox.Shape.BOX
-		shield.half_extents = Vector3(0.36, height * 0.3, 0.05)
-		shield.position = Vector3(0.0, height * 0.5, -(radius + 0.16))
-		shield.damage_scale = clampf(float(def.meta["shield"]), 0.0, 1.0)
-		shield.precedence = 20
-		set_node.add_child(shield)
-
-	return set_node
-
 ## Hitboxes and health, sized to the kind: a head a headshot can find, a body.
 func _register_combat(npc: DotNpcInstance) -> void:
 	var opened: DotResult = game.entities.open(
@@ -2285,7 +2150,7 @@ func _register_combat(npc: DotNpcInstance) -> void:
 	health.reset(game.current_tick())
 	npc.health = health.health
 
-	var set_node := _hitbox_set(def, height, radius)
+	var set_node := ZzZombieHitboxes.build(def, height, radius)
 	npc.node.add_child(set_node)
 	# Not optional: a set gathers its boxes on refresh, and one never refreshed has none — a
 	# zombie every shot passed through, stopped instead by its own movement capsule.

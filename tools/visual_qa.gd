@@ -138,14 +138,15 @@ func _process(_delta: float) -> bool:
 		return _done
 	if not _zombies.is_empty():
 		_started = true
-		_run_zombies()
+		# One-shot start of the QA coroutine, not per-frame work: deferred so it runs once, outside the frame path.
+		_run_zombies.call_deferred()
 		return false
 	_game = _client.get("game")
 	_local = _client.get("player")
 	if _game == null or _local == null or int(_game.get("phase")) == 0:
 		return false
 	_started = true
-	_run_survivor()
+	_run_survivor.call_deferred()
 	return false
 
 

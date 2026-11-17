@@ -166,6 +166,30 @@ func _job_for(game: Node, doc: Dictionary) -> Object:
 	return ZzNpcs.nav_job(doc, props_size, game.horde.open_gates, blockers, false, false)
 
 
+## Each graph point's label: the first point of its connected piece, counting only points inside the swept area.
+func _piece_labels(data: DotNpcNavData, graph: DotNpcNavGraph, lo: Vector3, hi: Vector3) -> Array[int]:
+	var label: Array[int] = []
+	label.resize(data.point_count())
+	var local: Array[int] = []
+
+	for i in data.point_count():
+		label[i] = i
+		var p := data.points[i]
+
+		if _area.size() != 4 or (p.x >= lo.x - 2.0 and p.x <= hi.x + 2.0 and p.z >= lo.z - 2.0 and p.z <= hi.z + 2.0):
+			local.append(i)
+
+	for n in local.size():
+		var i := local[n]
+
+		for m in n:
+			if graph.connected(local[m], i):
+				label[i] = label[local[m]]
+				break
+
+	return label
+
+
 ## `gap x y z piece`: a standing spot of the physics world with no graph point within 0.8 m across and 0.6 m up; piece is the nearest graph point's piece within 2 m, else -1.
 func _list_gaps(game: Node) -> void:
 	var data: DotNpcNavData = game.horde.spawner.nav.data
@@ -190,25 +214,7 @@ func _list_gaps(game: Node) -> void:
 		hi.x = _area[2]
 		hi.z = _area[3]
 
-	var label: Array[int] = []
-	label.resize(data.point_count())
-	var local: Array[int] = []
-
-	for i in data.point_count():
-		label[i] = i
-		var p := data.points[i]
-
-		if _area.size() != 4 or (p.x >= lo.x - 2.0 and p.x <= hi.x + 2.0 and p.z >= lo.z - 2.0 and p.z <= hi.z + 2.0):
-			local.append(i)
-
-	for n in local.size():
-		var i := local[n]
-
-		for m in n:
-			if graph.connected(local[m], i):
-				label[i] = label[local[m]]
-				break
-
+	var label := _piece_labels(data, graph, lo, hi)
 	var count := 0
 	var x := lo.x
 

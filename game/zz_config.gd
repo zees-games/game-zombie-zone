@@ -1,5 +1,7 @@
 extends "zz_config_base.gd"
 
+const ZzConfigText := preload("zz_config_text.gd")
+
 @export_group("The survivors")
 
 @export_range(1.0, 400.0, 1.0, "or_greater") var max_health: float = 100.0
@@ -815,19 +817,7 @@ func difficulty_name() -> String:
 
 
 func describe() -> Dictionary:
-	return {
-		"difficulty": difficulty_name(),
-		"horde": "%d + %d/survivor, mobs every %.0f..%.0f s" % [commons_base, commons_per_survivor,
-			mob_interval_min, mob_interval_max],
-		"specials": "%d + 1 per %.1f survivors, every %.0f..%.0f s" % [specials_base, survivors_per_special,
-			special_interval_min, special_interval_max],
-		"downs": "%d, then death; rescue %s; crawl %s" % [max_incaps, "off" if rescue_seconds <= 0.0 else "%.0f s" % rescue_seconds,
-			"off" if downed_crawl_speed <= 0.0 else "%.1f m/s" % downed_crawl_speed],
-		"boxes": "off" if not boxes_enabled else "%.1f%% common, %.0f%% special" % [box_drop_common * 100.0, box_drop_special * 100.0],
-		"maps": "all" if map_ids.is_empty() else ",".join(map_ids),
-		"bots": "%d%s" % [minimum_players, ", or the map's team" if team_from_map else ""],
-		"survival": survival_description(),
-	}
+	return ZzConfigText.describe(self)
 
 
 func describe_lines(_redact_sensitive: bool = true) -> PackedStringArray:

@@ -97,19 +97,7 @@ func _run() -> void:
 
 	_entered += 1
 	print("seeded worlds, the native steer against the script's")
-	var steers := {"bad": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
-	var tp := {"bad": 0, "n": 0}
-	for s in SEEDS:
-		_turn_probe(s, tp)
-	_check(tp["bad"] == 0, "the native turn_view is the character's to the bit, overshoot and its decay included",
-		"%d of %d differ" % [tp["bad"], tp["n"]])
-	for s in SEEDS:
-		_steers(s, steers)
-	_check(steers["bad"] == 0, "every native steer leaves the body, the turn, the cruise and the watch as the script's",
-		"%d of %d differ" % [steers["bad"], steers["steered"] + steers["still"]])
-	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
-			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
-		"the steers turned, overshot, stood still, reset their watch, got stuck and went rough", str(steers))
+	_check_steers()
 	_finished += 1
 
 	_entered += 1
@@ -457,6 +445,23 @@ func _put_state(brain: Object, st: Array) -> void:
 		brain.path.rough_until = st[10]
 
 
+## The native steer against the script's over seeded worlds, and the native turn_view beside it.
+func _check_steers() -> void:
+	var steers := {"bad": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
+	var tp := {"bad": 0, "n": 0}
+	for s in SEEDS:
+		_turn_probe(s, tp)
+	_check(tp["bad"] == 0, "the native turn_view is the character's to the bit, overshoot and its decay included",
+		"%d of %d differ" % [tp["bad"], tp["n"]])
+	for s in SEEDS:
+		_steers(s, steers)
+	_check(steers["bad"] == 0, "every native steer leaves the body, the turn, the cruise and the watch as the script's",
+		"%d of %d differ" % [steers["bad"], steers["steered"] + steers["still"]])
+	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
+			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
+		"the steers turned, overshot, stood still, reset their watch, got stuck and went rough", str(steers))
+
+
 ## Each common steered twice from the same state, once through [code]steer_step[/code] (applied) and once through
 ## the script's own steer, with characters of every tuning, turns half done, bodies stacked or at their goal, and
 ## watches fresh, moving, stale and stuck.
@@ -473,17 +478,7 @@ func _steers(s: int, steers: Dictionary) -> void:
 	h.crowd = grid
 	h.crowd_native = true
 	var ctx := DotNpcAiContext.new()
-	for brain: Object in commons:
-		var c := DotNpcAiCharacter.new()
-		c.seed_value = rng.randi()
-		c.view_turn_deg = rng.randf_range(30.0, 1440.0)
-		c.view_factor = rng.randf_range(0.05, 1.0)
-		c.overshoot = [0.0, 0.4, rng.randf()][rng.randi() % 3]
-		brain.character = c
-		brain.context = ctx
-		brain.stuck_seconds = rng.randf_range(0.5, 2.0)
-		if rng.randf() < 0.5:
-			brain.path = DotNpcPath.new()
+	_tune_characters(rng, commons, ctx)
 	for p in PASSES:
 		var ids := PackedInt64Array()
 		var at := PackedVector3Array()
@@ -500,33 +495,10 @@ func _steers(s: int, steers: Dictionary) -> void:
 		ctx.delta = [0.0, 1.0 / 60.0, rng.randf_range(0.001, 0.25)][rng.randi() % 3]
 		ctx.now = 10.0 * p + rng.randf_range(0.0, 5.0)
 		for brain: Object in commons:
-			var here: Vector3 = brain.npc.position()
-			var to := Vector3(rng.randf_range(-30, 30), rng.randf_range(-1, 2), rng.randf_range(-30, 30))
-			match rng.randi() % 10:
-				0:
-					to = here
-				1:
-					to = here + Vector3(rng.randf_range(-1.5, 1.5), 0.0, rng.randf_range(-1.5, 1.5))
-			brain._facing_at_tick = [Vector3.ZERO, (brain.npc.node as Node3D).global_transform.basis.z,
-				Vector3(rng.randf_range(-1, 1), 0.0, rng.randf_range(-1, 1))][rng.randi() % 3]
-			var c: DotNpcAiCharacter = brain.character
-			c._peak_turn = [0.0, rng.randf_range(0.0, PI)][rng.randi() % 2]
-			c._turns = rng.randi_range(0, 9)
-			c._over_amt = [0.0, rng.randf_range(-0.3, 0.3)][rng.randi() % 2]
-			match rng.randi() % 4:
-				0:
-					brain._progress_at = Vector3.INF
-				1:
-					brain._progress_at = here + Vector3(rng.randf_range(-0.4, 0.4), 0.0, rng.randf_range(-0.4, 0.4))
-					brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
-				2:
-					brain._progress_at = here + Vector3(rng.randf_range(-3, 3), 0.0, rng.randf_range(-3, 3))
-					brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
-				3:
-					brain._progress_at = here
-					brain._progress_since = ctx.now - 10.0
-			var spacing: float = [1.1, 1.6, rng.randf_range(0.3, 3.0)][rng.randi() % 3]
-			var speed := rng.randf_range(0.5, 8.0)
+			var kase := _steer_case(rng, brain, ctx)
+			var to: Vector3 = kase[0]
+			var spacing: float = kase[1]
+			var speed: float = kase[2]
 			var before := _steer_state(brain)
 			# Both steers start from a transform just set: look_at keeps the body's scale through get_scale, which a
 			# set transform answers from the basis and a set rotation from its cache, an ulp apart.
@@ -549,20 +521,72 @@ func _steers(s: int, steers: Dictionary) -> void:
 					for i in script.size():
 						if script[i] != native[i]:
 							print("  differ at %d: script %s native %s" % [i, var_to_str(script[i]), var_to_str(native[i])])
-			if script[1] == before[1] and script[0] == before[0]:
-				steers["still"] += 1
-			else:
-				steers["steered"] += 1
-			if script[2] != before[2] or script[5] != before[5]:
-				steers["turned"] += 1
-			if script[3] != 0.0 and script[3] != before[3]:
-				steers["overshot"] += 1
-			if script[9] != before[9]:
-				steers["reset"] += 1
-			if script[10] != before[10]:
-				steers["rough"] += 1
-			elif before[8] != Vector3.INF and script[9] == before[9] and ctx.now - before[9] >= brain.stuck_seconds:
-				steers["stuck"] += 1
+			_tally_steer(steers, brain, ctx, before, script)
+
+
+## Each common's character, tuned at random and given a path or not.
+func _tune_characters(rng: RandomNumberGenerator, commons: Array, ctx: DotNpcAiContext) -> void:
+	for brain: Object in commons:
+		var c := DotNpcAiCharacter.new()
+		c.seed_value = rng.randi()
+		c.view_turn_deg = rng.randf_range(30.0, 1440.0)
+		c.view_factor = rng.randf_range(0.05, 1.0)
+		c.overshoot = [0.0, 0.4, rng.randf()][rng.randi() % 3]
+		brain.character = c
+		brain.context = ctx
+		brain.stuck_seconds = rng.randf_range(0.5, 2.0)
+		if rng.randf() < 0.5:
+			brain.path = DotNpcPath.new()
+
+
+## One common's random steer case: its body, character and watch put in a state of the pass; [the goal, spacing, speed].
+func _steer_case(rng: RandomNumberGenerator, brain: Object, ctx: DotNpcAiContext) -> Array:
+	var here: Vector3 = brain.npc.position()
+	var to := Vector3(rng.randf_range(-30, 30), rng.randf_range(-1, 2), rng.randf_range(-30, 30))
+	match rng.randi() % 10:
+		0:
+			to = here
+		1:
+			to = here + Vector3(rng.randf_range(-1.5, 1.5), 0.0, rng.randf_range(-1.5, 1.5))
+	brain._facing_at_tick = [Vector3.ZERO, (brain.npc.node as Node3D).global_transform.basis.z,
+		Vector3(rng.randf_range(-1, 1), 0.0, rng.randf_range(-1, 1))][rng.randi() % 3]
+	var c: DotNpcAiCharacter = brain.character
+	c._peak_turn = [0.0, rng.randf_range(0.0, PI)][rng.randi() % 2]
+	c._turns = rng.randi_range(0, 9)
+	c._over_amt = [0.0, rng.randf_range(-0.3, 0.3)][rng.randi() % 2]
+	match rng.randi() % 4:
+		0:
+			brain._progress_at = Vector3.INF
+		1:
+			brain._progress_at = here + Vector3(rng.randf_range(-0.4, 0.4), 0.0, rng.randf_range(-0.4, 0.4))
+			brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
+		2:
+			brain._progress_at = here + Vector3(rng.randf_range(-3, 3), 0.0, rng.randf_range(-3, 3))
+			brain._progress_since = ctx.now - rng.randf_range(0.0, 4.0)
+		3:
+			brain._progress_at = here
+			brain._progress_since = ctx.now - 10.0
+	var spacing: float = [1.1, 1.6, rng.randf_range(0.3, 3.0)][rng.randi() % 3]
+	var speed := rng.randf_range(0.5, 8.0)
+	return [to, spacing, speed]
+
+
+## Counts what one pair of steers did, by the state the script left.
+func _tally_steer(steers: Dictionary, brain: Object, ctx: DotNpcAiContext, before: Array, script: Array) -> void:
+	if script[1] == before[1] and script[0] == before[0]:
+		steers["still"] += 1
+	else:
+		steers["steered"] += 1
+	if script[2] != before[2] or script[5] != before[5]:
+		steers["turned"] += 1
+	if script[3] != 0.0 and script[3] != before[3]:
+		steers["overshot"] += 1
+	if script[9] != before[9]:
+		steers["reset"] += 1
+	if script[10] != before[10]:
+		steers["rough"] += 1
+	elif before[8] != Vector3.INF and script[9] == before[9] and ctx.now - before[9] >= brain.stuck_seconds:
+		steers["stuck"] += 1
 
 
 ## The horde's [member ZzHorde.brains_verify]: both run, the script's answer is kept, every pair counted.
