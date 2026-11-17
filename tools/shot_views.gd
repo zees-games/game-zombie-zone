@@ -183,8 +183,9 @@ func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
 		waited += 1
 	# 7 m ahead, else to a side or behind, where the graph is: a ship's bow has only sea 7 m ahead.
 	var at: Vector3 = stand
+	var data: DotNpcNavData = game.horde.nav
 	for ahead: Vector3 in [Vector3(0.0, 0.0, -7.0), Vector3(-7.0, 0.0, 0.0), Vector3(7.0, 0.0, 0.0), Vector3(0.0, 0.0, 7.0)]:
-		if game.horde.nav != null and game.horde.nav.data.is_navigable(stand + ahead, 3.0):
+		if data != null and data.is_navigable(stand + ahead, 3.0):
 			at = stand + ahead
 			break
 	at = game.horde.snap_to_nav(at)

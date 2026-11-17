@@ -4,6 +4,8 @@ extends "res://examples/headless_nav_base.gd"
 ## --map=zm_roy_the_ship,zm_roy_highway [--zombies=40] [--seconds=120] [--seed=1]`; exits 1 on a trapped spawn or a stuck one.
 
 ## Within this of its survivor (metres) a zombie has reached it.
+const ZzNavPrune := preload("res://game/zz_nav_prune.gd")
+
 const REACHED := 2.5
 ## Moved less than this (metres) over the last [constant STILL_WINDOW] seconds, away from its survivor: stuck at the end.
 const STILL := 1.0
@@ -60,9 +62,10 @@ func _map(id: StringName) -> void:
 	var nav: ZzNavGraph = game.horde.spawner.nav
 	var doc: Dictionary = game.horde.get(&"_doc")
 	print("== %s: %d graph points, %d ladder boxes, %d ladder links" % [id, nav.data.points.size(), game.horde.ladders().size(), nav.ladder_count])
+	var side: Callable = ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics),
+		game.map.mechanics.walk_through_bodies() if game.map != null and game.map.mechanics != null else ([] as Array[RID]))
 	for box: AABB in game.horde.ladders():
-		print("  ladder foot %s top %.2f, foot->top %s" % [box.get_center() - Vector3(0.0, box.size.y / 2.0, 0.0), box.end.y,
-			_reaches(nav, game.horde.snap_to_nav(box.get_center() - Vector3(0.0, box.size.y / 2.0, 0.0)), game.horde.snap_to_nav(box.get_center() + Vector3(0.0, box.size.y / 2.0, 0.0)))])
+		print("  ladder %s top %.2f: %s" % [box.position, box.end.y, _ladder_ends(nav, box, side)])
 	var spawns: Array = doc.get("zombie_spawns", [])
 	var survivors: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
 	# A trapped zombie spawn reaches no survivor spawn; a cut survivor spawn is one some zombie spawn cannot path to.
@@ -112,6 +115,26 @@ func _map(id: StringName) -> void:
 	meter.freeze()
 	_summarize(id, movers, meter)
 	await _dispose(game)
+
+
+## The foot and head points `ZzNavGraph.apply_ladders` would join for [param box] at each reach, without and with the
+## wall-side test: where a ladder the horde cannot use loses its ends.
+func _ladder_ends(nav: ZzNavGraph, box: AABB, side: Callable) -> String:
+	var mid := box.get_center()
+	var out := PackedStringArray()
+	for reach: float in ZzNavGraph.LADDER_REACHES:
+		for test: Callable in [Callable(), side]:
+			var foot := _end(nav, Vector3(mid.x, box.position.y + 0.1, mid.z), reach, ZzNavGraph.LADDER_HEIGHT, box, test)
+			var head := _end(nav, Vector3(mid.x, box.end.y, mid.z), reach, ZzNavGraph.LADDER_OVER, box, test)
+			out.append("r%.1f%s foot %s head %s" % [reach, "+side" if test.is_valid() else "", nav.data.points[foot] if foot >= 0 else "-",
+				nav.data.points[head] if head >= 0 else "-"])
+	return "; ".join(out)
+
+
+func _end(nav: ZzNavGraph, at: Vector3, reach: float, over: float, box: AABB, side: Callable) -> int:
+	return nav.data.nearest_point_where(at, reach, func(p: int) -> bool:
+		var rise := nav.data.points[p].y - at.y
+		return rise >= -ZzNavGraph.LADDER_HEIGHT and rise <= over and (not side.is_valid() or bool(side.call(box, nav.data.points[p]))))
 
 
 func _reaches(nav: ZzNavGraph, from: Vector3, to: Vector3) -> bool:
