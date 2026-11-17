@@ -148,6 +148,8 @@ Publishing: `tools/publish.sh [--version V | --bump patch] [--site URL --token-f
 
 ## Validating
 
+`tools/check_addons.sh [checkout]` warns when a checkout's `addons/` links or native libraries differ from the `.gitignore` manifest (phantom failures come from a stale main checkout); fix with dot-bootstrap, never by editing it.
+
 ```bash
 ./game.sh test                                          # parse, then every suite
 python3 ../zombie-zone-maps/tools/build_maps.py --check
