@@ -725,7 +725,9 @@ func _accum(key: String, usec: int) -> void:
 	a[1] += 1
 
 
-## DotNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances.
+## DotNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances. With the spawner's
+## think pacing on (dot-npc DotNpcPacing) the counters live in the pacer, not the brains, so the tick is run through
+## it as the spawner runs it and lapped whole ("brain.paced"); per kind only with pacing off.
 func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 	var sample := sp._ticks % 64 == 0
 	var survivors: Array = []
@@ -733,6 +735,15 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 		for p in _game.survivors():
 			if p.is_up():
 				survivors.append(p.global_position)
+	sp._pacing.sync()
+	if sp._pacing.active():
+		var split: Array = []
+		var gathered: Array = []
+		var t0 := Time.get_ticks_usec()
+		sp._pacing.think(delta, split, gathered)
+		if not split.is_empty():
+			sp._decide_and_apply(split, gathered)
+		_accum("brain.paced", Time.get_ticks_usec() - t0)
 	for id in sp._npcs.keys():
 		var found: Variant = sp._npcs.get(id)
 		if not (found is DotNpcInstance):
@@ -740,11 +751,12 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 		var npc: DotNpcInstance = found
 		if not npc.is_alive() or npc.brain == null:
 			continue
-		var t0 := Time.get_ticks_usec()
-		(npc.brain as DotNpcBrain).think(delta)
-		var spent := Time.get_ticks_usec() - t0
-		_accum("brain." + String(npc.def.id), spent)
-		_accum("brain.thought" if int(npc.brain.get(&"_since_thought")) == 0 else "brain.skipped", spent)
+		if not sp._pacing.active():
+			var t0 := Time.get_ticks_usec()
+			(npc.brain as DotNpcBrain).think(delta)
+			var spent := Time.get_ticks_usec() - t0
+			_accum("brain." + String(npc.def.id), spent)
+			_accum("brain.thought" if int(npc.brain.get(&"_since_thought")) == 0 else "brain.skipped", spent)
 		if sample and npc.node is Node3D:
 			var best := INF
 			var at: Vector3 = (npc.node as Node3D).global_position
