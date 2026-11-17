@@ -3,6 +3,7 @@ extends "shot_base.gd"
 ## The shot tool's scripted views: one function per --view that needs more than a camera, split from shot.gd.
 
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
+const ZzPossession := preload("../game/zz_possession.gd")
 
 
 func _view_overview(game: ZzGame, local, stand: Vector3) -> void:
@@ -197,8 +198,11 @@ func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
 		if npc == null or npc.node == null:
 			return null
 		var basis := Basis.from_euler(Vector3(deg_to_rad(look_pitch[0]), deg_to_rad(cmd.yaw), 0.0))
-		cam.track_offset = basis.z * 3.6
-		return npc.position() + Vector3(0.0, 2.1, 0.0)
+		var focus := npc.position() + Vector3(0.0, 2.1, 0.0)
+		var spot := ZzPossession.camera_spot(cam.get_world_3d().direct_space_state, game.world_mask(), focus,
+				focus + basis.z * 3.6, [local.get_rid()])
+		cam.track_offset = spot - focus
+		return focus
 	await _drive_for(game, 0.6)
 	await _save_extra("_a_rest")
 	cmd.yaw = 270.0

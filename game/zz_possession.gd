@@ -93,3 +93,24 @@ func tick(_delta: float) -> void:
 		npc.brain.drive.feed(cmd.move, deg_to_rad(cmd.yaw), buttons)
 		# Up and down is the game's own (DotNpcDrive is flat): a spit or a rock goes where they look.
 		npc.brain.set(&"drive_pitch", deg_to_rad(cmd.pitch))
+
+
+## How far a driven body's camera keeps off a wall it was pulled in by.
+const CAMERA_WALL_MARGIN := 0.3
+
+
+## Where the follow camera of a driven body may sit: `want`, or short of the first wall on the way from
+## `focus` (kept CAMERA_WALL_MARGIN off it), so the lens never ends up inside a hull or a beam.
+static func camera_spot(space: PhysicsDirectSpaceState3D, mask: int, focus: Vector3, want: Vector3, exclude: Array[RID] = []) -> Vector3:
+	if space == null:
+		return want
+
+	var query := PhysicsRayQueryParameters3D.create(focus, want, mask)
+	query.exclude = exclude
+	var hit := space.intersect_ray(query)
+
+	if hit.is_empty():
+		return want
+
+	var room := maxf(0.0, focus.distance_to(hit["position"]) - CAMERA_WALL_MARGIN)
+	return focus + (want - focus).normalized() * room
