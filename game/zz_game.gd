@@ -1117,11 +1117,9 @@ func place_one(player: ZzPlayer) -> void:
 		if buddy != null:
 			player.place_at(buddy.feet() + Vector3(0.6, 0.1, 0.6), buddy.controller.state.yaw)
 		else:
-			var spot := map.spawn("survivors", players.size() - 1)
-			player.place_at(spot[0], spot[1])
+			seat_on_start(player, players.size() - 1)
 	else:
-		var spot := map.spawn("survivors", players.size() - 1)
-		player.place_at(spot[0], spot[1])
+		seat_on_start(player, players.size() - 1)
 
 	if authoritative:
 		assign_class(player)
@@ -1655,15 +1653,35 @@ func _place_everybody() -> void:
 			player.health.invulnerable = false
 
 		player.fit_hitboxes()
-		var spot := map.spawn("survivors", seat)
+		seat_on_start(player, seat)
 		seat += 1
-		player.place_at(spot[0], spot[1])
 
 		if authoritative:
 			_equip(player, true)
 
 		if spectate != null:
 			spectate.on_spawned(player.player_id)
+
+
+## Puts [param player] on survivor start point [param seat]. A join or a module load runs between ticks; on a threaded
+## server ([method ZzMap.space_open]) the start point cannot be checked for a prop there, so the check runs first thing in
+## the next tick through [member tick_gate], unless something moved the player meanwhile.
+func seat_on_start(player: ZzPlayer, seat: int) -> void:
+	var spot := map.spawn("survivors", seat)
+	player.place_at(spot[0], spot[1])
+
+	if ZzMap.space_open():
+		return
+
+	var at: Vector3 = spot[0]
+	var yaw: float = spot[1]
+	var placed := player.warps
+	tick_gate.run(func() -> void:
+		if not is_instance_valid(player) or map == null or players.get(player.player_id) != player or player.warps != placed:
+			return
+		var clear := map.clear_spot(at)
+		if clear != at:
+			player.place_at(clear, yaw))
 
 
 ## A survivor's health pool: the game's `max_health` scaled by their class (a class's 100 is the game's).

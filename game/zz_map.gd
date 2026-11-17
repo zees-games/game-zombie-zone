@@ -2005,10 +2005,20 @@ func spawn(side: String, seat: int) -> Array:
 
 	return [clear_spot(at), float(base.get("yaw", 0.0))]
 
+## Whether the physics space answers queries now. Always, unless physics runs on its own thread
+## (`physics/3d/run_on_separate_thread`, dot-server-deploy's `sv_physics_thread`): then only inside the
+## physics step, and a query from a join or a module load gets an engine error and nothing back.
+## Read at startup; a suite sets it to drive the threaded path.
+static var threaded_physics: bool = bool(ProjectSettings.get_setting("physics/3d/run_on_separate_thread", false))
+
+static func space_open() -> bool:
+	return not threaded_physics or Engine.is_in_physics_frame()
+
 ## [param at] if a standing survivor fits there, else the nearest spot within [constant SPAWN_SEARCH] metres where one does and
-## the ground is under it: a converted map's start point can land inside a prop. Unchanged before the map is in a world.
+## the ground is under it: a converted map's start point can land inside a prop. Unchanged before the map is in a world, and
+## off the physics step on a threaded server ([method space_open]), where ZzGame clears it again in the next tick.
 func clear_spot(at: Vector3) -> Vector3:
-	if physics == null or not is_inside_tree():
+	if physics == null or not is_inside_tree() or not space_open():
 		return at
 	var space := get_world_3d().direct_space_state
 	var mask := physics.collision_mask(&"player")

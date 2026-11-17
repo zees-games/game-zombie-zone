@@ -2,6 +2,7 @@ extends DotGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
+const ZzMap := preload("../game/zz_map.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzNetLink := preload("../game/net/zz_net_link.gd")
@@ -17,8 +18,8 @@ const _Probe := preload("dedicated_exit_probe.gd")
 ## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
 ## nothing but the stand-ins the module seats itself.
 
-const SECTIONS := 14
-const CHECKS := 116
+const SECTIONS := 15
+const CHECKS := 120
 
 const SERVER_DIR := "user://zz_dedicated"
 const TICK_RATE := 60
@@ -58,6 +59,7 @@ func _run() -> void:
 		_test_the_commands()
 		await _test_commands_wait_for_the_tick()
 		await _test_a_round_runs()
+		await _test_a_start_point_waits_for_the_tick()
 		# Before the reload section: a reload leaves two links on the server (see the report), and
 		# the live one is then named @Node@n, which no client path reaches.
 		await _test_a_covered_seat_is_not_harmed()
@@ -347,6 +349,40 @@ func _test_commands_wait_for_the_tick() -> void:
 	var ran := await _until(func() -> bool: return gate.pending() == 0, 5.0)
 	_check(ran, "the next tick runs it")
 	_check(_said(_run_command("zz_status"), "zombiezone"), "a command that only reads still answers at once")
+	_finished()
+
+
+## [b]A start point placed between ticks on a threaded server is cleared in the tick[/b]: with
+## `physics/3d/run_on_separate_thread` the space answers only inside the step, so ZzMap.clear_spot
+## skips the prop check from a join or a module load and the world's tick gate runs it next tick.
+## Forced on here; the check itself runs in the real step, threaded or not.
+func _test_a_start_point_waits_for_the_tick() -> void:
+	_section("a start point placed between ticks is checked in the tick")
+	var gate := game.tick_gate
+	var was := ZzMap.threaded_physics
+	ZzMap.threaded_physics = true
+	await get_tree().process_frame
+	var player: ZzPlayer = null
+	for id: StringName in game.players:
+		player = game.players[id]
+		break
+	_check(player != null and not ZzMap.space_open(), "a seated player, between ticks, physics threaded")
+	if player != null:
+		var pending_before := gate.pending()
+		game.seat_on_start(player, 0)
+		_check(gate.pending() == pending_before + 1, "the prop check is queued, not run")
+		# Queued behind it, so it runs in the same step right after: nothing moves in between.
+		var unchecked: Vector3 = game.map.spawn("survivors", 0)[0]
+		var seen := {}
+		gate.run(func() -> void:
+			seen["in_step"] = ZzMap.space_open()
+			seen["want"] = game.map.clear_spot(unchecked)
+			seen["feet"] = player.global_position)
+		var ran := await _until(func() -> bool: return gate.pending() == 0, 5.0)
+		_check(ran and bool(seen.get("in_step", false)), "the next tick runs it, inside the step")
+		_check(seen.has("want") and (seen["feet"] as Vector3).distance_to(seen["want"]) < 0.05,
+			"and the player stands on the cleared start point", str(seen))
+	ZzMap.threaded_physics = was
 	_finished()
 
 
