@@ -9,6 +9,8 @@ const ZzZombieBody := preload("zz_zombie_body.gd")
 const HORDE_META := &"zz_horde"
 
 var _horde: Object = null
+## Whether the horde's dot-sim has [code]steer_walk[/code] (-1 until asked; one library a process).
+static var _steer_walks: int = -1
 
 ## The horde this zombie belongs to. Duck-typed: see `zz_horde.gd`.
 func horde() -> Object:
@@ -101,7 +103,7 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 
 
 ## dot-npc-ai's steer, with everything after the path in one native call when the horde has its brains and
-## crowd grid ([code]DotSimZombieBrains.steer_step[/code]): the spaced heading, the body's wish, the eased turn,
+## crowd grid ([code]DotSimZombieBrains.steer_walk[/code], or [code]steer_step[/code] on a dot-sim without it): the spaced heading, the body's wish, the eased turn,
 ## the look and the progress watch, a dozen script calls apart. The script's own body ([method _steer_rest]) is
 ## the fallback, and under [code]brains_verify[/code] it runs instead and each native answer is checked against it.
 func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
@@ -127,8 +129,18 @@ func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float 
 
 	var now := _world_now()
 	var verify := bool(h.get(&"brains_verify"))
-	var out: PackedFloat64Array = brains.steer_step(grid, npc.instance_id, self, character, b, goal, to,
-		spacing, speed, context.delta, now, not verify)
+
+	if _steer_walks < 0:
+		_steer_walks = 1 if (brains as Object).has_method(&"steer_walk") else 0
+
+	var out: PackedFloat64Array
+	if _steer_walks == 1:
+		# The brain's watch handed in and its writes made here: six fewer member calls across the boundary.
+		out = brains.steer_walk(grid, npc.instance_id, character, b, goal, to, spacing, speed, context.delta,
+			not verify, _facing_at_tick, _progress_at, now - _progress_since, stuck_seconds)
+	else:
+		out = brains.steer_step(grid, npc.instance_id, self, character, b, goal, to,
+			spacing, speed, context.delta, now, not verify)
 
 	if out[0] < 0.0:
 		_steer_rest(goal, to, speed, delta, spacing)
@@ -137,6 +149,13 @@ func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float 
 	if verify:
 		_verify_steer(h, b, out, goal, to, speed, delta, spacing, now)
 		return
+
+	if _steer_walks == 1 and out[0] == 1.0:
+		_cruise_to = goal
+		_cruise_dest = to
+		if out[1] == 1.0:
+			_progress_at = Vector3(out[16], out[17], out[18])
+			_progress_since = now
 
 	if out[1] == 2.0 and path != null and path.has_method(&"go_rough"):
 		path.call(&"go_rough", now, 4.0)

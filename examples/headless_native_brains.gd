@@ -4,6 +4,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzHorde := preload("../game/zz_horde.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const CommonBrain := preload("../npcs/zz_common_brain.gd")
+const ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 
 ## The zombies' brains in dot-sim ([member ZzConfig.native_brains], on by default) decide as the script over seeded
@@ -11,12 +12,12 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## swing lands) under Hard Box stacks, Angry runners, downed, dead and missing survivors, crawlers and burning bodies,
 ## and every zombie's spaced heading off the native crowd, stacked bodies included, all to the bit. The script plan
 ## is checked against the calls it replaced (quarry, survivor_at, _chase_speed, strikes_down) too. The fused steer
-## ([code]steer_step[/code]: the heading, wish, eased turn, look and progress watch) leaves every body, character and
-## brain as the script's steer does, stuck ones and paths gone rough included. Without the library
+## ([code]steer_walk[/code], and [code]steer_step[/code] that reads and writes the brain itself: the heading, wish,
+## eased turn, look and progress watch) leaves every body, character and brain as the script's steer does, stuck ones and paths gone rough included. Without the library
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 6
-const CHECKS := 16
+const CHECKS := 17
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -447,7 +448,7 @@ func _put_state(brain: Object, st: Array) -> void:
 
 ## The native steer against the script's over seeded worlds, and the native turn_view beside it.
 func _check_steers() -> void:
-	var steers := {"bad": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
+	var steers := {"bad": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0}
 	var tp := {"bad": 0, "n": 0}
 	for s in SEEDS:
 		_turn_probe(s, tp)
@@ -457,6 +458,8 @@ func _check_steers() -> void:
 		_steers(s, steers)
 	_check(steers["bad"] == 0, "every native steer leaves the body, the turn, the cruise and the watch as the script's",
 		"%d of %d differ" % [steers["bad"], steers["steered"] + steers["still"]])
+	_check(not ClassDB.class_has_method(NATIVE, &"steer_walk") or steers["walked"] > 3000,
+		"the steers went through steer_walk as well as steer_step", str(steers))
 	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
 			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
 		"the steers turned, overshot, stood still, reset their watch, got stuck and went rough", str(steers))
@@ -506,22 +509,36 @@ func _steers(s: int, steers: Dictionary) -> void:
 			h.brains_crowd = null
 			brain.steer_with_spacing(to, speed, ctx.delta, spacing)
 			var script := _steer_state(brain)
-			_put_state(brain, before)
 			h.brains_crowd = grid
-			var steered: int = h.brains_now.call(&"steered")
-			brain.steer_with_spacing(to, speed, ctx.delta, spacing)
-			var native := _steer_state(brain)
-			if int(h.brains_now.call(&"steered")) == steered:
-				steers["bad"] += 1
-				if steers["bad"] <= 3:
-					print("  the native steer did not run")
-			elif native != script:
-				steers["bad"] += 1
-				if steers["bad"] <= 3:
-					for i in script.size():
-						if script[i] != native[i]:
-							print("  differ at %d: script %s native %s" % [i, var_to_str(script[i]), var_to_str(native[i])])
+			_native_steers(h, brain, before, script, kase, ctx, steers)
 			_tally_steer(steers, brain, ctx, before, script)
+
+
+## One common's native steer from [param before], through [code]steer_walk[/code] when the library has it and
+## [code]steer_step[/code] after it, each against the script's [param script].
+func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase: Array, ctx: DotNpcAiContext,
+		steers: Dictionary) -> void:
+	var walks: Array = [1, 0] if h.brains_now.has_method(&"steer_walk") else [0]
+	for walk: int in walks:
+		_put_state(brain, before)
+		ZombieMove._steer_walks = walk
+		var steered: int = h.brains_now.call(&"steered")
+		brain.steer_with_spacing(kase[0], kase[2], ctx.delta, kase[1])
+		var native := _steer_state(brain)
+		if walk == 1:
+			steers["walked"] += 1
+		if int(h.brains_now.call(&"steered")) == steered:
+			steers["bad"] += 1
+			if steers["bad"] <= 3:
+				print("  the native steer did not run (walk %d)" % walk)
+		elif native != script:
+			steers["bad"] += 1
+			if steers["bad"] <= 3:
+				for i in script.size():
+					if script[i] != native[i]:
+						print("  walk %d differ at %d: script %s native %s" % [walk, i, var_to_str(script[i]),
+							var_to_str(native[i])])
+	ZombieMove._steer_walks = -1
 
 
 ## Each common's character, tuned at random and given a path or not.
