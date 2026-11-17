@@ -234,11 +234,15 @@ func _test_hop_wedge() -> void:
 	_finished()
 
 
-## The ship's lower deck by its ladders and the main deck over them: two floors 5.7 m apart that only the ladders join.
-const LADDER_FOOT := Vector3(-45.5, 4.3, -21.0)
+## The ship's mezzanine (7.92 m, over the aft landing) and the main deck 2.2 m above it, joined only by the hatch ladder
+## at x -47.55. The lower deck is no start: its door aft is 1.6 m high (a common is 1.75 m) and its caged ladders stop
+## under the closed deck, so a common cannot leave it, and a ladder joined through a cage or a deck slab is a graph lie.
+const LADDER_FOOT := Vector3(-50.45, 7.92, -36.45)
 const LADDER_DECK := Vector3(-45.5, 10.0, -21.0)
+## Metres the zombie must rise while climbing: the hatch ladder's 1.95 m less its lip.
+const LADDER_CLIMB := 1.5
 
-## A common on the ship's lower deck, its quarry on the main deck above: it reaches the deck up a ladder
+## A common on the ship's mezzanine, its quarry on the main deck above: it reaches the deck up a ladder
 ## (`zz_zombie_ladder_speed`) instead of standing below forever, which it did while ladders were not on its graph.
 func _test_ladder_climb() -> void:
 	_section("a zombie climbs a ladder to the survivor on the floor above")
@@ -276,25 +280,40 @@ func _test_ladder_climb() -> void:
 	nav.allow_ladders = true
 	nav.filter = saved
 	_check(not with_rungs.is_empty() and not rungs_partial and (without.is_empty() or without_partial),
-		"the zombies' graph goes from the lower deck to the main deck by the ladders, and not without them",
+		"the zombies' graph goes from the mezzanine to the main deck by the ladder, and not without it",
 		"with %d points (partial %s), without %d (partial %s), %d ladder links" % [with_rungs.size(), rungs_partial, without.size(), without_partial, nav.ladder_count])
 	quarry.place_at(LADDER_DECK, 0.0)
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, LADDER_FOOT, &"test")
 	npc.brain.call(&"force_target", &"u200")
 	var highest := LADDER_FOOT.y
 	var closest := INF
+	# Metres risen while the body was climbing (ZzZombieBody.climbing), and every time the unstick watchdog set it down
+	# somewhere else (ZzUnstick relocate or nudge): the deck has to be reached up the ladder. A hop is a common's own
+	# way up a jump-up link (the crate), so it counts as walking.
+	var climbed := 0.0
+	var last_y := LADDER_FOOT.y
+	var rescues := PackedStringArray()
 
-	for step in 80:
-		await _sim(game, 0.5)
+	for step in 160:
+		await _sim(game, 0.25)
 		if not npc.is_alive():
 			break
-		highest = maxf(highest, npc.position().y)
+		var y := npc.position().y
+		var body := npc.brain.call(&"body") as ZzZombieBody
+		if body != null and body.climbing() and y > last_y:
+			climbed += y - last_y
+		last_y = y
+		highest = maxf(highest, y)
+		for line: String in npc.brain.unstick_log:
+			if (line.contains("relocate") or line.contains("nudge")) and not rescues.has(line):
+				rescues.append(line)
 		closest = minf(closest, npc.position().distance_to(quarry.global_position))
 		if closest < 2.5:
 			break
 
-	_check(npc.is_alive() and highest > LADDER_DECK.y - 0.5 and closest < 2.5, "it is on the deck beside the survivor within 40 s",
-		"rose to %.1f m (deck %.1f), closest %.1f m, ladders on the graph %d" % [highest, LADDER_DECK.y, closest, int(game.horde.spawner.nav.get(&"ladder_count"))])
+	_check(npc.is_alive() and highest > LADDER_DECK.y - 0.5 and closest < 2.5 and climbed >= LADDER_CLIMB and rescues.is_empty(),
+		"it climbs the ladder itself (no unstick relocation or nudge) and is on the deck beside the survivor within 40 s",
+		"rose to %.1f m (deck %.1f), %.1f m of it climbing (want %.1f), closest %.1f m, ladders on the graph %d, unstick rescues %s" % [highest, LADDER_DECK.y, climbed, LADDER_CLIMB, closest, int(game.horde.spawner.nav.get(&"ladder_count")), rescues])
 	await _dispose(game)
 	_finished()
 

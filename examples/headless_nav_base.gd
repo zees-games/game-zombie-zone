@@ -9,6 +9,7 @@ const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const StuckMeter := preload("../tools/stuck_meter.gd")
 const ZzUnstick := preload("../game/zz_unstick.gd")
+const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)

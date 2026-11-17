@@ -172,7 +172,9 @@ func _adopt_links(graph: ZzNavGraph) -> void:
 
 	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
 	graph.allow_ladders = config.zombie_ladder_speed > 0.0
-	var _rungs := graph.apply_ladders(ladders())
+	var passable: Array[RID] = game.map.mechanics.walk_through_bodies() if game.map != null and game.map.mechanics != null else ([] as Array[RID])
+	var side := ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), passable)
+	var _rungs := graph.apply_ladders(ladders(), side)
 	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():

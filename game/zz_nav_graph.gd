@@ -265,6 +265,9 @@ const LADDER_REACHES: Array[float] = [3.0, 6.5]
 ## How far off a ladder end's height a point may be (`ZzNpcs.LADDER_HEIGHT`), and the least rise that is a climb (`ZzNavPrune.CLIMB`).
 const LADDER_HEIGHT := 1.5
 const LADDER_CLIMB := 0.6
+## How far over a ladder's top its head point may stand (`ZzHorde.LADDER_OVER`): the lip of a deck a short ladder stops
+## under, which the climber goes on up to.
+const LADDER_OVER := 1.6
 
 ## A steep plain edge with both ends this close to a ladder's box (flat, metres) is that ladder.
 const LADDER_COLUMN := 3.0
@@ -272,13 +275,15 @@ const LADDER_COLUMN := 3.0
 ## Puts the map's ladder brushes [param boxes] (metres, world) on the graph: each joins the point nearest its foot to the
 ## point nearest its top, found the way the graph's own ladder edges were (`ZzNavPrune.join_ladders`, `ZzNpcs.with_ladders`),
 ## and every steep plain edge with both ends in a ladder's column is one too. Returns how many ladder links are on it.
-func apply_ladders(boxes: Array[AABB]) -> int:
+## [param side] (`ZzNavPrune.ladder_side`, `func(box: AABB, p: Vector3) -> bool`) keeps every end on the ladder's side
+## of the wall it is mounted on; without it any point in reach is an end.
+func apply_ladders(boxes: Array[AABB], side: Callable = Callable()) -> int:
 	for box: AABB in boxes:
 		var mid := box.get_center()
 
 		for reach: float in LADDER_REACHES:
-			var foot := _ladder_end(Vector3(mid.x, box.position.y + 0.1, mid.z), reach)
-			var head := _ladder_end(Vector3(mid.x, box.end.y, mid.z), reach)
+			var foot := _ladder_end(Vector3(mid.x, box.position.y + 0.1, mid.z), reach, LADDER_HEIGHT, box, side)
+			var head := _ladder_end(Vector3(mid.x, box.end.y, mid.z), reach, LADDER_OVER, box, side)
 
 			if foot >= 0 and head >= 0 and data.points[head].y - data.points[foot].y > LADDER_CLIMB:
 				add_ladder(foot, head)
@@ -289,7 +294,7 @@ func apply_ladders(boxes: Array[AABB]) -> int:
 		for to in super.neighbours(i):
 			if to > i and absf(data.points[to].y - here.y) > steep:
 				for box: AABB in boxes:
-					if _in_column(box, here) and _in_column(box, data.points[to]):
+					if _in_column(box, here) and _in_column(box, data.points[to]) and _on_side(box, here, side) and _on_side(box, data.points[to], side):
 						add_ladder(i, to)
 						break
 
@@ -299,8 +304,16 @@ func apply_ladders(boxes: Array[AABB]) -> int:
 	return ladder_count
 
 
-func _ladder_end(at: Vector3, reach: float) -> int:
-	return data.nearest_point_where(at, reach, func(p: int) -> bool: return absf(data.points[p].y - at.y) <= LADDER_HEIGHT)
+## The point nearest [param at] within [param reach] that is no more than [constant LADDER_HEIGHT] under it nor
+## [param over] above it, on the ladder's side of its wall.
+func _ladder_end(at: Vector3, reach: float, over: float, box: AABB, side: Callable) -> int:
+	return data.nearest_point_where(at, reach, func(p: int) -> bool:
+		var rise := data.points[p].y - at.y
+		return rise >= -LADDER_HEIGHT and rise <= over and _on_side(box, data.points[p], side))
+
+
+static func _on_side(box: AABB, p: Vector3, side: Callable) -> bool:
+	return not side.is_valid() or bool(side.call(box, p))
 
 
 ## Whether [param p] stands by [param box] (within [constant LADDER_COLUMN] of it flat, between its foot and top).
