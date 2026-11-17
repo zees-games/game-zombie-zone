@@ -131,6 +131,38 @@ func _special(_delta: float) -> void:
 	b.anim = ZzZombieBody.Anim.RUN
 
 
+## Held by a player: the ability key winds up a rock (the AI's 1.5 s) and throws it where they
+## look when it lets go, pitch included, at most rock_range out. Fire is its swing, as for any body.
+func _driven_special(_delta: float, pressed: int) -> bool:
+	var b := body()
+
+	if state == THROW:
+		halt()
+		b.anim = ZzZombieBody.Anim.THROW
+		b.rotation.y = drive.yaw
+
+		if _throw_at != INF and now() >= _throw_at:
+			_throw_at = INF
+			var from := npc.position() + Vector3(0.0, 3.0, 0.0)
+			var to := driven_target(from, tune(&"rock_range", 40.0))
+			var h := horde()
+			if h != null:
+				h.call(&"projectile", &"rock", from, launch_to(from, to, tune(&"rock_speed", 24.0), 18.0), npc, tune(&"rock_damage", 24.0))
+			cool_down(tune(&"rock_cooldown", 9.0))
+
+		if in_state_for() <= 2.0:
+			return true
+
+		go(APPROACH)
+
+	if pressed & DRIVE_ABILITY != 0 and cooled_down():
+		_throw_at = now() + 1.5
+		go(THROW)
+		return true
+
+	return false
+
+
 ## Overridden: a brute's hit lands on everybody in front of it, and throws them.
 func _advance_swing() -> void:
 	if not swinging():

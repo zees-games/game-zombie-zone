@@ -13,12 +13,12 @@ const ZzWaveSets := preload("../game/zz_wave_sets.gd")
 ## Counts sections and checks; the second is the one that matters.
 
 const SECTIONS := 22
-const CHECKS := 144
+const CHECKS := 154
 
 ## `-- --shard NAME` plays one part as a run of its own, declaring [sections, checks]: `core_a` to `core_e` are everything but the big maps (split so each part finishes well inside the suite timeout on a loaded box), and each
 ## big map is its own shard, so the tick-budget check (which load flakes) sits alone with its map. `-- --merge LOG...` holds that every
 ## shard's log is there and that together they entered all SECTIONS.
-const SHARDS := {"core_a": [3, 24], "core_b": [4, 38], "core_c": [3, 11], "core_d": [5, 24], "core_e": [3, 19], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
+const SHARDS := {"core_a": [3, 24], "core_b": [4, 48], "core_c": [3, 11], "core_d": [5, 24], "core_e": [3, 19], "zz_high_school": [1, 7], "zz_mall": [1, 7], "zz_stadium": [1, 7], "zz_relief_camp": [1, 7]}
 
 ## Allowance on the 64 Hz tick budget for the big maps. On PH's slow shared thread the stadium costs 15.8-16.1 ms CPU with or without the
 ## 72-unit body and nav rebake (05d7567 measured 16.07, 88e574a 15.78) and the mall 15.8-18.6 ms with the box loaded: the box, not a regression.
@@ -279,7 +279,7 @@ func _test_possession() -> void:
 
 
 func _test_possession_ability() -> void:
-	_section("possession: a special's trick on the shove key (leap, charge, spit)")
+	_section("possession: a special's trick on the shove key (leap, charge, spit, rock, ride)")
 	var game := await _hold(func(cfg: ZzConfig) -> void:
 		cfg.survival_style = 0
 		cfg.survival_warmup_seconds = 100.0, 2)
@@ -290,7 +290,7 @@ func _test_possession_ability() -> void:
 	cmd.yaw = 180.0
 	holder.input_move = cmd
 
-	for kind: StringName in [ZzNpcs.LEAPER, ZzNpcs.RAM, ZzNpcs.SPITTER]:
+	for kind: StringName in [ZzNpcs.LEAPER, ZzNpcs.RAM, ZzNpcs.SPITTER, ZzNpcs.BRUTE]:
 		var npc := game.horde.spawner.spawn(kind, base + Vector3(0.0, 0.0, 6.0), &"test")
 		await _sim(game, 0.3)
 		_check(npc != null and game.possession.possess(holder, npc), "%s: can be held" % kind)
@@ -315,10 +315,59 @@ func _test_possession_ability() -> void:
 			ZzNpcs.RAM:
 				_check(moved.z > 8.0 and absf(moved.x) < 3.0, "the ram charges that way", str(moved))
 			_:
-				_check(not brain.cooled_down() and moved.length() < 1.0, "the spitter spat (cooling down) without walking", str(moved))
+				_check(not brain.cooled_down() and moved.length() < 1.0, "the %s threw (cooling down) without walking" % kind, str(moved))
 
 		game.possession.release(holder.player_id)
 		var _dealt := game.horde.spawner.damage(npc.instance_id, 99999.0, &"")
+
+	# Pitch: a spit goes where they look, so looking down lands it at the body's feet.
+	var spitter := game.horde.spawner.spawn(ZzNpcs.SPITTER, base + Vector3(0.0, 0.0, 6.0), &"test")
+	await _sim(game, 0.3)
+	_check(spitter != null and game.possession.possess(holder, spitter), "spitter: held again for the pitch check")
+
+	if spitter != null:
+		cmd.pitch = -45.0
+		await _sim(game, 0.2)
+		var sb: Object = spitter.brain
+		_check(is_equal_approx(float(sb.get(&"drive_pitch")), deg_to_rad(-45.0)), "the holder's pitch reaches the brain", str(sb.get(&"drive_pitch")))
+		var eye := spitter.position() + Vector3(0.0, 1.7, 0.0)
+		var down: Vector3 = sb.call(&"driven_target", eye, 14.0)
+		var flat := Vector2(down.x - eye.x, down.z - eye.z).length()
+		_check(flat < 3.0 and down.y < eye.y - 1.0, "looking 45 degrees down aims at the floor in front, not 14 m out", "%s from %s" % [down, eye])
+		cmd.pitch = 0.0
+		await _sim(game, 0.2)
+		var level: Vector3 = sb.call(&"driven_aim")
+		_check(absf(level.y) < 0.01 and level.z > 0.99, "level aim is flat along where they face", str(level))
+		game.possession.release(holder.player_id)
+		var _gone := game.horde.spawner.damage(spitter.instance_id, 99999.0, &"")
+
+	# The rider: leaps on whoever is in front, then the holder's stick walks them.
+	var victim: ZzPlayer = game.survivors()[1]
+	victim.health.invulnerable = true
+	var rider := game.horde.spawner.spawn(ZzNpcs.RIDER, base + Vector3(0.0, 0.0, -4.0), &"test")
+	await _sim(game, 0.3)
+	_check(rider != null and game.possession.possess(holder, rider), "rider: can be held")
+
+	if rider != null:
+		victim.place_at(rider.position() + Vector3(0.0, 0.0, 3.5), 0.0)
+		await _sim(game, 0.2)
+		cmd.set_button(ZzNetCommand.BUTTON_SHOVE, true)
+		await _sim(game, 0.1)
+		cmd.set_button(ZzNetCommand.BUTTON_SHOVE, false)
+		await _sim(game, 1.2)
+		var ridden: StringName = game.horde.pinning(rider)
+		_check(ridden == victim.player_id, "the rider leapt onto the survivor in front", "riding '%s' rider %s victim %s" % [ridden, rider.position(), victim.global_position])
+
+		if ridden == victim.player_id:
+			var start := victim.global_position
+			cmd.move = Vector2(-1, 0)  # strafe left at yaw 180: along +X
+			await _sim(game, 1.2)
+			cmd.move = Vector2.ZERO
+			var walked := victim.global_position - start
+			_check(walked.x > 1.0 and absf(walked.z) < 1.5, "the holder's stick steers the ridden survivor", str(walked))
+
+		game.possession.release(holder.player_id)
+		var _off := game.horde.spawner.damage(rider.instance_id, 99999.0, &"")
 
 	await _dispose(game)
 	_finished()

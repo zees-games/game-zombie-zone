@@ -35,6 +35,9 @@ const DRIVE_ATTACK := 1
 ## The drive's ability button (the player's shove key): a special's leap, charge or spit.
 const DRIVE_ABILITY := 2
 
+## A holder's view pitch in radians, up positive ([ZzPossession] sets it from their command).
+var drive_pitch: float = 0.0
+
 ## What the brain is doing, for a describe() and for a subclass's own machine.
 var state: StringName = &"idle"
 var state_since: float = 0.0

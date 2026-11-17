@@ -34,18 +34,20 @@ func _victim_bonus(id: StringName, at: Vector3) -> float:
 	return bonus
 
 
-## Held by a player: the ability key spits a glob 14 m along where they face.
+## Held by a player: the ability key spits a glob where they look, pitch included, at most
+## driven_spit_range (14 m) out; the wind-up turns with them.
 func _driven_special(_delta: float, pressed: int) -> bool:
 	var b := body()
 
 	if state == SPIT:
 		halt()
 		b.anim = ZzZombieBody.Anim.SPIT
+		b.rotation.y = drive.yaw
 
 		if _spit_at != INF and now() >= _spit_at:
 			_spit_at = INF
 			var from := npc.position() + Vector3(0.0, 1.7, 0.0)
-			var aim := npc.position() + driven_forward() * tune(&"driven_spit_range", 14.0) + Vector3(0.0, 0.5, 0.0)
+			var aim := driven_target(from, tune(&"driven_spit_range", 14.0))
 			var h := horde()
 			if h != null:
 				h.call(&"projectile", &"spit", from, launch_to(from, aim, tune(&"spit_speed", 15.0), 18.0), npc, tune(&"acid_damage", 6.0))

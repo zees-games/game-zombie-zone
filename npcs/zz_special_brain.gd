@@ -362,6 +362,29 @@ func driven_forward() -> Vector3:
 	return Basis(Vector3.UP, drive.yaw) * Vector3.FORWARD if drive != null else Vector3.FORWARD
 
 
+## Where the holder looks, pitch included, as a unit vector.
+func driven_aim() -> Vector3:
+	if drive == null:
+		return Vector3.FORWARD
+
+	return Basis.from_euler(Vector3(drive_pitch, drive.yaw, 0.0)) * Vector3.FORWARD
+
+
+## The point the holder looks at from [param from]: the world along their view within
+## [param reach], else the far end of it (a lob into the open lands about that far out).
+func driven_target(from: Vector3, reach: float) -> Vector3:
+	var to := from + driven_aim() * reach
+	var h := horde()
+	var game: Object = h.get(&"game") if h != null else null
+
+	if game != null and game.has_method(&"ray_hit"):
+		var hit: Vector3 = game.call(&"ray_hit", from, to)
+		if hit != Vector3.INF:
+			return hit
+
+	return to
+
+
 ## While it has hold of somebody.
 func _holding(_delta: float) -> void:
 	halt()

@@ -52,11 +52,67 @@ func _special(_delta: float) -> void:
 	b.anim = ZzZombieBody.Anim.CROUCH if gap < 14.0 else ZzZombieBody.Anim.RUN
 
 
+## Held by a player: the ability key leaps along where they face (driven_leap_range, 6 m), and
+## whoever it passes close to in the air is ridden; then the player's stick steers them.
+func _driven_special(_delta: float, pressed: int) -> bool:
+	var b := body()
+
+	if state == LEAP:
+		b.anim = ZzZombieBody.Anim.LEAP
+
+		if b.flying:
+			var _caught := _catch_in_flight()
+			return true
+
+		if now() - _leapt_at <= 0.25:
+			return true
+
+		cool_down(1.2)
+		go(APPROACH)
+
+	if pressed & DRIVE_ABILITY != 0 and cooled_down() and b.is_on_floor():
+		var target := npc.position() + driven_forward() * tune(&"driven_leap_range", 6.0) + Vector3(0.0, 1.4, 0.0)
+		b.leap(launch_to(npc.position(), target, tune(&"leap_speed", 11.0), ZzZombieBody.GRAVITY))
+		_leapt_at = now()
+		go(LEAP)
+		return true
+
+	return false
+
+
+## A held rider in the air takes whoever is up, unpinned and within reach of their chest.
+func _catch_in_flight() -> bool:
+	var h := horde()
+
+	if h == null:
+		return false
+
+	for id in _survivors():
+		if survivor_is(id, &"up") and not survivor_is(id, &"pinned") \
+				and (survivor_at(id) + Vector3(0.0, 1.0, 0.0)).distance_to(npc.position()) < 1.5 \
+				and bool(h.call(&"pin", npc, id, &"ride")):
+			var b := body()
+			b.flying = false
+			b.velocity = Vector3.ZERO
+			go(RIDING)
+			return true
+
+	return false
+
+
 ## Riding: choose where to take them. Written into the body's wish, which the pin turns into
-## the victim's velocity (see `ZzPins.steer`).
+## the victim's velocity (see `ZzPins.steer`). A held rider goes where its player's stick says.
 func _holding(_delta: float) -> void:
 	var b := body()
 	b.anim = ZzZombieBody.Anim.PIN
+
+	if drive != null and drive.active:
+		b.wish = drive.wish_velocity(tune(&"ride_speed", 3.4))
+		b.wish.y = 0.0
+		if b.wish != Vector3.ZERO:
+			face(b.wish)
+		return
+
 	var h := horde()
 	var held: StringName = h.call(&"pinning", npc)
 	var at := survivor_at(held)

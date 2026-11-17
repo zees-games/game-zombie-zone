@@ -91,3 +91,5 @@ func tick(_delta: float) -> void:
 		if cmd.is_pressed(ZzNetCommand.BUTTON_SHOVE):
 			buttons |= 2
 		npc.brain.drive.feed(cmd.move, deg_to_rad(cmd.yaw), buttons)
+		# Up and down is the game's own (DotNpcDrive is flat): a spit or a rock goes where they look.
+		npc.brain.set(&"drive_pitch", deg_to_rad(cmd.pitch))
