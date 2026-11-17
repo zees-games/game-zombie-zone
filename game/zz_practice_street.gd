@@ -26,7 +26,7 @@ static func build(toys: Array, id: StringName, channel: String) -> Dictionary:
 		"boxes": _practice_boxes(),
 		"props": _practice_props(),
 		# No physics props (toys) of its own: only prop hunt, murder mystery, hide n seek and
-		# the playground keep them. Tests set practice_toys of ZzCatalogue.
+		# Playlot keep them. Tests set practice_toys of ZzCatalogue.
 		"toys": toys.duplicate(true),
 		"lights": _practice_lights(),
 	}
