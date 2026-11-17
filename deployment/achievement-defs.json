@@ -1,0 +1,279 @@
+{
+	"format": "dot-achievement-defs",
+	"version": 1,
+	"achievements": [
+		{
+			"key": "zz.first_blood",
+			"name": "Still Breathing",
+			"description": "Kill an infected.",
+			"points": 5,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "zz.killer",
+			"tier": 1,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.commons_killed",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.exterminator",
+			"name": "Exterminator",
+			"description": "Kill a thousand infected.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "zz.killer",
+			"tier": 2,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.commons_killed",
+					"op": "at_least",
+					"value": 1000.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.special_ops",
+			"name": "Special Ops",
+			"description": "Kill fifty special infected.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.specials_killed",
+					"op": "at_least",
+					"value": 50.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.giant_slayer",
+			"name": "Giant Slayer",
+			"description": "Be there when a brute goes down.",
+			"points": 25,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.brutes_killed",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.marksman",
+			"name": "Dead Eye",
+			"description": "Kill 250 infected with a headshot.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.headshots",
+					"op": "at_least",
+					"value": 250.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.medic",
+			"name": "Field Medic",
+			"description": "Heal ten teammates with your own medkit.",
+			"points": 15,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.team_heals",
+					"op": "at_least",
+					"value": 10.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.lifeline",
+			"name": "Lifeline",
+			"description": "Pick up twenty-five downed teammates.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.revives",
+					"op": "at_least",
+					"value": 25.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.bodyguard",
+			"name": "Bodyguard",
+			"description": "Free twenty-five teammates from specials.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.saves",
+					"op": "at_least",
+					"value": 25.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.gambler",
+			"name": "Gambler",
+			"description": "Open fifty boxes.",
+			"points": 15,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.boxes_opened",
+					"op": "at_least",
+					"value": 50.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.survivor",
+			"name": "Survivor",
+			"description": "Finish ten maps.",
+			"points": 25,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.maps_won",
+					"op": "at_least",
+					"value": 10.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.holdout",
+			"name": "Holdout",
+			"description": "Survive a hold to the end.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.holds_survived",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "zz.rampage",
+			"name": "Rampage",
+			"description": "Kill a hundred infected in one map.",
+			"points": 25,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.best_map_kills",
+					"op": "at_least",
+					"value": 100.0,
+					"merge": "highest"
+				}
+			]
+		},
+		{
+			"key": "zz.should_have_left_her",
+			"name": "Should Have Left Her Alone",
+			"description": "Kill a sleeper.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": true,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "zz.sleepers_killed",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		}
+	]
+}
