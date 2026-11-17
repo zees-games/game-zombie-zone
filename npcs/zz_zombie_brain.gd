@@ -504,6 +504,9 @@ func cancel_swing() -> void:
 func stagger(direction: Vector3, seconds: float, strength: float = 4.0) -> void:
 	stagger_until = maxf(stagger_until, now() + seconds)
 	_every = 1
+
+	if has_method(&"pace_every"):
+		call(&"pace_every", 1)
 	cancel_swing()
 	var b := body()
 
@@ -550,6 +553,29 @@ func _npc_think(delta: float) -> void:
 	_think_now(delta)
 	# Decided once per thought rather than every tick: a swing or the boards only start in one.
 	_every = _think_every()
+
+
+## The spawner counts the ticks between thoughts when its pacing is on (dot-npc DotNpcPacing): the same
+## thoughts as [method _npc_think], without a call into every brain every tick.
+func paces() -> bool:
+	return true
+
+
+func think_paced(owed: float) -> int:
+	age += owed
+	_think_now(owed)
+	_every = _think_every()
+	return _every
+
+
+func _pace_take() -> Array:
+	return [_since_thought, _owed_delta, _every]
+
+
+func _pace_give(since: int, owed: float, every: int) -> void:
+	_since_thought = since
+	_owed_delta = owed
+	_every = every
 
 
 ## A player holds this body (see [ZzPossession]): its own wish from the player's keys, a swing on

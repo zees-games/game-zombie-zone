@@ -904,6 +904,9 @@ func _pick_crowd() -> void:
 		senses.native_enabled = config != null and config.native_senses
 
 	var brains := config != null and config.native_brains and ClassDB.class_exists(NATIVE_BRAINS)
+	# Through `set` so an older dot-npc without pacing is simply not told.
+	if spawner != null:
+		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"DotSimThinkPacer"))
 
 	if brains != (brains_native != null):
 		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null

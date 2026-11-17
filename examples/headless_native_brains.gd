@@ -15,8 +15,8 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## brain as the script's steer does, stuck ones and paths gone rough included. Without the library
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
-const SECTIONS := 5
-const CHECKS := 13
+const SECTIONS := 6
+const CHECKS := 16
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -116,11 +116,79 @@ func _run() -> void:
 	print("the verify mode runs both and finds them the same")
 	_check(_verify(), "brains_verify counts no mismatch over ten seeded worlds")
 	_finished += 1
+
+	_entered += 1
+	print("think pacing: the spawner counts the zombies' ticks natively, the same thoughts as each counting its own")
+	_check(ZzConfig.new().native_pacing, "ZzConfig.native_pacing is on by default")
+	var off := _pace_run(false, false)
+	var script := _pace_run(true, false)
+	var counts := [0, 0]
+	var native := _pace_run(true, true, counts)
+	var kinds := {}
+	for e: Array in off:
+		kinds[e[0]] = true
+	_check(off.size() > 1000 and kinds.size() >= 6 and script == off and native == off,
+		"script and native pacing log the same thoughts, seconds, staggers, drives, removals and spawns as no pacing",
+		"%d entries, %s; script %s, native %s" % [off.size(), kinds.keys(), _pace_diff(script, off), _pace_diff(native, off)])
+	_check(counts[0] > 1000 and counts[1] == 0, "pacing_verify matched the script pacer call for call",
+		"%d checked, %d differ" % counts)
+	_finished += 1
 	if _world != null:
 		_world.free()
 		_world = null
 
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
+
+
+const PACE_PROBE := "res://examples/zz_paced_probe_brain.gd"
+const PACE_BODY := "res://examples/zz_paced_probe_body"
+
+
+## 1500 ticks of 30 probe zombies (and those they spawn) through a real spawner: [param pacing] off, script, or
+## native with [member DotNpcSpawner.pacing_verify] ([param counts] gets checked and mismatched).
+func _pace_run(pacing: bool, native: bool, counts: Array = []) -> Array:
+	_fresh_world()
+	var body := Node3D.new()
+	var packed := PackedScene.new()
+	packed.pack(body)
+	body.free()
+	var def := DotNpcDef.make(&"probe", PACE_BODY)
+	def.brain_script_path = PACE_PROBE
+	def.max_health = 100.0
+	def.require_line_of_sight = false
+	var spawner := DotNpcSpawner.new()
+	spawner.catalogue = DotNpcCatalogue.new()
+	spawner.catalogue.add(def)
+	var limits := DotNpcLimits.new()
+	limits.spawn_interval = 0.0
+	limits.require_navigable_spawn = false
+	limits.world_budget = 0
+	limits.per_kind_cap = 0
+	spawner.limits = limits
+	spawner.authoritative = true
+	spawner._held[PACE_BODY] = packed
+	spawner.pacing = pacing
+	spawner.pacing_native = native
+	spawner.pacing_verify = native
+	spawner.set_meta(&"pace_log", [])
+	_world.add_child(spawner)
+	for i in 30:
+		spawner.spawn(&"probe", Vector3(i * 1.5 - 22.0, 0, (i % 5) * 3.0 - 6.0))
+	for t in 1500:
+		spawner.tick(0.016)
+	if counts.size() == 2:
+		counts[0] = spawner.pacing_checked
+		counts[1] = spawner.pacing_mismatches
+	var out: Array = spawner.get_meta(&"pace_log", [])
+	spawner.queue_free()
+	return out
+
+
+func _pace_diff(a: Array, b: Array) -> String:
+	for i in mini(a.size(), b.size()):
+		if a[i] != b[i]:
+			return "entry %d: %s vs %s" % [i, a[i], b[i]]
+	return "%d vs %d entries" % [a.size(), b.size()]
 
 
 func _fresh_world() -> void:

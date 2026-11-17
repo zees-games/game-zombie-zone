@@ -312,6 +312,11 @@ func setup_seconds() -> float:
 ## the script, which false (or no library, the web) keeps. `zz_native_brains`.
 @export var native_brains: bool = true
 
+## dot-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tick in
+## dot-sim's `DotSimThinkPacer` when the library is loaded, calling only the zombies due: the same thoughts with the
+## same seconds as each brain counting its own ticks, which false (or no library, the web) keeps. `zz_native_pacing`.
+@export var native_pacing: bool = true
+
 ## Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at 64 Hz, so a big
 ## team on a small box is people plus this many. `zz_bot_max`.
 @export_range(0, 256, 1, "or_greater") var bot_max: int = 0

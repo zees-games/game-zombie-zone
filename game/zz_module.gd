@@ -364,6 +364,9 @@ func _add_tunables(world: ZzGame) -> void:
 	_tunable("zz_native_brains", 1.0 if config.native_brains else 0.0,
 		"Zombie chase plans and spaced headings run in dot-sim's native library when loaded (the same decisions); 0 keeps the script",
 		func(value: float) -> void: config.native_brains = value > 0.5)
+	_tunable("zz_native_pacing", 1.0 if config.native_pacing else 0.0,
+		"Which zombies think each tick is counted in dot-sim's native library when loaded (the same thoughts); 0 keeps each brain counting",
+		func(value: float) -> void: config.native_pacing = value > 0.5)
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
 		func(value: float) -> void: config.bot_hold_chokes = value > 0.5)
@@ -1574,6 +1577,7 @@ const HAND_FIELDS := {
 	"zz_dormant_from": "dormant_from", "zz_dormant_think_every": "dormant_think_every",
 	"zz_path_reuse_thoughts": "path_reuse_thoughts", "zz_native_crowd": "native_crowd",
 	"zz_native_senses": "native_senses", "zz_native_brains": "native_brains",
+	"zz_native_pacing": "native_pacing",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",
 	"zz_commons_far_divisor": "commons_far_divisor",
 }

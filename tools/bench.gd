@@ -39,6 +39,15 @@ var _ab_brains := false
 var _brains_verify := false
 var _abb_us := {}
 var _abb_ticks := {}
+## --ab-pacing (with --profile): every 64 ticks the spawner's think pacing flips between each brain counting its
+## own ticks (0) and one native batch calling only the due brains (1) through `ZzConfig.native_pacing`; h.brains
+## is summed per arm (AB lines).
+var _ab_pacing := false
+## --pacing-verify (with --profile): the script pacer runs beside the native one and every answer is compared bit
+## for bit (PARITY pacing line).
+var _pacing_verify := false
+var _abp_us := {}
+var _abp_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
@@ -72,6 +81,10 @@ func _read_args() -> void:
 			_ab_brains = true
 		elif arg == "--brains-verify":
 			_brains_verify = true
+		elif arg == "--ab-pacing":
+			_ab_pacing = true
+		elif arg == "--pacing-verify":
+			_pacing_verify = true
 		elif arg == "--crowd-parity":
 			_crowd_parity = true
 		elif arg.begins_with("--ring="):
@@ -105,6 +118,13 @@ func _print_profile() -> void:
 		var horde: Node = (_client.get("game") as ZzGame).horde
 		print("PARITY brains decided=%d mismatches=%d native=%s" % [horde.get(&"brains_decided"),
 			horde.get(&"brains_mismatches"), ClassDB.class_exists(&"DotSimZombieBrains")])
+	for side: int in _abp_ticks:
+		print("AB pacing=%d h.brains %.3f ms/tick over %d ticks" % [side,
+			float(_abp_us[side]) / 1000.0 / maxf(1.0, _abp_ticks[side]), _abp_ticks[side]])
+	if _pacing_verify:
+		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
+		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
+			sp.get(&"pacing_mismatches"), ClassDB.class_exists(&"DotSimThinkPacer")])
 	if _crowd_parity:
 		print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
 	_profiler.free()
@@ -432,6 +452,12 @@ func _physics_process(_delta: float) -> void:
 		(_client.get("game") as ZzGame).horde.config.native_brains = brains_arm == 1
 	if _brains_verify:
 		(_client.get("game") as ZzGame).horde.brains_verify = true
+	var pacing_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_pacing else -1
+	if pacing_arm >= 0:
+		(_client.get("game") as ZzGame).horde.config.native_pacing = pacing_arm == 1
+	if _pacing_verify:
+		(_client.get("game") as ZzGame).horde.config.native_pacing = true
+		(_client.get("game") as ZzGame).horde.spawner.set(&"pacing_verify", true)
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
@@ -440,6 +466,9 @@ func _physics_process(_delta: float) -> void:
 	if brains_arm >= 0 and _recording:
 		_abb_us[brains_arm] = int(_abb_us.get(brains_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abb_ticks[brains_arm] = int(_abb_ticks.get(brains_arm, 0)) + 1
+	if pacing_arm >= 0 and _recording:
+		_abp_us[pacing_arm] = int(_abp_us.get(pacing_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
+		_abp_ticks[pacing_arm] = int(_abp_ticks.get(pacing_arm, 0)) + 1
 	if native_arm >= 0 and _recording:
 		var parts: Dictionary = _profiler.get(&"_tick_parts")
 		_abn_us[native_arm] = _abn_us.get(native_arm, Vector3.ZERO) + Vector3(float(parts.get("h.brains", 0)),
