@@ -15,21 +15,30 @@ func _run() -> void:
 
 	var shard := DotGameShardArgs.shard()
 	var core := shard == "" or shard == "core"
+	var light := shard == "" or shard == "light"
+	var worlds := shard == "" or shard == "worlds"
 	var played: Array = []
 
 	if core:
 		await _test_the_catalogue()
 		_test_lazy_catalogue()
-		await _test_baked_light()
 		await _test_lamp_budget()
 		await _test_solid_prop_budget()
-		await _test_worlds()
 		await _test_footing()
 		_test_library_indices()
 
+	if light or worlds:
+		_maps = _linked_maps()
+
+	if light:
+		await _test_baked_light()
+
+	if worlds:
+		await _test_worlds()
+
 	if shard == "":
 		played = _maps.duplicate()
-	elif shard != "core":
+	elif shard not in ["core", "light", "worlds"]:
 		_maps = _linked_maps()
 		played = DotGameShardArgs.slice(_maps, shard, MAP_SHARDS)
 
@@ -46,10 +55,14 @@ func _run() -> void:
 	if _worlds_skipped > 0:
 		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
 
-	var sections := (CORE_SECTIONS if core else 0) + played.size()
+	var sections := (CORE_SECTIONS if core else 0) + (1 if light else 0) + (1 if worlds else 0) + played.size()
 	var checks := CHECKS_PER_MAP * played.size() + 3 * _spawner_worlds + _nav_extra_maps
 	if core:
-		checks += 2 + LAZY_CHECKS + BAKE_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS + WORLD_CHECKS * _worlds_read
+		checks += 2 + LAZY_CHECKS + LAMP_CHECKS + SOLID_PROP_CHECKS + FOOTING_CHECKS
+	if light:
+		checks += BAKE_CHECKS
+	if worlds:
+		checks += WORLD_CHECKS * _worlds_read
 	_broken = _maps.is_empty()
 	_report_sections(_sections_entered, _sections_finished, sections, checks)
 

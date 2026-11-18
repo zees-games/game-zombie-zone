@@ -67,12 +67,16 @@ var _worlds_skipped := 0
 ## Maps whose wire budget cut boxes: each adds the whole-floor check.
 var _nav_extra_maps := 0
 
-## The shards `game.conf` names: the whole-floor sections once as `core`, the maps dealt round-robin into `m0`..`m3`.
-const SHARD_NAMES := ["core", "m0", "m1", "m2", "m3"]
-
+## The shards `game.conf` names: the whole-floor sections once as `core` (catalogue, lazy catalogue, lamps, solid props, footing,
+## library) and `light` (baked light) and `worlds` (the world maps), each its own run: one `core` holding all eight was OOM-killed at heavy's 4096 MB,
+## the maps dealt round-robin into `m0`..`m{MAP_SHARDS-1}`. Change MAP_SHARDS, SHARD_NAMES and game.conf's SUITE_SHARDS together.
 const MAP_SHARDS := 4
 
-const CORE_SECTIONS := 8
+const SHARD_NAMES := ["core", "light", "worlds", "m0", "m1", "m2", "m3"]
+
+const CORE_SECTIONS := 6
+
+const WORLD_SECTIONS := 2
 
 ## The maps this machine has: all of MAPS, or only the practice street where `maps/` is not linked.
 func _linked_maps() -> Array:
@@ -83,7 +87,7 @@ func _merge(logs: Array) -> void:
 	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARD_NAMES.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
 	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
-	var want := CORE_SECTIONS + _linked_maps().size()
+	var want := CORE_SECTIONS + WORLD_SECTIONS + _linked_maps().size()
 	_check(entered == want, "the shards entered every section (%d of %d)" % [entered, want])
 	_report_sections(1, 1, 1, 2)
 
