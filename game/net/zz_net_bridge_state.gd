@@ -24,6 +24,8 @@ const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
 const ZzZombieLimbs := preload("../../npcs/zz_zombie_limbs.gd")
 const ZzPaths := preload("../zz_paths.gd")
 const ZzNpcs := preload("../zz_npcs.gd")
+## The interest rule: zombie tags, their radii, the net_* config ([code]zz_net_interest.gd[/code]).
+const Interest := preload("zz_net_interest.gd")
 
 ## Joins a [ZzGame] to a [DotNetManager]: the netcode seam, and the only file that names both.
 ## Survivors are predicted; zombies are server-owned entities (`NPC`, snapshots, `NPC_GONE`); the map arrives once as `MAP`; a joiner learns the current world on READY.

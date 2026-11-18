@@ -1,4 +1,4 @@
-extends "zz_client_state.gd"
+extends "zz_client_boot.gd"
 
 ## The Tab board and the end of a map (killcam, winner reveal, board) of [zz_client.gd],
 ## split off so each file stays a size the efficiency gate allows.

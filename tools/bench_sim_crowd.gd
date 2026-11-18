@@ -38,14 +38,7 @@ func _physics_process(_delta: float) -> void:
 	if game == null or game.phase == ZzGame.Phase.IDLE:
 		return
 	if _human == null or not is_instance_valid(_human):
-		_human = _the_human()
-		if _human == null:
-			return
-		for player in game.survivors():
-			player.health.invulnerable = true
-		_stand = _at if _at != Vector3.INF else default_stand(game)
-		_human.place_at(_stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
-		print("SIM_HOST bench stand %s" % _stand)
+		_seat_human()
 		return
 	var missing := _count - game.horde.spawner.all_npcs().size()
 	for _i in mini(missing, 8):
@@ -55,6 +48,18 @@ func _physics_process(_delta: float) -> void:
 		var npc: DotNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(at), &"bench", Basis(Vector3.UP, _rng.randf() * TAU))
 		if npc != null and npc.brain != null:
 			npc.brain.call(&"force_target", _human.player_id)
+
+
+## Finds the joined human, makes every survivor unkillable and puts the human at the stand (once per human).
+func _seat_human() -> void:
+	_human = _the_human()
+	if _human == null:
+		return
+	for player in game.survivors():
+		player.health.invulnerable = true
+	_stand = _at if _at != Vector3.INF else default_stand(game)
+	_human.place_at(_stand, float(game.map.spawn("survivors", 0)[1]) if _at == Vector3.INF else 0.0)
+	print("SIM_HOST bench stand ", _stand)
 
 
 func _the_human() -> ZzPlayer:

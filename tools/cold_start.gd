@@ -87,6 +87,29 @@ func _run() -> void:
 	print("COLDSTART open %.0f ms (_ready), start %.0f ms; sections %s map %s" % [t_ready, t_start, game.build_sections, game.map.sections])
 
 	print("COLDHORDE %s" % game.horde.sections)
+	var run := await _tick_through(game, ticks)
+	var worst: float = run.worst
+	var worst_at: int = run.worst_at
+	var waited: int = run.waited
+	var wait_began: int = run.wait_began
+	var opened := t_ready + t_start
+	var nav = game.horde.nav
+	var digest := hash([nav.points, nav.edges]) if nav != null else 0
+	print("COLDDIGEST points %d edges %d hash %d spawns %d" % [nav.point_count(), nav.edge_count(), digest, game.horde.director.spawn_points.size()] if nav != null else "none")
+	print("COLDNAV first graph waited %d ticks, %.0f ms wall" % [waited, _ms(wait_began)])
+	print("COLDWORST %.0f ms at tick %d; open+start %.0f ms" % [worst, worst_at, opened])
+	var fail := (max_tick > 0.0 and worst > max_tick) or (max_open > 0.0 and opened > max_open)
+	if fail:
+		printerr("COLDFAIL worst tick %.0f ms (limit %.0f), open+start %.0f ms (limit %.0f)" % [worst, max_tick, opened, max_open])
+	game.queue_free()
+	for _i in range(3):
+		await get_tree().process_frame
+	get_tree().quit(1 if fail else 0)
+
+
+## Simulates [param ticks] ticks once the first nav graph has landed (the ticks it is waited on do not count),
+## printing the slow ones; returns the worst tick and when, and how long the graph was waited on.
+func _tick_through(game: ZzGame, ticks: int) -> Dictionary:
 	var worst := 0.0
 	var worst_at := 0
 	var delta := 1.0 / float(TICK_RATE)
@@ -118,16 +141,4 @@ func _run() -> void:
 			worst_at = i
 		if i % 32 == 31:
 			await get_tree().physics_frame
-	var opened := t_ready + t_start
-	var nav = game.horde.nav
-	var digest := hash([nav.points, nav.edges]) if nav != null else 0
-	print("COLDDIGEST points %d edges %d hash %d spawns %d" % [nav.point_count(), nav.edge_count(), digest, game.horde.director.spawn_points.size()] if nav != null else "none")
-	print("COLDNAV first graph waited %d ticks, %.0f ms wall" % [waited, _ms(wait_began)])
-	print("COLDWORST %.0f ms at tick %d; open+start %.0f ms" % [worst, worst_at, opened])
-	var fail := (max_tick > 0.0 and worst > max_tick) or (max_open > 0.0 and opened > max_open)
-	if fail:
-		printerr("COLDFAIL worst tick %.0f ms (limit %.0f), open+start %.0f ms (limit %.0f)" % [worst, max_tick, opened, max_open])
-	game.queue_free()
-	for _i in range(3):
-		await get_tree().process_frame
-	get_tree().quit(1 if fail else 0)
+	return {"worst": worst, "worst_at": worst_at, "waited": waited, "wait_began": wait_began}

@@ -769,12 +769,12 @@ func _test_only_what_is_near_is_sent() -> void:
 	# prove nothing about distance, and the boss check below would pass whether or not the
 	# boss were exempt.
 	var rule := _server_net.interest as DotNetInterestDistance
-	_check(rule != null and rule.radius_by_tag.has(ZzNetBridge.TAG_COMMON) and rule.radius_by_tag.has(ZzNetBridge.TAG_SPECIAL)
-		and ZzNetBridge.zombie_radius(ZzNpcs.COMMON) < ZzNetBridge.zombie_radius(ZzNpcs.STRANGLER),
+	_check(rule != null and rule.radius_by_tag.has(ZzNetBridge.Interest.TAG_COMMON) and rule.radius_by_tag.has(ZzNetBridge.Interest.TAG_SPECIAL)
+		and ZzNetBridge.Interest.zombie_radius(ZzNpcs.COMMON) < ZzNetBridge.Interest.zombie_radius(ZzNpcs.STRANGLER),
 		"the server tells commons by distance, and specials from further out")
 	var radii: Dictionary = rule.radius_by_tag.duplicate()
 	var interval := rule.evaluation_interval_sec
-	rule.radius_by_tag = {ZzNetBridge.TAG_COMMON: 2.0, ZzNetBridge.TAG_SPECIAL: 2.0}
+	rule.radius_by_tag = {ZzNetBridge.Interest.TAG_COMMON: 2.0, ZzNetBridge.Interest.TAG_SPECIAL: 2.0}
 	rule.radius = 2.0
 	rule.evaluation_interval_sec = 0.0
 
@@ -787,7 +787,7 @@ func _test_only_what_is_near_is_sent() -> void:
 	common_net.identity.interest_linger_sec = 0.0
 	var common_id: int = common_net.identity.net_id
 	var boss_id: int = (_server_bridge._zombie_nets[boss.instance_id] as ZzNpcNet).identity.net_id
-	_check(common_net.identity.interest_tags.has(ZzNetBridge.TAG_COMMON) and not common_net.identity.always_relevant,
+	_check(common_net.identity.interest_tags.has(ZzNetBridge.Interest.TAG_COMMON) and not common_net.identity.always_relevant,
 		"a common is tagged and not always relevant")
 	_check((_server_bridge._zombie_nets[boss.instance_id] as ZzNpcNet).identity.always_relevant,
 		"the boss is always relevant")
@@ -815,7 +815,7 @@ func _test_only_what_is_near_is_sent() -> void:
 	_hurt_npc(common, 100000.0)
 	_hurt_npc(boss, 100000.0)
 	rule.radius_by_tag = radii
-	rule.radius = ZzNetBridge.DEFAULT_RADIUS
+	rule.radius = ZzNetBridge.Interest.DEFAULT_RADIUS
 	rule.evaluation_interval_sec = interval
 	await _steps(8)
 	_finished()

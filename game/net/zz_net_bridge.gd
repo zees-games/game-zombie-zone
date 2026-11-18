@@ -35,8 +35,8 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 	net.send_fn = _send
 
 	if net.is_server:
-		net.interest = make_interest(game.config if game != null else null)
-		_interest_applied = interest_key(game.config if game != null else null)
+		net.interest = Interest.make_interest(game.config if game != null else null)
+		_interest_applied = Interest.interest_key(game.config if game != null else null)
 
 	var event := net.messages.register(
 		ZzEvent.NAME, ZzEvent,
@@ -1664,18 +1664,6 @@ func _on_world_event_last(kind: int, reader: DotNetReader) -> void:
 
 # Zombies
 
-## Interest tags a zombie entity carries, and the radii (metres) [method make_interest] gives them.
-const TAG_COMMON := "common"
-const TAG_SPECIAL := "special"
-## A common is a body in a crowd: fog has taken half of it by 80 m and a horde spawns within 60 m
-## (`spawn_max_distance`), so past this nobody fights it. Too small pops a zombie at the edge of the
-## dark, too large costs snapshot bytes (docs/survival.md).
-const COMMON_RADIUS := 80.0
-## A special is a threat the team plans around (a rider heard before it is seen, a sleeper), so it
-## is told from further out. There are a handful, not hundreds, so the width costs little.
-const SPECIAL_RADIUS := 260.0
-## Players, toys and anything else with no tag.
-const DEFAULT_RADIUS := 200.0
 ## Seconds a zombie keeps being sent after it leaves a peer's radius: the time half of hysteresis
 ## (dot-net's strategies have one radius), so a zombie pacing along the edge is not a spawn and a
 ## despawn several times a second. Eight metres of walking at a common's pace.
@@ -1685,55 +1673,17 @@ const ZOMBIE_LINGER_SEC := 3.0
 const STALE_MSEC := 1000
 const NEAR_KEPT := 30.0
 
-## The server's interest rule. Always relevant: players, the boss, and everything announced by event.
-## Zombies are by distance (274 of 302 ms a tick at 128 survivors went to sending all of them,
-## docs/survival.md), by tag through [DotNetInterestDistance] since a special needs a wider radius.
-static func make_interest(config: ZzConfig = null) -> DotNetInterest:
-	var interest := DotNetInterestDistance.new()
-	interest.radius = DEFAULT_RADIUS
-	interest.radius_by_tag = {TAG_COMMON: COMMON_RADIUS, TAG_SPECIAL: SPECIAL_RADIUS}
-	apply_interest_config(interest, config)
-	return interest
-
-
-## Copies [param config]'s net_* radii and thinning into [param interest]; nothing without a config.
-static func apply_interest_config(interest: DotNetInterest, config: ZzConfig) -> void:
-	if config == null or interest == null:
-		return
-	if interest is DotNetInterestDistance:
-		(interest as DotNetInterestDistance).radius_by_tag = {
-			TAG_COMMON: config.net_common_radius, TAG_SPECIAL: config.net_special_radius,
-		}
-	interest.far_every = config.net_far_every
-	interest.far_distance = config.net_far_distance
-	interest.far_coherent = config.net_far_coherent
-	interest.far_tiers = config.net_far_tiers
-
-
-## The net_* fields [method apply_interest_config] copies, to tell when one changed.
-static func interest_key(config: ZzConfig) -> Array:
-	if config == null:
-		return []
-	return [config.net_common_radius, config.net_special_radius, config.net_far_every,
-		config.net_far_distance, config.net_far_coherent, config.net_far_tiers]
-
-
-## The shipped radius for [param kind]; the live one is the server's ZzConfig.
-static func zombie_radius(kind: StringName) -> float:
-	return SPECIAL_RADIUS if ZzNpcs.is_special(kind) else COMMON_RADIUS
-
-
 ## Server: re-applies the interest settings when a net_* field changed (cvar, yml or workbench).
 ## Compared, not re-applied each second, so a rule a suite edits in place is left alone.
 func _follow_interest_config() -> void:
 	var c := game.config if game != null else null
 	if c == null or net == null or net.interest == null:
 		return
-	var now := interest_key(c)
+	var now := Interest.interest_key(c)
 	if now == _interest_applied:
 		return
 	_interest_applied = now
-	apply_interest_config(net.interest, c)
+	Interest.apply_interest_config(net.interest, c)
 
 
 ## Client: hides a zombie the server has stopped telling about. A mirror is made by an event sent
@@ -1787,7 +1737,7 @@ func _npc_net_id(entity: int) -> int:
 
 
 ## A zombie appeared on the server: an entity for it, and the announcement. Relevant by distance
-## and kind, the boss always: see [method make_interest] for why a client is not sent a horde it
+## and kind, the boss always: see [method Interest.make_interest] for why a client is not sent a horde it
 ## cannot see, and for what is kept whole so that nothing a client needs goes missing.
 func _on_zombie_spawned(npc: DotNpcInstance) -> void:
 	var body := npc.node as ZzZombieBody
@@ -1805,10 +1755,10 @@ func _on_zombie_spawned(npc: DotNpcInstance) -> void:
 	identity.name = "Identity"
 	identity.owner_peer_id = 0
 	identity.authority = DotNetIdentity.Authority.SERVER
-	# By kind, not all of them (see [method make_interest]): the boss is one entity and the
+	# By kind, not all of them (see [method Interest.make_interest]): the boss is one entity and the
 	# team must see where it is from across the map; every other kind is told by distance.
 	identity.always_relevant = npc.def.id == ZzNpcs.BRUTE
-	identity.interest_tags = PackedStringArray([TAG_SPECIAL if ZzNpcs.is_special(npc.def.id) else TAG_COMMON])
+	identity.interest_tags = PackedStringArray([Interest.TAG_SPECIAL if ZzNpcs.is_special(npc.def.id) else Interest.TAG_COMMON])
 	identity.interest_linger_sec = ZOMBIE_LINGER_SEC
 	body.add_child(identity)
 

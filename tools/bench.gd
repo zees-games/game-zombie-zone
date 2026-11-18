@@ -6,6 +6,7 @@ extends "shot.gd"
 
 const _ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
 const _SimHost := preload("../game/zz_sim_host.gd")
+const Probes := preload("bench_probes.gd")
 
 var _count := 56
 var _bench_seed := 7
@@ -85,6 +86,8 @@ var _monitors: Array[PackedFloat64Array] = []
 var _hosted := false
 ## Seconds the hosted game may take to appear on this end (its server's boot and the join). 0 waits without end.
 var _host_wait_sec := 300.0
+## What the measured window recorded, per frame: render counts, GPU/CPU times and the crowd alive.
+var _measured := {}
 
 
 func _ready() -> void:
@@ -213,18 +216,8 @@ func _print_monitors(game: ZzGame) -> void:
 
 func _run() -> void:
 	_read_args()
-	var game: ZzGame = _client.get("game")
-	# A hosted client builds its world only once its server is up and joined.
-	var t0 := Time.get_ticks_msec()
-	while game == null:
-		if _host_wait_sec > 0.0 and Time.get_ticks_msec() - t0 > int(_host_wait_sec * 1000.0):
-			push_error("bench: no game after %.0f s" % _host_wait_sec)
-			get_tree().quit(1)
-			return
-		await get_tree().process_frame
-		game = _client.get("game")
-	if _hosted and _client.get("_sim_host") == null:
-		push_error("bench: --sim_host=1 but the sim host did not start (see user://logs/sim_server.log)")
+	var game: ZzGame = await _wait_for_game()
+	if game == null:
 		get_tree().quit(1)
 		return
 	await _until_a_round(game)
@@ -257,7 +250,7 @@ func _run() -> void:
 		get_tree().quit(0)
 		return
 	if "--physprobe" in OS.get_cmdline_user_args():
-		_phys_probe(local)
+		Probes.phys_probe(local)
 		get_tree().quit(0)
 		return
 	if _profile and _hosted:
@@ -268,21 +261,54 @@ func _run() -> void:
 		_profiler = (load("res://tools/survival_long_run.gd") as GDScript).new()
 		_profiler.set(&"_game", game)
 		game.external_tick = true
+	await _measure_frames(game, local, stand)
+	if _profiler != null:
+		_print_profile()
+	_print_monitors(game)
+	if "--census" in OS.get_cmdline_user_args():
+		_census()
+	if "--bodyprobe" in OS.get_cmdline_user_args():
+		Probes.body_probe(game, local)
+	_report_measured(game)
+	_save_last_frame()
+	get_tree().quit(0)
+
+
+## The game the client built; a hosted client builds it only once its server is up and joined.
+## Null (with the error pushed) when it never came or the sim host did not start.
+func _wait_for_game() -> ZzGame:
+	var game: ZzGame = _client.get("game")
+	var t0 := Time.get_ticks_msec()
+	while game == null:
+		if _host_wait_sec > 0.0 and Time.get_ticks_msec() - t0 > int(_host_wait_sec * 1000.0):
+			push_error("bench: no game after %.0f s" % _host_wait_sec)
+			return null
+		await get_tree().process_frame
+		game = _client.get("game")
+	if _hosted and _client.get("_sim_host") == null:
+		push_error("bench: --sim_host=1 but the sim host did not start (see user://logs/sim_server.log)")
+		return null
+	return game
+
+
+## The warm-up and measured window: the survivor turns a full circle while frames are recorded
+## into [member _measured]; the frame clock stops at the end.
+func _measure_frames(game: ZzGame, local, stand: Vector3) -> void:
+	var gpu := PackedFloat64Array()
+	var cpu := PackedFloat64Array()
+	var draws := PackedInt32Array()
+	var objects := PackedInt32Array()
+	var prims := PackedInt32Array()
+	var alive_sum := 0
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _bench_seed
 	var vp := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(vp, true)
-	var gpu := PackedFloat64Array()
-	var cpu := PackedFloat64Array()
 	_clock.on_frame = _on_frame
 	_clock.start(get_tree())
 	var start_yaw: float = local.controller.state.yaw
 	var began := Time.get_ticks_msec()
 	var total_ms := (_warm + _measure) * 1000.0
-	var draws := PackedInt32Array()
-	var objects := PackedInt32Array()
-	var prims := PackedInt32Array()
-	var alive_sum := 0
 	while Time.get_ticks_msec() - began < total_ms:
 		if not _hosted:
 			_keep_crowd(game, local, stand, rng)
@@ -299,16 +325,14 @@ func _run() -> void:
 		if _recording:
 			alive_sum += _record_frame(game, vp, draws, objects, prims, gpu, cpu)
 	_clock.stop()
-	if _profiler != null:
-		_print_profile()
-	_print_monitors(game)
-	if "--census" in OS.get_cmdline_user_args():
-		_census()
-	if "--bodyprobe" in OS.get_cmdline_user_args():
-		_body_probe(game, local)
-	_report(draws, objects, prims, float(alive_sum) / maxf(1.0, draws.size()), game, gpu, cpu)
-	_save_last_frame()
-	get_tree().quit(0)
+	_measured = {"draws": draws, "objects": objects, "prims": prims, "gpu": gpu, "cpu": cpu, "alive_sum": alive_sum}
+
+
+## The report over what [method _measure_frames] recorded.
+func _report_measured(game: ZzGame) -> void:
+	var m := _measured
+	var draws: PackedInt32Array = m.draws
+	_report(draws, m.objects, m.prims, float(m.alive_sum) / maxf(1.0, draws.size()), game, m.gpu, m.cpu)
 
 
 ## One measured frame's render counts, physics monitors and GPU/CPU times; returns the crowd alive.
@@ -736,120 +760,3 @@ func _print_perf(game: ZzGame, wall: PackedFloat64Array, phys_ms: float, draws: 
 		"nodes": int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 		"gpu": RenderingServer.get_video_adapter_name(), "driver": RenderingServer.get_current_rendering_driver_name(),
 		"resolution": "%dx%d" % [vp.x, vp.y], "godot": Engine.get_version_info().get("string", "")}))
-
-
-
-
-## --bodyprobe: what one zombie's move costs, and against what: move_and_slide at its own velocity,
-## one test_move, two rays, and the static shapes its capsule's swept box overlaps, by shape class.
-func _body_probe(game: ZzGame, local) -> void:
-	var space: PhysicsDirectSpaceState3D = local.get_world_3d().direct_space_state
-	var classes := {}
-	var n := 0
-	var t_slide := 0
-	var t_test := 0
-	var t_ray := 0
-	var overlaps := 0
-	var rayq := PhysicsRayQueryParameters3D.new()
-	for npc in game.horde.spawner.all_npcs():
-		var b := npc.node as CharacterBody3D
-		if b == null or not npc.is_alive():
-			continue
-		n += 1
-		var keep := b.global_transform
-		var wish: Vector3 = b.get(&"wish")
-		var v := Vector3(wish.x, -1.0, wish.z)
-		if v.length_squared() < 0.01:
-			v = Vector3(1.0, -1.0, 0.0)
-		b.velocity = v
-		var t0 := Time.get_ticks_usec()
-		for i in 20:
-			b.global_transform = keep
-			b.velocity = v
-			b.move_and_slide()
-		t_slide += Time.get_ticks_usec() - t0
-		b.global_transform = keep
-		t0 = Time.get_ticks_usec()
-		for i in 20:
-			var _hit := b.test_move(keep, v / 60.0)
-		t_test += Time.get_ticks_usec() - t0
-		rayq.collision_mask = b.collision_mask
-		t0 = Time.get_ticks_usec()
-		for i in 20:
-			rayq.from = keep.origin + Vector3(0, 0.5, 0)
-			rayq.to = rayq.from + v / 60.0 + Vector3(v.x, 0, v.z).normalized() * 0.4
-			var _a := space.intersect_ray(rayq)
-			rayq.from = keep.origin + Vector3(0, 0.6, 0)
-			rayq.to = keep.origin + Vector3(0, -0.6, 0)
-			var _c := space.intersect_ray(rayq)
-		t_ray += Time.get_ticks_usec() - t0
-		var q := PhysicsShapeQueryParameters3D.new()
-		var box := BoxShape3D.new()
-		box.size = Vector3(0.94, 2.05, 0.94)
-		q.shape = box
-		q.transform = Transform3D(Basis(), keep.origin + Vector3(0, 0.9, 0))
-		q.collision_mask = b.collision_mask
-		for r in space.intersect_shape(q, 128):
-			overlaps += 1
-			var owner: Object = r.get("collider")
-			var shape_class := "?"
-			if owner is CollisionObject3D:
-				var sid: int = (owner as CollisionObject3D).shape_find_owner(int(r.get("shape", 0)))
-				var sh := (owner as CollisionObject3D).shape_owner_get_shape(sid, 0) if sid >= 0 else null
-				shape_class = sh.get_class() if sh != null else "?"
-				if sh is ConcavePolygonShape3D:
-					shape_class += "(%d faces)" % ((sh as ConcavePolygonShape3D).get_faces().size() / 3)
-				elif sh is ConvexPolygonShape3D:
-					shape_class += "(%d pts)" % (sh as ConvexPolygonShape3D).points.size()
-			classes[shape_class] = int(classes.get(shape_class, 0)) + 1
-	n = maxi(n, 1)
-	print("BODYPROBE bodies=%d move_and_slide=%.1f us test_move=%.1f us two_rays=%.1f us overlaps=%.1f per body" % [
-		n, t_slide / 20.0 / n, t_test / 20.0 / n, t_ray / 20.0 / n, float(overlaps) / n])
-	var keys := classes.keys()
-	keys.sort_custom(func(a, c): return int(classes[a]) > int(classes[c]))
-	for k in keys.slice(0, 12):
-		print("BODYPROBE shape %-36s %d" % [k, classes[k]])
-
-
-## --physprobe: static shapes by body and what one capsule overlap query costs near the survivor.
-func _phys_probe(local: Node3D) -> void:
-	var shapes := 0
-	var bodies := 0
-	var procs := {}
-	var stack: Array[Node] = [get_tree().root]
-	while not stack.is_empty():
-		var n: Node = stack.pop_back()
-		stack.append_array(n.get_children())
-		if n.is_physics_processing():
-			var sc: Script = n.get_script()
-			var pk := "%s|%s" % [n.get_class(), sc.resource_path.get_file() if sc != null else ""]
-			procs[pk] = int(procs.get(pk, 0)) + 1
-		if n is StaticBody3D:
-			bodies += 1
-			for c in n.get_children():
-				if c is CollisionShape3D:
-					shapes += 1
-	print("PHYSPROBE static_bodies=%d shapes=%d" % [bodies, shapes])
-	print("PHYSPROBE physics_processing ", procs)
-	var space := local.get_world_3d().direct_space_state
-	var cap := CapsuleShape3D.new()
-	cap.radius = 0.4
-	cap.height = 1.8
-	var q := PhysicsShapeQueryParameters3D.new()
-	q.shape = cap
-	q.collision_mask = 0xFFFFF
-	var rng := RandomNumberGenerator.new()
-	var n := 2000
-	var hits := 0
-	var t0 := Time.get_ticks_usec()
-	for i in n:
-		q.transform = Transform3D(Basis(), local.global_position + Vector3(rng.randf_range(-20, 20), 1.0, rng.randf_range(-20, 20)))
-		hits += space.intersect_shape(q, 8).size()
-	print("PHYSPROBE intersect_shape %.1f us/call hits=%d" % [float(Time.get_ticks_usec() - t0) / n, hits])
-	var rayq := PhysicsRayQueryParameters3D.new()
-	t0 = Time.get_ticks_usec()
-	for i in n:
-		rayq.from = local.global_position + Vector3(rng.randf_range(-20, 20), 1.0, rng.randf_range(-20, 20))
-		rayq.to = rayq.from + Vector3(rng.randf_range(-10, 10), 0.0, rng.randf_range(-10, 10))
-		hits += space.intersect_ray(rayq).size()
-	print("PHYSPROBE intersect_ray %.1f us/call" % [float(Time.get_ticks_usec() - t0) / n])

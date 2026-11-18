@@ -6,6 +6,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const CommonBrain := preload("../npcs/zz_common_brain.gd")
 const ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
 const DecideCases := preload("zz_native_decide_cases.gd")
+const SteerState := preload("zz_native_steer_state.gd")
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 
 ## The zombies' brains in dot-sim ([member ZzConfig.native_brains], on by default) decide as the script over seeded
@@ -433,48 +434,6 @@ func _turn_probe(s: int, tp: Dictionary) -> void:
 				print("    got %s exp %s" % [var_to_str(got), var_to_str(expected)])
 
 
-## What a steer leaves behind: the body's transform and wish, the character's turn, the brain's cruise and watch.
-func _steer_state(brain: Object) -> Array:
-	var b: ZzZombieBody = brain.npc.node
-	var c: DotNpcAiCharacter = brain.character
-	var rough: float = brain.path.rough_until if brain.path != null else 0.0
-	var index: int = brain.path.index if brain.path != null else -99
-	var st := [b.global_transform, b.wish, c._peak_turn, c._over_amt, c._over_axis, c._turns, brain._cruise_to,
-		brain._cruise_dest, brain._progress_at, brain._progress_since, rough, index, brain._waypoint]
-	# The rest of the path: a stuck steer goes rough (its points dropped, its arrive radius cut), and a due one's
-	# search reads is_rough, which puts the radius back.
-	var p: DotNpcPath = brain.path
-	if p != null:
-		st.append_array([p.points.duplicate(), p.arrive_radius, p._arrive_before, p.computed_at, p.goal_at_compute,
-			p.partial])
-	return st
-
-
-func _put_state(brain: Object, st: Array) -> void:
-	var b: ZzZombieBody = brain.npc.node
-	var c: DotNpcAiCharacter = brain.character
-	b.global_transform = st[0]
-	b.wish = st[1]
-	c._peak_turn = st[2]
-	c._over_amt = st[3]
-	c._over_axis = st[4]
-	c._turns = st[5]
-	brain._cruise_to = st[6]
-	brain._cruise_dest = st[7]
-	brain._progress_at = st[8]
-	brain._progress_since = st[9]
-	if brain.path != null:
-		brain.path.rough_until = st[10]
-		brain.path.index = st[11]
-		brain.path.points = (st[13] as PackedVector3Array).duplicate()
-		brain.path.arrive_radius = st[14]
-		brain.path._arrive_before = st[15]
-		brain.path.computed_at = st[16]
-		brain.path.goal_at_compute = st[17]
-		brain.path.partial = st[18]
-	brain._waypoint = st[12]
-
-
 ## The native steer against the script's over seeded worlds, and the native turn_view beside it.
 func _check_steers() -> void:
 	var steers := {"bad": 0, "stored": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0,
@@ -546,18 +505,18 @@ func _steers(s: int, steers: Dictionary) -> void:
 			var to: Vector3 = kase[0]
 			var spacing: float = kase[1]
 			var speed: float = kase[2]
-			var before := _steer_state(brain)
+			var before := SteerState.take(brain)
 			# Both steers start from a transform just set: look_at keeps the body's scale through get_scale, which a
 			# set transform answers from the basis and a set rotation from its cache, an ulp apart.
-			_put_state(brain, before)
+			SteerState.put(brain, before)
 			h.brains_crowd = null
 			brain.steer_with_spacing(to, speed, ctx.delta, spacing)
-			var script := _steer_state(brain)
+			var script := SteerState.take(brain)
 			h.brains_crowd = grid
 			_native_steers(h, brain, before, script, kase, ctx, steers)
 			_tally_steer(steers, brain, ctx, before, script)
 			if brain.director == sp:
-				_put_state(brain, before)
+				SteerState.put(brain, before)
 				_tally_path(steers, brain, sp, kase[0], before, script)
 	sp.free()
 
@@ -574,7 +533,7 @@ func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase
 	if h.brains_now.has_method(&"walk_stored") and brain.director != null:
 		walks.push_front(3)
 	for walk: int in walks:
-		_put_state(brain, before)
+		SteerState.put(brain, before)
 		# 2 is the whole move (walk, then steer_walk after a due path), 1 the path in script and steer_walk.
 		ZombieMove._steer_walks = mini(walk, 1)
 		ZombieMove._walks = 1 if walk >= 2 else 0
@@ -591,7 +550,7 @@ func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase
 				steers["stored"] += 1
 			brain._unstore()
 			h.spawner = null
-		var native := _steer_state(brain)
+		var native := SteerState.take(brain)
 		if walk == 1:
 			steers["walked"] += 1
 		elif walk == 2 and brain.director != null:

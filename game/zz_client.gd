@@ -5,22 +5,14 @@ const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs
 
 
 func _ready() -> void:
-	# The server a hosted solo game started runs this same main scene: an export takes no scene path.
-	if ZzSimHost.is_server_child():
-		_become_sim_server()
+	if await _sim_host_first():
 		return
-	# `--sim_host 1`: the solo game's simulation in a second process, joined over loopback; a failure plays it here.
-	if ZzSimHost.wanted():
-		await _start_sim_host()
 	# First, before anything can be drawn: the map, the player and the camera arrive after this node is in the tree. The platform puts the loading cover up, held until the player exists and the camera is current, and finds the link.
 	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
 	_own_map_threads()
 	platform = DotGameClient.new()
 	platform.name = "Platform"
-	platform.force_offline = force_offline and _sim_host == null
-	if _sim_host != null:
-		platform.link = _sim_host.link
-		platform.local_link = true
+	_link_sim_host(platform)
 	platform.use_standalone_content = standalone_content
 	platform.spawned_fn = func() -> bool:
 		return player != null and camera != null and camera.is_inside_tree()
@@ -86,16 +78,6 @@ func _ready() -> void:
 		_start_offline()
 	else:
 		DotLog.result(CHANNEL, "the netcode", _build_netcode())
-
-
-## Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
-func _own_map_threads() -> void:
-	var own_threads := false
-	for a in OS.get_cmdline_user_args():
-		own_threads = own_threads or a.begins_with("--map_load_threads=")
-	if not own_threads:
-		MapThreads.client_value = -1
-		var _on := MapThreads.apply(-1)
 
 
 # The load gate is the platform's. Covered also means the horde does not act: offline the world ticks itself, so the director, waves, clocks and damage would work on the survivor in front of a picture;
@@ -215,35 +197,8 @@ func _avatar_figure(peer_id: int) -> Object:
 var _steps_before := 0
 
 
-## Hands this process to the server a hosted solo game asked for ([constant ZzSimHost.SERVER_FLAG]): no client is built.
-func _become_sim_server() -> void:
-	set_process(false)
-	set_physics_process(false)
-	set_process_input(false)
-	set_process_unhandled_input(false)
-	var server: Node = (load(ZzSimHost.SERVER_SCRIPT) as GDScript).new()
-	server.name = ZzSimHost.ANCHOR
-	get_tree().root.add_child.call_deferred(server)
-	queue_free()
-
-
-## Starts the solo game's server process and joins it; on any failure the client plays the in-process game.
-func _start_sim_host() -> void:
-	var host := ZzSimHost.new()
-	host.name = "SimHost"
-	add_child(host)
-	var started: DotResult = await host.start(offline_bots, config_file)
-	DotLog.result(CHANNEL, "sim host", started)
-	if started.ok:
-		_sim_host = host
-		return
-	DotLog.warn(CHANNEL, "sim host failed, playing in process: %s" % started.error.message)
-	host.queue_free()
-
-
 func _exit_tree() -> void:
-	if _sim_host != null and is_instance_valid(_sim_host):
-		_sim_host.stop()
+	_stop_sim_host()
 	reset_slowmo()
 	if _steps_before > 0:
 		Engine.max_physics_steps_per_frame = _steps_before
