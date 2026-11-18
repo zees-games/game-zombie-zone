@@ -23,8 +23,8 @@ static var _forced_workers := -2
 static func forced_npc_workers() -> int:
 	if _forced_workers == -2:
 		var v := OS.get_environment("ZZ_NPC_WORKERS").strip_edges()
-		if v == "" and FileAccess.file_exists(FORCE_WORKERS_FILE):
-			v = FileAccess.get_file_as_string(FORCE_WORKERS_FILE).strip_edges()
+		if v == "" and FileAccess.file_exists(FORCE_WORKERS_FILE):  # pack-path: ok (a test-run hook in a worktree, never shipped)
+			v = FileAccess.get_file_as_string(FORCE_WORKERS_FILE).strip_edges()  # pack-path: ok (as above)
 		_forced_workers = v.to_int() if v.is_valid_int() and v.to_int() >= 0 else -1
 		if _forced_workers >= 0:
 			DotParallel.verify = true

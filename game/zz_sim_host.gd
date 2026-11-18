@@ -62,7 +62,7 @@ static func wanted_for(args: PackedStringArray) -> bool:
 
 ## Starts the server child with [param bots] stand-ins and joins it; [param config_file] is the client's config layer.
 func start(bots: int, config_file: String) -> DotResult:
-	if not ResourceLoader.exists(SERVER_SCRIPT):
+	if not ResourceLoader.exists(SERVER_SCRIPT):  # pack-path: ok (the child runs the built-in project; mounted there is no sim host)
 		return DotResult.fail(DotError.CODE_UNSUPPORTED, "the sim server is not in this build")
 	var port := free_port()
 	if port <= 0:

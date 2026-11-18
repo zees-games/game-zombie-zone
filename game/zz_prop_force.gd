@@ -3,6 +3,7 @@ extends RefCounted
 ## Per-weapon force on each kind of loose prop: a multiplier table (`props/forces.json`, rows weapon ids and `*`, columns toy kinds and `default`).
 ## Pure data so a server owner retunes it without code; the push itself is dot-props' [method DotPropBodyBox.hit].
 
+const ZzPaths := preload("zz_paths.gd")
 const PATH := "res://props/forces.json"
 
 ## weapon id (String) -> {kind (String) -> float}
@@ -10,8 +11,10 @@ var table: Dictionary = {}
 
 
 ## The shipped table, or an empty one (every multiplier 1.0) when the file is missing or malformed.
+## [param path] is rebased onto where the game is mounted (a delivered pack is not at res://).
 static func load_file(path: String = PATH) -> RefCounted:
-	var force: RefCounted = (load("res://game/zz_prop_force.gd") as GDScript).new()
+	var force: RefCounted = (load(ZzPaths.rebase("res://game/zz_prop_force.gd")) as GDScript).new()
+	path = ZzPaths.rebase(path)
 	if not FileAccess.file_exists(path):
 		return force
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))

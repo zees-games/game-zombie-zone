@@ -149,10 +149,10 @@ func _apply_cvars(server: DotServer) -> bool:
 func _bench(server: DotServer) -> void:
 	if ZzSimHost.arg("--bench_crowd") == "":
 		return
-	if not ResourceLoader.exists(BENCH_HELPER):
+	if not ResourceLoader.exists(BENCH_HELPER):  # pack-path: ok (tools/ is not shipped; a bench runs from a checkout)
 		push_warning("sim server: --bench_crowd needs %s, which is not in this build" % BENCH_HELPER)
 		return
-	var helper: Node = (load(BENCH_HELPER) as GDScript).new()
+	var helper: Node = (load(BENCH_HELPER) as GDScript).new()  # pack-path: ok (as above)
 	helper.name = "BenchCrowd"
 	helper.set(&"game", world)
 	helper.set(&"server", server)
