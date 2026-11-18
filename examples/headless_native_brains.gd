@@ -21,7 +21,7 @@ const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
 const SECTIONS := 7
-const CHECKS := 24
+const CHECKS := 25
 const NATIVE := &"DotSimZombieBrains"
 const NATIVE_CROWD := &"DotSimCrowdGrid"
 const SEEDS := 60
@@ -477,7 +477,7 @@ func _put_state(brain: Object, st: Array) -> void:
 
 ## The native steer against the script's over seeded worlds, and the native turn_view beside it.
 func _check_steers() -> void:
-	var steers := {"bad": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0,
+	var steers := {"bad": 0, "stored": 0, "walked": 0, "steered": 0, "still": 0, "turned": 0, "overshot": 0, "reset": 0, "stuck": 0, "rough": 0,
 		"moved": 0, "due": 0, "advanced": 0, "ended": 0}
 	var tp := {"bad": 0, "n": 0}
 	for s in SEEDS:
@@ -493,6 +493,9 @@ func _check_steers() -> void:
 	_check(not ClassDB.class_has_method(NATIVE, &"walk") or (steers["moved"] > 1500 and steers["due"] > 300
 			and steers["advanced"] > 200 and steers["ended"] > 50),
 		"the whole move went through walk: paths walked, due, advanced past their corners and run to their end",
+		str(steers))
+	_check(not ClassDB.class_has_method(NATIVE, &"walk_stored") or steers["stored"] > 1500,
+		"the whole move went through the native store too (walk_stored, steer_stored), its state taken back the same",
 		str(steers))
 	_check(steers["steered"] > 3000 and steers["still"] > 20 and steers["turned"] > 1000 and steers["overshot"] > 100
 			and steers["reset"] > 500 and steers["stuck"] > 50 and steers["rough"] > 20,
@@ -566,13 +569,28 @@ func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase
 	var walks: Array = [1, 0] if h.brains_now.has_method(&"steer_walk") else [0]
 	if h.brains_now.has_method(&"walk"):
 		walks.push_front(2)
+	# 3 is the whole move with the turn and watch in the native store (walk_stored, steer_stored), for a brain of
+	# the horde's spawner, whose repath tuning the store is handed.
+	if h.brains_now.has_method(&"walk_stored") and brain.director != null:
+		walks.push_front(3)
 	for walk: int in walks:
 		_put_state(brain, before)
 		# 2 is the whole move (walk, then steer_walk after a due path), 1 the path in script and steer_walk.
 		ZombieMove._steer_walks = mini(walk, 1)
-		ZombieMove._walks = 1 if walk == 2 else 0
+		ZombieMove._walks = 1 if walk >= 2 else 0
+		ZombieMove._stores = 1 if walk == 3 else 0
+		if walk == 3:
+			var sp: DotNpcSpawner = brain.director
+			h.spawner = sp
+			h.brains_now.call(&"set_repath", sp.repath_drift, sp.repath_interval, sp.repath_drift_ratio,
+				sp.repath_interval_per_m)
 		var steered: int = h.brains_now.call(&"steered")
 		brain.steer_with_spacing(kase[0], kase[2], ctx.delta, kase[1])
+		if walk == 3:
+			if brain._stored_in != null:
+				steers["stored"] += 1
+			brain._unstore()
+			h.spawner = null
 		var native := _steer_state(brain)
 		if walk == 1:
 			steers["walked"] += 1
@@ -591,6 +609,7 @@ func _native_steers(h: Object, brain: Object, before: Array, script: Array, kase
 							var_to_str(native[i])])
 	ZombieMove._steer_walks = -1
 	ZombieMove._walks = -1
+	ZombieMove._stores = -1
 
 
 ## A spawner with a two-point nav graph (so it has navigation) whose repaths are deferred, with repath tuning rolled.
@@ -745,6 +764,9 @@ func _verify() -> bool:
 		h.brains_crowd = native_grid
 		var ctx := DotNpcAiContext.new()
 		var sp := _nav_spawner(rng)
+		# The horde's own spawner, so its repath tuning is fed and the stored walk is checked beside the walk.
+		h.spawner = sp
+		h._feed_brains()
 		for brain: Object in commons:
 			brain.character = DotNpcAiCharacter.new()
 			brain.character.seed_value = rng.randi()
@@ -776,6 +798,7 @@ func _verify() -> bool:
 			h._feed_brains()
 		decided += h.brains_decided
 		mismatches += h.brains_mismatches
+		h.spawner = null
 		sp.free()
 	print("  %d decided, %d mismatches" % [decided, mismatches])
 	return decided > 500 and mismatches == 0

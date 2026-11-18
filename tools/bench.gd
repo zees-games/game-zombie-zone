@@ -68,6 +68,11 @@ var _abd_us := {}
 var _abd_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
+## --ab-store (with --profile): every 64 ticks the zombie move flips between dot-sim's by-value `walk`/`steer_walk`
+## (0, the turn and watch handed across each call) and the native store's `walk_stored`/`steer_stored`/`face_stored`
+## (1); h.brains is summed per 64-tick window and the pairs' difference printed (AB store line).
+var _ab_store := false
+var _abst_windows := {}
 var _parity := {"compared": 0, "differ": 0, "pushes": 0}
 var _ab_us := {}
 var _ab_ticks := {}
@@ -128,6 +133,11 @@ func _read_args() -> void:
 			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk"):
 				push_error("bench: --ab-move needs a dot-sim build with DotSimZombieBrains.walk")
 				get_tree().quit(1)
+		elif arg == "--ab-store":
+			_ab_store = true
+			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk_stored"):
+				push_error("bench: --ab-store needs a dot-sim build with DotSimZombieBrains.walk_stored")
+				get_tree().quit(1)
 		elif arg == "--ab-decide":
 			_ab_decide = true
 			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"chase"):
@@ -180,6 +190,8 @@ func _print_profile() -> void:
 	for side: int in _abd_ticks:
 		print("AB decide=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abd_us[side]) / 1000.0 / maxf(1.0, _abd_ticks[side]), _abd_ticks[side]])
+	if _ab_store:
+		print(_paired_line("store", "h.brains", _abst_windows))
 	if _pacing_verify:
 		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
 		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
@@ -549,6 +561,9 @@ func _physics_process(_delta: float) -> void:
 	var decide_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_decide else -1
 	if decide_arm >= 0:
 		_ZombieMove._decides = decide_arm
+	var store_window := Engine.get_physics_frames() >> 6
+	if _ab_store:
+		_ZombieMove._stores = store_window & 1
 	_profiler.call(&"_profiled_step")
 	_ticks += 1
 	if senses_arm >= 0 and _recording:
@@ -563,6 +578,9 @@ func _physics_process(_delta: float) -> void:
 	if move_arm >= 0 and _recording:
 		_abm_us[move_arm] = int(_abm_us.get(move_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abm_ticks[move_arm] = int(_abm_ticks.get(move_arm, 0)) + 1
+	if _ab_store and _recording:
+		_abst_windows[store_window] = _abst_windows.get(store_window, Vector2.ZERO) + Vector2(
+			float((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0)), 1.0)
 	if decide_arm >= 0 and _recording:
 		_abd_us[decide_arm] = int(_abd_us.get(decide_arm, 0)) + int((_profiler.get(&"_tick_parts") as Dictionary).get("h.brains", 0))
 		_abd_ticks[decide_arm] = int(_abd_ticks.get(decide_arm, 0)) + 1
@@ -584,6 +602,31 @@ func _physics_process(_delta: float) -> void:
 
 var _abn_us := {}
 var _abn_ticks := {}
+
+
+## A paired A/B over 64-tick windows: window `w` ran arm `w & 1`, so each odd window and the one before it are a pair
+## under (nearly) the same load and game state. Each arm's mean, then the pairs' mean difference (arm 1 minus arm 0)
+## and its standard error; a gain inside about two errors is noise. [param windows] maps a window to
+## Vector2(summed microseconds, ticks).
+static func _paired_line(name: String, part: String, windows: Dictionary) -> String:
+	var arm_sum: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
+	var diffs := PackedFloat64Array()
+	for w: int in windows:
+		var cur: Vector2 = windows[w]
+		arm_sum[w & 1] += cur
+		if w & 1 == 1 and windows.has(w - 1) and cur.y > 0.0 and windows[w - 1].y > 0.0:
+			diffs.append((cur.x / cur.y - windows[w - 1].x / windows[w - 1].y) / 1000.0)
+	var mean := 0.0
+	for d in diffs:
+		mean += d
+	mean /= maxf(1.0, diffs.size())
+	var sq := 0.0
+	for d in diffs:
+		sq += (d - mean) * (d - mean)
+	var se := sqrt(sq / maxf(1.0, diffs.size() - 1)) / sqrt(maxf(1.0, diffs.size()))
+	return "AB %s=0 %s %.3f =1 %.3f ms/tick over %d+%d ticks; paired diff %+.3f +- %.3f ms (%d pairs)" % [name, part,
+		arm_sum[0].x / 1000.0 / maxf(1.0, arm_sum[0].y), arm_sum[1].x / 1000.0 / maxf(1.0, arm_sum[1].y),
+		int(arm_sum[0].y), int(arm_sum[1].y), mean, se, diffs.size()]
 
 
 ## The live grid's entries, in its order, into a fresh script grid and a fresh native grid; every entry's push

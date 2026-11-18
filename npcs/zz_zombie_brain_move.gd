@@ -21,6 +21,20 @@ static var _decides: int = -1
 ## What [method _walk] hands dot-sim, kept so a move fills them in place rather than building them.
 var _walk_s := PackedFloat64Array()
 var _walk_n := PackedInt64Array()
+## Whether the horde's dot-sim keeps each zombie's turn and progress watch in its own store between thinks
+## ([code]DotSimZombieBrains.store_put[/code], then [code]walk_stored[/code], [code]steer_stored[/code] and
+## [code]face_stored[/code] read and write them there): -1 until asked; 0 also turns it off, as
+## `tools/bench.gd --ab-store` does.
+static var _stores: int = -1
+## The native brains holding this brain's turn and watch; null while the character's and this brain's members are
+## the truth. Whatever script reads them takes them back first ([method _unstore]).
+var _stored_in: Object = null
+## The character whose turn state is in the store (another character is put afresh).
+var _stored_char: DotNpcAiCharacter = null
+## What [method _store_in] and [method _walk_stored] hand dot-sim, kept so they fill in place.
+var _store_s := PackedFloat64Array()
+var _walk_stored_s := PackedFloat64Array()
+var _walk_stored_n := PackedInt64Array()
 
 ## Whether [param native] (the horde's brains this tick) answers the decide calls ([member _decides]).
 static func _decides_with(native: Object) -> bool:
@@ -59,6 +73,97 @@ func steer_toward(to: Vector3, speed: float, _delta: float) -> void:
 	direction = direction.normalized()
 	b.wish = direction * speed
 	face(direction)
+
+
+## Overridden: while the turn is in the native store ([member _stored_in]) it turns there, in one call
+## ([code]face_stored[/code], dot-npc-ai's [code]face[/code] to the bit); anywhere else the store is taken back first.
+func face(direction: Vector3) -> void:
+	if _stored_in != null:
+		var h := horde()
+		var b := body()
+		if _stores == 1 and h != null and b != null and h.get(&"brains_steer") == _stored_in \
+				and not bool(h.get(&"brains_verify")) and character == _stored_char and context != null \
+				and context.delta > 0.0 and npc != null and npc.is_alive():
+			_stored_in.face_stored(get_instance_id(), b, direction, _facing_at_tick, context.delta, true)
+			return
+		_unstore()
+
+	super(direction)
+
+
+## Overridden only to take the store back first: the script's watch reads and writes the members.
+func _watch_progress(here: Vector3, goal: Vector3) -> void:
+	_unstore()
+	super(here, goal)
+
+
+## Whether this brain's turn and watch live in [param brains]' store for this move: put there on the first ask (from
+## the character's and this brain's members), and taken back while the store is off ([member _stores]), under
+## [code]brains_verify[/code], for another library or character, or a brain whose spawner is not the horde's (the
+## stored walk paths by the horde spawner's repath tuning).
+func _store_in(h: Object, brains: Object) -> bool:
+	if _stores < 0:
+		_stores = 1 if brains.has_method(&"walk_stored") else 0
+
+	if _stores != 1 or bool(h.get(&"brains_verify")):
+		_unstore()
+		return false
+
+	if _stored_in == brains and _stored_char == character:
+		return true
+
+	_unstore()
+
+	if director == null or director != h.get(&"spawner") or not _store_put(brains):
+		return false
+
+	_stored_in = brains
+	_stored_char = character
+	return true
+
+
+## Puts the character's turn state and tuning and this brain's watch in [param brains]' store under this brain.
+func _store_put(brains: Object) -> bool:
+	var c := character
+	if _store_s.size() != 13:
+		_store_s.resize(13)
+	_store_s[0] = c._peak_turn
+	_store_s[1] = c._over_amt
+	_store_s[2] = c._over_axis.x
+	_store_s[3] = c._over_axis.y
+	_store_s[4] = c._over_axis.z
+	_store_s[5] = c.view_factor
+	_store_s[6] = c.view_turn_deg
+	_store_s[7] = c.overshoot
+	_store_s[8] = _progress_at.x
+	_store_s[9] = _progress_at.y
+	_store_s[10] = _progress_at.z
+	_store_s[11] = _progress_since
+	_store_s[12] = stuck_seconds
+	return bool(brains.store_put(get_instance_id(), _store_s, c._turns, c.seed_value))
+
+
+## Takes the store's turn and watch back to the character and this brain, whose members are the truth again.
+func _unstore() -> void:
+	if _stored_in == null:
+		return
+
+	var back: PackedFloat64Array = _stored_in.store_take(get_instance_id(), true)
+	var c := _stored_char
+	_stored_in = null
+	_stored_char = null
+
+	if back.size() < 10:
+		push_error("ZzZombieBrain: the native store lost a zombie's turn and watch")
+		return
+
+	if c != null:
+		c._peak_turn = back[0]
+		c._over_amt = back[1]
+		c._over_axis = Vector3(back[2], back[3], back[4])
+		c._turns = int(back[5])
+	_progress_at = Vector3(back[6], back[7], back[8])
+	_progress_since = back[9]
 
 
 func halt() -> void:
@@ -161,6 +266,9 @@ func _steer_from(h: Object, b: ZzZombieBody, brains: Object, grid: Object, goal:
 	if _steer_walks < 0:
 		_steer_walks = 1 if brains.has_method(&"steer_walk") else 0
 
+	if _steer_walks == 1 and _store_in(h, brains) and _steer_stored(brains, grid, b, goal, to, speed, delta, spacing, now):
+		return
+
 	var out: PackedFloat64Array
 	if _steer_walks == 1:
 		# The brain's watch handed in and its writes made here: six fewer member calls across the boundary.
@@ -209,6 +317,12 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 	_path_denied = false
 	_sched()
 	var now := _world_now()
+
+	if _store_in(h, brains):
+		var stored := _walk_stored(h, b, brains, grid, p, sp, to, speed, delta, spacing, now)
+		if stored:
+			return true
+
 	var verify := bool(h.get(&"brains_verify"))
 	_walk_pack(sp, to, speed, spacing, now)
 
@@ -223,6 +337,7 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 	var goal := Vector3(out[20], out[21], out[22])
 
 	if verify:
+		_verify_stored_walk(h, b, brains, grid, p, out)
 		var index0 := p.index
 		var asked := _as_goal(sp.path_toward(npc, p, to))
 		var same := asked == goal and p.index == int(out[19]) and _waypoint == goal
@@ -307,6 +422,114 @@ func _walk_apply(p: DotNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: 
 		p.go_rough(now, 4.0)
 		_progress_at = Vector3(out[16], out[17], out[18])
 		_progress_since = now
+
+
+## [method _walk_native] with the turn and watch in the native store ([code]walk_stored[/code]): only the move's own
+## inputs are handed in, and dot-sim writes the turn, the watch and the look itself. False (nothing done) when the
+## store has no entry or no repath tuning, the store then taken back and the caller walking as before.
+func _walk_stored(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: DotNpcPath, sp: DotNpcSpawner,
+		to: Vector3, speed: float, delta: float, spacing: float, now: float) -> bool:
+	_walk_stored_pack(p, to, speed, spacing, now)
+	var out: PackedFloat64Array = brains.walk_stored(grid, npc.instance_id, get_instance_id(), b, p.points,
+		_walk_stored_s, _walk_stored_n, true)
+
+	if out[0] == -3.0:
+		_unstore()
+		return false
+
+	if out[0] < 0.0:
+		var asked := _as_goal(sp.path_toward(npc, p, to))
+		_steer_from(h, b, brains, grid, asked if asked != Vector3.INF else to, to, speed, delta, spacing)
+		return true
+
+	var goal := Vector3(out[20], out[21], out[22])
+	p.index = int(out[19])
+	_waypoint = goal
+
+	if out[0] != 1.0:
+		return true
+
+	if out[2] == 1.0:
+		b.wish = Vector3(out[3], out[4], out[5])
+	_cruise_to = goal
+	_cruise_dest = to
+
+	if out[1] == 2.0:
+		p.go_rough(now, 4.0)
+	return true
+
+
+## What [code]walk_stored[/code] is handed: [code][to, spacing, speed, delta, now, facing_at_tick, arrive_radius,
+## computed_at, goal_at_compute][/code] and [code][index, partial][/code].
+func _walk_stored_pack(p: DotNpcPath, to: Vector3, speed: float, spacing: float, now: float) -> void:
+	if _walk_stored_s.size() != 15:
+		_walk_stored_s.resize(15)
+		_walk_stored_n.resize(2)
+	_walk_stored_s[0] = to.x
+	_walk_stored_s[1] = to.y
+	_walk_stored_s[2] = to.z
+	_walk_stored_s[3] = spacing
+	_walk_stored_s[4] = speed
+	_walk_stored_s[5] = context.delta
+	_walk_stored_s[6] = now
+	_walk_stored_s[7] = _facing_at_tick.x
+	_walk_stored_s[8] = _facing_at_tick.y
+	_walk_stored_s[9] = _facing_at_tick.z
+	_walk_stored_s[10] = p.arrive_radius
+	_walk_stored_s[11] = p.computed_at
+	_walk_stored_s[12] = p.goal_at_compute.x
+	_walk_stored_s[13] = p.goal_at_compute.y
+	_walk_stored_s[14] = p.goal_at_compute.z
+	_walk_stored_n[0] = p.index
+	_walk_stored_n[1] = 1 if p.partial else 0
+
+
+## [method _steer_from]'s steer with the turn and watch in the native store ([code]steer_stored[/code]). False
+## (nothing done) when the store has no entry, the store then taken back and the caller steering as before.
+func _steer_stored(brains: Object, grid: Object, b: ZzZombieBody, goal: Vector3, to: Vector3, speed: float,
+		delta: float, spacing: float, now: float) -> bool:
+	var rough := path != null and path.has_method(&"go_rough")
+	var out: PackedFloat64Array = brains.steer_stored(grid, npc.instance_id, get_instance_id(), b, goal, to,
+		spacing, speed, context.delta, now, _facing_at_tick, rough, true)
+
+	if out[0] == -3.0:
+		_unstore()
+		return false
+
+	if out[0] < 0.0:
+		_steer_rest(goal, to, speed, delta, spacing)
+		return true
+
+	if out[0] == 1.0:
+		_cruise_to = goal
+		_cruise_dest = to
+
+	if out[1] == 2.0 and rough:
+		path.call(&"go_rough", now, 4.0)
+	return true
+
+
+## [code]brains_verify[/code] with the store on: the stored walk, asked of a fresh entry put from the members the
+## by-value [code]walk[/code] was handed and without applying, must answer [param out] to the bit.
+func _verify_stored_walk(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: DotNpcPath,
+		out: PackedFloat64Array) -> void:
+	if _stores != 1 or not brains.has_method(&"walk_stored") or director != h.get(&"spawner"):
+		return
+
+	if not _store_put(brains):
+		h.call(&"brains_tally", false)
+		return
+
+	_walk_stored_pack(p, Vector3(_walk_s[0], _walk_s[1], _walk_s[2]), _walk_s[4], _walk_s[3], _walk_s[6])
+	var stored: PackedFloat64Array = brains.walk_stored(grid, npc.instance_id, get_instance_id(), b, p.points,
+		_walk_stored_s, _walk_stored_n, false)
+	var _back: PackedFloat64Array = brains.store_take(get_instance_id(), true)
+	var same := stored == out
+
+	if not same:
+		DotLog.debug(CHANNEL, "native stored walk differs from the by-value walk", {"stored": str(stored),
+			"walk": str(out)})
+	h.call(&"brains_tally", same)
 
 
 ## dot-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.
