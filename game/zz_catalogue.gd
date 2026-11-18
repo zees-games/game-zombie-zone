@@ -414,6 +414,8 @@ func display_name(id: StringName) -> String:
 	var doc: Dictionary = maps.get(id, {})
 	var shown := str(doc.get("name", id))
 	var title := str(_content_titles.get(id, "")) if _content_ids.has(id) else ""
+	if roots.get(id, "") == USER_MAPS:
+		shown += DotMapDocDrop.TAG
 	return "%s [%s]" % [shown, title] if title != "" else shown
 
 
