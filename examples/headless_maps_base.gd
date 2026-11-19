@@ -118,6 +118,8 @@ const FOOTING_CHECKS := 5
 
 const ZzFooting := preload("res://game/zz_footing.gd")
 
+const ZzFootingMap := preload("res://game/zz_map.gd")
+
 const SOLID_PROP_CHECKS := 6
 
 func _visible(lamps: Array[Light3D]) -> int:
@@ -203,3 +205,37 @@ func _world(id: StringName, drawn := false) -> ZzGame:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	return game
+
+func _dispose(game: ZzGame) -> void:
+	remove_child(game)
+	game.free()
+	await get_tree().process_frame
+
+func _section(name: String) -> void:
+	_sections_entered += 1
+	print(name)
+
+func _finished() -> void:
+	_sections_finished += 1
+
+## The fall and stuck net (ZzFooting): what counts as out of the map, and that a fallen survivor is put back.
+func _test_footing() -> void:
+	_section("footing")
+	# Boat Escape has pools deeper than every deck: a swimmer there is not in the void.
+	var id: StringName = &"ze_boat_escape" if _maps.has("ze_boat_escape") else (StringName(_maps[0]) if not _maps.is_empty() else &"")
+	var game := await _world(id)
+	var map: ZzFootingMap = game.map
+	var plane := ZzFooting.floor_plane(map)
+	var at: Vector3 = map.spawn("survivors", 0)[0]
+	_check(plane < at.y and plane >= map.kill_height(), "the floor plane is under the spawn and over the kill height", "%.1f" % plane)
+	_check(not ZzFooting.out_of_map(map, at), "a spawn is in the map")
+	_check(ZzFooting.out_of_map(map, Vector3(at.x, plane - 1.0, at.z)), "under the floor plane is out of the map")
+	var drowned: Array = []
+	for pool: AABB in map.water_boxes:
+		if ZzFooting.out_of_map(map, pool.position + Vector3(0.0, 0.2, 0.0)):
+			drowned.append(str(pool))
+	_check(drowned.is_empty(), "the bed of a pool is not out of the map", "%s" % [drowned])
+	var net := ZzFooting.new()
+	_check(net.rescued == 0 and net.has_method("forget"), "a fresh net has rescued nobody")
+	await _dispose(game)
+	_finished()

@@ -139,28 +139,6 @@ func _test_lazy_catalogue() -> void:
 	var _dropped := DirAccess.remove_absolute(dir)
 	_finished()
 
-## The fall and stuck net (ZzFooting): what counts as out of the map, and that a fallen survivor is put back.
-func _test_footing() -> void:
-	_section("footing")
-	# Boat Escape has pools deeper than every deck: a swimmer there is not in the void.
-	var id: StringName = &"ze_boat_escape" if _maps.has("ze_boat_escape") else (StringName(_maps[0]) if not _maps.is_empty() else &"")
-	var game := await _world(id)
-	var map: ZzMap = game.map
-	var plane := ZzFooting.floor_plane(map)
-	var at: Vector3 = map.spawn("survivors", 0)[0]
-	_check(plane < at.y and plane >= map.kill_height(), "the floor plane is under the spawn and over the kill height", "%.1f" % plane)
-	_check(not ZzFooting.out_of_map(map, at), "a spawn is in the map")
-	_check(ZzFooting.out_of_map(map, Vector3(at.x, plane - 1.0, at.z)), "under the floor plane is out of the map")
-	var drowned: Array = []
-	for pool: AABB in map.water_boxes:
-		if ZzFooting.out_of_map(map, pool.position + Vector3(0.0, 0.2, 0.0)):
-			drowned.append(str(pool))
-	_check(drowned.is_empty(), "the bed of a pool is not out of the map", "%s" % [drowned])
-	var net := ZzFooting.new()
-	_check(net.rescued == 0 and net.has_method("forget"), "a fresh net has rescued nobody")
-	await _dispose(game)
-	_finished()
-
 ## A map with more solid props than the wire holds keeps them all on the server and sends none.
 func _test_solid_prop_budget() -> void:
 	_section("solid prop budget")
@@ -779,18 +757,6 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	# Both worlds share one physics space: let the server drop the drawn one's bodies before the
 	# checks that follow ask it about the same spot.
 	await get_tree().physics_frame
-
-func _dispose(game: ZzGame) -> void:
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-func _finished() -> void:
-	_sections_finished += 1
 
 ## The `game:` block of the spawner config the map resolved to (its traders and spawners).
 func lay_block(game: ZzGame, _doc: Dictionary) -> Dictionary:
