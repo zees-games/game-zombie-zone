@@ -385,6 +385,9 @@ func _stage() -> void:
 		return
 	for layer in _client.find_children("*", "CanvasLayer", true, false):
 		(layer as CanvasLayer).visible = false
+	# Loot price tags (a floating "250" over the lying guns) are overlays too: the judge reads them as a stray label.
+	for tag in _client.find_children("*", "Label3D", true, false):
+		(tag as Label3D).visible = false
 	var hud: Variant = _client.get("hud")
 	if hud is CanvasItem:
 		(hud as CanvasItem).visible = false

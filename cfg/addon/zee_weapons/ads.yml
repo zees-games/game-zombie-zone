@@ -16,6 +16,7 @@ ads:
     view_shift_x: 0.0
     view_shift_y: 0.0
     view_shift_z: 0.0
+    hip_zero: 12.0
 # A weapon override lists only what it changes, by weapon id:
   weapons:
     sniper:
