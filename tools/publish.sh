@@ -21,9 +21,12 @@ case " $* " in *" --dry-run "*) ;; *)
         case "$a" in --version|--bump|--out|--site|--token-file|--lock) skip="$a" ;; *) G+=("$a") ;; esac
     done
     T="$(mktemp -d)"
-    if ! "$PUB" "${BASE[@]}" --version "$GV" "${G[@]}" --dry-run --out "$T/out" >&2 \
-        || ! "$HERE/tools/pack_boot_test.sh" "$T/out" "$HOSTLOCK"; then
-        rm -rf "$T"; echo "publish: refusing to upload (gates above); nothing was sent" >&2; exit 1
+    # Keep the gates' verdicts: 1 = does not boot, anything else = could not judge (2), never turned into a verdict.
+    rc=0; "$PUB" "${BASE[@]}" --version "$GV" "${G[@]}" --dry-run --out "$T/out" >&2 \
+        && "$HERE/tools/pack_boot_test.sh" "$T/out" "$HOSTLOCK" || rc=$?
+    if [ "$rc" != 0 ]; then
+        [ "$rc" = 1 ] || rc=2; rm -rf "$T"
+        echo "publish: refusing to upload (gates above, exit $rc: 1 does not boot, 2 could not judge); nothing was sent" >&2; exit "$rc"
     fi
     rm -rf "$T"; set -- "$@" --no-import ;;
 esac
