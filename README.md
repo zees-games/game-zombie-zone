@@ -1,3 +1,5 @@
+![Zombie Zone banner](https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/banner.png)
+
 Zombie Zone is a 3D co-operative game for a team of survivors. You fight through a city at night, from one shelter to the next, or hold a school, a mall or a ballpark through ten waves of the horde. The zombies are directed rather than random, and the special infected each have one nasty trick. Zombies drop boxes that do something random when you open them, good or very bad. It is inspired by the co-operative zombie shooters and the big community servers that ran them with twenty-odd players.
 
 It is built on [Godot 4](https://godotengine.org/), the [**GameSpice**](https://gamespice.net) platform and addon collection.
