@@ -1594,7 +1594,7 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	for p: ZzPlayer in players.values():
 		p.flashlight_ready = false
 	world_rebuilt.emit()
-	DotLog.info(CHANNEL, "map built", {"id": str(doc.get("id", "?")), "ms": Time.get_ticks_msec() - started})
+	preload("zz_memory.gd").map_built(CHANNEL, str(doc.get("id", "?")), Time.get_ticks_msec() - started)
 	return built
 
 

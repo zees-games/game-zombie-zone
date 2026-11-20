@@ -111,7 +111,7 @@ func _ground_y(doc: Dictionary, at: Vector3) -> float:
 			best = y
 	return best
 
-const LAZY_CHECKS := 8 + 9
+const LAZY_CHECKS := 8 + 10
 
 ## The document keeps every lamp; only the nearest few are lit, and a lamp fades rather than pops.
 const FOOTING_CHECKS := 5

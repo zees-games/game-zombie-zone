@@ -46,6 +46,9 @@ var _files: Dictionary = {}
 var _stubs: Dictionary = {}
 const PEEK_BYTES := 4096
 
+## Most JSON a cold start parses at once on the worker threads (0: every uncached document at once).
+var parse_batch_bytes: int = 1 << 20
+
 ## The server's maps.yml, or null when there is none (every map rotates, as it always did).
 ## dot-map's rotation file speaks DotMapDef; this catalogue holds map documents, so [member _defs]
 ## mirrors the ids and the file marks `in_rotation` on the mirror. See [method rotating].
@@ -115,6 +118,35 @@ func _read_directory(root: String) -> int:
 
 	files.sort()
 	var loaded := 0
+
+	for batch in _batches(root, files):
+		loaded += _read_batch(root, batch)
+
+	return loaded
+
+
+## [param files] in runs of at most [member parse_batch_bytes] of JSON (one file at least), so a cold
+## start parses a run at a time instead of every document at once.
+func _batches(root: String, files: PackedStringArray) -> Array[PackedStringArray]:
+	var out: Array[PackedStringArray] = [PackedStringArray()]
+	var bytes := 0
+
+	for file in files:
+		var f := FileAccess.open(root.path_join(file), FileAccess.READ)
+		var size := f.get_length() if f != null else 0
+
+		if parse_batch_bytes > 0 and not out[-1].is_empty() and bytes + size > parse_batch_bytes:
+			out.append(PackedStringArray())
+			bytes = 0
+
+		out[-1].append(file)
+		bytes += size
+
+	return out
+
+
+func _read_batch(root: String, files: PackedStringArray) -> int:
+	var loaded := 0
 	var ahead := _parse_ahead(root, files)
 
 	for file in files:
@@ -143,6 +175,7 @@ func _read_directory(root: String) -> int:
 
 		if ahead.has(file):
 			parsed = ahead[file]
+			var _released := ahead.erase(file)
 		else:
 			var text := FileAccess.get_file_as_string(root.path_join(file))
 			parsed = ZzMapDoc.parse_json(text, file) if not text.is_empty() else null
@@ -161,9 +194,24 @@ func _read_directory(root: String) -> int:
 		if _add(parsed.value, file):
 			roots[StringName(str(parsed.value["id"]))] = root
 			loaded += 1
-			_cache_write(root, file, parsed.value)
+
+			# Every cold document held whole was 2.2 GB for 53 maps (OOM on a 2 GiB server); cached, its head will do.
+			if _cache_write(root, file, parsed.value) and stub_from_cache:
+				_stand_in(root, file, StringName(str(parsed.value["id"])))
 
 	return loaded
+
+
+## Holds the head of [param file] for [param id] in place of the whole document [method doc] reads back.
+func _stand_in(root: String, file: String, id: StringName) -> void:
+	var stub := _peek(root.path_join(file))
+
+	if stub.is_empty() or StringName(str(stub["id"])) != id:
+		return
+
+	_hold(id, stub)
+	_files[id] = root.path_join(file)
+	_stubs[id] = stub
 
 
 ## Reads and validates, on the worker threads, every document that has no current cached copy: a cold
@@ -231,22 +279,23 @@ func _cache_current(root: String, file: String) -> bool:
 	return typeof(head) == TYPE_STRING and head == _cache_key(root, file)
 
 
-func _cache_write(root: String, file: String, doc: Dictionary) -> void:
+## Whether a current copy of [param doc] is now cached.
+func _cache_write(root: String, file: String, doc: Dictionary) -> bool:
 	var path := _cache_path(root, file)
 
 	if path == "":
-		return
+		return false
 
-	DirAccess.make_dir_recursive_absolute(doc_cache_dir)
+	var _made := DirAccess.make_dir_recursive_absolute(doc_cache_dir)
 	var f := FileAccess.open(path + ".tmp", FileAccess.WRITE)
 
 	if f == null:
-		return
+		return false
 
 	f.store_var(_cache_key(root, file))
 	f.store_var(doc)
 	f.close()
-	var _renamed := DirAccess.rename_absolute(path + ".tmp", path)
+	return DirAccess.rename_absolute(path + ".tmp", path) == OK
 
 
 func _cache_path(root: String, file: String) -> String:

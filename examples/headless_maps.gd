@@ -774,14 +774,18 @@ func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
 
 ## A document the cache holds current is held as a stand-in at the next start, and read whole only
 ## when played; one the cache has nothing current for is read and validated, so a bad one is still
-## refused up front. Nine checks.
+## refused up front.
 func _test_cached_stubs(dir: String) -> void:
 	var cache := dir + "_cache"
 	var _c := DirAccess.make_dir_recursive_absolute(cache)
 	var first := ZzCatalogue.new()
 	first.doc_cache_dir = cache
-	_check(first.add_directory(dir) == 2 and not (first.maps[&"lz_a"] as Dictionary).has("_stub"),
-		"the first start reads every document whole and caches it")
+	_check(first.add_directory(dir) == 2 and first._cache_current(dir, "lz_a.json") and (first.maps[&"lz_a"] as Dictionary).get("_stub", false),
+		"the first start reads, validates and caches every document, then holds only its head (2.2 GB held whole killed a 2 GiB server)")
+	var batched := ZzCatalogue.new()
+	batched.parse_batch_bytes = 1
+	_check(batched._batches(dir, PackedStringArray(["lz_a.json", "lz_b.json"])).size() == 2 and batched.add_directory(dir) == 2,
+		"a cold start parses in runs of parse_batch_bytes and still reads every document")
 	var again := ZzCatalogue.new()
 	again.doc_cache_dir = cache
 	_check(again.add_directory(dir) == 2 and (again.maps[&"lz_a"] as Dictionary).get("_stub", false)
@@ -789,7 +793,7 @@ func _test_cached_stubs(dir: String) -> void:
 	_check(again.display_name(&"lz_a") == "Lazy lz_a" and again.playable(PackedStringArray()).size() == 2,
 		"a stand-in still names and offers the map")
 	var whole := again.doc(&"lz_a")
-	_check(whole.has("boxes") and ZzMapDoc.digest(whole) == ZzMapDoc.digest(first.maps[&"lz_a"]),
+	_check(whole.has("boxes") and ZzMapDoc.digest(whole) == ZzMapDoc.digest(first.doc(&"lz_a")),
 		"doc() hands back the whole document, the one the first start read")
 	var off := ZzCatalogue.new()
 	off.doc_cache_dir = cache
@@ -805,8 +809,8 @@ func _test_cached_stubs(dir: String) -> void:
 	var stale := ZzCatalogue.new()
 	stale.doc_cache_dir = cache
 	var _m := stale.add_directory(dir)
-	_check(not (stale.maps[&"lz_a"] as Dictionary).has("_stub") and (stale.maps[&"lz_b"] as Dictionary).get("_stub", false),
-		"a changed file is read whole again, an unchanged one stays a stand-in")
+	_check(stale._cache_current(dir, "lz_a.json") and (stale.maps[&"lz_b"] as Dictionary).get("_stub", false),
+		"a changed file is read whole again and its copy replaced, an unchanged one stays a stand-in")
 	_check(str(stale.maps[&"lz_a"]["name"]) == "Lazy lz_a changed", "and the new text is what the catalogue holds")
 	# A file that does not validate is never cached, so it is refused at every start.
 	var bad := FileAccess.open(dir.path_join("lz_bad.json"), FileAccess.WRITE)
