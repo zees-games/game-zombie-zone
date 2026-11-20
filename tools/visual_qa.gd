@@ -416,12 +416,7 @@ func _sample(i: int) -> Dictionary:
 		var found := figure.find_children("*", "Skeleton3D", true, false)
 		_skeleton = null if found.is_empty() else found.front() as Skeleton3D
 	_body.add(_body.pose_sample(t, _skeleton if is_instance_valid(_skeleton) else null, feet, true))
-	# The third-person carry as drawn (style, blends, the closed grip), so a capture shows whether it ran at all.
-	var person = figure.get("person") if figure != null else null
-	if is_instance_valid(person) and person.get("carry") != null:
-		var carry: Object = person.get("carry")
-		out["carry"] = carry.call("describe")
-		out["hold"] = person.get("hold")
+	_carry_sample(figure, out)
 	# Untyped on purpose: a typed local holding a freed node is itself the script error.
 	var cam = _client.get("camera")
 	var model = _client.get("view_model")
@@ -486,6 +481,14 @@ func _sample(i: int) -> Dictionary:
 	_last_wall = wall
 	_was_scoped = scoped
 	return out
+
+
+## The third-person carry as drawn (style, blends, the closed grip), so a capture shows whether it ran at all.
+func _carry_sample(figure: Node, out: Dictionary) -> void:
+	var person = figure.get("person") if figure != null else null
+	if is_instance_valid(person) and person.get("carry") != null:
+		out["carry"] = (person.get("carry") as Object).call("describe")
+		out["hold"] = person.get("hold")
 
 
 func _v(p: Vector3) -> Array:
