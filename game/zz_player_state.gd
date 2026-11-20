@@ -213,6 +213,8 @@ var mirror_fitted: int = 0
 ## One dictionary for the player's life: the arsenal's watcher holds it by reference.
 var fittings: Dictionary = {}
 var mirror_switching: bool = false
+## Whether a watched survivor is reloading (`net_reloading`), so their figure is seen to reload.
+var mirror_reloading: bool = false
 var mirror_fired: int = 0
 var mirror_fire_kind: int = 0
 var _seen_fire_seq: int = -1

@@ -361,6 +361,7 @@ func _apply_weapons() -> void:
 	player.mirror_slot = net_slot
 	player.mirror_fitted = net_fitted
 	player.mirror_switching = net_switching
+	player.mirror_reloading = net_reloading
 	player.mirror_fired += int(answer["fired"])
 	if int(answer["fired"]) > 0:
 		player.mirror_fire_kind = int(answer["kind"])

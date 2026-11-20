@@ -6,6 +6,7 @@ const ZzBoxCrate := preload("zz_box_crate.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzHeadScale := preload("zz_head_scale.gd")
 const ZzPacks := preload("zz_packs.gd")
+const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
 ## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
 ## wearing their side's colour on the torso and turned to where they are looking. Client
@@ -89,6 +90,11 @@ var _fit_for: StringName = &""
 ## The person, under this node.
 var person: DotHumanoidFigure = null
 
+## Whether the held gun is being reloaded, as [method hold] was last told. Read by the suite.
+var reloading_now: bool = false
+## The carry class last given to the person's carry (see [method carry_class]).
+var _carry_kind: StringName = &"-"
+
 func _init() -> void:
 	# The caller places it; see the class note.
 	top_level = true
@@ -109,6 +115,7 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 		person.queue_free()
 	person = DotHumanoidFigure.new()
 	person.name = "Person"
+	_carry_kind = &"-"
 	add_child(person)
 	person.build(look, height)
 	ZzHeadScale.attach(person, HEAD_SCALE)
@@ -227,12 +234,15 @@ func pose(at: Vector3, yaw_radians: float, speed: float) -> void:
 
 
 ## Draws [param id] in the right hand, or nothing for an empty id. [param switching] hides
-## it mid-switch, the way [ZeeWorldModel] does.
+## it mid-switch, the way [ZeeWorldModel] does; [param reloading] pulls the gun in and puts
+## the other hand on the magazine (the carry's reload stance and the gun's own magazine path),
+## so somebody else is seen to reload rather than stand still with an empty gun.
 ##
 ## [b]Asked every frame and cheap when nothing changed[/b]: the model is only re-equipped
 ## when the id differs from what is drawn.
-func hold(id: StringName, switching: bool) -> void:
+func hold(id: StringName, switching: bool, reloading: bool = false) -> void:
 	holding = id
+	reloading_now = reloading and id != &""
 
 	if id == &"":
 		if held != null:
@@ -265,7 +275,10 @@ func hold(id: StringName, switching: bool) -> void:
 
 	held.visible = not box_in_hands and not defib_in_hands
 	held.on_switching(switching)
+	if held.has_method(&"on_reloading"):
+		held.on_reloading(reloading_now)
 	_set_hold_kind()
+	_set_carry(switching)
 
 
 ## Dresses the held gun in the fitting [param code] packs (`net_fitted`), decoded against this
@@ -304,6 +317,49 @@ func _set_hold_kind() -> void:
 		person.set_hold(DotHumanoidFigure.Hold.GUN)
 
 
+## The person's gun carry for what is held: its class (a pistol is not carried as a rifle, and a
+## class the game chose puts the other hand on the foregrip), the reload and the switch.
+func _set_carry(switching: bool) -> void:
+	if person == null or person.carry == null:
+		return
+	var carry := person.carry
+	var kind := carry_class(holding)
+	if kind != _carry_kind:
+		_carry_kind = kind
+		carry.set_class(kind if kind != &"" else null)
+	carry.reloading = reloading_now
+	carry.switching = switching
+
+
+## The carry class ([method DotHumanoidCarry.for_class]) a weapon is held as: from its art's pose,
+## then its picture's kind (an smg, a shotgun, a scoped rifle, a launcher). Empty for none.
+static func carry_class(id: StringName) -> StringName:
+	if id == &"":
+		return &""
+	if _classes.has(id):
+		return _classes[id]
+	var pose := _pose_of(id)
+	var tag: StringName = ZzWeaponIcons.TAGS.get(id, &"")
+	var kind := &"rifle"
+	if pose == ZeeWeaponArtTable.POSE_MELEE or pose == ZeeWeaponArtTable.POSE_THROWN:
+		kind = &""
+	elif pose == ZeeWeaponArtTable.POSE_PISTOL or tag in [&"pistol", &"revolver", &"machine_pistol", &"derringer"]:
+		kind = &"pistol"
+	elif tag == &"smg":
+		kind = &"smg"
+	elif tag in [&"shotgun", &"drum_shotgun"]:
+		kind = &"shotgun"
+	elif tag in [&"sniper", &"marksman"]:
+		kind = &"sniper"
+	elif tag in [&"lmg", &"launcher"] or pose == ZeeWeaponArtTable.POSE_HEAVY:
+		kind = &"heavy"
+	_classes[id] = kind
+	return kind
+
+
+static var _classes: Dictionary = {}
+
+
 ## Weapon id -> pose, looked up once. This runs per figure per frame, and the table behind it
 ## is a dictionary of art; asking it each time was 8 of 10.5 ms of script a frame with sixteen
 ## bodies (zz-solo-loot-lag-1).
@@ -326,6 +382,9 @@ func fired(times: int, kind: int) -> void:
 		return
 
 	held.on_fired(WATCHED_RECOIL.get(kind, Vector2(0.6, 0.1)), kind)
+	# A shot shoulders the gun for a moment (the carry's aim stance): nobody fires from the hip-low ready.
+	if kind != ZeeWeaponNet.KIND_SWING and person != null and person.carry != null and _carry_kind != &"":
+		person.carry.fired()
 
 	# [b]A swing is the arm, not a kick[/b]: the person's slash, over whatever the legs do.
 	if kind == ZeeWeaponNet.KIND_SWING and person != null:

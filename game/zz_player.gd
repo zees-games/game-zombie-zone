@@ -810,6 +810,7 @@ func _present_held() -> void:
 	var rig := _rig()
 	var id := &""
 	var switching := false
+	var reloading := false
 	var fired := 0
 	var kind := 0
 	var fitted := 0
@@ -818,6 +819,7 @@ func _present_held() -> void:
 		var def := rig.arsenal.current_def()
 		id = def.id if def != null else &""
 		switching = rig.arsenal.is_switching()
+		reloading = rig.arsenal.is_reloading()
 		fitted = _fitted_code(rig.arsenal, id)
 		var seq := rig.fire_seq % ZeeWeaponNet.FIRE_SEQ_WRAP
 		fired = ZeeWeaponNet.uses_between(_seen_fire_seq, seq) if _seen_fire_seq >= 0 else 0
@@ -826,12 +828,13 @@ func _present_held() -> void:
 	elif mirrored:
 		id = held_by_slot(dealt, mirror_slot)
 		switching = mirror_switching
+		reloading = mirror_reloading
 		fired = mirror_fired
 		kind = mirror_fire_kind
 		fitted = mirror_fitted
 
 	mirror_fired = 0
-	figure.hold(&"" if is_holstered() else id, switching)
+	figure.hold(&"" if is_holstered() else id, switching, reloading)
 	figure.fitted(fitted)
 	figure.fired(fired, kind)
 
