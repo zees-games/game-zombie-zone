@@ -9,25 +9,9 @@ X=(); for d in world maps tools screenshots reports art-src tests examples image
 for l in "$HERE"/addons/*; do [ -L "$l" ] && [[ "$(basename "$l")" != dot_* ]] && X+=(--exclude-dir "addons/$(basename "$l")"); done
 PUB="$HERE/../dot-cloud/tools/publish_pack.sh"; HOSTLOCK="$HERE/../dot-server-deploy/addons.lock"; GV=0.0.0
 BASE=(publish --source "$HERE" --id game-zombie-zone --host-addons "$HOSTLOCK" "${X[@]}")
-# Gates before an upload (a --dry-run gets the first only): every load of the game's own files goes through the
-# game's path rebase (tools/check_pack_paths.sh), and the pack a dry run builds boots mounted, under
-# res://dot_cloud/<id>/<version>/, on a host built at addons.lock's tags (tools/pack_boot_test.sh). Airdrift and
-# Playlot 0.1.33 and Zombie Zone 0.1.40 failed the second (stale trees, a renamed addon) and booted nothing on servers.
+# Gates before an upload: every load of the game's own files goes through the game's path rebase
+# (tools/check_pack_paths.sh), and publish_pack.sh boots the pack it builds mounted, under res://dot_cloud/<id>/<version>/,
+# on a host built at --host-addons addons.lock's tags (dot-cloud tools/pack_boot_test.sh; exit 1 does not boot, 2 could
+# not judge). Airdrift and Playlot 0.1.33, Zombie Zone 0.1.40 and Hungario 0.1.19 booted nothing on servers without it.
 "$HERE/tools/check_pack_paths.sh" "$HERE"
-case " $* " in *" --dry-run "*) ;; *)
-    G=(); skip=""
-    for a in "$@"; do
-        if [ -n "$skip" ]; then [ "$skip" = --version ] && GV="$a"; skip=""; continue; fi
-        case "$a" in --version|--bump|--out|--site|--token-file|--lock) skip="$a" ;; *) G+=("$a") ;; esac
-    done
-    T="$(mktemp -d)"
-    # Keep the gates' verdicts: 1 = does not boot, anything else = could not judge (2), never turned into a verdict.
-    rc=0; "$PUB" "${BASE[@]}" --version "$GV" "${G[@]}" --dry-run --out "$T/out" >&2 \
-        && "$HERE/tools/pack_boot_test.sh" "$T/out" "$HOSTLOCK" || rc=$?
-    if [ "$rc" != 0 ]; then
-        [ "$rc" = 1 ] || rc=2; rm -rf "$T"
-        echo "publish: refusing to upload (gates above, exit $rc: 1 does not boot, 2 could not judge); nothing was sent" >&2; exit "$rc"
-    fi
-    rm -rf "$T"; set -- "$@" --no-import ;;
-esac
 exec "$PUB" "${BASE[@]}" --lock "$HERE/content.lock.json" "$@"
