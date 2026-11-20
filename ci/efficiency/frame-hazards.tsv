@@ -23,5 +23,4 @@ tools/filmstrip_capture.gd::_survivor_frame::string_build	1
 tools/filmstrip_capture.gd::_zombie_frame::alloc_array	1
 tools/filmstrip_capture.gd::_zombie_frame::load	1
 tools/filmstrip_capture.gd::_zombie_frame::string_build	1
-tools/load_probe.gd::_process::string_build	2
 tools/zombie_rack.gd::_process::string_build	2
