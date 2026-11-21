@@ -20,6 +20,9 @@
 /addons/dot_player_controller
 /addons/dot_combat
 /addons/dot_player_char
+/addons/dot_animation
+/addons/dot_save
+/addons/dot_camera
 /addons/dot_match
 /addons/dot_weapon
 /addons/dot_ui
