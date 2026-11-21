@@ -8,6 +8,23 @@ Everything in this repository is open source under the MIT license. The only clo
 
 The game was built with Claude Code and is maintained with it. It has a full automated test suite, but few real players have tried it yet, so expect rough edges. Please report what you find.
 
+## Screenshots
+
+<table>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/horde.png" alt="A horde of mixed zombies closing on the team in a shop room."><br>A horde of mixed zombies closing on the team in a shop room.</td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/specials.png" alt="Special infected, including a bloater, among the common horde."><br>Special infected, including a bloater, among the common horde.</td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/shop.png" alt="Trading at the shop between waves."><br>Trading at the shop between waves.</td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/pickup-night.png" alt="Weapon pickups and the pre-wave countdown on a night map."><br>Weapon pickups and the pre-wave countdown on a night map.</td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/night-street.png" alt="A starlit street in Blackout 1 with the survivor HUD."><br>A starlit street in Blackout 1 with the survivor HUD.</td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-zombie-zone/main/docs/screenshots/coop-team.png" alt="The co-op team HUD with name tags and health bars."><br>The co-op team HUD with name tags and health bars.</td>
+</tr>
+</table>
+
 ## How it plays
 
 There are two kinds of map.
