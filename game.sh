@@ -298,6 +298,12 @@ run_sharded() {
     run_suite "$base" --merge $logs
 }
 
+# The Nightly Performance gate (addons/dot_game/tools/dot_game_perf_gate.sh): the latest recorded run against the budgets. Advisory
+# unless PERF_GATE=strict; PERF_GATE=off skips it. Skipped quietly where there is no `nightly`.
+perf_gate_step() {
+    PERF_GAME=zz bash addons/dot_game/tools/dot_game_perf_gate.sh
+}
+
 do_test() {
     check_addons
     local fails=0 f out
@@ -327,6 +333,8 @@ do_test() {
             run_ui_check "$scene" || fails=$((fails + 1))
         done
     fi
+
+    [ $# -eq 0 ] && { perf_gate_step || fails=$((fails + 1)); }
 
     echo
     [ "$fails" -eq 0 ] && { printf '%sall passed%s\n' "$GRN" "$OFF"; return 0; }
@@ -389,6 +397,9 @@ case "$cmd" in
         timeout "$TIMEOUT" "$GODOT" --headless --path . res://tools/soak.tscn -- "${soak_args[@]}" "$@" \
             2>&1 | tee .godot/test-logs/soak.log | grep -E '^SOAK|^soak|^TRACE|SCRIPT ERROR|Parse Error|ERROR|FAIL'
         exit "${PIPESTATUS[0]}"
+        ;;
+    perf-gate)
+        perf_gate_step
         ;;
     suites)
         if [ "${1:-}" = "--shards" ]; then
