@@ -35,7 +35,7 @@ static func build(toys: Array, id: StringName, channel: String) -> Dictionary:
 	var normalised := ZzMapDoc.validate(source)
 
 	if not normalised.ok:
-		DotLog.error(channel, "the built-in practice street is refused", {"why": normalised.error.message})
+		GSLog.error(channel, "the built-in practice street is refused", {"why": normalised.error.message})
 		return {}
 
 	return normalised.value

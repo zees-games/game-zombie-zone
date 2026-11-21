@@ -368,7 +368,7 @@ func _npc_think(delta: float) -> void:
 	_every = _think_every()
 
 
-## The spawner counts the ticks between thoughts when its pacing is on (dot-npc DotNpcPacing): the same
+## The spawner counts the ticks between thoughts when its pacing is on (dot-npc GSNpcPacing): the same
 ## thoughts as [method _npc_think], without a call into every brain every tick.
 func paces() -> bool:
 	return true

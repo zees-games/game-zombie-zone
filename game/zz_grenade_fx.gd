@@ -8,12 +8,12 @@ const ZzGrenadeCloud := preload("grenades/zz_grenade_cloud.gd")
 
 
 ## Registers the cloud effects on [param catalogue].
-static func add_defs(catalogue: DotFxCatalogue) -> void:
+static func add_defs(catalogue: GSFxCatalogue) -> void:
 	ZzGrenadeCloud.add_defs(catalogue)
 
 
 ## The cloud node spawned on [param fx], or null when there is no effects layer.
-static func show(fx: DotFxManager, tree: SceneTree, kind: int, at: Vector3, radius: float, seconds: float) -> Node:
+static func show(fx: GSFxManager, tree: SceneTree, kind: int, at: Vector3, radius: float, seconds: float) -> Node:
 	if fx == null:
 		return null
 

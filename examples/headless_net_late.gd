@@ -14,7 +14,7 @@ func _test_a_gate_reaches_the_client() -> void:
 
 ## A world of one hinged prop door, as dot-map's manifest writes it.
 class DoorWorld extends RefCounted:
-	var ents: Variant = DotMapEntities.from_manifest({"movers": [{"entity": 900, "model": null, "kind": "rotate", "classname": "prop_door_rotating",
+	var ents: Variant = GSMapEntities.from_manifest({"movers": [{"entity": 900, "model": null, "kind": "rotate", "classname": "prop_door_rotating",
 		"targetname": "", "origin": [60.0, 0.0, 60.0], "axis": [0.0, 1.0, 0.0], "degrees": 90.0, "speed": 100.0, "travel_time": 0.9, "wait": 4.0,
 		"open_dir": 0, "yaw": 0.0, "use": true, "touch": false, "solid": true, "locked": false, "start_open": false, "outputs": [], "opened_by": []},
 		{"classname": "func_door", "direction": [0.0, 1.0, 0.0], "distance": 3.0, "entity": 901, "kind": "slide", "lip": 0.0, "locked": false,
@@ -173,10 +173,10 @@ func _test_the_map_ends() -> void:
 		and StringName(_heard["round_over"][4]) == _server_game.next_map_id,
 		"and how long until the next map, and which, for its countdown", str(_heard.get("round_over")))
 	var kc := ZzKillcam.new()
-	_check(kc.camera_mode_fn.call() == DotKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
-	var framing := DotKillcamFraming.new(null, 1)
+	_check(kc.camera_mode_fn.call() == GSKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
+	var framing := GSKillcamFraming.new(null, 1)
 	var eye := Transform3D(Basis.IDENTITY, Vector3(0, 1.6, 0))
-	var placed: Dictionary = framing.place(DotKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
+	var placed: Dictionary = framing.place(GSKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
 	_check((placed["transform"] as Transform3D).origin.z > 1.0, "the behind camera sits behind the killer's eye")
 	kc.free()
 	_finished()
@@ -265,11 +265,11 @@ func _check_hold_clock() -> void:
 		"and the daylight of the warm-up's day", "%.2f / %.2f" % [float(told.get("daylight", -1.0)), float(served["daylight"])])
 
 	for _i in range(SERVER_TICK_RATE * 4):
-		if int(_client_game.survival_state().get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE:
+		if int(_client_game.survival_state().get("stage", -1)) == GSNpcDirectorWaves.Stage.HORDE:
 			break
 		await _step()
 	told = _client_game.survival_state()
-	_check(int(told.get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE and int(told.get("index", 0)) == 1
+	_check(int(told.get("stage", -1)) == GSNpcDirectorWaves.Stage.HORDE and int(told.get("index", 0)) == 1
 		and float(told.get("daylight", -1.0)) >= 0.0 and float(told.get("daylight", 1.0)) < 0.02,
 		"night 1 falls on the client, in the dark (daylight is sent in 255ths)", str(told))
 

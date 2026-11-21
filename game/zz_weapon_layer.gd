@@ -4,7 +4,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 const ZzPickupPanel := preload("zz_pickup_panel.gd")
 
 ## Weapons lying in the world, thrown with the drop key (Q) or left by the dead: dot-weapon's
-## [DotWeaponDrops] under `sv_weapon_drop*`, with the survivor's hands and carry rules as the hooks.
+## [GSWeaponDrops] under `sv_weapon_drop*`, with the survivor's hands and carry rules as the hooks.
 ## An empty slot in reach takes a drop (so weight and quota still apply); a full slot swaps.
 
 const CHANNEL := "zz.weapon_layer"
@@ -16,16 +16,16 @@ const KEEP_SLOTS: Array[int] = [1]
 const KNIFE_WEAPON := &"zz_knife"
 const KNIFE_DAMAGE := 120.0
 
-var rules := DotWeaponDropRules.new()
-var drops: DotWeaponDrops = null
-## The aim key throws the knife in hand ([DotWeaponKnives], `zz_knife_throw*`). A thrown knife is a
+var rules := GSWeaponDropRules.new()
+var drops: GSWeaponDrops = null
+## The aim key throws the knife in hand ([GSWeaponKnives], `zz_knife_throw*`). A thrown knife is a
 ## weapon like any other, so it hurts what the horde is made of: the default is a hard hit, not a kill.
-var knives: DotWeaponKnives = null
-var knife_rules: Dictionary = DotWeaponKnives.DEFAULT_RULES.duplicate()
+var knives: GSWeaponKnives = null
+var knife_rules: Dictionary = GSWeaponKnives.DEFAULT_RULES.duplicate()
 ## Entity ids whose aim key was last handed to [member knives] down.
 var _aim_sent: Dictionary = {}
 ## Entity ids whose drop key was last stepped released: stepping a released key again changes nothing,
-## and [method DotWeaponDropKey.step] resolves the drop rules first (about 80 us a call), so it is skipped.
+## and [method GSWeaponDropKey.step] resolves the drop rules first (about 80 us a call), so it is skipped.
 var _drop_up: Dictionary = {}
 var game = null
 
@@ -38,7 +38,7 @@ func _init(p_game: Object) -> void:
 func build() -> void:
 	if drops != null:
 		return
-	drops = DotWeaponDrops.new()
+	drops = GSWeaponDrops.new()
 	drops.name = "WeaponDrops"
 	rules.auto_pickup = true
 	drops.rules = rules
@@ -58,7 +58,7 @@ func build() -> void:
 
 func _build_knives() -> void:
 	knife_rules["damage"] = KNIFE_DAMAGE
-	knives = DotWeaponKnives.new()
+	knives = GSWeaponKnives.new()
 	knives.name = "Knives"
 	knives.rules = knife_rules
 	knives.weapon_id = KNIFE_WEAPON
@@ -85,8 +85,8 @@ func clear() -> void:
 
 ## The aim key before the survivor's weapons simulate: a knife in hand leaves it (no protection of
 ## any kind: a thrown knife hurts whoever the game's damage rules let it hurt).
-func knife_input(player, command: DotWeaponCommand) -> void:
-	var down := command.is_pressed(DotWeaponCommand.BUTTON_AIM)
+func knife_input(player, command: GSWeaponCommand) -> void:
+	var down := command.is_pressed(GSWeaponCommand.BUTTON_AIM)
 	# Only a press throws; a released key the knives last saw released changes nothing there.
 	if not down and not _aim_sent.has(player.entity_id):
 		return
@@ -146,24 +146,24 @@ func drop_key(player, pressed: bool, delta: float) -> bool:
 		_drop_up[player.entity_id] = true
 	var keys: Dictionary = game.get_meta(&"drop_keys", {})
 	game.set_meta(&"drop_keys", keys)
-	var key: DotWeaponDropKey = keys.get(player.entity_id)
+	var key: GSWeaponDropKey = keys.get(player.entity_id)
 	if key == null:
-		key = DotWeaponDropKey.new()
+		key = GSWeaponDropKey.new()
 		keys[player.entity_id] = key
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
 	var id := key.step(drops, arsenal, player.eye_position(), player.aim_direction(), player.entity_id,
 		pressed, delta, player.class_def, player.controller.state.velocity)
 	if id == 0:
 		return false
 	player.wanted_slot = arsenal.current_slot()
-	DotLog.debug(CHANNEL, "threw", {"player": String(player.player_id), "drop": id})
+	GSLog.debug(CHANNEL, "threw", {"player": String(player.player_id), "drop": id})
 	return true
 
 
 ## Forgets a hold in progress: call on death, respawn and disconnect.
 func reset_key(player) -> void:
 	var keys: Dictionary = game.get_meta(&"drop_keys", {})
-	var key: DotWeaponDropKey = keys.get(player.entity_id)
+	var key: GSWeaponDropKey = keys.get(player.entity_id)
 	if key != null:
 		key.reset()
 
@@ -176,25 +176,25 @@ func take(player) -> void:
 	var _taken := drops.take_for(player.weapons.arsenal, at, player.entity_id, player.class_def)
 
 
-## The use key (E) on a dropped weapon in view, by [DotWeaponUseKey]'s shared rules.
+## The use key (E) on a dropped weapon in view, by [GSWeaponUseKey]'s shared rules.
 ## True while the key belongs to the weapon, so the caller leaves loot and objectives alone.
 func use_key(player, held: bool, delta: float) -> bool:
 	if drops == null or drops.count() == 0 or not _free(player):
 		return false
 	var keys: Dictionary = game.get_meta(&"use_keys", {})
 	game.set_meta(&"use_keys", keys)
-	var key: DotWeaponUseKey = keys.get(player.entity_id)
+	var key: GSWeaponUseKey = keys.get(player.entity_id)
 	if key == null:
-		key = DotWeaponUseKey.new()
+		key = GSWeaponUseKey.new()
 		keys[player.entity_id] = key
 	return key.step(drops, player.weapons.arsenal, player.eye_position(), player.aim_direction(), player.entity_id, held, delta, player.class_def)
 
 
 ## Lets traced shots and splash push dropped weapons about (the trace is built after this layer).
 func hook_shots() -> void:
-	if drops == null or game.combat == null or not game.combat.trace is DotTrace:
+	if drops == null or game.combat == null or not game.combat.trace is GSTrace:
 		return
-	var trace: DotTrace = game.combat.trace
+	var trace: GSTrace = game.combat.trace
 	if trace.ray_observer.is_valid():
 		return
 	var layer := drops

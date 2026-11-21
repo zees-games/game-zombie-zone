@@ -1,6 +1,6 @@
-extends DotGameNetchaosClient
+extends GSGameNetchaosClient
 
-## Zombie Zone's side of `tools/netchaos.sh` (dot-game's DotGameNetchaosClient).
+## Zombie Zone's side of `tools/netchaos.sh` (dot-game's GSGameNetchaosClient).
 
 
 func _configure() -> void:

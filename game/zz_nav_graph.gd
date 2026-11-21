@@ -1,4 +1,4 @@
-extends DotNpcNavGraph
+extends GSNpcNavGraph
 
 ## The zombies' graph with the one thing the grid cannot say: a way that only goes one way.
 ##
@@ -18,7 +18,7 @@ extends DotNpcNavGraph
 
 ## The filter a stand-in's search sets: no link at all. Its avoid cost is a number nothing else
 ## uses, so the native search keeps a graph of its own for it (dot-npc keys them by signature).
-var bot_filter: DotNpcNavFilter = null
+var bot_filter: GSNpcNavFilter = null
 
 ## Whether a zombie may climb the jump ups (`zz_zombie_climb`). A body that jumps a metre and a
 ## quarter would; the zombies do not, so a tower is defensible.
@@ -94,8 +94,8 @@ var _reach: PackedInt64Array = PackedInt64Array()
 var _reach_words: int = 0
 
 
-func _init(p_data: DotNpcNavData = null) -> void:
-	bot_filter = DotNpcNavFilter.new()
+func _init(p_data: GSNpcNavData = null) -> void:
+	bot_filter = GSNpcNavFilter.new()
 	bot_filter.avoid_cost = 3.9
 	straight_width_ratio = 0.5
 	super(p_data)
@@ -154,9 +154,9 @@ func find_paths(queries: Array, workers: int) -> void:
 	super(queries, workers)
 	var again: Array = []
 
-	for q: DotNpcNavGraph.PathQuery in queries:
+	for q: GSNpcNavGraph.PathQuery in queries:
 		if q.points.is_empty() and q.filter != null and (q.filter.exclude_flags & NARROW) != 0:
-			var retry := DotNpcNavGraph.PathQuery.new()
+			var retry := GSNpcNavGraph.PathQuery.new()
 			retry.from = q.from
 			retry.to = q.to
 			retry.filter = _relaxed(q.filter)
@@ -178,17 +178,17 @@ func find_paths(queries: Array, workers: int) -> void:
 	super(retries, workers)
 
 	for i in range(0, again.size(), 2):
-		var q: DotNpcNavGraph.PathQuery = again[i + 1]
-		q.points = (again[i] as DotNpcNavGraph.PathQuery).points
-		q.partial = (again[i] as DotNpcNavGraph.PathQuery).partial
+		var q: GSNpcNavGraph.PathQuery = again[i + 1]
+		q.points = (again[i] as GSNpcNavGraph.PathQuery).points
+		q.partial = (again[i] as GSNpcNavGraph.PathQuery).partial
 
 
 ## [param base] without the NARROW exclusion, kept per base so the native search keeps one graph for it.
-func _relaxed(base: DotNpcNavFilter) -> DotNpcNavFilter:
+func _relaxed(base: GSNpcNavFilter) -> GSNpcNavFilter:
 	if _relaxed_for.has(base):
 		return _relaxed_for[base]
 
-	var out := DotNpcNavFilter.new()
+	var out := GSNpcNavFilter.new()
 	out.area_costs = base.area_costs.duplicate()
 	out.include_flags = base.include_flags
 	out.exclude_flags = base.exclude_flags & ~NARROW
@@ -618,7 +618,7 @@ func _without_steep(index: int, base: PackedInt32Array, both: bool) -> PackedInt
 
 ## The native search's graph: [method super]'s (the plain edges), which has no link in it, plus
 ## the links as one-way segments.
-func _native_for(with: DotNpcNavFilter) -> AStar3D:
+func _native_for(with: GSNpcNavFilter) -> AStar3D:
 	_building = true
 	_steep_cut = with != bot_filter
 	var astar: AStar3D = super(with)

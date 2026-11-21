@@ -27,10 +27,10 @@ var _toggle_base: int = 0
 
 var _predicted: Array[Dictionary] = []
 
-var _vol_io: DotMapIO = null
+var _vol_io: GSMapIO = null
 
 ## Every entity of the map as a dot-map runtime, which owns the links: the lifts, buttons and volumes below are its targets.
-var _logic: DotMapIO = null
+var _logic: GSMapIO = null
 
 var _logic_base: int = 0
 
@@ -44,7 +44,7 @@ var _source_read: bool = false
 
 var _manifest: Dictionary = {}
 
-var _vols: DotMapVolumes = null
+var _vols: GSMapVolumes = null
 
 var _generic: Dictionary = {}
 
@@ -83,7 +83,7 @@ var _copy_next: int = 0
 
 var _last_tick: int = 0
 
-## Builds from [param world] (a DotMapBspMesh). [param put_on] is called with each body to give
+## Builds from [param world] (a GSMapBspMesh). [param put_on] is called with each body to give
 ## it the world's physics layer.
 ## [param doors_only] builds the doors a world from the global converter carries (the hinged prop doors and the
 ## brush doors with hulls; a boxed gate has none, so nothing collides twice), each open to anyone near it, and
@@ -154,10 +154,10 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 static func _is_brush_door(mv: Variant) -> bool:
 	return DOOR_CLASSES.has(str(mv.classname).to_lower()) and (mv.kind == "slide" or mv.kind == "rotate")
 
-## A prop door has no brush: dot-map's DotMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
+## A prop door has no brush: dot-map's GSMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
 func _build_door(mv: Variant, put_on: Callable, free_for_all: bool) -> void:
 	var yaw: float = mv.panel_yaw if not is_nan(mv.panel_yaw) else mv.yaw
-	var node: Node3D = DotMapDoorStandIn.build(mv, yaw, DotMapDoorStandIn.SIZE, 1)
+	var node: Node3D = GSMapDoorStandIn.build(mv, yaw, GSMapDoorStandIn.SIZE, 1)
 	add_child(node)
 	var body := node.get_node_or_null("col_solid") as CollisionObject3D
 	if body != null and put_on.is_valid():
@@ -184,10 +184,10 @@ static func _rest_side(mv: Variant) -> float:
 
 ## The door's reach: its swing about the hinge, from a metre under it (a hinge is often set above the floor) to the panel's top.
 static func _door_zone(mv: Variant, node: Node3D) -> AABB:
-	var width := DotMapDoorStandIn.SIZE.x
+	var width := GSMapDoorStandIn.SIZE.x
 	if not is_nan(mv.panel_yaw) and mv.panel_width > 0.1:
 		width = mv.panel_width
-	return AABB(node.position + Vector3(-width, -1.0, -width), Vector3(width * 2.0, DotMapDoorStandIn.SIZE.y + 1.0, width * 2.0))
+	return AABB(node.position + Vector3(-width, -1.0, -width), Vector3(width * 2.0, GSMapDoorStandIn.SIZE.y + 1.0, width * 2.0))
 
 ## Hands the drawn nodes over (from build_node): each mover's node takes its pose.
 func bind_drawn(root: Node3D) -> void:
@@ -792,7 +792,7 @@ func _note_unsupported(what: String) -> void:
 	if _unsupported_seen.has(what):
 		return
 	_unsupported_seen[what] = true
-	DotLog.debug(CHANNEL, "an output this map uses is not run", {"what": what})
+	GSLog.debug(CHANNEL, "an output this map uses is not run", {"what": what})
 
 
 # Hurt, push, teleport and gravity
@@ -831,13 +831,13 @@ func spawn_entities() -> Array:
 	if _logic == null:
 		return out
 
-	for e: DotMapEntity in _logic.entities:
+	for e: GSMapEntity in _logic.entities:
 		if e.classname.to_lower().begins_with("info_player"):
 			out.append({"name": e.targetname, "origin": e.origin(_logic), "enabled": e.enabled})
 
 	return out
 
-## The volumes' entities (their keys, and the filters they name) in a DotMapIO that never starts: the map's own links run in [member _logic].
+## The volumes' entities (their keys, and the filters they name) in a GSMapIO that never starts: the map's own links run in [member _logic].
 func _build_volume_io(world: RefCounted) -> void:
 	var from_doc := {}
 	var filters: Array = []
@@ -856,21 +856,21 @@ func _build_volume_io(world: RefCounted) -> void:
 		var copy: Dictionary = (f as Dictionary).duplicate()
 		copy["outputs"] = []
 		records.append(copy)
-	_vol_io = DotMapIO.new()
+	_vol_io = GSMapIO.new()
 	_vol_io.rate = maxi(tick_rate / VOLUME_EVERY, 1)
 	_scale_io(_vol_io, world.get("manifest"))
 	var loaded := _vol_io.load_records(records)
 	if not loaded.ok:
-		DotLog.warn(CHANNEL, "the map's volumes did not load", {"why": loaded.error.message})
+		GSLog.warn(CHANNEL, "the map's volumes did not load", {"why": loaded.error.message})
 		_vol_io = null
 		return
 	_vol_io.damage_fn = _volume_hurt
 	_vol_io.move_fn = _volume_move
 	_vol_io.event_fn = _on_logic_event
-	_vols = DotMapVolumes.new()
+	_vols = GSMapVolumes.new()
 	_vols.io = _vol_io
 	for t in _toggles:
-		var node := DotMapVolumeNode.new(t["vol"], _vol_io.entity_of(int(t["entity"])))
+		var node := GSMapVolumeNode.new(t["vol"], _vol_io.entity_of(int(t["entity"])))
 		_vols.nodes.append(node)
 		var e := node.entity
 		if e != null:
@@ -901,7 +901,7 @@ func _hazard_step() -> void:
 
 func _volume_hurt(body: Variant, amount: float, kind: String, by: Variant) -> void:
 	if damage_fn.is_valid():
-		damage_fn.call(body, amount, kind, (by as DotMapEntity).index if by is DotMapEntity else -1)
+		damage_fn.call(body, amount, kind, (by as GSMapEntity).index if by is GSMapEntity else -1)
 
 func _volume_move(body: Variant, motion: Variant) -> void:
 	if move_fn.is_valid():
@@ -916,11 +916,11 @@ func _toggle_input(t: Dictionary, name: String, param: String) -> void:
 		"toggle":
 			_set_toggle(t, not bool(t["enabled"]))
 		_:
-			var e: DotMapEntity = _vol_io.entity_of(int(t["entity"])) if _vol_io != null else null
+			var e: GSMapEntity = _vol_io.entity_of(int(t["entity"])) if _vol_io != null else null
 			if e == null or not e.accept(_vol_io, name, param, null, null):
 				_note_unsupported("%s input %s" % [str(t["kind"]), name])
-			elif e is DotMapPush:
-				_set_push(t, (e as DotMapPush).velocity())
+			elif e is GSMapPush:
+				_set_push(t, (e as GSMapPush).velocity())
 
 func _set_toggle(t: Dictionary, on: bool) -> void:
 	if bool(t["enabled"]) == on:
@@ -962,34 +962,34 @@ func push_at(feet: Vector3, height: float) -> Vector3:
 	var out := Vector3.ZERO
 	for t in _predicted:
 		if str(t["kind"]) == "push" and _touches_player(t, feet, height):
-			out += t["push"] if t.has("push") else (t["vol"] as DotMapVolume).push_velocity()
+			out += t["push"] if t.has("push") else (t["vol"] as GSMapVolume).push_velocity()
 	return out
 
 ## The map's push volumes that start live (the horde's nav costs up the points inside them: a body there is thrown, not walked).
-func push_volumes() -> Array[DotMapVolume]:
-	var out: Array[DotMapVolume] = []
+func push_volumes() -> Array[GSMapVolume]:
+	var out: Array[GSMapVolume] = []
 	for t in _toggles:
 		if str(t["kind"]) == "push" and bool(t["initial"]) and t.has("vol"):
-			out.append(t["vol"] as DotMapVolume)
+			out.append(t["vol"] as GSMapVolume)
 	return out
 
 ## The gravity scale a survivor at [param feet] is under (1 outside every gravity volume).
 func gravity_at(feet: Vector3, height: float) -> float:
 	for t in _predicted:
 		if str(t["kind"]) == "gravity" and _touches_player(t, feet, height):
-			return float((t["vol"] as DotMapVolume).record.get("gravity", 1.0))
+			return float((t["vol"] as GSMapVolume).record.get("gravity", 1.0))
 	return 1.0
 
 func _touches_player(t: Dictionary, feet: Vector3, height: float) -> bool:
 	if not bool(t["enabled"]):
 		return false
-	var vol: DotMapVolume = t["vol"]
+	var vol: GSMapVolume = t["vol"]
 	var flags := vol.spawnflags & 15
 	if flags != 0 and (flags & 1) == 0:
 		return false
 	return (t["bounds"] as AABB).intersects(AABB(feet - Vector3(0.05, 0.0, 0.05), Vector3(0.1, height, 0.1))) and vol.touches_column(feet, height)
 
-## The ladder brushes as boxes in metres, for each survivor's DotFpsLadderMode. Built once: the same list on both ends is what keeps a replayed climb the server's.
+## The ladder brushes as boxes in metres, for each survivor's GSFpsLadderMode. Built once: the same list on both ends is what keeps a replayed climb the server's.
 func ladder_boxes() -> Array[AABB]:
 	if _ladders_built or _ents == null:
 		return _ladders
@@ -1013,7 +1013,7 @@ func volume_toggles() -> Array[Dictionary]:
 
 # The map's logic
 
-func _scale_io(io: DotMapIO, manifest: Variant) -> void:
+func _scale_io(io: GSMapIO, manifest: Variant) -> void:
 	if manifest is Dictionary:
 		io.unit_scale = float(((manifest as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", io.unit_scale))
 		io.destinations = (manifest as Dictionary).get("destinations", {})
@@ -1065,7 +1065,7 @@ func _build_logic() -> void:
 		records = _manifest_records()
 	if records.is_empty():
 		return
-	var io := DotMapIO.new()
+	var io := GSMapIO.new()
 	io.rate = tick_rate
 	io.command_allow = MapCommands.allow()
 	_scale_io(io, _manifest)
@@ -1088,12 +1088,12 @@ func _build_logic() -> void:
 	io.state_changed.connect(_on_logic_state)
 	var loaded := io.load_records(records)
 	if not loaded.ok:
-		DotLog.warn(CHANNEL, "the map's logic did not load", {"why": loaded.error.message})
+		GSLog.warn(CHANNEL, "the map's logic did not load", {"why": loaded.error.message})
 		return
 	_logic = io
 
 ## An input the logic delivers to one of this class's own entities (a lift, a button, a volume).
-func _own_input(e: DotMapEntity, input_name: String, param: String, activator: Variant, _caller: Variant) -> bool:
+func _own_input(e: GSMapEntity, input_name: String, param: String, activator: Variant, _caller: Variant) -> bool:
 	if not _by_entity.has(e.index):
 		return _copy_door_input(e, input_name, activator)
 	var keep: Variant = _activator
@@ -1106,7 +1106,7 @@ func _own_input(e: DotMapEntity, input_name: String, param: String, activator: V
 	return true
 
 ## A door's copy is not a mover, so an Open on it is over at once (its OnFullyOpen then kills the streak or sprite it was made with).
-func _copy_door_input(e: DotMapEntity, input_name: String, activator: Variant) -> bool:
+func _copy_door_input(e: GSMapEntity, input_name: String, activator: Variant) -> bool:
 	if not _copies.has(e.index) or not COPY_DOORS.has(e.classname.to_lower()):
 		return false
 	match input_name.to_lower():
@@ -1131,7 +1131,7 @@ func wave_changed(number: int, ended: bool = false) -> void:
 	if _logic == null:
 		return
 	_logic_to(_last_tick)
-	for e: DotMapEntity in _logic.entities:
+	for e: GSMapEntity in _logic.entities:
 		if e is LogicWaves and e.alive:
 			if ended:
 				e.wave_ended(_logic, number)
@@ -1143,8 +1143,8 @@ func wave_changed(number: int, ended: bool = false) -> void:
 func announcer_off() -> bool:
 	if _logic == null:
 		return false
-	for e: DotMapEntity in _logic.entities:
-		if e is DotMapBeats and e.alive and e.announcer_off():
+	for e: GSMapEntity in _logic.entities:
+		if e is GSMapBeats and e.alive and e.announcer_off():
 			return true
 	return false
 
@@ -1153,8 +1153,8 @@ func round_decided(won: bool) -> void:
 	if _logic == null:
 		return
 	_logic_to(_last_tick)
-	for e: DotMapEntity in _logic.entities:
-		if e is DotMapWinLose and e.alive:
+	for e: GSMapEntity in _logic.entities:
+		if e is GSMapWinLose and e.alive:
 			e.decided(_logic, won)
 	_logic.settle()
 
@@ -1171,10 +1171,10 @@ func maker_child_gone(maker: int) -> void:
 func feed_uis(held_fn: Callable) -> void:
 	if _logic == null:
 		return
-	for e: DotMapEntity in _logic.active_uis():
-		_logic.feed_ui(e.index, held_fn.call(e.index, (e as DotMapGameUi).player))
+	for e: GSMapEntity in _logic.active_uis():
+		_logic.feed_ui(e.index, held_fn.call(e.index, (e as GSMapGameUi).player))
 
-func _on_logic_state(e: DotMapEntity, key: String, value: Variant, _tick: int) -> void:
+func _on_logic_state(e: GSMapEntity, key: String, value: Variant, _tick: int) -> void:
 	if key == "alive" and value == false and _copies.has(e.index):
 		_drop_copy(e.index)
 
@@ -1363,7 +1363,7 @@ func _set_pair(data: Dictionary) -> void:
 func _body_named(targetname: String) -> PhysicsBody3D:
 	if _logic == null or targetname.is_empty():
 		return null
-	for e: DotMapEntity in _logic.find(targetname):
+	for e: GSMapEntity in _logic.find(targetname):
 		if e.node is PhysicsBody3D:
 			return e.node as PhysicsBody3D
 		if e.node != null:
@@ -1377,7 +1377,7 @@ func logic_report() -> Dictionary:
 	if _logic == null:
 		return {}
 	var gone := {}
-	for e: DotMapEntity in _logic.entities:
+	for e: GSMapEntity in _logic.entities:
 		for link: Dictionary in e.links:
 			var target: String = link["target"]
 			if target.begins_with("!") or target.begins_with("#"):
@@ -1389,5 +1389,5 @@ func logic_report() -> Dictionary:
 			"commands_denied": cover["commands_denied"], "loop_trips": cover["loop_trips"]}
 
 ## The logic runtime itself, for checks.
-func logic() -> DotMapIO:
+func logic() -> GSMapIO:
 	return _logic

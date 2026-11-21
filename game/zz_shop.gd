@@ -119,7 +119,7 @@ func _price(v: Variant) -> int:
 	return game.spawners._clean_price(v)
 
 
-func _describe(def: DotWeaponDef, tier: StringName) -> String:
+func _describe(def: GSWeaponDef, tier: StringName) -> String:
 	var parts: PackedStringArray = []
 	parts.append(String(tier).capitalize())
 	if def.params.has("damage"):
@@ -184,7 +184,7 @@ func buy(player, item_id: String) -> bool:
 func _give(player, item_id: String, found: Dictionary) -> String:
 	var block := _block()
 	var supplies: Dictionary = block.get("supplies", {}) as Dictionary if block.get("supplies") is Dictionary else {}
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal if player.weapons != null else null
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal if player.weapons != null else null
 
 	if item_id == "medkit":
 		if not game.consumables.add_medkit(player, false):

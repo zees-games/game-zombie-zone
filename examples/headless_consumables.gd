@@ -11,7 +11,7 @@ const CHECKS := 39
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -74,7 +74,7 @@ func _test_limits() -> void:
 	_check(cons.medkits_full(p) and not cons.pills_full(p), "full is judged against the limit, never when unlimited")
 	_check(ConsumablesScript._limit("x", "-1", 5) == 5 and ConsumablesScript._limit("x", " 9 ", 5) == 9, "_limit refuses a negative and trims spaces")
 	var net_src := FileAccess.get_file_as_string("res://game/net/zz_player_net.gd")
-	_check(net_src.contains('replicate(&"net_kits", DotNetVar.Type.VARINT)') and net_src.contains('replicate(&"net_pills", DotNetVar.Type.VARINT)'), "medkits and pills replicate as varints")
+	_check(net_src.contains('replicate(&"net_kits", GSNetVar.Type.VARINT)') and net_src.contains('replicate(&"net_pills", GSNetVar.Type.VARINT)'), "medkits and pills replicate as varints")
 	_finished()
 
 

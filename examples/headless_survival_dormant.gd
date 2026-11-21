@@ -33,7 +33,7 @@ func _dormant_world(from: float, every: int) -> Array:
 
 func _dormant_positions(far: Array) -> PackedVector3Array:
 	var out := PackedVector3Array()
-	for npc: DotNpcInstance in far:
+	for npc: GSNpcInstance in far:
 		out.append(npc.position())
 	return out
 
@@ -43,7 +43,7 @@ func _dormant_approach(from: float) -> Array:
 	var w := await _dormant_world(from, 16)
 	var game: ZzGame = w[0]
 	var me: ZzPlayer = w[2]
-	var npc: DotNpcInstance = (w[1] as Array)[0]
+	var npc: GSNpcInstance = (w[1] as Array)[0]
 	await _sim(game, 1.0)
 	var from_pos: Vector3 = npc.position()
 	var toward := (from_pos - (w[3] as Vector3)).normalized()

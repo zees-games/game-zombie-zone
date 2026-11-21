@@ -1,8 +1,8 @@
-extends DotConfig
+extends GSConfig
 
 const ZzCapsScript := preload("zz_caps.gd")
 
-## Every number this game has, layered like every other [DotConfig] in the family: [code]exported defaults < JSON file < environment < command line[/code]. [b]Metres and seconds.[/b] The maps are documents in the same units (see [ZzMapDoc]), so a length a mapper writes and a
+## Every number this game has, layered like every other [GSConfig] in the family: [code]exported defaults < JSON file < environment < command line[/code]. [b]Metres and seconds.[/b] The maps are documents in the same units (see [ZzMapDoc]), so a length a mapper writes and a
 ## length this file tunes against are the same number. [b]Every rule here is a default, not a decision.[/b] A server owner changes any of them in `user://cfg/zombiezone.json`, an environment variable (`ZZ_DIFFICULTY`) or a flag (`--zz-difficulty`), and the commonly turned ones
 ## are cvars as well (see `ZzModule._add_tunables`). The defaults are the co-operative survival genre's: four people, a horde that comes in waves, specials that punish whoever strays, and a down rather than a death for the first two mistakes.
 
@@ -49,7 +49,7 @@ const ZzCapsScript := preload("zz_caps.gd")
 
 @export_group("Survival")
 
-## How a survival map is held (dot-npc-ai-director's [DotNpcDirectorWaves]): [codeblock] waves a breather, then wave after wave,
+## How a survival map is held (dot-npc-ai-director's [GSNpcDirectorWaves]): [codeblock] waves a breather, then wave after wave,
 ## each a crowd to kill and bigger than the last nights a day to get ready, then a night to live through, harder every night
 ## clock one stretch of time that gets worse the longer it runs (the old survival) [/codeblock]
 @export_enum("waves", "nights", "clock") var survival_style: int = 0
@@ -110,7 +110,7 @@ func setup_seconds() -> float:
 @export_range(0, 50, 1, "or_greater") var wave_size_per_survivor: int = 4
 
 ## How much bigger each wave (or harder each night) is than the first, as a share of it, and
-## the square term that makes the last waves a wall (see [DotNpcDirectorWaves.strength_of]).
+## the square term that makes the last waves a wall (see [GSNpcDirectorWaves.strength_of]).
 @export_range(0.0, 2.0, 0.01, "or_greater") var wave_growth: float = 0.22
 @export_range(0.0, 0.5, 0.005, "or_greater") var wave_growth_accel: float = 0.018
 
@@ -265,7 +265,7 @@ func setup_seconds() -> float:
 @export var zombie_spread: bool = true
 
 ## Whether a zombie reads its squad's sightings when it thinks instead of each sighting calling
-## the whole horde (DotNpcAiSquads.pull_reports). Read at map load.
+## the whole horde (GSNpcAiSquads.pull_reports). Read at map load.
 @export var squad_pull_reports: bool = true
 
 ## Seconds between a zombie's reads of its squad's sightings (the log keeps them, so this only delays news). 0 reads on every think.
@@ -298,22 +298,22 @@ func setup_seconds() -> float:
 ## bench 4 moved brains -6%, +1%, -3% and -3% on three boxes, inside the noise (docs/survival.md). `zz_path_reuse_thoughts`.
 @export_range(0, 64, 1, "or_greater") var path_reuse_thoughts: int = 0
 ## Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in dot-sim's native
-## `DotSimCrowdGrid` when the library is loaded: the same indices and pushes to the bit as dot-npc-ai's
+## `GSSimCrowdGrid` when the library is loaded: the same indices and pushes to the bit as dot-npc-ai's
 ## script grid, which false (or no library, the web) keeps. `zz_native_crowd`.
 @export var native_crowd: bool = true
 
-## dot-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in dot-sim's `DotSimSenses`
+## dot-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in dot-sim's `GSSimSenses`
 ## when the library is loaded: the same targets at the same moments as the script, which false (or no
 ## library, the web) keeps. `zz_native_senses`.
 @export var native_senses: bool = true
 
 ## The commons' chase plan (whom, where, how fast, how near) and every zombie's spaced heading in dot-sim's
-## `DotSimZombieBrains` and `DotSimCrowdGrid.spaced_direction` when the library is loaded: the same decisions as
+## `GSSimZombieBrains` and `GSSimCrowdGrid.spaced_direction` when the library is loaded: the same decisions as
 ## the script, which false (or no library, the web) keeps. `zz_native_brains`.
 @export var native_brains: bool = true
 
 ## dot-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tick in
-## dot-sim's `DotSimThinkPacer` when the library is loaded, calling only the zombies due: the same thoughts with the
+## dot-sim's `GSSimThinkPacer` when the library is loaded, calling only the zombies due: the same thoughts with the
 ## same seconds as each brain counting its own ticks, which false (or no library, the web) keeps. `zz_native_pacing`.
 @export var native_pacing: bool = true
 

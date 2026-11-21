@@ -27,7 +27,7 @@ var _verbose := OS.get_cmdline_user_args().has("--verbose")
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -90,12 +90,12 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 	var t0 := Time.get_ticks_msec()
 	await _boot(id)
 	var t1 := Time.get_ticks_msec()
-	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
+	var graph := _game.horde.spawner.nav as GSNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
 	for a in OS.get_cmdline_user_args():
 		if graph != null and a.begins_with("--ratio="):
 			graph.straight_width_ratio = float(a.substr(8))
 	var t1b := Time.get_ticks_msec()
-	var nav: DotNpcNavData = graph.data if graph != null else null
+	var nav: GSNpcNavData = graph.data if graph != null else null
 	if _verbose:
 		print("  data %d ms (graph at %d)" % [Time.get_ticks_msec() - t1b, t1b - t0])
 	var out := PackedStringArray()
@@ -159,7 +159,7 @@ func _probe_map(id: String, at: Array) -> PackedStringArray:
 func _reach_map(id: String) -> PackedStringArray:
 	await _boot(id)
 	var out := PackedStringArray()
-	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
+	var graph := _game.horde.spawner.nav as GSNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
 	if graph == null or not graph.is_ready():
 		out.append("MAP %s: no nav graph, 1 unreachable" % id)
 		_free_game()
@@ -216,7 +216,7 @@ func _reach_map(id: String) -> PackedStringArray:
 
 
 ## Per endpoint: off the graph (no point within the snap), or the graph piece it lands in with that piece's size.
-func _reach_causes(graph: DotNpcNavGraph, survivors: Array[Vector3], zombies: Array[Vector3], posts: Array[Vector3]) -> PackedStringArray:
+func _reach_causes(graph: GSNpcNavGraph, survivors: Array[Vector3], zombies: Array[Vector3], posts: Array[Vector3]) -> PackedStringArray:
 	var out := PackedStringArray()
 	var sizes := {}
 	for c in graph._component:
@@ -274,7 +274,7 @@ func _reach_causes(graph: DotNpcNavGraph, survivors: Array[Vector3], zombies: Ar
 
 ## --near=x,y,z[,r]: the zombie graph's points within r (3 m) of a spot, each with its piece and its neighbours, and every
 ## edge the prune cut that ends there with what the body hits on it. Where two pieces should join, this names the cut.
-func _near_dump(graph: DotNpcNavGraph, arg: String) -> PackedStringArray:
+func _near_dump(graph: GSNpcNavGraph, arg: String) -> PackedStringArray:
 	var out := PackedStringArray()
 	var parts := arg.split(",")
 	var at := Vector3(float(parts[0]), float(parts[1]), float(parts[2]))

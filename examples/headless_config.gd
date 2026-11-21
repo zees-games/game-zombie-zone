@@ -1,6 +1,6 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
-## ZzConfig through DotGameConfigBinder: fields, cvars, strict refusal, the diff, yml defaults and the workbench round trip.
+## ZzConfig through GSGameConfigBinder: fields, cvars, strict refusal, the diff, yml defaults and the workbench round trip.
 ## `godot --headless --path . res://examples/headless_config.tscn`
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -22,7 +22,7 @@ const CHECKS := 76
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.FATAL)
+	GSLog.set_level(GSLog.Level.FATAL)
 	_run.call_deferred()
 
 
@@ -54,9 +54,9 @@ func _run() -> void:
 	_check(config.escape_grace_seconds == 30.0 and config.grace_maps == 1 and config.grace_hud == 1 and config.trader_round == -1
 		and config.trader_closed_message == "Trader closed: round in progress", "the grace and trader window defaults")
 
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
-	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	binder.bind_cvars(console.cvar, GSConVar.FLAG_ARCHIVE, console.has_name)
 	console.set_cvar("zz_waves", "7")
 	_check(config.waves == 7 and binder.source_of("waves") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("waves: 7"), "the diff names the edit")
@@ -79,17 +79,17 @@ func _run() -> void:
 	_templates(binder)
 	_caps()
 
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.panel_mode = 1
 	wb.config = {"enabled": false}
-	for pset: DotProfileSet in binder.profile_sets():
+	for pset: GSProfileSet in binder.profile_sets():
 		wb.add_set(pset, pset.rel_path)
 	add_child(wb)
 	_check(wb.start().ok, "the workbench starts")
 	binder.attach(wb.api.runtime)
 	var listed := PackedStringArray()
 	for kind: String in wb.api.kinds():
-		var lg: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
+		var lg: GSResult = wb.api.handle(GSGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
 		if lg.ok:
 			listed.append_array(PackedStringArray((lg.value as Dictionary).get("values", {}).keys()))
 	var missing := PackedStringArray()
@@ -97,7 +97,7 @@ func _run() -> void:
 		if not listed.has(k):
 			missing.append(k)
 	_check(missing.is_empty() and binder.profile_sets().size() == 5, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
-	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "start_points", "value": 90})
+	var res: GSResult = wb.api.handle(GSGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "start_points", "value": 90})
 	_check(res.ok and config.start_points == 90, "a workbench edit reaches the live config", "" if res.ok else res.error.message)
 	var files: Dictionary = wb.exporter.call("collect")
 	var text: String = files.get("cfg/game/%s/config_round/game.yml" % GAME, "")
@@ -167,9 +167,9 @@ func _probe() -> void:
 	binder.strict = true
 	binder.roots = PackedStringArray([ProjectSettings.globalize_path(ROOT)])
 	var loaded := binder.load_layers()
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
-	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	binder.bind_cvars(console.cvar, GSConVar.FLAG_ARCHIVE, console.has_name)
 	print("PROBE ok=%s waves=%s waves_src=%s commons=%s commons_src=%s cvar=%s gibs=%s gibs_src=%s pts=%s pts_src=%s" % [
 		loaded.ok, config.waves, binder.source_of("waves"), config.commons_base, binder.source_of("commons_base"),
 		console.find_cvar("zz_commons_base").get_string(), config.gore_max_gibs, binder.source_of("gore_max_gibs"),
@@ -252,7 +252,7 @@ func _caps() -> void:
 
 
 ## The shipped cfg files hold every key, in step with ZzConfig, and change nothing as they are.
-func _templates(binder: DotGameConfigBinder) -> void:
+func _templates(binder: GSGameConfigBinder) -> void:
 	var files := binder.template_files()
 	_check(files.size() == 5, "five shipped cfg files", str(files.size()))
 	var stale := PackedStringArray()
@@ -263,7 +263,7 @@ func _templates(binder: DotGameConfigBinder) -> void:
 
 
 ## The turret rules moved out of zz_turrets.gd keep the old constants as defaults, and a cvar changes what the rules read.
-func _turrets(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+func _turrets(binder: GSGameConfigBinder, console: GSConsole, config: ZzConfig) -> void:
 	var fresh := ZzConfig.new()
 	_check(fresh.turret_max_per_owner == 2 and fresh.turret_seconds == 40.0 and fresh.turret_ammo == 220 and fresh.turret_damage == 14.0
 		and fresh.turret_reach == 20.0 and fresh.turret_interval == 0.14 and fresh.turret_muzzle_height == 0.85
@@ -290,7 +290,7 @@ func _turrets(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig
 
 
 ## The thrown-thing rules moved out of zz_hazards.gd keep the old constants as defaults, and a cvar changes what the rules read.
-func _hazards(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+func _hazards(binder: GSGameConfigBinder, console: GSConsole, config: ZzConfig) -> void:
 	var fresh := ZzConfig.new()
 	_check(fresh.hazard_goo_hit_radius == 1.1 and fresh.hazard_rock_hit_radius == 1.3 and fresh.hazard_bile_lure == 35.0
 		and fresh.hazard_bile_seconds == 15.0 and fresh.hazard_pipe_fuse == 6.0 and fresh.hazard_pipe_lure == 40.0
@@ -308,7 +308,7 @@ func _hazards(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig
 
 
 ## The stand-in rules moved out of zz_bots.gd keep the old constants as defaults, and a cvar changes the live config the bots read.
-func _standins(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+func _standins(binder: GSGameConfigBinder, console: GSConsole, config: ZzConfig) -> void:
 	var fresh := ZzConfig.new()
 	var old := {"sight": 32.0, "upgrade_ratio": 1.35, "blast_safe": 9.0, "launcher_bonus": 10000.0, "friend_clearance": 0.7,
 		"friend_cone_degrees": 14.0, "muzzle_margin": 0.08, "penetration_reach": 8.0, "shove_range": 1.7, "follow_near": 3.5,
@@ -328,7 +328,7 @@ func _standins(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfi
 
 
 ## Horde, footing and medkit-aim numbers moved out of their files keep the old constants as defaults, and a cvar changes the live config.
-func _batch4(binder: DotGameConfigBinder, console: DotConsole, config: ZzConfig) -> void:
+func _batch4(binder: GSGameConfigBinder, console: GSConsole, config: ZzConfig) -> void:
 	var fresh := ZzConfig.new()
 	var old := {"alert_radius": 9.0, "bile_radius": 45.0, "bile_splash": 4.0, "mob_burst": 6, "mob_burst_seconds": 0.4,
 		"wanderer_clearance": 28.0, "bash_reach": 0.75, "footing_sample_every": 1.5, "footing_sample_move": 1.5,

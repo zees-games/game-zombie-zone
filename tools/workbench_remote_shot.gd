@@ -11,20 +11,20 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var net := DotNetManager.new()
+	var net := GSNetManager.new()
 	net.is_server = false
 	net.local_peer_id = 5
 	net.config_file = ""
 	var _s := net.setup()
-	var client := DotGameWorkbenchRemoteClient.attach(net)
-	var wb := DotGameWorkbench.new()
+	var client := GSGameWorkbenchRemoteClient.attach(net)
+	var wb := GSGameWorkbench.new()
 	wb.remote_client = client
 	wb.remote_fn = func() -> bool: return true
 	wb.add_set(ZzBotProfiles.make_set(), "Bot personas (add, edit, delete)")
 	root.add_child(wb)
-	var started := wb.start(DotProfileRuntime.new())
-	var told := DotGameWorkbenchMessage.new()
-	told.kind = DotGameWorkbenchMessage.KIND_ACCESS
+	var started := wb.start(GSProfileRuntime.new())
+	var told := GSGameWorkbenchMessage.new()
+	told.kind = GSGameWorkbenchMessage.KIND_ACCESS
 	told.allowed = true
 	told.flags = "cvar,root"
 	client.handle_message(told)

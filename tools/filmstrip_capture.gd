@@ -8,14 +8,14 @@ extends SceneTree
 const REFERENCE_DT := 1.0 / 60.0
 const BUTTON_ACTIONS := {"sprint": &"dot_fps_sprint", "walk": &"dot_fps_walk", "crouch": &"dot_fps_crouch"}
 
-var _clip: DotScenario = null
+var _clip: GSScenario = null
 var _view := "tp"
 var _client: Node = null
 var _game: Object = null
 var _local: Object = null
 var _zombie: Node3D = null
 var _camera: Camera3D = null
-var _metrics := DotClipMetrics.new()
+var _metrics := GSClipMetrics.new()
 var _time := -1.0
 var _prev := -1.0
 var _frames := 0
@@ -40,7 +40,7 @@ var _zombie_script: GDScript = null
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
-	var clips := DotScenario.load_file("res://tools/filmstrip_scenarios.json")
+	var clips := GSScenario.load_file("res://tools/filmstrip_scenarios.json")
 	if args.is_empty() or not clips.has(args[0]):
 		printerr("filmstrip: clip %s not in %s" % [str(args), str(clips.keys())])
 		quit(2)
@@ -235,7 +235,7 @@ func _event(event: String) -> void:
 		"hit", "down":
 			_local.health.invulnerable = false
 			var amount := 20.0 if event == "hit" else 500.0
-			combat.call("apply_damage", DotDamage.make(0, _local.get("entity_id"), amount, combat.call("damage_type", &"strike")))
+			combat.call("apply_damage", GSDamage.make(0, _local.get("entity_id"), amount, combat.call("damage_type", &"strike")))
 			_local.health.invulnerable = true
 		"die":
 			_game.call("_die", _local, &"strike", &"filmstrip")
@@ -304,14 +304,14 @@ func _unit(cam: Camera3D, spot: Vector3) -> Vector2:
 
 func _finish() -> bool:
 	var label: String = _clip.name if _zombie != null else "%s_%s" % [_clip.name, _view]
-	var limits := DotClipMetrics.limits_for("res://tools/filmstrip_thresholds.json", _clip.name)
+	var limits := GSClipMetrics.limits_for("res://tools/filmstrip_thresholds.json", _clip.name)
 	print("FILMSTRIP_CLIP start_frame=%d frames=%d" % [_start_frame, _all - _start_frame])
 	var rows := _metrics.evaluate(limits)
 	if _view == "fp" and _zombie == null:
 		var cap := float(limits.get("view_hop_m", 0.15))
 		rows.append({"check": "view_pop", "pass": _worst_hop <= cap, "value": "%.3f" % _worst_hop, "limit": "%.3f" % cap,
 			"note": "m, largest hop of a hand or weapon part between frames (eye frame), at %.2f s, %s; %d parts" % [_worst_at, _worst_part, _parts.size()]})
-	var text := DotClipMetrics.table(label, rows)
+	var text := GSClipMetrics.table(label, rows)
 	print(text)
-	DotClipMetrics.write_report("res://screenshots/filmstrip/%s_report.txt" % label, text, _log)
+	GSClipMetrics.write_report("res://screenshots/filmstrip/%s_report.txt" % label, text, _log)
 	return true

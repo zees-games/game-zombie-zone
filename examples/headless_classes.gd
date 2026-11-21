@@ -19,7 +19,7 @@ const PACK_CFG := "res://addons/zz_ply_class_pack/cfg"
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -56,9 +56,9 @@ func _test_load() -> void:
 	_check(all.size() >= 6, "at least six classes", str(all.keys()))
 	for id in ["survivor", "medic", "scout", "heavy", "hunter", "looter"]:
 		_check(all.has(id), "class %s is there" % id)
-	var heavy: DotPlayerClassDef = all["heavy"]
+	var heavy: GSPlayerClassDef = all["heavy"]
 	_check(is_equal_approx(heavy.max_health, 140.0) and heavy.move_speed_scale < 1.0, "heavy: 140 health, slower", str(heavy.max_health))
-	var scout: DotPlayerClassDef = all["scout"]
+	var scout: GSPlayerClassDef = all["scout"]
 	_check(scout.move_speed_scale > 1.0 and scout.sprint_speed_scale > 1.0, "scout: faster, sprints harder")
 	_check(String(scout.loadout_id) == "zz_smg,zz_knife", "scout carries its loadout", String(scout.loadout_id))
 	_check(ZzClasses.models_of(all["medic"]) == PackedStringArray(["skin_c", "skin_f"]), "medic's models come through the profile")
@@ -120,12 +120,12 @@ func _test_models() -> void:
 	var all := ZzClasses.all()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var medic: DotPlayerClassDef = all["medic"]
+	var medic: GSPlayerClassDef = all["medic"]
 	var seen := {}
 	for i in 60:
 		seen[ZzClasses.pick_model(medic, "", rng)] = true
 	_check(seen.size() == 2 and seen.has("skin_c") and seen.has("skin_f"), "random: both of the medic's models, no others", str(seen.keys()))
-	var surv: DotPlayerClassDef = all["survivor"]
+	var surv: GSPlayerClassDef = all["survivor"]
 	var seen_all := {}
 	for i in 200:
 		seen_all[ZzClasses.pick_model(surv, "", rng)] = true
@@ -158,22 +158,22 @@ func _bad_file(id: String, text: String) -> void:
 
 func _test_bad() -> void:
 	_section("a bad profile is rejected on its own; the good ones load")
-	var _clean := DotPaths.remove_tree(BAD_DIR)
+	var _clean := GSPaths.remove_tree(BAD_DIR)
 	_bad_file("good", "name: Good\nhealth: 120\nextra:\n  models: [skin_a]\n  model_mode: first\n")
 	_bad_file("badmode", "health: 100\nextra:\n  models: [skin_a]\n  model_mode: sometimes\n")
 	_bad_file("badmodel", "health: 100\nextra:\n  models: [skin_zz]\n")
 	_bad_file("badhealth", "health: 0\n")
 	_bad_file("nomodels", "health: 100\nextra:\n  model_mode: select\n")
 	ZzClasses.set_roots(PackedStringArray([BAD_DIR]))
-	DotLog.set_level(DotLog.Level.FATAL)
+	GSLog.set_level(GSLog.Level.FATAL)
 	var all := ZzClasses.all()
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_check(all.has("good") and all.size() == 1, "only the good profile loads", str(all.keys()))
 	var why := "\n".join(ZzClasses.rejected())
 	_check(ZzClasses.rejected().size() == 4, "four are refused and named", why)
 	_check(why.contains("model_mode") and why.contains("skin_zz"), "and each refusal says why")
 	ZzClasses.set_roots(PackedStringArray())
-	var _gone := DotPaths.remove_tree(BAD_DIR)
+	var _gone := GSPaths.remove_tree(BAD_DIR)
 	_finished()
 
 
@@ -197,7 +197,7 @@ func _test_wire() -> void:
 	_section("CLASSED crosses the wire and a client applies it; stand-ins draw by weight and take the class's persona")
 	_use_pack()
 	var body := ZzEventsText.write_classed(5, &"medic", &"skin_f")
-	var r := DotNetReader.new(body)
+	var r := GSNetReader.new(body)
 	var got := ZzEventsText.read_classed(r)
 	_check(bool(got["ok"]) and int(got["player_id"]) == 5 and got["class_id"] == &"medic" and got["skin"] == &"skin_f", "write and read agree", str(got))
 	_check(ZzEvent.fits(), "every event kind still fits the header")
@@ -217,7 +217,7 @@ func _test_wire() -> void:
 	_check(bot.class_id != &"" and bot.class_def != null, "a stand-in is dealt a class")
 	var persona := str(bot.class_def.attributes.get("persona", ""))
 	_check(persona != "", "its class names a persona", persona)
-	var pool: DotBotPersonaPool = game.personas()
+	var pool: GSBotPersonaPool = game.personas()
 	var found := false
 	for pe in pool.personas:
 		if String(pe.id) == persona:

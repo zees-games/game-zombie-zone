@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzMapConfig := preload("../game/zz_map_config.gd")
 
@@ -9,7 +9,7 @@ const CHECKS := 8
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -20,12 +20,12 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	_write(dir.path_join("zz_probe_hold.yml"), "zz_waves: 4\nzz_difficulty: 3\nzz_gravity: 1\n")
 
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
 	console.cvar("zz_waves", "10", "")
 	console.cvar("zz_difficulty", "1", "")
 	console.cvar("zz_gravity", "20", "")
-	var cfg := DotGameMapConfig.for_console(ZzMapConfig.GAME_ID, console, ZzMapConfig.KEYS)
+	var cfg := GSGameMapConfig.for_console(ZzMapConfig.GAME_ID, console, ZzMapConfig.KEYS)
 	cfg.config_dir = root
 
 	var got := cfg.apply("zz_probe_hold")

@@ -11,7 +11,7 @@ const CHECKS := 253
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -122,7 +122,7 @@ func _build() -> bool:
 	# clock, so the client must not ask for dot-net's input-lead report: steered by reports
 	# about commands it never stamped, the clock runs away from them (only dot-net's cap
 	# holds it). By the constant map, so this parses against a dot-net from before the report.
-	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
+	var lead_bit := int((GSNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 
 	_server_bridge = _make_bridge(server_side)
@@ -134,9 +134,9 @@ func _build() -> bool:
 
 	_server_bridge.open_link(server_side)
 	_client_bridge.open_link(client_side)
-	# The server's order (DotGameNetcode: after the bridge): the remote workbench's frame.
-	_server_remote = DotGameWorkbenchRemote.serve(_server_net).value as DotGameWorkbenchRemote
-	_client_remote = DotGameWorkbenchRemoteClient.attach(_client_net)
+	# The server's order (GSGameNetcode: after the bridge): the remote workbench's frame.
+	_server_remote = GSGameWorkbenchRemote.serve(_server_net).value as GSGameWorkbenchRemote
+	_client_remote = GSGameWorkbenchRemoteClient.attach(_client_net)
 	_server_net.messages.seal()
 	_client_net.messages.seal()
 	_check(_server_net.messages.schema_hash() == _client_net.messages.schema_hash(), "both ends agree on the schema")
@@ -218,14 +218,14 @@ func _listen() -> void:
 ## copy; a guest, a non-admin, a revoked admin and every player with the cvar off are refused, whatever the client sends.
 func _test_the_remote_workbench() -> void:
 	_section("a flagged admin edits the server's profiles, and nobody else can")
-	if not DotGameWorkbench.available():
+	if not GSGameWorkbench.available():
 		print("  dot-workbench is not linked: skipped")
 		_passed += 16
 		_finished()
 		return
 	var flags := {"boss": ["cvar", "root"], "plain": []}
 	var state := {"on": false, "uid": "", "now": 100000}
-	var swb := DotGameWorkbench.new()
+	var swb := GSGameWorkbench.new()
 	swb.name = "ServerWorkbench"
 	swb.dedicated = true
 	swb.add_set(_server_game.bot_persona_set(), "bots")
@@ -238,8 +238,8 @@ func _test_the_remote_workbench() -> void:
 	remote.connected_fn = func(_p: int) -> bool: return true
 	remote.permit_uid_fn = func(uid: String, flag: String) -> bool: return (flags.get(uid, []) as Array).has(flag)
 	remote.now_fn = func() -> int: return state["now"]
-	remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
-	var cwb := DotGameWorkbench.new()
+	remote.limiter = GSRateLimiter.new(1000.0, 1000.0)
+	var cwb := GSGameWorkbench.new()
 	cwb.name = "ClientWorkbench"
 	cwb.remote_client = _client_remote
 	cwb.remote_fn = func() -> bool: return true
@@ -266,9 +266,9 @@ func _test_the_remote_workbench() -> void:
 	_exchange()
 	_check(_client_remote.allowed and _client_remote.flags.has("cvar"), "with the cvar on an admin is told the flags it holds")
 	_check(cwb.overlay != null, "and gets the panel")
-	var added: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, {"op": "add", "kind": "bot", "id": "wbtest"})
+	var added: GSResult = cwb.api.handle(GSGameWorkbenchRemoteClient.ACTOR, {"op": "add", "kind": "bot", "id": "wbtest"})
 	_exchange()
-	var applied: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, edit)
+	var applied: GSResult = cwb.api.handle(GSGameWorkbenchRemoteClient.ACTOR, edit)
 	_exchange()
 	_check(added.ok and applied.ok and srt.revision("bot", "wbtest") > 0, "an edit from the panel is applied on the server", "%s rev %d" % ["" if applied.ok else applied.error.message, srt.revision("bot", "wbtest")])
 	_check(is_equal_approx(float(_client_game.bot_persona_set().runtime_paths("wbtest").get("weight", 0.0)), 5.0) and crt.revision("bot", "wbtest") > 0, "and its row replicated to the client")
@@ -389,7 +389,7 @@ func _test_the_local_player_is_predicted() -> void:
 	_stand_in.place_at(STREET + Vector3(2.0, 0.0, 1.0), 0.0)
 	await _steps(20)
 	var before := mine.controller.state.position
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	await _step(forward)
 	_check(mine.controller.state.position.distance_to(before) > 0.01,
@@ -418,7 +418,7 @@ func _test_shots_count_online() -> void:
 	rig.role = ZeeWeaponRig.Role.LOCAL
 	rig.authority = false
 	rig.tick_rate = Engine.physics_ticks_per_second
-	rig.player_ref = DotNodeRef.of_path(mine.get_path())
+	rig.player_ref = GSNodeRef.of_path(mine.get_path())
 	mine.add_child(rig)
 	var _set := rig.setup()
 	mine.view_rig = rig
@@ -497,11 +497,11 @@ func _test_fire_mode_reaches_the_server() -> void:
 	_check(armed and arsenal.current_def().id == ZzWeaponIds.M4 and arsenal.fire_modes_available().size() >= 3, "the server holds a rifle with several modes")
 	var start := arsenal.fire_mode()
 	var guard := 0
-	while arsenal.fire_mode() != DotWeaponDef.Fire.BURST and guard < 4:
+	while arsenal.fire_mode() != GSWeaponDef.Fire.BURST and guard < 4:
 		for _i in range(6):
 			await _mode_step(false, ZzNetCommand.ACT_FIRE_MODE if _i < 3 else 0, slot)
 		guard += 1
-	_check(arsenal.fire_mode() == DotWeaponDef.Fire.BURST and arsenal.fire_mode() != start, "pressing B reaches the server's arsenal", "%d presses" % guard)
+	_check(arsenal.fire_mode() == GSWeaponDef.Fire.BURST and arsenal.fire_mode() != start, "pressing B reaches the server's arsenal", "%d presses" % guard)
 	await _steps(20)
 	var mag := arsenal.current().magazine
 	await _mode_step(true, 0, slot)
@@ -526,7 +526,7 @@ func _test_a_refused_fit_resyncs_the_owner() -> void:
 			pick = list[0]
 			break
 	_check(pick != &"", "the M4 takes at least one attachment", str(mount))
-	var held := DotWeaponFitting.make(base.id)
+	var held := GSWeaponFitting.make(base.id)
 	held.fit(mount, pick)
 	_check(_server_game.fit_weapon(server_me, base.id, held).ok, "the server holds a legal fitting for the M4")
 
@@ -545,13 +545,13 @@ func _test_a_refused_fit_resyncs_the_owner() -> void:
 	_check(expected != 0, "and it is the one the server holds, not nothing")
 	_check(catalogue.decode(base, int(heard[0][1]) if not heard.is_empty() else 0).attachment_on(mount) == pick,
 		"which decodes to %s on %s" % [pick, mount])
-	_check((server_me.fittings.get(base.id) as DotWeaponFitting).attachment_on(mount) == pick,
+	_check((server_me.fittings.get(base.id) as GSWeaponFitting).attachment_on(mount) == pick,
 		"the refusal left the server's fitting alone")
 	_finished()
 
 
 func _mode_step(fire: bool, actions: int, slot: int) -> void:
-	var move := DotFpsCommand.new()
+	var move := GSFpsCommand.new()
 	move.set_button(ZzNetCommand.BUTTON_FIRE, fire)
 	_tick += 1
 	var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
@@ -566,7 +566,7 @@ func _mode_step(fire: bool, actions: int, slot: int) -> void:
 ## client's drawn gun: what `ZzClient._physics_process` does each frame.
 func _armed_steps(count: int, fire: bool, reload: bool, slot: int) -> void:
 	for _i in range(count):
-		var move := DotFpsCommand.new()
+		var move := GSFpsCommand.new()
 		move.set_button(ZzNetCommand.BUTTON_FIRE, fire)
 		move.set_button(ZzNetCommand.BUTTON_RELOAD, reload)
 		_tick += 1
@@ -612,7 +612,7 @@ func _test_zombies_replicate() -> void:
 
 	# A hit of this survivor's, confirmed by the server, reaches this survivor's client: what
 	# its hit marker and damage numbers are drawn from.
-	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 5.0, null)
+	var shot := GSDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 5.0, null)
 	shot.tick = _server_game.current_tick()
 	var _landed := _server_game.combat.apply_damage(shot)
 	await _steps(4)
@@ -631,7 +631,7 @@ func _test_zombies_replicate() -> void:
 		"and the world's damage (no survivor behind it) confirms nothing to anybody", str(_heard.get("hits", [])))
 	_check(_heard.has("npc_gone") and int(_heard["npc_gone"][0]) == net_id and bool(_heard["npc_gone"][1]),
 		"killed, and the client is told it died rather than went away")
-	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is DotPlayerDeath,
+	_check(_heard.has("npc_gone") and _heard["npc_gone"][2] is GSPlayerDeath,
 		"and how it fell, for its body to fall that way")
 	_finished()
 
@@ -669,7 +669,7 @@ func _check_splats(server_me: ZzPlayer) -> void:
 ## A resolved shot's marks reach every client, and a miss into open air leaves none.
 func _check_impact_marks(server_me: ZzPlayer) -> void:
 	# A resolved shot's marks (the stop on the floor, both faces of a wall it passed, a bounce) reach every client.
-	var volley := DotShot.make(&"test", server_me.entity_id, _server_game.current_tick(), 0)
+	var volley := GSShot.make(&"test", server_me.entity_id, _server_game.current_tick(), 0)
 	volley.origin = Vector3(4.0, 3.0, 4.0)
 	volley.max_range = 100.0
 	volley.impacts.append(Vector3(4.0, 0.0, 4.0))
@@ -679,7 +679,7 @@ func _check_impact_marks(server_me: ZzPlayer) -> void:
 	var marks := ZzImpactMarks.collect(volley, _server_game.get_world_3d(), _server_game.world_mask())
 	_check(marks.size() == 4 and (marks[3][1] as Vector3).dot(Vector3.UP) > 0.98,
 		"a shot's marks are its wall faces, its bounces and the surface it stopped on", str(marks))
-	var open_air := DotShot.make(&"test", server_me.entity_id, 0, 0)
+	var open_air := GSShot.make(&"test", server_me.entity_id, 0, 0)
 	open_air.origin = Vector3.ZERO
 	open_air.max_range = 50.0
 	open_air.impacts.append(Vector3(0.0, 0.0, -50.0))
@@ -768,7 +768,7 @@ func _test_only_what_is_near_is_sent() -> void:
 	# section: the same rule, with everything on the street far away. Without that this would
 	# prove nothing about distance, and the boss check below would pass whether or not the
 	# boss were exempt.
-	var rule := _server_net.interest as DotNetInterestDistance
+	var rule := _server_net.interest as GSNetInterestDistance
 	_check(rule != null and rule.radius_by_tag.has(ZzNetBridge.Interest.TAG_COMMON) and rule.radius_by_tag.has(ZzNetBridge.Interest.TAG_SPECIAL)
 		and ZzNetBridge.Interest.zombie_radius(ZzNpcs.COMMON) < ZzNetBridge.Interest.zombie_radius(ZzNpcs.STRANGLER),
 		"the server tells commons by distance, and specials from further out")
@@ -903,7 +903,7 @@ func _step_with_actions(actions: int) -> void:
 	var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
 	_server_bridge.server_tick(_tick)
 	_flush()
-	_client_bridge.client_tick(_tick + INPUT_LEAD, DotFpsCommand.new(), 0, actions)
+	_client_bridge.client_tick(_tick + INPUT_LEAD, GSFpsCommand.new(), 0, actions)
 	_flush()
 	await get_tree().physics_frame
 
@@ -963,7 +963,7 @@ func _test_flash_strength_reaches_the_client() -> void:
 func _test_points_above_16_bits_reach_the_client() -> void:
 	_section("points above 65535 reach the client unclamped (net_points is a varint)")
 	var src := FileAccess.get_file_as_string("res://game/net/zz_player_net.gd")
-	_check(src.contains('replicate(&"net_points", DotNetVar.Type.VARINT)'), "net_points replicates as a varint")
+	_check(src.contains('replicate(&"net_points", GSNetVar.Type.VARINT)'), "net_points replicates as a varint")
 	var server_me := _server_me()
 	var before := server_me.points
 	server_me.points = 1234567
@@ -1053,7 +1053,7 @@ func _test_a_downed_crawl_is_predicted() -> void:
 	_hurt(server_me, 500.0)
 	server_me.health.invulnerable = true
 	await _steps(8)
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	var before := mine.controller.state.position
 	await _steps(48, forward)
@@ -1107,7 +1107,7 @@ func _test_a_downed_crawl_is_predicted() -> void:
 ## Ctrl and C as key events through the real sampler, then the command on the wire: both ends crouch and lower the eye.
 func _test_crouch_reaches_both_ends() -> void:
 	_section("crouching: Ctrl and C reach the command, and both ends lower the body and the eye")
-	var sampler := DotFpsSampler.new(ZzPlayer.tunables_for(_server_game.config))
+	var sampler := GSFpsSampler.new(ZzPlayer.tunables_for(_server_game.config))
 	ZzPlayer.register_actions(sampler)
 
 	for code: Key in [KEY_CTRL, KEY_C]:
@@ -1118,13 +1118,13 @@ func _test_crouch_reaches_both_ends() -> void:
 		press.ctrl_pressed = code == KEY_CTRL
 		Input.parse_input_event(press)
 		Input.flush_buffered_events()
-		_check(sampler.sample(0.016).is_pressed(DotFpsCommand.BUTTON_CROUCH), "%s held sets the command's crouch bit" % OS.get_keycode_string(code))
+		_check(sampler.sample(0.016).is_pressed(GSFpsCommand.BUTTON_CROUCH), "%s held sets the command's crouch bit" % OS.get_keycode_string(code))
 		var release := press.duplicate() as InputEventKey
 		release.pressed = false
 		release.ctrl_pressed = false
 		Input.parse_input_event(release)
 		Input.flush_buffered_events()
-		_check(not sampler.sample(0.016).is_pressed(DotFpsCommand.BUTTON_CROUCH), "%s released clears it" % OS.get_keycode_string(code))
+		_check(not sampler.sample(0.016).is_pressed(GSFpsCommand.BUTTON_CROUCH), "%s released clears it" % OS.get_keycode_string(code))
 
 	var server_me := _server_me()
 	var mine := _mine()
@@ -1132,8 +1132,8 @@ func _test_crouch_reaches_both_ends() -> void:
 	await _steps(30)
 	var stand_server := server_me.eye_position().y - server_me.controller.state.position.y
 	var stand_client := mine.eye_position().y - mine.controller.state.position.y
-	var held := DotFpsCommand.new()
-	held.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	var held := GSFpsCommand.new()
+	held.set_button(GSFpsCommand.BUTTON_CROUCH, true)
 	await _steps(40, held)
 	await _steps(10, held)
 	_check(server_me.controller.state.crouch_fraction > 0.99, "the server's survivor is crouched", str(server_me.controller.state.crouch_fraction))
@@ -1162,7 +1162,7 @@ func _test_a_head_shot_off_reaches_the_client() -> void:
 
 	# A body shot at the left arm: gone, and the zombie lives, slower to hurt.
 	var arm := body.limbs.points_of(body.limbs.defs[&"armL"])
-	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
+	var shot := GSDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
 	shot.point = arm[arm.size() - 1]
 	shot.direction = Vector3.FORWARD
 	shot.tick = _server_game.current_tick()
@@ -1177,8 +1177,8 @@ func _test_a_head_shot_off_reaches_the_client() -> void:
 		"and the client's copy has the arm severed", str(mirror.limb_mask) if mirror != null else "gone")
 
 	# A head shot: the head, then the life.
-	var head := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 20.0, null)
-	head.hit_group = DotHitGroup.HEAD
+	var head := GSDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 20.0, null)
+	head.hit_group = GSHitGroup.HEAD
 	head.point = body.global_position + Vector3(0.0, 1.6, 0.0)
 	head.direction = Vector3.FORWARD
 	head.tick = _server_game.current_tick()
@@ -1195,20 +1195,20 @@ func _test_gore_off_takes_no_limb() -> void:
 	var npc := _server_game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -10.0), &"test", Basis(Vector3.UP, PI))
 	await _steps(4)
 	var body := npc.node as ZzZombieBody
-	DotNpcGore.level = 0
+	GSNpcGore.level = 0
 	var arm := body.limbs.points_of(body.limbs.defs[&"armL"])
-	var shot := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
+	var shot := GSDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 35.0, null)
 	shot.point = arm[arm.size() - 1]
 	shot.direction = Vector3.FORWARD
 	shot.tick = _server_game.current_tick()
 	var _landed := _server_game.combat.apply_damage(shot)
 	_check(body.limbs.mask() == 0 and npc.is_alive(), "level 0: the arm stays on")
-	var head := DotDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 1.0, null)
-	head.hit_group = DotHitGroup.HEAD
+	var head := GSDamage.make(server_me.entity_id, _server_game.horde.entity_id_for(npc), 1.0, null)
+	head.hit_group = GSHitGroup.HEAD
 	head.point = body.global_position + Vector3(0.0, 1.6, 0.0)
 	head.direction = Vector3.FORWARD
 	head.tick = _server_game.current_tick()
 	var _headed := _server_game.combat.apply_damage(head)
 	_check(body.limbs.mask() == 0 and npc.is_alive(), "level 0: a head shot takes no head and does not kill by it")
-	DotNpcGore.reset()
+	GSNpcGore.reset()
 	_finished()

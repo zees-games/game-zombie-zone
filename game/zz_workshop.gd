@@ -7,7 +7,7 @@ extends RefCounted
 ## like its own maps (validation, nav graph, safe rooms, waves), shown as "Name [Pack]".
 ## This file only says which `map_kind`s are accepted.
 ##
-## [b]Solo only, by the index and not by this file.[/b] [method DotContentIndex.entries] answers
+## [b]Solo only, by the index and not by this file.[/b] [method GSContentIndex.entries] answers
 ## for the index's current session, so a server (online) lists none; nothing here checks which it is.
 ## No `class_name`: a mounted pack cannot register one.
 

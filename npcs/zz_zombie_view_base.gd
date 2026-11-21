@@ -321,7 +321,7 @@ var _rate := 1.0
 var _want_clip: StringName = &"idle"
 var _want_rate := 1.0
 ## Each foot planted on the floor through the shamble ([method _plant_feet]).
-var _plant := DotFootPlant.new()
+var _plant := GSFootPlant.new()
 ## Per side: [upper, lower, ankle in the lower bone's frame, rest ankle, leg length], skeleton space.
 var _legs: Array = []
 var _dead_for: float = -1.0
@@ -448,7 +448,7 @@ static func _scene(path: String) -> PackedScene:
 
 	if not _scenes.has(path):
 		# Imported or not: a pull that brought new zombies and no editor run left them all capsules.
-		_scenes[path] = DotHumanoidFigure.load_model(path)
+		_scenes[path] = GSHumanoidFigure.load_model(path)
 
 	return _scenes[path]
 
@@ -480,7 +480,7 @@ static func _library(id: StringName) -> AnimationLibrary:
 
 
 ## The clips [param id] plays: its own, or (a survivor body) zombie_basic's carried over onto its
-## skeleton by [method DotHumanoidClips.retarget], once per body and shared.
+## skeleton by [method GSHumanoidClips.retarget], once per body and shared.
 static func _library_for(id: StringName, skeleton: Skeleton3D) -> AnimationLibrary:
 	if not CLIPS_FROM.has(id):
 		return _library(id)
@@ -488,7 +488,7 @@ static func _library_for(id: StringName, skeleton: Skeleton3D) -> AnimationLibra
 	var key := StringName("%s<-%s" % [id, CLIPS_FROM[id]])
 
 	if not _libraries.has(key):
-		_libraries[key] = DotHumanoidClips.retarget(_library(CLIPS_FROM[id]), _rests(CLIPS_FROM[id]), skeleton)
+		_libraries[key] = GSHumanoidClips.retarget(_library(CLIPS_FROM[id]), _rests(CLIPS_FROM[id]), skeleton)
 
 	return _libraries[key]
 
@@ -508,12 +508,12 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 
 		if real != null and kit != null:
 			var probe := kit.instantiate()
-			var from := DotHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
+			var from := GSHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
 			probe.free()
 			merged = AnimationLibrary.new()
 			for clip in library.get_animation_list():
 				var _kept := merged.add_animation(clip, library.get_animation(clip))
-			var carried := DotHumanoidClips.retarget(real, from, skeleton)
+			var carried := GSHumanoidClips.retarget(real, from, skeleton)
 			for clip in carried.get_animation_list():
 				var animation := carried.get_animation(clip)
 				animation.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(StringName(clip)) else Animation.LOOP_NONE
@@ -544,7 +544,7 @@ static func _rests(id: StringName) -> Dictionary:
 
 		if scene != null:
 			var probe := scene.instantiate()
-			out = DotHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
+			out = GSHumanoidClips.rests_of(probe.find_children("*", "Skeleton3D", true, false).front() as Skeleton3D)
 			probe.free()
 
 		_libraries[key] = out
@@ -597,7 +597,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 		var normal_id := StringName("%s_normal" % look["body"])
 
 		if not _atlases.has(normal_id):
-			_atlases[normal_id] = DotHumanoidFigure.load_texture(ZzPaths.rebase(NORMALS[look["body"]]))
+			_atlases[normal_id] = GSHumanoidFigure.load_texture(ZzPaths.rebase(NORMALS[look["body"]]))
 
 		material.set_shader_parameter(&"normal_tex", _atlases[normal_id])
 
@@ -647,7 +647,7 @@ static func _load_atlas(look: Dictionary) -> StringName:
 		path = path.replace("city_albedo_0", "city_albedo_%d" % int(look.get("tex", 0)))
 
 	if not _atlases.has(atlas_id):
-		_atlases[atlas_id] = DotHumanoidFigure.load_texture(path)
+		_atlases[atlas_id] = GSHumanoidFigure.load_texture(path)
 	return atlas_id
 
 
@@ -695,7 +695,7 @@ static func _measure(skeleton: Skeleton3D, model: Node3D, head_top := 1.22) -> f
 
 
 ## The bone origins of [param p_kind]'s body in the body's own space as drawn (turned, scaled to
-## its height and girth), filed under the returned key in [method DotNpcLimbs.rest_points]: the
+## its height and girth), filed under the returned key in [method GSNpcLimbs.rest_points]: the
 ## server draws nothing, and its limb regions must still sit where a client sees the limbs.
 static func limb_rest(p_kind: StringName, p_variant: int) -> String:
 	var look := look_for(p_kind, p_variant)
@@ -705,7 +705,7 @@ static func limb_rest(p_kind: StringName, p_variant: int) -> String:
 		return ""
 
 	var key := "zz-rest:%s:%.3f:%.3f" % [look["body"], float(look["height"]), float(look["girth"])]
-	var filed := DotNpcLimbs.rest_points(key)
+	var filed := GSNpcLimbs.rest_points(key)
 
 	if not filed.is_empty():
 		return key
@@ -735,5 +735,5 @@ static func limb_rest(p_kind: StringName, p_variant: int) -> String:
 				filed["@" + bone] = StringName(skeleton.get_bone_name(skeleton.get_bone_parent(i)))
 
 	root.free()
-	DotNpcLimbs.store_rest_points(key, filed)
+	GSNpcLimbs.store_rest_points(key, filed)
 	return key

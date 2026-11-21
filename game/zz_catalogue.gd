@@ -50,18 +50,18 @@ const PEEK_BYTES := 4096
 var parse_batch_bytes: int = 1 << 20
 
 ## The server's maps.yml, or null when there is none (every map rotates, as it always did).
-## dot-map's rotation file speaks DotMapDef; this catalogue holds map documents, so [member _defs]
+## dot-map's rotation file speaks GSMapDef; this catalogue holds map documents, so [member _defs]
 ## mirrors the ids and the file marks `in_rotation` on the mirror. See [method rotating].
-var rotation_file: DotMapRotationFile = null
-var _defs: DotMapCatalogue = DotMapCatalogue.new()
-var _rotation: DotMapRotation = DotMapRotation.of(_defs)
+var rotation_file: GSMapRotationFile = null
+var _defs: GSMapCatalogue = GSMapCatalogue.new()
+var _rotation: GSMapRotation = GSMapRotation.of(_defs)
 var _next: int = 0
 
 # Workshop maps: a pack's `map` entry names a ZzMapDoc DOCUMENT in `scene`, so it gets the
 # game's own validation, nav graph, safe rooms and waves. Online the index lists none.
 ## id -> the directory its document was read from (its maps pack's `hulls/` is beside it).
 var roots: Dictionary = {}
-var _index: DotContentIndex = null
+var _index: GSContentIndex = null
 var _kinds: PackedStringArray = PackedStringArray()
 var _content_ids: Dictionary = {}    # id -> the document this follower added
 var _content_titles: Dictionary = {} # id -> pack title
@@ -90,7 +90,7 @@ func load_from(directory: String) -> int:
 	_rebuild_order()
 	sync_content()
 
-	DotLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
+	GSLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
 	return loaded
 
 
@@ -99,7 +99,7 @@ func load_from(directory: String) -> int:
 func add_directory(root: String) -> int:
 	var loaded := _read_directory(root)
 	_rebuild_order()
-	DotLog.info(CHANNEL, "maps added", {"from": root, "read": loaded, "maps": maps.size()})
+	GSLog.info(CHANNEL, "maps added", {"from": root, "read": loaded, "maps": maps.size()})
 	return loaded
 
 
@@ -107,7 +107,7 @@ func _read_directory(root: String) -> int:
 	var dir := DirAccess.open(root)
 
 	if dir == null:
-		DotLog.info(CHANNEL, "no map directory here", {"looked_at": root})
+		GSLog.info(CHANNEL, "no map directory here", {"looked_at": root})
 		return 0
 
 	var files := PackedStringArray()
@@ -171,7 +171,7 @@ func _read_batch(root: String, files: PackedStringArray) -> int:
 			loaded += 1
 			continue
 
-		var parsed: DotResult = null
+		var parsed: GSResult = null
 
 		if ahead.has(file):
 			parsed = ahead[file]
@@ -186,7 +186,7 @@ func _read_batch(root: String, files: PackedStringArray) -> int:
 
 		if not parsed.ok:
 			refused[file] = parsed.error.message
-			DotLog.warn(CHANNEL, "a map was refused", {
+			GSLog.warn(CHANNEL, "a map was refused", {
 				"file": file, "why": parsed.error.message, "detail": parsed.error.detail,
 			})
 			continue
@@ -215,7 +215,7 @@ func _stand_in(root: String, file: String, id: StringName) -> void:
 
 
 ## Reads and validates, on the worker threads, every document that has no current cached copy: a cold
-## start parses them all, and one after another that is tens of seconds. file -> DotResult (null: empty or unreadable).
+## start parses them all, and one after another that is tens of seconds. file -> GSResult (null: empty or unreadable).
 func _parse_ahead(root: String, files: PackedStringArray) -> Dictionary:
 	var todo := PackedStringArray()
 
@@ -223,7 +223,7 @@ func _parse_ahead(root: String, files: PackedStringArray) -> Dictionary:
 		if not lazy and not _cache_current(root, file):
 			todo.append(file)
 
-	if todo.size() < 2 or not DotPlatform.has_threads():
+	if todo.size() < 2 or not GSPlatform.has_threads():
 		return {}
 
 	var results: Array = []
@@ -376,7 +376,7 @@ func doc(id: StringName) -> Dictionary:
 
 	if not parsed.ok:
 		refused[str(_files[id]).get_file()] = parsed.error.message
-		DotLog.warn(CHANNEL, "a map was refused", {"file": _files[id], "why": parsed.error.message})
+		GSLog.warn(CHANNEL, "a map was refused", {"file": _files[id], "why": parsed.error.message})
 		return {}
 
 	_hold(id, parsed.value)
@@ -397,7 +397,7 @@ func _hold(id: StringName, document: Dictionary) -> void:
 
 ## Follows [param index]: subscribed (solo) map entries of an accepted kind become maps here, for
 ## the index's CURRENT session only. The game's own ids always win.
-func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray) -> void:
+func follow_content(index: GSContentIndex, accepted_kinds: PackedStringArray) -> void:
 	_index = index
 	_kinds = accepted_kinds
 	sync_content()
@@ -464,11 +464,11 @@ func display_name(id: StringName) -> String:
 	var shown := str(doc.get("name", id))
 	var title := str(_content_titles.get(id, "")) if _content_ids.has(id) else ""
 	if roots.get(id, "") == USER_MAPS:
-		shown += DotMapDocDrop.TAG
+		shown += GSMapDocDrop.TAG
 	return "%s [%s]" % [shown, title] if title != "" else shown
 
 
-func _content_doc(entry: DotContentEntry) -> Dictionary:
+func _content_doc(entry: GSContentEntry) -> Dictionary:
 	if _content_docs.has(entry.key):
 		return _content_docs[entry.key]
 
@@ -504,7 +504,7 @@ func _content_doc(entry: DotContentEntry) -> Dictionary:
 			doc = parsed.value
 		else:
 			refused[entry.key] = parsed.error.message
-			DotLog.warn(CHANNEL, "a subscribed map was refused", {
+			GSLog.warn(CHANNEL, "a subscribed map was refused", {
 				"key": entry.key, "why": parsed.error.message, "detail": parsed.error.detail,
 			})
 
@@ -583,7 +583,7 @@ func apply_rotation(allowed: PackedStringArray = PackedStringArray()) -> void:
 		var def := _defs.get_map(id)
 
 		if def == null:
-			def = DotMapDef.new()
+			def = GSMapDef.new()
 			def.id = id
 			def.scene_path = "zz:%s" % id
 			def.display_name = display_name(id)
@@ -591,7 +591,7 @@ func apply_rotation(allowed: PackedStringArray = PackedStringArray()) -> void:
 
 		def.enabled = allowed.is_empty() or allowed.has(String(id))
 
-	for def: DotMapDef in _defs.maps.duplicate():
+	for def: GSMapDef in _defs.maps.duplicate():
 		if not seen.has(def.id):
 			var _gone := _defs.remove(def.id)
 
@@ -599,21 +599,21 @@ func apply_rotation(allowed: PackedStringArray = PackedStringArray()) -> void:
 		# Captures the mirror, never self: a lambda on self held by a member is a reference cycle,
 		# and a RefCounted cycle leaks.
 		var mirror := _defs
-		rotation_file.fallback_in = func(def: DotMapDef) -> bool:
+		rotation_file.fallback_in = func(def: GSMapDef) -> bool:
 			return def.id != PRACTICE or mirror.size() == 1
 		var _applied := rotation_file.apply(_rotation)
 		return
 
 	_rotation.order = []
 
-	for def: DotMapDef in _defs.maps:
+	for def: GSMapDef in _defs.maps:
 		def.in_rotation = true
 
 
 ## `zz_rotation <name>`: the live switch to another named rotation in the file.
-func switch_rotation(rotation_name: String) -> DotResult:
+func switch_rotation(rotation_name: String) -> GSResult:
 	if not has_rotation_file():
-		return DotResult.fail(DotError.CODE_STATE, "There is no maps.yml to switch rotations in.")
+		return GSResult.fail(GSError.CODE_STATE, "There is no maps.yml to switch rotations in.")
 
 	apply_rotation()
 	return rotation_file.switch(_rotation, rotation_name)
@@ -672,7 +672,7 @@ func note_played(id: StringName) -> void:
 ## The next map: drawn from [param stream] when shuffling, in order otherwise, and never the
 ## same one twice running when there is a choice. A maps.yml with rotations replaces both: its
 ## rotation's mode (`random` with a cooldown, or `cycle`) and written order decide.
-func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream,
+func next_map(allowed: PackedStringArray, shuffle: bool, stream: GSRandomStream,
 		previous: StringName) -> Dictionary:
 	if has_rotation_file():
 		apply_rotation(allowed)
@@ -688,7 +688,7 @@ func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream
 	var ids := rotating(allowed)
 
 	if ids.is_empty():
-		DotLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
+		GSLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
 			"allowed": ",".join(allowed),
 		})
 		return maps.get(PRACTICE, practice())

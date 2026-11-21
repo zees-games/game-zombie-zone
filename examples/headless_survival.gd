@@ -35,14 +35,14 @@ const PLAY_SECONDS := 75.0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
 func _merge(logs: Array) -> void:
-	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
+	var absent := GSGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARDS.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
+	var entered := GSGameShardArgs.sections_entered(PackedStringArray(logs))
 	_check(entered == SECTIONS, "the shards entered every section (%d of %d)" % [entered, SECTIONS])
 	_report_sections(1, 1, 1, 2)
 
@@ -50,11 +50,11 @@ func _merge(logs: Array) -> void:
 func _run() -> void:
 	print("zombiezone survival")
 	print("")
-	if DotGameShardArgs.is_merge():
-		_merge(DotGameShardArgs.merge_logs())
+	if GSGameShardArgs.is_merge():
+		_merge(GSGameShardArgs.merge_logs())
 		return
 
-	var shard := DotGameShardArgs.shard()
+	var shard := GSGameShardArgs.shard()
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 
 	if shard == "" or shard == "core_a":
@@ -105,7 +105,7 @@ func _test_wave_sets() -> void:
 	_check(ZzWaveSets.validate_extra({"zz": {"twists": true}}).ok, "extra.zz twists is accepted")
 	_check(not ZzWaveSets.validate_extra({"zz": {"twits": true}}).ok, "an extra.zz typo is refused")
 
-	DotLog.set_level(DotLog.Level.FATAL)  # an unknown wave set logs an ERROR on purpose
+	GSLog.set_level(GSLog.Level.FATAL)  # an unknown wave set logs an ERROR on purpose
 	var game := await _world(func(c: ZzConfig) -> void:
 		c.survival_style = 0
 		c.waves_set = "nonesuch"
@@ -123,7 +123,7 @@ func _test_wave_sets() -> void:
 	var _player := game.add_player(&"u310", "Sets")
 	game.start()
 	await _sim(game, 2.0)
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_check(game.survival != null and game.survival.wave_set_id == "", "a set that does not exist leaves the cvars in charge", str(game.survival.wave_set_id if game.survival != null else "no survival"))
 	_check(game.survival != null and game.survival.waves.count == 3, "and zz_waves still counts", str(game.survival.waves.count if game.survival != null else -1))
 	await _dispose(game)
@@ -141,7 +141,7 @@ func _test_wave_sets() -> void:
 	_check(named.survival != null and named.survival.wave_set_id == "default", "sv_waves default loads the shipped set", str(named.survival.wave_set_id if named.survival != null else "no survival"))
 	_check(named.survival != null and named.survival.waves.count == 10, "its ten waves, not zz_waves", str(named.survival.waves.count if named.survival != null else -1))
 	_check(named.survival != null and named.survival.waves.wave_set != null and named.survival.waves.wave_set.resolve(5, 1).boss.get("npc", "") == "brute", "wave 5 brings the brute the yml names")
-	_check(named.survival != null and named.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET, "and the hold opens in its setup stage")
+	_check(named.survival != null and named.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET, "and the hold opens in its setup stage")
 	await _dispose(named)
 	_finished()
 
@@ -176,15 +176,15 @@ func _test_prestart() -> void:
 	var stage_before: int = game.survival.waves.stage if game.survival != null else -1
 
 	await _sim(game, 2.0)
-	_check(game.survival != null and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET,
+	_check(game.survival != null and game.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET,
 		"the hold opens in its setup stage", str(game.survival_state()))
 	_check(game.horde.spawner.all_npcs().size() == 0, "and nothing walks the map in it (sleepers and wanderers included)",
 		"%d zombies" % game.horde.spawner.all_npcs().size())
 	_check(float(game.survival_state().get("left", -1.0)) > 0.0, "and the HUD has a countdown", str(game.survival_state()))
-	_check(stage_before != DotNpcDirectorWaves.Stage.HORDE, "the first wave is not already on")
+	_check(stage_before != GSNpcDirectorWaves.Stage.HORDE, "the first wave is not already on")
 
 	await _sim(game, 4.0)
-	_check(game.survival.waves.stage == DotNpcDirectorWaves.Stage.HORDE and game.horde.spawner.all_npcs().size() > 0,
+	_check(game.survival.waves.stage == GSNpcDirectorWaves.Stage.HORDE and game.horde.spawner.all_npcs().size() > 0,
 		"when it ends the wave and the map's own zombies appear", "%d zombies" % game.horde.spawner.all_npcs().size())
 	await _dispose(game)
 	_finished()
@@ -299,11 +299,11 @@ func _test_waves() -> void:
 	var stages: Array = []
 
 	await _sim(game, 1.5)
-	_check(game.survival != null and game.survival.waves.stage == DotNpcDirectorWaves.Stage.HORDE and game.survival.waves.index == 1,
+	_check(game.survival != null and game.survival.waves.stage == GSNpcDirectorWaves.Stage.HORDE and game.survival.waves.index == 1,
 		"the opening quiet gives way to wave 1", str(game.survival_state()))
 	game.survival.waves.stage_changed.connect(func(stage: int, index: int) -> void:
 		stages.append([stage, index])
-		if stage == DotNpcDirectorWaves.Stage.HORDE:
+		if stage == GSNpcDirectorWaves.Stage.HORDE:
 			budgets.append(game.survival.waves.budget))
 	budgets.append(game.survival.waves.budget)
 
@@ -323,7 +323,7 @@ func _test_waves() -> void:
 	hurt.health.invulnerable = true
 	var was_down := hurt.is_down()
 	await _clear_wave(game, 1)
-	_check(game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET and game.survival.waves.index == 2,
+	_check(game.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET and game.survival.waves.index == 2,
 		"killing all of wave 1 starts the breather", str(game.survival_state()))
 	_check(was_down and hurt.is_up(), "and the breather stands the downed up")
 	var stocked := 0
@@ -354,16 +354,16 @@ func _test_nights() -> void:
 		c.night_seconds = 6.0, 2)
 	await _sim(game, 2.0)
 	var held := game.survival_state()
-	_check(int(held.get("stage", -1)) == DotNpcDirectorWaves.Stage.QUIET and float(held.get("daylight", 0.0)) > 0.5,
+	_check(int(held.get("stage", -1)) == GSNpcDirectorWaves.Stage.QUIET and float(held.get("daylight", 0.0)) > 0.5,
 		"the first stretch is day, in daylight", str(held))
 	_check(not game.horde.pacing, "and nothing hunts by day")
 	await _sim(game, 3.0)
 	held = game.survival_state()
-	_check(int(held.get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE and float(held.get("daylight", 1.0)) == 0.0 and game.horde.pacing,
+	_check(int(held.get("stage", -1)) == GSNpcDirectorWaves.Stage.HORDE and float(held.get("daylight", 1.0)) == 0.0 and game.horde.pacing,
 		"then night falls and the horde runs", str(held))
 	var first := game.horde.intensity
 	await _sim(game, 6.5)
-	_check(game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET and not game.horde.pacing, "dawn ends the night, whatever is left")
+	_check(game.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET and not game.horde.pacing, "dawn ends the night, whatever is left")
 	await _sim(game, 4.5)
 	_check(game.horde.intensity > first, "the second night is harder", "%.2f then %.2f" % [first, game.horde.intensity])
 	await _sim(game, 6.5)
@@ -378,7 +378,7 @@ func _test_clock() -> void:
 		c.survive_seconds = 5.0, 1)
 	await _sim(game, 1.0)
 	var held := game.survival_state()
-	_check(int(held.get("stage", -1)) == DotNpcDirectorWaves.Stage.HORDE and float(held.get("left", -1.0)) > 0.0 and game.horde.pacing,
+	_check(int(held.get("stage", -1)) == GSNpcDirectorWaves.Stage.HORDE and float(held.get("left", -1.0)) > 0.0 and game.horde.pacing,
 		"the clock starts at once and the horde runs", str(held))
 	await _sim(game, 5.0)
 	_check(_won_with("held out"), "and the map is won when it runs out", str(_result))
@@ -557,17 +557,17 @@ func _test_team_size() -> void:
 func _test_the_wire() -> void:
 	_section("the hold and the barricades on the wire")
 	var held := {"style": 1, "stage": 2, "index": 3, "count": 5, "left": 42.5, "remaining": -1, "twist": "swarm", "daylight": 0.0}
-	var back := ZzEvents.read_survival(DotNetReader.new(ZzEvents.write_survival(held)))
+	var back := ZzEvents.read_survival(GSNetReader.new(ZzEvents.write_survival(held)))
 	_check(bool(back["ok"]) and int(back["index"]) == 3 and int(back["count"]) == 5 and absf(float(back["left"]) - 42.5) < 0.1
 		and str(back["twist"]) == "swarm" and int(back["remaining"]) == -1 and float(back["daylight"]) < 0.01,
 		"SURVIVAL reads back what was written", str(back))
 	held["left"] = -1.0
 	held["remaining"] = 37
 	held["daylight"] = -1.0
-	back = ZzEvents.read_survival(DotNetReader.new(ZzEvents.write_survival(held)))
+	back = ZzEvents.read_survival(GSNetReader.new(ZzEvents.write_survival(held)))
 	_check(float(back["left"]) == -1.0 and int(back["remaining"]) == 37 and float(back["daylight"]) == -1.0,
 		"including 'none' for a clock and the light", str(back))
-	var bar := ZzEvents.read_barricade(DotNetReader.new(ZzEvents.write_barricade("gym_doors", 0.5, true)))
+	var bar := ZzEvents.read_barricade(GSNetReader.new(ZzEvents.write_barricade("gym_doors", 0.5, true)))
 	_check(bool(bar["ok"]) and str(bar["id"]) == "gym_doors" and absf(float(bar["fraction"]) - 0.5) < 0.01 and bool(bar["intact"]),
 		"BARRICADE too", str(bar))
 	_check(ZzEvents.Kind.size() <= (1 << ZzEvent.KIND_BITS), "and both kinds fit the kind's bits", "%d kinds" % ZzEvents.Kind.size())
@@ -576,15 +576,15 @@ func _test_the_wire() -> void:
 
 func _test_the_hud() -> void:
 	_section("what the top of the screen says")
-	var wave := ZzHud.survival_lines({"style": 0, "stage": DotNpcDirectorWaves.Stage.HORDE, "index": 3, "count": 10, "left": -1.0,
+	var wave := ZzHud.survival_lines({"style": 0, "stage": GSNpcDirectorWaves.Stage.HORDE, "index": 3, "count": 10, "left": -1.0,
 		"remaining": 42, "twist": "sprinters"})
 	_check(wave[0] == "Wave 3 of 10 · Sprinters" and wave[1] == "42" and wave[2] == "left", "a wave: which, its twist, how many left", str(wave))
-	var breather := ZzHud.survival_lines({"style": 0, "stage": DotNpcDirectorWaves.Stage.QUIET, "index": 4, "count": 10, "left": 24.0})
+	var breather := ZzHud.survival_lines({"style": 0, "stage": GSNpcDirectorWaves.Stage.QUIET, "index": 4, "count": 10, "left": 24.0})
 	_check(breather[0] == "Breather" and breather[1] == "0:24" and str(breather[2]).contains("wave 4") and str(breather[2]).contains("mend")
 		and str(breather[3]) == "", "a breather: the clock to the next, the hint under it, nothing over it", str(breather))
-	var night := ZzHud.survival_lines({"style": 1, "stage": DotNpcDirectorWaves.Stage.HORDE, "index": 2, "count": 5, "left": 100.0})
+	var night := ZzHud.survival_lines({"style": 1, "stage": GSNpcDirectorWaves.Stage.HORDE, "index": 2, "count": 5, "left": 100.0})
 	_check(night[0] == "Night 2 of 5" and night[2] == "until dawn", "a night: until dawn", str(night))
-	var last := ZzHud.survival_lines({"style": 0, "stage": DotNpcDirectorWaves.Stage.HORDE, "index": 10, "count": 10, "remaining": 3})
+	var last := ZzHud.survival_lines({"style": 0, "stage": GSNpcDirectorWaves.Stage.HORDE, "index": 10, "count": 10, "remaining": 3})
 	_check(last[0] == "The last wave", "and the last wave says so", str(last))
 	_finished()
 
@@ -623,7 +623,7 @@ func _team_at_posts(game: ZzGame) -> Array:
 	# In a breather a stand-in short of ammunition walks to a cache, so only standing counts
 	# then: the camp's minute ended 2 s into wave 1's breather with four of ten at their posts.
 	var in_breather: bool = game.survival != null and game.survival.waves != null \
-		and game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET
+		and game.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET
 	for player in game.survivors():
 		if player.is_up():
 			standing += 1
@@ -675,7 +675,7 @@ func _test_big_map(id: StringName) -> void:
 	var wall_spent := 0
 	var worst := 0
 	var t := 0.0
-	# CPU time (DotGameCheckSuite.cpu_usec), not wall time, so a loaded box (other suites share its CPUs) does not inflate it: the minute is
+	# CPU time (GSGameCheckSuite.cpu_usec), not wall time, so a loaded box (other suites share its CPUs) does not inflate it: the minute is
 	# five windows and the budget is judged on the cheapest one's mean; a real slowdown makes every window slow.
 	var windows := 5
 	var window_ticks := int(PLAY_SECONDS * float(TICK_RATE) / float(windows))
@@ -686,9 +686,9 @@ func _test_big_map(id: StringName) -> void:
 	while t < PLAY_SECONDS:
 		for i in 32:
 			var wall_before := Time.get_ticks_usec()
-			var before := DotGameCheckSuite.cpu_usec()
+			var before := GSGameCheckSuite.cpu_usec()
 			game.simulate(TICK)
-			var cost := DotGameCheckSuite.cpu_usec() - before
+			var cost := GSGameCheckSuite.cpu_usec() - before
 			wall_spent += Time.get_ticks_usec() - wall_before
 			spent += cost
 			worst = maxi(worst, cost)

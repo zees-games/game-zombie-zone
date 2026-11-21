@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 ## Collision against the drawn mesh on 4-Way Tunnel (nightly zz-4way-blocked-1): a warehouse shelf boxed a whole grid cell (0.26 m) proud of
 ## its posts, which read as an invisible wall beside the red door frame. dot-map's decomposition now cuts each box back to the surface.
 
@@ -19,7 +19,7 @@ var _skipped := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -30,7 +30,7 @@ func _run() -> void:
 	var probe := CollideProbe.new()
 	probe.manual = true
 	add_child(probe)
-	var sweep: DotCollisionSweep = await probe.probe(&"zm_4way_tunnel", 2.0, 400, 6)
+	var sweep: GSCollisionSweep = await probe.probe(&"zm_4way_tunnel", 2.0, 400, 6)
 	if sweep != null:
 		_check(sweep.count("floor_missing") == 0, "no drawn floor without collision")
 		_check(sweep.count("wall_missing") == 0, "no drawn wall without collision")

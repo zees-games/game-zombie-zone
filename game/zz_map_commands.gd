@@ -11,7 +11,7 @@ const ALIASES := {
 }
 
 
-## The allow-list for [member DotMapIO.command_allow].
+## The allow-list for [member GSMapIO.command_allow].
 static func allow() -> PackedStringArray:
 	return PackedStringArray(ALIASES.keys())
 

@@ -131,17 +131,17 @@ static func take_derived_light(doc: Dictionary, derived: Dictionary) -> void:
 		doc["environment"] = derived
 
 ## Reads a document from JSON text, and checks it.
-static func parse_json(text: String, origin: String = "") -> DotResult:
+static func parse_json(text: String, origin: String = "") -> GSResult:
 	var json := JSON.new()
 
 	if json.parse(text) != OK:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "The map is not JSON.",
+		return GSResult.fail(
+			GSError.CODE_PARSE, "The map is not JSON.",
 			"%s line %d: %s" % [origin, json.get_error_line(), json.get_error_message()]
 		)
 
 	if typeof(json.data) != TYPE_DICTIONARY:
-		return DotResult.fail(DotError.CODE_PARSE, "The map is not a JSON object.", origin)
+		return GSResult.fail(GSError.CODE_PARSE, "The map is not a JSON object.", origin)
 
 	return validate(json.data as Dictionary)
 
@@ -201,10 +201,10 @@ static func _nav_block(source: Dictionary, doc: Dictionary) -> String:
 	if source.has("terrain"):
 		if not (source["terrain"] is Dictionary):
 			return "terrain is not a dictionary"
-		var ground := DotMapTerrain.from_dict(source["terrain"])
+		var ground := GSMapTerrain.from_dict(source["terrain"])
 		if not ground.ok:
 			return "terrain: %s" % str(ground)
-		walked = (ground.value as DotMapTerrain).describe()["walk"]
+		walked = (ground.value as GSMapTerrain).describe()["walk"]
 		doc["terrain"] = source["terrain"]
 
 	if (nav["floors"] as Array).is_empty() and walked == 0:
@@ -217,7 +217,7 @@ static func _nav_block(source: Dictionary, doc: Dictionary) -> String:
 
 ## Checks a document and returns a normalised copy of it: every optional field present, every
 ## position three numbers.
-static func validate(source: Dictionary) -> DotResult:
+static func validate(source: Dictionary) -> GSResult:
 	if int(source.get("format", 0)) != FORMAT:
 		return _refuse("format is %s; this build reads %d" % [str(source.get("format")), FORMAT], source)
 
@@ -316,12 +316,12 @@ static func validate(source: Dictionary) -> DotResult:
 
 	doc["props"] = props
 
-	# Toys: dot-props' DotPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# Toys: dot-props' GSPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
 	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
 	# with a toy a newer dot-props has still plays on an older server.
 	var toys: Array = []
 	for raw: Variant in source.get("toys", []):
-		var toy := DotPropBodyBox.normal_placement(raw)
+		var toy := GSPropBodyBox.normal_placement(raw)
 		if toy.is_empty():
 			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
 		toys.append(toy)
@@ -334,7 +334,7 @@ static func validate(source: Dictionary) -> DotResult:
 	# Loose props of a drawn world and the supports under them (dot-map's `loose_toys()` and `supports()`).
 	var loose: Array = []
 	for raw: Variant in source.get("loose_toys", []):
-		var placed := DotPropBodyBox.normal_placement(raw)
+		var placed := GSPropBodyBox.normal_placement(raw)
 		if placed.is_empty():
 			return _refuse("loose toy %d is not {toy, at}" % loose.size(), source)
 		loose.append(placed)
@@ -603,7 +603,7 @@ static func validate(source: Dictionary) -> DotResult:
 		return _refuse("%d barricades; the most is %d" % [barricades.size(), ZzCapsScript.doc_limit("zz_map_barricades")] + ZzCapsScript.lift_hint("zz_map_barricades"), source)
 	doc["barricades"] = barricades
 
-	return DotResult.success(doc)
+	return GSResult.success(doc)
 
 static func _box(raw: Variant) -> Dictionary:
 	if not (raw is Dictionary):
@@ -751,23 +751,23 @@ static func encode(doc: Dictionary) -> PackedByteArray:
 	out.append_array(packed)
 	return out
 
-static func decode(bytes: PackedByteArray) -> DotResult:
+static func decode(bytes: PackedByteArray) -> GSResult:
 	if bytes.size() < 9:
-		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire was empty.")
+		return GSResult.fail(GSError.CODE_PARSE, "A map on the wire was empty.")
 
 	var size := bytes.decode_u32(0)
 
 	if bytes.decode_u32(4) != bytes.size() - 8:
-		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire is not the length it says.")
+		return GSResult.fail(GSError.CODE_PARSE, "A map on the wire is not the length it says.")
 
 	# A size this large is a corrupt header; decompressing it would allocate whatever it says.
 	if size <= 0 or size > WIRE_INFLATED_MAX:
-		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire says it is %d bytes." % size)
+		return GSResult.fail(GSError.CODE_PARSE, "A map on the wire says it is %d bytes." % size)
 
 	var raw := bytes.slice(8).decompress(size, FileAccess.COMPRESSION_DEFLATE)
 
 	if raw.size() != size:
-		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire would not decompress.")
+		return GSResult.fail(GSError.CODE_PARSE, "A map on the wire would not decompress.")
 
 	return parse_json(raw.get_string_from_utf8(), "wire")
 
@@ -866,7 +866,7 @@ static func _ambient(raw: Variant) -> Variant:
 		out["frequency"] = clampf(float(src["frequency"]), 0.0, 4.0)
 	return mood if out.size() == 1 else out
 
-static func _refuse(why: String, doc: Dictionary) -> DotResult:
-	return DotResult.fail(
-		DotError.CODE_INVALID, "The map is refused: %s." % why, str(doc.get("id", "?"))
+static func _refuse(why: String, doc: Dictionary) -> GSResult:
+	return GSResult.fail(
+		GSError.CODE_INVALID, "The map is refused: %s." % why, str(doc.get("id", "?"))
 	)

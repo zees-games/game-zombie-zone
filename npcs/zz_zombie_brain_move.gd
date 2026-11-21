@@ -22,7 +22,7 @@ static var _decides: int = -1
 var _walk_s := PackedFloat64Array()
 var _walk_n := PackedInt64Array()
 ## Whether the horde's dot-sim keeps each zombie's turn and progress watch in its own store between thinks
-## ([code]DotSimZombieBrains.store_put[/code], then [code]walk_stored[/code], [code]steer_stored[/code] and
+## ([code]GSSimZombieBrains.store_put[/code], then [code]walk_stored[/code], [code]steer_stored[/code] and
 ## [code]face_stored[/code] read and write them there): -1 until asked; 0 also turns it off, as
 ## `tools/bench.gd --ab-store` does.
 static var _stores: int = -1
@@ -30,7 +30,7 @@ static var _stores: int = -1
 ## the truth. Whatever script reads them takes them back first ([method _unstore]).
 var _stored_in: Object = null
 ## The character whose turn state is in the store (another character is put afresh).
-var _stored_char: DotNpcAiCharacter = null
+var _stored_char: GSNpcAiCharacter = null
 ## What [method _store_in] and [method _walk_stored] hand dot-sim, kept so they fill in place.
 var _store_s := PackedFloat64Array()
 var _walk_stored_s := PackedFloat64Array()
@@ -186,7 +186,7 @@ func neighbours(radius: float) -> Array:
 
 
 ## [method steer_with_spacing]'s heading (seek, crowd push, blend) in one call to dot-sim's
-## `DotSimCrowdGrid.spaced_direction` while the horde's brains and crowd are both native; the script otherwise,
+## `GSSimCrowdGrid.spaced_direction` while the horde's brains and crowd are both native; the script otherwise,
 ## and beside it under the horde's `brains_verify`, whose answer is then the one used.
 func _spaced_direction(here: Vector3, goal: Vector3, spacing: float) -> Vector3:
 	var h := horde()
@@ -209,7 +209,7 @@ func _spaced_direction(here: Vector3, goal: Vector3, spacing: float) -> Vector3:
 
 
 ## Spacing straight off the horde's crowd grid: the same push as [method neighbours] fed to
-## `DotNpcAiSteering.separate`, without building the array each think.
+## `GSNpcAiSteering.separate`, without building the array each think.
 func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	var h := horde()
 	var grid: Variant = h.get(&"crowd") if h != null and npc != null and npc.is_alive() else null
@@ -225,7 +225,7 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	return grid.separation(own, here, spacing, spacing * 2.0, right)
 
 
-## dot-npc-ai's steer in one native call: the whole move ([code]DotSimZombieBrains.walk[/code], path then steer) when
+## dot-npc-ai's steer in one native call: the whole move ([code]GSSimZombieBrains.walk[/code], path then steer) when
 ## the path is not due, else everything after the path ([code]steer_walk[/code], else [code]steer_step[/code]). The
 ## script ([method _steer_rest]) is the fallback, and under [code]brains_verify[/code] each native answer is checked.
 func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
@@ -299,7 +299,7 @@ func _steer_from(h: Object, b: ZzZombieBody, brains: Object, grid: Object, goal:
 		_progress_since = now
 
 
-## The whole move in one [code]DotSimZombieBrains.walk[/code]: dot-npc-ai's [code]_steer_goal[/code] (dot-npc's
+## The whole move in one [code]GSSimZombieBrains.walk[/code]: dot-npc-ai's [code]_steer_goal[/code] (dot-npc's
 ## [code]path_toward[/code]: its repath test and the path's advance) and then the steer, with the brain's, character's,
 ## path's and spawner's members handed in by value and the answer written back here. Only where the script's own
 ## [code]_steer_goal[/code] is exactly [code]path_toward[/code] (a nav graph and a path, no scheduler, no path reuse);
@@ -308,7 +308,7 @@ func _steer_from(h: Object, b: ZzZombieBody, brains: Object, grid: Object, goal:
 func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: Vector3, speed: float, delta: float,
 		spacing: float) -> bool:
 	var p := path
-	var sp := director as DotNpcSpawner
+	var sp := director as GSNpcSpawner
 	# _path_goal's own way to path_toward, with its scheduler probe taken only where it cannot find one.
 	if p == null or sp == null or path_reuse_thoughts > 0 or scheduler != null or _sched_probe <= 1 \
 			or not sp.has_nav():
@@ -342,7 +342,7 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 		var asked := _as_goal(sp.path_toward(npc, p, to))
 		var same := asked == goal and p.index == int(out[19]) and _waypoint == goal
 		if not same:
-			DotLog.debug(CHANNEL, "native walk differs from the script's", {"native": str([goal, int(out[19])]),
+			GSLog.debug(CHANNEL, "native walk differs from the script's", {"native": str([goal, int(out[19])]),
 				"script": str([asked, p.index, _waypoint]), "was": index0})
 		h.call(&"brains_tally", same)
 		_verify_steer(h, b, out, asked if asked != Vector3.INF else to, to, speed, delta, spacing, now)
@@ -353,7 +353,7 @@ func _walk_native(h: Object, b: ZzZombieBody, brains: Object, grid: Object, to: 
 
 
 ## The members [method _walk_native] hands [code]walk[/code] by value.
-func _walk_pack(sp: DotNpcSpawner, to: Vector3, speed: float, spacing: float, now: float) -> void:
+func _walk_pack(sp: GSNpcSpawner, to: Vector3, speed: float, spacing: float, now: float) -> void:
 	var p := path
 	var c := character
 	if _walk_s.size() != 32:
@@ -398,7 +398,7 @@ func _walk_pack(sp: DotNpcSpawner, to: Vector3, speed: float, spacing: float, no
 
 
 ## What [code]walk[/code] answered, written back to the path, the character and this brain.
-func _walk_apply(p: DotNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: Vector3, to: Vector3, now: float) -> void:
+func _walk_apply(p: GSNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: Vector3, to: Vector3, now: float) -> void:
 	var c := character
 	p.index = int(out[19])
 	_waypoint = goal
@@ -427,7 +427,7 @@ func _walk_apply(p: DotNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: 
 ## [method _walk_native] with the turn and watch in the native store ([code]walk_stored[/code]): only the move's own
 ## inputs are handed in, and dot-sim writes the turn, the watch and the look itself. False (nothing done) when the
 ## store has no entry or no repath tuning, the store then taken back and the caller walking as before.
-func _walk_stored(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: DotNpcPath, sp: DotNpcSpawner,
+func _walk_stored(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: GSNpcPath, sp: GSNpcSpawner,
 		to: Vector3, speed: float, delta: float, spacing: float, now: float) -> bool:
 	_walk_stored_pack(p, to, speed, spacing, now)
 	var out: PackedFloat64Array = brains.walk_stored(grid, npc.instance_id, get_instance_id(), b, p.points,
@@ -461,7 +461,7 @@ func _walk_stored(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: D
 
 ## What [code]walk_stored[/code] is handed: [code][to, spacing, speed, delta, now, facing_at_tick, arrive_radius,
 ## computed_at, goal_at_compute][/code] and [code][index, partial][/code].
-func _walk_stored_pack(p: DotNpcPath, to: Vector3, speed: float, spacing: float, now: float) -> void:
+func _walk_stored_pack(p: GSNpcPath, to: Vector3, speed: float, spacing: float, now: float) -> void:
 	if _walk_stored_s.size() != 15:
 		_walk_stored_s.resize(15)
 		_walk_stored_n.resize(2)
@@ -511,7 +511,7 @@ func _steer_stored(brains: Object, grid: Object, b: ZzZombieBody, goal: Vector3,
 
 ## [code]brains_verify[/code] with the store on: the stored walk, asked of a fresh entry put from the members the
 ## by-value [code]walk[/code] was handed and without applying, must answer [param out] to the bit.
-func _verify_stored_walk(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: DotNpcPath,
+func _verify_stored_walk(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: GSNpcPath,
 		out: PackedFloat64Array) -> void:
 	if _stores != 1 or not brains.has_method(&"walk_stored") or director != h.get(&"spawner"):
 		return
@@ -527,7 +527,7 @@ func _verify_stored_walk(h: Object, b: ZzZombieBody, brains: Object, grid: Objec
 	var same := stored == out
 
 	if not same:
-		DotLog.debug(CHANNEL, "native stored walk differs from the by-value walk", {"stored": str(stored),
+		GSLog.debug(CHANNEL, "native stored walk differs from the by-value walk", {"stored": str(stored),
 			"walk": str(out)})
 	h.call(&"brains_tally", same)
 
@@ -589,7 +589,7 @@ func _verify_steer(h: Object, b: ZzZombieBody, out: PackedFloat64Array, goal: Ve
 			same = same and _progress_at == at0 and _progress_since == since0
 
 	if not same:
-		DotLog.debug(CHANNEL, "native steer differs from the script's", {"native": str(out), "wish": str(b.wish),
+		GSLog.debug(CHANNEL, "native steer differs from the script's", {"native": str(out), "wish": str(b.wish),
 			"turn": str([character._peak_turn, character._over_amt, character._turns, character._over_axis]),
 			"progress": str([_progress_at, _progress_since]), "xf": str(t1), "want": str(want), "cruise": str(_cruise_to), "goal": str(goal)})
 

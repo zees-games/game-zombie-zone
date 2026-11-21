@@ -5,14 +5,14 @@ const ZzEvents := preload("../game/net/zz_events.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 const ZzBindings := preload("../game/zz_bindings.gd")
 
-## Q throws the held weapon through the shared DotWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
+## Q throws the held weapon through the shared GSWeaponDrops: pickup, swap, cvars, cap, downed, death, wire.
 
 const SECTIONS := 5
 const CHECKS := 37
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -156,7 +156,7 @@ func _test_rules() -> void:
 	drops.clear()
 	_check(drops.count() == 0, "clear() empties the layer")
 
-	# The drop key with a hold (DotWeaponDropKey): nothing on the press, a throw when the hold is over, none on an early release.
+	# The drop key with a hold (GSWeaponDropKey): nothing on the press, a throw when the hold is over, none on an early release.
 	var layer = game.weapon_layer
 	var _held_id := await _equip_primary(game, p)
 	rules.key_hold = 0.5
@@ -227,7 +227,7 @@ func _test_shot_hold() -> void:
 	var snap: Dictionary = drops.snapshot()[0]
 	var rest: Vector3 = snap["at"].origin if snap.has("at") else Vector3.ZERO
 	var awake: int = drops.active_count()
-	var tr: DotTrace = game.combat.trace
+	var tr: GSTrace = game.combat.trace
 	var _miss := tr.ray(rest + Vector3(3, 1, 0), Vector3.DOWN, 5.0)
 	_check(drops.active_count() == awake, "a trace that misses wakes nothing")
 	# Reading the result keeps the call: an unused one was left out and the observer never ran (no floor in CI, so not ok()).
@@ -283,9 +283,9 @@ func _test_wire() -> void:
 	var table := ZzBindings.make()
 	_check(not table.row_for_action(ZzBindings.DROP).is_empty(), "the Controls page lists the drop key")
 	var at := Transform3D(Basis.IDENTITY, Vector3(4, 1, -7))
-	var d := ZzEvents.read_weapon_drop(DotNetReader.new(ZzEvents.write_weapon_drop(7, &"m4", 12, 90, at, Vector3(1, 2, 3), 20.0, false)))
+	var d := ZzEvents.read_weapon_drop(GSNetReader.new(ZzEvents.write_weapon_drop(7, &"m4", 12, 90, at, Vector3(1, 2, 3), 20.0, false)))
 	_check(d["ok"] and d["id"] == 7 and d["magazine"] == 12 and d["reserve"] == 90 and d["at"].origin.distance_to(at.origin) < 0.1, "a weapon drop round-trips")
-	var st := ZzEvents.read_weapon_settled(DotNetReader.new(ZzEvents.write_weapon_settled(7, at)))
+	var st := ZzEvents.read_weapon_settled(GSNetReader.new(ZzEvents.write_weapon_settled(7, at)))
 	_check(st["id"] == 7 and st["at"].origin.distance_to(at.origin) < 0.1, "a settle round-trips")
 	_finished()
 

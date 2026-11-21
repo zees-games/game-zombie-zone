@@ -25,7 +25,7 @@ const CONFIG_FILE := "user://zz_headless_weapons.json"
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -69,18 +69,18 @@ func _test_the_weapon_art_is_vendored() -> void:
 	var models := ZeeWeaponArtTable.validate_models()
 	_check(models.ok, "no weapon model is missing", "" if models.ok else models.error.message)
 	var stock_ok := true
-	for sound: StringName in DotAudioWeaponStock.COUNTS:
-		stock_ok = stock_ok and (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue").find(DotAudioWeaponStock.id_of(sound)) != null
+	for sound: StringName in GSAudioWeaponStock.COUNTS:
+		stock_ok = stock_ok and (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue").find(GSAudioWeaponStock.id_of(sound)) != null
 	_check(stock_ok, "the game's sound catalogue carries every stock weapon sound")
 	var stock_streams := true
 	for sound in [ZeeWeaponSound.LIGHT, ZeeWeaponSound.SHOTGUN, ZeeWeaponSound.DRY, ZeeWeaponSound.EQUIP,
 			ZeeWeaponSound.RELOAD_OUT, ZeeWeaponSound.RELOAD_SHELL, ZeeWeaponSound.SUPPRESSED]:
 		var s := ZeeWeaponSound.stream(sound)
-		stock_streams = stock_streams and s is AudioStreamOggVorbis and s.resource_path.begins_with(DotWeaponSound.DIR)
+		stock_streams = stock_streams and s is AudioStreamOggVorbis and s.resource_path.begins_with(GSWeaponSound.DIR)
 	_check(stock_streams, "weapon shots, dry, equip and reloads play the stock recordings, not the synth fallback")
-	var problems := DotWeaponSound.check_stock()
+	var problems := GSWeaponSound.check_stock()
 	_check(problems.is_empty(), "every weapon class resolves a non-silent, unclipped voice", ", ".join(problems))
-	_check(DotWeaponSound.pick_tail(&"rifle", true) != null and DotWeaponSound.pick_tail(&"rifle", false) == null, "indoors a shot gets a tail, outdoors none")
+	_check(GSWeaponSound.pick_tail(&"rifle", true) != null and GSWeaponSound.pick_tail(&"rifle", false) == null, "indoors a shot gets a tail, outdoors none")
 	_finished()
 
 
@@ -104,7 +104,7 @@ func _test_every_pack_weapon_sounds_and_reloads() -> void:
 	var no_reload: PackedStringArray = []
 	var no_clip: PackedStringArray = []
 	var guns := 0
-	for def: DotWeaponDef in defs:
+	for def: GSWeaponDef in defs:
 		var id := def.id
 		if sound_script.call("stream_for", id, &"fire") == null:
 			no_fire.append(String(id))
@@ -210,10 +210,10 @@ func _test_fitting() -> void:
 	_check(_client.weapons.arsenal.fitting_at(slot).attachment_on(mount) == pick,
 		"the client's rig wears %s on %s" % [pick, mount])
 	_check(me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).attachment_on(mount) == pick
-			and (me.fittings.get(base.id) as DotWeaponFitting).attachment_on(mount) == pick,
+			and (me.fittings.get(base.id) as GSWeaponFitting).attachment_on(mount) == pick,
 		"and the authority's rig, which keeps it for the player")
 
-	var bogus := DotWeaponFitting.make(base.id)
+	var bogus := GSWeaponFitting.make(base.id)
 	bogus.fit(mount, &"zz_no_such_attachment")
 	_check(not _client.game.fit_weapon(me, base.id, bogus).ok
 			and me.weapons.arsenal.fitting_at(me.weapons.arsenal.current_slot()).attachment_on(mount) == pick,
@@ -225,11 +225,11 @@ func _test_fitting() -> void:
 		"choosing it again takes it off both rigs")
 
 	# The server's answer to a refused fit (Kind.FITTING): that fitting is saved and worn.
-	var told := DotWeaponFitting.make(base.id)
+	var told := GSWeaponFitting.make(base.id)
 	told.fit(mount, pick)
 	_client._on_fitting_resync(base.id, catalogue.encode(base, told))
 	_check(_client._saved_fittings().has(base.id)
-			and (_client._saved_fittings()[base.id] as DotWeaponFitting).attachment_on(mount) == pick,
+			and (_client._saved_fittings()[base.id] as GSWeaponFitting).attachment_on(mount) == pick,
 		"the server's fitting from a resync is the saved one")
 	_check(_client.weapons.arsenal.fitting_at(slot).attachment_on(mount) == pick,
 		"and the client's rig wears it")
@@ -282,7 +282,7 @@ func _test_fire_bloom() -> void:
 	var me := _client.player
 	for id: StringName in [&"zz_m4", &"zz_smg", &"zz_sniper"]:
 		var def := ZzWeapons.def_of(id)
-		var b := def.tuning as DotWeaponBallistics if def != null else null
+		var b := def.tuning as GSWeaponBallistics if def != null else null
 		_check(b != null and b.bloom > 0.0, "%s sets bloom" % id, str(b.bloom) if b != null else "pack not loaded")
 
 		if def == null or not _client.game.arm(me, id):
@@ -414,9 +414,9 @@ func _test_box_guns_are_drawn() -> void:
 
 ## One second of held trigger through the server's recoil rules: the view's peak climb, the peak
 ## sideways wander, and what is left a second and a half after release.
-func _spray(def: DotWeaponDef) -> Array:
-	var b := def.tuning as DotWeaponBallistics
-	var view := DotWeaponRecoil.new()
+func _spray(def: GSWeaponDef) -> Array:
+	var b := def.tuning as GSWeaponBallistics
+	var view := GSWeaponRecoil.new()
 	var state := {}
 	var rate := maxi(Engine.physics_ticks_per_second, 1)
 	var interval := maxi(def.use_interval_ticks, 1)
@@ -425,8 +425,8 @@ func _spray(def: DotWeaponDef) -> Array:
 	var tick := 1000
 
 	while tick < 1000 + rate:
-		var out := DotWeaponOutcome.new()
-		var ctx := DotWeaponContext.new()
+		var out := GSWeaponOutcome.new()
+		var ctx := GSWeaponContext.new()
 		ctx.tick = tick
 		var _bullet: Variant = _client.game.combat_feel.recoil.apply(out, b, state, ctx, def.id, rate)
 		view.kick_outcome(out)
@@ -445,7 +445,7 @@ func _test_spray() -> void:
 	var stuck := PackedStringArray()
 
 	for def in ZzWeapons.all_defs():
-		if def.tuning is DotWeaponBallistics and def.use_interval_ticks > 0:
+		if def.tuning is GSWeaponBallistics and def.use_interval_ticks > 0:
 			sprays[def.id] = _spray(def)
 
 			if sprays[def.id][2] > 0.25:
@@ -511,10 +511,10 @@ func _test_spawner() -> void:
 	me.place_at(game.loot.position_of(shelf[0]), 0.0)
 	# The suite's player stands in as the stand-in; a human at the shelf would own it (personal space).
 	me.is_bot = true
-	var wants_open: bool = game.bots._pick_up(me, DotFpsCommand.new(), {"pick": -1})
+	var wants_open: bool = game.bots._pick_up(me, GSFpsCommand.new(), {"pick": -1})
 	game.spawners.set("_open", false)
 	var memory := {"pick": -1}
-	var wants_closed: bool = game.bots._pick_up(me, DotFpsCommand.new(), memory)
+	var wants_closed: bool = game.bots._pick_up(me, GSFpsCommand.new(), memory)
 	game.spawners.set("_open", true)
 	me.is_bot = false
 	_check(wants_open and not wants_closed and int(memory["pick"]) == -1, "a stand-in goes for a shelf item while the trader is open and not while it is closed", "open %s, closed %s" % [wants_open, wants_closed])
@@ -538,7 +538,7 @@ func _test_spawner() -> void:
 	for id: int in game.spawners.loot_ids():
 		if game.loot.kind_of(id) == ZzLoot.AMMO:
 			amid = id
-	var arsenal: DotWeaponArsenal = me.weapons.arsenal
+	var arsenal: GSWeaponArsenal = me.weapons.arsenal
 	for pool in arsenal.ammo().pools():
 		arsenal.ammo().set_count(pool, 0)
 	me.points = 200
@@ -552,7 +552,7 @@ func _test_spawner() -> void:
 	me.points = 10
 	game.loot.remove(cheap, me.player_id)
 	_check(me.points == 0, "a charge never takes the points below zero", str(me.points))
-	var wire := ZzEvents.read_loot(DotNetReader.new(ZzEvents.write_loot(7, &"weapon", &"zz_shotgun", Vector3.ZERO, 250)))
+	var wire := ZzEvents.read_loot(GSNetReader.new(ZzEvents.write_loot(7, &"weapon", &"zz_shotgun", Vector3.ZERO, 250)))
 	_check(int(wire["price"]) == 250 and bool(wire["ok"]), "the loot event carries the price to the client")
 	_finished()
 

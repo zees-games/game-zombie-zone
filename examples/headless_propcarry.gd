@@ -11,7 +11,7 @@ const CHECKS := 29
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -127,7 +127,7 @@ func _test_throw() -> void:
 	_face(me, barrel.body.global_position)
 	game._begin_use(me)
 	_check(game.prop_carry.carrying(me.player_id), "picked up again")
-	var cmd := DotFpsCommand.new()
+	var cmd := GSFpsCommand.new()
 	cmd.set_button(ZzNetCommand.BUTTON_FIRE, true)
 	me.controller.current_command = cmd
 	game._advance_hands(me, 0.016)

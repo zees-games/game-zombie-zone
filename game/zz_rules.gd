@@ -1,4 +1,4 @@
-extends DotMatchRules
+extends GSMatchRules
 
 ## A round ends when the game says so, and the game says who won.
 ##
@@ -6,7 +6,7 @@ extends DotMatchRules
 ## when a side has nobody alive — but a player who joined mid-round is benched rather than
 ## dead, the hiding half of a round must never end on a count, and the clock's winner is a
 ## server setting rather than "whoever has more people up". What decides is [ZzGame],
-## which knows all of that, and [DotMatchRules] is documented as the place a mode dot-match
+## which knows all of that, and [GSMatchRules] is documented as the place a mode dot-match
 ## does not ship goes, with the state machine left alone.
 ##
 ## [b]The answer is read, never computed here.[/b] dot-match's rules are meant to be pure
@@ -17,7 +17,7 @@ extends DotMatchRules
 var decision_fn: Callable = Callable()
 
 
-static func make() -> DotMatchRules:
+static func make() -> GSMatchRules:
 	# Not this class's own name, for dot-match's reason: a script that names itself in an
 	# expression cuts Godot 4.7.2's exit teardown short. See docs/gdscript-hazards.md.
 	var rules := new()
@@ -37,8 +37,8 @@ static func make() -> DotMatchRules:
 
 
 func _round_outcome(
-	_scoreboard: DotScoreboard,
-	_teams: DotTeamManager,
+	_scoreboard: GSScoreboard,
+	_teams: GSTeamManager,
 	_elapsed_sec: float
 ) -> Outcome:
 	if not decision_fn.is_valid():
@@ -53,7 +53,7 @@ func _round_outcome(
 	return super._round_outcome(_scoreboard, _teams, _elapsed_sec)
 
 
-func _round_winner(_scoreboard: DotScoreboard, _teams: DotTeamManager) -> int:
+func _round_winner(_scoreboard: GSScoreboard, _teams: GSTeamManager) -> int:
 	if not decision_fn.is_valid():
 		return 0
 

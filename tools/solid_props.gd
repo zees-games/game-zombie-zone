@@ -53,12 +53,12 @@ func _initialize() -> void:
 			boxes = ((doc as Dictionary).get("solid_props", []) as Array).duplicate()
 		else:
 			var prefix := "res://world/%s/%s" % [(doc as Dictionary)["world"], id]
-			var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+			var read: GSResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 			if not read.ok:
 				printerr(id, ": ", read.error.message)
 				failed = true
 				continue
-			var mesh := read.value as DotMapBspMesh
+			var mesh := read.value as GSMapBspMesh
 			mesh.model_library = ProjectSettings.globalize_path(STORE)
 			var bad := _unloadable_models(mesh)
 			if not bad.is_empty():
@@ -104,19 +104,19 @@ func _initialize() -> void:
 
 
 ## Why each solid library model of [param mesh] would be left out, one line per model; empty when every one loads.
-## A model the pack does not list, or a damaged glTF ([method DotMapBspMesh.gltf_defect]: drawn as its box), is left
+## A model the pack does not list, or a damaged glTF ([method GSMapBspMesh.gltf_defect]: drawn as its box), is left
 ## out the same way everywhere, so passes; a listed one missing from the store, or one that fails to load, does not.
-static func _unloadable_models(mesh: DotMapBspMesh) -> PackedStringArray:
+static func _unloadable_models(mesh: GSMapBspMesh) -> PackedStringArray:
 	var out := PackedStringArray()
 	var seen := {}
 	for rec: Dictionary in mesh.manifest.get("props", []):
-		if not int(rec.get("solid", 0)) in DotMapBspMesh.SOLID_BOX or rec.has("box"):
+		if not int(rec.get("solid", 0)) in GSMapBspMesh.SOLID_BOX or rec.has("box"):
 			continue
 		var id := str(rec.get("stand_in", ""))
 		if seen.has(id):
 			continue
 		seen[id] = true
-		if not id.begins_with("lib/") or not DotMapBspMesh.find_resource_path(id, DotMapBspMesh.DEFAULT_PROP_DIRS, DotMapBspMesh.PROP_EXTS).is_empty():
+		if not id.begins_with("lib/") or not GSMapBspMesh.find_resource_path(id, GSMapBspMesh.DEFAULT_PROP_DIRS, GSMapBspMesh.PROP_EXTS).is_empty():
 			continue
 		var path: String = mesh.call(&"_library_path", id)
 		if path.is_empty():
@@ -125,7 +125,7 @@ static func _unloadable_models(mesh: DotMapBspMesh) -> PackedStringArray:
 			out.append("%s: %s is inside res://, where whether it loads depends on this checkout's imports" % [id, path])
 		elif not FileAccess.file_exists(path):
 			out.append("%s: %s is missing" % [id, path])
-		elif DotMapBspMesh.gltf_defect(path) == "":
+		elif GSMapBspMesh.gltf_defect(path) == "":
 			var model: Node3D = mesh.call(&"_library_model", id)
 			if model == null:
 				out.append("%s: %s does not load" % [id, path])

@@ -13,7 +13,7 @@ func _test_possession() -> void:
 		cfg.infect_after_seconds = 1.0
 		cfg.infect_count = 1, 2)
 
-	var cmd := DotFpsCommand.new()
+	var cmd := GSFpsCommand.new()
 	cmd.move = Vector2(0, 1)
 	cmd.yaw = 90.0
 	for p: ZzPlayer in game.survivors():
@@ -24,7 +24,7 @@ func _test_possession() -> void:
 	for id: StringName in game.possession.holds:
 		holder = id
 	_check(game.possession.holds.size() == 1 and holder != &"", "the turned player holds a body", str(game.possession.holds))
-	var npc: DotNpcInstance = game.horde.spawner.get_npc(game.possession.body_of(holder))
+	var npc: GSNpcInstance = game.horde.spawner.get_npc(game.possession.body_of(holder))
 	_check(npc != null and npc.brain.drive != null and npc.brain.drive.active, "its brain is driven")
 	_check(game.players[holder].life == ZzPlayer.Life.DEAD, "and the player themselves is dead")
 
@@ -75,7 +75,7 @@ func _test_possession_ability() -> void:
 
 	var holder: ZzPlayer = game.survivors()[0]
 	var base := game.survivors()[1].global_position
-	var cmd := DotFpsCommand.new()
+	var cmd := GSFpsCommand.new()
 	cmd.yaw = 180.0
 	holder.input_move = cmd
 
@@ -117,7 +117,7 @@ func _test_possession_ability() -> void:
 
 
 ## A spit goes where they look: looking down lands it at the body's feet.
-func _possession_pitch(game: ZzGame, holder: ZzPlayer, cmd: DotFpsCommand, base: Vector3) -> void:
+func _possession_pitch(game: ZzGame, holder: ZzPlayer, cmd: GSFpsCommand, base: Vector3) -> void:
 	var spitter := game.horde.spawner.spawn(ZzNpcs.SPITTER, base + Vector3(0.0, 0.0, 6.0), &"test")
 	await _sim(game, 0.3)
 	_check(spitter != null and game.possession.possess(holder, spitter), "spitter: held again for the pitch check")
@@ -140,7 +140,7 @@ func _possession_pitch(game: ZzGame, holder: ZzPlayer, cmd: DotFpsCommand, base:
 
 
 ## The rider leaps on whoever is in front, then the holder's stick walks them.
-func _possession_rider(game: ZzGame, holder: ZzPlayer, cmd: DotFpsCommand, base: Vector3) -> void:
+func _possession_rider(game: ZzGame, holder: ZzPlayer, cmd: GSFpsCommand, base: Vector3) -> void:
 	var victim: ZzPlayer = game.survivors()[1]
 	victim.health.invulnerable = true
 	var rider := game.horde.spawner.spawn(ZzNpcs.RIDER, base + Vector3(0.0, 0.0, -4.0), &"test")

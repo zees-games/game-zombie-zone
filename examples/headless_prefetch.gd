@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -19,7 +19,7 @@ var _checks := CHECKS
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -57,7 +57,7 @@ func _test_world() -> void:
 	var before := MapThreads.current()
 	var _on := MapThreads.apply(-1)
 	var started := Time.get_ticks_msec()
-	var res: DotResult = await game.map.load_world()
+	var res: GSResult = await game.map.load_world()
 	var took := Time.get_ticks_msec() - started
 	get_tree().process_frame.disconnect(counter)
 	var _off := MapThreads.apply(before)
@@ -82,7 +82,7 @@ func _test_concurrent(config: ZzConfig) -> void:
 	await get_tree().process_frame
 	var both := [0]
 	var load_one := func() -> void:
-		var r: DotResult = await game.map.load_world()
+		var r: GSResult = await game.map.load_world()
 		both[0] += 1 if r.ok else 0
 	load_one.call()
 	load_one.call()
@@ -105,10 +105,10 @@ func _test_baked() -> void:
 	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
 	img.fill(Color(0.8, 0.3, 0.1))
 	var _saved := img.save_png(png)
-	var surfaces := DotMapSurfaces.new("res://addons/dot_map/surfaces")
-	var variant := DotMapSurfaces.baked_variant()
+	var surfaces := GSMapSurfaces.new("res://addons/dot_map/surfaces")
+	var variant := GSMapSurfaces.baked_variant()
 	_check(surfaces.call(&"_baked_texture", png) == null, "with no baked file the plain decode is used")
-	var baked := DotMapTextureBake.bake_file(png, dir.path_join("albedo"), 0)
+	var baked := GSMapTextureBake.bake_file(png, dir.path_join("albedo"), 0)
 	_check(baked.ok, "a texture bakes", "" if baked.ok else baked.error.message)
 	if variant == "":
 		print("SKIPPED: this renderer has no VRAM format; baked textures are read only where one exists")

@@ -82,7 +82,7 @@ The trader is closed while the horde is on (default `available: waves`: the setu
 | `zz_grace_maps` | 1 | 0 no map, 1 escape (exodus) maps only, 2 every map (a survival hold then begins after the grace) |
 | `zz_grace_hud` | 1 | 1 shows "Zombies arrive in 0:23"; the end is always announced |
 
-The grace is dot-npc-ai-director's `DotNpcDirectorGrace`, set as `director.grace`; another game uses it the same way. The default of 30 s is long enough to buy and spread out and short enough that the horde is not a pause in the map.
+The grace is dot-npc-ai-director's `GSNpcDirectorGrace`, set as `director.grace`; another game uses it the same way. The default of 30 s is long enough to buy and spread out and short enough that the horde is not a pause in the map.
 
 The price of a weapon is its tier's (`prices:`); a melee weapon is not sold unless `items` gives it a price. The ground shelf and the menu share the window, the stock pool (`trader_stock`) and the points.
 
@@ -90,7 +90,7 @@ The price of a weapon is its tier's (`prices:`); a melee weapon is not sold unle
 
 Every `ZzConfig` field is a `zz_<field>` cvar (`zz_` names that were hand-written keep their code), a key in `cfg/game/game-zombie-zone/config/game.yml` (a server's own in `cfg/server/game/game-zombie-zone/config/game.yml`; a flat mapping of field names, for example `waves: 12`) and a set in the workbench. On a dedicated server an unknown key or a bad value refuses the boot. `zz_config_dump` lists every field with the layer it came from; `zz_config_diff save` writes what differs from the code defaults to `user://config_diff_game-zombie-zone.yml`, which copied to `cfg/game/game-zombie-zone/config/game.yml` becomes the shipped defaults. The per-map dictionaries (`wave_scale_by_map`, `wave_alive_share_by_map`) are not scalar and stay in the JSON file or a map's own yml.
 
-The workbench (F9 solo or hosting a game, `workbench` in the console) is dot-game's `DotGameWorkbench`; its HTTP page is off until `workbench.enabled` in `cfg/server.yml`, and a dot-auth connect ticket of an account in `workbench.admin_uids` or `admin_groups` is accepted as the bearer.
+The workbench (F9 solo or hosting a game, `workbench` in the console) is dot-game's `GSGameWorkbench`; its HTTP page is off until `workbench.enabled` in `cfg/server.yml`, and a dot-auth connect ticket of an account in `workbench.admin_uids` or `admin_groups` is accepted as the bearer.
 
 dot-team's block rules are on when the addon is linked: survivors pass through each other (`mp_teamblock`), and `!block` / `!noblock` ask to stop or pass. Without the addon players block each other and the server logs one WARN.
 
@@ -137,7 +137,7 @@ Everything here defaults to the small-server behaviour and changes live (console
 - `sv_threads_net` (off) with `sv_worker_threads` (-1, cores less one): builds each player's snapshot on worker threads, from the next snapshot. Not on the web.
 - `net_native` (on) and `net_native_interest` (on): snapshots, and with the second the choice of what each survivor is sent, are built in dot-net's native library; same bytes, GDScript where the library cannot load or the interest strategy cannot be ported. Live at the console and in dot-workbench's Server threads panel.
 - `sv_threads_npc` (off) with `sv_worker_threads`: runs the horde's perception passes and its repath searches on worker threads; a repath lands at the end of the think that asked it. Decisions and movement stay on the main thread. Not on the web.
-- Physics on its own thread (`physics/3d/run_on_separate_thread`, set by the deploy, not a cvar): a ray or shape query is then safe only inside the physics step. Everything that queries runs in the tick; the admin commands that spawn or drop something (`zz_spawn`, `zz_box`, `zz_mob`) and the map menu's change wait for the next tick through the world's tick gate (dot-physics' `DotTickGate`), so their reply comes a tick later. Boot and module start build the first map before the gate is armed.
+- Physics on its own thread (`physics/3d/run_on_separate_thread`, set by the deploy, not a cvar): a ray or shape query is then safe only inside the physics step. Everything that queries runs in the tick; the admin commands that spawn or drop something (`zz_spawn`, `zz_box`, `zz_mob`) and the map menu's change wait for the next tick through the world's tick gate (dot-physics' `GSTickGate`), so their reply comes a tick later. Boot and module start build the first map before the gate is armed.
 
 `tools/server_probe.tscn` runs with `net_native` and `net_native_interest` on (`--no-native` / `--no-native-interest` for the GDScript path) and builds snapshots on the workers a server takes from `sv_threads_net` and `sv_worker_threads` (`--workers=0` for the inline build, which `--split` needs). `tools/server_probe.tscn -- --n=100 --acks --far-every=4 --far=15` measures a tick at a given player count.
 

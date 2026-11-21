@@ -1,9 +1,9 @@
-extends DotGameNetchaosServer
+extends GSGameNetchaosServer
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 
-## Zombie Zone's side of `tools/netchaos.sh` (dot-game's DotGameNetchaosServer): the practice street, no stand-ins, no horde.
+## Zombie Zone's side of `tools/netchaos.sh` (dot-game's GSGameNetchaosServer): the practice street, no stand-ins, no horde.
 
 var _game: ZzGame = null
 
@@ -32,13 +32,13 @@ func _boot_world() -> void:
 	add_child(_game)
 	await get_tree().process_frame
 	(load("res://game/zz_module.gd") as GDScript).set("punishments_file", "%s/punishments.json" % data_dir)
-	var loaded: DotResult = await server.modules.load_module("res://game/zz_module.gd")
+	var loaded: GSResult = await server.modules.load_module("res://game/zz_module.gd")
 	if not loaded.ok:
 		printerr("netchaos server: ", loaded.error)
 		return
 	module = server.modules.get_module("zombiezone")
 	if solid != "":
-		var cv: DotConVar = server.console.find_cvar("mp_solidplayers")
+		var cv: GSConVar = server.console.find_cvar("mp_solidplayers")
 		if cv != null:
 			cv.force_set(solid)
 

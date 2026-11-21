@@ -13,9 +13,9 @@ static func map_built(channel: String, id: String, ms: int) -> void:
 
 	if near_limit(fields):
 		fields["near_limit"] = true
-		DotLog.warn(channel, "map built", fields)
+		GSLog.warn(channel, "map built", fields)
 	else:
-		DotLog.info(channel, "map built", fields)
+		GSLog.info(channel, "map built", fields)
 
 
 ## rss_mb, peak_mb (VmRSS, VmHWM) and limit_mb (the cgroup's memory.max, 0 when none or not Linux).

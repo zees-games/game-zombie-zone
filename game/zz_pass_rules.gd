@@ -3,7 +3,7 @@ extends RefCounted
 ## `zz_pass_barricades`: whether survivors walk through a barricade instead of being stopped by
 ## it. The horde is held by a barricade either way, and a shot stops on it either way; only
 ## the people's own mask changes, which is why a client has to know it (it predicts its own
-## player) and the cvar is REPLICATED. Shaped like dot-player-controller's `DotPlayerBodyRules`.
+## player) and the cvar is REPLICATED. Shaped like dot-player-controller's `GSPlayerBodyRules`.
 
 signal changed
 

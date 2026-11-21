@@ -17,10 +17,10 @@ const SCENES := {&"smoke_cloud": preload("fx/smoke_cloud.tscn"), &"fire_cloud": 
 
 
 ## The three defs; [param fx_dir] holds `smoke_cloud.tscn` and `fire_cloud.tscn` (empty: the game's own in `fx/`).
-static func defs(fx_dir: String = "") -> Array[DotFxDef]:
-	var out: Array[DotFxDef] = []
+static func defs(fx_dir: String = "") -> Array[GSFxDef]:
+	var out: Array[GSFxDef] = []
 	for id: StringName in [SMOKE_ID, FIRE_ID]:
-		var cloud := DotFxDef.new()
+		var cloud := GSFxDef.new()
 		cloud.id = id
 		cloud.scene_path = (SCENES[id] as PackedScene).resource_path if fx_dir.is_empty() else "%s/%s.tscn" % [fx_dir, id]
 		cloud.lifetime_ms = 30000
@@ -29,9 +29,9 @@ static func defs(fx_dir: String = "") -> Array[DotFxDef]:
 		cloud.max_distance = 120.0
 		out.append(cloud)
 
-	var blind := DotFxDef.new()
+	var blind := GSFxDef.new()
 	blind.id = BLIND_ID
-	blind.kind = DotFxDef.Kind.SCREEN
+	blind.kind = GSFxDef.Kind.SCREEN
 	blind.flash_peak = 1.0
 	blind.flash_decay_ms = 2500
 	out.append(blind)
@@ -43,7 +43,7 @@ static func own_dir() -> String:
 	return (SCENES[SMOKE_ID] as PackedScene).resource_path.get_base_dir()
 
 
-static func add_defs(catalogue: DotFxCatalogue, fx_dir: String = "") -> void:
+static func add_defs(catalogue: GSFxCatalogue, fx_dir: String = "") -> void:
 	for def in defs(fx_dir):
 		catalogue.add(def)
 
@@ -54,7 +54,7 @@ static func flash_decay_ms(seconds: float) -> int:
 
 
 ## Shows an [signal ZzUtilityZones.effect] on [param fx]; a blind only for [param own_id]. Returns the cloud, or null.
-static func show(fx: DotFxManager, tree: SceneTree, info: Dictionary, own_id: int) -> Node:
+static func show(fx: GSFxManager, tree: SceneTree, info: Dictionary, own_id: int) -> Node:
 	if fx == null or fx.catalogue == null:
 		return null
 

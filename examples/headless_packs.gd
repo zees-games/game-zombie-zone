@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
@@ -37,7 +37,7 @@ var _checks := CHECKS
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -158,9 +158,9 @@ func _box_profiles() -> void:
 	f2.close()
 	var bad := ZzBoxes.new(null)
 	var _l3 := bad.load_text(text)
-	DotLog.set_level(DotLog.Level.FATAL)  # the refusal logs an ERROR on purpose
+	GSLog.set_level(GSLog.Level.FATAL)  # the refusal logs an ERROR on purpose
 	var _n3 := bad.overlay_profiles(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg", "user://zz_box_cfg"])))
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_check(bad.types[&"explosive"]["title"] == "Explosive Box", "a bad server file is refused and the shipped type stays")
 	DirAccess.remove_absolute(base + "/explosive.yml")
 	_finished += 1
@@ -174,8 +174,8 @@ func _npc_profiles() -> void:
 	var cat := ZzNpcs.catalogue(c)
 	var same := 0
 	var stale := 0
-	for def: DotNpcDef in built:
-		var got: DotNpcDef = cat.get_npc(def.id)
+	for def: GSNpcDef in built:
+		var got: GSNpcDef = cat.get_npc(def.id)
 		if got != null and got.max_health == def.max_health and got.move_speed == def.move_speed \
 				and got.sight_range == def.sight_range and got.sight_half_angle_deg == def.sight_half_angle_deg \
 				and got.hearing_range == def.hearing_range and got.eye_height == def.eye_height \
@@ -205,7 +205,7 @@ func _npc_profiles() -> void:
 	f.store_string("health: 5000.0\n")
 	f.close()
 	var over := ZzNpcs.catalogue(c, PackedStringArray(["res://cfg", tier + "/cfg"]))
-	var leaper: DotNpcDef = over.get_npc(&"leaper")
+	var leaper: GSNpcDef = over.get_npc(&"leaper")
 	_check(leaper.move_speed == 9.5 and float(leaper.meta["pounce_max"]) == 30.0, "a later tier overrides the keys it names")
 	_check(leaper.max_health == 250.0 and float(leaper.meta["pounce_min"]) == 4.0 and leaper.sight_range == 60.0, "and leaves the rest as shipped")
 	_check(is_equal_approx(ZzNpcs.brute_health(c, 1, over.get_npc(&"brute")), 5000.0), "a brute's profile health is its base")
@@ -234,7 +234,7 @@ func _installed() -> void:
 	_check(not ZzPacks.is_pack_kind(&"brute"), "a monster named like a built-in is refused")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
 	_check(cat.size() == 16, "the catalogue gains both monsters", "%d" % cat.size())
-	var ghoul: DotNpcDef = cat.get_npc(&"fx_ghoul")
+	var ghoul: GSNpcDef = cat.get_npc(&"fx_ghoul")
 	_check(ghoul != null and ghoul.move_speed == 5.0 and float(ghoul.meta.get("damage", 0)) == 7.0, "a row's numbers reach the definition")
 	_check(ZzNpcs.is_special(&"fx_ghoul"), "a pack monster counts as a special")
 	_check(ZzPacks.pick(ZzPacks.specials(), 0.5).id == &"fx_ghoul", "a weighted pick finds it")
@@ -378,7 +378,7 @@ func _each_pack_alone() -> void:
 
 
 ## The monsters' host seam in a running game: targets, blows and afflictions go through the game.
-func _monster_host(game: ZzGame, player: Object, npc: DotNpcInstance) -> void:
+func _monster_host(game: ZzGame, player: Object, npc: GSNpcInstance) -> void:
 	var host: Object = game.horde.spawner.get_meta(&"zhm_host", null)
 	_check(host != null and host == game.horde.monster_host, "the spawner carries the game's monster host")
 	var targets: Array = host.call(&"zhm_targets")
@@ -399,14 +399,14 @@ func _monster_host(game: ZzGame, player: Object, npc: DotNpcInstance) -> void:
 ## A pack monster runs its own brain on the game's body: it hunts, its attacks start and land through the host.
 func _pack_brain(game: ZzGame, player: Object) -> void:
 	for id: StringName in [&"zhm_tiger", &"zhm_bear", &"zhm_trex"]:
-		var def: DotNpcDef = game.horde.catalogue.get_npc(id)
+		var def: GSNpcDef = game.horde.catalogue.get_npc(id)
 		_check(def != null and def.brain_script_path.begins_with("user://zz_pack_brains/") and FileAccess.file_exists(def.brain_script_path),
 			"%s runs a generated brain, not the common's" % id, str(def.brain_script_path if def != null else "-"))
 		_check(def != null and def.meta.has("cfg") and def.meta.get("species", "") != "", "%s carries its species and numbers" % id)
 
 	# The generated script is named by its own text, so a build with another template (another checkout, sharing user://) never
 	# swaps the file under a running monster: that was a tiger without force_target, once in a dozen loaded runs.
-	var tiger_def: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
+	var tiger_def: GSNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
 	var brain_path: String = tiger_def.brain_script_path if tiger_def != null else ""
 	var brain_text := FileAccess.get_file_as_string(brain_path)
 	_check(brain_text.contains("func force_target") and brain_text.contains("var _forced"), "the generated brain answers force_target", brain_path)
@@ -450,9 +450,9 @@ func _pack_brain(game: ZzGame, player: Object) -> void:
 
 ## The collider is the pack's declared body (radius capped for the doorways, height stooped like the brute's).
 func _pack_colliders(game: ZzGame) -> void:
-	var tiger: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
-	var bear: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_bear")
-	var trex: DotNpcDef = game.horde.catalogue.get_npc(&"zhm_trex")
+	var tiger: GSNpcDef = game.horde.catalogue.get_npc(&"zhm_tiger")
+	var bear: GSNpcDef = game.horde.catalogue.get_npc(&"zhm_bear")
+	var trex: GSNpcDef = game.horde.catalogue.get_npc(&"zhm_trex")
 	_check(is_equal_approx(float(tiger.meta["radius"]), 0.55) and is_equal_approx(float(tiger.meta["height"]), 1.7),
 		"the tiger's collider is the pack's 0.55 by 1.7", "%s x %s" % [tiger.meta["radius"], tiger.meta["height"]])
 	_check(is_equal_approx(float(bear.meta["radius"]), 0.8) and is_equal_approx(float(bear.meta["height"]), 2.0),
@@ -473,7 +473,7 @@ func _pack_colliders(game: ZzGame) -> void:
 			if c is CollisionShape3D and (c.shape as CapsuleShape3D) != null:
 				shaped = is_equal_approx((c.shape as CapsuleShape3D).radius, 0.9) and is_equal_approx((c.shape as CapsuleShape3D).height, 2.1)
 	_check(shaped, "and its collision capsule is that radius at the stooped height")
-	game.horde.spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	game.horde.spawner.remove(npc.instance_id, GSNpcSpawner.REASON_CLEANUP)
 
 
 ## The game's handles on a brain, answered by a pack monster: told to hunt, lured, and tearing at a barricade.
@@ -485,8 +485,8 @@ func _pack_handles(game: ZzGame, player: Object) -> void:
 		game.simulate(1.0 / 64.0)
 		guard += 1
 	player.health.invulnerable = true
-	for n: DotNpcInstance in game.horde.spawner.npcs_near(Vector3.ZERO, 10000.0):
-		game.horde.spawner.remove(n.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	for n: GSNpcInstance in game.horde.spawner.npcs_near(Vector3.ZERO, 10000.0):
+		game.horde.spawner.remove(n.instance_id, GSNpcSpawner.REASON_CLEANUP)
 	var prey: Vector3 = game.horde.survivor_position(&"u100")
 	# Far from the survivor, out of every pounce and charge range, so only the handle moves it.
 	var tiger := _spawn_far(game, &"zhm_tiger", prey, 24.0)
@@ -526,7 +526,7 @@ func _pack_handles(game: ZzGame, player: Object) -> void:
 	_check(not bool(tiger.brain.get(&"bashing")) and tiger.position().distance_to(held) > 1.0, "gone, it walks on")
 	game.barricades.erase("fx_pack")
 
-	game.horde.spawner.remove(tiger.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	game.horde.spawner.remove(tiger.instance_id, GSNpcSpawner.REASON_CLEANUP)
 	_pack_lure(game, player)
 
 
@@ -562,12 +562,12 @@ func _pack_lure(game: ZzGame, player: Object) -> void:
 		game.simulate(1.0 / 64.0)
 	_check(lured.brain.get(&"state") != &"lure" and lured.position().distance_to(player.global_position) < gap - 1.0,
 		"though a survivor it is told to hunt outranks it", "state %s, %.1f -> %.1f m" % [lured.brain.get(&"state"), gap, lured.position().distance_to(player.global_position)])
-	for n: DotNpcInstance in [lured, plain]:
-		game.horde.spawner.remove(n.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	for n: GSNpcInstance in [lured, plain]:
+		game.horde.spawner.remove(n.instance_id, GSNpcSpawner.REASON_CLEANUP)
 
 
 ## A monster of [param kind] at least [param min_apart] metres from [param from], on the first spot the map lets one stand.
-func _spawn_far(game: ZzGame, kind: StringName, from: Vector3, min_apart: float) -> DotNpcInstance:
+func _spawn_far(game: ZzGame, kind: StringName, from: Vector3, min_apart: float) -> GSNpcInstance:
 	for d: float in [40.0, 34.0, 28.0, min_apart + 1.0]:
 		for dir: Vector3 in [Vector3(0, 0, -1), Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(-1, 0, 0), Vector3(0.7, 0, -0.7), Vector3(-0.7, 0, 0.7)]:
 			var npc := game.horde.spawn_special(kind, from + dir * d)
@@ -575,7 +575,7 @@ func _spawn_far(game: ZzGame, kind: StringName, from: Vector3, min_apart: float)
 				continue
 			if npc.position().distance_to(from) >= min_apart:
 				return npc
-			game.horde.spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+			game.horde.spawner.remove(npc.instance_id, GSNpcSpawner.REASON_CLEANUP)
 	return null
 
 
@@ -688,13 +688,13 @@ func _real_packs() -> void:
 	spawned[&"zhm_trex"] = game.horde.spawn_pack_boss(&"zhm_trex")
 
 	for id: StringName in spawned:
-		var npc: DotNpcInstance = spawned[id]
+		var npc: GSNpcInstance = spawned[id]
 		_check(npc != null and npc.def.id == id, "%s spawns" % id)
 
 	for i in 128:
 		game.simulate(1.0 / 64.0)
 
-	_check(spawned.values().all(func(n: DotNpcInstance) -> bool: return n != null and n.alive), "all three are alive after two seconds")
+	_check(spawned.values().all(func(n: GSNpcInstance) -> bool: return n != null and n.alive), "all three are alive after two seconds")
 	_check(game.arm(player, &"zz_m4") and game.arm(player, &"dagger"), "a survivor can be armed from each weapon pack")
 	_monster_host(game, player, spawned[&"zhm_tiger"])
 	_pack_brain(game, player)
@@ -709,7 +709,7 @@ func _check_pack_numbers() -> void:
 	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
 	_check(is_equal_approx(_damage_of(&"zz_m4"), 29.0), "a modern weapon carries the pack's damage", "%.1f" % _damage_of(&"zz_m4"))
 	_check(is_equal_approx(_damage_of(&"dagger"), 28.0), "a medieval weapon carries the pack's damage", "%.1f" % _damage_of(&"dagger"))
-	var tiger: DotNpcDef = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
+	var tiger: GSNpcDef = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
 	_check(tiger != null and is_equal_approx(tiger.max_health, 520.0) and is_equal_approx(float(tiger.meta.get("damage", 0)), 14.0),
 		"a monster's health and damage come from the pack's yml")
 

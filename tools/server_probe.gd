@@ -10,7 +10,7 @@ extends Node
 ##     [--detail] [--cfg=field=value] [--cvar=name=value]
 ## [/codeblock]
 ##
-## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [DotNetManager] and a
+## [b]The real server half, without a socket[/b]: [ZzGame] on the map, a [GSNetManager] and a
 ## [ZzNetBridge] with the socket replaced by a counter (load_probe's pattern in game-airdrift, and
 ## headless_net's wiring). Every survivor is a peer the way a real one is (`add_player`, `_admit`,
 ## its own entity and snapshot) and is then driven by the stand-in brain (`is_bot`), so it walks
@@ -21,7 +21,7 @@ extends Node
 ## [b]Phases[/b] are laps taken around ZzGame._step's own calls (kept in step with it, as
 ## survival_long_run's profile is) and around the manager's half of the tick. dot-npc has no timer
 ## inside a path search, so pathing is derived: searches per tick from
-## [member DotNpcNavGraph.searches], times the cost of one search measured on the same graph after
+## [member GSNpcNavGraph.searches], times the cost of one search measured on the same graph after
 ## the window. The frame is split into the step (physics_frame to process_frame; engine_physics_ms) and the rest
 ## (engine_rest_ms), and the row names the physics engine and the thread setting (tools/server_probe.sh PHYS_ENGINE=JoltPhysics3D PHYS_THREAD=1). The engine's own frame (one physics step of the server's world) is the time spent in
 ## `await physics_frame`, taken once every 16 ticks; "bodies" is the zombies' move_and_slide, the motor queries.
@@ -45,18 +45,18 @@ var _wave := 10
 ## the commons up to the cap itself (the stand-ins kill them as fast as a wave releases them).
 var _lead := 90.0
 var _fill := true
-## --relevance=off sends every entity to every peer (DotNetInterestAll), the before of the lever.
+## --relevance=off sends every entity to every peer (GSNetInterestAll), the before of the lever.
 var _relevance := true
-## DotNetConfig.snapshot_workers for the run (0 inline, -1 auto, n). Default: the count a server copies in from
-## sv_threads_net (on) and sv_worker_threads, [method DotServerConfig.net_snapshot_workers]. It was 0, an inline
+## GSNetConfig.snapshot_workers for the run (0 inline, -1 auto, n). Default: the count a server copies in from
+## sv_threads_net (on) and sv_worker_threads, [method GSServerConfig.net_snapshot_workers]. It was 0, an inline
 ## build no server runs (zz-snapcost, PH, n=32: net_snapshot 9.18 ms a tick inline, 3.98 on the server's 8 workers).
-var _workers := DotServerConfig.new().net_snapshot_workers()
-## --npc-workers=N: DotNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server);
+var _workers := GSServerConfig.new().net_snapshot_workers()
+## --npc-workers=N: GSNpcSpawner.sense_workers, path_workers and think_workers (what sv_threads_npc sets on a server);
 ## deferred_paths is on at every N, as on a server.
 var _npc_workers := 0
 ## Native snapshots and native interest are on (the shipped setting to measure); --no-native / --no-native-interest turn them off.
 var _native := true
-## --native-interest: also DotNetConfig.native_interest. --net=field=value (repeatable): any other DotNetConfig field.
+## --native-interest: also GSNetConfig.native_interest. --net=field=value (repeatable): any other GSNetConfig field.
 var _native_interest := true
 var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
@@ -69,10 +69,10 @@ var _snapshot_auto := true
 var _split := false
 ## Snapshots built, for the prep/join/apply means of a native or pooled run.
 var _snaps := 0
-## --far-every=N --far=M: DotNetInterest thinning, everything past M metres sent every Nth snapshot (unset: the config's net_far_*).
+## --far-every=N --far=M: GSNetInterest thinning, everything past M metres sent every Nth snapshot (unset: the config's net_far_*).
 var _far_every := 0
 var _far := 0.0
-## --far-coherent, --far-tiers=T: DotNetInterest.far_coherent and far_tiers.
+## --far-coherent, --far-tiers=T: GSNetInterest.far_coherent and far_tiers.
 var _far_coherent := false
 var _far_tiers := 1
 const ACK_LAG := 2
@@ -93,9 +93,9 @@ var _near_hist: Dictionary = {}
 var _detail_ticks := 0
 ## --cfg=field=value (repeatable): a ZzConfig field set before the game starts, e.g. squad_coalesce=true.
 var _cfg: Dictionary = {}
-## --cvar=name=value (repeatable): dot-game's DotGameNpcLod cvars (npc_lod, npc_lod_full, npc_sense_quiet ...) on a stand-in console.
+## --cvar=name=value (repeatable): dot-game's GSGameNpcLod cvars (npc_lod, npc_lod_full, npc_sense_quiet ...) on a stand-in console.
 var _cvars: Dictionary = {}
-var _lod: DotGameNpcLod = null
+var _lod: GSGameNpcLod = null
 ## Gameplay counters over the window: zombies killed, health zombies lost, health survivors lost, and zombies with a target per tick.
 var _kills := 0
 var _dmg_npc := 0.0
@@ -103,7 +103,7 @@ var _dmg_survivor := 0.0
 var _engaged := 0
 var _sent_ticks: Dictionary = {}
 var _game: ZzGame
-var _net: DotNetManager
+var _net: GSNetManager
 var _bridge: ZzNetBridge
 var _bytes := 0
 var _watched_peer := 2
@@ -112,7 +112,7 @@ var _series: Dictionary = {}
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
 			_map = StringName(arg.trim_prefix("--map="))
@@ -214,7 +214,7 @@ func _run() -> void:
 			print("[probe] tick %d took %d us, up_at %d, phase %s, nav_blocks %s, survival %s, map %s mode %s, wall %d ms" % [tick, Time.get_ticks_usec() - t0, _up_at, str(_game.phase), str(_game.horde.nav_blocks_play()) if _game.horde != null else "nohorde", str(_game.survival != null), str(_game.map_doc.get("id", "?")), str(_game.map_doc.get("mode", "?")), Time.get_ticks_msec()])
 		if measuring:
 			for id in _game.horde.spawner._npcs:
-				var inst: DotNpcInstance = _game.horde.spawner._npcs[id]
+				var inst: GSNpcInstance = _game.horde.spawner._npcs[id]
 				_engaged += 1 if inst.is_alive() and inst.has_target() else 0
 			measured += 1
 			for k: String in _lap:
@@ -230,14 +230,14 @@ func _run() -> void:
 
 
 func _start_net() -> bool:
-	_net = DotNetManager.new()
+	_net = GSNetManager.new()
 	_net.name = "Server"
 	_net.is_server = true
 	_net.local_peer_id = 1
 	_net.service_scope = &"server_probe"
 	_net.auto_tick = false
 	_net.config_file = ""
-	var nc := DotNetConfig.new()
+	var nc := GSNetConfig.new()
 	nc.tick_rate = _rate
 	nc.snapshot_rate = SNAPSHOT_RATE
 	nc.enable_prediction = true
@@ -248,7 +248,7 @@ func _start_net() -> bool:
 	nc.native = _native
 	nc.native_interest = _native_interest
 	if _snapshot_auto:
-		var _line := DotGameNetcode.adapt_snapshot_rate(nc, _n)
+		var _line := GSGameNetcode.adapt_snapshot_rate(nc, _n)
 	for field: String in _net_fields:
 		nc.set(field, type_convert(_net_fields[field], typeof(nc.get(field))))
 	_net.config = nc
@@ -262,7 +262,7 @@ func _start_net() -> bool:
 		get_tree().quit(2)
 		return false
 	if not _relevance:
-		_net.interest = DotNetInterestAll.new()
+		_net.interest = GSNetInterestAll.new()
 	# Only what was asked for: otherwise the game's own net_far_* settings stand, as on a server.
 	if _far_every > 0:
 		_net.interest.far_every = _far_every
@@ -311,10 +311,10 @@ func _frame_wait(measuring: bool) -> void:
 
 
 func _wave_step(tick: int) -> void:
-	var w: DotNpcDirectorWaves = _game.survival.waves if _game.survival != null else null
+	var w: GSNpcDirectorWaves = _game.survival.waves if _game.survival != null else null
 	if w == null:
 		return
-	if not _wave_set and w.stage == DotNpcDirectorWaves.Stage.QUIET:
+	if not _wave_set and w.stage == GSNpcDirectorWaves.Stage.QUIET:
 		w.index = _wave
 		_game.survival.cleared = _wave - 1
 		_wave_set = true
@@ -333,7 +333,7 @@ func _reach_cap(tick: int) -> void:
 	_bytes = 0
 	_graph = _game.horde.spawner.nav
 	_game.horde.spawner.died.connect(func(_n, _b): _kills += 1)
-	_game.combat.damage_applied.connect(func(d: DotDamage) -> void:
+	_game.combat.damage_applied.connect(func(d: GSDamage) -> void:
 		if _game.horde.is_npc_entity(d.victim):
 			_dmg_npc += d.health_lost
 		else:
@@ -478,7 +478,7 @@ func _tick_horde(h, delta: float, at: int) -> int:
 
 ## The spawner: senses, brains, the bodies, then the horde's own pacing.
 func _tick_horde_npcs(h, delta: float, at: int) -> int:
-	var sp: DotNpcSpawner = h.spawner
+	var sp: GSNpcSpawner = h.spawner
 	sp._now += delta
 	sp._ticks += 1
 	sp.deferred_paths = true  # as ZzHorde.setup sets it in every game
@@ -486,12 +486,12 @@ func _tick_horde_npcs(h, delta: float, at: int) -> int:
 	sp.path_workers = _npc_workers
 	sp.think_workers = _npc_workers
 	if _lod == null and not _cvars.is_empty():
-		var console := DotConsole.new()
+		var console := GSConsole.new()
 		add_child(console)
-		DotGameNpcLod.ensure_cvars(console)
+		GSGameNpcLod.ensure_cvars(console)
 		for name: String in _cvars:
 			console.set_cvar(name, _cvars[name])
-		_lod = DotGameNpcLod.attach(self, console, sp)
+		_lod = GSGameNpcLod.attach(self, console, sp)
 	if _lod != null:
 		_lod.follow(delta)
 	sp._perception.perceive()
@@ -504,7 +504,7 @@ func _tick_horde_npcs(h, delta: float, at: int) -> int:
 	sp._perception.reclaim()
 	var speed: float = h.zombie_speed_scale * h.wave_speed_scale
 	at = _add("horde_other", at)
-	for npc: DotNpcInstance in sp.all_npcs():
+	for npc: GSNpcInstance in sp.all_npcs():
 		if npc.is_alive() and npc.node != null and npc.node.has_method(&"tick"):
 			npc.node.speed_scale = speed
 			npc.node.tick(delta)
@@ -569,7 +569,7 @@ func _tick_net(tick: int, at: int) -> int:
 	at = _add("net_pull", at)
 	var period := _net.config.ticks_per_snapshot()
 	if _net.config.stagger_snapshots and period > 1:
-		# DotNetManager.server_tick's staggered path: a share of the peers every tick.
+		# GSNetManager.server_tick's staggered path: a share of the peers every tick.
 		_net.history.record(identities, tick)
 		at = _add("net_history", at)
 		_net._send_snapshots(tick, identities, posmod(tick, period), period)
@@ -625,8 +625,8 @@ func _step_player(g: ZzGame, player: Object, delta: float) -> void:
 			g._advance_hands(player, delta)
 
 
-## DotNetManager._send_snapshots' inline path (workers 0), the same calls, lapped by part.
-func _split_snapshots(tick: int, identities: Array[DotNetIdentity]) -> void:
+## GSNetManager._send_snapshots' inline path (workers 0), the same calls, lapped by part.
+func _split_snapshots(tick: int, identities: Array[GSNetIdentity]) -> void:
 	var n := _net
 	var context := {"tick": tick, "config": n.config, "now_ms": Time.get_ticks_msec()}
 	var at := Time.get_ticks_usec()
@@ -642,7 +642,7 @@ func _split_snapshots(tick: int, identities: Array[DotNetIdentity]) -> void:
 		var relevant := n.interest.relevant_for(observer, identities, peer_id, context)
 		at = _add("si_relevant", at)
 		if n.interest.thins():
-			var kept: Array[DotNetIdentity] = []
+			var kept: Array[GSNetIdentity] = []
 			n.interest.thin_into(kept, observer, relevant, peer_id, context)
 			relevant = kept
 		at = _add("si_thin", at)
@@ -665,14 +665,14 @@ func _split_snapshots(tick: int, identities: Array[DotNetIdentity]) -> void:
 
 ## What a client does with a snapshot, ACK_LAG snapshots late: the ack its encode_ack would send.
 func _ack_later(peer_id: int, payload: PackedByteArray) -> void:
-	var tick := DotNetReader.new(payload).read_uint(32)
+	var tick := GSNetReader.new(payload).read_uint(32)
 	var list: Array = _sent_ticks.get_or_add(peer_id, [])
 	if not list.is_empty() and list.back() == tick:
 		return
 	list.append(tick)
 	if list.size() <= ACK_LAG:
 		return
-	var ack := DotNetWriter.new()
+	var ack := GSNetWriter.new()
 	ack.write_uint(int(list.pop_front()), 32)
 	var _taken := _net.receive_ack_payload(peer_id, ack.to_bytes())
 
@@ -688,7 +688,7 @@ func _search_cost(graph) -> float:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var pts: Array = []
-	for npc: DotNpcInstance in _game.horde.spawner.all_npcs():
+	for npc: GSNpcInstance in _game.horde.spawner.all_npcs():
 		if npc.is_alive():
 			pts.append(npc.position())
 	for p in _game.survivors():
@@ -737,10 +737,10 @@ func _accum(key: String, usec: int) -> void:
 	a[1] += 1
 
 
-## DotNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances. With the spawner's
-## think pacing on (dot-npc DotNpcPacing) the counters live in the pacer, not the brains, so the tick is run through
+## GSNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances. With the spawner's
+## think pacing on (dot-npc GSNpcPacing) the counters live in the pacer, not the brains, so the tick is run through
 ## it as the spawner runs it and lapped whole ("brain.paced"); per kind only with pacing off.
-func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
+func _think_detail(sp: GSNpcSpawner, delta: float) -> void:
 	var sample := sp._ticks % 64 == 0
 	var survivors: Array = []
 	if sample:
@@ -758,14 +758,14 @@ func _think_detail(sp: DotNpcSpawner, delta: float) -> void:
 		_accum("brain.paced", Time.get_ticks_usec() - t0)
 	for id in sp._npcs.keys():
 		var found: Variant = sp._npcs.get(id)
-		if not (found is DotNpcInstance):
+		if not (found is GSNpcInstance):
 			continue
-		var npc: DotNpcInstance = found
+		var npc: GSNpcInstance = found
 		if not npc.is_alive() or npc.brain == null:
 			continue
 		if not sp._pacing.active():
 			var t0 := Time.get_ticks_usec()
-			(npc.brain as DotNpcBrain).think(delta)
+			(npc.brain as GSNpcBrain).think(delta)
 			var spent := Time.get_ticks_usec() - t0
 			_accum("brain." + String(npc.def.id), spent)
 			_accum("brain.thought" if int(npc.brain.get(&"_since_thought")) == 0 else "brain.skipped", spent)

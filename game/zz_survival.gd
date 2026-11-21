@@ -10,7 +10,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 
 ## A survival map held: the schedule, what each stage does to the horde, and the breather.
 ##
-## [b]The schedule is dot-npc-ai-director's[/b] ([DotNpcDirectorWaves]); this file is what it
+## [b]The schedule is dot-npc-ai-director's[/b] ([GSNpcDirectorWaves]); this file is what it
 ## means in this game. The server owner picks the style (`zz_survival`), and the default is the
 ## one the first play test asked for:
 ##
@@ -51,7 +51,7 @@ const TWISTS := {
 
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
-var waves: DotNpcDirectorWaves = null
+var waves: GSNpcDirectorWaves = null
 
 ## The wave set in play, or empty when the cvars set the schedule.
 var wave_set_id: String = ""
@@ -82,14 +82,14 @@ func _init(p_game: Object) -> void:
 
 
 ## The cvar-built schedule, used when no wave set is chosen or none loads.
-func _legacy_schedule() -> DotNpcDirectorWaves:
+func _legacy_schedule() -> GSNpcDirectorWaves:
 	var c = game.config
-	var waves := DotNpcDirectorWaves.new()
-	waves.style = [DotNpcDirectorWaves.Style.ROUNDS, DotNpcDirectorWaves.Style.CYCLE, DotNpcDirectorWaves.Style.CLOCK][clampi(c.survival_style, 0, 2)]
-	waves.count = c.waves if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.nights
-	waves.first_quiet_seconds = c.setup_seconds() if waves.style != DotNpcDirectorWaves.Style.CLOCK else 0.0
-	waves.quiet_seconds = c.breather_seconds if waves.style == DotNpcDirectorWaves.Style.ROUNDS else c.day_seconds
-	waves.horde_seconds = c.night_seconds if waves.style == DotNpcDirectorWaves.Style.CYCLE else game.survival_goal
+	var waves := GSNpcDirectorWaves.new()
+	waves.style = [GSNpcDirectorWaves.Style.ROUNDS, GSNpcDirectorWaves.Style.CYCLE, GSNpcDirectorWaves.Style.CLOCK][clampi(c.survival_style, 0, 2)]
+	waves.count = c.waves if waves.style == GSNpcDirectorWaves.Style.ROUNDS else c.nights
+	waves.first_quiet_seconds = c.setup_seconds() if waves.style != GSNpcDirectorWaves.Style.CLOCK else 0.0
+	waves.quiet_seconds = c.breather_seconds if waves.style == GSNpcDirectorWaves.Style.ROUNDS else c.day_seconds
+	waves.horde_seconds = c.night_seconds if waves.style == GSNpcDirectorWaves.Style.CYCLE else game.survival_goal
 	var scale: float = float(c.wave_scale_by_map.get(str(game.map_doc.get("id", "")), 1.0))
 	waves.wave_base = int(round(float(c.wave_size) * scale))
 	waves.wave_per_player = int(round(float(c.wave_size_per_survivor) * scale))
@@ -102,7 +102,7 @@ func _legacy_schedule() -> DotNpcDirectorWaves:
 
 ## The first wave set that loads, from `sv_waves`, the rotation entry's `waves`, then the map
 ## document's `survival.waves`; null when none is named or none loads (the cvars then rule).
-func _from_wave_set() -> DotNpcDirectorWaves:
+func _from_wave_set() -> GSNpcDirectorWaves:
 	var c = game.config
 	var map_id := str(game.map_doc.get("id", ""))
 	var doc_waves := str((game.map_doc.get("survival", {}) as Dictionary).get("waves", "")) if game.map_doc.get("survival") is Dictionary else ""
@@ -111,29 +111,29 @@ func _from_wave_set() -> DotNpcDirectorWaves:
 	if names.is_empty():
 		return null
 	var difficulty := str(play.get("difficulty", "normal"))
-	var profiles := DotWaveSet.make_set(ZzWaveSets.GAME)
+	var profiles := GSWaveSet.make_set(ZzWaveSets.GAME)
 	for set_name: String in names:
-		var res := DotWaveSet.load_set(profiles, set_name, difficulty, Callable(), ZzWaveSets.validate_extra)
+		var res := GSWaveSet.load_set(profiles, set_name, difficulty, Callable(), ZzWaveSets.validate_extra)
 		if not res.ok:
-			DotLog.warn(CHANNEL, "a wave set did not load; trying the next", {"set": set_name, "why": res.error.message})
+			GSLog.warn(CHANNEL, "a wave set did not load; trying the next", {"set": set_name, "why": res.error.message})
 			continue
-		var set: DotWaveSet = res.value
+		var set: GSWaveSet = res.value
 		ZzWaveSets.scale_for_map(set, map_id)
 		set.map_key = map_id
-		var sched := DotNpcDirectorWaves.new()
+		var sched := GSNpcDirectorWaves.new()
 		set.fill_schedule(sched, _team())
 		if not sched.validate().ok:
-			DotLog.warn(CHANNEL, "a wave set made no usable schedule; trying the next", {"set": set_name})
+			GSLog.warn(CHANNEL, "a wave set made no usable schedule; trying the next", {"set": set_name})
 			continue
-		DotLog.info(CHANNEL, "wave set chosen", {"set": set_name, "difficulty": difficulty, "map": map_id})
+		GSLog.info(CHANNEL, "wave set chosen", {"set": set_name, "difficulty": difficulty, "map": map_id})
 		wave_set_id = set_name
 		return sched
-	DotLog.error(CHANNEL, "no named wave set loaded; the survival cvars rule", {"tried": ",".join(names)})
+	GSLog.error(CHANNEL, "no named wave set loaded; the survival cvars rule", {"tried": ",".join(names)})
 	return null
 
 
 ## Builds the schedule from the configuration and starts it.
-func begin() -> DotResult:
+func begin() -> GSResult:
 	var c = game.config
 	waves = _from_wave_set()
 	if waves == null:
@@ -142,7 +142,7 @@ func begin() -> DotResult:
 	var valid := waves.validate()
 
 	if not valid.ok:
-		DotLog.error(CHANNEL, "the survival schedule is not usable", {"why": valid.error.message})
+		GSLog.error(CHANNEL, "the survival schedule is not usable", {"why": valid.error.message})
 		return valid
 
 	_rng.seed = int(c.seed_value) ^ hash(str(game.map_doc.get("id", ""))) ^ int(game.round_number) * 131
@@ -152,8 +152,8 @@ func begin() -> DotResult:
 	_last_twist = &""
 	waves.stage_changed.connect(_on_stage)
 	waves.begin(_team())
-	DotLog.info(CHANNEL, "the hold began", {"style": waves.style_name(), "count": waves.count, "team": _team()})
-	return DotResult.success(waves)
+	GSLog.info(CHANNEL, "the hold began", {"style": waves.style_name(), "count": waves.count, "team": _team()})
+	return GSResult.success(waves)
 
 
 func stop() -> void:
@@ -167,11 +167,11 @@ func stop() -> void:
 
 
 func is_running() -> bool:
-	return waves != null and waves.stage != DotNpcDirectorWaves.Stage.IDLE
+	return waves != null and waves.stage != GSNpcDirectorWaves.Stage.IDLE
 
 
 func is_done() -> bool:
-	return waves != null and waves.stage == DotNpcDirectorWaves.Stage.DONE
+	return waves != null and waves.stage == GSNpcDirectorWaves.Stage.DONE
 
 
 ## One tick: the schedule, and what it releases.
@@ -186,15 +186,15 @@ func tick(delta: float) -> void:
 	# at the team through the breather and into the next wave, a twist on top, and that sixth
 	# wave was where the school and the ballpark went down (zz-survival-retune-2). The overtime
 	# still ends it.
-	if waves.style == DotNpcDirectorWaves.Style.ROUNDS and waves.stage == DotNpcDirectorWaves.Stage.HORDE and horde.wave_brutes() > 0:
+	if waves.style == GSNpcDirectorWaves.Style.ROUNDS and waves.stage == GSNpcDirectorWaves.Stage.HORDE and horde.wave_brutes() > 0:
 		alive = maxi(alive, waves.straggler_count + 1)
 	waves.tick(delta, alive, _team())
 
-	if waves.stage != DotNpcDirectorWaves.Stage.HORDE:
+	if waves.stage != GSNpcDirectorWaves.Stage.HORDE:
 		return
 
 	match waves.style:
-		DotNpcDirectorWaves.Style.ROUNDS:
+		GSNpcDirectorWaves.Style.ROUNDS:
 			_release(horde)
 		_:
 			# A night or the clock: the horde's own pacing, harder by the schedule.
@@ -262,14 +262,14 @@ func _on_stage(stage: int, index: int) -> void:
 	var horde = game.horde
 
 	match stage:
-		DotNpcDirectorWaves.Stage.QUIET:
+		GSNpcDirectorWaves.Stage.QUIET:
 			horde.stop_pacing()
 			_set_twist(&"")
 
 			if index > 1:
 				cleared += 1
 				var straggled := 0
-				if waves.style == DotNpcDirectorWaves.Style.ROUNDS:
+				if waves.style == GSNpcDirectorWaves.Style.ROUNDS:
 					if waves.overtime:
 						straggled = horde.clear_wave_stragglers(30.0)
 				else:
@@ -280,29 +280,29 @@ func _on_stage(stage: int, index: int) -> void:
 					game.boxes.end_round()
 				game.notice.emit(_cleared_line(index - 1))
 				game.map_wave_changed(index - 1, true)
-				DotLog.info(CHANNEL, "a breather", {"after": index - 1, "tidied": straggled})
+				GSLog.info(CHANNEL, "a breather", {"after": index - 1, "tidied": straggled})
 			else:
 				# Four of the big maps have no loose items, only caches, and a cache was filled
 				# only by the first breather: wave 1 began with nothing to pick up.
 				var _placed := restock()
 				game.notice.emit(_opening_line())
 
-		DotNpcDirectorWaves.Stage.HORDE:
+		GSNpcDirectorWaves.Stage.HORDE:
 			# Nothing walks the map until the setup time is over.
 			horde.populate_map()
 
-			if waves.style == DotNpcDirectorWaves.Style.ROUNDS:
+			if waves.style == GSNpcDirectorWaves.Style.ROUNDS:
 				_begin_wave(index)
 			else:
 				horde.intensity = waves.strength()
 				horde.start_pacing(true)
-				if waves.style == DotNpcDirectorWaves.Style.CYCLE:
+				if waves.style == GSNpcDirectorWaves.Style.CYCLE:
 					game.notice.emit("Night %d of %d. Hold on until dawn." % [index, waves.count] if index < waves.count \
 						else "The last night. Hold on until dawn.")
 				else:
 					game.notice.emit("Here they come.")
 
-		DotNpcDirectorWaves.Stage.DONE:
+		GSNpcDirectorWaves.Stage.DONE:
 			horde.stop_pacing()
 			_set_twist(&"")
 			cleared += 1
@@ -341,7 +341,7 @@ func _begin_wave(index: int) -> void:
 	game.map_wave_changed(index)
 	if not game.map_announcer_off():
 		game.notice.emit("%s%s" % [title, (" — %s" % str(TWISTS[twist]["title"])) if twist != &"" else ""])
-	DotLog.info(CHANNEL, "a wave", {"index": index, "size": waves.budget, "twist": String(twist),
+	GSLog.info(CHANNEL, "a wave", {"index": index, "size": waves.budget, "twist": String(twist),
 		"specials": _specials_owed, "brutes": _brutes_owed, "team": team})
 
 
@@ -442,15 +442,15 @@ func _team() -> int:
 
 func _opening_line() -> String:
 	match waves.style:
-		DotNpcDirectorWaves.Style.ROUNDS:
+		GSNpcDirectorWaves.Style.ROUNDS:
 			return "%d waves are coming. Find the doors, the caches and each other." % waves.count
-		DotNpcDirectorWaves.Style.CYCLE:
+		GSNpcDirectorWaves.Style.CYCLE:
 			return "Night falls in %d seconds. Get ready." % int(waves.first_quiet_seconds)
 	return "Here they come."
 
 
 func _cleared_line(index: int) -> String:
-	if waves.style == DotNpcDirectorWaves.Style.CYCLE:
+	if waves.style == GSNpcDirectorWaves.Style.CYCLE:
 		return "Dawn. Night %d is over: the caches are full, mend what they broke." % index
 
 	return "Wave %d cleared. %d seconds: restock at the caches, mend the barricades." % [index, int(waves.quiet_seconds)]
@@ -458,9 +458,9 @@ func _cleared_line(index: int) -> String:
 
 func _won_line() -> String:
 	match waves.style:
-		DotNpcDirectorWaves.Style.ROUNDS:
+		GSNpcDirectorWaves.Style.ROUNDS:
 			return "held through %d waves" % waves.count
-		DotNpcDirectorWaves.Style.CYCLE:
+		GSNpcDirectorWaves.Style.CYCLE:
 			return "lived through %d nights" % waves.count
 
 	return "held out for %d:%02d" % [int(waves.elapsed) / 60, int(waves.elapsed) % 60]
@@ -475,7 +475,7 @@ func state() -> Dictionary:
 
 	return {
 		"style": waves.style, "stage": waves.stage, "index": waves.index, "count": waves.count,
-		"left": waves.seconds_left(), "remaining": waves.remaining() if waves.stage == DotNpcDirectorWaves.Stage.HORDE else -1,
+		"left": waves.seconds_left(), "remaining": waves.remaining() if waves.stage == GSNpcDirectorWaves.Stage.HORDE else -1,
 		"twist": String(twist), "daylight": waves.daylight(),
 	}
 

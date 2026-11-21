@@ -1,11 +1,11 @@
-extends DotMapEntity
+extends GSMapEntity
 
 ## game_text and game_text_tooltip: Display tells the game to put the entity's message on the HUD
 ## (`hud_text`), to everyone (spawnflag 1) or to the activator when one is known.
 
 
 func _input(p_io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	match name:
 		"display":
 			if enabled:

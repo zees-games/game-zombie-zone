@@ -1,6 +1,6 @@
-extends DotGameClientBench
+extends GSGameClientBench
 
-## Client prediction bench (dot-game's DotGameClientBench): see that class for the flags.
+## Client prediction bench (dot-game's GSGameClientBench): see that class for the flags.
 ## The practice street with no stand-ins and no horde, so `--bots` is ignored.
 
 const ZzConfig := preload("../game/zz_config.gd")
@@ -12,16 +12,16 @@ func _configure() -> void:
 	forward_action = &"dot_fps_forward"
 
 
-func _boot_server(_bots_wanted: int, data_dir: String) -> DotNetManager:
+func _boot_server(_bots_wanted: int, data_dir: String) -> GSNetManager:
 	var config := make_server_config(data_dir)
 	config.max_players = 16
-	var server := DotServer.new()
+	var server := GSServer.new()
 	server.name = "Server"
 	server.config = config
 	add_child(server)
 	for _i in 60:
 		await get_tree().process_frame
-		if server.state == DotServer.State.RUNNING:
+		if server.state == GSServer.State.RUNNING:
 			break
 	var game_config := ZzConfig.new()
 	game_config.warmup_seconds = 0.0
@@ -40,7 +40,7 @@ func _boot_server(_bots_wanted: int, data_dir: String) -> DotNetManager:
 	add_child(game)
 	await get_tree().process_frame
 	(load("res://game/zz_module.gd") as GDScript).set("punishments_file", "%s/punishments.json" % data_dir)
-	var loaded: DotResult = await server.modules.load_module("res://game/zz_module.gd")
+	var loaded: GSResult = await server.modules.load_module("res://game/zz_module.gd")
 	if not loaded.ok:
 		printerr("client_bench server: ", loaded.error)
 		return null

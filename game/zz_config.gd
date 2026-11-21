@@ -472,7 +472,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 
 @export_group("Gore")
 
-## How much dismemberment there is (dot-npc's DotNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
+## How much dismemberment there is (dot-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
 @export_range(0, 3, 1, "or_greater") var gore_level: int = 2
 
 ## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
@@ -494,7 +494,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 @export var shuffle_maps: bool = false
 
 ## The file that says which maps this server ROTATES: `cfg/maps.yml` (dot-map's
-## `DotMapRotationFile`: named rotations, `random` or `cycle`, wildcards, command names), looked
+## `GSMapRotationFile`: named rotations, `random` or `cycle`, wildcards, command names), looked
 ## for in the `--config` directory. Empty, or no such file, rotates every map. A map it leaves out
 ## stays installed (`zz_map <id>` and the map menu load it); it is only never drawn, balloted or
 ## nominated. A rotation in the file replaces [member shuffle_maps]. `sv_map_rotation_file`.
@@ -503,7 +503,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
-## How the client culls a world: off, pvs, occluders or both (dot-map's DotMapVisibility). Empty
+## How the client culls a world: off, pvs, occluders or both (dot-map's GSMapVisibility). Empty
 ## leaves it to the client's video setting. `--zz-vis-mode=`.
 @export var vis_mode: String = ""
 
@@ -511,7 +511,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## lit materials and the document's lamps. `--zz-lightmaps=`.
 @export var lightmaps: bool = true
 
-## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (dot-map's `DotMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
+## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (dot-map's `GSMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
 @export_range(0.0, 2.0, 1.0, "or_greater") var light_floor: float = 0.6
 
 ## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
@@ -564,11 +564,11 @@ const ZzConfigText := preload("zz_config_text.gd")
 @export_range(40.0, 1000.0, 5.0, "or_greater") var net_common_radius: float = 80.0
 @export_range(40.0, 1000.0, 5.0, "or_greater") var net_special_radius: float = 260.0
 ## Anything past [member net_far_distance] metres from a survivor (players included, never their
-## own) is sent every Nth snapshot only. 1 is off; dot-net's DotNetInterest.far_every.
+## own) is sent every Nth snapshot only. 1 is off; dot-net's GSNetInterest.far_every.
 @export_range(1, 16, 1, "or_greater") var net_far_every: int = 1
 @export_range(0.0, 1000.0, 5.0, "or_greater") var net_far_distance: float = 40.0
 ## Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once
-## for all of them (DotNetInterest.far_coherent). Off staggers each survivor's turns.
+## for all of them (GSNetInterest.far_coherent). Off staggers each survivor's turns.
 @export var net_far_coherent: bool = false
 ## Bands past [member net_far_distance], each twice as far and sent half as often (1 is one band).
 @export_range(1, 4, 1, "or_greater") var net_far_tiers: int = 1
@@ -720,56 +720,56 @@ func specials_cap(survivors: int) -> int:
 	return specials_base + int(floor(float(maxi(survivors - 1, 0)) / maxf(survivors_per_special, 1.0)))
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if mob_interval_min > mob_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "mob_interval_min is over mob_interval_max; raise the max or lower the min.")
+		return GSResult.fail(GSError.CODE_INVALID, "mob_interval_min is over mob_interval_max; raise the max or lower the min.")
 
 	if special_interval_min > special_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "special_interval_min is over special_interval_max; raise the max or lower the min.")
+		return GSResult.fail(GSError.CODE_INVALID, "special_interval_min is over special_interval_max; raise the max or lower the min.")
 
 	if brute_interval_min > brute_interval_max:
-		return DotResult.fail(DotError.CODE_INVALID, "brute_interval_min is over brute_interval_max; raise the max or lower the min.")
+		return GSResult.fail(GSError.CODE_INVALID, "brute_interval_min is over brute_interval_max; raise the max or lower the min.")
 
 	if body_stride_near > body_stride_far:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"body_stride_near is over body_stride_far; raise body_stride_far or lower body_stride_near.")
 
 	if respawn_min_seconds > respawn_max_seconds:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"respawn_min_seconds is over respawn_max_seconds; raise respawn_max_seconds or lower respawn_min_seconds.")
 
 	if common_speed_base > common_speed_max:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"common_speed_base is over common_speed_max; raise common_speed_max or lower common_speed_base.")
 
 	if difficulty < 0 or difficulty > 3:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"difficulty is %d; it is 0 (easy), 1 (normal), 2 (advanced) or 3 (expert)." % difficulty)
 
 	if survival_style < 0 or survival_style > 2:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"survival_style is %d; it is 0 (waves), 1 (nights) or 2 (clock)." % survival_style)
 
 	if start_weapons.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "Survivors have to start holding something.")
+		return GSResult.fail(GSError.CODE_INVALID, "Survivors have to start holding something.")
 
 	var cap_errors := PackedStringArray()
 	var overrides := ZzCapsScript.parse_overrides(cap_overrides, cap_errors)
 	if not cap_errors.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "; ".join(cap_errors))
+		return GSResult.fail(GSError.CODE_INVALID, "; ".join(cap_errors))
 
 	if box_deploy_seconds < 0.5 or box_deploy_seconds > ZzCapsScript.highest("zz_box_deploy_seconds", overrides):
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"box_deploy_seconds is %.2f; it is 0.5 to 15 (cap_overrides zz_box_deploy_seconds=0 lifts the top)." % box_deploy_seconds)
 
 	if downed_crawl_speed < 0.0 or downed_crawl_speed > ZzCapsScript.highest("zz_downed_crawl_speed", overrides):
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"downed_crawl_speed is %.2f; it is 0 (stay put) to 6 metres per second (cap_overrides zz_downed_crawl_speed=0 lifts the top)." % downed_crawl_speed)
 
 	if weight_over_limit != "slow" and weight_over_limit != "drop":
-		return DotResult.fail(DotError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)
+		return GSResult.fail(GSError.CODE_INVALID, "weight_over_limit is '%s'; it is slow or drop." % weight_over_limit)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## `@export_group` -> the cfg file it lives in: `cfg/game/game-zombie-zone/config_<file>/game.yml`.
@@ -782,20 +782,20 @@ const CFG_FILES := {
 
 
 ## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
-static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
-	var b := DotGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
+static func make_binder(config: GSConfig, json_path := "") -> GSGameConfigBinder:
+	var b := GSGameConfigBinder.create(config, "game-zombie-zone", "zz", json_path)
 	b.grouped = true
 	b.group_files = CFG_FILES
 	return b
 
 
-## The layered load through [DotGameConfigBinder] (JSON, cfg/ yml, env, argv; strict on a server). The value is the binder.
-static func boot(config: DotConfig, json_path: String) -> DotResult:
+## The layered load through [GSGameConfigBinder] (JSON, cfg/ yml, env, argv; strict on a server). The value is the binder.
+static func boot(config: GSConfig, json_path: String) -> GSResult:
 	var binder := make_binder(config, json_path)
 	var loaded := binder.load_layers()
 	if not loaded.ok:
 		return loaded
-	return DotResult.success(binder)
+	return GSResult.success(binder)
 
 
 ## The survival style's name, as the cvar and the HUD say it.

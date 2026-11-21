@@ -4,7 +4,7 @@ const ZzLoot := preload("zz_loot.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzPaths := preload("zz_paths.gd")
 
-## The map's weapon and supply spawners: dot-weapon's [DotWeaponSpawner] driving [ZzLoot].
+## The map's weapon and supply spawners: dot-weapon's [GSWeaponSpawner] driving [ZzLoot].
 ##
 ## The sources of what lies on a map, all through the one spawner: the document's `spawners`, the converted world's `pickups` (weapon_*, item_*, ammo_* entities, mapped by the config's `classes:`), the config's per-map `game: spawners:` list (same fields as the document's), and traders (`traders` in the document or the config's `game: traders:`; a shelf of priced stock rolled from a pool).
 ## A map document lists `spawners` (`{at, id?, pool?, tags_any?, respawn?, max?, kind?, item?...}`, the fields of dot-weapon's docs/spawners.md); pools, defaults and per-map blocks are `cfg/game/game-zombie-zone/dot_weapon/spawner.yml`, and `spawner_*` keys in a map's dot_map file. Each spawned item is an ordinary loot entry, so the wire, the look-and-press use and the HUD are unchanged; using or removing the entry is what starts the respawn timer.
@@ -16,7 +16,7 @@ const GAME_ID := "game-zombie-zone"
 const KINDS: Array[StringName] = [ZzLoot.WEAPON, ZzLoot.AMMO, ZzLoot.MEDKIT, ZzLoot.PILLS, ZzLoot.THROWABLE, ZzLoot.BOX, ZzLoot.DEFIB, ZzLoot.BACKPACK]
 
 var game = null
-var spawner := DotWeaponSpawner.new()
+var spawner := GSWeaponSpawner.new()
 
 var _loot_of: Dictionary = {}
 var _inst_of: Dictionary = {}
@@ -80,7 +80,7 @@ func start_round(doc: Dictionary) -> void:
 				if not d.has("id"):
 					d["id"] = "spawner_%d" % index
 				index += 1
-				var _site := spawner.add_site(DotWeaponSpawnSite.from_dictionary(d))
+				var _site := spawner.add_site(GSWeaponSpawnSite.from_dictionary(d))
 
 	var entities: Array = (doc.get("entities", []) as Array).duplicate()
 	entities.append_array(world_pickups(doc))
@@ -130,7 +130,7 @@ func _add_trader(raw: Dictionary, defaults: Dictionary) -> void:
 	var d := raw.duplicate()
 	var id := StringName(str(d.get("id", "trader_%d" % _traders.size())))
 	var at := _vec(d.get("at", [0, 0, 0]))
-	var site := DotWeaponSpawnSite.from_dictionary({"id": String(id), "position": at, "pool": str(d.get("pool", defaults.get("pool", "trader_stock"))),
+	var site := GSWeaponSpawnSite.from_dictionary({"id": String(id), "position": at, "pool": str(d.get("pool", defaults.get("pool", "trader_stock"))),
 		"enabled": false, "data": {"tier_price": true}})
 	var _site := spawner.add_site(site)
 	_traders[id] = {"at": at, "yaw": deg_to_rad(float(d.get("yaw", defaults.get("yaw", 0.0)))),
@@ -282,7 +282,7 @@ func trader_window() -> StringName:
 	if game.grace.is_active():
 		return &"grace"
 	var run = game.survival
-	if game.is_survival() and (run == null or run.waves == null or run.waves.stage != DotNpcDirectorWaves.Stage.HORDE):
+	if game.is_survival() and (run == null or run.waves == null or run.waves.stage != GSNpcDirectorWaves.Stage.HORDE):
 		return &"breather"
 	return &"round"
 
@@ -313,7 +313,7 @@ func _follow_window() -> void:
 	var open := _window_open() and trader_enabled()
 	if open != _open:
 		_open = open
-		DotLog.debug(CHANNEL, "the trader changed", {"open": open})
+		GSLog.debug(CHANNEL, "the trader changed", {"open": open})
 		game.shop_changed.emit()
 	var present := _open or not trader_despawns()
 	if present == _present:

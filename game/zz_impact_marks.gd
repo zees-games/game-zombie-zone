@@ -13,7 +13,7 @@ const DECAL := &"bullet_hole"
 ## `[[point, normal], ...]` for [param shot] after the combat manager resolved it. [param world] is the
 ## physics world and [param mask] what a hole may be drawn on; the stop of each pellet is re-cast to
 ## find its surface normal and refused when it is a body rather than the map.
-static func collect(shot: DotShot, world: World3D, mask: int) -> Array:
+static func collect(shot: GSShot, world: World3D, mask: int) -> Array:
 	var marks: Array = []
 
 	for p in shot.penetrations:
@@ -47,7 +47,7 @@ static func collect(shot: DotShot, world: World3D, mask: int) -> Array:
 
 
 ## Draws [param marks] (from [method collect], or off the wire) on [param fx]. Returns how many were placed.
-static func place(fx: DotFxManager, marks: Array) -> int:
+static func place(fx: GSFxManager, marks: Array) -> int:
 	if fx == null or fx.config == null or not fx.config.penetration_decals:
 		return 0
 
@@ -64,10 +64,10 @@ static func place(fx: DotFxManager, marks: Array) -> int:
 
 
 ## The effect definition [method place] spawns: a dark mark that lives until the decal ring retires it.
-static func add_def(catalogue: DotFxCatalogue, scene_path: String) -> void:
-	var d := DotFxDef.new()
+static func add_def(catalogue: GSFxCatalogue, scene_path: String) -> void:
+	var d := GSFxDef.new()
 	d.id = DECAL
-	d.kind = DotFxDef.Kind.DECAL
+	d.kind = GSFxDef.Kind.DECAL
 	d.scene_path = scene_path
 	d.lifetime_ms = 600000
 	d.cost = 1

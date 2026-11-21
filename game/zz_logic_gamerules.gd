@@ -1,4 +1,4 @@
-extends DotMapEntity
+extends GSMapEntity
 
 ## logic_gamerules: a bag of rule keys the map sets at start. The ones that map onto this game's tunables (ZzMapCommands.GAMERULES)
 ## are told to the game as `game_rule` events, which applies them through the same ranges as a map's server commands; the rest are
@@ -6,7 +6,7 @@ extends DotMapEntity
 
 
 func on_map_spawn(p_io: RefCounted) -> void:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	if not enabled:
 		return
 	for k: String in keys:

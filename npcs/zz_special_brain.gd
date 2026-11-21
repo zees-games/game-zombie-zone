@@ -56,8 +56,8 @@ var _rush_until: float = -1.0
 
 func _build() -> void:
 	var seed_id := npc.seed if npc != null else 0
-	character = DotNpcAiCharacter.preset(&"hard").with_seed(seed_id)
-	character.reaction_time = lerpf(0.2, 0.45, DotNpcAiNode.deterministic_unit(seed_id, 5011))
+	character = GSNpcAiCharacter.preset(&"hard").with_seed(seed_id)
+	character.reaction_time = lerpf(0.2, 0.45, GSNpcAiNode.deterministic_unit(seed_id, 5011))
 	character.view_turn_deg = 540.0
 	character.memory_time = 20.0
 	character.tactics = 0.9

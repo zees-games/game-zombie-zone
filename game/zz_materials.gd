@@ -144,7 +144,7 @@ static func penetration_of(collider: Object, shape_index: int) -> StringName:
 	return StringName(PENETRATION_OF.get(str(node.get_meta(&"surface")), ""))
 
 
-## Where the photographic kinds are (dot-map's DotMapSurfaces), in this game's own tree: the
+## Where the photographic kinds are (dot-map's GSMapSurfaces), in this game's own tree: the
 ## client shell bundles dot-map without its textures, so the ones used ship in this pack
 ## (assets/surfaces, [code]tools/sync-surfaces.sh[/code] in dot-map writes it). Rebased, for a
 ## delivered pack.
@@ -196,7 +196,7 @@ const KIND_TINT := {
 
 static var _textures: Dictionary = {}
 static var _materials: Dictionary = {}
-## DotMapSurfaces for baked surfaces (no metallic: a lightmap holds diffuse light only) and for
+## GSMapSurfaces for baked surfaces (no metallic: a lightmap holds diffuse light only) and for
 ## the one live-lit metal; null until asked, and false when the addon or the textures are not
 ## in this build (then every surface keeps its generated look).
 static var _baked_surfaces: Variant = null
@@ -242,7 +242,7 @@ static func surface_for(map_id: String, mat: String, surface: String) -> String:
 
 ## The photographic kind that draws [param id] for a box of [param role], or empty when it keeps
 ## its generated look (or this build has no textures). [param surface] is a map's own word for
-## the box ("surface": "brick") and wins; it may be a kind or one of DotMapSurfaces' aliases.
+## the box ("surface": "brick") and wins; it may be a kind or one of GSMapSurfaces' aliases.
 static func kind_for(id: String, role: String = "wall", surface: String = "") -> String:
 	# A barricade's damage is its tint stepping down (zz_map.set_barricade); a photograph under
 	# the paled tint would barely show it, so the boards keep their generated look.
@@ -343,7 +343,7 @@ static func _photo(kind: String, tint: Color) -> StandardMaterial3D:
 		return null
 	var pale := Color(minf(tint.r, 1.1), minf(tint.g, 1.1), minf(tint.b, 1.1)).lerp(Color.WHITE, 0.5)
 	var base: Color = KIND_TINT.get(kind, Color.WHITE)
-	var res: DotResult = surfaces.try_material(StringName(kind), Color(base.r * pale.r, base.g * pale.g, base.b * pale.b))
+	var res: GSResult = surfaces.try_material(StringName(kind), Color(base.r * pale.r, base.g * pale.g, base.b * pale.b))
 	if not res.ok:
 		return null
 	var m: StandardMaterial3D = res.value

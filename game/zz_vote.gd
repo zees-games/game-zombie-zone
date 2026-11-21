@@ -2,7 +2,7 @@ extends Node
 
 ## The players choose the next map.
 ##
-## [DotVoteDirector] over a [DotVoteListSource] of this server's maps, and the only thing this
+## [GSVoteDirector] over a [GSVoteListSource] of this server's maps, and the only thing this
 ## file decides is WHEN: a ballot opens [member open_after_sec] into the LAST round on a map
 ## ([member due_fn]) and is applied when that round ends, so the next round starts on whatever
 ## was chosen. Rocking the vote opens one in any round and changes the map at that round's
@@ -16,7 +16,7 @@ extends Node
 ## next round.
 ##
 ## [b]Server side only.[/b] A client draws the ballot from the notice [member ballot_fn] sends
-## (the client shell's [DotBallotPanel]), and never holds a director: a client that applied a
+## (the client shell's [GSBallotPanel]), and never holds a director: a client that applied a
 ## result would be deciding what it plays.
 
 const ZzWorkshop := preload("zz_workshop.gd")
@@ -37,7 +37,7 @@ const COMMAND_NAMES := {"vote": "vote"}
 ## while hiding, early enough that a short round still sees it close.
 @export var open_after_sec: float = 20.0
 
-## The file a server owner configures the vote in, keyed exactly as [DotVoteRules]. Layered:
+## The file a server owner configures the vote in, keyed exactly as [GSVoteRules]. Layered:
 ## [code]_rules() < game.yml metadata map_vote: < this file < DOT_VOTE_* < --vote-*[/code].
 ## Empty skips the file. [code]{"enabled": false}[/code] turns the vote off and the rotation
 ## ([code]zz_shuffle_maps[/code]) decides alone.
@@ -51,7 +51,7 @@ var maps_fn: Callable = Callable()
 ## is every round.
 var due_fn: Callable = Callable()
 
-## [code]func(id: StringName) -> DotResult[/code]: play this map next.
+## [code]func(id: StringName) -> GSResult[/code]: play this map next.
 var apply_fn: Callable = Callable()
 
 ## [code]func() -> Array[/code] of voter ids (StringName): the people who may vote. Stand-ins
@@ -77,11 +77,11 @@ var round_in_progress_fn: Callable = Callable()
 
 ## The content index subscribed maps are read from. Null is dot-core's shared one; a test hands
 ## its own so it never touches the process's.
-var content_index: DotContentIndex = null
+var content_index: GSContentIndex = null
 
-var director: DotVoteDirector = null
-var source: DotVoteListSource = null
-var commands: DotVoteCommands = null
+var director: GSVoteDirector = null
+var source: GSVoteListSource = null
+var commands: GSVoteCommands = null
 
 ## `() -> Dictionary`: maps.yml's `commands:` block. Unset renames nothing.
 var commands_spec_fn: Callable = Callable()
@@ -89,7 +89,7 @@ var commands_spec_fn: Callable = Callable()
 ## `(id) -> bool`: maps.yml's active rotation, handed to the source so the pack maps dot-vote merges
 ## are filtered like the game's own (dot-vote API level 12). Unset, every merged map is offered.
 var in_rotation_fn: Callable = Callable()
-var feed: DotVoteBallotFeed = null
+var feed: GSVoteBallotFeed = null
 
 ## Seconds since the map in play was built.
 var _on_map_sec: float = 0.0
@@ -100,29 +100,29 @@ var _opened_this_map: bool = false
 
 ## Builds the director. Fails when the rules do not validate, never because there are too few
 ## maps: a server whose catalogue grows on [code]zz_reload[/code] gets a ballot from then on.
-func setup() -> DotResult:
-	source = DotVoteListSource.new()
+func setup() -> GSResult:
+	source = GSVoteListSource.new()
 	source.label = "maps"
-	source.apply_fn = func(id: StringName) -> DotResult:
-		return apply_fn.call(id) if apply_fn.is_valid() else DotResult.success(id)
+	source.apply_fn = func(id: StringName) -> GSResult:
+		return apply_fn.call(id) if apply_fn.is_valid() else GSResult.success(id)
 	# A subscribed pack's maps join the ballot in solo only: the index answers for its own session
 	# and a server's is online, so a ballot there lists none of them. The game's own ids win.
 	source.entries_fn = _own_choices
-	source.follow_content(content_index if content_index != null else DotContentIndex.shared(),
+	source.follow_content(content_index if content_index != null else GSContentIndex.shared(),
 		ZzWorkshop.accepted_map_kinds())
 	# By name, only where it exists: a delivered pack may run on an older shell dot-vote.
 	if "in_rotation_fn" in source:
 		source.set(&"in_rotation_fn", in_rotation_fn)
 	refresh_maps()
 
-	director = DotVoteDirector.new()
+	director = GSVoteDirector.new()
 	director.name = "VoteDirector"
 	director.rules = configured_rules()
 	director.source = source
 	director.auto_apply = true
 	# The host calls begin() whenever a map is built, which a vote's change is one cause of
 	# and an operator's zz_reload or a rotation another; both firing would put one play in the
-	# history twice. See DotVoteDirector.begin_on_apply.
+	# history twice. See GSVoteDirector.begin_on_apply.
 	director.begin_on_apply = false
 	# The server's tick drives it, not the frame clock.
 	director.self_advance = false
@@ -154,23 +154,23 @@ func setup() -> DotResult:
 	# nothing, and `!rtv` answered "Rocked. 1 of 1." and nothing happened. Only there does
 	# this game open it, connected after the director's own handler. Any round, not only the
 	# last on a map (due_fn): rocking is the players asking now.
-	if DotAddonApi.build_level("dot_vote") < RTV_OPENS_IN_DIRECTOR_LEVEL:
+	if GSAddonApi.build_level("dot_vote") < RTV_OPENS_IN_DIRECTOR_LEVEL:
 		director.clock.expired.connect(func(reason: StringName) -> void:
-			if reason != DotVoteClock.REASON_RTV or director.is_voting():
+			if reason != GSVoteClock.REASON_RTV or director.is_voting():
 				return
 
 			_opened_this_map = true
-			var opened := director.start_vote(DotVoteClock.REASON_RTV)
+			var opened := director.start_vote(GSVoteClock.REASON_RTV)
 
 			if not opened.ok:
-				DotLog.debug(CHANNEL, "the rocked vote could not open", {"why": opened.error.message})
+				GSLog.debug(CHANNEL, "the rocked vote could not open", {"why": opened.error.message})
 		)
 
-	director.vote_closed.connect(func(result: DotVoteResult) -> void:
-		DotLog.info(CHANNEL, "the map vote closed", {"winner": String(result.winner_id), "votes": result.votes_cast})
+	director.vote_closed.connect(func(result: GSVoteResult) -> void:
+		GSLog.info(CHANNEL, "the map vote closed", {"winner": String(result.winner_id), "votes": result.votes_cast})
 	)
 
-	feed = DotVoteBallotFeed.of(director, func(state: Dictionary) -> void:
+	feed = GSVoteBallotFeed.of(director, func(state: Dictionary) -> void:
 		if ballot_fn.is_valid():
 			ballot_fn.call(state)
 	)
@@ -179,30 +179,30 @@ func setup() -> DotResult:
 	feed.people_fn = func(voter: StringName) -> Dictionary:
 		return people_fn.call(voter) if people_fn.is_valid() else {}
 
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 ## [method _rules] under the server owner's layers. A layer that does not validate is refused
 ## whole, with the reason logged, and the defaults stand.
-func configured_rules() -> DotVoteRules:
+func configured_rules() -> GSVoteRules:
 	var rules := _rules()
 	var loaded := rules.layer_over_defaults(
-		config_path, DotVoteGameSource.running_game_metadata(METADATA_KEY)
+		config_path, GSVoteGameSource.running_game_metadata(METADATA_KEY)
 	)
-	DotLog.result(CHANNEL, "the map vote's rules", loaded)
+	GSLog.result(CHANNEL, "the map vote's rules", loaded)
 	return rules
 
 
 ## What a one-map-per-round game wants from dot-vote by default. Every line is a default an
 ## operator overrides in [member config_path].
-func _rules() -> DotVoteRules:
-	var rules := DotVoteRules.new()
+func _rules() -> GSVoteRules:
+	var rules := GSVoteRules.new()
 	# See the class note: opened here, applied at the round's end.
-	rules.trigger = DotVoteRules.Trigger.MANUAL
-	rules.apply = DotVoteRules.Apply.END_OF_ROUND
+	rules.trigger = GSVoteRules.Trigger.MANUAL
+	rules.apply = GSVoteRules.Apply.END_OF_ROUND
 	# A rocked vote changes the map at the round's end too. Immediately would take the
 	# furniture out from under every prop in the middle of a round.
-	rules.rtv_apply = DotVoteRules.Apply.END_OF_ROUND
+	rules.rtv_apply = GSVoteRules.Apply.END_OF_ROUND
 	# No time limit: a map lasts a few rounds (`zz_rounds_per_map`), and dot-vote's 45-minute
 	# default would expire and change it under a round in progress.
 	rules.duration_sec = 0.0
@@ -223,8 +223,8 @@ func _rules() -> DotVoteRules:
 	rules.cooldown = 0
 	rules.max_options = 5
 	rules.vote_duration_sec = 25.0
-	rules.method = DotVoteRules.Method.PLURALITY
-	rules.tie_break = DotVoteRules.TieBreak.RANDOM
+	rules.method = GSVoteRules.Method.PLURALITY
+	rules.tie_break = GSVoteRules.TieBreak.RANDOM
 	return rules
 
 
@@ -239,7 +239,7 @@ func refresh_maps() -> void:
 	var _read := source.refresh()
 
 
-## The game's own maps as choices: what [member DotVoteListSource.entries_fn] reads before every
+## The game's own maps as choices: what [member GSVoteListSource.entries_fn] reads before every
 ## ballot, so a map the operator removed leaves it. Subscribed maps are merged on top, never in
 ## here.
 func _own_choices() -> Array:
@@ -250,7 +250,7 @@ func _own_choices() -> Array:
 
 	for pair: Variant in maps_fn.call():
 		var row: Array = pair
-		out.append(DotVoteChoice.of(StringName(str(row[0])), str(row[1])))
+		out.append(GSVoteChoice.of(StringName(str(row[0])), str(row[1])))
 
 	return out
 
@@ -268,7 +268,7 @@ func note_map(id: StringName) -> void:
 
 ## The server woke from hibernation: the map ballot is owed again, from the top.
 ##
-## The director restarts itself ([member DotVoteRules.wake_restart]); this is the half that is
+## The director restarts itself ([member GSVoteRules.wake_restart]); this is the half that is
 ## this game's — the seconds into the map at which the ballot opens.
 func note_woke() -> void:
 	_on_map_sec = 0.0
@@ -298,7 +298,7 @@ func advance(delta: float) -> void:
 		feed.poll()
 
 	# The ballot's own timer waits with the director's clock while the server hibernates
-	# (DotGameModule hands the director the server's hibernation). Counted on, it ran past
+	# (GSGameModule hands the director the server's hibernation). Counted on, it ran past
 	# open_after_sec over an empty room, the ballot was refused for want of voters, and the
 	# first player in never got one on this map.
 	if director.hibernating:
@@ -327,10 +327,10 @@ func advance(delta: float) -> void:
 	if source.choices().size() < 2:
 		return
 
-	var opened := director.start_vote(DotVoteClock.REASON_MANUAL)
+	var opened := director.start_vote(GSVoteClock.REASON_MANUAL)
 
 	if not opened.ok:
-		DotLog.debug(CHANNEL, "no map vote this round", {"why": opened.error.message})
+		GSLog.debug(CHANNEL, "no map vote this round", {"why": opened.error.message})
 
 
 func forget_voter(voter: StringName) -> void:
@@ -345,11 +345,11 @@ func is_voting() -> bool:
 ## dot-vote's commands on [param host]: `vote`, `rtv`, `nominate` and the operator's. Voters
 ## are the bare session id, the same spelling [member voters_fn] lists — dot-vote's default is
 ## `u<userid>`, and two spellings of one voter is a player who rocks the vote twice.
-func install_commands(host: Object) -> DotResult:
+func install_commands(host: Object) -> GSResult:
 	if director == null:
-		return DotResult.fail(DotError.CODE_STATE, "There is no vote to command.")
+		return GSResult.fail(GSError.CODE_STATE, "There is no vote to command.")
 
-	commands = DotVoteCommands.new()
+	commands = GSVoteCommands.new()
 	commands.director = director
 	commands.names = COMMAND_NAMES.duplicate()
 	# maps.yml's `commands:` block, so an operator renames vote and rtv without this game naming

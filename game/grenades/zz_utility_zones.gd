@@ -41,13 +41,13 @@ var _smokes: Array[Dictionary] = []
 ## The loadout ids of the utility weapons in [param defs], whatever the pack calls them.
 static func utility_ids(defs: Array) -> Array[StringName]:
 	var out: Array[StringName] = []
-	for def: DotWeaponDef in defs:
+	for def: GSWeaponDef in defs:
 		if is_utility(def):
 			out.append(def.id)
 	return out
 
 
-static func is_utility(def: DotWeaponDef) -> bool:
+static func is_utility(def: GSWeaponDef) -> bool:
 	return def != null and UTILITY_KINDS.has(StringName(def.params.get(&"kind", &"")))
 
 
@@ -65,7 +65,7 @@ static func los_from_ray(blocked: Callable) -> Callable:
 
 
 ## Resolves a utility grenade that went off at its position; returns the blast's events for the host to use further.
-func detonate(g: ZzGrenade, def: DotWeaponDef) -> Array[Dictionary]:
+func detonate(g: ZzGrenade, def: GSWeaponDef) -> Array[Dictionary]:
 	var out := ZzGrenadeBlast.detonate(g, def, victims.call() if victims.is_valid() else [], los if los.is_valid() else _open)
 	var at := g.position
 	for ev in out:

@@ -14,7 +14,7 @@ const SERVER_SCRIPT := "res://game/zz_sim_server.gd"
 ## The child's own log, so a boot failure can say why; its default log is the parent's file.
 const SERVER_LOG := "user://logs/sim_server.log"
 ## The server node's name under the root. RPCs address a node by path, so the client's link sits at the same
-## `/root/ZzSimServer/Server` as the server's own [DotServer].
+## `/root/ZzSimServer/Server` as the server's own [GSServer].
 const ANCHOR := "ZzSimServer"
 ## How often the boot and the join are looked at.
 const POLL_SEC := 0.02
@@ -32,7 +32,7 @@ static var live: Node = null
 
 ## True once the link is playing on the local server.
 var up := false
-var link: DotClientLink = null
+var link: GSClientLink = null
 var _pid := -1
 var _anchor: Node = null
 var _ready_path := ""
@@ -51,9 +51,9 @@ static func wanted() -> bool:
 ## [method wanted] for the given user args. A second process needs a desktop build with threads, and a client a
 ## shell already linked to a server is not solo.
 static func wanted_for(args: PackedStringArray) -> bool:
-	if DotPlatform.is_web() or not DotPlatform.has_threads():
+	if GSPlatform.is_web() or not GSPlatform.has_threads():
 		return false
-	if DotRegistry.get_service(&"dot_client_link") != null:
+	if GSRegistry.get_service(&"dot_client_link") != null:
 		return false
 	if forced >= 0:
 		return forced == 1
@@ -61,12 +61,12 @@ static func wanted_for(args: PackedStringArray) -> bool:
 
 
 ## Starts the server child with [param bots] stand-ins and joins it; [param config_file] is the client's config layer.
-func start(bots: int, config_file: String) -> DotResult:
+func start(bots: int, config_file: String) -> GSResult:
 	if not ResourceLoader.exists(SERVER_SCRIPT):  # pack-path: ok (the child runs the built-in project; mounted there is no sim host)
-		return DotResult.fail(DotError.CODE_UNSUPPORTED, "the sim server is not in this build")
+		return GSResult.fail(GSError.CODE_UNSUPPORTED, "the sim server is not in this build")
 	var port := free_port()
 	if port <= 0:
-		return DotResult.fail(DotError.CODE_INVALID, "no free loopback port")
+		return GSResult.fail(GSError.CODE_INVALID, "no free loopback port")
 	_ready_path = ProjectSettings.globalize_path("user://sim_host_%d.ready" % port)
 	if FileAccess.file_exists(_ready_path):
 		var _gone := DirAccess.remove_absolute(_ready_path)
@@ -83,28 +83,28 @@ func start(bots: int, config_file: String) -> DotResult:
 	args.append_array(extra_args)
 	_pid = OS.create_process(OS.get_executable_path(), args)
 	if _pid <= 0:
-		return DotResult.fail(DotError.CODE_INVALID, "the server process did not start")
+		return GSResult.fail(GSError.CODE_INVALID, "the server process did not start")
 
 	var t0 := Time.get_ticks_msec()
 	while not FileAccess.file_exists(_ready_path) and not _late(t0, boot_limit_sec):
 		if not OS.is_process_running(_pid):
 			var why := _exit_reason(log_path)
 			_pid = -1
-			return DotResult.fail(DotError.CODE_INVALID, "the server process exited while booting (%s)" % why)
+			return GSResult.fail(GSError.CODE_INVALID, "the server process exited while booting (%s)" % why)
 		await get_tree().create_timer(POLL_SEC).timeout
 	if not FileAccess.file_exists(_ready_path):
 		stop()
-		return DotResult.fail(DotError.CODE_INVALID, "the server did not come up in %.0f s (log %s)" % [boot_limit_sec, log_path])
+		return GSResult.fail(GSError.CODE_INVALID, "the server did not come up in %.0f s (log %s)" % [boot_limit_sec, log_path])
 	var boot_sec := (Time.get_ticks_msec() - t0) / 1000.0
 
-	link = DotClientLink.new()
+	link = GSClientLink.new()
 	link.name = "Server"
 	link.transport_preference = "udp"
 	_anchor = Node.new()
 	_anchor.name = ANCHOR
 	get_tree().root.add_child(_anchor)
 	_anchor.add_child(link)
-	var asked: DotResult = await link.connect_to_server("127.0.0.1:%d" % port)
+	var asked: GSResult = await link.connect_to_server("127.0.0.1:%d" % port)
 	if not asked.ok:
 		stop()
 		return asked
@@ -113,10 +113,10 @@ func start(bots: int, config_file: String) -> DotResult:
 		await get_tree().create_timer(POLL_SEC).timeout
 	if not link.is_playing():
 		stop()
-		return DotResult.fail(DotError.CODE_INVALID, "never joined the local server in %.0f s" % join_limit_sec)
+		return GSResult.fail(GSError.CODE_INVALID, "never joined the local server in %.0f s" % join_limit_sec)
 	up = true
 	live = self
-	return DotResult.success({"port": port, "pid": _pid, "boot_sec": boot_sec})
+	return GSResult.success({"port": port, "pid": _pid, "boot_sec": boot_sec})
 
 
 static func _late(t0_msec: int, limit_sec: float) -> bool:

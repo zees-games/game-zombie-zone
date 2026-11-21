@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The horde's mover watch and cull (dot-spawn's DotSpawnWatch and DotSpawnCull): who is stuck or
+## The horde's mover watch and cull (dot-spawn's GSSpawnWatch and GSSpawnCull): who is stuck or
 ## has fallen out of the map, and what is done about it. The game applies the actions; the watch
 ## is also what tools/stuck_meter.gd and the long run read, so "stuck" means one thing.
 
@@ -11,8 +11,8 @@ const WAVE := &"wave"
 ## A survivor this close to a zombie is a fight, not a snag.
 const FIGHT := 3.0
 
-var watch: DotSpawnWatch
-var cull: DotSpawnCull
+var watch: GSSpawnWatch
+var cull: GSSpawnCull
 ## Zombies the cull took out, by verdict name.
 var removed: Dictionary = {}
 var _horde: Object
@@ -21,21 +21,21 @@ var _watched: Dictionary = {}
 
 func _init(p_horde: Object, kill_y: float) -> void:
 	_horde = p_horde
-	var rules := DotSpawnCullRules.new()
+	var rules := GSSpawnCullRules.new()
 	rules.enabled = true
 	rules.kill_y = kill_y
 	# Stuck is nudged along its way; the horde's rescue repaths and relocates on its own clock.
-	rules.stuck_action = DotSpawnDecision.Action.NUDGE
+	rules.stuck_action = GSSpawnDecision.Action.NUDGE
 	rules.cooldown_sec = 4.0
-	rules.fell_out_action = DotSpawnDecision.Action.DESPAWN
+	rules.fell_out_action = GSSpawnDecision.Action.DESPAWN
 	# Off nav and unreachable are not judged here, and "far" is asked for at a wave's overtime
 	# (see tidy_far), never on a clock: a wave is meant to come a long way.
-	rules.off_nav_action = DotSpawnDecision.Action.IGNORE
-	rules.unreachable_action = DotSpawnDecision.Action.IGNORE
-	rules.far_action = DotSpawnDecision.Action.DESPAWN
+	rules.off_nav_action = GSSpawnDecision.Action.IGNORE
+	rules.unreachable_action = GSSpawnDecision.Action.IGNORE
+	rules.far_action = GSSpawnDecision.Action.DESPAWN
 	rules.far_sec = 1.0e9
-	watch = DotSpawnWatch.new(rules)
-	cull = DotSpawnCull.new(rules)
+	watch = GSSpawnWatch.new(rules)
+	cull = GSSpawnCull.new(rules)
 	cull.nudge_fn = _nudge
 	cull.despawn_fn = _despawn
 
@@ -50,7 +50,7 @@ func tick(delta: float) -> void:
 	watch.set_players(here)
 	var seen := {}
 
-	for npc: DotNpcInstance in _horde.spawner.all_npcs():
+	for npc: GSNpcInstance in _horde.spawner.all_npcs():
 		if not npc.is_alive():
 			continue
 
@@ -70,7 +70,7 @@ func tick(delta: float) -> void:
 ## Whether [param npc] has somewhere to go and is going: chasing, investigating or luring on a
 ## path it has not finished. Idle, at the boards, swinging, staggered, held up behind a shut gate
 ## or within [constant FIGHT] of a survivor it is not.
-func walks(npc: DotNpcInstance, survivors: Variant) -> bool:
+func walks(npc: GSNpcInstance, survivors: Variant) -> bool:
 	var brain = npc.brain
 
 	if brain == null:
@@ -88,7 +88,7 @@ func walks(npc: DotNpcInstance, survivors: Variant) -> bool:
 
 	# With no way to go (a shut gate between it and who it chases) it waits, which is the rule's
 	# doing and not a snag: only a mover with a path it does not follow is stuck.
-	var path: DotNpcPath = brain.get(&"path")
+	var path: GSNpcPath = brain.get(&"path")
 
 	if path == null or path.partial or path.points.is_empty() or path.current(Vector3.INF) == Vector3.INF:
 		return false
@@ -114,14 +114,14 @@ func walks(npc: DotNpcInstance, survivors: Variant) -> bool:
 
 ## A wave's overtime tidy: [param npcs] go through the cull as lost ("far"), so they are counted
 ## like any other removal. Returns how many were removed.
-func tidy_far(npcs: Array[DotNpcInstance]) -> int:
-	var verdicts: Array[DotSpawnVerdict] = []
+func tidy_far(npcs: Array[GSNpcInstance]) -> int:
+	var verdicts: Array[GSSpawnVerdict] = []
 
 	for npc in npcs:
-		var v := DotSpawnVerdict.new()
+		var v := GSSpawnVerdict.new()
 		v.id = npc.instance_id
 		v.kind = npc.def.id if npc.def != null else &""
-		v.category = DotSpawnVerdict.Category.FAR
+		v.category = GSSpawnVerdict.Category.FAR
 		v.seconds = watch.rules.far_sec
 		v.position = npc.position()
 		v.time = watch.now
@@ -134,8 +134,8 @@ func describe() -> String:
 	return "%s; removed %s" % [cull.describe(), removed]
 
 
-func _nudge(id: Variant, v: DotSpawnVerdict) -> void:
-	var npc: DotNpcInstance = _horde.spawner.get_npc(int(id))
+func _nudge(id: Variant, v: GSSpawnVerdict) -> void:
+	var npc: GSNpcInstance = _horde.spawner.get_npc(int(id))
 	var b := npc.node as ZzZombieBody if npc != null else null
 
 	if b == null or b.anchored:
@@ -156,19 +156,19 @@ func _nudge(id: Variant, v: DotSpawnVerdict) -> void:
 		_horde.stuck_nudges += 1
 
 
-func _despawn(id: Variant, v: DotSpawnVerdict) -> void:
-	var npc: DotNpcInstance = _horde.spawner.get_npc(int(id))
+func _despawn(id: Variant, v: GSSpawnVerdict) -> void:
+	var npc: GSNpcInstance = _horde.spawner.get_npc(int(id))
 
 	if npc == null:
 		return
 
-	var label := DotSpawnVerdict.category_name(v.category)
+	var label := GSSpawnVerdict.category_name(v.category)
 	removed[label] = int(removed.get(label, 0)) + 1
 
-	if v.category == DotSpawnVerdict.Category.FELL_OUT:
+	if v.category == GSSpawnVerdict.Category.FELL_OUT:
 		_horde.note_fallen(npc)
 
 	if npc.owner_id == WAVE:
 		_horde.refused_wave += 1
 
-	var _gone: bool = _horde.spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+	var _gone: bool = _horde.spawner.remove(npc.instance_id, GSNpcSpawner.REASON_CLEANUP)

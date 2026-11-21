@@ -36,7 +36,7 @@ func apply_detail(level: int) -> void:
 	shadow_until = p[2]
 	draw_until = p[3]
 	offscreen_every = p[4]
-	DotLog.debug(CHANNEL, "crowd detail", {"level": detail})
+	GSLog.debug(CHANNEL, "crowd detail", {"level": detail})
 
 
 ## Follows `crowd_detail` in [param store] now and whenever it changes.

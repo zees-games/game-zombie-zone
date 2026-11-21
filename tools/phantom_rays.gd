@@ -15,7 +15,7 @@ const YAWS := 16
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -51,7 +51,7 @@ func _scan(id: StringName, step: float, quiet: bool) -> int:
 	game.set_physics_process(false)
 	for i in 3:
 		await get_tree().physics_frame
-	var loaded: DotResult = await game.map.load_world()
+	var loaded: GSResult = await game.map.load_world()
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 

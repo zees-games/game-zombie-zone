@@ -19,7 +19,7 @@ func _sim_host_first() -> bool:
 
 
 ## Points [param p] at the sim host's loopback link when one is up, else leaves it to its own.
-func _link_sim_host(p: DotGameClient) -> void:
+func _link_sim_host(p: GSGameClient) -> void:
 	p.force_offline = force_offline and _sim_host == null
 	if _sim_host != null:
 		p.link = _sim_host.link
@@ -43,12 +43,12 @@ func _start_sim_host() -> void:
 	var host := ZzSimHost.new()
 	host.name = "SimHost"
 	add_child(host)
-	var started: DotResult = await host.start(offline_bots, config_file)
-	DotLog.result(CHANNEL, "sim host", started)
+	var started: GSResult = await host.start(offline_bots, config_file)
+	GSLog.result(CHANNEL, "sim host", started)
 	if started.ok:
 		_sim_host = host
 		return
-	DotLog.warn(CHANNEL, "sim host failed, playing in process: %s" % started.error.message)
+	GSLog.warn(CHANNEL, "sim host failed, playing in process: %s" % started.error.message)
 	host.queue_free()
 
 

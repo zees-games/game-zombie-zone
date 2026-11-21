@@ -10,7 +10,7 @@ func _ready() -> void:
 	# First, before anything can be drawn: the map, the player and the camera arrive after this node is in the tree. The platform puts the loading cover up, held until the player exists and the camera is current, and finds the link.
 	# Decoding the world's textures inline costs ~8 s on the biggest map; the user's own `--map_load_threads` wins.
 	_own_map_threads()
-	platform = DotGameClient.new()
+	platform = GSGameClient.new()
 	platform.name = "Platform"
 	_link_sim_host(platform)
 	platform.use_standalone_content = standalone_content
@@ -36,7 +36,7 @@ func _ready() -> void:
 	var loaded := ZzConfig.boot(config, config_file)
 
 	if not loaded.ok:
-		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		GSGameConfigBinder.fail_boot(get_tree(), loaded)
 		return
 
 	link = platform.link as Node
@@ -77,7 +77,7 @@ func _ready() -> void:
 	if _offline:
 		_start_offline()
 	else:
-		DotLog.result(CHANNEL, "the netcode", _build_netcode())
+		GSLog.result(CHANNEL, "the netcode", _build_netcode())
 
 
 # The load gate is the platform's. Covered also means the horde does not act: offline the world ticks itself, so the director, waves, clocks and damage would work on the survivor in front of a picture;
@@ -105,7 +105,7 @@ func _draw_world() -> void:
 	var ticket := _world_ticket
 	if gate != null:
 		# The world's art slices download under this hold, so it waits as long as the content hold does.
-		gate.timeout_sec = maxf(gate.timeout_sec, DotGameStandaloneContent.max_wait_sec())
+		gate.timeout_sec = maxf(gate.timeout_sec, GSGameStandaloneContent.max_wait_sec())
 		gate.hold(&"world", "Loading the world")
 	# A world opened offline builds its map twice in one frame (ZzGame.start rebuilds for listeners that came late): only the last draws.
 	await get_tree().process_frame
@@ -125,8 +125,8 @@ func _draw_world() -> void:
 		game.map.set_model_lod(int(game.config.get(&"prop_lod_min_tris")), int(game.config.get(&"prop_max_tris")))
 		get_viewport().mesh_lod_threshold = maxf(float(game.config.get(&"mesh_lod_threshold")), 0.0)
 	var t_draw := Time.get_ticks_msec()
-	var _drawn: DotResult = await game.map.load_world()
-	DotLog.info(CHANNEL, "world drawn under the cover", {"map": str(game.map.id()), "ms": Time.get_ticks_msec() - t_draw})
+	var _drawn: GSResult = await game.map.load_world()
+	GSLog.info(CHANNEL, "world drawn under the cover", {"map": str(game.map.id()), "ms": Time.get_ticks_msec() - t_draw})
 	if gate != null and ticket == _world_ticket:
 		gate.release(&"world")
 
@@ -174,7 +174,7 @@ func _guard_placed() -> void:
 	if not player.is_alive() or _is_placed():
 		return
 
-	DotLog.info(CHANNEL, "the survivor is outside the built map; covering until placed", {"at": player.global_position})
+	GSLog.info(CHANNEL, "the survivor is outside the built map; covering until placed", {"at": player.global_position})
 	gate.require(&"placed", _is_placed, "Placing you")
 
 
@@ -304,10 +304,10 @@ func _start_offline() -> void:
 			chat.say_locally("Achievement: %s (+%d)" % [title, points], Color(0.98, 0.84, 0.40))
 	)
 	game.start()
-	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
+	GSLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
 
-## The most stand-ins a solo game seats where [method DotPlatform.has_threads] is false or the
+## The most stand-ins a solo game seats where [method GSPlatform.has_threads] is false or the
 ## machine has four cores or fewer.
 const WEAK_HARDWARE_BOTS := 7
 
@@ -318,7 +318,7 @@ func _fill_offline_team() -> void:
 	var wanted := maxi(offline_bots, game.team_size() - 1) if offline_bots > 0 else 0
 	# A browser without threads, or a machine with few cores, cannot run fifteen stand-ins and the
 	# horde in the time a frame has: half a team still holds the map. A capability, never the OS name.
-	if wanted > WEAK_HARDWARE_BOTS and (not DotPlatform.has_threads() or OS.get_processor_count() <= 4):
+	if wanted > WEAK_HARDWARE_BOTS and (not GSPlatform.has_threads() or OS.get_processor_count() <= 4):
 		wanted = WEAK_HARDWARE_BOTS
 	var have: Array[StringName] = []
 
@@ -347,8 +347,8 @@ func _fill_offline_team() -> void:
 static func _bot_name(index: int) -> String:
 	var taken: Array = []
 	for i in range(index):
-		taken.append(DotBotNames.pick(taken, i, ZzBots.BOT_NAMES))
-	return DotBotNames.pick(taken, index, ZzBots.BOT_NAMES)
+		taken.append(GSBotNames.pick(taken, i, ZzBots.BOT_NAMES))
+	return GSBotNames.pick(taken, index, ZzBots.BOT_NAMES)
 
 
 ## dot-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
@@ -356,9 +356,9 @@ func _add_noblock_and_workbench() -> void:
 	if game == null:
 		return
 	if link != null:
-		DotLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
+		GSLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
 	var rt := game.ensure_runtime()
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.name = "Workbench"
 	if link != null:
 		# Somebody else's server: no local trust, no panel until the server names this player an admin.
@@ -370,22 +370,22 @@ func _add_noblock_and_workbench() -> void:
 	else:
 		wb.listen_host_fn = func() -> bool: return true
 	if game.config_binder != null:
-		for set: DotProfileSet in game.config_binder.profile_sets():
+		for set: GSProfileSet in game.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	var _fl := game.flashlight_conf()
 	if game.flashlight_binder != null:
-		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+		for set: GSProfileSet in game.flashlight_binder.profile_sets():
 			wb.add_set(set, "Flashlight")
 	wb.add_set(game.bot_persona_set(), "Bot personas (add, edit, delete)")
 	wb.add_set(game.box_profile_set(), "Boxes (odds, effects, colours, sounds)")
 	add_child(wb)
 	var started := wb.start(rt)
-	DotLog.result(CHANNEL, "the workbench", started)
+	GSLog.result(CHANNEL, "the workbench", started)
 	if started.ok:
 		rt.profile_changed.connect(func(kind: String, _id: String, _rev: int) -> void:
-			if kind == DotBotPersona.KIND:
+			if kind == GSBotPersona.KIND:
 				game.reload_personas()
-			elif kind == DotBoxProfiles.KIND:
+			elif kind == GSBoxProfiles.KIND:
 				game.reload_boxes())
 	if link == null:
 		if started.ok and game.config_binder != null:
@@ -433,17 +433,17 @@ func _follow_server_rules() -> void:
 		var _roster := follow_roster(link, game.config)
 
 
-func _build_netcode() -> DotResult:
+func _build_netcode() -> GSResult:
 	_follow_server_rules()
 
-	net = DotNetManager.new()
+	net = GSNetManager.new()
 	net.name = "Net"
 	net.is_server = false
 	net.local_peer_id = multiplayer.get_unique_id() if multiplayer != null else 2
 	net.auto_tick = false
 	net.config_file = ""
 
-	var net_config := DotNetConfig.new()
+	var net_config := GSNetConfig.new()
 	net_config.tick_rate = game.tick_rate
 	net_config.snapshot_rate = ZzGame.NET_SNAPSHOT_RATE
 	net_config.enable_prediction = true
@@ -469,9 +469,9 @@ func _build_netcode() -> DotResult:
 
 	bridge.open_link(link)
 	# Before the seal and in the server's order (after the bridge), or the actions stay local.
-	DotLog.result(CHANNEL, "avatar action message", DotGameAvatarActionMessage.register(net))
+	GSLog.result(CHANNEL, "avatar action message", GSGameAvatarActionMessage.register(net))
 	# The server's order again (after the avatar frame): the remote workbench's frame.
-	workbench_remote = DotGameWorkbenchRemoteClient.attach(net)
+	workbench_remote = GSGameWorkbenchRemoteClient.attach(net)
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -546,7 +546,7 @@ func _build_netcode() -> DotResult:
 		bridge.rtt_source = func() -> float:
 			return float(maxi(0, int(link.call("ping_ms"))))
 
-	DotLog.result(CHANNEL, "chat and voice", chat.attach(bridge))
+	GSLog.result(CHANNEL, "chat and voice", chat.attach(bridge))
 
 	if link != null and link.has_method("is_playing") and bool(link.call("is_playing")):
 		_say_ready()
@@ -664,11 +664,11 @@ func _hear_the_world() -> void:
 	game.exploded.connect(world_view.blast)
 
 	if game.horde != null:
-		game.horde.zombie_spawned.connect(func(npc: DotNpcInstance) -> void:
+		game.horde.zombie_spawned.connect(func(npc: GSNpcInstance) -> void:
 			_on_zombie(npc.def.id, true)
 			var body := npc.node as ZzZombieBody
 			world_view.add_zombie(npc.instance_id, npc.def.id, body.variant if body != null else 0, body))
-		game.horde.zombie_removed.connect(func(npc: DotNpcInstance) -> void:
+		game.horde.zombie_removed.connect(func(npc: GSNpcInstance) -> void:
 			_on_zombie(npc.def.id, false)
 			world_view.remove_zombie(npc.instance_id, not npc.alive and npc.health <= 0.0))
 		game.horde.mob_started.connect(func(_size: int) -> void:
@@ -677,7 +677,7 @@ func _hear_the_world() -> void:
 
 	if game.pins != null:
 		game.pins.pinned.connect(func(victim: StringName, kind: StringName, _attacker: int) -> void:
-			var holder: DotNpcInstance = game.pins.holder_of(victim)
+			var holder: GSNpcInstance = game.pins.holder_of(victim)
 			_on_pin(_session(victim), holder.node if holder != null else null, kind))
 		game.pins.released.connect(func(victim: StringName, _kind: StringName, why: StringName) -> void:
 			_on_unpin(_session(victim), why))
@@ -746,7 +746,7 @@ func _hear_rig(armed: ZzPlayer) -> void:
 	armed.weapons.used.connect(_on_rig_used.bind(armed))
 
 
-func _on_rig_used(outcome: DotWeaponOutcome, armed: ZzPlayer) -> void:
+func _on_rig_used(outcome: GSWeaponOutcome, armed: ZzPlayer) -> void:
 	if audio != null and is_instance_valid(armed):
 		var _heard := audio.on_weapon(armed.global_position, ZeeWeaponNet.kind_number(outcome.kind))
 
@@ -771,7 +771,7 @@ func _on_phase(phase: int) -> void:
 
 func _on_map(map_id: StringName) -> void:
 	if flash != null:
-		flash.allowed = DotFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
+		flash.allowed = GSFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
 	reset_slowmo()
 	_end_active = false
 	_end_weight = 0.0
@@ -1052,15 +1052,15 @@ func _on_hurt(amount: float, from: Vector3) -> void:
 	if audio != null:
 		# Scaled by the damage; a hit that downs or kills leaves the moment to the down or death cry.
 		var lethal := player != null and (player.is_down() or not player.is_alive())
-		var _ouch := DotHurtSound.play(audio, ZzAudio.HURT, amount, lethal)
+		var _ouch := GSHurtSound.play(audio, ZzAudio.HURT, amount, lethal)
 
 	if hud != null and player != null:
 		hud.hurt_from(from, amount)
 
 
-## The player's blood setting trims what is drawn (dot-npc's DotNpcGore.view_cap): off keeps clean stumps only. What comes off is the server's rule.
+## The player's blood setting trims what is drawn (dot-npc's GSNpcGore.view_cap): off keeps clean stumps only. What comes off is the server's rule.
 func _apply_gore_pref() -> void:
-	DotNpcGore.view_cap = DotNpcGore.MAX_LEVEL if settings.settings.get_bool(&"gore", true) else DotNpcGore.STUMPS
+	GSNpcGore.view_cap = GSNpcGore.MAX_LEVEL if settings.settings.get_bool(&"gore", true) else GSNpcGore.STUMPS
 
 
 ## A hit the server confirmed: the marker and the number on the body.
@@ -1162,8 +1162,8 @@ func _arm_locally(weapon_id: StringName) -> void:
 		# sat empty after the server's gun had filled.
 		weapons.tick_rate = Engine.physics_ticks_per_second
 		weapons.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-		weapons.view_model_ref = DotNodeRef.of_path(view_model.get_path())
-		weapons.player_ref = DotNodeRef.of_path(player.get_path())
+		weapons.view_model_ref = GSNodeRef.of_path(view_model.get_path())
+		weapons.player_ref = GSNodeRef.of_path(player.get_path())
 		weapons.ads_rules = game.ads_rules
 		view_model.ads_rules = weapons.ads_rules
 		player.add_child(weapons)
@@ -1171,11 +1171,11 @@ func _arm_locally(weapon_id: StringName) -> void:
 		var ready_now := weapons.setup()
 
 		if not ready_now.ok:
-			DotLog.warn(CHANNEL, "the view model would not set up", {"why": ready_now.error.message})
+			GSLog.warn(CHANNEL, "the view model would not set up", {"why": ready_now.error.message})
 			_strip_locally()
 			return
 
-		weapons.used.connect(func(outcome: DotWeaponOutcome) -> void:
+		weapons.used.connect(func(outcome: GSWeaponOutcome) -> void:
 			if audio != null and camera != null:
 				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
@@ -1233,7 +1233,7 @@ func _on_carry_json(json: String) -> void:
 	for key in slots:
 		for id: Variant in slots[key]:
 			told[StringName(str(id))] = true
-	var arsenal: DotWeaponArsenal = weapons.arsenal
+	var arsenal: GSWeaponArsenal = weapons.arsenal
 	var dropped := false
 	for slot: int in arsenal.slots():
 		for held in arsenal.weapons_in(slot):
@@ -1287,7 +1287,7 @@ func _build_camera() -> void:
 	# Survivors and stand-ins, handed over (their hulls are off while players pass through
 	# each other), and zombies, found on their layer: hidden at the lens, faded in third
 	# person between the camera and you. It rides the camera wherever the camera goes.
-	_fade = DotCameraFade.new()
+	_fade = GSCameraFade.new()
 	_fade.name = "Fade"
 	_fade.bodies_fn = _other_players
 	if game.physics != null:
@@ -1330,7 +1330,7 @@ func _place_camera() -> void:
 	# dot-core's boom, swept from the eye with the height above it added in the world's up:
 	# a pivot raised above the head can itself be inside a beam, and the spring arm it
 	# replaced cast a ray from there and snapped to whatever it hit.
-	_arm = DotCameraBoom.new()
+	_arm = GSCameraBoom.new()
 	_arm.name = "Chase"
 	_arm.spring_length = CHASE_BACK
 	_arm.collision_mask = game.world_mask()
@@ -1394,7 +1394,7 @@ func _build_hud() -> void:
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
-	_attach_menu = DotWeaponAttachMenu.new()
+	_attach_menu = GSWeaponAttachMenu.new()
 	_attach_menu.name = "AttachMenu"
 	_attach_menu.hide()
 	_attach_menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
@@ -1410,15 +1410,15 @@ func _build_hud() -> void:
 func _build_touch() -> void:
 	var menu_button: Control = null
 	if settings != null and settings.menu != null:
-		menu_button = (settings.menu as DotMenu).menu_button
+		menu_button = (settings.menu as GSMenu).menu_button
 	# Built on every client: a server may give auto-fire to keyboard players too (`sv_autofire_desktop`).
 	_touch = ZzTouch.build(self, hud.screen(), _sampler, game.mobile_rules, menu_button)
 	_touch.controls.button_pressed.connect(touch_button.bind(true))
 	_touch.controls.button_released.connect(touch_button.bind(false))
-	if DotPlatform.has_touch():
+	if GSPlatform.has_touch():
 		hud.shift_weight_left(_touch.weight_shift())
 		hud.lift_plate(_touch.plate_lift())
-		# dot-game's DotGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
+		# dot-game's GSGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
 		if platform != null and platform.has_method(&"fit_touch_buttons"):
 			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), _touch.layout())
 
@@ -1479,7 +1479,7 @@ static func _set_fade_cvar(config: ZzConfig, cvar_name: String, value: String) -
 # Chat, sound, settings
 
 func _build_chat() -> void:
-	chat = DotGameChatClient.new()
+	chat = GSGameChatClient.new()
 	chat.name = "Chat"
 	chat.channels = [
 		{"id": ZzServices.CH_ALL, "label": "All", "colour": Color(0.93, 0.94, 0.96)},
@@ -1489,7 +1489,7 @@ func _build_chat() -> void:
 	chat.max_length = ZzServices.chat_rules().max_length
 	chat.voice_config = ZzServices.voice_format()
 	# A phone: three narrow rows in the corner, clear of the thumbstick and buttons.
-	if DotPlatform.has_touch():
+	if GSPlatform.has_touch():
 		chat.window_settings = {"max_lines": 3, "width": 200.0, "margin_left": 12.0, "margin_bottom": 8.0}
 	add_child(chat)
 
@@ -1502,7 +1502,7 @@ func _build_audio() -> void:
 	var ready_now := audio.setup()
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "no sound", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "no sound", {"why": ready_now.error.message})
 		remove_child(audio)
 		audio.queue_free()
 		audio = null
@@ -1522,21 +1522,21 @@ func _build_settings() -> void:
 	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (dot-vote's
 	# map menu, wired in [ZzModule]).
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
-	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
-	DotLog.result(CHANNEL, "the platform", platform.setup())
+	platform.maps_change_fn = func(id: StringName) -> GSResult: return game.change_map_now(id)
+	GSLog.result(CHANNEL, "the platform", platform.setup())
 	_hit_flinch = platform.add_hit_flinch(
 		func() -> Variant: return player.sampler if _offline and player != null and player.sampler != null else _sampler,
 		func() -> Variant: return camera,
 		_aim_sent)
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
-	DotLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
+	GSLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	_add_noblock_and_workbench()
 	# Walking is off while the cover is up, a menu is open or a line is typed.
 	platform.input_blocked_changed.connect(_suspend_input)
 	_suspend_input(platform.is_input_blocked())
 
 	settings = platform.settings as ZzSettings
-	console = platform.console as DotConsoleController
+	console = platform.console as GSConsoleController
 
 	if settings == null:
 		return
@@ -1572,7 +1572,7 @@ func _build_settings() -> void:
 			hud.follow_menu(settings.menu)
 		_bind_bot_console()
 		_bind_crosshair_console()
-		board = platform.board as DotMenuScoreboard
+		board = platform.board as GSMenuScoreboard
 		_dress_board()
 
 
@@ -1580,19 +1580,19 @@ func _build_settings() -> void:
 func _bind_crosshair_console() -> void:
 	if console != null:
 		var held_sources: Array = console.sources()
-		if not held_sources.is_empty() and held_sources[0] is DotConsoleLocal:
-			(held_sources[0] as DotConsoleLocal).add_var(&"cl_viewarms_held",
+		if not held_sources.is_empty() and held_sources[0] is GSConsoleLocal:
+			(held_sources[0] as GSConsoleLocal).add_var(&"cl_viewarms_held",
 				"1 draws the held weapon in the first-person arms (default 0)",
 				func() -> String: return "1" if cl_viewarms_held else "0",
 				func(v: String) -> void: cl_viewarms_held = v.to_int() != 0)
 	if console != null:
 		var scope_sources: Array = console.sources()
-		if not scope_sources.is_empty() and scope_sources[0] is DotConsoleLocal:
+		if not scope_sources.is_empty() and scope_sources[0] is GSConsoleLocal:
 			ScopePrefs.bind_cvars(scope_sources[0])
 	if console != null and hud != null:
 		var _bound := game.combat_feel.bind_console(console, hud.crosshair())
 		var sources: Array = console.sources()
-		if not sources.is_empty() and sources[0] is DotConsoleLocal:
+		if not sources.is_empty() and sources[0] is GSConsoleLocal:
 			ZzWeaponIcons.shared.bind_console(sources[0])
 			hud.bind_elements(sources[0])
 
@@ -1603,13 +1603,13 @@ func _bind_bot_console() -> void:
 	if not _offline or console == null or game == null:
 		return
 	var sources: Array = console.sources()
-	if sources.is_empty() or not (sources[0] is DotConsoleLocal):
+	if sources.is_empty() or not (sources[0] is GSConsoleLocal):
 		return
-	var _bound := DotBotSettings.of(game).bind_console(sources[0])
+	var _bound := GSBotSettings.of(game).bind_console(sources[0])
 	var args := OS.get_cmdline_user_args()
 	var index := args.find("--bot_difficulty")
 	if index >= 0 and index + 1 < args.size():
-		DotLog.result(CHANNEL, "bot difficulty from the command line", DotBotSettings.of(game).set_difficulty(args[index + 1]))
+		GSLog.result(CHANNEL, "bot difficulty from the command line", GSBotSettings.of(game).set_difficulty(args[index + 1]))
 
 
 ## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
@@ -1622,10 +1622,10 @@ func _pointer_ours() -> bool:
 
 
 ## The sound manager the flashlight clicks play through, or null before audio is up.
-func _flash_audio_ref() -> DotNodeRef:
+func _flash_audio_ref() -> GSNodeRef:
 	if audio == null or audio.manager == null or not audio.manager.is_inside_tree():
 		return null
-	return DotNodeRef.of_path(audio.manager.get_path())
+	return GSNodeRef.of_path(audio.manager.get_path())
 
 
 ## The light on the eye follows the server's state (but not for 0.4 s after our own switch, which is shown at once), and everyone else's beams follow theirs.
@@ -1638,12 +1638,12 @@ func _present_flashlights() -> void:
 	var cfg := game.flashlight_conf()
 
 	if flash == null or not is_instance_valid(flash):
-		flash = DotFlashlight.new()
+		flash = GSFlashlight.new()
 		flash.name = "Flashlight"
 		flash.config = cfg
 		flash.handle_input = false
 		flash.authoritative = false
-		flash.allowed = DotFlashlightRules.allowed_on(cfg, String(game.map_doc.get("id", "")))
+		flash.allowed = GSFlashlightRules.allowed_on(cfg, String(game.map_doc.get("id", "")))
 		flash.audio = _flash_audio_ref()
 		if not flash.switch_requested.is_connected(_on_flash_switch):
 			flash.switch_requested.connect(_on_flash_switch)
@@ -1656,7 +1656,7 @@ func _present_flashlights() -> void:
 		flash.apply_state({"on": player.flashlight and player.is_alive()})
 
 	if flash_crowd == null:
-		flash_crowd = DotFlashlightCrowd.new()
+		flash_crowd = GSFlashlightCrowd.new()
 		flash_crowd.name = "Flashlights"
 		flash_crowd.config = cfg
 		flash_crowd.audio = _flash_audio_ref()
@@ -1729,7 +1729,7 @@ func _physics_process(delta: float) -> void:
 	if _covered():
 		return
 
-	var move := _sampler.sample(delta) if _sampler != null else DotFpsCommand.new()
+	var move := _sampler.sample(delta) if _sampler != null else GSFpsCommand.new()
 	_stamp(move)
 
 	for i in range(ticks):
@@ -1765,7 +1765,7 @@ func _drive_offline() -> void:
 			truth.arsenal.current_slot(), truth.arsenal.is_reloading() or truth.arsenal.is_switching())
 
 
-func _stamp(command: DotFpsCommand) -> void:
+func _stamp(command: GSFpsCommand) -> void:
 	if command == null:
 		return
 
@@ -1775,7 +1775,7 @@ func _stamp(command: DotFpsCommand) -> void:
 
 
 ## One tick of the gun you see, from the same buttons the server's gun is given this tick.
-func _drive_view_model(_command: DotFpsCommand) -> void:
+func _drive_view_model(_command: GSFpsCommand) -> void:
 	if weapons == null or player == null:
 		return
 
@@ -1790,12 +1790,12 @@ func _touch_busy() -> bool:
 	return is_spectating() or is_shop_open() or (platform != null and platform.is_input_blocked())
 
 
-func _gun_in_hand() -> DotWeaponDef:
+func _gun_in_hand() -> GSWeaponDef:
 	return weapons.arsenal.current_def() if weapons != null and weapons.arsenal != null else null
 
 
 func _own_legs() -> bool:
-	return settings != null and settings.settings != null and settings.settings.get_bool(DotOwnBodySetting.KEY, DotOwnBodySetting.DEFAULT)
+	return settings != null and settings.settings != null and settings.settings.get_bool(GSOwnBodySetting.KEY, GSOwnBodySetting.DEFAULT)
 
 
 func _process(delta: float) -> void:
@@ -1847,7 +1847,7 @@ func _process(delta: float) -> void:
 
 	if weapons != null:
 		var speed := Vector2(state.velocity.x, state.velocity.z).length()
-		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != DotFpsState.Mode.AIR, state.crouch_fraction > 0.5)
+		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != GSFpsState.Mode.AIR, state.crouch_fraction > 0.5)
 
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = not third_person and not player.is_held() and _end_weight < 0.3
@@ -1869,7 +1869,7 @@ func _process(delta: float) -> void:
 
 ## Your crawling arms while down in first person. The pivot turns with the yaw only: under the pitch they would swing with the look.
 var cl_viewarms_held: bool = false
-var _held_grip: DotViewGrip = null
+var _held_grip: GSViewGrip = null
 var _held_on: bool = false
 var _arms_downed: bool = false
 
@@ -1880,7 +1880,7 @@ func _present_view_arms(delta: float, yaw: float) -> void:
 		_arms_yaw.name = "ViewArmsYaw"
 		_arms_yaw.top_level = true
 		add_child(_arms_yaw)
-		view_arms = DotPlayerViewArms.new()
+		view_arms = GSPlayerViewArms.new()
 		view_arms.name = "ViewArms"
 		_arms_yaw.add_child(view_arms)
 		view_arms.build(player.view_look(game.side_colour(ZzGame.SURVIVORS)), ZzPlayer.BODY_HEIGHT)
@@ -2109,7 +2109,7 @@ func _watched_through_eyes() -> ZzPlayer:
 
 	var mode := game.spectate.mode_of(player.player_id)
 
-	if mode != DotSpectatorView.Mode.FIRST_PERSON and mode != DotSpectatorView.Mode.FREEZE_CAM:
+	if mode != GSSpectatorView.Mode.FIRST_PERSON and mode != GSSpectatorView.Mode.FREEZE_CAM:
 		return null
 
 	return game.players.get(StringName(game.spectate.watching(player.player_id)))
@@ -2182,7 +2182,7 @@ func _drive_spectator_camera(delta: float) -> bool:
 		view_model.visible = false
 
 	# Chase and death cameras pulled out of the street by dot-spectate, given the level.
-	var manager: DotSpectatorManager = game.spectate.manager
+	var manager: GSSpectatorManager = game.spectate.manager
 	if manager != null and manager.camera_world == null:
 		manager.camera_world = camera.get_world_3d()
 		manager.camera_mask = game.world_mask()
@@ -2233,7 +2233,7 @@ const NEAR_EYE := 1.2
 ## every survivor, then every beacon. Returns how many are shown. Static so the net suite drives
 ## exactly this and not a copy of it.
 static func present_frame(
-	p_net: DotNetManager,
+	p_net: GSNetManager,
 	p_game: ZzGame,
 	own: ZzPlayer,
 	first_person: bool,
@@ -2248,7 +2248,7 @@ static func present_frame(
 		p_net.interpolate_frame(alpha)
 
 	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the clock stretches and shrinks its ticks while it settles on the server, so at the engine's fraction the eye stood still on one frame and moved double on the next.
-	# `DotFpsController.render_state` reads it from `render_clock` (dot-player-controller); by name both ways, so an older shell draws as before. Null offline, where every physics frame is one tick.
+	# `GSFpsController.render_state` reads it from `render_clock` (dot-player-controller); by name both ways, so an older shell draws as before. Null offline, where every physics frame is one tick.
 	if own != null and own.controller != null:
 		own.controller.set(&"render_clock", p_net.clock if networked else null)
 
@@ -2288,7 +2288,7 @@ static func present_frame(
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
+	# Tab, M and a click taking the pointer back are the platform's (GSGameClient).
 	if event.is_action_pressed("ui_cancel") and is_shop_open():
 		close_shop()
 		get_viewport().set_input_as_handled()
@@ -2320,7 +2320,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Touch arrives as a screen touch plus an emulated mouse press; is_next_press skips the
 	# emulated one, so a tap steps once.
-	if is_spectating() and DotSpectatorHost.is_next_press(event):
+	if is_spectating() and GSSpectatorHost.is_next_press(event):
 		_firing = false
 		_shoving = false
 		spectate_step(1)
@@ -2420,7 +2420,7 @@ func _key_event(event: InputEvent) -> bool:
 	if not pressed:
 		return false
 
-	if event.is_action_pressed(DotWeaponAttachMenu.ACTION):
+	if event.is_action_pressed(GSWeaponAttachMenu.ACTION):
 		if not is_spectating():
 			open_fitting()
 		return true
@@ -2487,9 +2487,9 @@ func _step_slot(step: int) -> void:
 		_slot = int(to)
 
 
-func _weapon_wheel() -> DotWeaponWheel:
+func _weapon_wheel() -> GSWeaponWheel:
 	if _wheel == null:
-		_wheel = DotWeaponWheel.new()
+		_wheel = GSWeaponWheel.new()
 		_wheel.ring_provider = func() -> Array:
 			return weapons.arsenal.slots() if weapons != null and weapons.arsenal != null else []
 		_wheel.current_provider = func() -> Variant:

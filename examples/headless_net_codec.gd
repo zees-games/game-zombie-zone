@@ -1,8 +1,8 @@
 extends "headless_net_late.gd"
 
 
-static func _r(bytes: PackedByteArray) -> DotNetReader:
-	return DotNetReader.new(bytes)
+static func _r(bytes: PackedByteArray) -> GSNetReader:
+	return GSNetReader.new(bytes)
 
 
 ## Every encoder against its decoder. Nothing checks that two ends of a serialisation are
@@ -33,7 +33,7 @@ func _test_the_codec() -> void:
 
 	var doc := ZzCatalogue.practice()
 	var sent := ZzEvents.read_map(_r(ZzEvents.write_map(ZzMapDoc.encode(doc))))
-	var decoded := ZzMapDoc.decode(sent["encoded"]) if bool(sent["ok"]) else DotResult.fail(DotError.CODE_PARSE, "no map")
+	var decoded := ZzMapDoc.decode(sent["encoded"]) if bool(sent["ok"]) else GSResult.fail(GSError.CODE_PARSE, "no map")
 	_check(decoded.ok and ZzMapDoc.digest(decoded.value) == ZzMapDoc.digest(doc), "MAP carries the document whole")
 
 	var join := ZzEvents.read_join(_r(ZzEvents.write_join(SESSION, 9, "Ada", ZzGame.SURVIVORS, null)))
@@ -69,9 +69,9 @@ func _test_the_codec() -> void:
 
 	var gone := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(77, true)))
 	_check(bool(gone["ok"]) and int(gone["net_id"]) == 77 and bool(gone["killed"]) and gone["death"] == null, "NPC_GONE")
-	var fall := DotPlayerDeath.decide(DotPlayerDeathReactions.stock(), true, 120.0, Vector3(0, 0, -1), 4242)
+	var fall := GSPlayerDeath.decide(GSPlayerDeathReactions.stock(), true, 120.0, Vector3(0, 0, -1), 4242)
 	var fell := ZzEvents.read_npc_gone(_r(ZzEvents.write_npc_gone(78, true, fall)))
-	var told: DotPlayerDeath = fell["death"]
+	var told: GSPlayerDeath = fell["death"]
 	_check(bool(fell["ok"]) and told != null and told.reaction == fall.reaction and told.roll_seed == 4242
 		and told.direction.distance_to(Vector3(0, 0, -1)) < 0.05 and told.headshot,
 		"NPC_GONE with how it fell", String(told.reaction) if told != null else "-")
@@ -99,10 +99,10 @@ func _check_codec_world() -> void:
 	var biggest := PackedByteArray()
 	biggest.resize(ZzEvents.MAP_BYTES)
 	var outgoing := ZzEvent.new(ZzEvents.Kind.MAP, ZzEvents.write_map(biggest))
-	var wire := DotNetWriter.new()
+	var wire := GSNetWriter.new()
 	outgoing._write(wire)
 	var incoming := ZzEvent.new()
-	incoming._read(DotNetReader.new(wire.to_bytes()))
+	incoming._read(GSNetReader.new(wire.to_bytes()))
 	var carried := ZzEvents.read_map(incoming.reader())
 	_check(bool(carried["ok"]) and (carried["encoded"] as PackedByteArray).size() == ZzEvents.MAP_BYTES,
 		"a MAP as large as a reader accepts fits in an event", "%d of %d bytes" % [(carried["encoded"] as PackedByteArray).size(), ZzEvents.MAP_BYTES])
@@ -116,7 +116,7 @@ func _check_codec_world() -> void:
 	_check(ZzRequest.fits(), "every request kind fits the request's kind field",
 		"%d kinds in %d bits" % [ZzEvents.Ask.size(), ZzRequest.KIND_BITS])
 	_check(ZzEventsText.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
-		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), ZzEventsText.CHAT_KIND_BITS])
+		"%d kinds in %d bits" % [GSChatMessage.KIND_NAMES.size(), ZzEventsText.CHAT_KIND_BITS])
 
 
 ## Map effects, objectives, endings and copies decode, and the wild ones are clamped.
@@ -151,7 +151,7 @@ func _check_codec_map_fx() -> void:
 
 ## Hits, splats, effects, hazards, turrets and blasts decode to what was written.
 func _check_codec_effects() -> void:
-	var hit := ZzEvents.read_hit(_r(ZzEvents.write_hit(DotEntity.make_id(DotEntity.KIND_NPC, 4321), 17.5, Vector3(1.0, 1.4, -6.0), true, true)))
+	var hit := ZzEvents.read_hit(_r(ZzEvents.write_hit(GSEntity.make_id(GSEntity.KIND_NPC, 4321), 17.5, Vector3(1.0, 1.4, -6.0), true, true)))
 	_check(bool(hit["ok"]) and int(hit["victim"]) == 4321 and absf(float(hit["amount"]) - 17.5) < 0.1
 		and bool(hit["killed"]) and bool(hit["headshot"]) and (hit["point"] as Vector3).distance_to(Vector3(1.0, 1.4, -6.0)) < 0.01,
 		"HIT (the victim's entity serial, so a whole entity id never overflows the field)", str(hit))

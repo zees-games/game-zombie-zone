@@ -22,7 +22,7 @@ const CHANNEL := "zz.props"
 const CATALOGUE := "res://props/catalogue.json"
 
 ## The part-shaped collision `tools/measure_props.gd` cuts out of the models with dot-props'
-## [DotPropPieces]: a tree as a trunk, branches and leaf clumps, a table as a top and legs. A
+## [GSPropPieces]: a tree as a trunk, branches and leaf clumps, a table as a top and legs. A
 ## prop not in it collides as its box. The zombies' graph still goes round the box.
 const PIECES := "res://props/pieces.json"
 
@@ -58,7 +58,7 @@ func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 	var parsed: Variant = JSON.parse_string(text) if text != "" else null
 
 	if not (parsed is Dictionary):
-		DotLog.error(CHANNEL, "the prop catalogue would not read", {"path": path})
+		GSLog.error(CHANNEL, "the prop catalogue would not read", {"path": path})
 		return 0
 
 	props.clear()
@@ -101,7 +101,7 @@ func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 			"size": size,
 			"offset": _v3(entry.get("offset")),
 			"disguise": bool(entry.get("disguise", true)),
-			"pieces": DotPropPieces.decode(all_pieces.get(String(id), [])),
+			"pieces": GSPropPieces.decode(all_pieces.get(String(id), [])),
 		}
 		order.append(id)
 
@@ -147,11 +147,11 @@ func shapes_of(id: StringName) -> Array:
 		# body standing on it a contact pointing anywhere, down included (zz-mall-floor-falls-1).
 		var solid: Array = []
 		for piece: PackedVector3Array in pieces:
-			var box := DotPropPieces.bounds([piece])
+			var box := GSPropPieces.bounds([piece])
 			if box.size.y < 0.03 and box.end.y < 0.05:
 				continue
 			solid.append(piece)
-		for shape in DotPropPieces.shapes(solid):
+		for shape in GSPropPieces.shapes(solid):
 			out.append([shape, Transform3D.IDENTITY])
 
 	_shapes[id] = out
@@ -280,7 +280,7 @@ static func _scene(model_path: String) -> PackedScene:
 		_scenes[model_path] = load(path) as PackedScene if ResourceLoader.exists(path) else null
 
 		if _scenes[model_path] == null:
-			DotLog.warn(CHANNEL, "a prop's model would not load; a box stands in", {"model": model_path})
+			GSLog.warn(CHANNEL, "a prop's model would not load; a box stands in", {"model": model_path})
 
 	return _scenes[model_path]
 

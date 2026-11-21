@@ -1,6 +1,6 @@
 extends RefCounted
 
-## ZZ's carry-weight rules: one [DotWeaponCarry] (dot-weapon owns the logic) fed from `zz_weight_*` and from the boxes.
+## ZZ's carry-weight rules: one [GSWeaponCarry] (dot-weapon owns the logic) fed from `zz_weight_*` and from the boxes.
 ##
 ## The server's carry refuses and drops; a client's ([member mirror]) only stows several weapons
 ## per slot like the server, because the weights it shows come from the server's CARRY event.
@@ -11,7 +11,7 @@ const MODIFIER_PREFIX := "fx_"
 ## Weight by tier (kilograms, the scale of the packs' ymls) when no yml names the weapon.
 const TIER_WEIGHT := {&"sidearm": 1.0, &"primary": 4.0, &"heavy": 7.0, &"melee": 1.5, &"thrown": 0.4}
 
-var carry := DotWeaponCarry.new()
+var carry := GSWeaponCarry.new()
 
 ## A client's copy: stows several per slot, never refuses on weight.
 var mirror: bool = false
@@ -41,7 +41,7 @@ func sync(config: Object, boxes: Object = null) -> bool:
 	carry.base_limit = ZzClasses.carry_limit(float(config.get(&"weight_limit")))
 	carry.multiplier = float(config.get(&"weight_multiplier"))
 	carry.slot_capacity = int(config.get(&"weight_slot_capacity")) if bool(config.get(&"weight_enabled")) else 1
-	carry.over_limit = DotWeaponCarry.OverLimit.DROP if String(config.get(&"weight_over_limit")) == "drop" else DotWeaponCarry.OverLimit.SLOW
+	carry.over_limit = GSWeaponCarry.OverLimit.DROP if String(config.get(&"weight_over_limit")) == "drop" else GSWeaponCarry.OverLimit.SLOW
 	carry.slow_floor = float(config.get(&"weight_slow_floor"))
 	carry.backpack_tiers = parse_floats(String(config.get(&"weight_backpack_tiers")))
 	_prices = PackedInt32Array()
@@ -94,14 +94,14 @@ func backpack_price(tier: int) -> int:
 
 ## Gives every def of [param catalogue] that no profile weighed (`weight:` in `cfg/addon/zee_weapons/weapon/<id>.yml`,
 ## which the workbench edits) the default of its tier.
-func tune_catalogue(catalogue: DotWeaponCatalogue) -> void:
+func tune_catalogue(catalogue: GSWeaponCatalogue) -> void:
 	for id in catalogue.ids():
 		var def := catalogue.get_def(id)
 		if def.weight <= 0.0:
 			def.weight = default_weight(def)
 
 
-static func default_weight(def: DotWeaponDef) -> float:
+static func default_weight(def: GSWeaponDef) -> float:
 	for tier: StringName in TIER_WEIGHT:
 		if def.tags.has(tier):
 			return TIER_WEIGHT[tier]
@@ -113,7 +113,7 @@ static func default_weight(def: DotWeaponDef) -> float:
 ## The owner's view, for the CARRY event and the HUD: weight, limit, backpack and the weapons by slot (in hand first).
 func state_json(player: Object) -> String:
 	var rig: Object = player.get(&"weapons")
-	var arsenal: DotWeaponArsenal = rig.arsenal if rig != null else null
+	var arsenal: GSWeaponArsenal = rig.arsenal if rig != null else null
 	if arsenal == null or not carry.enabled:
 		return JSON.stringify({"on": false})
 	var slots := {}

@@ -1,17 +1,17 @@
 extends RefCounted
 
 ## The phone's controls: dot-mobile's stick, drag-look and buttons over the HUD, driving the client's own
-## [DotFpsTouchSampler]. Fire is read through [method is_held], so a thumb and auto-fire take the Fire key's path.
+## [GSFpsTouchSampler]. Fire is read through [method is_held], so a thumb and auto-fire take the Fire key's path.
 ## The server's `sv_mobile_*`, `sv_aim_assist*` and `sv_autofire*` cvars ([member ZzGameState.mobile_rules]) govern it.
 
 const SelfScript := preload("zz_touch.gd")
 
-## Offsets are from the bottom-right corner (see [DotTouchButtons]). Every radius is at least 24 so a
+## Offsets are from the bottom-right corner (see [GSTouchButtons]). Every radius is at least 24 so a
 ## button is 48 px across, thumb size, and the cluster still sits above the ammunition plate.
 const LAYOUT: Array[Dictionary] = [
 	{"id": &"fire", "label": "FIRE", "offset": Vector2(86, 150), "radius": 52.0},
-	{"id": &"jump", "label": "JUMP", "offset": Vector2(200, 130), "radius": 42.0, "hold": DotFpsCommand.BUTTON_JUMP},
-	{"id": &"crouch", "label": "DUCK", "offset": Vector2(60, 272), "radius": 36.0, "hold": DotFpsCommand.BUTTON_CROUCH},
+	{"id": &"jump", "label": "JUMP", "offset": Vector2(200, 130), "radius": 42.0, "hold": GSFpsCommand.BUTTON_JUMP},
+	{"id": &"crouch", "label": "DUCK", "offset": Vector2(60, 272), "radius": 36.0, "hold": GSFpsCommand.BUTTON_CROUCH},
 	{"id": &"reload", "label": "R", "offset": Vector2(170, 244), "radius": 36.0},
 	{"id": &"next", "label": "NEXT", "offset": Vector2(268, 200), "radius": 36.0},
 	{"id": &"use", "label": "USE", "offset": Vector2(290, 90), "radius": 36.0},
@@ -22,8 +22,8 @@ const LAYOUT: Array[Dictionary] = [
 ## sits on the health panel or the readout.
 const LAYOUT_PORTRAIT: Array[Dictionary] = [
 	{"id": &"fire", "label": "FIRE", "offset": Vector2(70, 340), "radius": 44.0},
-	{"id": &"jump", "label": "JUMP", "offset": Vector2(175, 310), "radius": 36.0, "hold": DotFpsCommand.BUTTON_JUMP},
-	{"id": &"crouch", "label": "DUCK", "offset": Vector2(50, 450), "radius": 30.0, "hold": DotFpsCommand.BUTTON_CROUCH},
+	{"id": &"jump", "label": "JUMP", "offset": Vector2(175, 310), "radius": 36.0, "hold": GSFpsCommand.BUTTON_JUMP},
+	{"id": &"crouch", "label": "DUCK", "offset": Vector2(50, 450), "radius": 30.0, "hold": GSFpsCommand.BUTTON_CROUCH},
 	{"id": &"reload", "label": "R", "offset": Vector2(135, 435), "radius": 30.0},
 	{"id": &"next", "label": "NEXT", "offset": Vector2(225, 385), "radius": 30.0},
 	{"id": &"use", "label": "USE", "offset": Vector2(225, 490), "radius": 30.0},
@@ -64,9 +64,9 @@ const SIGHT_RANGE := 120.0
 const PLAYER_HEIGHT := 1.8
 const PLAYER_RADIUS := 0.4
 
-var controls: DotMobileControls = null
+var controls: GSMobileControls = null
 ## dot-ui's buttons inside the overlay, for the shell's DPI fit.
-var buttons: DotTouchButtons:
+var buttons: GSTouchButtons:
 	get:
 		return controls.buttons if controls != null else null
 
@@ -85,16 +85,16 @@ func weight_shift() -> float:
 
 
 ## Builds the overlay under [param host] (the HUD), following [param rules] (the server's). Never null.
-static func build(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobileRules, menu_button: Control = null) -> RefCounted:
+static func build(client: Node, host: Control, sampler: GSFpsSampler, rules: GSMobileRules, menu_button: Control = null) -> RefCounted:
 	var made: RefCounted = (SelfScript as GDScript).new()
 	made.call(&"_setup", client, host, sampler, rules, menu_button)
 	return made
 
 
-func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobileRules, menu_button: Control) -> void:
+func _setup(client: Node, host: Control, sampler: GSFpsSampler, rules: GSMobileRules, menu_button: Control) -> void:
 	_client = client
 	_host = host
-	controls = DotMobileControls.new()
+	controls = GSMobileControls.new()
 	controls.name = "TouchControls"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if rules != null:
@@ -110,7 +110,7 @@ func _setup(client: Node, host: Control, sampler: DotFpsSampler, rules: DotMobil
 
 
 ## Hands the overlay the sampler now in use (offline, the player's own; online, the client's), sized to [param width].
-func attach(sampler: DotFpsSampler, _width: float = 0.0) -> void:
+func attach(sampler: GSFpsSampler, _width: float = 0.0) -> void:
 	if controls != null and sampler != null:
 		controls.setup(sampler, layout())
 
@@ -133,7 +133,7 @@ func active() -> bool:
 
 
 ## Called every frame by the client: pauses under a menu, the shop or a spectate, and matches auto-fire to the gun in hand.
-func sync(busy: bool, gun: DotWeaponDef) -> void:
+func sync(busy: bool, gun: GSWeaponDef) -> void:
 	if controls == null:
 		return
 	controls.paused = busy
@@ -165,7 +165,7 @@ func _crosshair() -> int:
 	var cam := _camera()
 	var game := _game()
 	if cam == null or game == null:
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	return crosshair_kind(cam.global_position, -cam.global_basis.z, _me(), _others(game), _zombies(), _space(cam),
 		int(game.call(&"world_mask")))
 
@@ -218,12 +218,12 @@ static func crosshair_kind(eye: Vector3, forward: Vector3, me: Object, others: A
 			best_enemy = true
 			best_aim = z.global_position + Vector3(0.0, height * 0.6, 0.0)
 	if best_t == INF:
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	if not best_enemy:
-		return DotMobileAutoFire.TARGET_FRIEND
+		return GSMobileAutoFire.TARGET_FRIEND
 	if _blocked(space, mask, eye, best_aim):
-		return DotMobileAutoFire.TARGET_NONE
-	return DotMobileAutoFire.TARGET_ENEMY
+		return GSMobileAutoFire.TARGET_NONE
+	return GSMobileAutoFire.TARGET_ENEMY
 
 
 ## The chests of living zombies near the crosshair with no wall between, for aim assist.

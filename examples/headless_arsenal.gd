@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzFigure := preload("../game/zz_figure.gd")
@@ -26,7 +26,7 @@ var _ids: Array[StringName] = []
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -270,7 +270,7 @@ func _stand_ins_fire() -> void:
 
 		for t in 8:
 			await _sim(game, 0.5)
-			var slot: DotWeaponSlot = bot.weapons.arsenal.current()
+			var slot: GSWeaponSlot = bot.weapons.arsenal.current()
 			shot = slot == null or slot.magazine < start_mag or bot.weapons.arsenal.is_reloading() or not target.is_alive() or target.health < start_hp
 			if shot:
 				break

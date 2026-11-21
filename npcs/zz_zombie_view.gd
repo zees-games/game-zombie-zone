@@ -17,7 +17,7 @@ func build(p_kind: StringName, p_variant: int) -> void:
 	var scene := _scene(BODIES.get(body_id, ""))
 
 	if scene == null:
-		DotLog.warn(CHANNEL, "no zombie model; drawing a capsule", {"kind": String(kind), "body": String(body_id)})
+		GSLog.warn(CHANNEL, "no zombie model; drawing a capsule", {"kind": String(kind), "body": String(body_id)})
 		_model = _capsule()
 		add_child(_model)
 		return
@@ -87,13 +87,13 @@ func _index_bones() -> void:
 	_dead_bones = shape_scales(_skeleton, limp)
 
 
-## [DotNpcLimbs]' view seam: takes a limb off the drawn body, and returns where it was cut.
+## [GSNpcLimbs]' view seam: takes a limb off the drawn body, and returns where it was cut.
 func sever_limb(limb: StringName, d: Dictionary, impulse: Vector3) -> Vector3:
 	if _skeleton == null or _model == null:
 		return Vector3.INF
 
 	_note_limb(limb)
-	var joint := DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, impulse)
+	var joint := GSNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, impulse)
 	_fade_new_parts(limb, joint)
 	return joint
 
@@ -104,7 +104,7 @@ func stump_limb(limb: StringName, d: Dictionary) -> Vector3:
 		return Vector3.INF
 
 	_note_limb(limb)
-	var joint := DotNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, Vector3.ZERO, true)
+	var joint := GSNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, Vector3.ZERO, true)
 	_fade_new_parts(limb, joint)
 	return joint
 
@@ -114,7 +114,7 @@ func _trail(at: Vector3) -> void:
 		return
 	if _trail_from == Vector3.INF or at.distance_to(_trail_from) > 0.8:
 		_trail_from = at
-		var _pool := DotNpcGibs.add_pool(get_tree(), at, 0.2)
+		var _pool := GSNpcGibs.add_pool(get_tree(), at, 0.2)
 
 
 func _note_limb(limb: StringName) -> void:
@@ -122,16 +122,16 @@ func _note_limb(limb: StringName) -> void:
 		_legs_gone += 1
 
 
-## A wet mark on the body where a shot landed (client only, pooled and capped by DotNpcGore.max_wounds).
+## A wet mark on the body where a shot landed (client only, pooled and capped by GSNpcGore.max_wounds).
 func wound_at(world_point: Vector3, size := 0.09) -> void:
 	if _skeleton != null and kind != &"":
-		var _mark := DotNpcGibs.add_wound(_skeleton, world_point, size)
+		var _mark := GSNpcGibs.add_wound(_skeleton, world_point, size)
 
 
 func restore_limbs() -> void:
 	_legs_gone = 0
 	if _skeleton != null:
-		DotNpcGibs.restore(_skeleton, _model)
+		GSNpcGibs.restore(_skeleton, _model)
 
 
 func _capsule() -> Node3D:
@@ -580,7 +580,7 @@ func _pose(anim: int) -> void:
 		hunch = 0.0
 
 	# A severed limb's collapsed bone: the clip wrote its scale back this frame.
-	for gone: int in _skeleton.get_meta(DotNpcGibs.COLLAPSED, []):
+	for gone: int in _skeleton.get_meta(GSNpcGibs.COLLAPSED, []):
 		_skeleton.set_bone_pose_scale(gone, Vector3.ONE * 0.001)
 
 	var spine: int = _bones.get(&"Torso", -1)
@@ -659,7 +659,7 @@ func _lift_pelvis(up: Vector3) -> void:
 		if t >= 0:
 			base = playing.position_track_interpolate(t, _anim.current_animation_position)
 	if above >= 0:
-		up = DotHumanoidIk.global_pose(_skeleton, above).basis.inverse() * up
+		up = GSHumanoidIk.global_pose(_skeleton, above).basis.inverse() * up
 	_skeleton.set_bone_pose_position(pelvis, base + up)
 
 
@@ -687,26 +687,26 @@ func _ground_feet() -> void:
 		return
 	_lift_pelvis(Vector3.ZERO)
 	for leg: Array in _legs:
-		var ankle := DotHumanoidIk.global_pose(_skeleton, leg[1]) * (leg[2] as Vector3)
+		var ankle := GSHumanoidIk.global_pose(_skeleton, leg[1]) * (leg[2] as Vector3)
 		var floor_y := (leg[3] as Vector3).y
 		if ankle.y < floor_y:
-			DotHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], Vector3(ankle.x, floor_y, ankle.z), Vector3(0.0, 0.0, 1.0), 1.0)
+			GSHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], Vector3(ankle.x, floor_y, ankle.z), Vector3(0.0, 0.0, 1.0), 1.0)
 		_lift_foot_bone(int(leg[5]), floor_y)
 
 
 ## The foot bone hangs from Root, not from the shin, so bending the leg does not move it: a clip
 ## that keys it under the floor (the sprint, up to 0.24 m) is lifted straight up to [param floor_y].
 func _lift_foot_bone(foot: int, floor_y: float) -> void:
-	var at := DotHumanoidIk.global_pose(_skeleton, foot).origin
+	var at := GSHumanoidIk.global_pose(_skeleton, foot).origin
 	if at.y >= floor_y:
 		return
-	var parent := DotHumanoidIk.global_pose(_skeleton, _skeleton.get_bone_parent(foot))
+	var parent := GSHumanoidIk.global_pose(_skeleton, _skeleton.get_bone_parent(foot))
 	var local := parent.affine_inverse().basis * Vector3(0.0, floor_y - at.y, 0.0)
 	_skeleton.set_bone_pose_position(foot, _skeleton.get_bone_pose_position(foot) + local)
 
 
 ## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
-## step (dot-player-char's DotFootPlant over the clip's own phase), the hips lowered where a leg
+## step (dot-player-char's GSFootPlant over the clip's own phase), the hips lowered where a leg
 ## would not reach and both legs bent to their feet. Weighted by [member _shamble].
 func _plant_feet() -> void:
 	var legs := _leg_chains()
@@ -722,7 +722,7 @@ func _plant_feet() -> void:
 	var feet := _plant.step(_anim.current_animation_position / length, homes, _velocity, length / maxf(_rate, 0.05))
 	var drop := 0.0
 	for i in legs.size():
-		var hip := DotHumanoidIk.global_pose(_skeleton, legs[i][0]).origin
+		var hip := GSHumanoidIk.global_pose(_skeleton, legs[i][0]).origin
 		var gap := to_skeleton * feet[i] - hip
 		var flat := Vector2(gap.x, gap.z).length()
 		var longest := float(legs[i][4]) * 0.97
@@ -731,7 +731,7 @@ func _plant_feet() -> void:
 	if drop > 0.0:
 		_lift_pelvis(Vector3(0.0, -drop * _shamble, 0.0))
 	for i in legs.size():
-		var _reached := DotHumanoidIk.two_bone_to(_skeleton, legs[i][0], legs[i][1], legs[i][2], to_skeleton * feet[i], Vector3(0.0, 0.0, 1.0), _shamble)
+		var _reached := GSHumanoidIk.two_bone_to(_skeleton, legs[i][0], legs[i][1], legs[i][2], to_skeleton * feet[i], Vector3(0.0, 0.0, 1.0), _shamble)
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.
@@ -1002,7 +1002,7 @@ func _draw_flags(flags: int) -> void:
 # Dying
 
 ## Starts the fall: [param reaction] is a dot-player-char reaction id the server picked
-## (`DotPlayerDeath`), [param push] the shot's direction scaled by its strength, [param seed] the
+## (`GSPlayerDeath`), [param push] the shot's direction scaled by its strength, [param seed] the
 ## death's own number. Animated, not physical: see [method _present_death].
 func die(reaction: StringName, push: Vector3, seed: int) -> void:
 	if not _death.is_empty():

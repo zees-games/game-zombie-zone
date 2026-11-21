@@ -9,7 +9,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 ##
 ## [b]Tuning is `cfg/addon/zombie_zone/drops.yml`[/b] (every `*.yml` there, then the game, then the
 ## operator's `cfg/server/...` tiers, then `ZOMBIE_ZONE_DROPS_*` and `--zombie_zone.drops.*`), read
-## by dot-core's [DotAddonConfig]. A kind's setting is the first found of `types.<kind>`, then its
+## by dot-core's [GSAddonConfig]. A kind's setting is the first found of `types.<kind>`, then its
 ## class (`common`, or `mutant` for every other kind, a pack's monster included), then the top level.
 
 const CHANNEL := "zz.drops"
@@ -87,10 +87,10 @@ func _init(p_game: Object) -> void:
 
 ## Reads the cfg tiers; without files the defaults stand.
 func load_config() -> void:
-	var res := DotAddonConfig.load_dir(ADDON, DEFAULTS)
+	var res := GSAddonConfig.load_dir(ADDON, DEFAULTS)
 
 	if not res.ok:
-		DotLog.warn(CHANNEL, "the drop settings do not load, defaults used", {"why": res.error.message})
+		GSLog.warn(CHANNEL, "the drop settings do not load, defaults used", {"why": res.error.message})
 		return
 
 	var block: Variant = (res.value as Dictionary).get("drops", null)

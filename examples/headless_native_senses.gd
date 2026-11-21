@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 
@@ -9,7 +9,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 
 const SECTIONS := 3
 const CHECKS := 8
-const NATIVE := &"DotSimSenses"
+const NATIVE := &"GSSimSenses"
 const SEEDS := 40
 const PASSES := 6
 const FACTIONS: Array[StringName] = [&"survivors", &"hostile", &"rival", &"wildlife"]
@@ -20,7 +20,7 @@ var _world: Node3D = null
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -115,8 +115,8 @@ func _place(rng: RandomNumberGenerator, node: Node3D) -> void:
 	node.rotation = Vector3(rng.randf_range(-0.3, 0.3), rng.randf_range(-PI, PI), 0.0)
 
 
-func _def(rng: RandomNumberGenerator) -> DotNpcDef:
-	var def := DotNpcDef.new()
+func _def(rng: RandomNumberGenerator) -> GSNpcDef:
+	var def := GSNpcDef.new()
 	def.faction = FACTIONS[1 + rng.randi() % 3]
 	def.sight_range = [0.0, rng.randf_range(4.0, 60.0), rng.randf_range(10.0, 30.0)][rng.randi() % 3]
 	def.sight_half_angle_deg = [180.0, rng.randf_range(10.0, 179.0), 60.0][rng.randi() % 3]
@@ -135,20 +135,20 @@ func _candidates(rng: RandomNumberGenerator) -> Array:
 		var id := StringName("p%d" % rng.randi_range(0, 18))
 		var faction: StringName = FACTIONS[0] if rng.randf() < 0.7 else FACTIONS[rng.randi() % FACTIONS.size()]
 		var at := Vector3(rng.randf_range(-40, 40), rng.randf_range(-0.5, 2.5), rng.randf_range(-40, 40))
-		out.append(DotNpcSenses.Candidate.new(id, at, faction, [0.0, 0.0, rng.randf_range(1.0, 25.0)][rng.randi() % 3]))
+		out.append(GSNpcSenses.Candidate.new(id, at, faction, [0.0, 0.0, rng.randf_range(1.0, 25.0)][rng.randi() % 3]))
 	return out
 
 
 ## Two spawners (not in the tree: only their perception pass runs) over the same seeded state, one native.
-func _spawner(rng_seed: int, native: bool, verify := false) -> DotNpcSpawner:
+func _spawner(rng_seed: int, native: bool, verify := false) -> GSNpcSpawner:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = rng_seed
-	var sp := DotNpcSpawner.new()
-	sp.limits = DotNpcLimits.new()
+	var sp := GSNpcSpawner.new()
+	sp.limits = GSNpcLimits.new()
 	sp.limits.sense_period_ticks = rng.randi_range(1, 3)
 	sp.limits.sense_quiet_mult = rng.randi_range(1, 3)
 	sp.limits.sense_candidate_cap = [0, 0, rng.randi_range(1, 8)][rng.randi() % 3]
-	sp.senses = DotNpcSenses.new()
+	sp.senses = GSNpcSenses.new()
 	sp.senses.switch_ratio = [0.6, rng.randf_range(0.2, 1.0)][rng.randi() % 2]
 	sp.senses.commitment_grace = rng.randf_range(0.0, 5.0)
 	sp.senses.line_of_sight_enabled = rng.randf() < 0.9
@@ -159,10 +159,10 @@ func _spawner(rng_seed: int, native: bool, verify := false) -> DotNpcSpawner:
 	return sp
 
 
-func _instances(rng: RandomNumberGenerator, nodes: Array[Node], cands: Array) -> Array[DotNpcInstance]:
-	var out: Array[DotNpcInstance] = []
+func _instances(rng: RandomNumberGenerator, nodes: Array[Node], cands: Array) -> Array[GSNpcInstance]:
+	var out: Array[GSNpcInstance] = []
 	for i in nodes.size():
-		var npc := DotNpcInstance.new()
+		var npc := GSNpcInstance.new()
 		npc.instance_id = i + 1
 		npc.def = _def(rng)
 		npc.node = nodes[i]
@@ -177,7 +177,7 @@ func _instances(rng: RandomNumberGenerator, nodes: Array[Node], cands: Array) ->
 				npc.target_id = &"gone"
 			_:
 				var c: Variant = cands[rng.randi() % cands.size()] if not cands.is_empty() else null
-				npc.target_id = (c as DotNpcSenses.Candidate).id if c != null else &""
+				npc.target_id = (c as GSNpcSenses.Candidate).id if c != null else &""
 		npc.target_seen_at = rng.randf_range(-3.0, 2.0)
 		npc.engaged_at = npc.target_seen_at
 		npc.target_since = npc.target_seen_at - 1.0
@@ -194,7 +194,7 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 	var state := rng.randi()
 	var a := _spawner(9000 + s, false)
 	var b := _spawner(9000 + s, true)
-	var sides: Array[DotNpcSpawner] = [a, b]
+	var sides: Array[GSNpcSpawner] = [a, b]
 	var logs: Array = [[], []]
 	for side in 2:
 		var r := RandomNumberGenerator.new()
@@ -202,7 +202,7 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 		for npc in _instances(r, nodes, cands):
 			sides[side]._npcs[npc.instance_id] = npc
 		var seen: Array = logs[side]
-		sides[side].target_changed.connect(func(npc: DotNpcInstance, t: StringName) -> void: seen.append([npc.instance_id, t]))
+		sides[side].target_changed.connect(func(npc: GSNpcInstance, t: StringName) -> void: seen.append([npc.instance_id, t]))
 	var now := rng.randf_range(0.0, 4.0)
 	for p in PASSES:
 		await get_tree().physics_frame
@@ -221,7 +221,7 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 			sp._now = now
 			sp._ticks = p + s
 		var held: Array = []
-		for npc: DotNpcInstance in a._npcs.values():
+		for npc: GSNpcInstance in a._npcs.values():
 			held.append(npc.target_id)
 		a._perception.perceive()
 		b._perception.perceive()
@@ -233,8 +233,8 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 			bad["signals"] += 1
 		var k := 0
 		for id: int in a._npcs:
-			var x: DotNpcInstance = a._npcs[id]
-			var y: DotNpcInstance = b._npcs[id]
+			var x: GSNpcInstance = a._npcs[id]
+			var y: GSNpcInstance = b._npcs[id]
 			if x.target_id != y.target_id or x.target_seen_at != y.target_seen_at or x.engaged_at != y.engaged_at \
 					or x.target_since != y.target_since or x.sense_quiet != y.sense_quiet:
 				bad["state"] += 1
@@ -247,9 +247,9 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 		logs[1].clear()
 		# Moved on: some candidates walk, some leave or arrive, some zombies turn and walk, time passes.
 		for i in cands.size():
-			var c := cands[i] as DotNpcSenses.Candidate
+			var c := cands[i] as GSNpcSenses.Candidate
 			if c != null and rng.randf() < 0.6:
-				cands[i] = DotNpcSenses.Candidate.new(c.id, c.position + Vector3(rng.randf_range(-6, 6), 0.0,
+				cands[i] = GSNpcSenses.Candidate.new(c.id, c.position + Vector3(rng.randf_range(-6, 6), 0.0,
 					rng.randf_range(-6, 6)), c.faction, [0.0, rng.randf_range(1.0, 25.0)][rng.randi() % 2])
 		if rng.randf() < 0.3 and not cands.is_empty():
 			cands.remove_at(rng.randi() % cands.size())
@@ -265,7 +265,7 @@ func _compare(s: int, bad: Dictionary, counted: Dictionary) -> void:
 	b.free()
 
 
-## [member DotNpcSenses.native_verify] over ten worlds: both passes run, the script's answers kept, no mismatch.
+## [member GSNpcSenses.native_verify] over ten worlds: both passes run, the script's answers kept, no mismatch.
 func _verify() -> bool:
 	var decided := 0
 	var mismatches := 0

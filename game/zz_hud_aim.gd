@@ -6,13 +6,13 @@ extends "zz_hud_base.gd"
 ## dot-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
 ## directly, an older dot-ui fails to compile this script.
 func _make_crosshair() -> Control:
-	if DotAddonApi.build_level("dot_ui") >= 10:
-		var shape: Variant = DotCrosshair
+	if GSAddonApi.build_level("dot_ui") >= 10:
+		var shape: Variant = GSCrosshair
 		var cross := (shape as GDScript).new() as Control
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		# Dead or spectating: nothing in hand to aim (dot-ui API 14; older ones ignore the property).
-		if DotAddonApi.build_level("dot_ui") >= 14:
+		if GSAddonApi.build_level("dot_ui") >= 14:
 			cross.set(&"alive_source", func() -> bool: return player != null and player.is_alive() and not player.watching)
 		return cross
 
@@ -69,5 +69,5 @@ func crosshair_opacity(fraction: float) -> float:
 	if not _fades:
 		return 1.0
 	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
-	var crosshair: Variant = DotCrosshair
+	var crosshair: Variant = GSCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))

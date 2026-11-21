@@ -2,8 +2,8 @@ extends RefCounted
 
 ## Sentry turrets a box deploys: the server's, announced once and fired from there.
 ##
-## [b]The decision is dot-combat's [DotSentry]; this file is the rules.[/b] Where a turret may
-## stand ([method deploy] asks [method DotSentry.find_spot]), how many a survivor may have out,
+## [b]The decision is dot-combat's [GSSentry]; this file is the rules.[/b] Where a turret may
+## stand ([method deploy] asks [method GSSentry.find_spot]), how many a survivor may have out,
 ## what it shoots (the horde, never a survivor: it has no friendly fire to be wrong about), and
 ## how a shot becomes damage (the same dot-combat path as a survivor's, credited to its owner, so
 ## the score, the drop and the body falling are not a second implementation).
@@ -37,7 +37,7 @@ signal ended(id: int)
 ## The game (`zz_game.gd`), untyped: it preloads this file.
 var game = null
 
-## id -> {sentry: DotSentry, owner: int (entity), owner_key: StringName, damage: float}
+## id -> {sentry: GSSentry, owner: int (entity), owner_key: StringName, damage: float}
 var turrets: Dictionary = {}
 
 var _next_id: int = 1
@@ -48,29 +48,29 @@ func _init(p_game: Object) -> void:
 
 
 ## Puts a turret where [param player] is looking, or at their feet when that spot is no good.
-## Returns the id, or 0 with [param why] saying what was wrong (a [DotResult] failure's detail).
-func deploy(player, params: Dictionary) -> DotResult:
+## Returns the id, or 0 with [param why] saying what was wrong (a [GSResult] failure's detail).
+func deploy(player, params: Dictionary) -> GSResult:
 	var cfg = _cfg()
 	var defs := defaults()
 	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state if game.get_world_3d() != null else null
 
 	if space == null:
-		return DotResult.fail(DotError.CODE_STATE, "No world to stand it in.")
+		return GSResult.fail(GSError.CODE_STATE, "No world to stand it in.")
 
 	var eye: Vector3 = player.feet() + Vector3(0.0, 1.5, 0.0)
 	var facing := Vector3(-sin(deg_to_rad(player.controller.state.yaw)), 0.0, -cos(deg_to_rad(player.controller.state.yaw)))
 	var mask: int = game.world_mask()
-	var spot := DotSentry.find_spot(space, eye, facing, mask, cfg.turret_place_reach)
+	var spot := GSSentry.find_spot(space, eye, facing, mask, cfg.turret_place_reach)
 
 	if not spot.ok:
-		spot = DotSentry.find_spot(space, eye, Vector3.DOWN + facing * 0.01, mask, cfg.turret_foot_reach)
+		spot = GSSentry.find_spot(space, eye, Vector3.DOWN + facing * 0.01, mask, cfg.turret_foot_reach)
 
 	if not spot.ok:
 		return spot.wrap("A turret cannot stand there.")
 
 	var at: Vector3 = spot.value["position"]
 	var seconds := float(params.get("seconds", defs["seconds"]))
-	var sentry := DotSentry.new(at, game.now(), deg_to_rad(player.controller.state.yaw))
+	var sentry := GSSentry.new(at, game.now(), deg_to_rad(player.controller.state.yaw))
 	sentry.lifetime = seconds
 	sentry.ammo = int(params.get("ammo", defs["ammo"]))
 	sentry.reach = float(params.get("reach", defs["reach"]))
@@ -83,8 +83,8 @@ func deploy(player, params: Dictionary) -> DotResult:
 	turrets[id] = {"sentry": sentry, "owner": player.entity_id, "owner_key": player.player_id,
 		"damage": float(params.get("damage", defs["damage"]))}
 	placed.emit(id, at, sentry.yaw, seconds)
-	DotLog.info(CHANNEL, "a turret was deployed", {"by": String(player.player_id), "at": at})
-	return DotResult.success(id)
+	GSLog.info(CHANNEL, "a turret was deployed", {"by": String(player.player_id), "at": at})
+	return GSResult.success(id)
 
 
 func tick(delta: float) -> void:
@@ -95,7 +95,7 @@ func tick(delta: float) -> void:
 
 	for id: int in turrets.keys():
 		var t: Dictionary = turrets[id]
-		var sentry: DotSentry = t["sentry"]
+		var sentry: GSSentry = t["sentry"]
 
 		if sentry.expired(now):
 			remove(id)
@@ -146,7 +146,7 @@ func _make_room(owner: int) -> void:
 		remove(oldest)
 
 
-func _candidates(sentry: DotSentry) -> Array:
+func _candidates(sentry: GSSentry) -> Array:
 	var out: Array = []
 	var chest := Vector3(0.0, _cfg().turret_chest_height, 0.0)
 
@@ -164,9 +164,9 @@ func _candidates(sentry: DotSentry) -> Array:
 
 func _hit(t: Dictionary, target: Dictionary, point: Vector3) -> void:
 	var victim := int(target["id"])
-	var hit := DotDamage.make(int(t["owner"]), victim, float(t["damage"]), game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(int(t["owner"]), victim, float(t["damage"]), game.combat.damage_type(&"strike"))
 	hit.point = point
-	hit.direction = (point - (t["sentry"] as DotSentry).muzzle()).normalized()
+	hit.direction = (point - (t["sentry"] as GSSentry).muzzle()).normalized()
 	hit.tick = int(float(game.now()) * float(game.tick_rate))
 	hit.weapon_id = &"turret"
 	var _applied: Variant = game.combat.apply_damage(hit)
@@ -176,6 +176,6 @@ func describe() -> Dictionary:
 	var rows: Array = []
 
 	for id: int in turrets:
-		rows.append({"id": id, "owner": String(turrets[id]["owner_key"]), "sentry": (turrets[id]["sentry"] as DotSentry).describe()})
+		rows.append({"id": id, "owner": String(turrets[id]["owner_key"]), "sentry": (turrets[id]["sentry"] as GSSentry).describe()})
 
 	return {"turrets": rows}

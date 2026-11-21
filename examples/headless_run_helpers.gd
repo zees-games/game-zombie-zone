@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## The world and simulation helpers of [headless_run.gd]'s suite, split off to keep each file under the size gate.
 
@@ -98,14 +98,14 @@ func _sim(game: ZzGame, seconds: float) -> void:
 
 ## Holds or releases the survivor's primary fire on the command the server reads this tick.
 func _fire(who: ZzPlayer, on: bool) -> void:
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.set_button(ZzNetCommand.BUTTON_FIRE, on)
 	who.controller.current_command = command
 
 
 func _aim(player: ZzPlayer, target: Vector3) -> void:
 	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	player.controller.apply_command(command)
@@ -113,8 +113,8 @@ func _aim(player: ZzPlayer, target: Vector3) -> void:
 	player.controller.state.pitch = command.pitch
 
 
-func _shot(game: ZzGame, from: ZzPlayer, at: Vector3, damage: float) -> DotShot:
-	var shot := DotShot.make(&"test", from.entity_id, game.current_tick(), 0)
+func _shot(game: ZzGame, from: ZzPlayer, at: Vector3, damage: float) -> GSShot:
+	var shot := GSShot.make(&"test", from.entity_id, game.current_tick(), 0)
 	shot.origin = from.eye_position()
 	shot.direction = (at - shot.origin).normalized()
 	shot.damage = damage
@@ -125,13 +125,13 @@ func _shot(game: ZzGame, from: ZzPlayer, at: Vector3, damage: float) -> DotShot:
 
 
 func _hurt(game: ZzGame, player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 
 
-func _hurt_npc(game: ZzGame, npc: DotNpcInstance, amount: float) -> void:
-	var hit := DotDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
+func _hurt_npc(game: ZzGame, npc: GSNpcInstance, amount: float) -> void:
+	var hit := GSDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 

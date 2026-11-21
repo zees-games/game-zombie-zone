@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzConfig := preload("../game/zz_config.gd")
@@ -43,10 +43,10 @@ var _sections_finished := 0
 
 var _server_game: ZzGame = null
 var _client_game: ZzGame = null
-var _server_net: DotNetManager = null
-var _server_remote: DotGameWorkbenchRemote = null
-var _client_remote: DotGameWorkbenchRemoteClient = null
-var _client_net: DotNetManager = null
+var _server_net: GSNetManager = null
+var _server_remote: GSGameWorkbenchRemote = null
+var _client_remote: GSGameWorkbenchRemoteClient = null
+var _client_net: GSNetManager = null
 var _server_bridge: ZzNetBridge = null
 var _client_bridge: ZzNetBridge = null
 var _stand_in: ZzPlayer = null
@@ -73,23 +73,23 @@ func _server_me() -> ZzPlayer:
 
 
 ## A command that looks from [param player]'s eye at [param target].
-func _aim_at(player: ZzPlayer, target: Vector3) -> DotFpsCommand:
+func _aim_at(player: ZzPlayer, target: Vector3) -> GSFpsCommand:
 	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	return command
 
 
 func _hurt(player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, _server_game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, player.entity_id, amount, _server_game.combat.damage_type(&"strike"))
 	hit.tick = _server_game.current_tick()
 	var _applied := _server_game.combat.apply_damage(hit)
 
 
 
-func _hurt_npc(npc: DotNpcInstance, amount: float) -> void:
-	var hit := DotDamage.make(0, _server_game.horde.entity_id_for(npc), amount, _server_game.combat.damage_type(&"strike"))
+func _hurt_npc(npc: GSNpcInstance, amount: float) -> void:
+	var hit := GSDamage.make(0, _server_game.horde.entity_id_for(npc), amount, _server_game.combat.damage_type(&"strike"))
 	hit.tick = _server_game.current_tick()
 	var _applied := _server_game.combat.apply_damage(hit)
 
@@ -123,8 +123,8 @@ func _make_game(server: bool, parent: Node) -> ZzGame:
 	return game
 
 
-func _make_manager(server: bool, scope: StringName, peer_id: int, parent: Node, tick_rate: int) -> DotNetManager:
-	var manager := DotNetManager.new()
+func _make_manager(server: bool, scope: StringName, peer_id: int, parent: Node, tick_rate: int) -> GSNetManager:
+	var manager := GSNetManager.new()
 	manager.name = "Server" if server else "Client"
 	manager.is_server = server
 	manager.local_peer_id = peer_id
@@ -132,7 +132,7 @@ func _make_manager(server: bool, scope: StringName, peer_id: int, parent: Node, 
 	manager.auto_tick = false
 	manager.config_file = ""
 
-	var config := DotNetConfig.new()
+	var config := GSNetConfig.new()
 	config.tick_rate = tick_rate
 	config.snapshot_rate = SNAPSHOT_RATE
 	config.enable_prediction = true
@@ -176,17 +176,17 @@ func _exchange() -> void:
 
 
 ## One tick on both ends, with a real physics frame between them.
-func _step(command: DotFpsCommand = null) -> void:
+func _step(command: GSFpsCommand = null) -> void:
 	_tick += 1
 	var _ticks := _client_net.clock.advance(1.0 / float(maxi(_client_game.tick_rate, 1)))
 	_server_bridge.server_tick(_tick)
 	_flush()
-	_client_bridge.client_tick(_tick + INPUT_LEAD, command if command != null else DotFpsCommand.new())
+	_client_bridge.client_tick(_tick + INPUT_LEAD, command if command != null else GSFpsCommand.new())
 	_flush()
 	await get_tree().physics_frame
 
 
-func _steps(count: int, command: DotFpsCommand = null) -> void:
+func _steps(count: int, command: GSFpsCommand = null) -> void:
 	for _i in range(count):
 		await _step(command)
 

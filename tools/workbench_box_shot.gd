@@ -21,11 +21,11 @@ func _find_editor(n: Node) -> Node:
 
 
 func _run() -> void:
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.listen_host_fn = func() -> bool: return true
 	wb.add_set(ZzBoxProfiles.make_set(PackedStringArray(["res://cfg"])), "Boxes (odds, effects, colours, sounds)")
 	root.add_child(wb)
-	var started := wb.start(DotProfileRuntime.new())
+	var started := wb.start(GSProfileRuntime.new())
 	await _frames(3)
 	wb.toggle()
 	await _frames(6)

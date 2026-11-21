@@ -6,7 +6,7 @@ const ZzPins := preload("../game/zz_pins.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
-## The acid pool on dot-effects' shared DotHazardPool, and what it adds: caps, trail, slow. Counts sections AND checks.
+## The acid pool on dot-effects' shared GSHazardPool, and what it adds: caps, trail, slow. Counts sections AND checks.
 
 const SECTIONS := 7
 const CHECKS := 44
@@ -15,7 +15,7 @@ const SPOT := Vector3(0.0, 0.05, 14.0)
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -72,7 +72,7 @@ func _test_caps_and_trail() -> void:
 		"ramp_seconds": 0.0, "slow_factor": 0.4, "max_per_owner": 3, "global_cap": 4, "trail_spacing": 2.0, "trail_interval": 0.1})
 	var ended: Array = []
 	game.hazards.area_ended.connect(func(id: int) -> void: ended.append(id))
-	var profile: DotHazardProfile = game.hazards.profiles[&"goo"]
+	var profile: GSHazardProfile = game.hazards.profiles[&"goo"]
 	for i in 5:
 		var _p := game.hazards.add(&"goo", SPOT + Vector3(40.0 + 5.0 * float(i), 0.0, 0.0), 2.0, 20.0, -1.0, 77)
 	_check(game.hazards.pool.count(&"goo", 77) == 3 and ended.size() == 2, "three per owner; the oldest two ended on the wire too")
@@ -114,19 +114,19 @@ func _oil_ring(gap: float, tune: Dictionary = {}, mates: int = 0) -> Array:
 
 func _test_oil_catalogue() -> void:
 	_section("oil monster: catalogued, its keys reach the pools, the wire carries its kinds")
-	var def: DotNpcDef = ZzNpcs.builtin(ZzConfig.new()).filter(func(d: DotNpcDef) -> bool: return d.id == ZzNpcs.OIL_MONSTER)[0]
+	var def: GSNpcDef = ZzNpcs.builtin(ZzConfig.new()).filter(func(d: GSNpcDef) -> bool: return d.id == ZzNpcs.OIL_MONSTER)[0]
 	_check(ZzNpcs.SPECIALS.has(ZzNpcs.OIL_MONSTER) and def.move_speed > 0.0 and def.move_speed < 4.0, "it is a special and slides slowly", "%.1f" % def.move_speed)
 	var hazards := ZzHazards.new(null)
 	hazards.configure_from_meta(def.meta)
-	var goo: DotHazardProfile = hazards.profiles[ZzHazards.GOO]
-	var trail: DotHazardProfile = hazards.profiles[ZzHazards.GOO_TRAIL]
+	var goo: GSHazardProfile = hazards.profiles[ZzHazards.GOO]
+	var trail: GSHazardProfile = hazards.profiles[ZzHazards.GOO_TRAIL]
 	_check(is_equal_approx(goo.dps, 9.0) and is_equal_approx(goo.slow_factor, 0.6) and goo.seconds == 9.0, "goo_* keys reach the spit's puddle profile")
 	_check(trail.radius == 1.1 and trail.seconds == 6.0 and trail.max_per_owner == 30 and trail.trail_spacing == 1.4 and trail.kind == &"goo_trail", "trail_* keys reach the trail profile, radius and life included")
 	def.meta["trail_spacing"] = 3.0
 	def.meta["goo_dps"] = 20.0
 	hazards.configure_from_meta(def.meta)
 	_check(trail.trail_spacing == 3.0 and goo.dps == 20.0 and trail.dps == 5.0, "a changed key moves only its own pool")
-	var r := ZzEvents.read_hazard(DotNetReader.new(ZzEvents.write_hazard(5, ZzHazards.GOO_TRAIL, Vector3(1, 0, 2), 1.1, 6.0)))
+	var r := ZzEvents.read_hazard(GSNetReader.new(ZzEvents.write_hazard(5, ZzHazards.GOO_TRAIL, Vector3(1, 0, 2), 1.1, 6.0)))
 	_check(r["ok"] and r["kind"] == ZzHazards.GOO_TRAIL, "a trail puddle's kind survives the wire")
 	_finished()
 
@@ -135,7 +135,7 @@ func _test_oil_trail() -> void:
 	_section("oil monster: slides toward the survivor and leaves a damaging, slowing trail")
 	var a := await _oil_ring(14.0, {"spit_cooldown": 999.0, "spit_range": 0.0})
 	var game: ZzGame = a[0]
-	var oil: DotNpcInstance = a[2]
+	var oil: GSNpcInstance = a[2]
 	await _sim(game, 5.0)
 	var count := game.hazards.pool.count(ZzHazards.GOO_TRAIL)
 	_check(count >= 3 and count <= 30, "it leaves trail puddles as it slides", str(count))
@@ -186,14 +186,14 @@ func _test_oil_director() -> void:
 
 
 func _down_and_wait(game: ZzGame, me: ZzPlayer) -> void:
-	var hit := DotDamage.make(0, me.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, me.entity_id, 500.0, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 	await _sim(game, 0.1)
 
 
-func _shoot_oil(game: ZzGame, oil: DotNpcInstance, amount: float) -> void:
-	var hit := DotDamage.make(game.survivors()[0].entity_id, game.horde.entity_id_for(oil), amount, game.combat.damage_type(&"strike"))
+func _shoot_oil(game: ZzGame, oil: GSNpcInstance, amount: float) -> void:
+	var hit := GSDamage.make(game.survivors()[0].entity_id, game.horde.entity_id_for(oil), amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 
@@ -211,7 +211,7 @@ func _test_oil_eat() -> void:
 	var a := await _oil_ring(1.8, tune, 1)
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
-	var oil: DotNpcInstance = a[2]
+	var oil: GSNpcInstance = a[2]
 	var floor_y := me.feet().y
 	await _down_and_wait(game, me)
 	_check(me.is_down() and me.is_alive(), "the survivor is down")

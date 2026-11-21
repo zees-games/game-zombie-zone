@@ -3,7 +3,7 @@ extends "headless_mechanics_base.gd"
 const CHECKS := 155
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 func _run() -> void:
@@ -95,7 +95,7 @@ func _test_lift() -> void:
 
 	var told := mech.told_indices()
 	_check(told.has(plate), "the move is queued for clients", str(mech.snapshot(plate)))
-	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(mech.snapshot(plate), plate)))
+	var wire := ZzEvents.read_mover(GSNetReader.new(ZzEvents.write_mover(mech.snapshot(plate), plate)))
 	var snap: Array = mech.snapshot(plate)
 	_check(bool(wire["ok"]) and int(wire["index"]) == plate and int(wire["start"]) == int(snap[0]) and int(wire["dir"]) == int(snap[2]),
 		"the state survives the wire", str(wire))
@@ -243,7 +243,7 @@ func _test_prop_doors() -> void:
 	game.start()
 	await _sim(game, 8)
 	var mech: ZzMechanics = game.map.mechanics
-	var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", game.map.local_world_prefix())
+	var read: GSResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", game.map.local_world_prefix())
 	var doors := 0
 	var brush_doors := 0
 
@@ -271,7 +271,7 @@ func _test_prop_doors() -> void:
 	var rest: Transform3D = m["base"]
 	var normal := rest.basis * Vector3.RIGHT
 	var hinge := rest.origin
-	var middle := hinge + rest.basis * Vector3(0.0, 1.0, -DotMapDoorStandIn.SIZE.x * 0.5)
+	var middle := hinge + rest.basis * Vector3(0.0, 1.0, -GSMapDoorStandIn.SIZE.x * 0.5)
 	_check(body != null and body.collision_layer != 0 and bool(m["auto"]) and not bool(m["locked"]),
 		"the door has a body on a layer, and opens to anyone near", "layer %d" % (body.collision_layer if body != null else -1))
 
@@ -331,11 +331,11 @@ func _test_prop_doors() -> void:
 	# The wire: the side is in the snapshot and survives it.
 	m["side"] = -1.0
 	var snap: Array = mech.snapshot(d)
-	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, d)))
+	var wire := ZzEvents.read_mover(GSNetReader.new(ZzEvents.write_mover(snap, d)))
 	_check(bool(wire["ok"]) and float(wire["side"]) == -1.0, "the side survives the wire", str(wire))
 	m["side"] = 1.0
 	snap = mech.snapshot(d)
-	wire = ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, d)))
+	wire = ZzEvents.read_mover(GSNetReader.new(ZzEvents.write_mover(snap, d)))
 	_check(float(wire["side"]) == 1.0, "and so does the other")
 	await _test_brush_door(game, mech)
 	game.queue_free()
@@ -526,7 +526,7 @@ const VOLUME_MAP := &"ze_death_star_escape"
 
 func _first_volume(mech: ZzMechanics, kind: String, want_enabled := true, least := -1.0, most := 1e9, filtered := false) -> Dictionary:
 	for t in mech.volume_toggles():
-		var rec: Dictionary = (t["vol"] as DotMapVolume).record
+		var rec: Dictionary = (t["vol"] as GSMapVolume).record
 		var damage := float(rec.get("damage", 0.0))
 		if str(t["kind"]) == kind and bool(t["enabled"]) == want_enabled and damage >= least and damage <= most \
 				and (str(rec.get("filter", "")) != "") == filtered:
@@ -534,7 +534,7 @@ func _first_volume(mech: ZzMechanics, kind: String, want_enabled := true, least 
 	return {}
 
 func _volume_spot(t: Dictionary, lift := 0.1) -> Vector3:
-	var box: AABB = (t["vol"] as DotMapVolume).bounds()
+	var box: AABB = (t["vol"] as GSMapVolume).bounds()
 	return Vector3(box.get_center().x, box.position.y + lift, box.get_center().z)
 
 ## The map's hurt, teleport, push and gravity volumes, run on the server on a real map: they hurt, move and push survivors and
@@ -664,7 +664,7 @@ func _volumes_push(game: ZzGame, mech: ZzMechanics) -> void:
 	_check(pushed.feet().distance_to(feet) > 0.2 or speed > 1.0, "and a survivor in it is pushed", "%.1f m/s" % speed)
 
 	var grav := _first_volume(mech, "gravity")
-	var gbox: AABB = (grav["vol"] as DotMapVolume).bounds()
+	var gbox: AABB = (grav["vol"] as GSMapVolume).bounds()
 	var high := Vector3(gbox.get_center().x, gbox.end.y - 0.3, gbox.get_center().z)
 	var scale := mech.gravity_at(high, 1.8)
 	print("    gravity entity %d: scale %.2f at %s" % [int(grav["entity"]), scale, str(high)])
@@ -674,12 +674,12 @@ func _volumes_push(game: ZzGame, mech: ZzMechanics) -> void:
 	for off in [false, true]:
 		mech.input(int(push["entity"]), "Disable" if not off else "Enable", game.current_tick())
 		var snap: Array = mech.snapshot(int(push["idx"]))
-		var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(snap, int(push["idx"]))))
+		var wire := ZzEvents.read_mover(GSNetReader.new(ZzEvents.write_mover(snap, int(push["idx"]))))
 		wire_ok = wire_ok and bool(wire["ok"]) and int(wire["index"]) == int(push["idx"]) and bool(wire["locked"]) == (not off)
 	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
 
 
-# The map's logic (dot-map's DotMapIO under the mechanics)
+# The map's logic (dot-map's GSMapIO under the mechanics)
 
 func _logic_rec(entity: int, classname: String, targetname: String, keys: Dictionary) -> Dictionary:
 	return {"entity": entity, "classname": classname, "targetname": targetname, "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": keys}
@@ -760,7 +760,7 @@ func _test_logic_fixture() -> void:
 			at_door = io.now
 	_check(at_text == 32, "a relay's output waits its 0.5 s (32 ticks) before the text shows", str(at_text))
 	_check(_texts(events) == ["Hold!"], "and the text is the entity's message", str(_texts(events)))
-	var counter := io.entity_of(11) as DotMapCounter
+	var counter := io.entity_of(11) as GSMapCounter
 	_check(counter.value == 3.0, "the counter took 1 now and 2 after the second relay's 2 s + 1 s", str(counter.value))
 	_check(at_door >= 192 and at_door <= 195, "its OnHitMax opened the door at the 3 s mark (delays add: 2 s + 1 s)", str(at_door))
 	var npc_spawns := events.filter(func(e: Array) -> bool: return e[0] == "npc_spawn").size()
@@ -887,8 +887,8 @@ func _test_real_zz_logic() -> void:
 	_check(mech != null and mech.logic() != null, "zs_lens builds a logic runtime")
 	if mech != null and mech.logic() != null:
 		var io := mech.logic()
-		var count := func(c: GDScript) -> int: return io.entities.filter(func(e: DotMapEntity) -> bool: return is_instance_of(e, c)).size()
-		_check(count.call(ZzMechanics.LogicWaves) > 0 and count.call(DotMapWinLose) > 0 and count.call(DotMapBeats) > 0,
+		var count := func(c: GDScript) -> int: return io.entities.filter(func(e: GSMapEntity) -> bool: return is_instance_of(e, c)).size()
+		_check(count.call(ZzMechanics.LogicWaves) > 0 and count.call(GSMapWinLose) > 0 and count.call(GSMapBeats) > 0,
 			"its logic_waves, logic_winlose and logic_beats are the live classes, not records")
 		mech.wave_changed(1)
 		mech.wave_changed(1, true)
@@ -914,18 +914,18 @@ func _test_real_zz_logic() -> void:
 
 	game = await _game(&"zm_pathogen", true)
 	mech = game.map.mechanics
-	var tio: DotMapIO = mech.logic() if mech != null else null
+	var tio: GSMapIO = mech.logic() if mech != null else null
 	_check(tio != null and not tio.find("template_transmission2").is_empty(), "zm_pathogen builds its transmission templates")
 	if tio != null and not tio.find("template_transmission2").is_empty():
-		var door := tio.find("transmission_door2")[0] as DotMapEntity
+		var door := tio.find("transmission_door2")[0] as GSMapEntity
 		var _sent := tio.send("template_transmission2", "ForceSpawn")
 		tio.settle()
-		var made := tio.entities.filter(func(e: DotMapEntity) -> bool: return e.targetname.begins_with("transmission_door2&"))
-		_check(made.size() == 1 and (made[0] as DotMapEntity).links.any(func(l: Dictionary) -> bool: return str(l["target"]) == (made[0] as DotMapEntity).targetname),
+		var made := tio.entities.filter(func(e: GSMapEntity) -> bool: return e.targetname.begins_with("transmission_door2&"))
+		_check(made.size() == 1 and (made[0] as GSMapEntity).links.any(func(l: Dictionary) -> bool: return str(l["target"]) == (made[0] as GSMapEntity).targetname),
 			"a door copy's own Kill names the copy, not the original", str(made.size()))
 		tio.advance(40)
-		var doorway: Dictionary = (mech.get("_copies") as Dictionary).get((made[0] as DotMapEntity).index, {}) if not made.is_empty() else {"body": 1}
-		_check(door.alive and doorway.is_empty(), "the copy ran its Open to the end and was killed, so no frozen door is left standing; the original stays", "%s unhandled %s alive %s" % [doorway, tio.unhandled, (made[0] as DotMapEntity).alive])
+		var doorway: Dictionary = (mech.get("_copies") as Dictionary).get((made[0] as GSMapEntity).index, {}) if not made.is_empty() else {"body": 1}
+		_check(door.alive and doorway.is_empty(), "the copy ran its Open to the end and was killed, so no frozen door is left standing; the original stays", "%s unhandled %s alive %s" % [doorway, tio.unhandled, (made[0] as GSMapEntity).alive])
 	game.queue_free()
 	_finished += 1
 
@@ -954,7 +954,7 @@ func _test_logic_blockfort() -> void:
 
 	var events: Array = []
 	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data]))
-	var counter := io.entities.filter(func(e: DotMapEntity) -> bool: return e.targetname == "mod_counter")[0] as DotMapCounter
+	var counter := io.entities.filter(func(e: GSMapEntity) -> bool: return e.targetname == "mod_counter")[0] as GSMapCounter
 	for i in 3:
 		var _r := io.send("mod_counter", "Add", "1")
 	_check(_texts(events).is_empty() and counter.value == 3.0, "three adds to a counter that stops at 4 show nothing yet")
@@ -993,7 +993,7 @@ func _test_logic_death_star() -> void:
 	mech.logic_event.connect(func(kind: String, data: Dictionary) -> void: events.append([kind, data]))
 	var push := {}
 	for t in mech.volume_toggles():
-		if str(t["kind"]) == "push" and (t["vol"] as DotMapVolume).targetname == "push":
+		if str(t["kind"]) == "push" and (t["vol"] as GSMapVolume).targetname == "push":
 			push = t
 	_check(not push.is_empty(), "the map's pushes are built", str(mech.volume_counts()))
 	var _r := io.send("push", "Disable")
@@ -1010,7 +1010,7 @@ func _test_logic_death_star() -> void:
 	_r = io.send("push", "SetPushSpeed", "1000")
 	var after := mech.push_at(spot, 1.8)
 	_check(absf(after.length() - 19.0) < 0.2 and not is_equal_approx(before.length(), after.length()), "SetPushSpeed changes what prediction asks for", "%.1f -> %.1f m/s" % [before.length(), after.length()])
-	var wire := ZzEvents.read_mover(DotNetReader.new(ZzEvents.write_mover(mech.snapshot(int(push["idx"])), int(push["idx"]))))
+	var wire := ZzEvents.read_mover(GSNetReader.new(ZzEvents.write_mover(mech.snapshot(int(push["idx"])), int(push["idx"]))))
 	var client := ZzMechanics.new()
 	client.authoritative = false
 	client.name = "Client"
@@ -1023,7 +1023,7 @@ func _test_logic_death_star() -> void:
 	game.queue_free()
 	_finished += 1
 
-## A spritetrail's parentname finds a mover's drawn node (what DotMapFx.trail_target_fn calls).
+## A spritetrail's parentname finds a mover's drawn node (what GSMapFx.trail_target_fn calls).
 func _test_trail_targets() -> void:
 	_entered += 1
 	print("a trail finds the mover it follows")
@@ -1119,7 +1119,7 @@ func _test_map_events() -> void:
 	player.set_meta(&"dot_map_entity", 7)
 	player.set_meta(&"dot_map_gain_scale", 1.0)
 	driver_root.add_child(player)
-	var driver := DotMapSoundDriver.new()
+	var driver := GSMapSoundDriver.new()
 	driver.root = driver_root
 	driver_root.add_child(driver)
 	var _d := driver.handle("sound_fade", {"entity": 7, "name": "hum", "seconds": 0.0, "from": 1.0, "to": 0.5})
@@ -1185,7 +1185,7 @@ func _test_footing_rescue() -> void:
 	wall.transform.origin = Vector3(spot.x, spot.y + 3.0, spot.z - 3.0)
 	game.map.get("_solid").add_child(wall)
 	walker.place_at(spot, 0.0)
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	walker.controller.apply_command(forward)
 	for i in 4 * TICK_RATE:
@@ -1229,7 +1229,7 @@ func _test_ladders() -> void:
 				at.y = box.position.y + 0.05
 				me.place_at(at, 0.0)
 				me.controller.state.velocity = Vector3.ZERO
-				var up := DotFpsCommand.new()
+				var up := GSFpsCommand.new()
 				up.move = Vector2(0.0, 1.0)
 				up.yaw = rad_to_deg(atan2(side.x, side.z))
 				up.pitch = 60.0
@@ -1238,7 +1238,7 @@ func _test_ladders() -> void:
 				if me.feet().y - at.y > gained:
 					gained = me.feet().y - at.y
 					best = box
-				me.controller.apply_command(DotFpsCommand.new())
+				me.controller.apply_command(GSFpsCommand.new())
 			if gained > 1.5:
 				break
 		_check(boxes.size() > 0 and gained > 1.5, "%s: a survivor climbs a ladder" % id, "%d ladder boxes, climbed %.1f m of a %.1f m one" % [boxes.size(), gained, best.size.y])
@@ -1270,14 +1270,14 @@ func _test_ladder_from_water() -> void:
 			me.set_water(wet, game.water_rules)
 			me.place_at(at, 0.0)
 			me.controller.state.velocity = Vector3.ZERO
-			var up := DotFpsCommand.new()
+			var up := GSFpsCommand.new()
 			up.move = Vector2(0.0, 1.0)
 			up.yaw = rad_to_deg(atan2(side.x, side.z))
 			up.pitch = 60.0
 			me.controller.apply_command(up)
 			await _sim(game, TICK_RATE * 2)
 			gained = maxf(gained, me.feet().y - at.y)
-			me.controller.apply_command(DotFpsCommand.new())
+			me.controller.apply_command(GSFpsCommand.new())
 		if gained > 1.5:
 			break
 	var none: Array[AABB] = []

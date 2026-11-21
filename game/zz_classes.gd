@@ -42,7 +42,7 @@ static func _roots() -> PackedStringArray:
 		return given
 
 	var out: PackedStringArray = Engine.get_meta(META_PACK_ROOTS, PackedStringArray()).duplicate()
-	out.append_array(DotProfileSet.default_roots())
+	out.append_array(GSProfileSet.default_roots())
 	return out
 
 
@@ -58,16 +58,16 @@ static func default_id() -> String:
 	return id if all().has(id) else SURVIVOR
 
 
-## Every class that loads, id to [DotPlayerClassDef]. A profile the schema or `validate` refuses is
+## Every class that loads, id to [GSPlayerClassDef]. A profile the schema or `validate` refuses is
 ## left out and named in [method rejected]; the rest still load.
 static func all() -> Dictionary:
 	var host := _def_host()
 	if not host.has_meta(META_ALL):
 		var loaded := {}
 		var errors := PackedStringArray()
-		var set := DotPlayerClassProfiles.make_set(GAME, _roots())
+		var set := GSPlayerClassProfiles.make_set(GAME, _roots())
 		for id in set.list_ids():
-			var res := DotPlayerClassProfiles.load_def(set, id)
+			var res := GSPlayerClassProfiles.load_def(set, id)
 			var bad := ""
 			if res.ok:
 				bad = _check_extras(res.value)
@@ -77,7 +77,7 @@ static func all() -> Dictionary:
 				loaded[id] = res.value
 			else:
 				errors.append("%s: %s" % [id, bad])
-				DotLog.error(CHANNEL, "class refused", {"class": id, "why": bad})
+				GSLog.error(CHANNEL, "class refused", {"class": id, "why": bad})
 		host.set_meta(META_ALL, loaded)
 		host.set_meta(META_ERRORS, errors)
 	return host.get_meta(META_ALL)
@@ -89,7 +89,7 @@ static func rejected() -> PackedStringArray:
 	return _def_host().get_meta(META_ERRORS, PackedStringArray())
 
 
-static func _check_extras(def: DotPlayerClassDef) -> String:
+static func _check_extras(def: GSPlayerClassDef) -> String:
 	var mode := model_mode(def)
 	if not MODES.has(mode):
 		return "model_mode '%s' is not one of %s" % [mode, ", ".join(MODES)]
@@ -106,12 +106,12 @@ static func _check_extras(def: DotPlayerClassDef) -> String:
 	return ""
 
 
-static func model_mode(def: DotPlayerClassDef) -> String:
+static func model_mode(def: GSPlayerClassDef) -> String:
 	return str(def.attributes.get("model_mode", "random"))
 
 
 ## The skin ids a class may wear, as strings.
-static func models_of(def: DotPlayerClassDef) -> PackedStringArray:
+static func models_of(def: GSPlayerClassDef) -> PackedStringArray:
 	var out := PackedStringArray()
 	var list: Variant = def.attributes.get("models", [])
 	if list is Array:
@@ -123,7 +123,7 @@ static func models_of(def: DotPlayerClassDef) -> PackedStringArray:
 ## The skin for this spawn. [param wanted] is the player's own pick (used only in `select` mode and
 ## only if it is on the list); `random` draws from [param rng]; `first` is the head of the list.
 ## Empty means the class has no models: the player keeps their own avatar.
-static func pick_model(def: DotPlayerClassDef, wanted: String, rng: RandomNumberGenerator) -> String:
+static func pick_model(def: GSPlayerClassDef, wanted: String, rng: RandomNumberGenerator) -> String:
 	var models := models_of(def)
 	if models.is_empty():
 		return ""
@@ -147,21 +147,21 @@ static func offered(select_on: bool, allowed_csv: String) -> PackedStringArray:
 	var ids: Array = all().keys()
 	ids.sort()
 	for id: String in ids:
-		var def: DotPlayerClassDef = all()[id]
+		var def: GSPlayerClassDef = all()[id]
 		if (wanted.is_empty() and def.selectable) or wanted.has(id):
 			out.append(id)
 	return out
 
 
 ## Whether [param id] may be chosen; the refusal names why.
-static func check_choice(id: String, select_on: bool, allowed_csv: String) -> DotResult:
+static func check_choice(id: String, select_on: bool, allowed_csv: String) -> GSResult:
 	if not select_on:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "Class selection is off on this server.")
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "Class selection is off on this server.")
 	if not all().has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "No class '%s'." % id)
+		return GSResult.fail(GSError.CODE_INVALID, "No class '%s'." % id)
 	if not offered(select_on, allowed_csv).has(id):
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "'%s' is not offered here." % id)
-	return DotResult.success(id)
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "'%s' is not offered here." % id)
+	return GSResult.success(id)
 
 
 ## The class a stand-in is dealt, by `bot_weight` (0 never), or the default; deterministic in [param rng].
@@ -170,27 +170,27 @@ static func draw_for_bot(rng: RandomNumberGenerator) -> String:
 	ids.sort()
 	var total := 0.0
 	for id: String in ids:
-		total += float((all()[id] as DotPlayerClassDef).attributes.get("bot_weight", 0.0))
+		total += float((all()[id] as GSPlayerClassDef).attributes.get("bot_weight", 0.0))
 	if total <= 0.0:
 		return default_id()
 	var point := rng.randf() * total
 	for id: String in ids:
-		point -= float((all()[id] as DotPlayerClassDef).attributes.get("bot_weight", 0.0))
+		point -= float((all()[id] as GSPlayerClassDef).attributes.get("bot_weight", 0.0))
 		if point < 0.0:
 			return id
 	return default_id()
 
 
 ## The default class, or null when no profile loads (then config alone applies).
-static func survivor() -> DotPlayerClassDef:
+static func survivor() -> GSPlayerClassDef:
 	var found: Variant = all().get(default_id())
-	return found as DotPlayerClassDef
+	return found as GSPlayerClassDef
 
 
 ## A class by id, or the default.
-static func def_of(id: String) -> DotPlayerClassDef:
+static func def_of(id: String) -> GSPlayerClassDef:
 	var found: Variant = all().get(id)
-	return found as DotPlayerClassDef if found != null else survivor()
+	return found as GSPlayerClassDef if found != null else survivor()
 
 
 ## Forgets the loaded class so the next spawn reads the files again.
@@ -211,10 +211,10 @@ static func _def_host() -> Object:
 
 ## The carry limit for a survivor: the class's, else [param fallback].
 static func carry_limit(fallback: float) -> float:
-	return DotPlayerClassApply.carry_limit(survivor(), fallback)
+	return GSPlayerClassApply.carry_limit(survivor(), fallback)
 
 
 ## Writes the survivor class's `immune_to` onto [param combat] for [param entity]; no profile clears it.
 ## Called at every spawn, so a respawn never keeps what the last life had.
 static func apply_immunity(combat: Object, entity: int) -> int:
-	return DotGameClassImmunity.apply(combat, survivor(), entity)
+	return GSGameClassImmunity.apply(combat, survivor(), entity)

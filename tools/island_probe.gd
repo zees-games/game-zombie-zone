@@ -12,7 +12,7 @@ var _game: ZzGame
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -46,7 +46,7 @@ func _probe(id: String) -> void:
 		_game.simulate(0.05)
 		await get_tree().physics_frame
 	var horde = _game.horde
-	var pr: DotNpcNavData = horde.nav
+	var pr: GSNpcNavData = horde.nav
 	var doc: Dictionary = horde.nav_doc()
 	var blockers: Array[AABB] = []
 	if _game.map != null and _game.map.mechanics != null:
@@ -56,7 +56,7 @@ func _probe(id: String) -> void:
 		props_size = func(pid: StringName) -> Vector3:
 			return _game.props_catalogue.size_of(pid) if _game.props_catalogue.has(pid) else Vector3.ZERO
 	var job = ZzNpcs.nav_job(doc, props_size, horde.open_gates, blockers, false, false)
-	var raw: DotNpcNavData = job.run_blocking()
+	var raw: GSNpcNavData = job.run_blocking()
 	var pc := _comps(pr)
 	var rc := _comps(raw)
 	var main := _biggest(pc)
@@ -120,7 +120,7 @@ func _zombie_view(ends: Array) -> void:
 		return
 	graph.filter = null
 	graph.relabel()
-	var d: DotNpcNavData = graph.data
+	var d: GSNpcNavData = graph.data
 	var comp: PackedInt32Array = graph._component
 	var main := _biggest(comp)
 	var held := {}
@@ -163,7 +163,7 @@ func _zombie_view(ends: Array) -> void:
 ## What a zombie can really reach, by a flood of its own over the one-way edges, held against what the graph's pieces
 ## say ([method ZzNavGraph.connected], which the search trusts without searching): the two must agree on every pair.
 ## Per group of survivor spawns and posts no zombie spawn reaches: the edges that lead in, which a zombie may not climb.
-func _zombie_reach(graph: Variant, d: DotNpcNavData) -> void:
+func _zombie_reach(graph: Variant, d: GSNpcNavData) -> void:
 	var doc: Dictionary = _game.map_doc
 	var starts: Array[int] = []
 	for z: Variant in doc.get("zombie_spawns", []):
@@ -241,7 +241,7 @@ func _zombie_reach(graph: Variant, d: DotNpcNavData) -> void:
 			print(r[1])
 
 
-func _raw_path_cuts(raw: DotNpcNavData, rc: PackedInt32Array, pr: DotNpcNavData, pc: PackedInt32Array, main: int, start: int, _goal: int) -> void:
+func _raw_path_cuts(raw: GSNpcNavData, rc: PackedInt32Array, pr: GSNpcNavData, pc: PackedInt32Array, main: int, start: int, _goal: int) -> void:
 	var adj := {}
 	for k in range(0, raw.edges.size(), 2):
 		(adj.get_or_add(raw.edges[k], []) as Array).append(raw.edges[k + 1])
@@ -304,7 +304,7 @@ func _raw_path_cuts(raw: DotNpcNavData, rc: PackedInt32Array, pr: DotNpcNavData,
 				print("      column %s: H1 %s | V %s | H2 %s" % [_f(c), _first_hit(space, hi, top, 0.32).left(140), _first_hit(space, top, bot, 0.32).left(140), _first_hit(space, bot, lo, 0.32).left(140)])
 
 
-func _has_edge(d: DotNpcNavData, a: int, b: int) -> bool:
+func _has_edge(d: GSNpcNavData, a: int, b: int) -> bool:
 	for k in range(0, d.edges.size(), 2):
 		if (d.edges[k] == a and d.edges[k + 1] == b) or (d.edges[k] == b and d.edges[k + 1] == a):
 			return true
@@ -329,7 +329,7 @@ func _first_hit(space: PhysicsDirectSpaceState3D, a: Vector3, z: Vector3, radius
 	return "clear"
 
 
-func _links_near(doc: Dictionary, pr: DotNpcNavData, pc: PackedInt32Array, c: int, main: int) -> void:
+func _links_near(doc: Dictionary, pr: GSNpcNavData, pc: PackedInt32Array, c: int, main: int) -> void:
 	var shown := 0
 	for l: Array in doc.get("nav", {}).get("links", []) + doc.get("nav", {}).get("ladders", []):
 		var a := Vector3(l[0], l[1], l[2])
@@ -351,7 +351,7 @@ func _links_near(doc: Dictionary, pr: DotNpcNavData, pc: PackedInt32Array, c: in
 				print("    link %s(%s) -> %s(%s) OFF-GRAPH end" % [_f(a), str(ca), _f(z), str(cz)])
 
 
-func _obstacle_at(b: DotNpcNavBuilder, s: Vector3) -> String:
+func _obstacle_at(b: GSNpcNavBuilder, s: Vector3) -> String:
 	var out := PackedStringArray()
 	for box: AABB in b._obstacles:
 		var w := box.grow(b.clearance)
@@ -402,7 +402,7 @@ func _space_hits(space: PhysicsDirectSpaceState3D, q: PhysicsShapeQueryParameter
 	return "; ".join(out)
 
 
-static func _comps(d: DotNpcNavData) -> PackedInt32Array:
+static func _comps(d: GSNpcNavData) -> PackedInt32Array:
 	var parent := PackedInt32Array()
 	parent.resize(d.points.size())
 	for i in parent.size():

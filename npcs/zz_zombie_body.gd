@@ -53,10 +53,10 @@ var health: float = -1.0
 
 ## How it fell, once it is dead: decided by the server (`ZzHorde.decide_death`), sent with
 ## NPC_GONE, and read by the view. Null until then, and on a client that was not told.
-var death: DotPlayerDeath = null
+var death: GSPlayerDeath = null
 
 ## Its shootable limbs (`ZzZombieLimbs.attach` makes them); null for a kind without any.
-var limbs: DotNpcLimbs = null
+var limbs: GSNpcLimbs = null
 
 ## Replicated: bit `i` is set when the `i`th limb in config order is gone. Setting it severs the missing ones.
 var limb_mask: int = 0:
@@ -134,7 +134,7 @@ func _ready() -> void:
 
 
 ## Sizes the capsule from the kind's definition.
-func configure(def: DotNpcDef) -> void:
+func configure(def: GSNpcDef) -> void:
 	if def == null:
 		return
 

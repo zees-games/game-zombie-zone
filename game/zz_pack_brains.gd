@@ -158,7 +158,7 @@ func lure_to(at: Vector3) -> void:
 	lure = at
 
 
-func _enter_leap(_c: DotNpcAiContext) -> void:
+func _enter_leap(_c: GSNpcAiContext) -> void:
 	var p: Dictionary = cfg.get("pounce", {})
 	_hit_victims.clear()
 	_landed = false
@@ -172,7 +172,7 @@ func _enter_leap(_c: DotNpcAiContext) -> void:
 	npc.node.call(&"leap", _locked_dir * (flat.length() / t) + Vector3(0.0, up, 0.0))
 
 
-func _tick_leap(_c: DotNpcAiContext) -> void:
+func _tick_leap(_c: GSNpcAiContext) -> void:
 	var p: Dictionary = cfg.get("pounce", {})
 	if npc.node == null:
 		return

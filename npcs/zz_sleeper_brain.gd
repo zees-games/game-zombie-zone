@@ -24,7 +24,7 @@ var _quarry_down_at: float = -1.0
 
 
 func _build() -> void:
-	character = DotNpcAiCharacter.preset(&"hard").with_seed(npc.seed if npc != null else 0)
+	character = GSNpcAiCharacter.preset(&"hard").with_seed(npc.seed if npc != null else 0)
 	character.reaction_time = 0.05
 	character.view_turn_deg = 900.0
 	go(SITTING)
@@ -114,7 +114,7 @@ func _fill(delta: float) -> void:
 		meter += rate * delta
 		_blame[id] = float(_blame.get(id, 0.0)) + rate * delta
 
-	if context.conditions.has(DotNpcAiConditions.HEAR_COMBAT):
+	if context.conditions.has(GSNpcAiConditions.HEAR_COMBAT):
 		var heard := last_known_position()
 		if heard != Vector3.INF and heard.distance_to(npc.position()) < 12.0:
 			meter += 0.6 * delta * 4.0

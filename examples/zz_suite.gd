@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## Shared body of the headless suites that build a ZzGame solo or as a team: a quiet world, a stepped clock, an aim, a hit and section accounting.
 
@@ -84,7 +84,7 @@ func _sim(game: ZzGame, seconds: float) -> void:
 
 func _aim(player: ZzPlayer, target: Vector3) -> void:
 	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	player.controller.apply_command(command)
@@ -93,7 +93,7 @@ func _aim(player: ZzPlayer, target: Vector3) -> void:
 
 
 func _hurt(game: ZzGame, player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 

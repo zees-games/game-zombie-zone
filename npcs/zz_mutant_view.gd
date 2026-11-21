@@ -15,7 +15,7 @@ var _rest: Dictionary = {}
 var _index: Dictionary = {}
 var _phase := 0.0
 var _swing := 0.0
-var _thruster: DotFxThruster = null
+var _thruster: GSFxThruster = null
 var _stump_fx: Dictionary = {}
 var _dead_t := -1.0
 var _body_flash := 0.0
@@ -66,7 +66,7 @@ func build(p_kind: StringName, p_variant: int) -> void:
 		_player.root_node = _player.get_path_to(_model)
 		_player.add_animation_library(&"", library)
 
-	_thruster = DotFxThruster.new()
+	_thruster = GSFxThruster.new()
 	_thruster.position = EXHAUST
 	add_child(_thruster)
 
@@ -234,7 +234,7 @@ func _pose_for(anim: int, delta: float) -> float:
 
 
 func _collapse() -> void:
-	for gone: int in _skeleton.get_meta(DotNpcGibs.COLLAPSED, []):
+	for gone: int in _skeleton.get_meta(GSNpcGibs.COLLAPSED, []):
 		_skeleton.set_bone_pose_scale(gone, Vector3.ONE * 0.001)
 
 
@@ -283,7 +283,7 @@ func _part_lost(limb: StringName, at: Vector3) -> void:
 		_thruster.spark()
 		return
 
-	var fx := DotFxThruster.new()
+	var fx := GSFxThruster.new()
 	fx.broken = true
 	add_child(fx)
 	fx.global_position = at if at.is_finite() else global_position + Vector3(0.0, 2.0, 0.0)
@@ -296,7 +296,7 @@ func restore_limbs() -> void:
 	super()
 
 	for key: StringName in _stump_fx:
-		var fx: DotFxThruster = _stump_fx[key]
+		var fx: GSFxThruster = _stump_fx[key]
 		if fx != _thruster and is_instance_valid(fx):
 			fx.queue_free()
 

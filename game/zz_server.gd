@@ -3,7 +3,7 @@ extends Node
 const ZzConfig := preload("zz_config.gd")
 const ZzGame := preload("zz_game.gd")
 
-## What a [DotServer] loads as its game scene. Never a client.
+## What a [GSServer] loads as its game scene. Never a client.
 ##
 ## [b]Small on purpose.[/b] Everything a dedicated server does is in `zz_module.gd`; this
 ## exists because dot-server loads a SCENE and the game needs one, and because the world has
@@ -34,7 +34,7 @@ func _ready() -> void:
 	var loaded := ZzConfig.boot(config, "user://cfg/zombiezone.json")
 
 	if not loaded.ok:
-		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		GSGameConfigBinder.fail_boot(get_tree(), loaded)
 		return
 
 	game = ZzGame.new()
@@ -50,7 +50,7 @@ func _ready() -> void:
 	game.nav_async = true
 	add_child(game)
 
-	DotLog.info(CHANNEL, "the world is up", {
+	GSLog.info(CHANNEL, "the world is up", {
 		"tick_rate": game.tick_rate,
 		"maps": config.map_directory,
 		"difficulty": config.difficulty,

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzClient := preload("../game/zz_client.gd")
 const ZzSimHost := preload("../game/zz_sim_host.gd")
@@ -19,7 +19,7 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 

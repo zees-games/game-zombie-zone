@@ -30,7 +30,7 @@ const MODERN_PACK := "zz_modern_weapons"
 ## The survival wave in play (0 outside a hold); `weapons.min_wave` holds a heavy weapon back until then.
 static var wave: int = 0
 
-static var _defs: Array[DotWeaponDef] = []
+static var _defs: Array[GSWeaponDef] = []
 static var _by_id: Dictionary = {}
 
 
@@ -43,11 +43,11 @@ static func use_packs() -> void:
 	_shared = null
 
 
-static var _shared: DotWeaponCatalogue = null
+static var _shared: GSWeaponCatalogue = null
 
 
 ## The rigs' weapon table, built once per pack set so their behaviour scripts load once; [method use_packs] drops it.
-static func shared_catalogue() -> DotWeaponCatalogue:
+static func shared_catalogue() -> GSWeaponCatalogue:
 	if _shared == null:
 		_shared = ZeeWeaponPack.catalogue()
 		# Built under the loading cover; the first spawn then loads no script.
@@ -56,7 +56,7 @@ static func shared_catalogue() -> DotWeaponCatalogue:
 
 
 ## Every weapon from every pack, once.
-static func all_defs() -> Array[DotWeaponDef]:
+static func all_defs() -> Array[GSWeaponDef]:
 	if _defs.is_empty():
 		for def in ZeeWeaponPack.weapons():
 			_add(def)
@@ -64,7 +64,7 @@ static func all_defs() -> Array[DotWeaponDef]:
 	return _defs
 
 
-static func _add(def: DotWeaponDef) -> void:
+static func _add(def: GSWeaponDef) -> void:
 	if def == null or _by_id.has(def.id):
 		return
 
@@ -108,8 +108,8 @@ static func resolve(id: StringName) -> StringName:
 
 
 ## [method all_defs] without the legacy blasters when they are not offered.
-static func offered_defs() -> Array[DotWeaponDef]:
-	var out: Array[DotWeaponDef] = []
+static func offered_defs() -> Array[GSWeaponDef]:
+	var out: Array[GSWeaponDef] = []
 
 	for def in all_defs():
 		if offered(def.id):
@@ -123,7 +123,7 @@ static func exists(id: StringName) -> bool:
 	return _by_id.has(id)
 
 
-static func def_of(id: StringName) -> DotWeaponDef:
+static func def_of(id: StringName) -> GSWeaponDef:
 	var _all := all_defs()
 	return _by_id.get(id)
 
@@ -173,7 +173,7 @@ static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: Str
 
 ## A spawner pool's weight for weapon [param id] on [param channel] (`spawner`, `wall`, `crate`, `trader`, plus the
 ## box, loot and cache ones): 0 when `weapons.not_in.<channel>` bars it, else [param weight] times `weapons.weights`.
-## Handed to dot-weapon's `DotWeaponSpawnerConfig.weigher`; ids that are no weapon (a medkit) pass through.
+## Handed to dot-weapon's `GSWeaponSpawnerConfig.weigher`; ids that are no weapon (a medkit) pass through.
 static func channel_weight(channel: StringName, id: StringName, weight: float) -> float:
 	if not exists(id):
 		return weight
@@ -240,15 +240,15 @@ static func title_of(id: StringName) -> String:
 	return def.display_name if def != null and def.display_name != "" else String(id).capitalize()
 
 
-## The kind ([constant DotDownedRules.KIND_PRIMARY] or pistol) of the weapon [param id].
+## The kind ([constant GSDownedRules.KIND_PRIMARY] or pistol) of the weapon [param id].
 static func downed_kind_of(id: StringName) -> StringName:
-	return DotDownedRules.kind_of_tier(tier_of(id))
+	return GSDownedRules.kind_of_tier(tier_of(id))
 
 
 ## The slot a survivor who has just gone down takes out, by [param rules] and what [param arsenal]
 ## carries; the default pistol [param default_id] is given if the mode wants it and it is not carried.
 ## One function for the server's rig and the one a client draws, so both pick the same slot.
-static func downed_slot(arsenal: DotWeaponArsenal, rules: DotDownedRules, default_id: StringName) -> int:
+static func downed_slot(arsenal: GSWeaponArsenal, rules: GSDownedRules, default_id: StringName) -> int:
 	if arsenal == null:
 		return 0
 
@@ -268,10 +268,10 @@ static func downed_slot(arsenal: DotWeaponArsenal, rules: DotDownedRules, defaul
 
 	var kind := rules.choose_weapon(secondary != 0, primary != 0)
 
-	if kind == DotDownedRules.KIND_PRIMARY:
+	if kind == GSDownedRules.KIND_PRIMARY:
 		return primary
 
-	if kind == DotDownedRules.KIND_SECONDARY:
+	if kind == GSDownedRules.KIND_SECONDARY:
 		return secondary
 
 	if default_def == null:
@@ -292,13 +292,13 @@ static func downed_slot(arsenal: DotWeaponArsenal, rules: DotDownedRules, defaul
 ## counter say one thing while the server's gun does another. [param held] is the server's own
 ## test: pinned, or using something with both hands. Down, you still shoot.
 static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch: float, slot: int,
-		arsenal: DotWeaponArsenal, aim: bool = false) -> DotWeaponCommand:
-	var command := DotWeaponCommand.new()
-	command.set_button(DotWeaponCommand.BUTTON_USER_0, aim and not held)
+		arsenal: GSWeaponArsenal, aim: bool = false) -> GSWeaponCommand:
+	var command := GSWeaponCommand.new()
+	command.set_button(GSWeaponCommand.BUTTON_USER_0, aim and not held)
 
 	if not held:
-		command.set_button(DotWeaponCommand.BUTTON_ATTACK, fire)
-		command.set_button(DotWeaponCommand.BUTTON_RELOAD, reload or wants_reload(arsenal))
+		command.set_button(GSWeaponCommand.BUTTON_ATTACK, fire)
+		command.set_button(GSWeaponCommand.BUTTON_RELOAD, reload or wants_reload(arsenal))
 
 	command.yaw = yaw
 	command.pitch = pitch
@@ -312,7 +312,7 @@ static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch:
 ## on a dry pull (`auto_reload`), so a survivor who let go on the last round stood with an empty
 ## gun until the next pull clicked: with a horde coming, that click is the reload starting a
 ## second late. A weapon with `auto_reload` off (a minigun, a beam) is left to the R key.
-static func wants_reload(arsenal: DotWeaponArsenal) -> bool:
+static func wants_reload(arsenal: GSWeaponArsenal) -> bool:
 	if arsenal == null or arsenal.is_reloading() or arsenal.is_switching():
 		return false
 

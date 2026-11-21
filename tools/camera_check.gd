@@ -3,7 +3,7 @@ extends Node
 ## The cameras and bodies the first play test caught, in the real offline game:
 ##
 ## - the third-person and spectator chase cameras flown round the start and every
-##   checkpoint of the course (dot-core's DotCameraCheck): never inside, armed by the
+##   checkpoint of the course (dot-core's GSCameraCheck): never inside, armed by the
 ##   unprotected camera being in or behind the course on some frames;
 ## - the player walked (the forward action held) into another player held still: with
 ##   `mp_solidplayers 1` their capsules never overlap; with 0 they do (the armed half: the
@@ -64,7 +64,7 @@ func _fly(game: ZzGame) -> void:
 		places.append(point)
 	for at in places:
 		var eye := Vector3(at[0], at[1], at[2]) + Vector3.UP * 1.6
-		if not DotCameraProbe.is_inside(space, eye, 0.3, mask):
+		if not GSCameraProbe.is_inside(space, eye, 0.3, mask):
 			pivots.append(eye)
 	var world := _client.get_viewport().world_3d
 	var cases := {
@@ -74,8 +74,8 @@ func _fly(game: ZzGame) -> void:
 	for name in cases:
 		var total := {}
 		for pivot in pivots:
-			total = DotCameraCheck.add(total, DotCameraCheck.fly(world, DotCameraCheck.orbit_path(pivot), cases[name], mask))
-		_check(DotCameraCheck.passed(total), "%s round %d points of the street: %s" % [name, pivots.size(), DotCameraCheck.summary(total)])
+			total = GSCameraCheck.add(total, GSCameraCheck.fly(world, GSCameraCheck.orbit_path(pivot), cases[name], mask))
+		_check(GSCameraCheck.passed(total), "%s round %d points of the street: %s" % [name, pivots.size(), GSCameraCheck.summary(total)])
 
 
 ## Walks the player (the real input path: the forward action held) into another player held
@@ -99,7 +99,7 @@ func _bodies(game: ZzGame) -> Array:
 			var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(probe + Vector3.UP, probe + Vector3.DOWN, mask))
 			if hit.is_empty() or absf((hit["position"] as Vector3).y - spot.y) > 0.3:
 				continue
-			if DotCameraProbe.is_inside(space, probe + Vector3.UP * 0.9, 0.36, mask):
+			if GSCameraProbe.is_inside(space, probe + Vector3.UP * 0.9, 0.36, mask):
 				continue
 			var from: Vector3 = hit["position"]
 			var loose: float = await _walk(game, me, other, spot, from, false)
@@ -155,7 +155,7 @@ func _views(game: ZzGame) -> void:
 	# them put it. Before: nothing hides it. After: the fade does (and solid bodies keep it
 	# from getting there at all, which the check above measures). Re-placed every frame,
 	# because its own brain moves it on.
-	var fade: DotCameraFade = _client.get("_fade")
+	var fade: GSCameraFade = _client.get("_fade")
 	var camera: Camera3D = _client.get("camera")
 	var bot: ZzPlayer = null
 	for id in game.players:

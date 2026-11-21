@@ -12,7 +12,7 @@ const CHECKS := 9
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -63,7 +63,7 @@ func _shot_with(scale: float) -> float:
 	var me := game.survivors()[0]
 	var barrel := game.map.toys.toy(1)
 	var r0 := barrel.body.global_position
-	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	var shot := GSShot.make(&"test", me.entity_id, game.current_tick(), 0)
 	shot.weapon_id = &"zz_m4"
 	shot.origin = r0 + Vector3(0.0, 0.0, -5.0)
 	shot.direction = Vector3(0.0, 0.0, 1.0)

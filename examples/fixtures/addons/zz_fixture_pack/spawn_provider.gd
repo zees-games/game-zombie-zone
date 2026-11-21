@@ -19,9 +19,9 @@ static func spawn_entries() -> Array[Dictionary]:
 	]
 
 
-static func weapon_defs(types: Dictionary = {}) -> Array[DotWeaponDef]:
+static func weapon_defs(types: Dictionary = {}) -> Array[GSWeaponDef]:
 	var def := ZeeWeaponPack.rifle(types)
 	def.id = &"fx_rifle"
 	def.display_name = "Fixture Rifle"
-	var out: Array[DotWeaponDef] = [def]
+	var out: Array[GSWeaponDef] = [def]
 	return out

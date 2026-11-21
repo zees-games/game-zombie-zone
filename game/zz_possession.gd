@@ -1,5 +1,5 @@
 extends RefCounted
-## A turned survivor's hold on a zombie body: the server feeds their latest command to the body's [DotNpcDrive]
+## A turned survivor's hold on a zombie body: the server feeds their latest command to the body's [GSNpcDrive]
 ## each tick and the zombie's brain turns it into a walk and a swing ([method ZzZombieBrain._npc_driven]).
 ## Server-authoritative (ZzEvents POSSESS names it); it ends when the body dies, and the player spectates.
 
@@ -30,11 +30,11 @@ func body_of(player_id: StringName) -> int:
 
 
 ## The player takes [param npc]. False if its brain cannot be driven.
-func possess(player: Object, npc: DotNpcInstance) -> bool:
+func possess(player: Object, npc: GSNpcInstance) -> bool:
 	if npc == null or npc.brain == null or not npc.brain.has_method(&"_npc_driven"):
 		return false
 
-	var drive := DotNpcDrive.new()
+	var drive := GSNpcDrive.new()
 	drive.grab(player.player_id)
 	npc.brain.drive = drive
 	# Never reclaimed for having nobody near: a person is behind it.
@@ -51,7 +51,7 @@ func release(player_id: StringName) -> void:
 		return
 
 	holds.erase(player_id)
-	var npc: DotNpcInstance = game.horde.spawner.get_npc(id) if game.horde != null else null
+	var npc: GSNpcInstance = game.horde.spawner.get_npc(id) if game.horde != null else null
 
 	if npc != null and npc.brain != null and npc.brain.drive != null:
 		npc.brain.drive.release()
@@ -61,7 +61,7 @@ func release(player_id: StringName) -> void:
 
 func tick(_delta: float) -> void:
 	for player_id: StringName in holds.keys():
-		var npc: DotNpcInstance = game.horde.spawner.get_npc(body_of(player_id)) if game.horde != null else null
+		var npc: GSNpcInstance = game.horde.spawner.get_npc(body_of(player_id)) if game.horde != null else null
 		var player: Object = game.players.get(player_id)
 
 		if npc == null or not npc.is_alive() or player == null or npc.brain == null:
@@ -80,7 +80,7 @@ func tick(_delta: float) -> void:
 			player.controller.state.position = npc.position()
 			player.global_position = npc.position()
 
-		var cmd: DotFpsCommand = player.input_move
+		var cmd: GSFpsCommand = player.input_move
 		if cmd == null:
 			continue
 
@@ -91,7 +91,7 @@ func tick(_delta: float) -> void:
 		if cmd.is_pressed(ZzNetCommand.BUTTON_SHOVE):
 			buttons |= 2
 		npc.brain.drive.feed(cmd.move, deg_to_rad(cmd.yaw), buttons)
-		# Up and down is the game's own (DotNpcDrive is flat): a spit or a rock goes where they look.
+		# Up and down is the game's own (GSNpcDrive is flat): a spit or a rock goes where they look.
 		npc.brain.set(&"drive_pitch", deg_to_rad(cmd.pitch))
 
 

@@ -6,7 +6,7 @@ const ZzSimHost := preload("zz_sim_host.gd")
 
 ## The authoritative game of a solo session in its own process (`--sim_host 1`, [code]zz_sim_host.gd[/code]): a
 ## loopback dedicated server the solo client spawns and joins, so the simulation never runs on the render thread.
-## The same world, [DotServer] and [code]zz_module.gd[/code] a public server runs, in the order `dedicated` boots them.
+## The same world, [GSServer] and [code]zz_module.gd[/code] a public server runs, in the order `dedicated` boots them.
 ## Launch flags (after `--`): `--port N --bots N --ready PATH --config_file PATH --cvar name=value` plus the client's
 ## `--zz-*` config. It writes PATH once it accepts players, and quits a few seconds after its player left.
 
@@ -20,7 +20,7 @@ const WEAK_HARDWARE_BOTS := 7
 const BENCH_HELPER := "res://tools/bench_sim_crowd.gd"
 
 var world: ZzGame = null
-var _server: DotServer = null
+var _server: GSServer = null
 var _joined := false
 var _alone_sec := 0.0
 var _since_check := 0.0
@@ -38,13 +38,13 @@ func _ready() -> void:
 
 	# The server first (whose tick rate the world reads), then the world, then the module: dedicated's order.
 	var config := server_config(port, tick_rate, data)
-	var server := DotServer.new()
+	var server := GSServer.new()
 	server.name = "Server"
 	server.config = config
 	server.config_file = ""
 	server.auto_boot = false
 	add_child(server)
-	var booted: DotResult = await server.boot()
+	var booted: GSResult = await server.boot()
 	if not booted.ok:
 		_die("boot: %s" % booted.error.message)
 		return
@@ -67,7 +67,7 @@ func _ready() -> void:
 	world.nav_async = true
 	add_child(world)
 
-	var module_loaded: DotResult = await server.modules.load_module("res://game/zz_module.gd")
+	var module_loaded: GSResult = await server.modules.load_module("res://game/zz_module.gd")
 	if not module_loaded.ok:
 		_die("module: %s" % module_loaded.error.message)
 		return
@@ -89,15 +89,15 @@ func _ready() -> void:
 		var _stored := f.store_string(str(config.effective_enet_port()))
 		f.close()
 	_server = server
-	var module := server.modules.get_module("zombiezone") as DotGameModule
+	var module := server.modules.get_module("zombiezone") as GSGameModule
 	print("SIM_HOST ready map=%s bots=%d tick=%d" % [String(world.map.doc.get("id", "?")) if world.map != null else "?", bots, Engine.physics_ticks_per_second])  # check-logging: allow print (the SIM_HOST lines are the bench output)
 	if module != null and module.net != null:
 		_report(module.net)
 
 
 ## The loopback server config: [param data] holds its admin, ban and audit files. No player cap (bot_quota sets the bots).
-static func server_config(port: int, tickrate: int, data: String) -> DotServerConfig:
-	var config := DotServerConfig.new()
+static func server_config(port: int, tickrate: int, data: String) -> GSServerConfig:
+	var config := GSServerConfig.new()
 	config.hostname = "solo"
 	config.port = port
 	config.tickrate = tickrate
@@ -121,8 +121,8 @@ static func server_config(port: int, tickrate: int, data: String) -> DotServerCo
 	return config
 
 
-func _set_cvar(server: DotServer, cvar_name: String, value: String) -> bool:
-	var cv: DotConVar = server.console.find_cvar(cvar_name)
+func _set_cvar(server: GSServer, cvar_name: String, value: String) -> bool:
+	var cv: GSConVar = server.console.find_cvar(cvar_name)
 	if cv == null:
 		_die("no cvar %s" % cvar_name)
 		return false
@@ -131,7 +131,7 @@ func _set_cvar(server: DotServer, cvar_name: String, value: String) -> bool:
 
 
 ## `--cvar name=value` (repeatable), a bench knob for an A/B of one setting; an unknown name stops the host.
-func _apply_cvars(server: DotServer) -> bool:
+func _apply_cvars(server: GSServer) -> bool:
 	var args := OS.get_cmdline_user_args()
 	for k in args.size() - 1:
 		if args[k] != "--cvar":
@@ -146,7 +146,7 @@ func _apply_cvars(server: DotServer) -> bool:
 
 
 ## `--bench_crowd=N`: tools/bench.gd's crowd, kept here where the horde is (the bench client only draws it).
-func _bench(server: DotServer) -> void:
+func _bench(server: GSServer) -> void:
 	if ZzSimHost.arg("--bench_crowd") == "":
 		return
 	if not ResourceLoader.exists(BENCH_HELPER):  # pack-path: ok (tools/ is not shipped; a bench runs from a checkout)
@@ -174,14 +174,14 @@ func _process(delta: float) -> void:
 
 func _remote_players() -> int:
 	var count := 0
-	for session: DotClientSession in _server.sessions():
+	for session: GSClientSession in _server.sessions():
 		if not session.local:
 			count += 1
 	return count
 
 
 ## Every few seconds, one line: the tick rate held and what a tick cost (dot-net server counters).
-func _report(net: DotNetManager) -> void:
+func _report(net: GSNetManager) -> void:
 	var last: Dictionary = net.perf_counters()
 	var t0 := Time.get_ticks_usec()
 	while is_inside_tree():
@@ -195,7 +195,7 @@ func _report(net: DotNetManager) -> void:
 			held, Engine.physics_ticks_per_second, sim_ms,
 			(int(now[&"server_send_usec"]) - int(last[&"server_send_usec"])) / 1000.0 / ticks])
 		if held < Engine.physics_ticks_per_second * 0.95:
-			DotLog.warn(CHANNEL, "behind real time: %.1f of %d ticks/s (a tick costs %.1f ms)" % [held, Engine.physics_ticks_per_second, sim_ms])
+			GSLog.warn(CHANNEL, "behind real time: %.1f of %d ticks/s (a tick costs %.1f ms)" % [held, Engine.physics_ticks_per_second, sim_ms])
 		last = now
 		t0 = Time.get_ticks_usec()
 

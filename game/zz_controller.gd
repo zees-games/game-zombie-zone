@@ -1,4 +1,4 @@
-extends DotFpsController
+extends GSFpsController
 
 ## The first-person controller, with the modifiers a survivor's body can be under.
 ##
@@ -77,7 +77,7 @@ func _on_pre_simulate(tick: int, _delta: float) -> void:
 
 
 func _register_extensions() -> void:
-	var pinned := DotFpsModifier.make(PINNED)
+	var pinned := GSFpsModifier.make(PINNED)
 	pinned.deny_move = true
 	pinned.deny_jump = true
 	pinned.deny_crouch = true
@@ -88,51 +88,51 @@ func _register_extensions() -> void:
 	set_wade_scale(0.8)
 	set_weight_scale(1.0)
 
-	var limp := DotFpsModifier.make(LIMP)
+	var limp := GSFpsModifier.make(LIMP)
 	limp.max_speed_scale = 0.78
 	limp.deny_jump = false
 	var _l := motor.register_modifier(limp)
 
-	var tagged := DotFpsModifier.make(TAGGED)
+	var tagged := GSFpsModifier.make(TAGGED)
 	tagged.duration_sec = 0.35
 	tagged.max_speed_scale = 0.55
 	tagged.refreshable = true
 	var _t := motor.register_modifier(tagged)
 
-	var busy := DotFpsModifier.make(BUSY)
+	var busy := GSFpsModifier.make(BUSY)
 	busy.deny_move = true
 	busy.deny_jump = true
 	busy.max_speed_scale = 0.0
 	var _b := motor.register_modifier(busy)
 
-	var haste := DotFpsModifier.make(HASTE)
+	var haste := GSFpsModifier.make(HASTE)
 	haste.duration_sec = 20.0
 	haste.max_speed_scale = 1.4
 	haste.accelerate_scale = 1.4
 	var _h := motor.register_modifier(haste)
 
-	var floaty := DotFpsModifier.make(LOW_GRAVITY)
+	var floaty := GSFpsModifier.make(LOW_GRAVITY)
 	floaty.duration_sec = 25.0
 	floaty.gravity_scale = 0.35
 	floaty.jump_scale = 1.6
 	var _f := motor.register_modifier(floaty)
 
-	var heavy := DotFpsModifier.make(HEAVY)
+	var heavy := GSFpsModifier.make(HEAVY)
 	heavy.duration_sec = 15.0
 	heavy.max_speed_scale = 0.6
 	heavy.jump_scale = 0.5
 	var _w := motor.register_modifier(heavy)
 
-	var move_boost := DotFpsModifier.make(MOVE_BOOST)
+	var move_boost := GSFpsModifier.make(MOVE_BOOST)
 	move_boost.max_speed_scale = MOVE_BOOST_SCALE
 	var _m := motor.register_modifier(move_boost)
 
-	var crawl_boost := DotFpsModifier.make(CRAWL_BOOST)
+	var crawl_boost := GSFpsModifier.make(CRAWL_BOOST)
 	crawl_boost.max_speed_scale = CRAWL_BOOST_SCALE
 	var _c := motor.register_modifier(crawl_boost)
 
 	for i in KNOCK_DIRECTIONS:
-		var knock := DotFpsModifier.make(StringName(KNOCK_PREFIX + str(i)))
+		var knock := GSFpsModifier.make(StringName(KNOCK_PREFIX + str(i)))
 		knock.duration_sec = 0.05
 		knock.refreshable = true
 		var angle := float(i) * TAU / float(KNOCK_DIRECTIONS)
@@ -141,7 +141,7 @@ func _register_extensions() -> void:
 		var _k := motor.register_modifier(knock)
 
 	for i in GOO_SLOW_LEVELS.size():
-		var goo := DotFpsModifier.make(StringName(GOO_SLOW_PREFIX + str(i)))
+		var goo := GSFpsModifier.make(StringName(GOO_SLOW_PREFIX + str(i)))
 		goo.duration_sec = 0.35
 		goo.refreshable = true
 		goo.max_speed_scale = GOO_SLOW_LEVELS[i]
@@ -153,7 +153,7 @@ func _register_extensions() -> void:
 ## on every end whenever `zz_down_crawl_speed` is bound or changes, because the definition is
 ## what a replay reads.
 func set_crawl_speed(metres_per_second: float) -> void:
-	var down := DotFpsModifier.make(DOWN)
+	var down := GSFpsModifier.make(DOWN)
 	down.deny_jump = true
 	down.deny_crouch = true
 
@@ -173,7 +173,7 @@ func set_crawl_speed(metres_per_second: float) -> void:
 ## Registers the WADING modifier at [param scale] of a run again, which replaces its definition
 ## and keeps its place in the order (the id is what travels, so the order must not move).
 func set_wade_scale(scale: float) -> void:
-	var wading := DotFpsModifier.make(WADING)
+	var wading := GSFpsModifier.make(WADING)
 	wading.max_speed_scale = clampf(scale, 0.05, 1.0)
 	wading.jump_scale = 0.9
 	var _w := motor.register_modifier(wading)
@@ -181,7 +181,7 @@ func set_wade_scale(scale: float) -> void:
 
 ## Registers WEIGHT at [param scale] of a run again (same reason as [method set_wade_scale]) and switches it on below 1.
 func set_weight_scale(scale: float) -> void:
-	var weight := DotFpsModifier.make(WEIGHT)
+	var weight := GSFpsModifier.make(WEIGHT)
 	weight.max_speed_scale = clampf(scale, 0.05, 1.0)
 	var _w := motor.register_modifier(weight)
 	if scale < 0.999:

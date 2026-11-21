@@ -219,7 +219,7 @@ func _ragdolls(root: Node3D) -> void:
 	floor_mesh.mesh = plane
 	floor_mesh.position = Vector3(kinds.size() * 1.2 - 1.2, 0.0, 0.0)
 	root.add_child(floor_mesh)
-	var yard := DotPlayerRagdolls.new()
+	var yard := GSPlayerRagdolls.new()
 	root.add_child(yard)
 	for i in kinds.size():
 		var view := ZzZombieView.new()
@@ -236,7 +236,7 @@ func _ragdolls(root: Node3D) -> void:
 			var defs := preload("../npcs/zz_zombie_limbs.gd").defs_for(kinds[i], 100.0)
 			for limb: String in limbs:
 				view.sever_limb(StringName(limb), defs[limb], Vector3(0.0, 1.0, 2.0))
-			var death := DotPlayerDeath.new()
+			var death := GSPlayerDeath.new()
 			death.reaction = &"limp"
 			death.direction = Vector3(0.0, 0.0, -1.0)
 			death.damage = 40.0
@@ -253,7 +253,7 @@ func _ragdolls(root: Node3D) -> void:
 
 
 ## Dismemberment: a common with no limb, then one each, then several, side by side, standing and walking.
-## `--level=N` sets DotNpcGore.level first.
+## `--level=N` sets GSNpcGore.level first.
 func _gore(root: Node3D) -> void:
 	var ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 	var kind := &"common"
@@ -282,7 +282,7 @@ func _gore(root: Node3D) -> void:
 	root.add_child(ground)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--level="):
-			DotNpcGore.level = int(arg.trim_prefix("--level="))
+			GSNpcGore.level = int(arg.trim_prefix("--level="))
 	for i in sets.size():
 		var view := ZzZombieView.new()
 		root.add_child(view)
@@ -298,7 +298,7 @@ func _gore(root: Node3D) -> void:
 					view.wound_at(view.global_position + view.global_basis * w, 0.1)
 				if "legL" in sets[i] and "legR" in sets[i]:
 					for k in 4:
-						var _p := DotNpcGibs.add_pool(root.get_tree(), view.global_position + view.global_basis * Vector3(0.0, 0.0, -0.5 - 0.7 * float(k)), 0.22 - 0.02 * float(k))
+						var _p := GSNpcGibs.add_pool(root.get_tree(), view.global_position + view.global_basis * Vector3(0.0, 0.0, -0.5 - 0.7 * float(k)), 0.22 - 0.02 * float(k))
 		_deferred.append(setup)
 	var camera := Camera3D.new()
 	root.add_child(camera)

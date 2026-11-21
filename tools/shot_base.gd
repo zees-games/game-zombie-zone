@@ -84,7 +84,7 @@ func _hold_exact(game: ZzGame, local, id: StringName) -> bool:
 		return false
 	var def := ZzWeapons.def_of(id)
 	_client.set("_slot", def.slot)
-	var arsenal: DotWeaponArsenal = _client.get("weapons").arsenal
+	var arsenal: GSWeaponArsenal = _client.get("weapons").arsenal
 	await _seconds_of(0.8)
 	for _i in 6:
 		var now := arsenal.current()
@@ -311,7 +311,7 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 			Input.action_release(action)
 		_client.set("_aiming", false)
 		await _seconds_of(0.8)
-	# Dead: the crosshair must be gone (DotCrosshair.alive_source), the rest of the HUD stays.
+	# Dead: the crosshair must be gone (GSCrosshair.alive_source), the rest of the HUD stays.
 	local.health.alive = false
 	await _seconds_of(0.5)
 	await RenderingServer.frame_post_draw
@@ -326,7 +326,7 @@ func _stamina_frames(local) -> void:
 	local.health.invulnerable = true
 	var dir := ProjectSettings.globalize_path(_out)
 	DirAccess.make_dir_recursive_absolute(dir)
-	var state: DotFpsState = local.controller.state
+	var state: GSFpsState = local.controller.state
 	state.stamina = 1.0
 	Input.action_press("dot_fps_forward")
 	Input.action_press("dot_fps_sprint")
@@ -350,7 +350,7 @@ func _stamina_frames(local) -> void:
 	await _stamina_save(dir, "recovered", state, hud)
 
 
-func _stamina_save(dir: String, stage: String, state: DotFpsState, hud) -> void:
+func _stamina_save(dir: String, stage: String, state: GSFpsState, hud) -> void:
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
 	var bar: Control = hud.stamina_bar
@@ -368,7 +368,7 @@ func _fire_mode_frames(game: ZzGame, local) -> void:
 	local.health.invulnerable = true
 	var dir := ProjectSettings.globalize_path(_out)
 	DirAccess.make_dir_recursive_absolute(dir)
-	var arsenal: DotWeaponArsenal = _client.get("weapons").arsenal
+	var arsenal: GSWeaponArsenal = _client.get("weapons").arsenal
 	var _picked := arsenal.select(ZzWeapons.def_of(id).slot, 0)
 	await _seconds_of(2.0)
 	for mode in arsenal.fire_modes_available():
@@ -428,7 +428,7 @@ func _survival_frame(game: ZzGame, local) -> void:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
-	await DotShotSeq.new().record(get_tree(), path)
+	await GSShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
 
 
@@ -441,7 +441,7 @@ func _clear_view(game: ZzGame, local, stand: Vector3) -> void:
 
 func _face(player, target: Vector3) -> void:
 	var look: Vector3 = target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	player.controller.state.yaw = command.yaw
@@ -460,7 +460,7 @@ func _until_a_round(game: ZzGame) -> void:
 
 ## --view=break: a barricade and a support of the map broken in front of a free camera, frames before and after (_<what>_<t>.png).
 func _view_break(game: ZzGame) -> void:
-	var platform: DotGameClient = _client.get("platform")
+	var platform: GSGameClient = _client.get("platform")
 	while not platform.is_shown():
 		await get_tree().process_frame
 	await _seconds_of(2.5)
@@ -510,7 +510,7 @@ func _synth_support(game: ZzGame) -> void:
 		return
 	for rec: Dictionary in manifest.get("breakables", []):
 		if rec.get("glass") == null and rec.has("bounds"):
-			var built := DotMapSupport.build_all([rec], game.physics.layer_mask(&"toy"), true)
+			var built := GSMapSupport.build_all([rec], game.physics.layer_mask(&"toy"), true)
 			for support in built:
 				game.map.add_child(support)
 				game.map.supports.append(support)
@@ -598,7 +598,7 @@ func _save_extra(suffix: String) -> void:
 
 ## The clip must start after the loading cover lifts, or it is spent unseen.
 func _until_uncovered() -> void:
-	var gate: DotLoadGate = _client.get("gate")
+	var gate: GSLoadGate = _client.get("gate")
 	for _i in range(1200):
 		if gate == null or gate.is_open():
 			break
@@ -613,7 +613,7 @@ func _settle(actor: Object) -> void:
 	await _seconds_of(0.6)
 	# Dropped from above the floor it is still falling: wait for it to land, or the clip ends at once.
 	var waited := 0
-	while waited < 600 and actor.figure.body_node().get("state") != DotPlayerAnimState.IDLE:
+	while waited < 600 and actor.figure.body_node().get("state") != GSPlayerAnimState.IDLE:
 		await get_tree().process_frame
 		waited += 1
 	await _seconds_of(0.2)

@@ -42,7 +42,7 @@ const END_ROOM := Vector3(0.0, 0.05, 85.0)
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	OS.add_logger(_script_errors)
 	# The installed packs are the game's weapons (zee carries only fists), so this suite scans addons/; the stand-ins' thresholds
 	# hold with them (headless_packs covers pack rules).
@@ -221,7 +221,7 @@ func _test_box_file() -> void:
 func _test_navigation() -> void:
 	_section("the zombies' ground")
 	var game := await _team(1)
-	var graph: DotNpcNavGraph = game.horde.spawner.nav
+	var graph: GSNpcNavGraph = game.horde.spawner.nav
 
 	# Asked with the barrier shut and the survivor on the near side: every mob spawn must be
 	# somewhere it can walk to them from. The first dedicated run spawned its panic beyond it.
@@ -475,7 +475,7 @@ func _test_solid_props() -> void:
 	_section("a solid prop of a drawn world blocks bodies, a non-solid one does not")
 	var game := await _world(_quiet)
 	var origin := Vector3(300.0, 0.0, 300.0)
-	var world := DotMapBspMesh.new()
+	var world := GSMapBspMesh.new()
 	world.manifest = {"props": [
 		{"at": [origin.x, 0.0, origin.z], "stand_in": "cabinet", "yaw": 0.0, "scale": 1.0, "size": 1.0, "solid": 6},
 		{"at": [origin.x, 0.0, origin.z + 10.0], "stand_in": "cabinet", "yaw": 0.0, "scale": 1.0, "size": 1.0, "solid": 0},
@@ -722,7 +722,7 @@ func _test_shots() -> void:
 	_check(npc.is_alive() and npc.health < npc.def.max_health, "and hurts it", "%.0f" % npc.health)
 	var head := _shot(game, me, npc.position() + Vector3(0, 1.58, 0), 30.0)
 	await _sim(game, 0.1)
-	_check(not npc.is_alive() and head.damages.size() == 1 and head.damages[0].hit_group == DotHitGroup.HEAD,
+	_check(not npc.is_alive() and head.damages.size() == 1 and head.damages[0].hit_group == GSHitGroup.HEAD,
 		"a headshot finishes it")
 	_check(me.commons_killed == 1 and me.points >= 1, "and it is theirs", "%d kills" % me.commons_killed)
 	_finished()
@@ -750,7 +750,7 @@ func _test_toys() -> void:
 
 	var barrel := box.toy(1)
 	var r0 := barrel.body.global_position
-	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	var shot := GSShot.make(&"test", me.entity_id, game.current_tick(), 0)
 	shot.origin = r0 + Vector3(0.0, 0.0, -5.0)
 	shot.direction = Vector3(0.0, 0.0, 1.0)
 	shot.damage = 30.0
@@ -801,7 +801,7 @@ func _test_supports() -> void:
 	var told := []
 	var _c := game.support_broken.connect(func(index: int) -> void: told.append(index))
 	var me := game.survivors()[0]
-	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	var shot := GSShot.make(&"test", me.entity_id, game.current_tick(), 0)
 	shot.origin = base + Vector3(-5.0, 0.5, 0.0)
 	shot.direction = Vector3(1.0, 0.0, 0.0)
 	shot.damage = 100.0
@@ -917,7 +917,7 @@ func _test_crates() -> void:
 		game.crates.tick(TICK)
 		await get_tree().physics_frame
 	var here: Vector3 = game.loot.position_of(id)
-	var shot := DotShot.make(&"test", me.entity_id, game.current_tick(), 0)
+	var shot := GSShot.make(&"test", me.entity_id, game.current_tick(), 0)
 	shot.origin = here + Vector3(0.0, 0.2, -2.0)
 	shot.direction = Vector3(0.0, 0.0, 1.0)
 	shot.damage = 40.0
@@ -939,7 +939,7 @@ func _test_crates() -> void:
 		await get_tree().physics_frame
 	_check(not game.crates.toy_of(id).awake() and (game.loot.position_of(id) as Vector3).distance_to(still) < 1.5, "a crate at rest goes to sleep", "awake %s v %s w %s" % [str(game.crates.toy_of(id).awake()), str(game.crates.toy_of(id).body.linear_velocity), str(game.crates.toy_of(id).body.angular_velocity)])
 
-	var wire := ZzEvents.read_loot_moved(DotNetReader.new(ZzEvents.write_loot_moved([[7, Vector3(12.5, 0.2, -3.0), Quaternion(Vector3.UP, 0.7)]])))
+	var wire := ZzEvents.read_loot_moved(GSNetReader.new(ZzEvents.write_loot_moved([[7, Vector3(12.5, 0.2, -3.0), Quaternion(Vector3.UP, 0.7)]])))
 	var row: Array = (wire["rows"] as Array)[0] if not (wire["rows"] as Array).is_empty() else []
 	_check(bool(wire["ok"]) and row.size() == 3 and row[0] == 7 and (row[1] as Vector3).distance_to(Vector3(12.5, 0.2, -3.0)) < 0.1 and (row[2] as Quaternion).angle_to(Quaternion(Vector3.UP, 0.7)) < 0.05,
 		"LOOT_MOVED round-trips an id, a place and a turn")
@@ -1001,17 +1001,17 @@ func _test_the_room_wakes() -> void:
 	var game := await _team(1, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET + Vector3(0, 0, 30), 180.0)
-	var crowd: Array[DotNpcInstance] = []
+	var crowd: Array[GSNpcInstance] = []
 	for i in 6:
 		var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-3 + i, 0, 0), &"test")
 		(npc.brain as Object).set(&"idle_kind", 0)
 		crowd.append(npc)
 	await _sim(game, 0.3)
-	var asleep := crowd.all(func(n: DotNpcInstance) -> bool: return str(n.brain.get(&"state")) == "idle")
+	var asleep := crowd.all(func(n: GSNpcInstance) -> bool: return str(n.brain.get(&"state")) == "idle")
 	_check(asleep, "six commons standing idle")
 	crowd[0].brain.call(&"wake", me.player_id, Vector3.INF, 0.0)
 	await _sim(game, 2.0)
-	var awake := crowd.filter(func(n: DotNpcInstance) -> bool: return str(n.brain.get(&"state")) != "idle").size()
+	var awake := crowd.filter(func(n: GSNpcInstance) -> bool: return str(n.brain.get(&"state")) != "idle").size()
 	_check(awake == 6, "the one woken wakes the rest", "%d of 6" % awake)
 	_finished()
 
@@ -1112,18 +1112,18 @@ func _test_ground_strike() -> void:
 func _test_limb_zones() -> void:
 	_section("zombie limbs use dot-combat's zone ids (knee, foot, hand, stomach)")
 	const L := preload("../npcs/zz_zombie_limbs.gd")
-	_check(L.zone_of(&"legL", 0.27) == DotHitGroup.KNEE and L.zone_of(&"legR", 0.27) == DotHitGroup.KNEE, "a leg hit at knee height is the knee")
-	_check(L.zone_of(&"legL", 0.03) == DotHitGroup.FOOT, "a leg hit at the ground is the foot")
-	_check(L.zone_of(&"legL", 0.45) == DotHitGroup.LEG, "a thigh is the leg")
-	_check(L.zone_of(&"armR", 0.3) == DotHitGroup.HAND and L.zone_of(&"armR", 0.7) == DotHitGroup.ARM, "a low arm hit is the hand, a high one the arm")
-	_check(L.zone_of(&"head", 0.95) == DotHitGroup.HEAD and L.zone_of(&"gunL", 0.5) == DotHitGroup.CHEST, "the head is the head and a mutant's gun the chest")
-	_check(DotHitzone.coarse(L.zone_of(&"legL", 0.27)) == DotHitGroup.LEG and DotHitzone.coarse(L.zone_of(&"armL", 0.3)) == DotHitGroup.ARM, "with zones off knee folds to leg and hand to arm")
-	_check(DotHitzone.coarse(DotHitGroup.STOMACH) == DotHitGroup.CHEST, "with zones off the stomach folds into chest")
+	_check(L.zone_of(&"legL", 0.27) == GSHitGroup.KNEE and L.zone_of(&"legR", 0.27) == GSHitGroup.KNEE, "a leg hit at knee height is the knee")
+	_check(L.zone_of(&"legL", 0.03) == GSHitGroup.FOOT, "a leg hit at the ground is the foot")
+	_check(L.zone_of(&"legL", 0.45) == GSHitGroup.LEG, "a thigh is the leg")
+	_check(L.zone_of(&"armR", 0.3) == GSHitGroup.HAND and L.zone_of(&"armR", 0.7) == GSHitGroup.ARM, "a low arm hit is the hand, a high one the arm")
+	_check(L.zone_of(&"head", 0.95) == GSHitGroup.HEAD and L.zone_of(&"gunL", 0.5) == GSHitGroup.CHEST, "the head is the head and a mutant's gun the chest")
+	_check(GSHitzone.coarse(L.zone_of(&"legL", 0.27)) == GSHitGroup.LEG and GSHitzone.coarse(L.zone_of(&"armL", 0.3)) == GSHitGroup.ARM, "with zones off knee folds to leg and hand to arm")
+	_check(GSHitzone.coarse(GSHitGroup.STOMACH) == GSHitGroup.CHEST, "with zones off the stomach folds into chest")
 	var game := await _team(1, _quiet)
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -8.0), &"test", Basis(Vector3.UP, PI))
-	var belly := npc.node.get_node_or_null(^"Hitboxes/Stomach") as DotHitbox
-	_check(belly != null and belly.group == DotHitGroup.STOMACH, "a zombie has a stomach hitbox in the stomach zone")
-	var chest := npc.node.get_node_or_null(^"Hitboxes/Body") as DotHitbox
+	var belly := npc.node.get_node_or_null(^"Hitboxes/Stomach") as GSHitbox
+	_check(belly != null and belly.group == GSHitGroup.STOMACH, "a zombie has a stomach hitbox in the stomach zone")
+	var chest := npc.node.get_node_or_null(^"Hitboxes/Body") as GSHitbox
 	_check(belly != null and chest != null and belly.precedence > chest.precedence, "the stomach wins over the body capsule where they overlap")
 	_finished()
 
@@ -1286,7 +1286,7 @@ func _test_team_damage() -> void:
 	_check(game.team_damage.is_new(a), "a player with no playtime is new")
 	var a_before := a.health.health
 	var b_before := b.health.health
-	var hit := DotDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 	_check(is_equal_approx(b.health.health, b_before), "a new player's shot at a friend does the friend nothing",
@@ -1295,7 +1295,7 @@ func _test_team_damage() -> void:
 	a.session_seconds = 200.0 * 60.0
 	_check(not game.team_damage.is_new(a), "a player past rookie_minutes is not new")
 	b_before = b.health.health
-	hit = DotDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
+	hit = GSDamage.make(a.entity_id, b.entity_id, 20.0, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	_applied = game.combat.apply_damage(hit)
 	_check(b.health.health < b_before, "and their shot at a friend hurts the friend")
@@ -1381,18 +1381,18 @@ func _test_the_flashlight() -> void:
 	var cfg := game.flashlight_conf()
 	_check(cfg.key == "F" and game.flashlight_binder != null, "the key is F, since T is the shove", cfg.key)
 
-	cfg.default_state = DotFlashlightConfig.START_ON
+	cfg.default_state = GSFlashlightConfig.START_ON
 	me.flashlight_ready = false
 	await _sim(game, 0.1)
 	_check(me.flashlight, "a map that starts lit lights the survivor")
-	cfg.default_state = DotFlashlightConfig.START_OFF
+	cfg.default_state = GSFlashlightConfig.START_OFF
 	me.flashlight_ready = false
 	await _sim(game, 0.1)
 	_check(not me.flashlight, "and one that starts dark does not")
 
 	# Converted maps write "ambient" as a dictionary: the manor (ambient 0.3) is dark by mood alone.
-	var dark_cfg := DotFlashlightConfig.new()
-	dark_cfg.default_state = DotFlashlightConfig.START_DARK
+	var dark_cfg := GSFlashlightConfig.new()
+	dark_cfg.default_state = GSFlashlightConfig.START_DARK
 	var manor := {"ambient": {"mood": "interior_horror", "indoor": "interior_horror"}, "environment": {"ambient_energy": 0.3}}
 	var hall := {"ambient": {"mood": "indoor_hall", "indoor": "interior_horror"}, "environment": {"ambient_energy": 0.3}}
 	_check(ZzFlashlight.starts_on(dark_cfg, "ze_biohazard_manor", manor), "an interior_horror map document starts lit")
@@ -1548,7 +1548,7 @@ func _test_the_new_specials() -> void:
 	me = game.survivors()[0]
 	me.place_at(STREET, 0.0)
 	var riot := game.horde.spawner.spawn(ZzNpcs.RIOT, STREET + Vector3(0, 0, -6), &"test")
-	(riot.brain as DotNpcBrain).unbind()
+	(riot.brain as GSNpcBrain).unbind()
 	riot.brain = null
 	var body := riot.node as Node3D
 	body.look_at(Vector3(STREET.x, body.global_position.y, STREET.z), Vector3.UP)
@@ -1580,12 +1580,12 @@ func _test_how_zombies_fall() -> void:
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -5), &"test")
 	await _sim(game, 0.1)
 	var seen: Array = []
-	game.horde.zombie_died.connect(func(dead: DotNpcInstance, _by: StringName, _hit: DotDamage) -> void:
+	game.horde.zombie_died.connect(func(dead: GSNpcInstance, _by: StringName, _hit: GSDamage) -> void:
 		if dead == npc and dead.node is ZzZombieBody:
 			seen.append((dead.node as ZzZombieBody).death))
 	var _shot_dead := _shot(game, me, npc.position() + Vector3(0, 1.0, 0), 10000.0)
 	await _sim(game, 0.05)
-	var death: DotPlayerDeath = seen[0] if not seen.is_empty() else null
+	var death: GSPlayerDeath = seen[0] if not seen.is_empty() else null
 	_check(not npc.is_alive() and death != null, "the server decides the fall")
 	_check(death != null and game.horde.death_reactions.has(death.reaction), "as one of dot-player-char's reactions",
 		String(death.reaction) if death != null else "-")
@@ -1628,12 +1628,12 @@ func _test_how_survivors_fall() -> void:
 	var _shown := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
 	# cl_legs: your own body in first person keeps the legs and drops the gun; third person is whole again.
 	var _legs := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9), true)
-	_check(me.figure.person.first_person == DotHumanoidOwnView.LEGS and me.figure.visible
+	_check(me.figure.person.first_person == GSHumanoidOwnView.LEGS and me.figure.visible
 		and (me.figure.held == null or not me.figure.held.visible), "own legs: first person draws the legs, not the gun")
 	var _whole := me.present_body(false, me.feet(), Color(0.3, 0.5, 0.9))
-	_check(me.figure.person.first_person == DotHumanoidOwnView.THIRD, "own legs: third person draws the whole figure")
+	_check(me.figure.person.first_person == GSHumanoidOwnView.THIRD, "own legs: third person draws the whole figure")
 	me.incaps = game.config.max_incaps
-	var hit := DotDamage.make(claw, me.entity_id, me.health.health * 50.0 + 500.0, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(claw, me.entity_id, me.health.health * 50.0 + 500.0, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied: Variant = game.combat.apply_damage(hit)
 	await _sim(game, 0.05)
@@ -1670,24 +1670,24 @@ func _test_how_survivors_fall() -> void:
 ## What a DEATH carries on the wire, and that the death sounds are catalogued.
 func _check_death_wire() -> void:
 	# The fall rides DEATH last and optional, so a death from an older server still reads.
-	var fall := DotPlayerDeath.new()
+	var fall := GSPlayerDeath.new()
 	fall.reaction = &"face_plant"
 	fall.roll_seed = 1234
 	fall.direction = Vector3(1, 0, 0)
-	var died := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common", fall)))
-	var carried: DotPlayerDeath = died.get("death")
-	var bare := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common")))
+	var died := ZzEvents.read_death(GSNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common", fall)))
+	var carried: GSPlayerDeath = died.get("death")
+	var bare := ZzEvents.read_death(GSNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"common")))
 	_check(bool(died["ok"]) and carried != null and carried.reaction == &"face_plant" and carried.roll_seed == 1234
 		and died["by_kind"] == &"common" and bool(bare["ok"]) and not bare.has("death"),
 		"a DEATH carries the fall the server picked, and one without a fall still reads")
-	var armed_death := ZzEvents.read_death(DotNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"", fall, &"rifle")))
-	var carried_again: DotPlayerDeath = armed_death.get("death")
+	var armed_death := ZzEvents.read_death(GSNetReader.new(ZzEvents.write_death(5, 6, ZzGame.BY_ZOMBIE, &"", fall, &"rifle")))
+	var carried_again: GSPlayerDeath = armed_death.get("death")
 	_check(armed_death["weapon_id"] == &"rifle" and carried_again != null and carried_again.roll_seed == 1234 and bare["weapon_id"] == &"",
 		"a DEATH carries the weapon that landed it (the killcam's icon), before the fall")
 
-	var catalogue: DotAudioCatalogue = (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue")
-	var listed := not DotPlayerDeathSounds.rows().is_empty()
-	for row: Dictionary in DotPlayerDeathSounds.rows():
+	var catalogue: GSAudioCatalogue = (load("res://game/zz_audio.gd") as GDScript).call("sound_catalogue")
+	var listed := not GSPlayerDeathSounds.rows().is_empty()
+	for row: Dictionary in GSPlayerDeathSounds.rows():
 		listed = listed and catalogue.find(row["id"]) != null
 	_check(listed, "the death sounds are in the game's catalogue")
 
@@ -1768,16 +1768,16 @@ func _test_hazards() -> void:
 	_check((npc.node as ZzZombieBody).has_flag(ZzZombieBody.FLAG_BURNING) or not npc.is_alive(), "fire sets a zombie alight")
 
 	me.place_at(STREET + Vector3(0, 0, 40), 0.0)
-	var crowd: Array[DotNpcInstance] = []
+	var crowd: Array[GSNpcInstance] = []
 	for i in 4:
 		crowd.append(game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-6 + i, 0, -18), &"test"))
 	var _pipe := game.hazards.launch(ZzHazards.PIPE, STREET + Vector3(0, 0.5, -10), Vector3(0, 1, 0), me.entity_id, 400.0)
 	await _sim(game, 3.0)
-	var lured := crowd.filter(func(n: DotNpcInstance) -> bool:
+	var lured := crowd.filter(func(n: GSNpcInstance) -> bool:
 		return n.is_alive() and n.position().distance_to(STREET + Vector3(0, 0, -10)) < 4.0).size()
 	_check(lured >= 3, "commons go to a beeping charge", "%d of 4" % lured)
 	await _sim(game, 4.0)
-	var alive := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive()).size()
+	var alive := crowd.filter(func(n: GSNpcInstance) -> bool: return n.is_alive()).size()
 	_check(alive == 0, "and it goes off among them", "%d left" % alive)
 	_finished()
 
@@ -1840,15 +1840,15 @@ func _test_throwables() -> void:
 		fire = fire or (a["kind"] == ZzHazards.FIRE and (a["at"] as Vector3).distance_to(ahead) < 6.0)
 	_check(game.hazards.areas.size() > fires_before and fire, "a molotov starts a fire where it lands")
 
-	var crowd: Array[DotNpcInstance] = []
+	var crowd: Array[GSNpcInstance] = []
 	for i in 4:
 		crowd.append(game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(-3.0 + i * 2.0, 0.0, -22.0), &"test"))
 	var _pipe := game.hazards.launch(ZzHazards.PIPE, me.eye_position(), (ahead - me.eye_position()) * 0.6 + Vector3.UP * 4.0, me.entity_id, 300.0)
 	await _sim(game, 3.0)
-	var drawn := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive() and n.position().distance_to(ahead) < 9.0).size()
+	var drawn := crowd.filter(func(n: GSNpcInstance) -> bool: return n.is_alive() and n.position().distance_to(ahead) < 9.0).size()
 	_check(drawn >= 2, "a pipe bomb draws the commons to it", "%d of 4 within 9 m" % drawn)
 	await _sim(game, 5.0)
-	var left := crowd.filter(func(n: DotNpcInstance) -> bool: return n.is_alive()).size()
+	var left := crowd.filter(func(n: GSNpcInstance) -> bool: return n.is_alive()).size()
 	_check(left < 4, "and goes off among them", "%d of 4 standing" % left)
 
 	var frag := game.horde.spawner.spawn(ZzNpcs.COMMON, ahead, &"test")
@@ -1865,7 +1865,7 @@ func _test_throwables() -> void:
 	var _cleared := game.horde.spawner.clear_all()
 	var target := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -12.0), &"test")
 	await _sim(game, 0.1)
-	var rocket := DotWeaponSpawn.make(&"rocket_launcher", me.eye_position(), (target.position() + Vector3(0, 1.0, 0) - me.eye_position()).normalized() * 36.0, me.entity_id)
+	var rocket := GSWeaponSpawn.make(&"rocket_launcher", me.eye_position(), (target.position() + Vector3(0, 1.0, 0) - me.eye_position()).normalized() * 36.0, me.entity_id)
 	rocket.splash_radius = 6.5
 	rocket.splash_damage = 240.0
 	rocket.gravity_scale = 0.0
@@ -1875,13 +1875,13 @@ func _test_throwables() -> void:
 	_finished()
 
 
-func _spawn(id: StringName, from: ZzPlayer, at: Vector3) -> DotWeaponSpawn:
+func _spawn(id: StringName, from: ZzPlayer, at: Vector3) -> GSWeaponSpawn:
 	var origin := from.eye_position()
 	var flat := Vector3(at.x - origin.x, 0.0, at.z - origin.z)
 	# A lob that lands at [param at]: up at 45 degrees, at the speed that range needs.
 	var speed := sqrt(flat.length() * ZzHazards.GRAVITY)
 	var velocity := flat.normalized() * speed * 0.707 + Vector3.UP * speed * 0.707
-	var spawn := DotWeaponSpawn.make(id, origin, velocity, from.entity_id)
+	var spawn := GSWeaponSpawn.make(id, origin, velocity, from.entity_id)
 	spawn.gravity_scale = 1.0
 	spawn.fuse_ticks = TICK_RATE * 10
 	return spawn
@@ -1912,7 +1912,7 @@ func _test_every_box_outcome() -> void:
 
 
 ## The Turret Box: opened where a survivor looks, a sentry stands on the floor and shoots the horde on
-## its own (the server's decision, dot-combat's DotSentry), wears out, is limited per survivor, and a
+## its own (the server's decision, dot-combat's GSSentry), wears out, is limited per survivor, and a
 ## spot with no floor gives the box back.
 func _test_turret_box() -> void:
 	_section("the turret box: deployed, shoots zombies, wears out, limited, refused with no floor")
@@ -1932,7 +1932,7 @@ func _test_turret_box() -> void:
 	var _carried := game.boxes.carry(me, &"turret")
 	game.boxes.deploy(me)
 	_check(game.turrets.turrets.size() == 1 and seen.size() == 1, "opening the box stands one turret up", str(game.turrets.turrets.size()))
-	var sentry: DotSentry = (game.turrets.turrets.values()[0] as Dictionary)["sentry"]
+	var sentry: GSSentry = (game.turrets.turrets.values()[0] as Dictionary)["sentry"]
 	_check(absf(sentry.position.y) < 0.3 and sentry.position.distance_to(me.feet()) < 3.0 and sentry.position.z < me.feet().z,
 		"on the floor, in front of the survivor", str(sentry.position))
 
@@ -1952,7 +1952,7 @@ func _test_turret_box() -> void:
 
 	# It wears out.
 	for id: int in game.turrets.turrets:
-		((game.turrets.turrets[id] as Dictionary)["sentry"] as DotSentry).lifetime = 0.5
+		((game.turrets.turrets[id] as Dictionary)["sentry"] as GSSentry).lifetime = 0.5
 	await _sim(game, 1.2)
 	_check(game.turrets.turrets.is_empty(), "when its time is up it is taken down")
 
@@ -2122,9 +2122,9 @@ func _test_box_framework() -> void:
 	var spit := game.horde.spawner.spawn(ZzNpcs.SPITTER, STREET + Vector3(0, 0, -6), &"test")
 	_check(is_equal_approx(game.boxes.zombie_damage(ZzNpcs.SPITTER, spit.def.max_health, 10.0), 10.0 * game.config.box_instakill_special_scale)
 		and game.boxes.zombie_damage(ZzNpcs.COMMON, 50.0, 1.0) > 50.0, "a special takes the configured multiple, a common everything")
-	var boosted := DotDamage.make(0, 0, 160.0, null)
+	var boosted := GSDamage.make(0, 0, 160.0, null)
 	boosted.base_amount = 40.0
-	var spit_health := spit.node.get_node(^"Health") as DotHealth
+	var spit_health := spit.node.get_node(^"Health") as GSHealth
 	var rated := spit.def.max_health / spit_health.max_health
 	_check(is_equal_approx(game.horde.limb_damage(spit, boosted), 40.0 * rated), "Instakill's boost does not reach a special's limbs")
 	game.config.limb_follow_health = false
@@ -2167,12 +2167,12 @@ func _test_box_framework() -> void:
 func _walk(game: ZzGame, player: ZzPlayer, from: Vector3, seconds: float) -> float:
 	player.place_at(from, 0.0)
 	player.controller.state.velocity = Vector3.ZERO
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	player.controller.apply_command(forward)
 	await _sim(game, seconds)
 	var gone := player.feet().distance_to(from)
-	var stop := DotFpsCommand.new()
+	var stop := GSFpsCommand.new()
 	player.controller.apply_command(stop)
 	await _sim(game, 0.3)
 	return gone
@@ -2318,8 +2318,8 @@ func _test_water() -> void:
 		"deep water is swum in, the waist under", str(me.water_level))
 	await _sim(game, 1.5)
 	_check(not me.submerged and is_equal_approx(me.air, game.water_rules.drown_seconds), "a swimmer floats with the head out, and breathes")
-	var dive := DotFpsCommand.new()
-	dive.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	var dive := GSFpsCommand.new()
+	dive.set_button(GSFpsCommand.BUTTON_CROUCH, true)
 	me.controller.apply_command(dive)
 	await _sim(game, 1.5)
 	_check(me.submerged, "and a diver's eyes go under")
@@ -2353,7 +2353,7 @@ func _test_water() -> void:
 		"every setting is a cvar, the ones a client predicts replicated", str(added.size()))
 	_check(not game.water_rules.set_cvar("zz_water_swim_speed", "fast") and not game.water_rules.set_cvar("zz_water_swim_speed", "99")
 		and game.water_rules.swim_speed <= 12.0, "junk and an out-of-range speed are refused")
-	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= DotFpsNetSync.MODIFIER_BITS,
+	_check(me.controller.motor.modifier_index(ZzController.WADING) >= 0 and me.controller.motor.modifier_defs.size() <= GSFpsNetSync.MODIFIER_BITS,
 		"the wading modifier fits the motor's modifier bits", str(me.controller.motor.modifier_defs.size()))
 	_finished()
 
@@ -2560,7 +2560,7 @@ func _test_stand_ins_and_the_pass_through_level() -> void:
 	var aim := game.bots._aim_point(npc)
 	# A stand-in that has been on this zombie for a minute, its view settled onto it.
 	var reacted: Dictionary = game.bots._memory(me)
-	var settled: DotBotAim = reacted["aim"]
+	var settled: GSBotAim = reacted["aim"]
 	settled.forget()
 	var _seen := settled.engage(npc.instance_id, me.eye_position(), aim, game.now() - 60.0)
 	for _i in range(256):
@@ -2570,21 +2570,21 @@ func _test_stand_ins_and_the_pass_through_level() -> void:
 	_check(game.bots._friend_in_the_way(me, aim) and not game.bots._fire_ok(me, reacted, npc),
 		"at 1 a friend in the line holds a stand-in's fire")
 
-	_check(game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2"), "the server goes to 2")
+	_check(game.combat.set_cvar(GSCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2"), "the server goes to 2")
 	_check(not game.bots._friend_in_the_way(me, aim) and game.bots._fire_ok(me, reacted, npc),
 		"at 2 the stand-in fires through the friend")
 	var before := friend.health.health
 	var shot := _shot(game, me, aim, 30.0)
-	_check(shot.damages.size() == 1 and DotEntity.is_kind(shot.damages[0].victim, DotEntity.KIND_NPC),
-		"and the shot goes through them to the zombie", str(shot.damages.map(func(d: DotDamage) -> int: return d.victim)))
+	_check(shot.damages.size() == 1 and GSEntity.is_kind(shot.damages[0].victim, GSEntity.KIND_NPC),
+		"and the shot goes through them to the zombie", str(shot.damages.map(func(d: GSDamage) -> int: return d.victim)))
 	_check(friend.health.health == before, "leaving the friend unhurt")
 
 	# A friend standing inside the stand-in: at 1 the shot passes through them, at 0 it does not.
 	friend.place_at(STREET, 0.0)
 	await _sim(game, 0.05)
-	var _zero := game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "0")
+	var _zero := game.combat.set_cvar(GSCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "0")
 	_check(game.bots._friend_in_the_way(me, aim), "at 0 a friend holding the muzzle holds a stand-in's fire")
-	var _two := game.combat.set_cvar(DotCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2")
+	var _two := game.combat.set_cvar(GSCombatManager.CVAR_TEAMMATE_PASSTHROUGH, "2")
 	_check(not game.bots._friend_in_the_way(me, aim), "and at 2 even that one does not")
 	_finished()
 
@@ -2600,15 +2600,15 @@ func _test_a_crowd_is_cheap() -> void:
 		if npc != null:
 			npc.brain.call(&"force_target", me.player_id)
 	await _sim(game, 4.0)
-	# CPU time (DotGameCheckSuite.cpu_usec), not wall time: a loaded box (other suites share its CPUs) stretches wall time
+	# CPU time (GSGameCheckSuite.cpu_usec), not wall time: a loaded box (other suites share its CPUs) stretches wall time
 	# but not the CPU a tick burns. The cheapest of five windows of a second each is the tick's cost, and a real slowdown
 	# makes every window slow. One wall-time window read 15 ms once.
 	var per_tick := INF
 	for window in 5:
-		var started := DotGameCheckSuite.cpu_usec()
+		var started := GSGameCheckSuite.cpu_usec()
 		for i in 64:
 			game.simulate(TICK)
-		per_tick = minf(per_tick, float(DotGameCheckSuite.cpu_usec() - started) / 64000.0)
+		per_tick = minf(per_tick, float(GSGameCheckSuite.cpu_usec() - started) / 64000.0)
 	var near := game.horde.spawner.npcs_near(me.feet(), 6.0).size()
 	_check(near > 15, "sixty arrive", "%d within 6 m" % near)
 	_check(per_tick < 12.0, "and a tick costs less than a 64 Hz tick has", "%.2f ms" % per_tick)

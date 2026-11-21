@@ -34,7 +34,7 @@ func _view_fire(game: ZzGame, local, stand: Vector3) -> void:
 
 func _view_down(game: ZzGame, local, stand: Vector3) -> void:
 	local.health.invulnerable = false
-	var hit := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
 	var _applied = game.combat.apply_damage(hit)
 	local.health.invulnerable = true
 	await _seconds_of(_seconds)
@@ -46,7 +46,7 @@ func _view_killcam(game: ZzGame, local, stand: Vector3) -> void:
 	await _seconds_of(4.0)
 	for who in game.survivors():
 		who.health.invulnerable = false
-		var blow := DotDamage.make(0, who.entity_id, 9999.0, game.combat.damage_type(&"strike"))
+		var blow := GSDamage.make(0, who.entity_id, 9999.0, game.combat.damage_type(&"strike"))
 		var _felled = game.combat.apply_damage(blow)
 	game._decide(false, "the horde took the last survivor")
 	await _seconds_of(_seconds)
@@ -116,7 +116,7 @@ func _view_walk(game: ZzGame, local, stand: Vector3) -> void:
 	# A filmstrip of --zombie=<kind> walking at the survivor: a frame every 0.15 s for --seconds,
 	# a camera tracking it from the side (walk_00.. beside --out).
 	_clear_view(game, local, stand)
-	var walker: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(2.0, 0.0, -9.0)), &"shot", Basis(Vector3.UP, PI))
+	var walker: GSNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(2.0, 0.0, -9.0)), &"shot", Basis(Vector3.UP, PI))
 	if walker != null and walker.brain != null:
 		walker.brain.call(&"force_target", local.player_id)
 	var walk_cam := _free_camera()
@@ -132,10 +132,10 @@ func _view_strike(game: ZzGame, local, stand: Vector3) -> void:
 	# standing or, for strike_down, downed; a free camera from the side.
 	if _view == "strike_down":
 		local.health.invulnerable = false
-		var floored := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+		var floored := GSDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
 		var _felled = game.combat.apply_damage(floored)
 		local.health.invulnerable = true
-	var foe: DotNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -1.2)), &"shot", Basis(Vector3.UP, PI))
+	var foe: GSNpcInstance = game.horde.spawner.spawn(_zombie, game.horde.snap_to_nav(stand + Vector3(0.0, 0.0, -1.2)), &"shot", Basis(Vector3.UP, PI))
 	if foe != null and foe.brain != null:
 		foe.brain.call(&"force_target", local.player_id)
 	if _view == "pin" and foe != null:
@@ -172,7 +172,7 @@ func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
 			break
 	if game.possession == null:
 		game.possession = load("res://game/zz_possession.gd").new(game)
-	var cmd := DotFpsCommand.new()
+	var cmd := GSFpsCommand.new()
 	cmd.yaw = 180.0
 	holder.input_move = cmd
 	# The horde stands still while the map's nav bakes (a big map takes seconds): wait it out (up to 60 s)
@@ -184,13 +184,13 @@ func _view_possess(game: ZzGame, local, stand: Vector3) -> void:
 		waited += 1
 	# 7 m ahead, else to a side or behind, where the graph is: a ship's bow has only sea 7 m ahead.
 	var at: Vector3 = stand
-	var data: DotNpcNavData = game.horde.nav
+	var data: GSNpcNavData = game.horde.nav
 	for ahead: Vector3 in [Vector3(0.0, 0.0, -7.0), Vector3(-7.0, 0.0, 0.0), Vector3(7.0, 0.0, 0.0), Vector3(0.0, 0.0, 7.0)]:
 		if data != null and data.is_navigable(stand + ahead, 3.0):
 			at = stand + ahead
 			break
 	at = game.horde.snap_to_nav(at)
-	var npc: DotNpcInstance = game.horde.spawner.spawn(_zombie, at, &"shot", Basis(Vector3.UP, PI))
+	var npc: GSNpcInstance = game.horde.spawner.spawn(_zombie, at, &"shot", Basis(Vector3.UP, PI))
 	print("possess: ", _zombie, " held ", game.possession.possess(holder, npc) if npc != null else false)
 	var cam := _free_camera()
 	var look_pitch := [0.0]
@@ -242,7 +242,7 @@ func _view_ending(game: ZzGame, local, stand: Vector3) -> void:
 		var mover := Node3D.new()
 		mover.name = "shot_mover"
 		game.map.add_child(mover)
-		var trail := DotMapTrail.new()
+		var trail := GSMapTrail.new()
 		trail.follow = mover
 		trail.lifetime = 1.4
 		trail.start_width = 0.4
@@ -268,7 +268,7 @@ func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
 	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
 	game.boxes.run([{"do": "effect", "name": "crawl_speed"}], {"opener": local, "at": stand, "box": &"lifeline"})
 	local.health.invulnerable = false
-	var wound := DotDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	var wound := GSDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
 	var _hurt = game.combat.apply_damage(wound)
 	local.health.invulnerable = true
 	if _view == "crawl_third":
@@ -327,7 +327,7 @@ func _view_defib(game: ZzGame, local, stand: Vector3) -> void:
 		corpse.place_at(stand + Vector3(0.0, 0.0, -1.2), 0.0)
 		corpse.incaps = game.config.max_incaps
 		corpse.health.invulnerable = false
-		var kill := DotDamage.make(0, corpse.entity_id, 9999.0, game.combat.damage_type(&"strike"))
+		var kill := GSDamage.make(0, corpse.entity_id, 9999.0, game.combat.damage_type(&"strike"))
 		var _k = game.combat.apply_damage(kill)
 		await _seconds_of(0.3)
 		game._begin_defib(local, corpse)
@@ -341,21 +341,21 @@ func _view_hit(game: ZzGame, local, stand: Vector3) -> void:
 	# holding an objective, so the vitals' bonus and the hold-out clock are in the frame too.
 	await _seconds_of(maxf(_seconds - 0.5, 0.5))
 	# The one nearest the line of sight (straight ahead is -Z), so the number is on screen.
-	var nearest: DotNpcInstance = null
+	var nearest: GSNpcInstance = null
 	var off := INF
-	for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+	for npc: GSNpcInstance in game.horde.spawner.all_npcs():
 		var to := npc.position() - stand
 		if npc.is_alive() and to.z < -1.0 and absf(to.x / to.z) < off:
 			off = absf(to.x / to.z)
 			nearest = npc
 	if nearest != null:
 		var victim: int = game.horde.entity_id_for(nearest)
-		var first := DotDamage.make(local.entity_id, victim, 18.0, null)
+		var first := GSDamage.make(local.entity_id, victim, 18.0, null)
 		first.point = nearest.position() + Vector3(0.0, 1.2, 0.0)
 		var _a = game.combat.apply_damage(first)
-		var second := DotDamage.make(local.entity_id, victim, 400.0, null)
+		var second := GSDamage.make(local.entity_id, victim, 400.0, null)
 		second.point = nearest.position() + Vector3(0.0, 1.6, 0.0)
-		second.hit_group = DotHitGroup.HEAD
+		second.hit_group = GSHitGroup.HEAD
 		var _b = game.combat.apply_damage(second)
 	local.health.invulnerable = false
 	local.health.health = 55.0
@@ -379,7 +379,7 @@ func _view_ragdoll(game: ZzGame, local, stand: Vector3) -> void:
 	feet = victim.feet()
 	if _reaction != &"":
 		var weights := PackedStringArray()
-		for id: StringName in DotPlayerDeathReactions.stock().ids():
+		for id: StringName in GSPlayerDeathReactions.stock().ids():
 			weights.append("%s=%d" % [id, 1 if id == _reaction else 0])
 		var _forced: bool = game.ragdoll_rules.set_cvar("sv_ragdoll_reactions", ",".join(weights))
 	# Your own eyes (and the gun drawn at them) out of the frame, behind the camera.
@@ -388,15 +388,15 @@ func _view_ragdoll(game: ZzGame, local, stand: Vector3) -> void:
 	camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
 	victim.health.invulnerable = false
 	victim.incaps = game.config.max_incaps
-	var slay := DotDamage.make(0, victim.entity_id, 5000.0, game.combat.damage_type(&"strike"))
+	var slay := GSDamage.make(0, victim.entity_id, 5000.0, game.combat.damage_type(&"strike"))
 	slay.tick = game.current_tick()
 	slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
 	var _killed = game.combat.apply_damage(slay)
 	print("killed %s at %s: %s" % [victim.display_name, feet.snapped(Vector3.ONE * 0.1),
 		victim.death.describe() if victim.death != null else "no fall"])
 	await _seconds_of(_seconds)
-	var yard: DotPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
-	for body: DotPlayerRagdoll in yard.live():
+	var yard: GSPlayerRagdolls = (_client.get("world_view") as Node).get("ragdolls")
+	for body: GSPlayerRagdoll in yard.live():
 		print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 
 
@@ -435,7 +435,7 @@ func _view_action(game: ZzGame, local, stand: Vector3) -> void:
 	at_feet = actor.feet()
 	local.place_at(at_feet + Vector3(0.0, 0.0, 9.0), 0.0)
 	var parts := _action.split(":")
-	var entry: Dictionary = DotAvatarActions.defaults().find(StringName(parts[0]), parts[1])
+	var entry: Dictionary = GSAvatarActions.defaults().find(StringName(parts[0]), parts[1])
 	var ok: bool = actor.figure.body_node().play_action(StringName(parts[1]), bool(entry.get("loop", false)), 0.0)
 	print("action %s: played=%s" % [_action, ok])
 	_free_camera().look_at_from_position(at_feet + Vector3(0.0, 1.5, 3.0), at_feet + Vector3(0.0, 1.0, 0.0))
@@ -465,7 +465,7 @@ func _view_mutant(game: ZzGame, local: Node, stand: Vector3) -> void:
 	# A mutant 9 m off, angry and flying: taking flight at once, then
 	# frames as it cruises, charges and dives (_a, _b, _c, each --seconds apart).
 	_clear_view(game, local, stand)
-	var mut: DotNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(-9.0, 0.0, -5.0)))
+	var mut: GSNpcInstance = game.horde.spawn_special(&"mutant", game.horde.snap_to_nav(stand + Vector3(-9.0, 0.0, -5.0)))
 	if mut != null and mut.brain != null:
 		mut.brain.call(&"take_flight", 30.0)
 	# Deterministic: climb to altitude, then fire the guns, then force the dive; frames around each.

@@ -33,7 +33,7 @@ var waits: int = 0
 
 ## True where a prewarm is worth the frames: it draws nothing headless, and an open gate has no cover.
 static func wanted(gate: Object) -> bool:
-	return gate != null and not DotPlatform.is_headless() and not bool(gate.call(&"is_open"))
+	return gate != null and not GSPlatform.is_headless() and not bool(gate.call(&"is_open"))
 
 
 ## Starts on [param camera] with a spare made like [param live]. False when there is nothing to do.
@@ -116,7 +116,7 @@ func _take(real: String, status: int) -> void:
 		_held.append(ResourceLoader.load_threaded_get(real))
 	else:
 		# The equip loads it in place and logs whatever is wrong with it.
-		DotLog.warn("zz_prewarm", "thread load failed; loading in place", {"path": real, "status": status})
+		GSLog.warn("zz_prewarm", "thread load failed; loading in place", {"path": real, "status": status})
 
 
 func _tick() -> void:
@@ -156,6 +156,6 @@ func _end() -> void:
 	_spare = null
 	if _gate != null and is_instance_valid(_gate):
 		_gate.call(&"release", HOLD)
-	DotLog.info("zz_prewarm", "weapon views built", {"weapons": built, "frames": frames, "waits": waits, "msec": Time.get_ticks_msec() - _began_msec,
+	GSLog.info("zz_prewarm", "weapon views built", {"weapons": built, "frames": frames, "waits": waits, "msec": Time.get_ticks_msec() - _began_msec,
 		"build_msec": build_msec, "worst_msec": _worst_msec, "worst": _worst_id})
 	queue_free()

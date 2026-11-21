@@ -15,7 +15,7 @@ const CHECKS := 50
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -57,7 +57,7 @@ func _test_off() -> void:
 	var game := await _solo({"weight_enabled": false})
 	var p := game.survivors()[0]
 	var heavies := ZzWeapons.ids_of(&"heavy")
-	_check(not DotWeaponCarry.new().enabled, "the addon's carry is off until a game turns it on")
+	_check(not GSWeaponCarry.new().enabled, "the addon's carry is off until a game turns it on")
 	_check(not game.carry.carry.enabled and p.weapons.arsenal.carry != null and not p.weapons.arsenal.carry.enabled, "the shared carry is off")
 	_check(heavies.size() >= 2 and _hand(game, heavies[0]) and _hand(game, heavies[1]), "two heavy weapons are both handed over")
 	var slot_of := p.weapons.arsenal.catalogue.get_def(heavies[1]).slot
@@ -119,7 +119,7 @@ func _test_cycle() -> void:
 	var before := arsenal.fire_mode()
 	p.actions = ZzNetCommand.ACT_FIRE_MODE
 	await _sim(game, 0.3)
-	_check(arsenal.fire_mode() != before and arsenal.fire_mode() == DotWeaponDef.Fire.SEMI, "ACT_FIRE_MODE cycles auto to semi once, however long it is held")
+	_check(arsenal.fire_mode() != before and arsenal.fire_mode() == GSWeaponDef.Fire.SEMI, "ACT_FIRE_MODE cycles auto to semi once, however long it is held")
 	p.actions = 0
 	_finished()
 
@@ -161,7 +161,7 @@ func _test_wire() -> void:
 	var state: Variant = JSON.parse_string(game.carry.state_json(p))
 	_check(state is Dictionary and bool(state["on"]) and float(state["l"]) == 30.0 and (state["slots"] as Dictionary).size() >= 1, "state_json names weight, limit and slots")
 	var body := ZzEventsText.write_carry(game.carry.state_json(p))
-	var reader := DotNetReader.new(body)
+	var reader := GSNetReader.new(body)
 	var back := ZzEventsText.read_carry(reader)
 	_check(bool(back["ok"]) and str(back["json"]) == game.carry.state_json(p), "the CARRY event round-trips")
 	_check(ZzNetCommand.ACT_CYCLE == 128 and ZzNetCommand.ACT_FIRE_MODE == 256 and ZzNetCommand.ACT_BITS == 12, "ACT_CYCLE and ACT_FIRE_MODE fit the action bits")
@@ -214,7 +214,7 @@ func _class_file(text: String) -> void:
 
 func _test_class_profile() -> void:
 	_section("the survivor class profile sets speed, sprint, stamina and carry; an edit lands on the next spawn")
-	var _clean := DotPaths.remove_tree(CLASS_DIR)
+	var _clean := GSPaths.remove_tree(CLASS_DIR)
 	ZzClasses.set_roots(PackedStringArray([CLASS_DIR]))
 	var plain := ZzConfig.new()
 	var base := ZzPlayer.tunables_for(plain)
@@ -233,19 +233,19 @@ func _test_class_profile() -> void:
 	_check(is_equal_approx(p.controller.tunables.max_speed, plain.run_speed * 1.5), "a spawned survivor moves at the class speed", "%.2f" % p.controller.tunables.max_speed)
 
 	_class_file("speed: 99\n")
-	DotLog.set_level(DotLog.Level.FATAL)  # the refusal logs an ERROR on purpose
+	GSLog.set_level(GSLog.Level.FATAL)  # the refusal logs an ERROR on purpose
 	var refused := ZzPlayer.tunables_for(plain).max_speed
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_check(is_equal_approx(refused, plain.run_speed), "an unsafe value is refused and the config speed stands")
 
 	ZzClasses.set_roots(PackedStringArray())
-	var _gone := DotPaths.remove_tree(CLASS_DIR)
+	var _gone := GSPaths.remove_tree(CLASS_DIR)
 	_finished()
 
 
 func _fall_hit(game: ZzGame, p: ZzPlayer) -> float:
 	var before := p.health.health
-	var hit := DotDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"fall"))
+	var hit := GSDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"fall"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 	var lost := before - p.health.health
@@ -255,7 +255,7 @@ func _fall_hit(game: ZzGame, p: ZzPlayer) -> float:
 
 func _test_class_immunity() -> void:
 	_section("an `immune: [fall]` class takes no fall damage, and a respawn as another class keeps nothing")
-	var _clean := DotPaths.remove_tree(CLASS_DIR)
+	var _clean := GSPaths.remove_tree(CLASS_DIR)
 	ZzClasses.set_roots(PackedStringArray([CLASS_DIR]))
 	var game := await _solo({})
 	var p := game.survivors()[0]
@@ -264,7 +264,7 @@ func _test_class_immunity() -> void:
 	_class_file("immune: [fall]\n")
 	game.place_one(p)
 	_check(is_zero_approx(_fall_hit(game, p)), "an immune: [fall] class takes no fall damage")
-	var hit := DotDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"bite"))
+	var hit := GSDamage.make(0, p.entity_id, 10.0, game.combat.damage_type(&"bite"))
 	hit.tick = game.current_tick()
 	var before := p.health.health
 	var _bitten := game.combat.apply_damage(hit)
@@ -276,5 +276,5 @@ func _test_class_immunity() -> void:
 	_check(_fall_hit(game, p) > 0.0, "a respawn under a class without it clears the immunity")
 
 	ZzClasses.set_roots(PackedStringArray())
-	var _gone := DotPaths.remove_tree(CLASS_DIR)
+	var _gone := GSPaths.remove_tree(CLASS_DIR)
 	_finished()

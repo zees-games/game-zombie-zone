@@ -19,7 +19,7 @@ var _blasts: Array = []
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -68,7 +68,7 @@ func _beams_of(kind: StringName) -> int:
 
 func _test_catalogue() -> void:
 	_section("catalogue: the mutant is a rare special with a body, numbers and parts of its own")
-	var def := ZzNpcs.builtin(ZzConfig.new()).filter(func(d: DotNpcDef) -> bool: return d.id == ZzNpcs.MUTANT)
+	var def := ZzNpcs.builtin(ZzConfig.new()).filter(func(d: GSNpcDef) -> bool: return d.id == ZzNpcs.MUTANT)
 	_check(def.size() == 1 and ZzNpcs.SPECIALS.has(ZzNpcs.MUTANT), "it is in the catalogue and the director's list")
 	_check(def[0].move_speed < 3.0, "and slow on the ground, being heavy", "%.1f" % def[0].move_speed)
 	_check(float(def[0].meta.get("slam_damage", 0.0)) > 0.0 and float(def[0].meta.get("zap_damage", 0.0)) > 0.0, "its damage numbers are meta (cvars reach them)")
@@ -95,7 +95,7 @@ func _test_props() -> void:
 	var a := await _ring(10.0, {"prop_chance": 1.0, "fly_from": 999.0, "hold_time": 0.5})
 	var game: ZzGame = a[0]
 	var me: ZzPlayer = a[1]
-	var toy: DotPropBody = game.map.toys.add_toy(&"barrel", SPOT + Vector3(0.0, 0.6, 6.0))
+	var toy: GSPropBody = game.map.toys.add_toy(&"barrel", SPOT + Vector3(0.0, 0.6, 6.0))
 	_check(toy != null and toy.body != null, "a loose barrel is on the map")
 	var held := false
 	var before := me.health.health

@@ -3,15 +3,15 @@ extends "zz_game_services.gd"
 const ZzMovementCvars := preload("zz_movement_cvars.gd")
 const ZzCapsScript := preload("zz_caps.gd")
 
-func ensure_runtime() -> DotProfileRuntime:
+func ensure_runtime() -> GSProfileRuntime:
 	if profile_runtime == null:
-		profile_runtime = DotProfileRuntime.new()
+		profile_runtime = GSProfileRuntime.new()
 		profile_runtime.permit = func(actor: Variant, _flag: String) -> bool:
 			return typeof(actor) == TYPE_STRING_NAME and actor == LOCAL_ACTOR
 	return profile_runtime
 
 ## The `bot` profile set (the stand-ins' characters), for the workbench and [method personas].
-func bot_persona_set() -> DotProfileSet:
+func bot_persona_set() -> GSProfileSet:
 	if _persona_set == null:
 		_persona_set = ZzBotProfiles.make_set()
 	return _persona_set
@@ -19,9 +19,9 @@ func bot_persona_set() -> DotProfileSet:
 
 ## The pool a stand-in's character is drawn from: every enabled persona profile by its weight, or the
 ## server's `zz_bot_personas` list.
-func personas() -> DotBotPersonaPool:
+func personas() -> GSBotPersonaPool:
 	if _personas == null:
-		_personas = DotBotPersonaPool.new()
+		_personas = GSBotPersonaPool.new()
 		var _n := _personas.load_from(bot_persona_set())
 		_personas_text = ""
 	if config != null and config.bot_personas != _personas_text:
@@ -32,7 +32,7 @@ func personas() -> DotBotPersonaPool:
 
 
 ## The `box` profile set (every type's odds, effect, colour and sounds), for the workbench and [method reload_boxes].
-func box_profile_set() -> DotProfileSet:
+func box_profile_set() -> GSProfileSet:
 	if _box_set == null:
 		_box_set = ZzBoxProfiles.make_set()
 	return _box_set
@@ -57,7 +57,7 @@ func reload_personas() -> void:
 	_personas.reset_assignments()
 	if bots != null:
 		bots.redraw_personas()
-	DotLog.info("zz.bots", "bot personas reloaded", {"personas": n})
+	GSLog.info("zz.bots", "bot personas reloaded", {"personas": n})
 
 
 func _ready() -> void:
@@ -66,17 +66,17 @@ func _ready() -> void:
 
 	# The map document limits and the tick rate's top are settings (ZzCaps); an unreadable one is an error, not a default.
 	for why in ZzCapsScript.set_doc_overrides(config.cap_overrides):
-		DotLog.error(CHANNEL, "cap_overrides is not usable", {"why": why})
+		GSLog.error(CHANNEL, "cap_overrides is not usable", {"why": why})
 
 	var valid := config.validate()
 
 	if not valid.ok:
-		DotLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
+		GSLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
 		return
 
 	var rate_why := ZzCapsScript.refusal("zz_tick_rate", float(tick_rate), ZzCapsScript.doc_overrides)
 	if not rate_why.is_empty():
-		DotLog.error(CHANNEL, rate_why, {"setting": "tick_rate"})
+		GSLog.error(CHANNEL, rate_why, {"setting": "tick_rate"})
 
 	_round_seed = config.seed_value
 	var lap := Time.get_ticks_usec()
@@ -116,7 +116,7 @@ func _ready() -> void:
 		var _rotation := load_rotation()
 		if authoritative and catalogue.maps.is_empty():
 			# A server with nothing to play is broken, not quiet: an old pack, or the map packs never installed.
-			DotLog.error(CHANNEL, "this game has no maps: nothing to play", {"directory": config.map_directory,
+			GSLog.error(CHANNEL, "this game has no maps: nothing to play", {"directory": config.map_directory,
 				"fix": "install the map packs this version names (Reinstall the server), or publish a version that ships them"})
 		lap = _lap(&"catalogue", lap)
 		# Laid out now, not on the first round: a warmup on an empty world is indistinguishable
@@ -125,9 +125,9 @@ func _ready() -> void:
 		lap = _lap(&"lay_out_map", lap)
 
 	if register_service:
-		DotRegistry.register(SERVICE, self)
+		GSRegistry.register(SERVICE, self)
 
-	DotLog.info(CHANNEL, "world ready", config.describe())
+	GSLog.info(CHANNEL, "world ready", config.describe())
 
 
 ## The movement rule sets take the config and tell the game when they change.
@@ -151,7 +151,7 @@ func _wire_rules() -> void:
 ## Solo play, per dot-server-deploy's `client/solo.json`). Read as the module reads its server's.
 ## Empty elsewhere. Duck-typed: a delivered game may not name a host's class.
 static func solo_map_dirs(subdir: String) -> PackedStringArray:
-	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	var host: Object = GSRegistry.get_service(SOLO_SERVICE)
 	if host == null or not host.has_method(&"map_dirs"):
 		return PackedStringArray()
 	return host.call(&"map_dirs", subdir)
@@ -159,7 +159,7 @@ static func solo_map_dirs(subdir: String) -> PackedStringArray:
 
 func _exit_tree() -> void:
 	if register_service:
-		DotRegistry.unregister_instance(SERVICE, self)
+		GSRegistry.unregister_instance(SERVICE, self)
 
 
 # Building
@@ -168,7 +168,7 @@ func _exit_tree() -> void:
 ## with zombies: that is the netcode's call (predicted survivor vs zombie drawn in the past); the crowd
 ## blocks by hitting (`ZzController.TAGGED`). Zombies skip each other: steering, not bodies.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary", &"clip"])
+	physics = GSPhysicsLayout.custom(&"zombiezone", [&"world", &"player", &"prop", &"zombie", &"toy", &"footprint", &"barricade", &"boundary", &"clip"])
 
 	for layer in physics.layers:
 		match layer.id:
@@ -189,7 +189,7 @@ func _build_physics() -> void:
 	var built := physics.build()
 
 	if not built.ok:
-		DotLog.error(CHANNEL, "the collision layout would not build", {"why": built.error.message})
+		GSLog.error(CHANNEL, "the collision layout would not build", {"why": built.error.message})
 		physics = null
 
 
@@ -312,7 +312,7 @@ func _apply_gravity() -> void:
 
 
 func _build_random() -> void:
-	random = DotRandomManager.new()
+	random = GSRandomManager.new()
 	random.name = "Random"
 	random.register_as_service = false
 	add_child(random)
@@ -325,7 +325,7 @@ func _build_props() -> void:
 	var count := props_catalogue.load_file()
 
 	if count == 0:
-		DotLog.warn(CHANNEL, "no props: maps will be bare streets", {})
+		GSLog.warn(CHANNEL, "no props: maps will be bare streets", {})
 
 
 func _build_map() -> void:
@@ -386,22 +386,22 @@ func _volume_damage(body: Variant, amount: float, kind: String, entity: int) -> 
 			return
 
 		var type := &"fire" if kind in ["burn", "slowburn"] else (&"blast" if kind == "blast" else &"acid")
-		var hit := DotDamage.make(0, player.entity_id, amount, combat.damage_type(type))
+		var hit := GSDamage.make(0, player.entity_id, amount, combat.damage_type(type))
 		hit.tick = _tick
 		hit.weapon_id = type
 		hit.context = {"why": BY_HAZARD, "volume": entity}
 		var _applied := combat.apply_damage(hit)
 		player_hurt.emit(player.player_id, amount, player.feet())
-	elif body is DotNpcInstance and horde != null:
-		var npc: DotNpcInstance = body
+	elif body is GSNpcInstance and horde != null:
+		var npc: GSNpcInstance = body
 
 		if not npc.is_alive():
 			return
 
 		var victim := horde.entity_id_for(npc)
-		var health := npc.node.get_node_or_null(^"Health") as DotHealth
+		var health := npc.node.get_node_or_null(^"Health") as GSHealth
 		var dealt := amount if health == null or amount < VOLUME_LETHAL else health.health + health.armour + 1.0
-		var hit := DotDamage.make(0, victim, dealt, combat.damage_type(&"fire" if kind in ["burn", "slowburn"] else &"acid"))
+		var hit := GSDamage.make(0, victim, dealt, combat.damage_type(&"fire" if kind in ["burn", "slowburn"] else &"acid"))
 		hit.tick = _tick
 		hit.context = {"volume": entity}
 		var _applied := combat.apply_damage(hit)
@@ -416,10 +416,10 @@ func _volume_move(body: Variant, motion: Variant) -> void:
 
 		if body is ZzPlayer:
 			(body as ZzPlayer).place_at(at, yaw)
-		elif body is DotNpcInstance and horde != null:
-			horde.warp(body as DotNpcInstance, at, yaw)
-	elif motion is Vector3 and body is DotNpcInstance and horde != null:
-		horde.throw_zombie(body as DotNpcInstance, motion as Vector3)
+		elif body is GSNpcInstance and horde != null:
+			horde.warp(body as GSNpcInstance, at, yaw)
+	elif motion is Vector3 and body is GSNpcInstance and horde != null:
+		horde.throw_zombie(body as GSNpcInstance, motion as Vector3)
 
 
 ## What a map's own logic asks for: its text on the HUD, a zombie from its spawner, a setting from the short list
@@ -463,8 +463,8 @@ func _on_map_logic_event(kind: String, data: Dictionary) -> void:
 				var _laid := map_objects.spawn(int(data.get("object", 0)), _object_place(data))
 		"damage_force":
 			var npc: Variant = data.get("body")
-			if npc is DotNpcInstance and horde != null:
-				horde.throw_zombie(npc as DotNpcInstance, data["force"] as Vector3)
+			if npc is GSNpcInstance and horde != null:
+				horde.throw_zombie(npc as GSNpcInstance, data["force"] as Vector3)
 
 
 ## Where a broken thing's piece lies: the event's place, else the middle of the breakable's drawn node (a shatter by input has no hit point); the origin means unknown.
@@ -607,7 +607,7 @@ func _feed_map_uis() -> void:
 		if command == null:
 			return held
 
-		var c: DotFpsCommand = command
+		var c: GSFpsCommand = command
 		held["forward"] = c.move.y > 0.3
 		held["back"] = c.move.y < -0.3
 		held["right"] = c.move.x > 0.3
@@ -615,7 +615,7 @@ func _feed_map_uis() -> void:
 		# The attack key throws a held prop, it does not fire the gun.
 		held["attack"] = c.is_pressed(ZzNetCommand.BUTTON_FIRE) and not prop_carry.carrying(player.player_id)
 		held["attack2"] = (player.actions & ZzNetCommand.ACT_AIM) != 0
-		held["jump"] = c.is_pressed(DotFpsCommand.BUTTON_JUMP)
+		held["jump"] = c.is_pressed(GSFpsCommand.BUTTON_JUMP)
 		held["use"] = (player.actions & ZzNetCommand.ACT_USE) != 0
 		return held)
 
@@ -684,34 +684,34 @@ func _mechanics_opener(zone: AABB) -> Variant:
 
 
 func _build_combat() -> void:
-	combat = DotCombatManager.new()
+	combat = GSCombatManager.new()
 	combat.name = "Combat"
 	combat.is_authority = authoritative
 	combat.register_service = false
 
-	var damage_rules := DotDamageRules.new()
+	var damage_rules := GSDamageRules.new()
 	damage_rules.friendly_fire = config.friendly_fire_scale() > 0.0
 	damage_rules.friendly_scale = maxf(config.friendly_fire_scale(), 0.0)
 	damage_rules.self_damage = true
 	damage_rules.hit_groups = true
 	combat.rules = damage_rules
 
-	var settings := DotCombatConfig.new()
+	var settings := GSCombatConfig.new()
 	settings.lag_compensation = true
 	combat.config = settings
 
 	# A shot stops on a wall and on the furniture. A shot that starts inside a team-mate is not
 	# aimed at them: dot-combat's pass_through_sets does that (API level 2), under the rules.
-	var trace := DotTracePhysics.new()
+	var trace := GSTracePhysics.new()
 	trace.bind(get_world_3d())
 	trace.collision_mask = world_mask()
 	trace.material_shape_fn = ZzMaterials.penetration_of
 
 	combat.trace = trace
-	combat.resolver = DotDamageResolver.with_rules(damage_rules)
-	combat.resolver.hit_groups = DotHitGroup.defaults()
+	combat.resolver = GSDamageResolver.with_rules(damage_rules)
+	combat.resolver.hit_groups = GSHitGroup.defaults()
 	combat.resolver.team_of = func(entity_id: int) -> int:
-		return INFECTED if DotEntity.is_kind(entity_id, DotEntity.KIND_NPC) else SURVIVORS
+		return INFECTED if GSEntity.is_kind(entity_id, GSEntity.KIND_NPC) else SURVIVORS
 	combat.resolver.adjust = _adjust_damage
 
 	for type in [_type(&"bite", 0.0), _type(&"fire", 0.0), _type(&"acid", 0.0), _type(&"blast", 0.0),
@@ -721,13 +721,13 @@ func _build_combat() -> void:
 	add_child(combat)
 	combat.damage_applied.connect(_on_hit_landed)
 	combat.damage_applied.connect(_on_limb_damage)
-	combat.damage_applied.connect(func(damage: DotDamage) -> void:
-		if progress != null and DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
+	combat.damage_applied.connect(func(damage: GSDamage) -> void:
+		if progress != null and GSEntity.is_kind(damage.victim, GSEntity.KIND_NPC):
 			progress.on_damage(damage))
 
 
-static func _type(id: StringName, armour_share: float) -> DotDamageType:
-	var t := DotDamageType.new()
+static func _type(id: StringName, armour_share: float) -> GSDamageType:
+	var t := GSDamageType.new()
 	t.id = id
 	t.armour_share = armour_share
 	return t
@@ -735,9 +735,9 @@ static func _type(id: StringName, armour_share: float) -> DotDamageType:
 
 ## Turns dot-combat's applied damage into [signal hit_landed] for a survivor hitting a zombie.
 ## Friendly fire and a hit that took nothing (dead body, immune zombie) did not land.
-func _on_hit_landed(damage: DotDamage) -> void:
+func _on_hit_landed(damage: GSDamage) -> void:
 	if not authoritative or damage.refused or damage.health_lost <= 0.0 \
-			or not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
+			or not GSEntity.is_kind(damage.victim, GSEntity.KIND_NPC):
 		return
 
 	var by := key_for_entity(damage.attacker)
@@ -746,20 +746,20 @@ func _on_hit_landed(damage: DotDamage) -> void:
 		return
 
 	hit_landed.emit(by, damage.victim, damage.health_lost, damage.point, damage.lethal,
-		damage.hit_group == DotHitGroup.HEAD)
+		damage.hit_group == GSHitGroup.HEAD)
 
 
 ## Every applied hit on a zombie also goes to its limbs (the server only: a client's are told).
-func _on_limb_damage(damage: DotDamage) -> void:
+func _on_limb_damage(damage: GSDamage) -> void:
 	if authoritative and horde != null:
 		horde.limb_hit(damage)
 
 
-func _adjust_damage(damage: DotDamage) -> void:
+func _adjust_damage(damage: GSDamage) -> void:
 	# dot-game's "still loading": the one place every hurt on a survivor passes (a bite, a pin's
 	# damage, acid, fire, a blast, a friend's bullet), so a seat behind its client's cover is
 	# neither hurt, downed nor killed. An admin's slay or slap is the operator's word and passes.
-	if DotEntity.is_kind(damage.victim, DotEntity.KIND_PLAYER) and not damage.context.get("admin", false):
+	if GSEntity.is_kind(damage.victim, GSEntity.KIND_PLAYER) and not damage.context.get("admin", false):
 		var covered := player_for_entity(damage.victim)
 
 		if covered != null and not can_be_harmed(covered.player_id):
@@ -767,11 +767,11 @@ func _adjust_damage(damage: DotDamage) -> void:
 			return
 
 	if authoritative and damage.attacker != damage.victim and damage.attacker != 0 \
-			and DotEntity.is_kind(damage.victim, DotEntity.KIND_PLAYER):
+			and GSEntity.is_kind(damage.victim, GSEntity.KIND_PLAYER):
 		_team_damage_hit(damage)
 		return
 
-	if not DotEntity.is_kind(damage.victim, DotEntity.KIND_NPC):
+	if not GSEntity.is_kind(damage.victim, GSEntity.KIND_NPC):
 		return
 
 	var attacker := player_for_entity(damage.attacker)
@@ -799,7 +799,7 @@ func can_be_harmed(player_id: StringName) -> bool:
 ## A survivor's bullet or blast reached another survivor, at [param damage] (friendly-fire scale applied).
 ## Counted in the shooter's window first (voteban/ban total), then reflected onto the shooter if
 ## reflection is on: the one hit takes nothing. Server only.
-func _team_damage_hit(damage: DotDamage) -> void:
+func _team_damage_hit(damage: GSDamage) -> void:
 	var by := player_for_entity(damage.attacker)
 	var victim := player_for_entity(damage.victim)
 
@@ -825,13 +825,13 @@ func _build_effects() -> void:
 	if authoritative and not draw_world:
 		return
 
-	var fx := DotFxCatalogue.new()
+	var fx := GSFxCatalogue.new()
 
 	for spec in [["go", 0.18, Color(0.98, 0.86, 0.35)], ["hurt", 0.32, Color(0.85, 0.08, 0.06)],
 			["bile", 0.5, Color(0.42, 0.55, 0.12)], ["heal", 0.2, Color(0.3, 0.95, 0.4)]]:
-		var def := DotFxDef.new()
+		var def := GSFxDef.new()
 		def.id = StringName(spec[0])
-		def.kind = DotFxDef.Kind.SCREEN
+		def.kind = GSFxDef.Kind.SCREEN
 		def.flash_peak = float(spec[1])
 		def.flash_colour = spec[2]
 		def.flash_decay_ms = 380
@@ -841,18 +841,18 @@ func _build_effects() -> void:
 
 	ZzGrenadeFx.add_defs(fx)
 
-	effects = DotFxManager.new()
+	effects = GSFxManager.new()
 	effects.name = "Effects"
 	effects.catalogue = fx
-	effects.config = DotFxConfig.new()
+	effects.config = GSFxConfig.new()
 	effects.register_as_service = false
 	add_child(effects)
-	DotLog.result(CHANNEL, "the effects layer", effects.setup())
+	GSLog.result(CHANNEL, "the effects layer", effects.setup())
 
 
 ## The intermission is the pause plus the killcam the clients play inside it, so the server never waits on one.
-func apply_intermission(rules: DotMatchRules = null) -> void:
-	var target: DotMatchRules = rules if rules != null else (match_node.rules if match_node != null else null)
+func apply_intermission(rules: GSMatchRules = null) -> void:
+	var target: GSMatchRules = rules if rules != null else (match_node.rules if match_node != null else null)
 	if target == null:
 		return
 	var pause := config.intermission_seconds
@@ -860,18 +860,18 @@ func apply_intermission(rules: DotMatchRules = null) -> void:
 
 
 func _build_match() -> void:
-	match_node = DotMatch.new()
+	match_node = GSMatch.new()
 	match_node.name = "Match"
 	match_node.register_service = false
 
-	var match_config := DotMatchConfig.new()
+	var match_config := GSMatchConfig.new()
 	match_config.tick_rate = tick_rate
 	match_config.auto_start = false
 	match_config.log_transitions = false
 	match_config.balance_between_rounds = false
 	match_node.config = match_config
 
-	var match_rules: DotMatchRules = ZzRules.make()
+	var match_rules: GSMatchRules = ZzRules.make()
 	apply_intermission(match_rules)
 	match_rules.warmup_sec = config.warmup_seconds
 	match_rules.countdown_sec = 0.0
@@ -883,15 +883,15 @@ func _build_match() -> void:
 	match_node.rules = match_rules
 
 	# Scoped to the match node, which finds nothing: this game places its own players.
-	match_node.spawns_ref = DotNodeRef.of_path(^".")
+	match_node.spawns_ref = GSNodeRef.of_path(^".")
 	add_child(match_node)
 
 	match_node.round_started.connect(_on_round_started)
 	match_node.round_ended.connect(_on_round_ended)
 
-	var teams: Array[DotTeam] = [
-		DotTeam.make(SURVIVORS, TEAM_NAMES[0], TEAM_COLOURS[0]),
-		DotTeam.make(INFECTED, TEAM_NAMES[1], TEAM_COLOURS[1]),
+	var teams: Array[GSTeam] = [
+		GSTeam.make(SURVIVORS, TEAM_NAMES[0], TEAM_COLOURS[0]),
+		GSTeam.make(INFECTED, TEAM_NAMES[1], TEAM_COLOURS[1]),
 	]
 	match_node.teams.teams = teams
 	match_node.teams.force_balance = false
@@ -919,7 +919,7 @@ func _build_spectate() -> void:
 	var ready_now := spectate.setup()
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
 		remove_child(spectate)
 		spectate.queue_free()
 		spectate = null
@@ -941,7 +941,7 @@ func _build_progress() -> void:
 	var ready_now := progress.setup(config.progress_directory, config.report_progress)
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "progress is off", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "progress is off", {"why": ready_now.error.message})
 		remove_child(progress)
 		progress.queue_free()
 		progress = null
@@ -983,7 +983,7 @@ func _build_horde() -> void:
 	var ready_now := horde.setup(self, config)
 
 	if not ready_now.ok:
-		DotLog.error(CHANNEL, "the horde would not set up", {"why": ready_now.error.message})
+		GSLog.error(CHANNEL, "the horde would not set up", {"why": ready_now.error.message})
 		horde.queue_free()
 		horde = null
 		return
@@ -1019,7 +1019,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		var applied := physics.apply_to(player, &"player")
 
 		if not applied.ok:
-			DotLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
+			GSLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
 
 		_apply_body_mask(player)
 
@@ -1031,10 +1031,10 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 	combat_feel.track_tunables(player.controller.tunables)
 	player.set_water(_water_boxes(), water_rules)
 
-	var opened := entities.open(DotEntity.KIND_PLAYER, player, &"", player_id, now())
-	player.entity_id = (opened.value as DotEntityHandle).id if opened.ok else 0
+	var opened := entities.open(GSEntity.KIND_PLAYER, player, &"", player_id, now())
+	player.entity_id = (opened.value as GSEntityHandle).id if opened.ok else 0
 
-	var health := DotHealth.new()
+	var health := GSHealth.new()
 	health.name = "Health"
 	health.max_health = config.max_health
 	health.health = health.max_health
@@ -1047,19 +1047,19 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		player.build_hitboxes(combat)
 
 	if combat != null and player.controller != null:
-		var fall := DotFallDamage.new()
+		var fall := GSFallDamage.new()
 		fall.name = "FallDamage"
 		fall.rules = fall_rules
 		fall.victim = player.entity_id
-		fall.controller = DotNodeRef.of_path(player.controller.get_path())
-		fall.controller.mode = DotNodeRef.Mode.ABSOLUTE
-		fall.combat = DotNodeRef.of_path(combat.get_path())
-		fall.combat.mode = DotNodeRef.Mode.ABSOLUTE
+		fall.controller = GSNodeRef.of_path(player.controller.get_path())
+		fall.controller.mode = GSNodeRef.Mode.ABSOLUTE
+		fall.combat = GSNodeRef.of_path(combat.get_path())
+		fall.combat.mode = GSNodeRef.Mode.ABSOLUTE
 		fall.in_water = func() -> bool: return player.water_level != ZzPlayer.WaterLevel.NONE
 		player.add_child(fall)
 
-	health.died.connect(func(damage: DotDamage) -> void: _on_health_zero(player, damage))
-	health.damaged.connect(func(damage: DotDamage) -> void: _on_player_damaged(player, damage))
+	health.died.connect(func(damage: GSDamage) -> void: _on_health_zero(player, damage))
+	health.damaged.connect(func(damage: GSDamage) -> void: _on_player_damaged(player, damage))
 
 	players[player_id] = player
 	sides[player_id] = SURVIVORS
@@ -1069,12 +1069,12 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		var seated := match_node.add_player(String(player_id), display_name, _tick, SURVIVORS)
 
 		if not seated.ok:
-			DotLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
+			GSLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
 
 	place_one(player)
 	if authoritative and spawners != null and phase != Phase.PLAY:
 		spawners.grant_start_points_to(player)
-	DotLog.debug(CHANNEL, "player joined", {"id": String(player_id)})
+	GSLog.debug(CHANNEL, "player joined", {"id": String(player_id)})
 	player_added.emit(player_id)
 	return player
 
@@ -1117,8 +1117,8 @@ func remove_player(player_id: StringName) -> void:
 
 	if combat != null and is_instance_valid(combat) and player.entity_id != 0:
 		combat.forget(player.entity_id)
-		DotGameClassImmunity.clear(combat, player.entity_id)
-		var _closed := entities.close(player.entity_id, DotEntityTable.REASON_OWNER_LEFT)
+		GSGameClassImmunity.clear(combat, player.entity_id)
+		var _closed := entities.close(player.entity_id, GSEntityTable.REASON_OWNER_LEFT)
 
 	if match_node != null:
 		match_node.remove_player(String(player_id))
@@ -1177,7 +1177,7 @@ func player_by_id(id: StringName) -> ZzPlayer:
 
 
 func player_for_entity(entity: int) -> ZzPlayer:
-	if not DotEntity.is_kind(entity, DotEntity.KIND_PLAYER):
+	if not GSEntity.is_kind(entity, GSEntity.KIND_PLAYER):
 		return null
 
 	return players.get(entities.key_for_id(entity))
@@ -1244,7 +1244,7 @@ func survivor_near_segment(from: Vector3, to: Vector3, radius: float) -> StringN
 func _furthest_survivor(except: StringName = &"") -> ZzPlayer:
 	var best: ZzPlayer = null
 	var best_flow := -INF
-	var flow: DotNpcDirectorFlow = horde.director.flow if horde != null and horde.director != null else null
+	var flow: GSNpcDirectorFlow = horde.director.flow if horde != null and horde.director != null else null
 
 	for player in survivors():
 		if player.player_id == except or not player.is_up() or player.watching:
@@ -1328,7 +1328,7 @@ func _on_round_started(number: int) -> void:
 	if horde != null:
 		var built := horde.build_for_map(map_doc, map.read_nav_extra(str(catalogue.roots.get(StringName(str(map_doc.get("id", ""))), "")) if catalogue != null else "") if authoritative and map != null else {})
 		if not built.ok:
-			DotLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": built.error.message})
+			GSLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": built.error.message})
 
 	_place_everybody()
 
@@ -1339,7 +1339,7 @@ func _on_round_started(number: int) -> void:
 	_set_phase(Phase.READY)
 	round_began.emit(number, map.id())
 
-	DotLog.info(CHANNEL, "map began", {
+	GSLog.info(CHANNEL, "map began", {
 		"number": number, "map": String(map.id()), "mode": str(map_doc.get("mode", "")),
 		"seed": _round_seed, "survivors": players.size(), "difficulty": config.difficulty_name(),
 	})
@@ -1382,7 +1382,7 @@ func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 				next_map_id = map.id()
 
 	round_over.emit(number, _won, _why)
-	DotLog.info(CHANNEL, "map over", {"number": number, "won": _won, "why": _why, "next": String(next_map_id)})
+	GSLog.info(CHANNEL, "map over", {"number": number, "won": _won, "why": _why, "next": String(next_map_id)})
 
 
 ## Every map this server plays, for the map menu (M): `{id, name, mode, detail, current}`.
@@ -1410,28 +1410,28 @@ func map_rows() -> Array:
 ## The map menu's change: [param id] now. The next map is set and a fresh round begins
 ## (dot-match `begin_round_now`: the map called off is neither won nor lost); with no match
 ## running it is simply built. Authority only.
-func change_map_now(id: StringName) -> DotResult:
+func change_map_now(id: StringName) -> GSResult:
 	if not authoritative:
-		return DotResult.fail(DotError.CODE_STATE, "Only the server changes the map.")
+		return GSResult.fail(GSError.CODE_STATE, "Only the server changes the map.")
 	if catalogue == null or not catalogue.playable(config.map_ids).has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "There is no map called '%s' here." % id)
+		return GSResult.fail(GSError.CODE_INVALID, "There is no map called '%s' here." % id)
 	next_map_id = id
 	losses_on_map = 0
 	if match_node == null or not match_node.begin_round_now(_tick):
 		_lay_out_map()
-	DotLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
-	return DotResult.success(id)
+	GSLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
+	return GSResult.success(id)
 
 
 ## The host's startup map (server.yml `map:`, `+map`, `sv_map`), duck-typed by dot-server-deploy's host,
 ## which cannot name this game's classes: the same path as `map <id>` and the map menu.
-func start_on_map(id: StringName) -> DotResult:
+func start_on_map(id: StringName) -> GSResult:
 	return await change_map_in_tick(id)
 
 
 ## [method change_map_now] from a handler that runs between ticks (the map menu's `change_fn`):
 ## building the map casts rays and prunes nav, so on a server it waits for the next tick.
-func change_map_in_tick(id: StringName) -> DotResult:
+func change_map_in_tick(id: StringName) -> GSResult:
 	await tick_gate.reached()
 	return change_map_now(id)
 
@@ -1439,18 +1439,18 @@ func change_map_in_tick(id: StringName) -> DotResult:
 ## Reads maps.yml (the `--config` directory first) and applies it. Called at boot and by
 ## `sv_map_rotation_file`. A file that is present and unreadable is an ERROR and changes nothing:
 ## rotating every map is a better failure than rotating none.
-func load_rotation() -> DotResult:
+func load_rotation() -> GSResult:
 	if catalogue == null:
-		return DotResult.fail(DotError.CODE_STATE, "There is no catalogue to rotate.")
+		return GSResult.fail(GSError.CODE_STATE, "There is no catalogue to rotate.")
 
 	var stem := config.map_rotation_file
-	var dir := DotMapRotationFile.config_dir_arg()
-	var found := DotMapRotationFile.find(stem, dir)
+	var dir := GSMapRotationFile.config_dir_arg()
+	var found := GSMapRotationFile.find(stem, dir)
 
 	if found == "" and stem != "" and (dir != "" or stem != ZzConfig.new().map_rotation_file):
 		# The default name being absent is an install with no maps.yml; a name or a directory
 		# somebody chose that finds nothing is a typo they would otherwise never hear about.
-		DotLog.warn(CHANNEL, "the map rotation file was not found; every map rotates", {
+		GSLog.warn(CHANNEL, "the map rotation file was not found; every map rotates", {
 			"file": stem, "config_dir": dir,
 		})
 
@@ -1459,10 +1459,10 @@ func load_rotation() -> DotResult:
 	if found != "":
 		paths.append(found)
 
-	var read := DotMapRotationFile.load_files(paths, "game-zombie-zone")
+	var read := GSMapRotationFile.load_files(paths, "game-zombie-zone")
 
 	if not read.ok:
-		DotLog.error(CHANNEL, "the map rotation file could not be read; every map rotates", {
+		GSLog.error(CHANNEL, "the map rotation file could not be read; every map rotates", {
 			"why": read.error.message,
 		})
 		catalogue.rotation_file = null
@@ -1473,7 +1473,7 @@ func load_rotation() -> DotResult:
 	catalogue.apply_rotation(config.map_ids)
 
 	if catalogue.has_rotation_file():
-		DotLog.info(CHANNEL, "the map rotation file", {
+		GSLog.info(CHANNEL, "the map rotation file", {
 			"paths": ", ".join(catalogue.rotation_file.sources),
 			"active": catalogue.rotation_file.active_name(),
 		})
@@ -1499,7 +1499,7 @@ func command_names(role: String) -> PackedStringArray:
 	if not names.has(role):
 		return PackedStringArray([role])
 
-	return DotCommandNames.all_of("", names, {}, role)
+	return GSCommandNames.all_of("", names, {}, role)
 
 
 func _rotation_next() -> StringName:
@@ -1547,7 +1547,7 @@ func restart_same_map() -> void:
 
 ## Builds [param doc] as the map: what the server does between maps, and a client when sent one.
 ## With [param reuse], a map already built from the same inputs is kept and only the signals fire again.
-func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
+func build_map(doc: Dictionary, reuse: bool = false) -> GSResult:
 	var started := Time.get_ticks_msec()
 	world_clearing.emit()
 
@@ -1565,13 +1565,13 @@ func build_map(doc: Dictionary, reuse: bool = false) -> DotResult:
 	var stamp := _build_stamp(doc)
 	var kept := reuse and _built_stamp == stamp
 	var lap := Time.get_ticks_usec()
-	var built := DotResult.success(null) if kept else map.build(doc)
+	var built := GSResult.success(null) if kept else map.build(doc)
 	lap = _lap(&"map_build", lap)
 	map_builds += 0 if kept else 1
 	_built_stamp = stamp if built.ok else 0
 
 	if not built.ok:
-		DotLog.error(CHANNEL, "a map would not build", {"id": str(doc.get("id", "?")), "why": built.error.message})
+		GSLog.error(CHANNEL, "a map would not build", {"id": str(doc.get("id", "?")), "why": built.error.message})
 		return built
 
 	map_doc = map.doc
@@ -1605,7 +1605,7 @@ var build_sections: Dictionary = {}
 ## Adds the time since [param since] (usec) to section [param name]; returns the new lap start.
 func _lap(name: StringName, since: int) -> int:
 	if OS.has_feature("web"):  # the wasm heap only grows: a failed allocation names the section it died in
-		DotLog.info(CHANNEL, "build section", {"section": String(name)})
+		GSLog.info(CHANNEL, "build section", {"section": String(name)})
 	return ZzLaps.lap(build_sections, name, since)
 
 
@@ -1687,26 +1687,26 @@ func assign_class(player: ZzPlayer) -> void:
 
 ## Puts [param player] in a class on this end. The sprint rules re-apply on tracking, so the class's
 ## own numbers go on after them.
-func set_class(player: ZzPlayer, id: StringName, skin: StringName, def: DotPlayerClassDef) -> void:
+func set_class(player: ZzPlayer, id: StringName, skin: StringName, def: GSPlayerClassDef) -> void:
 	player.apply_class(id, skin, def)
 	combat_feel.track_tunables(player.controller.tunables)
-	var _classed := DotPlayerClassApply.to_movement(def, player.controller.tunables, ZzPlayer.tunables_for(config, DotPlayerClassDef.new()))
+	var _classed := GSPlayerClassApply.to_movement(def, player.controller.tunables, ZzPlayer.tunables_for(config, GSPlayerClassDef.new()))
 
 
 ## A survivor asks to be [param id] (and, if that class lets them pick, [param model]) from the next spawn.
-func request_class(player_id: StringName, id: String, model: String = "") -> DotResult:
+func request_class(player_id: StringName, id: String, model: String = "") -> GSResult:
 	var player: ZzPlayer = players.get(player_id)
 	if player == null:
-		return DotResult.fail(DotError.CODE_INVALID, "No such player.")
+		return GSResult.fail(GSError.CODE_INVALID, "No such player.")
 	var ok := ZzClasses.check_choice(id, config.class_select, config.class_allowed)
 	if not ok.ok:
 		return ok
 	var def := ZzClasses.def_of(id)
 	if model != "" and not ZzClasses.models_of(def).has(model):
-		return DotResult.fail(DotError.CODE_INVALID, "'%s' has no model '%s'." % [id, model])
+		return GSResult.fail(GSError.CODE_INVALID, "'%s' has no model '%s'." % [id, model])
 	player.class_wanted = StringName(id)
 	player.model_wanted = StringName(model)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 ## What a survivor holds at the start of a map ([param fresh]) or after a rescue.
@@ -1758,7 +1758,7 @@ func _set_phase(to: int) -> void:
 	phase = to
 	phase_elapsed = 0.0
 	phase_changed.emit(to)
-	DotLog.debug(CHANNEL, "the map changed phase", {"phase": Phase.keys()[to]})
+	GSLog.debug(CHANNEL, "the map changed phase", {"phase": Phase.keys()[to]})
 
 
 func is_survival() -> bool:
@@ -2014,7 +2014,7 @@ func _decide(won: bool, why: String) -> void:
 				if progress != null:
 					progress.on_survived(player.player_id, is_survival())
 
-	DotLog.info(CHANNEL, "the map is decided", {"won": won, "why": why})
+	GSLog.info(CHANNEL, "the map is decided", {"won": won, "why": why})
 
 	if map != null and map.mechanics != null:
 		map.mechanics.round_decided(won)
@@ -2030,7 +2030,7 @@ static func _clock(seconds: float) -> String:
 func next_round_seconds() -> float:
 	if not authoritative:
 		return remote_next_round
-	if match_node == null or match_node.state != DotMatch.State.INTERMISSION:
+	if match_node == null or match_node.state != GSMatch.State.INTERMISSION:
 		return -1.0
 	return match_node.seconds_remaining(_tick)
 
@@ -2195,7 +2195,7 @@ func bash_barricade(id: String, amount: float) -> void:
 		_tell_horde_barricades()
 		barricade_changed.emit(id, 0.0, false)
 		notice.emit("They are through %s!" % str(e["label"]))
-		DotLog.info(CHANNEL, "a barricade broke", {"id": id})
+		GSLog.info(CHANNEL, "a barricade broke", {"id": id})
 		return
 
 	# Told in steps of a sixteenth: a crowd at a window is a hit every tick, and a message per
@@ -2549,11 +2549,11 @@ func _fire_held(player: ZzPlayer) -> bool:
 
 
 ## The flashlight config, made on first use.
-func flashlight_conf() -> DotFlashlightConfig:
+func flashlight_conf() -> GSFlashlightConfig:
 	if flashlight_config == null:
 		flashlight_config = ZzFlashlight.make_config()
 		flashlight_binder = ZzFlashlight.flashlight_binder(flashlight_config)
-		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
+		GSLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
 	return flashlight_config
 
 
@@ -2565,7 +2565,7 @@ func _flashlight_hands(player: ZzPlayer, pressed: int) -> void:
 		var map_id := String(map_doc.get("id", ""))
 		player.flashlight = cfg.enabled and ZzFlashlight.starts_on(cfg, map_id, map_doc)
 	if (pressed & ZzNetCommand.ACT_FLASHLIGHT) != 0 and cfg.enabled \
-			and DotFlashlightRules.allowed_on(cfg, String(map_doc.get("id", ""))):
+			and GSFlashlightRules.allowed_on(cfg, String(map_doc.get("id", ""))):
 		player.flashlight = not player.flashlight
 
 
@@ -2652,9 +2652,9 @@ func _body_to_defib(player: ZzPlayer) -> ZzPlayer:
 	return best
 
 
-## The defibrillator in [param player]'s hands as [DotDefib] data, from the configuration now.
-func _defib_of(player: ZzPlayer) -> DotDefib:
-	var d := DotDefib.new()
+## The defibrillator in [param player]'s hands as [GSDefib] data, from the configuration now.
+func _defib_of(player: ZzPlayer) -> GSDefib:
+	var d := GSDefib.new()
 	d.charge_seconds = config.defib_charge_seconds
 	d.reach = config.defib_range
 	d.revive_fraction = config.defib_revive_fraction
@@ -2672,7 +2672,7 @@ func defib_body_ok(body: ZzPlayer) -> bool:
 	return body.life == ZzPlayer.Life.DEAD and body.died_at >= 0.0 and now() - body.died_at <= config.defib_max_body_age
 
 
-func _defib_check(user: ZzPlayer, body: ZzPlayer) -> DotResult:
+func _defib_check(user: ZzPlayer, body: ZzPlayer) -> GSResult:
 	var age := now() - body.died_at if body.died_at >= 0.0 else 0.0
 	return _defib_of(user).check(now(), age, body.feet().distance_to(user.feet()))
 
@@ -2899,7 +2899,7 @@ func _shove(player: ZzPlayer) -> void:
 # Hurting survivors
 
 ## A zombie's swing landed. The difficulty is applied here, once.
-func zombie_hit(npc: DotNpcInstance, entity: int, victim: StringName, amount: float) -> void:
+func zombie_hit(npc: GSNpcInstance, entity: int, victim: StringName, amount: float) -> void:
 	var player := player_by_id(victim)
 
 	if player == null or not player.is_alive() or combat == null:
@@ -2912,7 +2912,7 @@ func zombie_hit(npc: DotNpcInstance, entity: int, victim: StringName, amount: fl
 	if npc != null and ZzNpcs.is_special(npc.def.id):
 		scaled = amount * lerpf(1.0, config.damage_scale(), 0.35)
 
-	var hit := DotDamage.make(entity, player.entity_id, scaled, combat.damage_type(&"bite"))
+	var hit := GSDamage.make(entity, player.entity_id, scaled, combat.damage_type(&"bite"))
 	hit.point = player.feet() + Vector3(0.0, 1.0, 0.0)
 	hit.direction = (player.feet() - (npc.position() if npc != null else player.feet())).normalized()
 	hit.tick = _tick
@@ -2937,13 +2937,13 @@ func eat_victim(entity: int, victim: StringName) -> void:
 
 
 ## A pin's damage over time.
-func pin_damage(npc: DotNpcInstance, entity: int, victim: StringName, amount: float, _kind: StringName) -> void:
+func pin_damage(npc: GSNpcInstance, entity: int, victim: StringName, amount: float, _kind: StringName) -> void:
 	var player := player_by_id(victim)
 
 	if player == null or not player.is_alive():
 		return
 
-	var hit := DotDamage.make(entity, player.entity_id, amount * lerpf(1.0, config.damage_scale(), 0.35), combat.damage_type(&"bite"))
+	var hit := GSDamage.make(entity, player.entity_id, amount * lerpf(1.0, config.damage_scale(), 0.35), combat.damage_type(&"bite"))
 	hit.tick = _tick
 	hit.weapon_id = npc.def.id if npc != null else &"special"
 	hit.context = {"why": BY_SPECIAL}
@@ -2960,7 +2960,7 @@ func hazard_damage(player: ZzPlayer, amount: float, owner: int, kind: StringName
 		return
 
 	_hurt_backlog[player.player_id] = owed - floorf(owed)
-	var hit := DotDamage.make(owner, player.entity_id, floorf(owed), combat.damage_type(kind))
+	var hit := GSDamage.make(owner, player.entity_id, floorf(owed), combat.damage_type(kind))
 	hit.tick = _tick
 	hit.weapon_id = kind
 	hit.context = {"why": BY_HAZARD}
@@ -2975,7 +2975,7 @@ func goo_hit(victim: StringName, amount: float, owner: int) -> void:
 	if player == null or not player.is_alive():
 		return
 
-	var npc: DotNpcInstance = horde.npc_for_entity(owner) if horde != null else null
+	var npc: GSNpcInstance = horde.npc_for_entity(owner) if horde != null else null
 	var meta: Dictionary = npc.def.meta if npc != null else {}
 	hazard_damage(player, amount, owner, ZzHazards.GOO)
 	player.goo_stacks = mini(player.goo_stacks + 1, int(meta.get("blind_max_stacks", 3)))
@@ -2990,7 +2990,7 @@ func knock_survivor(victim: StringName, from: Vector3, amount: float, owner: int
 		return
 
 	if amount > 0.0:
-		var npc: DotNpcInstance = horde.npc_for_entity(owner) if horde != null else null
+		var npc: GSNpcInstance = horde.npc_for_entity(owner) if horde != null else null
 		zombie_hit(npc, owner, victim, amount)
 
 	if player.is_up() and not player.is_pinned():
@@ -3018,7 +3018,7 @@ func bile_survivor(victim: StringName, seconds: float, _owner: int) -> void:
 
 
 ## A zombie burning: fire damage, credited to nobody.
-func burn_zombie(npc: DotNpcInstance, amount: float) -> void:
+func burn_zombie(npc: GSNpcInstance, amount: float) -> void:
 	if horde == null or combat == null:
 		return
 
@@ -3027,7 +3027,7 @@ func burn_zombie(npc: DotNpcInstance, amount: float) -> void:
 	if entity == 0:
 		return
 
-	var hit := DotDamage.make(0, entity, amount, combat.damage_type(&"fire"))
+	var hit := GSDamage.make(0, entity, amount, combat.damage_type(&"fire"))
 	hit.tick = _tick
 	hit.weapon_id = &"fire"
 	var _applied := combat.apply_damage(hit)
@@ -3042,7 +3042,7 @@ func explode(at: Vector3, radius: float, amount: float, owner: int, kind: String
 		for npc in horde.spawner.npcs_near(at, radius):
 			var entity := horde.entity_id_for(npc)
 			var falloff := 1.0 - clampf(npc.position().distance_to(at) / radius, 0.0, 0.9)
-			var hit := DotDamage.make(owner, entity, amount * falloff, combat.damage_type(&"blast"))
+			var hit := GSDamage.make(owner, entity, amount * falloff, combat.damage_type(&"blast"))
 			hit.point = npc.position()
 			hit.direction = (npc.position() - at).normalized()
 			hit.tick = _tick
@@ -3050,12 +3050,12 @@ func explode(at: Vector3, radius: float, amount: float, owner: int, kind: String
 			var _a := combat.apply_damage(hit)
 
 		horde.blast(at, radius * 1.2)
-		horde.sounds.emit(DotNpcAiSounds.Kind.COMBAT, at, 50.0, horde.now(), 0.5)
+		horde.sounds.emit(GSNpcAiSounds.Kind.COMBAT, at, 50.0, horde.now(), 0.5)
 
 	if survivor_scale > 0.0:
 		for player in survivors_within(at, radius, 3.0):
 			var falloff := 1.0 - clampf(player.feet().distance_to(at) / radius, 0.0, 0.9)
-			var hurt := DotDamage.make(0, player.entity_id, amount * survivor_scale * falloff, combat.damage_type(&"blast"))
+			var hurt := GSDamage.make(0, player.entity_id, amount * survivor_scale * falloff, combat.damage_type(&"blast"))
 			hurt.tick = _tick
 			hurt.weapon_id = kind
 			hurt.context = {"why": BY_HAZARD}
@@ -3069,7 +3069,7 @@ func explode(at: Vector3, radius: float, amount: float, owner: int, kind: String
 
 # Health
 
-func _on_player_damaged(player: ZzPlayer, damage: DotDamage) -> void:
+func _on_player_damaged(player: ZzPlayer, damage: GSDamage) -> void:
 	if damage.health_lost <= 0.0:
 		return
 
@@ -3088,7 +3088,7 @@ func _on_player_damaged(player: ZzPlayer, damage: DotDamage) -> void:
 
 
 ## Health reached zero: down, unless this is the one too many.
-func _on_health_zero(player: ZzPlayer, damage: DotDamage) -> void:
+func _on_health_zero(player: ZzPlayer, damage: GSDamage) -> void:
 	var why: StringName = damage.context.get("why", BY_ZOMBIE)
 	var by := _blame(damage)
 
@@ -3098,7 +3098,7 @@ func _on_health_zero(player: ZzPlayer, damage: DotDamage) -> void:
 		_die(player, by, why, damage)
 
 
-func _blame(damage: DotDamage) -> StringName:
+func _blame(damage: GSDamage) -> StringName:
 	var attacker := player_for_entity(damage.attacker)
 
 	if attacker != null:
@@ -3141,7 +3141,7 @@ func _go_down(player: ZzPlayer, by: StringName, why: StringName) -> void:
 		progress.on_downed(player.player_id)
 
 	player_downed.emit(player.player_id, by, why)
-	DotLog.debug(CHANNEL, "survivor down", {"id": String(player.player_id), "by": String(by), "incaps": player.incaps})
+	GSLog.debug(CHANNEL, "survivor down", {"id": String(player.player_id), "by": String(by), "incaps": player.incaps})
 
 
 func _revive(player: ZzPlayer, by: ZzPlayer) -> void:
@@ -3207,7 +3207,7 @@ func _defib_revive(body: ZzPlayer, by: ZzPlayer) -> void:
 
 	defibbed.emit(body.player_id, by.player_id)
 	notice.emit("%s shocked %s back." % [by.display_name, body.display_name])
-	DotLog.debug(CHANNEL, "defibrillated", {"id": String(body.player_id), "by": String(by.player_id)})
+	GSLog.debug(CHANNEL, "defibrillated", {"id": String(body.player_id), "by": String(by.player_id)})
 
 
 ## Stands a downed survivor up without anybody holding E: a box's doing.
@@ -3215,7 +3215,7 @@ func stand_up(player: ZzPlayer) -> void:
 	_revive(player, null)
 
 
-func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage = null) -> void:
+func _die(player: ZzPlayer, by: StringName, why: StringName, damage: GSDamage = null) -> void:
 	if player.life == ZzPlayer.Life.DEAD:
 		return
 
@@ -3253,13 +3253,13 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: DotDamage =
 	player.death_weapon = damage.weapon_id if damage != null else &""
 
 	player_died.emit(player.player_id, by, why)
-	DotLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
+	GSLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 
 ## The fall a survivor's death gets: dot-player-char's reaction rule, seeded from player and tick.
 ## Killing hit's direction, else away from the killer; bleeding out and falling push nothing.
 ## A heavy friend's weapon may launch the body as it would a zombie.
-func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
+func decide_death(player: ZzPlayer, damage: GSDamage) -> GSPlayerDeath:
 	var direction := Vector3.ZERO
 	var headshot := false
 	var amount := 0.0
@@ -3283,9 +3283,9 @@ func decide_death(player: ZzPlayer, damage: DotDamage) -> DotPlayerDeath:
 			if from != Vector3.INF:
 				direction = (player.feet() - from) * Vector3(1, 0, 1)
 
-	return DotPlayerDeath.decide(
+	return GSPlayerDeath.decide(
 		ragdoll_rules.reactions(), headshot, amount, direction,
-		DotPlayerDeath.seed_of(player.entity_id, _tick), weapon
+		GSPlayerDeath.seed_of(player.entity_id, _tick), weapon
 	)
 
 
@@ -3403,10 +3403,10 @@ func _advance_bodies(delta: float) -> void:
 
 # Zombies dying
 
-func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage) -> void:
+func _on_zombie_died(npc: GSNpcInstance, killer: StringName, damage: GSDamage) -> void:
 	var kind := npc.def.id
 	var at := npc.position()
-	var headshot := damage != null and damage.hit_group == DotHitGroup.HEAD
+	var headshot := damage != null and damage.hit_group == GSHitGroup.HEAD
 	var player := player_by_id(killer)
 
 	if player != null:
@@ -3448,7 +3448,7 @@ func _on_zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
 # Weapons
 
 ## The weapon table every rig shares (see [method ZzWeapons.shared_catalogue]).
-static func weapon_catalogue() -> DotWeaponCatalogue:
+static func weapon_catalogue() -> GSWeaponCatalogue:
 	return ZzWeapons.shared_catalogue()
 
 
@@ -3465,14 +3465,14 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 		rig.catalogue = weapon_catalogue()
 		# The held weapon lowers at every brush that stops the player, fences and clip included.
 		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-		rig.player_ref = DotNodeRef.of_path(player.get_path())
+		rig.player_ref = GSNodeRef.of_path(player.get_path())
 		rig.ads_rules = ads_rules
 		player.add_child(rig)
 
 		var ready_now := rig.setup()
 
 		if not ready_now.ok:
-			DotLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
+			GSLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
 			player.remove_child(rig)
 			rig.queue_free()
 			return false
@@ -3488,7 +3488,7 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 
 	var given := player.weapons.give(weapon_id, true)
 	if not given.ok:
-		arm_failure = given.error.message if given.error.code == DotError.CODE_QUOTA else ""
+		arm_failure = given.error.message if given.error.code == GSError.CODE_QUOTA else ""
 		return false
 
 	player_armed.emit(player.player_id, weapon_id)
@@ -3497,12 +3497,12 @@ func arm(player: ZzPlayer, weapon_id: StringName) -> bool:
 
 ## Fits [param weapon_id] per [param fitting] for [param player], now and on later holds.
 ## Server's check of a client's ask: legal for the base def in the shared attachment catalogue,
-## or refused whole. Stats follow from `DotWeaponArsenal.fit`.
-func fit_weapon(player: ZzPlayer, weapon_id: StringName, fitting: DotWeaponFitting) -> DotResult:
+## or refused whole. Stats follow from `GSWeaponArsenal.fit`.
+func fit_weapon(player: ZzPlayer, weapon_id: StringName, fitting: GSWeaponFitting) -> GSResult:
 	var base := ZzWeapons.def_of(weapon_id) if player != null and fitting != null else null
 
 	if base == null:
-		return DotResult.fail(DotError.CODE_INVALID, "There is no such weapon to fit.")
+		return GSResult.fail(GSError.CODE_INVALID, "There is no such weapon to fit.")
 
 	var legal := ZzPacks.attachment_catalogue().validate_fitting(base, fitting)
 
@@ -3514,7 +3514,7 @@ func fit_weapon(player: ZzPlayer, weapon_id: StringName, fitting: DotWeaponFitti
 	if player.weapons != null:
 		var _changed := ZzFittings.apply_to(player.weapons.arsenal, player.fittings)
 
-	return DotResult.success(fitting)
+	return GSResult.success(fitting)
 
 
 ## Hangs the shared carry rules on [param player]'s arsenal and weighs its catalogue.
@@ -3558,7 +3558,7 @@ func _carry_update() -> void:
 
 		if rules_moved or player.carry_dirty:
 			player.carry_dirty = false
-			if carry.carry.enabled and carry.carry.over_limit == DotWeaponCarry.OverLimit.DROP:
+			if carry.carry.enabled and carry.carry.over_limit == GSWeaponCarry.OverLimit.DROP:
 				for dropped in arsenal.enforce_limit():
 					told.emit(id, "Too heavy: you dropped %s." % ZzWeapons.title_of(dropped))
 					if loot != null:
@@ -3605,7 +3605,7 @@ func _advance_weapons() -> void:
 			player.weapons.arsenal.crosshair_cone = false
 
 			if not player.weapons.arsenal.idle_posture.is_valid():
-				player.weapons.arsenal.idle_posture = DotWeaponPlayerBridge.posture_for.bind(player)
+				player.weapons.arsenal.idle_posture = GSWeaponPlayerBridge.posture_for.bind(player)
 
 			if _bot_weapon_idle(player, command):
 				continue
@@ -3627,7 +3627,7 @@ func _advance_weapons() -> void:
 			if horde != null:
 				var def := player.weapons.current_def()
 				var quiet := def != null and def.tags.has(&"silenced")
-				horde.sounds.emit(DotNpcAiSounds.Kind.COMBAT, shot.origin,
+				horde.sounds.emit(GSNpcAiSounds.Kind.COMBAT, shot.origin,
 					config.gunfire_radius * (0.35 if quiet else 1.0), horde.now(), 0.5, id)
 
 		if authoritative and hazards != null:
@@ -3636,7 +3636,7 @@ func _advance_weapons() -> void:
 
 
 ## Tells the world where [param shot] left marks (see [signal shot_marked]); nothing on a client or when no one listens.
-func _mark_shot(shot: DotShot) -> void:
+func _mark_shot(shot: GSShot) -> void:
 	if not authoritative or shot_marked.get_connections().is_empty():
 		return
 
@@ -3728,7 +3728,7 @@ func _bot_motor_asleep(player: ZzPlayer) -> bool:
 
 
 ## True on the ticks a stand-in's untouched weapon may sleep (see [member ZzConfig.bot_weapon_idle_every]).
-func _bot_weapon_idle(player: ZzPlayer, command: DotWeaponCommand) -> bool:
+func _bot_weapon_idle(player: ZzPlayer, command: GSWeaponCommand) -> bool:
 	var every := config.bot_weapon_idle_every
 	var arsenal := player.weapons.arsenal
 
@@ -3746,7 +3746,7 @@ func _bot_weapon_idle(player: ZzPlayer, command: DotWeaponCommand) -> bool:
 ## What a weapon put into the world, as one of [ZzHazards]' projectiles. dot-weapon spawns nothing,
 ## it says what should exist; a throwable is known by its tags (`molotov`, `pipe_bomb`, `bile`),
 ## anything else explosive is a grenade on its fuse, or on contact without one.
-func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
+func _throw(player: ZzPlayer, spawn: GSWeaponSpawn) -> void:
 	var def := ZzWeapons.def_of(spawn.id)
 
 	if grenades.handles(def):
@@ -3781,7 +3781,7 @@ func _throw(player: ZzPlayer, spawn: DotWeaponSpawn) -> void:
 
 ## The command [param player]'s gun simulates this tick, from the buttons on their movement
 ## command. `ZzWeapons.command_for` is the rule, shared with the gun a client draws.
-func weapon_command_for(player: ZzPlayer) -> DotWeaponCommand:
+func weapon_command_for(player: ZzPlayer) -> GSWeaponCommand:
 	var held := player.is_held() or ui_holds(player)
 	var pending := player.controller.current_command
 	var arsenal := player.weapons.arsenal if player.weapons != null else null
@@ -4015,7 +4015,7 @@ func _roll_into_survivors(delta: float) -> void:
 		var player: ZzPlayer = players.get(hit["victim"])
 		if player == null:
 			continue
-		var damage := DotDamage.make(0, player.entity_id, float(hit["damage"]), combat.damage_type(&"strike"))
+		var damage := GSDamage.make(0, player.entity_id, float(hit["damage"]), combat.damage_type(&"strike"))
 		damage.tick = _tick
 		damage.weapon_id = &"barrel"
 		damage.context = {"why": BY_HAZARD}
@@ -4028,7 +4028,7 @@ func _roll_into_survivors(delta: float) -> void:
 ## Whether any rolling kind of toy is past the speed that hurts; false is the usual tick.
 func _toy_moving_fast() -> bool:
 	var floor_speed := minf(rolling.min_speed, rolling_zombies.min_speed)
-	for toy: DotPropBody in map.toys.toys:
+	for toy: GSPropBody in map.toys.toys:
 		if is_instance_valid(toy) and toy.body != null and toy.body.linear_velocity.length_squared() >= floor_speed * floor_speed:
 			return true
 	return false
@@ -4043,17 +4043,17 @@ func _roll_into_zombies(delta: float) -> void:
 	var by_id := _roll_by_id
 	victims.clear()
 	by_id.clear()
-	for npc: DotNpcInstance in horde.spawner.all_npcs():
+	for npc: GSNpcInstance in horde.spawner.all_npcs():
 		var entity := horde.entity_id_for(npc)
 		if not npc.is_alive() or entity == 0:
 			continue
 		by_id[entity] = npc
 		victims.append({"id": entity, "position": npc.position(), "radius": 0.4, "height": 1.8})
 	for hit: Dictionary in rolling_zombies.scan(map.toys, victims, delta):
-		var npc: DotNpcInstance = by_id.get(hit["victim"])
+		var npc: GSNpcInstance = by_id.get(hit["victim"])
 		if npc == null:
 			continue
-		var damage := DotDamage.make(0, int(hit["victim"]), float(hit["damage"]), combat.damage_type(&"strike"))
+		var damage := GSDamage.make(0, int(hit["victim"]), float(hit["damage"]), combat.damage_type(&"strike"))
 		damage.point = npc.position()
 		damage.direction = hit["direction"]
 		damage.tick = _tick
@@ -4064,7 +4064,7 @@ func _roll_into_zombies(delta: float) -> void:
 ## A survivor's shot against the toys: the first one on its ray, nearer than a wall, is pushed
 ## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
 ## a barrel is never cover between a survivor and a zombie. Server side.
-func _shoot_toys(shot: DotShot) -> void:
+func _shoot_toys(shot: GSShot) -> void:
 	if not authoritative or map == null:
 		return
 	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
@@ -4075,12 +4075,12 @@ func _shoot_toys(shot: DotShot) -> void:
 			var _pushed := push_toy(shot, raw as Vector3)
 		if not map.supports.is_empty():
 			var wall := _wall_distance(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0))
-			var _broke := DotMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
+			var _broke := GSMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
 
 
 ## The first toy on a shot's ray, nearer than a wall, pushed as dot-props pushes it from the shot's damage times the weapon's
 ## `props/forces.json` multiplier for that kind of toy. The toy's index, or -1.
-func push_toy(shot: DotShot, direction: Vector3) -> int:
+func push_toy(shot: GSShot, direction: Vector3) -> int:
 	var box := map.toys
 	if prop_force == null:
 		prop_force = ZzPropForce.load_file()
@@ -4092,12 +4092,12 @@ func push_toy(shot: DotShot, direction: Vector3) -> int:
 	var found := box.get_world_3d().direct_space_state.intersect_ray(query)
 	if found.is_empty():
 		return -1
-	var toy := DotPropBodyBox.toy_of(found.get("collider"))
+	var toy := GSPropBodyBox.toy_of(found.get("collider"))
 	if toy == null or shot.damage <= 0.0:
 		return -1
 	var scale: float = prop_force.multiplier(shot.weapon_id, toy.kind)
-	var speed := clampf(shot.damage * DotPropBodyBox.SHOT_SPEED_PER_DAMAGE, DotPropBodyBox.SHOT_SPEED_MIN, DotPropBodyBox.SHOT_SPEED_MAX)
-	return box.hit(found.get("collider"), found.get("position"), direction, speed * DotPropBodyBox._shot_mass(toy) * scale)
+	var speed := clampf(shot.damage * GSPropBodyBox.SHOT_SPEED_PER_DAMAGE, GSPropBodyBox.SHOT_SPEED_MIN, GSPropBodyBox.SHOT_SPEED_MAX)
+	return box.hit(found.get("collider"), found.get("position"), direction, speed * GSPropBodyBox._shot_mass(toy) * scale)
 
 
 ## The force table, loaded on first use.
@@ -4127,7 +4127,7 @@ func set_tick_rate(rate: int) -> bool:
 	var why := ZzCapsScript.refusal("zz_tick_rate", float(rate), ZzCapsScript.doc_overrides)
 
 	if not why.is_empty():
-		DotLog.error(CHANNEL, why, {"setting": "tick_rate"})
+		GSLog.error(CHANNEL, why, {"setting": "tick_rate"})
 		return false
 
 	tick_rate = rate

@@ -17,13 +17,13 @@ var _opened := false
 
 func _process(_delta: float) -> bool:
 	if _settings == null:
-		DotLog.set_level(DotLog.Level.ERROR)
+		GSLog.set_level(GSLog.Level.ERROR)
 		DirAccess.make_dir_recursive_absolute("res://screenshots")
-		var index := DotContentIndex.new()
-		index.set_session(DotContentIndex.SESSION_SOLO)
+		var index := GSContentIndex.new()
+		index.set_session(GSContentIndex.SESSION_SOLO)
 		var _added := index.add_pack({
 			"content_id": "fixture/ruins", "version": "1.0.0", "prefix": "res://fixture/",
-			"session": DotContentIndex.SESSION_SOLO, "source": &"subscription",
+			"session": GSContentIndex.SESSION_SOLO, "source": &"subscription",
 			"provides": {"schema": 1, "title": "Ruins Pack", "kinds": ["map"], "entries": [
 				{"kind": "map", "id": "fixture_ruin", "name": "Fixture Ruin", "scene": "ruin.tscn", "map_kind": "survival"},
 				{"kind": "map", "id": "fixture_run", "name": "Fixture Run", "scene": "run.tscn", "map_kind": "race"},
@@ -38,7 +38,7 @@ func _process(_delta: float) -> bool:
 		root.add_child(_settings)
 		var _built := _settings.setup()
 		var _maps: Variant = _settings.call(&"use_maps", game.map_rows,
-			func(id: StringName) -> DotResult: return game.change_map_now(id))
+			func(id: StringName) -> GSResult: return game.change_map_now(id))
 		return false
 	if not _opened:
 		_settings.menu.open_maps()

@@ -1,13 +1,13 @@
 extends Node
 
-## Splinters where a barricade or a support gives way, drawn by dot-fx's DotFxBreak and following fx_quality.
+## Splinters where a barricade or a support gives way, drawn by dot-fx's GSFxBreak and following fx_quality.
 
-var break_fx: DotFxBreak = null
+var break_fx: GSFxBreak = null
 
 
 func _init() -> void:
 	name = "BreakFx"
-	break_fx = DotFxBreak.new()
+	break_fx = GSFxBreak.new()
 	break_fx.name = "Break"
 	add_child(break_fx)
 

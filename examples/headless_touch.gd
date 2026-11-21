@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzTouch := preload("../game/zz_touch.gd")
 const ZzGameState := preload("../game/zz_game_state.gd")
@@ -11,7 +11,7 @@ const CHECKS := 29
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -27,7 +27,7 @@ func _run() -> void:
 		_check(want in ids, "the layout keeps the %s button" % want)
 	_check(smallest * 2.0 >= 44.0, "every button is thumb size (44 px or more)", str(smallest * 2.0))
 	for size: Vector2 in [Vector2(844, 390), Vector2(932, 430)]:
-		var buttons := DotTouchButtons.new()
+		var buttons := GSTouchButtons.new()
 		buttons.size = size
 		buttons.set_buttons(layout)
 		add_child(buttons)
@@ -60,19 +60,19 @@ class Zombie extends Node3D:
 
 
 func _overlay() -> void:
-	var rules: DotMobileRules = ZzGameState._make_mobile_rules()
-	var prefs := DotMobilePrefs.new()
+	var rules: GSMobileRules = ZzGameState._make_mobile_rules()
+	var prefs := GSMobilePrefs.new()
 	_check(rules.resolve(prefs, true).autofire, "auto-fire is on for a touch player by default")
 	_check(not rules.resolve(prefs, false).autofire, "and off for keyboard and mouse")
-	DotPlatform.touch_override = 1
+	GSPlatform.touch_override = 1
 	var host := Control.new()
 	host.size = Vector2(844, 390)
 	add_child(host)
-	var sampler := DotFpsTouchSampler.new(DotFpsTunables.new())
+	var sampler := GSFpsTouchSampler.new(GSFpsTunables.new())
 	var touch: RefCounted = ZzTouch.build(self, host, sampler, rules)
-	var controls: DotMobileControls = touch.get(&"controls")
+	var controls: GSMobileControls = touch.get(&"controls")
 	_check(controls != null and controls.touch and controls.sampler == sampler, "the overlay drives the client's own sampler", str(touch.call(&"describe")))
-	var other := DotFpsTouchSampler.new(DotFpsTunables.new())
+	var other := GSFpsTouchSampler.new(GSFpsTunables.new())
 	touch.call(&"attach", other)
 	_check(controls.sampler == other, "offline play hands it the player's own sampler")
 	var tap := InputEventScreenTouch.new()
@@ -90,7 +90,7 @@ func _overlay() -> void:
 			hold += 1
 	_check(hold == 2, "jump and duck are held on the sampler by the overlay", str(hold))
 	host.free()
-	DotPlatform.touch_override = -1
+	GSPlatform.touch_override = -1
 
 
 func _crosshair() -> void:
@@ -98,9 +98,9 @@ func _crosshair() -> void:
 	var foe := _zombie(Vector3(0, 0, -10))
 	var eye := Vector3(0, 1.6, 0)
 	var ahead := Vector3(0, 0, -1)
-	var none := DotMobileAutoFire.TARGET_NONE
-	var enemy := DotMobileAutoFire.TARGET_ENEMY
-	var friend := DotMobileAutoFire.TARGET_FRIEND
+	var none := GSMobileAutoFire.TARGET_NONE
+	var enemy := GSMobileAutoFire.TARGET_ENEMY
+	var friend := GSMobileAutoFire.TARGET_FRIEND
 	_check(ZzTouch.crosshair_kind(eye, ahead, me, [me], [foe], null, 0) == enemy, "the crosshair on a living zombie is an enemy")
 	_check(ZzTouch.crosshair_kind(eye, Vector3(1, 0, 0), me, [me], [foe], null, 0) == none, "looking away is nothing")
 	var mate := _survivor(Vector3(0, 0, -5))

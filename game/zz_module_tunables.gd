@@ -216,63 +216,63 @@ func _bind_rule_cvars(world: ZzGame) -> void:
 	# (survivors and stand-ins block each other, 1 by default). REPLICATED: the client places its camera
 	# under the first and predicts its player under the second.
 	var _views := world.view_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	var _bodies := world.body_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# Dead bodies, survivors' and zombies' alike: dot-player-char's sv_ragdoll* set. The server
 	# only picks each death's reaction from them; REPLICATED, because the clients draw the bodies.
 	var _ragdolls := world.ragdoll_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
 	# server took away.
 	var _toys := world.toy_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# Whether survivors walk through barricades. REPLICATED, because a client predicts its own
 	# player under it (see ZzPassRules).
 	var _passing := world.pass_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# How fast a downed survivor crawls. REPLICATED: the DOWN modifier's speed is part of the
 	# prediction (see ZzCrawlRules).
 	world.crawl_rules.speed = world.config.downed_crawl_speed
 	var _crawl := world.crawl_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# dot-mobile's touch, aim assist and auto-fire rules: REPLICATED, the overlay on a phone follows them.
 	var _mobile := world.mobile_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# The slide's numbers (dot-player-controller's cvar table under `zz_slide`): REPLICATED, a client predicts its own slide.
 	var _slide := world.slide_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# What a downed survivor holds and whether they crawl with it: part of the prediction (can_crawl).
 	var _downed := world.downed_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# Aim down sights: spread and pace while aimed are part of the prediction, so the numbers the
 	# simulation reads cross as one JSON cvar (see ZeeAdsRules.PREDICTED).
 	var _ads := world.ads_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# mp_vm_* and cl_vm_kick: the view model's feel, drawn on each client, hence REPLICATED.
 	var _feel := world.feel_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# zz_head_mult, zz_neck_mult, zz_stomach_mult, zz_leg_mult: what a hit on that zone does, for every attacker.
 	if world.combat != null and world.combat.resolver.hit_groups != null:
-		var _zones: Array = world.combat.resolver.hit_groups.bind_cvars(add_cvar, "zz", DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+		var _zones: Array = world.combat.resolver.hit_groups.bind_cvars(add_cvar, "zz", GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY)
 
 	# Spread, recoil, sprint and stamina: the server's shot, and a client's prediction and view, read the same numbers.
 	world.combat_feel.bind_cvars(add_cvar)
@@ -280,17 +280,17 @@ func _bind_rule_cvars(world: ZzGame) -> void:
 	# Water: how survivors wade, swim and drown, and how the horde wades (see ZzWaterRules). The
 	# movement ones are REPLICATED, because a client predicts its own swim.
 	var _water := world.water_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED,
+		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY
 	)
 
 	# The creepy ambience: on/off, level, one-shot rate and mood (see ZzAmbientRules).
 	var _ambient := world.ambient_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED,
+		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY
 	)
 	# The ending camera a map may ask for: the viewer's own, archived (see ZzEndCameraRules).
-	var _end_camera := world.end_camera_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY)
+	var _end_camera := world.end_camera_rules.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY)
 
 
 ## The tunables of the specials added with the animated models.
@@ -341,7 +341,7 @@ func _add_tunables_specials(world: ZzGame) -> void:
 		func(value: float) -> void: config.oil_monster_chance = clampf(value, 0.0, 1.0))
 	_tunable("zz_oil_monster_min_wave", float(config.oil_monster_min_wave), "First wave the oil monster can appear on",
 		func(value: float) -> void: config.oil_monster_min_wave = maxi(int(value), 0))
-	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, dot-effects' DotHazardProfile keys).
+	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, dot-effects' GSHazardProfile keys).
 	var oil := ZzNpcs._oil_monster(config).meta
 	for row: Array in OIL_TUNABLES:
 		var key: String = row[0]
@@ -442,7 +442,7 @@ func _add_tunables_survival(world: ZzGame) -> void:
 		"How survival maps are held: waves (the default: waves to clear), nights (days to get ready, nights to live through) or clock")
 	if style != null:
 		style.changed.connect(func(_old: String, now: String) -> void:
-			var picked := DotNpcDirectorWaves.style_from(now)
+			var picked := GSNpcDirectorWaves.style_from(now)
 			if picked >= 0:
 				config.survival_style = picked
 			log_info("survival style", {"now": config.survival_style_name()}))
@@ -535,8 +535,8 @@ func _add_tunables_survival_2(world: ZzGame) -> void:
 	# How the stand-ins aim and shoot is dot-bot's: `bot_difficulty` and the `bot_*` settings it bundles.
 	# Kept as game metadata, where ZzBots reads it, never the registry (two servers in one process).
 	# `zz_bot_reaction` stays as the old name for `bot_reaction`.
-	var bot_settings := DotBotSettings.of(game)
-	var _bot_cvars := bot_settings.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
+	var bot_settings := GSBotSettings.of(game)
+	var _bot_cvars := bot_settings.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY, add_command)
 	_tunable("zz_bot_reaction", bot_settings.profile.reaction, "Deprecated, sets bot_reaction. Seconds a stand-in takes to react to a zombie",
 		func(value: float) -> void:
 			var _set := bot_settings.set_value("reaction", str(value)))
@@ -595,12 +595,12 @@ func _tunable(
 
 	# A value outside the cvar's range is refused here, loudly (the console reports it, the log
 	# carries it); nothing is clamped silently. See [ZzCaps].
-	var _checked := cvar.with_validator(func(text: String) -> DotResult:
+	var _checked := cvar.with_validator(func(text: String) -> GSResult:
 		var refused := _cap_refusal(cvar_name, text.to_float(), range_of)
 		if refused.is_empty():
-			return DotResult.success(text)
+			return GSResult.success(text)
 		log_warn(refused, {"cvar": cvar_name})
-		return DotResult.fail(DotError.CODE_INVALID, refused))
+		return GSResult.fail(GSError.CODE_INVALID, refused))
 
 	# The handler must not capture `cvar`: it would be a reference cycle the engine never frees.
 	cvar.changed.connect(func(_old: String, new_value: String) -> void:

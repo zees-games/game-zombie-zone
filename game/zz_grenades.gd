@@ -40,7 +40,7 @@ func _init(p_game: Object) -> void:
 
 
 ## True when the weapon [param def] is a grenade this file flies (its row names a `kind`).
-func handles(def: DotWeaponDef) -> bool:
+func handles(def: GSWeaponDef) -> bool:
 	return def != null and def.params.has(&"kind")
 
 
@@ -54,7 +54,7 @@ func count() -> int:
 
 
 ## Takes a thrown spawn: flies it from the next tick, and tells clients to draw the arc.
-func throw(player: Object, spawn: DotWeaponSpawn, def: DotWeaponDef) -> void:
+func throw(player: Object, spawn: GSWeaponSpawn, def: GSWeaponDef) -> void:
 	var g: Object = ZzGrenade.from_spawn(spawn, def, rules)
 	# The clients draw the arc under the hazards' gravity, so the server flies it under the same.
 	g.set(&"gravity", ZzHazards.GRAVITY * spawn.gravity_scale)
@@ -97,7 +97,7 @@ func clear() -> void:
 
 ## True when dot-npc has the blind and sight-blocker hooks (API 6).
 func has_senses() -> bool:
-	return DotAddonApi.build_level("dot_npc") >= 6 and game.horde != null and game.horde.senses != null
+	return GSAddonApi.build_level("dot_npc") >= 6 and game.horde != null and game.horde.senses != null
 
 
 ## `{position, normal}` of the first world hit on the segment, or empty.
@@ -118,10 +118,10 @@ func _blocked(from: Vector3, direction: Vector3, dist: float) -> bool:
 	return game.ray_hit(from, from + direction * dist) != Vector3.INF
 
 
-func _go_off(id: int, g: Object, def: DotWeaponDef) -> void:
+func _go_off(id: int, g: Object, def: GSWeaponDef) -> void:
 	var at: Vector3 = g.get(&"position") + Vector3(0.0, 0.1, 0.0)
 	g.set(&"position", at)
-	var b := def.tuning as DotWeaponBallistics
+	var b := def.tuning as GSWeaponBallistics
 	var reach := maxf(float(def.params.get(&"effect_radius", 0.0)), b.splash_radius if b != null else 0.0)
 	_spots.append({"at": at, "reach": reach, "until": game.now()})
 	var events: Array = zones.call(&"detonate", g, def)
@@ -132,7 +132,7 @@ func _go_off(id: int, g: Object, def: DotWeaponDef) -> void:
 	for e: Dictionary in events:
 		_apply(e, g)
 
-		if String(e["event"]) == "blind" and DotEntity.is_kind(int(e["victim"]), DotEntity.KIND_NPC):
+		if String(e["event"]) == "blind" and GSEntity.is_kind(int(e["victim"]), GSEntity.KIND_NPC):
 			blinded = maxf(blinded, _blind_left(int(e["victim"])))
 
 	# One lure for the whole flash: the commons it blinded go to the bang, not at the survivors.
@@ -204,13 +204,13 @@ func _bang(at: Vector3, radius: float, _owner: int) -> void:
 
 	if game.horde != null:
 		game.horde.blast(at, radius * 1.2)
-		game.horde.sounds.emit(DotNpcAiSounds.Kind.COMBAT, at, 50.0, game.horde.now(), 0.5)
+		game.horde.sounds.emit(GSNpcAiSounds.Kind.COMBAT, at, 50.0, game.horde.now(), 0.5)
 
 
 ## Through combat.apply_damage, so friendly fire, armour and the difficulty are the rules every other hit follows.
 func _damage(attacker: int, victim: int, amount: float, type: Variant, weapon: StringName) -> void:
 	var kind: Variant = game.combat.damage_type(type as StringName) if type is StringName else type
-	var hit := DotDamage.make(attacker, victim, amount, kind)
+	var hit := GSDamage.make(attacker, victim, amount, kind)
 	hit.tick = game.current_tick()
 	hit.weapon_id = weapon if weapon != &"" else &"fire"
 
@@ -254,10 +254,10 @@ func _blind(victim: int, at: Vector3) -> void:
 		player.flash_strength = float(zones.get(&"ledger").call(&"strength", victim))
 		return
 
-	if game.horde == null or not DotEntity.is_kind(victim, DotEntity.KIND_NPC):
+	if game.horde == null or not GSEntity.is_kind(victim, GSEntity.KIND_NPC):
 		return
 
-	var npc: DotNpcInstance = game.horde.npc_for_entity(victim)
+	var npc: GSNpcInstance = game.horde.npc_for_entity(victim)
 
 	if npc != null and has_senses():
 		npc.blind_for(game.horde.now(), seconds)

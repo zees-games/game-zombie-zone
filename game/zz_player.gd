@@ -6,7 +6,7 @@ func _ready() -> void:
 	controller.tick_rate = tick_rate
 	# EXTERNAL even offline: the world owns the tick, which is the shape a dedicated server
 	# needs and the one a predicting client replays.
-	controller.drive = DotFpsController.Drive.EXTERNAL
+	controller.drive = GSFpsController.Drive.EXTERNAL
 	controller.tunables = tunables_for(config, null, slide_rules)
 	controller.admin_abilities = true
 	controller.extra_modes = [swim, ladder]
@@ -20,8 +20,8 @@ func _ready() -> void:
 
 
 ## The sampler a screen's player is read through: touch (stick, look drag, buttons) on a phone.
-static func make_sampler(p_tunables: DotFpsTunables) -> DotFpsSampler:
-	return DotFpsTouchSampler.new(p_tunables) if DotPlatform.has_touch() else DotFpsSampler.new(p_tunables)
+static func make_sampler(p_tunables: GSFpsTunables) -> GSFpsSampler:
+	return GSFpsTouchSampler.new(p_tunables) if GSPlatform.has_touch() else GSFpsSampler.new(p_tunables)
 
 
 ## Hands over the map's water, [param boxes] (empty: none), and the rules that tune it.
@@ -35,7 +35,7 @@ func set_water(boxes: Array[AABB], rules: ZzWaterRules) -> void:
 
 		if boxes.is_empty() and controller.motor != null and controller.state != null \
 				and controller.state.mode == swim.mode_id:
-			controller.motor.set_mode(controller.state, DotFpsState.Mode.AIR)
+			controller.motor.set_mode(controller.state, GSFpsState.Mode.AIR)
 
 	air = rules.drown_seconds if rules != null else 12.0
 
@@ -72,8 +72,8 @@ func _before_tick(tick: int) -> void:
 
 ## What the ground does to somebody standing on it: a lift or a swinging door carries them, in
 ## the state, because the next tick starts from `state.position`.
-func _ride(tick: int, state: DotFpsState) -> void:
-	if state.mode != DotFpsState.Mode.GROUND or state.ground_id == 0 or not mechanics_fn.is_valid():
+func _ride(tick: int, state: GSFpsState) -> void:
+	if state.mode != GSFpsState.Mode.GROUND or state.ground_id == 0 or not mechanics_fn.is_valid():
 		return
 
 	var mech: Variant = mechanics_fn.call()
@@ -90,10 +90,10 @@ func _ride(tick: int, state: DotFpsState) -> void:
 
 ## A map's push and gravity volumes, in the state so a replayed tick gives the server's answer. A push lifts the velocity along
 ## its direction to its speed (standing in it adds no more), a gravity volume scales the fall that tick's gravity took.
-func _volume_forces(state: DotFpsState) -> void:
+func _volume_forces(state: GSFpsState) -> void:
 	var mech: Variant = mechanics_fn.call() if mechanics_fn.is_valid() else null
 
-	if mech == null or state.mode == DotFpsState.Mode.NOCLIP:
+	if mech == null or state.mode == GSFpsState.Mode.NOCLIP:
 		return
 
 	var tunables := controller.tunables
@@ -106,18 +106,18 @@ func _volume_forces(state: DotFpsState) -> void:
 		if along < push.length():
 			state.velocity += dir * (push.length() - along)
 
-			if state.velocity.y > 0.0 and state.mode == DotFpsState.Mode.GROUND:
-				controller.motor.set_mode(state, DotFpsState.Mode.AIR)
+			if state.velocity.y > 0.0 and state.mode == GSFpsState.Mode.GROUND:
+				controller.motor.set_mode(state, GSFpsState.Mode.AIR)
 
 	var scale: float = mech.gravity_at(state.position, tunables.stand_height)
 
-	if scale != 1.0 and state.mode == DotFpsState.Mode.AIR:
+	if scale != 1.0 and state.mode == GSFpsState.Mode.AIR:
 		state.velocity.y += tunables.gravity * (1.0 - scale) / float(maxi(tick_rate, 1))
 
 
 ## Once per simulated tick, after the move, a replay's included: into the water at the waist,
 ## and the wading slowdown while the feet are wet and the waist is not.
-func _on_simulated(tick: int, state: DotFpsState) -> void:
+func _on_simulated(tick: int, state: GSFpsState) -> void:
 	if controller.motor == null:
 		return
 
@@ -132,13 +132,13 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 			ladder.volumes = mech.ladder_boxes()
 	var cmd := controller.current_command
 	if cmd != null:
-		var view := DotFpsMotor._view_basis(state.yaw, 0.0)
+		var view := GSFpsMotor._view_basis(state.yaw, 0.0)
 		var intent: Vector3 = view.right * cmd.move.x + view.forward * cmd.move.y
 		ladder.wish = Vector3(intent.x, 0.0, intent.z).normalized()
 	ladder.update(controller.motor, state)
 	water_level = level_at(state.position, eye_position())
 	submerged = water_level == WaterLevel.EYES
-	# Waist-deep water too shallow to float in is waded too (DotFpsSwimMode.has_room_to_float).
+	# Waist-deep water too shallow to float in is waded too (GSFpsSwimMode.has_room_to_float).
 	var wading := water_level != WaterLevel.NONE and state.mode != swim.mode_id
 	var has := controller.motor.has_modifier(state, ZzController.WADING)
 
@@ -150,7 +150,7 @@ func _on_simulated(tick: int, state: DotFpsState) -> void:
 
 ## A downed survivor who may not crawl with what they hold is rooted (BUSY: no move, no jump), on
 ## every end that simulates them; the modifier is taken off again once they may, or are up.
-func _downed_tick(state: DotFpsState) -> void:
+func _downed_tick(state: GSFpsState) -> void:
 	var speed := Vector2(state.velocity.x, state.velocity.z).length()
 	_crawl_ticks = CRAWL_HOLD_TICKS if is_down() and speed > CRAWL_SPEED_MIN else maxi(_crawl_ticks - 1, 0)
 	var root := is_down() and not can_crawl_now()
@@ -180,8 +180,8 @@ func breathe(delta: float, rules: ZzWaterRules) -> float:
 
 ## How a survivor moves. Static: a connected client builds a sampler before it has a player, and
 ## the two must agree.
-static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null, p_slide: ZzSlideRules = null) -> DotFpsTunables:
-	var t := DotFpsTunables.with_profile("legacy")
+static func tunables_for(p_config: ZzConfig, p_class: GSPlayerClassDef = null, p_slide: ZzSlideRules = null) -> GSFpsTunables:
+	var t := GSFpsTunables.with_profile("legacy")
 	t.max_speed = p_config.run_speed if p_config != null else 6.2
 	t.gravity = p_config.gravity if p_config != null else 20.0
 	t.jump_height = p_config.jump_height if p_config != null else 1.1
@@ -204,12 +204,12 @@ static func tunables_for(p_config: ZzConfig, p_class: DotPlayerClassDef = null, 
 	t.stand_height = BODY_HEIGHT
 	t.crouch_height = BODY_CROUCH
 	t.step_height = BODY_STEP
-	var _classed := DotPlayerClassApply.to_movement(p_class if p_class != null else ZzClasses.survivor(), t)
+	var _classed := GSPlayerClassApply.to_movement(p_class if p_class != null else ZzClasses.survivor(), t)
 	return t
 
 
 ## Copies the sprint and stamina numbers of [param p_config] onto [param t] (also on a live cvar change).
-static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
+static func apply_sprint(t: GSFpsTunables, p_config: ZzConfig) -> void:
 	if p_config == null:
 		t.can_sprint = false
 		return
@@ -229,14 +229,14 @@ static func apply_sprint(t: DotFpsTunables, p_config: ZzConfig) -> void:
 ## Slide, ZZ's way: only a sprinter holding C slides (see [ZzSlideRules]). A walk, a plain run or a
 ## crouch alone never does, because [code]slide_requires_sprint[/code] wants the sprint button and the
 ## minimum speed sits above a plain run. Fatal Contact leaves both at the addon default, so it is unchanged.
-static func apply_slide(t: DotFpsTunables, p_config: ZzConfig, p_slide: ZzSlideRules = null) -> void:
+static func apply_slide(t: GSFpsTunables, p_config: ZzConfig, p_slide: ZzSlideRules = null) -> void:
 	var rules := p_slide if p_slide != null else ZzSlideRules.new()
 	rules.apply(t, p_config.slide_max_speed if p_config != null else t.slide_max_speed, p_config != null and p_config.sprint_enabled)
 
 
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.
-static func register_actions(p_sampler: DotFpsSampler = null) -> void:
-	var _added := DotFpsSampler.register_default_actions(p_sampler)
+static func register_actions(p_sampler: GSFpsSampler = null) -> void:
+	var _added := GSFpsSampler.register_default_actions(p_sampler)
 	var crouch := &"dot_fps_crouch"
 
 	# C beside Ctrl: Ctrl is a browser shortcut and a window manager's on some desktops.
@@ -273,8 +273,8 @@ func simulate(tick: int, delta: float) -> void:
 
 	if sampler != null:
 		# Settling under the cover runs the body with its input off (falls, lands, no keys).
-		var gate := DotLoadGate.of(self) if is_inside_tree() else null
-		var sampled := sampler.sample(delta) if gate == null or gate.is_open() else DotFpsCommand.new()
+		var gate := GSLoadGate.of(self) if is_inside_tree() else null
+		var sampled := sampler.sample(delta) if gate == null or gate.is_open() else GSFpsCommand.new()
 
 		if command_stamp.is_valid():
 			command_stamp.call(sampled)
@@ -355,12 +355,12 @@ func is_crawling() -> bool:
 
 ## Crawling with the gun put away.
 func is_holstered() -> bool:
-	return downed_rules != null and is_crawling() and downed_rules.holstered(DotDownedRules.POSE_CRAWL)
+	return downed_rules != null and is_crawling() and downed_rules.holstered(GSDownedRules.POSE_CRAWL)
 
 
-## The pose a downed body is drawn in, [constant DotDownedRules.POSE_PROPPED] or POSE_CRAWL.
+## The pose a downed body is drawn in, [constant GSDownedRules.POSE_PROPPED] or POSE_CRAWL.
 func downed_pose() -> StringName:
-	return DotDownedRules.POSE_CRAWL if is_crawling() else DotDownedRules.POSE_PROPPED
+	return GSDownedRules.POSE_CRAWL if is_crawling() else GSDownedRules.POSE_PROPPED
 
 
 ## Pinned, using something with both hands, or a box in them: the gun does nothing (down, you
@@ -371,9 +371,9 @@ func is_held() -> bool:
 
 ## One tick of [member view_rig] from the client's own buttons, by the same rule the server's rig
 ## follows (`ZzWeapons.command_for`). [param delta] is the tick's simulated length.
-func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float, aim: bool = false) -> DotWeaponOutcome:
+func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float, aim: bool = false) -> GSWeaponOutcome:
 	if view_rig == null or view_rig.arsenal == null:
-		return DotWeaponOutcome.nothing("No drawn rig.")
+		return GSWeaponOutcome.nothing("No drawn rig.")
 
 	var state := controller.state if controller != null else null
 
@@ -390,7 +390,7 @@ func drive_view_rig(fire: bool, reload: bool, slot: int, tick: int, delta: float
 	var outcome := view_rig.simulate_tick(command, tick)
 	var arsenal := view_rig.arsenal
 
-	if command.is_pressed(DotWeaponCommand.BUTTON_ATTACK) or command.is_pressed(DotWeaponCommand.BUTTON_RELOAD) \
+	if command.is_pressed(GSWeaponCommand.BUTTON_ATTACK) or command.is_pressed(GSWeaponCommand.BUTTON_RELOAD) \
 			or arsenal.is_reloading() or arsenal.is_switching():
 		_view_rig_quiet = 0.0
 	else:
@@ -501,20 +501,20 @@ func decay_temp(amount: float) -> void:
 # Bodies
 
 ## Where this player's eyes are: standing, crouched, or on the floor.
-## The weapons' arsenal, under the name dot-weapon's [DotWeaponKnives] reads a player by.
-var arsenal: DotWeaponArsenal:
+## The weapons' arsenal, under the name dot-weapon's [GSWeaponKnives] reads a player by.
+var arsenal: GSWeaponArsenal:
 	get:
 		return weapons.arsenal if weapons != null else null
 
 
-## The server rig's [member DotWeaponArsenal.idle_still]: true only when the posture the rig's idle tick reads
-## ([method DotWeaponPlayerBridge.posture_for], from [method DotFpsController.motion]) is the settled one, so an idle
+## The server rig's [member GSWeaponArsenal.idle_still]: true only when the posture the rig's idle tick reads
+## ([method GSWeaponPlayerBridge.posture_for], from [method GSFpsController.motion]) is the settled one, so an idle
 ## weapon at rest skips its tick. Read off the state directly; erring towards false only costs that tick.
 func weapon_still() -> bool:
 	if controller == null:
 		return false
 	var s := controller.state
-	return s.velocity.x == 0.0 and s.velocity.z == 0.0 and s.mode == DotFpsState.Mode.GROUND \
+	return s.velocity.x == 0.0 and s.velocity.z == 0.0 and s.mode == GSFpsState.Mode.GROUND \
 		and s.crouch_fraction <= 0.5 and not s.sprinting and not s.is_sliding()
 
 
@@ -546,27 +546,27 @@ func feet() -> Vector3:
 
 
 ## The hitboxes: a capsule and a head. A survivor on the floor is the same boxes, lowered.
-func build_hitboxes(combat: DotCombatManager) -> void:
-	hitboxes = DotHitboxSet.new()
+func build_hitboxes(combat: GSCombatManager) -> void:
+	hitboxes = GSHitboxSet.new()
 	hitboxes.name = "Hitboxes"
-	hitboxes.owner_ref = DotNodeRef.of_path(^"..")
+	hitboxes.owner_ref = GSNodeRef.of_path(^"..")
 	hitboxes.bounds_offset = Vector3(0.0, 0.9, 0.0)
 	hitboxes.bounds_radius = 1.5
 	add_child(hitboxes)
 
-	var chest := DotHitbox.new()
+	var chest := GSHitbox.new()
 	chest.name = "Chest"
-	chest.group = DotHitGroup.CHEST
-	chest.shape = DotHitbox.Shape.CAPSULE
+	chest.group = GSHitGroup.CHEST
+	chest.shape = GSHitbox.Shape.CAPSULE
 	chest.radius = BODY_RADIUS - 0.0064  # the 0.4 m torso of the 72-unit body
 	chest.height = 1.25
 	chest.position = Vector3(0.0, 0.78, 0.0)
 	hitboxes.add_child(chest)
 
-	var head := DotHitbox.new()
+	var head := GSHitbox.new()
 	head.name = "Head"
-	head.group = DotHitGroup.HEAD
-	head.shape = DotHitbox.Shape.SPHERE
+	head.group = GSHitGroup.HEAD
+	head.shape = GSHitbox.Shape.SPHERE
 	head.radius = 0.19
 	head.position = Vector3(0.0, EYE_HEIGHT + 0.06, 0.0)
 	head.damage_scale = 2.0
@@ -583,8 +583,8 @@ func fit_hitboxes() -> void:
 		return
 
 	var down := is_down()
-	var chest := hitboxes.get_node_or_null(^"Chest") as DotHitbox
-	var head := hitboxes.get_node_or_null(^"Head") as DotHitbox
+	var chest := hitboxes.get_node_or_null(^"Chest") as GSHitbox
+	var head := hitboxes.get_node_or_null(^"Head") as GSHitbox
 
 	if chest != null:
 		chest.position = Vector3(0.0, 0.3 if down else 0.78, 0.0)
@@ -596,9 +596,9 @@ func fit_hitboxes() -> void:
 ## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
 func component(type_name: StringName) -> Object:
 	match String(type_name):
-		"DotPlayerController", "DotFpsController":
+		"GSPlayerController", "GSFpsController":
 			return controller
-		"DotHealth":
+		"GSHealth":
 			return health
 		"ZeeWeaponRig":
 			return weapons
@@ -615,7 +615,7 @@ func place_at(at: Vector3, yaw_degrees: float) -> void:
 	if sampler != null:
 		sampler.look_at_angles(yaw_degrees, 0.0)
 
-	var facing := DotFpsCommand.new()
+	var facing := GSFpsCommand.new()
 	facing.yaw = yaw_degrees
 	controller.apply_command(facing)
 
@@ -666,7 +666,7 @@ func reset_map() -> void:
 
 ## Becomes [param id] with [param skin] on and [param def]'s movement; both ends run it (the server
 ## when it deals the class, a client when CLASSED arrives), so what they predict agrees.
-func apply_class(id: StringName, skin: StringName, def: DotPlayerClassDef) -> void:
+func apply_class(id: StringName, skin: StringName, def: GSPlayerClassDef) -> void:
 	class_id = id
 	class_skin = skin
 	class_def = def
@@ -700,7 +700,7 @@ func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) 
 		return false
 
 	if beacon_marker == null:
-		beacon_marker = DotFxBeacon.new()
+		beacon_marker = GSFxBeacon.new()
 		beacon_marker.name = "Beacon"
 		beacon_marker.period = period
 		beacon_marker.colour = Color(0.98, 0.22, 0.86)
@@ -734,7 +734,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color, own_legs: bool 
 
 	if shown:
 		# Your own legs in first person (cl_legs): the figure shrinks head and torso away and trails back from the eye itself.
-		figure.person.first_person = DotHumanoidOwnView.LEGS if own_legs else DotHumanoidOwnView.THIRD
+		figure.person.first_person = GSHumanoidOwnView.LEGS if own_legs else GSHumanoidOwnView.THIRD
 		_present_held()
 		if own_legs and figure.held != null:
 			figure.held.visible = false
@@ -748,7 +748,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color, own_legs: bool 
 		# slowed to the crawling pace. It used to be the standing figure tipped onto its back,
 		# which slid along the ground lying flat (the first play test, 1:44).
 		figure.set_motion({
-			"on_floor": controller.state.mode == DotFpsState.Mode.GROUND,
+			"on_floor": controller.state.mode == GSFpsState.Mode.GROUND,
 			"vertical": velocity.y,
 			"crouched": controller.state.crouch_fraction > 0.5,
 			"downed": is_down(),
@@ -773,7 +773,7 @@ func present_tag(shown: bool, at: Vector3, camera: Camera3D, delta: float) -> vo
 		return
 
 	if _tag == null:
-		_tag = DotHealthTag.new()
+		_tag = GSHealthTag.new()
 		_tag.name = "HealthTag"
 		add_child(_tag)
 
@@ -783,7 +783,7 @@ func present_tag(shown: bool, at: Vector3, camera: Camera3D, delta: float) -> vo
 
 
 ## Breaks this player's body apart: torn up by a brute. Client side.
-func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value: int) -> DotPlayerBodyBreak:
+func break_body(break_rules: GSPlayerBreakRules, direction: Vector3, seed_value: int) -> GSPlayerBodyBreak:
 	if figure == null or not figure.visible or break_rules == null:
 		return null
 
@@ -792,7 +792,7 @@ func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value
 	if model == null:
 		return null
 
-	return DotPlayerBodyBreak.break_apart(
+	return GSPlayerBodyBreak.break_apart(
 		model, get_parent(), break_rules, figure.global_position, direction, seed_value, true, true
 	)
 
@@ -841,7 +841,7 @@ func _present_held() -> void:
 static var _fit_codes: Dictionary = {}
 
 
-static func _fitted_code(arsenal: DotWeaponArsenal, id: StringName) -> int:
+static func _fitted_code(arsenal: GSWeaponArsenal, id: StringName) -> int:
 	var base := ZzWeapons.def_of(id) if id != &"" and arsenal.attachments != null else null
 
 	if base == null:
@@ -886,7 +886,7 @@ func _rig() -> ZeeWeaponRig:
 
 
 ## The drawn person's look, for the first-person arms (the figure is never built for your own eyes).
-func view_look(team_colour: Color) -> DotHumanoidLook:
+func view_look(team_colour: Color) -> GSHumanoidLook:
 	return ZzFigure.look_for(_atlas(), team_colour, hash(player_id))
 
 

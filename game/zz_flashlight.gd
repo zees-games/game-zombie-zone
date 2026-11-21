@@ -8,24 +8,24 @@ const GAME_ID := "game-zombie-zone"
 
 
 ## A config with this game's defaults: the key is F; the shove moved to T.
-static func make_config() -> DotFlashlightConfig:
-	var cfg := DotFlashlightConfig.new()
+static func make_config() -> GSFlashlightConfig:
+	var cfg := GSFlashlightConfig.new()
 	cfg.key = "F"
 	return cfg
 
 
 ## The binder for the config: `zz_flashlight_<field>` cvars, `cfg/game/game-zombie-zone/flashlight/game.yml`, a workbench set.
-static func flashlight_binder(cfg: DotFlashlightConfig) -> DotGameConfigBinder:
-	var b := DotGameConfigBinder.create(cfg, GAME_ID, "zz_flashlight")
+static func flashlight_binder(cfg: GSFlashlightConfig) -> GSGameConfigBinder:
+	var b := GSGameConfigBinder.create(cfg, GAME_ID, "zz_flashlight")
 	b.profile_kind = "flashlight"
 	return b
 
 
 ## Whether a survivor starts the map with the light on: the map's mood or its ambient against the floor.
-static func starts_on(cfg: DotFlashlightConfig, map_id: String, doc: Dictionary) -> bool:
+static func starts_on(cfg: GSFlashlightConfig, map_id: String, doc: Dictionary) -> bool:
 	var env: Dictionary = doc.get("environment", {})
 	var ambient := float(env.get("ambient_energy", ZzMapDocScript.DEFAULT_ENV["ambient_energy"]))
-	return DotFlashlightRules.start_on(cfg, map_id, ambient, mood_of(map_id, doc))
+	return GSFlashlightRules.start_on(cfg, map_id, ambient, mood_of(map_id, doc))
 
 
 ## The mood a map document names: converted maps write "ambient" as a dictionary ({"mood": ..., "indoor": ...}),

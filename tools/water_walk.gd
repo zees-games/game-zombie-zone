@@ -23,11 +23,11 @@ func _run() -> void:
 		var at := Vector3(float(parts[0]), y, float(parts[1]))
 		for d in 8:
 			p.place_at(at, 0.0)
-			p.controller.apply_command(DotFpsCommand.new())
+			p.controller.apply_command(GSFpsCommand.new())
 			for i in 30:
 				game.simulate(TICK)
 			var from := p.feet()
-			var c := DotFpsCommand.new()
+			var c := GSFpsCommand.new()
 			c.yaw = d * 45.0
 			c.move = Vector2(0, 1)
 			for i in 120:

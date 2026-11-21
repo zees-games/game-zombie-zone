@@ -5,7 +5,7 @@ const ZzWatchCull := preload("zz_watch_cull.gd")
 ## What a point inside a push volume costs to arrive at, times the usual.
 const PUSH_COST := 12.0
 
-## Metres a push volume's box is grown by before its points are tested: far more than [method DotMapVolume.contains]'s
+## Metres a push volume's box is grown by before its points are tested: far more than [method GSMapVolume.contains]'s
 ## 0.0001 slack, so the box never turns away a point the planes would take.
 const PUSH_BOX_SLACK := 0.05
 
@@ -17,7 +17,7 @@ var wcull: ZzWatchCull = null
 const FORCE_WORKERS_FILE := "res://zz_npc_workers.force"
 static var _forced_workers := -2
 
-## Every NPC worker count (sense, path, think) forced for a test run, with DotParallel.verify on:
+## Every NPC worker count (sense, path, think) forced for a test run, with GSParallel.verify on:
 ## env ZZ_NPC_WORKERS=N, else the number in [constant FORCE_WORKERS_FILE] (the form that reaches a
 ## box a suite is offloaded to, which gets the worktree's files but not the caller's env). -1 unset.
 static func forced_npc_workers() -> int:
@@ -27,14 +27,14 @@ static func forced_npc_workers() -> int:
 			v = FileAccess.get_file_as_string(FORCE_WORKERS_FILE).strip_edges()  # pack-path: ok (as above)
 		_forced_workers = v.to_int() if v.is_valid_int() and v.to_int() >= 0 else -1
 		if _forced_workers >= 0:
-			DotParallel.verify = true
-			DotLog.info(CHANNEL, "NPC workers forced, DotParallel.verify on", {"workers": _forced_workers})
+			GSParallel.verify = true
+			GSLog.info(CHANNEL, "NPC workers forced, GSParallel.verify on", {"workers": _forced_workers})
 	return _forced_workers
 
 ## How the background pressure behaves. The genre's numbers: spawn well ahead and out of
 ## sight, peak when the worst-off survivor is struggling, rest when the team has moved on.
-func _rules() -> DotNpcDirectorRules:
-	var rules := DotNpcDirectorRules.new()
+func _rules() -> GSNpcDirectorRules:
+	var rules := GSNpcDirectorRules.new()
 	rules.peak_per_player = 5.0
 	rules.build_up_per_player = 2.5
 	rules.relax_per_player = 0.6
@@ -72,11 +72,11 @@ func _note_seeds() -> PackedVector3Array:
 
 ## Costs up every point inside a live push volume for good: a zombie there is thrown along the push, so a path through one
 ## is walked against it. Paths still use them when nothing else joins the two ends.
-func _mark_pushes(graph: DotNpcNavGraph) -> void:
+func _mark_pushes(graph: GSNpcNavGraph) -> void:
 	if game == null or game.map == null or game.map.mechanics == null:
 		return
 
-	var volumes: Array[DotMapVolume] = game.map.mechanics.push_volumes()
+	var volumes: Array[GSMapVolume] = game.map.mechanics.push_volumes()
 
 	if volumes.is_empty():
 		return
@@ -110,7 +110,7 @@ func _request_warm() -> void:
 	if not spawner.has_method(&"warm"):
 		return
 
-	for def: DotNpcDef in catalogue.npcs:
+	for def: GSNpcDef in catalogue.npcs:
 		if def == null or not def.enabled:
 			continue
 
@@ -147,7 +147,7 @@ func _collect_warm() -> void:
 
 ## The zombies' graph for [param data], built on the nav job's thread (half a second of adjacency and pieces that was the
 ## first tick of play's): only when the graph needs no physics prune first, which only the main thread may ask.
-static func _graph_off_thread(data: DotNpcNavData) -> ZzNavGraph:
+static func _graph_off_thread(data: GSNpcNavData) -> ZzNavGraph:
 	if int(data.meta.get("pruned", 0)) < PRUNE_VERSION:
 		return null
 
@@ -157,7 +157,7 @@ static func _graph_off_thread(data: DotNpcNavData) -> ZzNavGraph:
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
 func _mark_narrow() -> void:
 	if spawner.nav.has_method(&"mark_narrow"):
-		var brute: DotNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
+		var brute: GSNpcDef = spawner.catalogue.get_npc(ZzNpcs.BRUTE)
 		var radius := float(brute.meta.get("radius", 0.7)) if brute != null else 0.7
 		var fit := float(brute.meta.get("fit_height", brute.meta.get("height", 2.1))) if brute != null else 2.1
 		narrow_points = spawner.nav.mark_narrow(game.get_world_3d().direct_space_state,

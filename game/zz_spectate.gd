@@ -1,4 +1,4 @@
-extends DotSpectatorHost
+extends GSSpectatorHost
 
 const ZzPlayer := preload("zz_player.gd")
 
@@ -13,7 +13,7 @@ const ZzPlayer := preload("zz_player.gd")
 ## computes a transform and touches no camera, and the policy — may this person watch, whom,
 ## through which camera — is the server's, so a client that decided for itself what it may
 ## look at would be a client that may look at anything. On a server this runs an
-## authoritative [DotSpectatorManager]; on a connected client it runs a MIRROR that is told
+## authoritative [GSSpectatorManager]; on a connected client it runs a MIRROR that is told
 ## each view change in a `SPECTATE` event and computes the camera itself from the players it
 ## already draws. That split is what keeps the wire to one small event per decision rather
 ## than a camera transform per frame.
@@ -78,7 +78,7 @@ func _channel() -> String:
 
 
 ## The policy beyond the exports.
-func _tune_rules(r: DotSpectatorRules) -> DotSpectatorRules:
+func _tune_rules(r: GSSpectatorRules) -> GSSpectatorRules:
 	r.force_camera = clampi(force_camera, 0, 2)
 	# Off whatever the policy. A roaming camera over the map sees the whole map from anywhere,
 	# which with "own side" on is the one thing that setting forbids.
@@ -131,13 +131,13 @@ func line_for(key: String) -> String:
 	var view := manager.view(key)
 
 	match view.mode:
-		DotSpectatorView.Mode.DEATH_CAM:
+		GSSpectatorView.Mode.DEATH_CAM:
 			return "you are out"
-		DotSpectatorView.Mode.FREEZE_CAM:
+		GSSpectatorView.Mode.FREEZE_CAM:
 			return "shot by %s" % _name_of(view.target)
-		DotSpectatorView.Mode.FIXED:
+		GSSpectatorView.Mode.FIXED:
 			return "nobody left to watch"
-		DotSpectatorView.Mode.CHASE:
+		GSSpectatorView.Mode.CHASE:
 			return "watching %s  (behind)   click: next   F5: their eyes" % _name_of(view.target)
 		_:
 			return "watching %s   click: next   F5: behind them" % _name_of(view.target)

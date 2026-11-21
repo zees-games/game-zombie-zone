@@ -22,7 +22,7 @@ class FakeLink extends RefCounted:
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -82,7 +82,7 @@ func _test_weapon() -> void:
 	_check(me.held_id() == &"zz_pistol", "pistol_only: the pistol even with a primary", String(me.held_id()))
 	_check(me.weapons.arsenal.carries(&"zz_m4"), "and the primary is still carried")
 
-	var rules := DotDownedRules.new()
+	var rules := GSDownedRules.new()
 	_check(not rules.set_cvar("sv_downed_weapon", "fists") and rules.weapon_mode == &"secondary", "an unknown mode is refused")
 	_finished()
 
@@ -92,7 +92,7 @@ func _walk(me: ZzPlayer) -> float:
 	var from := STREET + Vector3(0, 0, 4.0)
 	me.place_at(from, 0.0)
 	me.controller.state.velocity = Vector3.ZERO
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	me.controller.apply_command(forward)
 	await _sim(game, 1.0)
@@ -100,7 +100,7 @@ func _walk(me: ZzPlayer) -> float:
 
 
 func _stop(me: ZzPlayer, seconds: float) -> void:
-	var stop := DotFpsCommand.new()
+	var stop := GSFpsCommand.new()
 	me.controller.apply_command(stop)
 	await _sim(_worlds[_worlds.size() - 1], seconds)
 
@@ -145,7 +145,7 @@ func _test_crawl() -> void:
 
 func _test_replication() -> void:
 	_section("the rules replicate: a follower agrees with the server and draws the same pose")
-	var server := DotDownedRules.new()
+	var server := GSDownedRules.new()
 	var link := FakeLink.new()
 	var names: Array[String] = []
 	var flags: Array[int] = []
@@ -157,7 +157,7 @@ func _test_replication() -> void:
 	_check(names.size() == 4 and names.all(func(n: String) -> bool: return n.begins_with("sv_downed_")), "four sv_downed_ cvars are bound", str(names))
 	_check(flags.all(func(f: int) -> bool: return f == 7), "all with the flags given (the game passes REPLICATED)")
 
-	var client := DotDownedRules.new()
+	var client := GSDownedRules.new()
 	_check(client.follow_cvars(link), "a client follows the link")
 	link.values = {"sv_downed_weapon": "primary_in_place", "sv_downed_crawl_primary": "1", "sv_downed_crawl_pistol": "0", "sv_downed_holster_crawl": "0"}
 	for cvar_name: String in link.values:
@@ -173,13 +173,13 @@ func _test_replication() -> void:
 	_check(same, "and both draw every pose, holster and clip the same")
 	_check(client.pose_for(true, &"pistol") == &"propped" and client.pose_for(true, &"primary") == &"crawl", "the pose follows the replicated crawl rules")
 
-	var late := DotDownedRules.new()
+	var late := GSDownedRules.new()
 	var _joined := late.follow_cvars(link)
 	_check(late.describe() == server.describe(), "a client that joins later is given the current values")
 	link.replicated_cvar_changed.emit("sv_downed_weapon", "bogus")
 	link.replicated_cvar_changed.emit("sv_other", "1")
 	_check(late.describe() == server.describe(), "a junk value or another cvar changes nothing")
-	_check(not DotDownedRules.new().follow_cvars(null), "no link is refused")
+	_check(not GSDownedRules.new().follow_cvars(null), "no link is refused")
 	_finished()
 
 

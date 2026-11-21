@@ -19,7 +19,7 @@ const ZzAvatars := preload("zz_avatars.gd")
 const EYE_HEIGHT := 1.6256
 const EYE_DOWN := 0.45
 
-## The shared 72-unit body (DotFpsTunables defaults): 32 unit hull, 72 standing, 54 crouched.
+## The shared 72-unit body (GSFpsTunables defaults): 32 unit hull, 72 standing, 54 crouched.
 const BODY_RADIUS := 0.4064
 const BODY_HEIGHT := 1.83
 const BODY_CROUCH := 1.372
@@ -35,12 +35,12 @@ enum Life { UP, DOWN, DEAD }
 @export var is_bot: bool = false
 
 ## What this player looks like, as a dot-user-avatar document; null is the stock person.
-var avatar: DotAvatar = null
+var avatar: GSAvatar = null
 ## The class this survivor plays (empty before the first spawn), the skin it gave them (empty: their
 ## own avatar) and its definition, which [method tunables_for] reads. Set by [method apply_class].
 var class_id: StringName = &""
 var class_skin: StringName = &""
-var class_def: DotPlayerClassDef = null
+var class_def: GSPlayerClassDef = null
 ## What the player asked for, landing on the next spawn: a class id and (in `select` mode) a skin.
 var class_wanted: StringName = &""
 var model_wanted: StringName = &""
@@ -48,9 +48,9 @@ var model_wanted: StringName = &""
 var config: ZzConfig = null
 
 var controller: ZzController = null
-var sampler: DotFpsSampler = null
-var health: DotHealth = null
-var hitboxes: DotHitboxSet = null
+var sampler: GSFpsSampler = null
+var health: GSHealth = null
+var hitboxes: GSHitboxSet = null
 var weapons: ZeeWeaponRig = null
 
 ## Always the survivors, today; kept so the scoreboard and the chat's team channel have a side.
@@ -72,7 +72,7 @@ var life: int = Life.UP
 ## Times down this map. At [member ZzConfig.max_incaps] the next one is death.
 var incaps: int = 0
 
-## Borrowed health, already inside [member DotHealth.health]. See the class notes.
+## Borrowed health, already inside [member GSHealth.health]. See the class notes.
 var temp_health: float = 0.0
 
 ## The special holding them, as an entity id, and what it is doing. 0 / empty when free.
@@ -177,7 +177,7 @@ var previous_shove: bool = false
 
 ## The latest command the server heard from this player, kept for a dead one too: it is what drives
 ## the zombie they possess (see [ZzPossession]). Null until the first.
-var input_move: DotFpsCommand = null
+var input_move: GSFpsCommand = null
 
 ## An administrator's `blind` and `beacon`, as dot-moderation's tools set them.
 var blinded: bool = false
@@ -185,7 +185,7 @@ var beacon: bool = false
 ## The flashlight is on (server-owned, replicated); `flashlight_ready` is cleared on a new map so the next tick sets its start state.
 var flashlight: bool = false
 var flashlight_ready: bool = false
-var beacon_marker: DotFxBeacon = null
+var beacon_marker: GSFxBeacon = null
 
 ## Whether the end-of-map logic has them inside the end area right now.
 var in_end_area: bool = false
@@ -193,11 +193,11 @@ var in_end_area: bool = false
 ## What other people see this player as. Client side.
 var figure: ZzFigure = null
 ## The name and health pill floating over this survivor for the others to read (dot-ui).
-var _tag: DotHealthTag = null
+var _tag: GSHealthTag = null
 
 ## How this survivor's body falls on their death: the server's pick ([method ZzGame.decide_death]),
 ## carried on DEATH and set here before anybody hears of it. Null before a first death.
-var death: DotPlayerDeath = null
+var death: GSPlayerDeath = null
 
 ## The weapon that landed the killing hit (empty for a claw or a fall), for the killcam's icon.
 var death_weapon: StringName = &""
@@ -207,9 +207,9 @@ var mirrored: bool = false
 var dealt: Array[StringName] = []
 var dealt_round: int = -1
 var mirror_slot: int = 0
-## The held weapon's fitting, as [method DotWeaponAttachments.encode] packs it (`net_fitted`).
+## The held weapon's fitting, as [method GSWeaponAttachments.encode] packs it (`net_fitted`).
 var mirror_fitted: int = 0
-## Server side: weapon id -> the [DotWeaponFitting] this survivor asked for (`ZzGame.fit_weapon`).
+## Server side: weapon id -> the [GSWeaponFitting] this survivor asked for (`ZzGame.fit_weapon`).
 ## One dictionary for the player's life: the arsenal's watcher holds it by reference.
 var fittings: Dictionary = {}
 var mirror_switching: bool = false
@@ -226,7 +226,7 @@ static var _slots: Dictionary = {}
 var view_rig: ZeeWeaponRig = null
 
 ## The downed rules (`sv_downed_*`) and the default pistol a downed survivor falls back to, set by the game.
-var downed_rules: DotDownedRules = null
+var downed_rules: GSDownedRules = null
 
 ## The slide's cvars, shared with the game ([ZzSlideRules]); null reads the defaults.
 var slide_rules: ZzSlideRules = null
@@ -264,12 +264,12 @@ enum WaterLevel { NONE, FEET, WAIST, EYES }
 ## The map's water volumes this player moves through, world space (see [method set_water]).
 var water: Array[AABB] = []
 
-## This player's swimming mode (dot-player-controller's DotFpsSwimMode), one per player in
+## This player's swimming mode (dot-player-controller's GSFpsSwimMode), one per player in
 ## `controller.extra_modes` so a style's rebuilt motor keeps it under the same id on every machine.
-var swim: DotFpsSwimMode = DotFpsSwimMode.new()
+var swim: GSFpsSwimMode = GSFpsSwimMode.new()
 
-## Ladder climbing (dot-player-controller's DotFpsLadderMode), fed the map's ladder brushes by [method ZzMechanics.ladder_boxes].
-var ladder: DotFpsLadderMode = DotFpsLadderMode.new()
+## Ladder climbing (dot-player-controller's GSFpsLadderMode), fed the map's ladder brushes by [method ZzMechanics.ladder_boxes].
+var ladder: GSFpsLadderMode = GSFpsLadderMode.new()
 
 ## Breath left, in seconds under water; refilled with the head out. Each end counts its own
 ## from its own copy of the water: the server's decides the damage, the client's is the HUD's

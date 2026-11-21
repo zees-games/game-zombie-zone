@@ -14,16 +14,16 @@ const KEYS: Array[String] = [
 ]
 
 
-static func make_set(roots: PackedStringArray = PackedStringArray()) -> DotProfileSet:
-	return DotBoxProfiles.make_set(GAME, roots)
+static func make_set(roots: PackedStringArray = PackedStringArray()) -> GSProfileSet:
+	return GSBoxProfiles.make_set(GAME, roots)
 
 
 ## The profile as the document ZzBoxes.read_box reads.
-static func doc_of(p: DotProfile) -> Dictionary:
+static func doc_of(p: GSProfile) -> Dictionary:
 	var doc := {}
 
 	for k in KEYS:
-		doc[k] = DotBoxProfiles.unwrap_lists(p.get_value(k))
+		doc[k] = GSBoxProfiles.unwrap_lists(p.get_value(k))
 
 	return doc
 
@@ -36,4 +36,4 @@ static func yaml_of(box: Dictionary) -> String:
 		if box.has(k):
 			tree[k] = box[k]
 
-	return DotBoxProfiles.to_yaml(tree)
+	return GSBoxProfiles.to_yaml(tree)

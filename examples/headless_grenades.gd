@@ -15,7 +15,7 @@ const SPOT := Vector3(0.0, 0.05, 14.0)
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	ZzPacks.root = "res://addons"
 	var _found := ZzPacks.scan()
 	ZzWeapons.use_packs()
@@ -130,7 +130,7 @@ func _watcher(game: ZzGame, me: Object) -> Array:
 	var spawned := game.horde.spawn_common_at(spot)
 	await _sim(game, 0.5)
 	var npcs: Array = game.horde.spawner.npcs_near(spot, 3.0)
-	var npc: DotNpcInstance = npcs[0] if spawned and not npcs.is_empty() else null
+	var npc: GSNpcInstance = npcs[0] if spawned and not npcs.is_empty() else null
 
 	if npc != null and npc.node is Node3D:
 		(npc.node as Node3D).look_at(me.feet() + Vector3(0.0, 0.0, 0.0), Vector3.UP, false)
@@ -138,10 +138,10 @@ func _watcher(game: ZzGame, me: Object) -> Array:
 	return [npc]
 
 
-func _sees(game: ZzGame, npc: DotNpcInstance, me: Object) -> bool:
-	var senses: DotNpcSenses = game.horde.senses
+func _sees(game: ZzGame, npc: GSNpcInstance, me: Object) -> bool:
+	var senses: GSNpcSenses = game.horde.senses
 	senses.now = game.horde.now()
-	return senses.perceives(npc, DotNpcSenses.Candidate.new(&"me", me.eye_position(), &"survivor", 0.0))
+	return senses.perceives(npc, GSNpcSenses.Candidate.new(&"me", me.eye_position(), &"survivor", 0.0))
 
 
 func _test_flash_blinds_zombie() -> void:
@@ -149,7 +149,7 @@ func _test_flash_blinds_zombie() -> void:
 	var game := await _team(1)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
-	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	var npc: GSNpcInstance = (await _watcher(game, me))[0]
 	_check(npc != null and _sees(game, npc, me), "before the flash the zombie sees the survivor (so the next check can fail)")
 
 	if npc == null:
@@ -171,7 +171,7 @@ func _test_smoke_blocks_sight() -> void:
 	var game := await _team(1)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
-	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	var npc: GSNpcInstance = (await _watcher(game, me))[0]
 	_check(npc != null and _sees(game, npc, me), "before the smoke the zombie sees the survivor")
 
 	if npc == null:
@@ -213,7 +213,7 @@ func _test_bot_smoke() -> void:
 	var game := await _team(1)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
-	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	var npc: GSNpcInstance = (await _watcher(game, me))[0]
 
 	if npc == null:
 		_check(false, "a zombie spawned")
@@ -239,7 +239,7 @@ func _test_bot_flash() -> void:
 	var game := await _team(1)
 	var me := game.survivors()[0]
 	me.place_at(SPOT, 0.0)
-	var npc: DotNpcInstance = (await _watcher(game, me))[0]
+	var npc: GSNpcInstance = (await _watcher(game, me))[0]
 
 	if npc == null:
 		_check(false, "a zombie spawned")
@@ -253,7 +253,7 @@ func _test_bot_flash() -> void:
 	_check(me.flashed, "the stand-in is flashed")
 	_check(game.bots._threat(me) == null, "a blind stand-in has no threat")
 	var memory: Dictionary = game.bots._memory(me)
-	memory["aim"] = DotBotAim.new()
+	memory["aim"] = GSBotAim.new()
 	memory["aim"].target_id = npc.instance_id
 	_check(not game.bots._fire_ok(me, memory, npc), "and does not fire")
 	await _sim(game, float(game.grenades.rules.flash_seconds) + 1.0)
@@ -275,7 +275,7 @@ func _test_bounce_is_announced() -> void:
 	if not heard.is_empty():
 		_check((heard[0][2] as Vector3).y > 0.0, "leaving upward, not through the floor", str(heard[0][2]))
 		_check(absf((heard[0][1] as Vector3).y - SPOT.y) < 0.5, "from the floor it struck", str(heard[0][1]))
-		var back := ZzEvents.read_bounce(DotNetReader.new(ZzEvents.write_bounce(int(heard[0][0]), heard[0][1], heard[0][2])))
+		var back := ZzEvents.read_bounce(GSNetReader.new(ZzEvents.write_bounce(int(heard[0][0]), heard[0][1], heard[0][2])))
 		_check(bool(back["ok"]) and int(back["id"]) == int(heard[0][0]), "the event round-trips its id")
 		_check((back["at"] as Vector3).distance_to(heard[0][1]) < 0.1, "and its place")
 		_check((back["velocity"] as Vector3).distance_to(heard[0][2]) < 0.5, "and its velocity")
@@ -285,8 +285,8 @@ func _test_bounce_is_announced() -> void:
 func _throw(game: ZzGame, player: Object, id: StringName, at: Vector3, velocity: Vector3, fuse: int = 4) -> void:
 	var def := _def(id)
 	var _routed: bool = game.grenades.handles(def)
-	var b := def.tuning as DotWeaponBallistics
-	var s := DotWeaponSpawn.new()
+	var b := def.tuning as GSWeaponBallistics
+	var s := GSWeaponSpawn.new()
 	s.id = id
 	s.origin = at
 	s.velocity = velocity
@@ -310,16 +310,16 @@ func _team(count: int) -> ZzGame:
 
 
 ## A grenade row of [param id] (`gr_<kind>`, `gr_sticky` is a frag that sticks), from zz-modern-weapons' frag.
-func _def(id: StringName) -> DotWeaponDef:
+func _def(id: StringName) -> GSWeaponDef:
 	if _rows.has(id):
 		return _rows[id]
 
-	var def := (ZzWeapons.def_of(&"zz_frag") as DotWeaponDef).duplicate(true) as DotWeaponDef
+	var def := (ZzWeapons.def_of(&"zz_frag") as GSWeaponDef).duplicate(true) as GSWeaponDef
 	def.id = id
 	def.params = def.params.duplicate(true)
 	if def.tuning != null:
-		def.tuning = def.tuning.duplicate(true) as DotWeaponTuning
-	var b := def.tuning as DotWeaponBallistics
+		def.tuning = def.tuning.duplicate(true) as GSWeaponTuning
+	var b := def.tuning as GSWeaponBallistics
 	var kind := String(id).trim_prefix("gr_")
 
 	match kind:

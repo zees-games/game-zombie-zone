@@ -84,7 +84,7 @@ func _fade_new_parts(limb: StringName, joint: Vector3) -> void:
 
 	var best: Node3D = null
 
-	for n: Node in get_tree().get_nodes_in_group(DotNpcGibs.GROUP):
+	for n: Node in get_tree().get_nodes_in_group(GSNpcGibs.GROUP):
 		var gib := n as Node3D
 
 		if gib != null and gib.name == "Gib_%s" % limb and not gib.is_queued_for_deletion():

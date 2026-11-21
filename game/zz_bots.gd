@@ -6,7 +6,7 @@ func describe_personas() -> Dictionary:
 
 	for id: StringName in _state:
 		var m: Dictionary = _state[id]
-		out[String(id)] = {"persona": String((m["persona"] as DotBotPersona).id) if m.has("persona") else "", "behaviour": String(m.get("behave", &""))}
+		out[String(id)] = {"persona": String((m["persona"] as GSBotPersona).id) if m.has("persona") else "", "behaviour": String(m.get("behave", &""))}
 
 	return out
 
@@ -56,15 +56,15 @@ func _drive_each() -> void:
 		# events), seats alternating so half the team thinks on each tick. Anyone down, pinned,
 		# shoving or mid-mend decides every tick, as does the first tick.
 		var kept: Variant = _state.get(player.player_id, {}).get("last_command")
-		if kept is DotFpsCommand and player.is_up() and not player.is_pinned() and player.using == &"" \
+		if kept is GSFpsCommand and player.is_up() and not player.is_pinned() and player.using == &"" \
 				and game.phase != game.Phase.IDLE:
 			var turn: int = game.current_tick() + _seat(player)
 			var every: int = game.config.bot_decide_every_far if game.stand_in_far(player) else 2
 			if turn % every != 0:
-				player.controller.apply_command(kept as DotFpsCommand)
+				player.controller.apply_command(kept as GSFpsCommand)
 				continue
 
-		var command := DotFpsCommand.new()
+		var command := GSFpsCommand.new()
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
 		player.actions = 0
@@ -72,7 +72,7 @@ func _drive_each() -> void:
 		_aiming = false
 
 		var memory := _memory(player)
-		var aim: DotBotAim = memory["aim"]
+		var aim: GSBotAim = memory["aim"]
 		aim.view_from(command.yaw, command.pitch)
 		var last_now := float(memory["now"])
 		_dt = clampf(game.now() - last_now, 0.0, 0.25) if not is_nan(last_now) else 0.0
@@ -86,7 +86,7 @@ func _drive_each() -> void:
 		memory["last_command"] = command
 		player.controller.apply_command(command)
 
-func _decide(player, command: DotFpsCommand) -> void:
+func _decide(player, command: GSFpsCommand) -> void:
 	var memory := _memory(player)
 
 	if player.is_pinned() and player.pin_kind != &"grab":
@@ -155,7 +155,7 @@ func _decide(player, command: DotFpsCommand) -> void:
 
 	# Reload when nothing is happening.
 	if player.weapons != null and player.weapons.arsenal != null:
-		var slot: DotWeaponSlot = player.weapons.arsenal.current()
+		var slot: GSWeaponSlot = player.weapons.arsenal.current()
 		if slot != null and slot.def.magazine > 0 and slot.magazine < slot.def.magazine * 0.5:
 			command.set_button(ZzNetCommand.BUTTON_RELOAD, true)
 
@@ -185,8 +185,8 @@ func _decide(player, command: DotFpsCommand) -> void:
 	_follow(player, command, memory)
 
 ## Kills or shoves what holds [param pinned]. True when it spent the tick on that.
-func _help_pinned(player, command: DotFpsCommand, memory: Dictionary, pinned) -> bool:
-	var holder: DotNpcInstance = game.pins.holder_of(pinned.player_id)
+func _help_pinned(player, command: GSFpsCommand, memory: Dictionary, pinned) -> bool:
+	var holder: GSNpcInstance = game.pins.holder_of(pinned.player_id)
 
 	if holder == null:
 		return false
@@ -204,7 +204,7 @@ func _help_pinned(player, command: DotFpsCommand, memory: Dictionary, pinned) ->
 	return true
 
 ## Fights [param danger]: aims, picks a slot, shoves a crowd and backs off from what is in its face.
-func _fight(player, command: DotFpsCommand, memory: Dictionary, danger: DotNpcInstance) -> void:
+func _fight(player, command: GSFpsCommand, memory: Dictionary, danger: GSNpcInstance) -> void:
 	_aim_at(player, command, danger)
 	_choose_slot(player, danger)
 	var crowd := _crowd_within(player, game.config.bot_shove_range)
@@ -225,7 +225,7 @@ func _fight(player, command: DotFpsCommand, memory: Dictionary, danger: DotNpcIn
 ## Shocks the nearest dead friend back when [param player] holds a defibrillator and the body is still good
 ## (inside the defibrillator's age limit and [member ZzConfig.bot_defib_reach]). Walks up, looks at the body and
 ## holds E, as a human would. True when it spent the tick on that.
-func _defib_body(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _defib_body(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	if not game.config.bot_defib or player.defibs <= 0 or game.now() < player.defib_ready_at:
 		return false
 
@@ -259,11 +259,11 @@ func _defib_body(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 ## With infected left and nothing in sight, acts by the persona's mix: hunt the rest, loot, hold a choke, support a
 ## teammate, scout. Never stands: a pick with nothing to do hands on to the next, and scouting always has somewhere
 ## to go. False only when no infected remain (the breather's mending and holding take over) or there is no map to walk.
-func persona_act(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func persona_act(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	if game.horde == null or game.horde.infected_left() <= 0:
 		return false
 
-	var persona: DotBotPersona = memory["persona"]
+	var persona: GSBotPersona = memory["persona"]
 	var now: float = game.now()
 	var behave: StringName = memory.get("behave", &"")
 
@@ -272,14 +272,14 @@ func persona_act(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 		memory["behave"] = behave
 		memory["behave_until"] = now + _rng.randf_range(game.config.bot_behave_min, game.config.bot_behave_max)
 		memory.erase("scout_goal")
-		DotLog.debug(CHANNEL, "a stand-in picked a behaviour", {"player": String(player.player_id), "persona": String(persona.id),
+		GSLog.debug(CHANNEL, "a stand-in picked a behaviour", {"player": String(player.player_id), "persona": String(persona.id),
 			"behaviour": String(behave), "infected_left": game.horde.infected_left()})
 
 	if _behave(behave, player, command, memory):
 		return true
 
 	# Its pick has nothing to do now: the others in order of weight, then the two that nearly always can.
-	var rest: Array = DotBotPersona.BEHAVIOURS.duplicate()
+	var rest: Array = GSBotPersona.BEHAVIOURS.duplicate()
 	rest.erase(behave)
 	rest.sort_custom(func(a: StringName, b: StringName) -> bool: return float(persona.mix.get(a, 0.0)) > float(persona.mix.get(b, 0.0)))
 
@@ -290,22 +290,22 @@ func persona_act(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 
 	return false
 
-func _behave(behaviour: StringName, player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _behave(behaviour: StringName, player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	match behaviour:
-		DotBotPersona.HUNT:
+		GSBotPersona.HUNT:
 			return _hunt(player, command, memory)
-		DotBotPersona.LOOT:
+		GSBotPersona.LOOT:
 			return _loot(player, command, memory)
-		DotBotPersona.HOLD:
+		GSBotPersona.HOLD:
 			return _hold_choke(player, command, memory)
-		DotBotPersona.SUPPORT:
+		GSBotPersona.SUPPORT:
 			return _support(player, command, memory)
 		_:
 			return _scout(player, command, memory)
 
 ## Walks at the nearest live zombie, the horde's own list, so five stragglers somewhere on the map are found.
-func _hunt(player, command: DotFpsCommand, memory: Dictionary) -> bool:
-	var npc: DotNpcInstance = memory.get("hunt_target")
+func _hunt(player, command: GSFpsCommand, memory: Dictionary) -> bool:
+	var npc: GSNpcInstance = memory.get("hunt_target")
 
 	if npc == null or not is_instance_valid(npc.node) or not npc.is_alive() or game.now() >= float(memory.get("hunt_until", 0.0)):
 		npc = game.horde.nearest_zombie(player.feet())
@@ -319,7 +319,7 @@ func _hunt(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 ## Anything it wants within `zz_bot_loot_reach`, else a stocked cache it is not already standing at.
-func _loot(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _loot(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	if _pick_up(player, command, memory, game.config.bot_loot_reach):
 		return true
 
@@ -340,7 +340,7 @@ func _loot(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 ## Stands behind the choke on the horde's route, unless few infected are left: then nobody camps.
-func _hold_choke(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _hold_choke(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	if game.horde.infected_left() <= game.config.stuck_low_count:
 		return false
 
@@ -352,7 +352,7 @@ func _hold_choke(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 ## Goes to the weakest teammate it is not already beside (a downed one is answered earlier in the decision).
-func _support(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _support(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	var best = null
 	var best_health := INF
 
@@ -373,7 +373,7 @@ func _support(player, command: DotFpsCommand, memory: Dictionary) -> bool:
 	return true
 
 ## Walks the map's posts (or its spawns) one after another: always somewhere to go.
-func _scout(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _scout(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	var goal: Vector3 = memory.get("scout_goal", Vector3.INF)
 	var here: Vector3 = player.feet()
 
@@ -474,7 +474,7 @@ func _seat(player) -> int:
 	memory["seat_roster"] = roster
 	return int(memory["seat"])
 
-func _hold_post(player, command: DotFpsCommand, memory: Dictionary) -> void:
+func _hold_post(player, command: GSFpsCommand, memory: Dictionary) -> void:
 	var post := _clear_of_humans(player, _hold_of(player))
 	# Close enough to the post to stand still, unless that is a person's elbow: then on to the cleared spot.
 	var slack := 2.0 if _clear_of_humans(player, player.feet()) == player.feet() else 0.5
@@ -506,7 +506,7 @@ func _clear_of_humans(player, post: Vector3) -> Vector3:
 
 ## Mends the weakest barricade near its post when nothing is in sight: walks to its inside face
 ## and holds E until it is whole. A broken one is rebuilt first.
-func _mend(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _mend(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	var list: Array = game.map_doc.get("barricades", [])
 
 	if list.is_empty():
@@ -590,9 +590,9 @@ func _needs_mending(entry: Dictionary) -> float:
 
 ## In a breather, short of ammunition, a medkit or a primary: to the nearest cache that has
 ## something on it.
-func _restock(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _restock(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	if game.survival == null or game.survival.waves == null or game.loot == null \
-			or game.survival.waves.stage != DotNpcDirectorWaves.Stage.QUIET:
+			or game.survival.waves.stage != GSNpcDirectorWaves.Stage.QUIET:
 		return false
 
 	# The opening quiet is for taking the chokes: the caches are stocked then too (the player
@@ -648,14 +648,14 @@ func _caches_with_loot() -> Array:
 var _primary_slots: Array = []
 
 ## Auto up close, burst mid range, semi far; assign `_fire_modes.rule` to change it.
-var _fire_modes := DotBotFireMode.new()
+var _fire_modes := GSBotFireMode.new()
 
-const MODE_NAMES := {DotWeaponDef.Fire.AUTO: "auto", DotWeaponDef.Fire.SEMI: "semi", DotWeaponDef.Fire.BURST: "burst"}
+const MODE_NAMES := {GSWeaponDef.Fire.AUTO: "auto", GSWeaponDef.Fire.SEMI: "semi", GSWeaponDef.Fire.BURST: "burst"}
 
 func _has_primary(player) -> bool:
 	if _primary_slots.is_empty():
 		for id in ZzWeapons.ids_of(&"primary") + ZzWeapons.ids_of(&"heavy"):
-			var def: DotWeaponDef = ZzWeapons.def_of(id)
+			var def: GSWeaponDef = ZzWeapons.def_of(id)
 			if def != null and not _primary_slots.has(def.slot):
 				_primary_slots.append(def.slot)
 
@@ -667,23 +667,23 @@ func _has_primary(player) -> bool:
 
 ## A semi-automatic weapon fires on the press, not while held: the trigger is let go every
 ## other few ticks, or a stand-in with a pistol fires once and then holds a dead trigger.
-func _pulse_trigger(player, command: DotFpsCommand) -> void:
+func _pulse_trigger(player, command: GSFpsCommand) -> void:
 	if not command.is_pressed(ZzNetCommand.BUTTON_FIRE) or player.weapons == null:
 		return
 
-	var def: DotWeaponDef = player.weapons.current_def()
+	var def: GSWeaponDef = player.weapons.current_def()
 	var threat: Variant = _memory(player).get("threat")
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
-	if def != null and threat is DotNpcInstance and def.allowed_fire_modes().size() > 1 and not arsenal.is_switching():
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
+	if def != null and threat is GSNpcInstance and def.allowed_fire_modes().size() > 1 and not arsenal.is_switching():
 		var names := PackedStringArray()
 		for m in def.allowed_fire_modes():
 			names.append(MODE_NAMES[m])
-		var want := _fire_modes.pick(player.feet().distance_to((threat as DotNpcInstance).position()), names)
+		var want := _fire_modes.pick(player.feet().distance_to((threat as GSNpcInstance).position()), names)
 		if want != "":
-			var _set := arsenal.set_fire_mode(DotWeaponDef.fire_mode_named(want))
+			var _set := arsenal.set_fire_mode(GSWeaponDef.fire_mode_named(want))
 
 	var mode := arsenal.fire_mode()
-	if def != null and mode != DotWeaponDef.Fire.AUTO and (game.current_tick() % 6) >= 3:
+	if def != null and mode != GSWeaponDef.Fire.AUTO and (game.current_tick() % 6) >= 3:
 		command.set_button(ZzNetCommand.BUTTON_FIRE, false)
 
 
@@ -694,7 +694,7 @@ func _pulse_trigger(player, command: DotFpsCommand) -> void:
 ## [b]Scored first, looked at in order, and the first one seen wins[/b]: a sight line is a
 ## raycast, and a stand-in in front of a crowd of forty that tested each one it might prefer
 ## cast forty a tick. Asked again only every few ticks while the one it has is alive.
-func _threat(player) -> DotNpcInstance:
+func _threat(player) -> GSNpcInstance:
 	if game.horde == null:
 		return null
 
@@ -708,7 +708,7 @@ func _threat(player) -> DotNpcInstance:
 
 	# Nobody in sight is an answer too: kept as long as a sighting is.
 	if game.current_tick() < int(memory.get("threat_until", 0)) \
-			and (held == null or (held is DotNpcInstance and (held as DotNpcInstance).is_alive())):
+			and (held == null or (held is GSNpcInstance and (held as GSNpcInstance).is_alive())):
 		return held
 
 	var eye: Vector3 = player.eye_position()
@@ -722,7 +722,7 @@ func _threat(player) -> DotNpcInstance:
 	var calm := true
 
 	for i in near.size():
-		var npc: DotNpcInstance = near[i]
+		var npc: GSNpcInstance = near[i]
 
 		if calm and npc.position().distance_squared_to(feet) < close_sq:
 			calm = false
@@ -739,12 +739,12 @@ func _threat(player) -> DotNpcInstance:
 		keys.append((int((score + 64.0) * 1000.0) << 12) | i)
 
 	keys.sort()
-	var best: DotNpcInstance = null
+	var best: GSNpcInstance = null
 
 	# The ten it would rather shoot, at most: past those, a crowd behind a wall is a crowd
 	# behind a wall.
 	for n in mini(keys.size(), 10):
-		var npc: DotNpcInstance = near[keys[n] & 0xFFF]
+		var npc: GSNpcInstance = near[keys[n] & 0xFFF]
 		if _sees(player, _aim_point(npc)) or _sees(player, _head_point(npc)):
 			best = npc
 			break
@@ -759,18 +759,18 @@ func _threat(player) -> DotNpcInstance:
 func is_calm(player) -> bool:
 	return game.current_tick() < int(_memory(player).get("calm_until", 0))
 
-func _aim_point(npc: DotNpcInstance) -> Vector3:
+func _aim_point(npc: GSNpcInstance) -> Vector3:
 	var height := float(npc.def.meta.get("height", 1.7))
 	return npc.position() + Vector3(0.0, height * 0.72, 0.0)
 
-func _head_point(npc: DotNpcInstance) -> Vector3:
+func _head_point(npc: GSNpcInstance) -> Vector3:
 	var height := float(npc.def.meta.get("height", 1.7))
 	return npc.position() + Vector3(0.0, height * 0.9, 0.0)
 
 ## Where to shoot [param npc] from [param player]'s eye: the chest, or the head when only the
 ## head shows (over a window's boards, a person aims there; aimed at the chest, every shot
 ## went into the planks and the crowd at the window was never thinned).
-func _shot_point(player, npc: DotNpcInstance) -> Vector3:
+func _shot_point(player, npc: GSNpcInstance) -> Vector3:
 	var chest := _aim_point(npc)
 	if _sees(player, chest):
 		return chest
@@ -802,12 +802,12 @@ func _crowd_within(player, reach: float) -> int:
 	return n
 
 ## Fires only once it has had its reaction time on this target, with its view on its aim and
-## in bursts at range ([DotBotAim.trigger]), and never through a friend.
-func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
-	var aim: DotBotAim = memory["aim"]
+## in bursts at range ([GSBotAim.trigger]), and never through a friend.
+func _fire_ok(player, memory: Dictionary, npc: GSNpcInstance) -> bool:
+	var aim: GSBotAim = memory["aim"]
 	if player.flashed or aim.target_id != npc.instance_id:
 		return false
-	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
+	var held: GSWeaponDef = player.weapons.current_def() if player.weapons != null else null
 	if held != null and ZzWeapons.explosive(held.id) and npc.position().distance_to(player.feet()) < game.config.bot_blast_safe:
 		return false
 	var at: Vector3 = memory["target_at"] if memory.get("target_at", Vector3.INF) != Vector3.INF else _aim_point(npc)
@@ -829,7 +829,7 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 ## friend is often right beside the gun, shoulder to shoulder or half inside it. Their middle
 ## is then well off the line while their head and chest are on it: with the middle-only test
 ## four stand-ins dealt each other 200 to 500 points in every minute measured. A friend whose
-## hitbox holds the eye itself is skipped, because the shot passes through them (`DotCombatManager.pass_through_sets`).
+## hitbox holds the eye itself is skipped, because the shot passes through them (`GSCombatManager.pass_through_sets`).
 ##
 ## [b]Under the server's `mp_teammate_passthrough`.[/b] At 2 every shot passes through every
 ## survivor, so nobody is in the way and a stand-in that held fire for a friend in the line
@@ -838,7 +838,7 @@ func _fire_ok(player, memory: Dictionary, npc: DotNpcInstance) -> bool:
 func _friend_in_the_way(player, at: Vector3) -> bool:
 	var level := _pass_through_level()
 
-	if level >= DotDamageRules.PASS_THROUGH_ALWAYS:
+	if level >= GSDamageRules.PASS_THROUGH_ALWAYS:
 		return false
 
 	var eye: Vector3 = player.eye_position()
@@ -865,19 +865,19 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		if off > 2.5 + reach * cone:
 			continue
 
-		var set_node: DotHitboxSet = other.hitboxes
+		var set_node: GSHitboxSet = other.hitboxes
 
 		if set_node == null or not is_instance_valid(set_node):
 			continue
 
-		if level >= DotDamageRules.PASS_THROUGH_AT_MUZZLE and _holds_muzzle(set_node, eye):
+		if level >= GSDamageRules.PASS_THROUGH_AT_MUZZLE and _holds_muzzle(set_node, eye):
 			continue
 
 		for box in set_node.hitboxes():
 			if not box.enabled:
 				continue
 
-			var half := maxf(0.0, box.height * 0.5 - box.radius) if box.shape == DotHitbox.Shape.CAPSULE else 0.0
+			var half := maxf(0.0, box.height * 0.5 - box.radius) if box.shape == GSHitbox.Shape.CAPSULE else 0.0
 			var low: Vector3 = box.global_transform * Vector3(0.0, -half, 0.0)
 			var high: Vector3 = box.global_transform * Vector3(0.0, half, 0.0)
 			var near := Geometry3D.get_closest_points_between_segments(eye, at, low, high)
@@ -894,7 +894,7 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 ## pass-through no longer applied and a shotgun volley hit that friend at 7 mm (86 damage in one
 ## shot, the "102 friendly damage" that failed headless_run whenever the loot pool let a stand-in
 ## pick the shotgun up). An eye near the edge counts as not held, so the line test below runs.
-func _holds_muzzle(set_node: DotHitboxSet, eye: Vector3) -> bool:
+func _holds_muzzle(set_node: GSHitboxSet, eye: Vector3) -> bool:
 	if not set_node.contains_point(eye):
 		return false
 
@@ -912,19 +912,19 @@ func _round_passes_bodies(player) -> bool:
 	if rules == null or not rules.penetration_enabled or not rules.penetration_players:
 		return false
 
-	var held: DotWeaponDef = player.weapons.current_def() if player.weapons != null else null
+	var held: GSWeaponDef = player.weapons.current_def() if player.weapons != null else null
 	var arsenal: Object = player.weapons.arsenal if player.weapons != null else null
 
 	if held == null or arsenal == null or not arsenal.has_method("round_for"):
 		return false
 
-	var ammo := arsenal.call("round_for", held.id) as DotWeaponAmmoType
+	var ammo := arsenal.call("round_for", held.id) as GSWeaponAmmoType
 	return ammo != null and ammo.penetration > 0.0
 
 ## The level the server's combat manager judges shots under (its `mp_teammate_passthrough`).
 func _pass_through_level() -> int:
 	if game == null or game.combat == null or game.combat.rules == null:
-		return DotDamageRules.PASS_THROUGH_AT_MUZZLE
+		return GSDamageRules.PASS_THROUGH_AT_MUZZLE
 	return game.combat.rules.pass_through_level()
 
 ## Whether [param player] is one of the stand-ins that go to [param friend], pinned or down. On a
@@ -996,10 +996,10 @@ func _sleeper_near(player, reach: float) -> Vector3:
 ## Aims at a zombie the way a person would: engaged with it from the first tick it is aimed at
 ## (its reaction starts), the view turned onto it at the settings' speed, off by the aim error
 ## of this engagement.
-func _aim_at(player, command: DotFpsCommand, npc: DotNpcInstance) -> void:
+func _aim_at(player, command: GSFpsCommand, npc: GSNpcInstance) -> void:
 	_aiming = true
 	var memory := _memory(player)
-	var aim: DotBotAim = memory["aim"]
+	var aim: GSBotAim = memory["aim"]
 	var eye: Vector3 = player.eye_position()
 	var at := _shot_point(player, npc)
 	var was: Vector3 = memory["target_at"]
@@ -1012,15 +1012,15 @@ func _aim_at(player, command: DotFpsCommand, npc: DotNpcInstance) -> void:
 
 ## Turns toward [param at] (a friend to revive, a door, a box): looking, not shooting, but
 ## still no faster than the settings turn a view.
-func _aim(player, command: DotFpsCommand, at: Vector3) -> void:
+func _aim(player, command: GSFpsCommand, at: Vector3) -> void:
 	_aiming = true
-	var aim: DotBotAim = _memory(player)["aim"]
+	var aim: GSBotAim = _memory(player)["aim"]
 	var view := aim.look_at_point(player.eye_position(), at, _dt)
 	command.yaw = view.x
 	command.pitch = clampf(view.y, -89.0, 89.0)
 
 ## Moves along [param direction] (world space), whatever the bot is aiming at.
-func _move_world(_player, command: DotFpsCommand, direction: Vector3) -> void:
+func _move_world(_player, command: GSFpsCommand, direction: Vector3) -> void:
 	var flat := Vector3(direction.x, 0.0, direction.z)
 
 	if flat.length() < 0.01:
@@ -1033,9 +1033,9 @@ func _move_world(_player, command: DotFpsCommand, direction: Vector3) -> void:
 	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
 	command.move = Vector2(flat.dot(right), flat.dot(forward)).limit_length(1.0)
 
-func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary) -> void:
+func _walk_to(player, command: GSFpsCommand, goal: Vector3, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
-	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
+	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
 	var path: PackedVector3Array = memory["path"]
 
 	# An empty path (unreachable goal, or arrived) retries at most every 0.5 s: searching the
@@ -1070,7 +1070,7 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 	if not _aiming:
 		# Not aiming at anything: look where it is going, turning there as a person would
 		# rather than snapping round at every corner of the path.
-		var aim: DotBotAim = memory["aim"]
+		var aim: GSBotAim = memory["aim"]
 		var eye: Vector3 = player.eye_position()
 		var view := aim.look_at_point(eye, Vector3(next.x, eye.y, next.z), _dt)
 		command.yaw = view.x
@@ -1083,7 +1083,7 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 	# Past a sleeper: at a walk, and edging away from her. Running by within seven metres is
 	# what wakes her, and a stand-in that does it loses a teammate.
 	if quiet != Vector3.INF:
-		command.set_button(DotFpsCommand.BUTTON_WALK, true)
+		command.set_button(GSFpsCommand.BUTTON_WALK, true)
 		var away := here - quiet
 		away.y = 0.0
 		if away.length() < 9.0 and heading.length() > 0.01:
@@ -1092,7 +1092,7 @@ func _walk_to(player, command: DotFpsCommand, goal: Vector3, memory: Dictionary)
 	_move_world(player, command, heading)
 	_unstick(player, command, memory)
 
-func _follow(player, command: DotFpsCommand, memory: Dictionary) -> void:
+func _follow(player, command: GSFpsCommand, memory: Dictionary) -> void:
 	var leader = _leader(player)
 
 	if leader == null or leader == player:
@@ -1152,7 +1152,7 @@ func _route_goal(player) -> Vector3:
 	return Vector3.INF
 
 ## Works the current objective when the team is there: walks to it and holds E.
-func _objective(player, command: DotFpsCommand, memory: Dictionary) -> bool:
+func _objective(player, command: GSFpsCommand, memory: Dictionary) -> bool:
 	var index: int = game.current_objective()
 
 	if index < 0 or game.objective_states[index] != &"waiting":
@@ -1187,7 +1187,7 @@ func _give_up_pick(memory: Dictionary, loot, id: int) -> void:
 
 ## Whether the graph has a way from [param player] to [param at]; true when there is no graph to ask.
 func _can_walk_to(player, at: Vector3) -> bool:
-	var nav: DotNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
+	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
 
 	if nav == null or not nav.is_ready():
 		return true
@@ -1201,7 +1201,7 @@ func _can_walk_to(player, at: Vector3) -> bool:
 	return not path.is_empty()
 
 ## Picks up what it needs within a few metres: a medkit without one, pills, ammo when low, a box.
-func _pick_up(player, command: DotFpsCommand, memory: Dictionary, reach: float = -1.0) -> bool:
+func _pick_up(player, command: GSFpsCommand, memory: Dictionary, reach: float = -1.0) -> bool:
 	if reach < 0.0:
 		reach = game.config.bot_pick_up_reach
 	var loot = game.loot
@@ -1328,7 +1328,7 @@ func _wants_loot(player, e: Dictionary) -> bool:
 
 ## A thrown or dropped weapon (the weapon layer's drops) the stand-in wants, within [param reach]: walks to the nearest.
 ## The layer's own take hands it over once the stand-in stands at it, so no key is pressed.
-func _pick_up_drop(player, command: DotFpsCommand, memory: Dictionary, reach: float) -> bool:
+func _pick_up_drop(player, command: GSFpsCommand, memory: Dictionary, reach: float) -> bool:
 	var layer = game.weapon_layer
 
 	if layer == null or layer.drops == null or layer.drops.count() == 0 or player.weapons == null or player.weapons.arsenal == null:
@@ -1359,12 +1359,12 @@ func _wants_weapon(player, id: StringName) -> bool:
 	if player.weapons == null or player.weapons.arsenal == null:
 		return true
 
-	var def: DotWeaponDef = ZzWeapons.def_of(id)
+	var def: GSWeaponDef = ZzWeapons.def_of(id)
 
 	if def == null:
 		return false
 
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
 
 	if not arsenal.has_slot(def.slot):
 		return true
@@ -1374,14 +1374,14 @@ func _wants_weapon(player, id: StringName) -> bool:
 
 ## Which carried gun to hold against [param danger]: the best-rated that has rounds, a launcher only against a special
 ## or a brute that is far enough off not to catch its owner in the blast. Changes only for a clear gain, so a stand-in does not hop.
-func _choose_slot(player, danger: DotNpcInstance) -> void:
+func _choose_slot(player, danger: GSNpcInstance) -> void:
 	if player.weapons == null or player.weapons.arsenal == null or player.weapons.arsenal.is_switching() or player.weapons.arsenal.is_reloading():
 		return
 
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
 	var gap := danger.position().distance_to(player.feet())
 	var big := danger.def.id != ZzNpcs.COMMON
-	var held: DotWeaponSlot = arsenal.current()
+	var held: GSWeaponSlot = arsenal.current()
 	var best := -1
 	var best_score := 0.0
 
@@ -1405,14 +1405,14 @@ func _choose_slot(player, danger: DotNpcInstance) -> void:
 	if best >= 0 and best != arsenal.current_slot():
 		player.wanted_slot = best
 
-func _loaded(arsenal: DotWeaponArsenal, slot: DotWeaponSlot) -> bool:
+func _loaded(arsenal: GSWeaponArsenal, slot: GSWeaponSlot) -> bool:
 	return slot.magazine > 0 or slot.def.infinite_reserve or slot.def.ammo_type == &"" or arsenal.ammo().has(slot.def.ammo_type, 1)
 
 func _low_on_ammo(player) -> bool:
 	if player.weapons == null or player.weapons.arsenal == null:
 		return false
 
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
 
 	for pool in arsenal.ammo().pools():
 		if arsenal.ammo().count(pool) < arsenal.ammo().cap(pool) * 0.3:
@@ -1421,7 +1421,7 @@ func _low_on_ammo(player) -> bool:
 	return false
 
 ## Standing in acid or fire: step out of it, whatever else.
-func _get_out_of_hazards(player, command: DotFpsCommand) -> void:
+func _get_out_of_hazards(player, command: GSFpsCommand) -> void:
 	if game.hazards == null:
 		return
 
@@ -1438,7 +1438,7 @@ func _get_out_of_hazards(player, command: DotFpsCommand) -> void:
 			_move_world(player, command, away if away.length() > 0.1 else Vector3.RIGHT)
 			return
 
-func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
+func _unstick(player, command: GSFpsCommand, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
 	var mark: Vector3 = memory["stuck_at"]
 
@@ -1455,7 +1455,7 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 		return
 
 	if command.move.length() > 0.5 and game.now() - float(memory["stuck_time"]) > 1.0:
-		command.set_button(DotFpsCommand.BUTTON_JUMP, true)
+		command.set_button(GSFpsCommand.BUTTON_JUMP, true)
 		memory["path"] = PackedVector3Array()
 		memory["stuck_time"] = game.now()
 		memory["hops"] = int(memory.get("hops", 0)) + 1
@@ -1477,7 +1477,7 @@ func _unstick(player, command: DotFpsCommand, memory: Dictionary) -> void:
 				memory["relocations"] = int(memory.get("relocations", 0)) + 1
 
 ## Seconds a stand-in may want something (an item, a place) and not move or act before it is given another goal (`zz_bot_idle_seconds`).
-func _watch_idle(player, command: DotFpsCommand, memory: Dictionary) -> void:
+func _watch_idle(player, command: GSFpsCommand, memory: Dictionary) -> void:
 	var limit: float = game.config.bot_idle_seconds
 	var here: Vector3 = player.feet()
 	var anchor: Vector3 = memory.get("idle_at", Vector3.INF)
@@ -1504,6 +1504,6 @@ func _watch_idle(player, command: DotFpsCommand, memory: Dictionary) -> void:
 	elif ZzUnstick.relocate_player(player, _hold_of(player), command.yaw):
 		how = "relocated"
 
-	DotLog.info(CHANNEL, "a stand-in stood still wanting to move; given another goal", {
+	GSLog.info(CHANNEL, "a stand-in stood still wanting to move; given another goal", {
 		"player": String(player.player_id), "at": str(here.snappedf(0.1)), "pick": pick, "how": how, "seconds": limit,
 	})

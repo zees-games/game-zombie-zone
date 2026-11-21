@@ -28,9 +28,9 @@ func _test_help_and_menu() -> void:
 	_section("H opens help, and the Escape menu has Help and Leave")
 	var settings := ZzSettings.new()
 	add_child(settings)
-	var built := settings.setup(DotSettingsStoreMemory.new())
+	var built := settings.setup(GSSettingsStoreMemory.new())
 	var keys := settings.bindings
-	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
+	_check(built.ok and keys != null and keys.key_for(GSMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H (the medkit is on G)",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
 	# The right mouse button aims down the sights (the family's Aim row); the shove is on T.
@@ -39,7 +39,7 @@ func _test_help_and_menu() -> void:
 		"%s %s %d" % [keys.key_for(ZzBindings.AIM), keys.key_for(ZzBindings.SHOVE), keys.defaults_on("Mouse 2").size()])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "T")
-	_check(keys.key_for(ZzBindings.CHAT) == "T" and DotInputBinding.describe_action(ZzBindings.CHAT) == "T"
+	_check(keys.key_for(ZzBindings.CHAT) == "T" and GSInputBinding.describe_action(ZzBindings.CHAT) == "T"
 		and keys.key_for(ZzBindings.CHAT_TEAM) == "U", "chat (Y) and team chat (U) are rows: rebinding one moves its key",
 		"%s %s" % [keys.key_for(ZzBindings.CHAT), keys.key_for(ZzBindings.CHAT_TEAM)])
 	var h := InputEventKey.new()
@@ -83,7 +83,7 @@ func _test_help_and_menu() -> void:
 func _check_old_settings_document() -> void:
 	# A document saved when the medkit was on H and the shove on V: they follow their new
 	# defaults, help keeps H, and a key the player chose stays where they put it.
-	var old_doc := DotSettingsStoreMemory.new()
+	var old_doc := GSSettingsStoreMemory.new()
 	var _saved := old_doc.save_document(ZzSettings.APP_NAMESPACE, &"local", {"version": 1, "values": {
 		"bind_heal": "H", "bind_help": "H", "bind_shove": "V", "bind_use": "J", "field_of_view": 92,
 		"crowd_detail": 2, "vis_mode": 1, "ambient_frequency": 0.5, "gore": false, "reduce_motion": true, "sfx_volume": 0.3,
@@ -91,10 +91,10 @@ func _check_old_settings_document() -> void:
 	var returning := ZzSettings.new()
 	add_child(returning)
 	var _r := returning.setup(old_doc, false)
-	var rk: DotMenuBindings = returning.bindings
-	_check(rk.key_for(ZzBindings.HEAL) == "G" and rk.key_for(DotMenuBindings.HELP_ACTION) == "H",
+	var rk: GSMenuBindings = returning.bindings
+	_check(rk.key_for(ZzBindings.HEAL) == "G" and rk.key_for(GSMenuBindings.HELP_ACTION) == "H",
 		"an old settings file with the medkit on H: the medkit moves to G, help keeps H",
-		"%s %s" % [rk.key_for(ZzBindings.HEAL), rk.key_for(DotMenuBindings.HELP_ACTION)])
+		"%s %s" % [rk.key_for(ZzBindings.HEAL), rk.key_for(GSMenuBindings.HELP_ACTION)])
 	_check(rk.key_for(ZzBindings.SHOVE) == "T" and rk.key_for(ZzBindings.USE) == "J",
 		"the shove leaves V for push to talk (it moves to T), and a key the player chose is kept",
 		"%s %s" % [rk.key_for(ZzBindings.SHOVE), rk.key_for(ZzBindings.USE)])
@@ -113,7 +113,7 @@ func _check_old_settings_document() -> void:
 	_check(absf(rad_to_deg(wide) - 100.0) < 1.5,
 		"the default field of view is about 100 degrees across a 16:9 window", "%.1f" % rad_to_deg(wide))
 	var _w := returning.settings.set_value(&"field_of_view", 70)
-	_check(absf(fov_cam.fov - DotMenuApplier.vertical_from_horizontal_4_3(70.0)) < 0.01,
+	_check(absf(fov_cam.fov - GSMenuApplier.vertical_from_horizontal_4_3(70.0)) < 0.01,
 		"the slider is horizontal degrees at 4:3, converted for the camera", "%.2f" % fov_cam.fov)
 	returning.queue_free()
 	await get_tree().process_frame
@@ -132,14 +132,14 @@ func _test_the_map_menu() -> void:
 		await get_tree().physics_frame
 	var settings := ZzSettings.new()
 	add_child(settings)
-	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
-	var keys: DotMenuBindings = settings.bindings
+	var _built: GSResult = settings.setup(GSSettingsStoreMemory.new())
+	var keys: GSMenuBindings = settings.bindings
 	var image := settings.menu.page(&"video").find_section(&"image")
-	var gore_row: DotMenuRow = image.find_row(&"gore") if image != null else null
+	var gore_row: GSMenuRow = image.find_row(&"gore") if image != null else null
 	_check(gore_row != null and gore_row.row_id() == &"gore" and settings.schema.has(&"gore"),
 		"the Video page's Image section has a Blood splatters row on the gore setting")
 	_check_gore_persist()
-	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
+	_check(keys.key_for(GSMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table defaults to M",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
 	var rows: Array = game.map_rows()
@@ -153,7 +153,7 @@ func _test_the_map_menu() -> void:
 	_check(settings.menu.handle_event(m) and settings.menu.picker.is_open(), "M opens the picker")
 	var wanted: StringName = &""
 	var key := KEY_NONE
-	for row in range(1, DotMenuPicker.PAGE_SIZE + 1):
+	for row in range(1, GSMenuPicker.PAGE_SIZE + 1):
 		var it: Variant = settings.menu.picker.at_row(row)
 		if it is Dictionary and not bool((it as Dictionary)["current"]):
 			wanted = StringName(str((it as Dictionary)["id"]))
@@ -176,11 +176,11 @@ func _test_the_map_menu() -> void:
 ## Gore off survives a save and a fresh settings manager, and reaches the decals.
 func _check_gore_persist() -> void:
 	# Gore persists: toggled off, flushed to a real file store in this process's scratch directory, read back by a fresh instance.
-	var scratch := DotSettingsScratch.use("headless_gore_persist")
+	var scratch := GSSettingsScratch.use("headless_gore_persist")
 	var first := ZzSettings.new()
 	first.directory = scratch
 	add_child(first)
-	var _b1 := first.setup(DotSettingsStoreFile.new(scratch), false)
+	var _b1 := first.setup(GSSettingsStoreFile.new(scratch), false)
 	var _g2 := first.settings.set_value(&"gore", false)
 	var flushed := first.settings.flush()
 	_check(flushed.ok and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(scratch)) and not DirAccess.get_files_at(scratch).is_empty(),
@@ -188,7 +188,7 @@ func _check_gore_persist() -> void:
 	var second := ZzSettings.new()
 	second.directory = scratch
 	add_child(second)
-	var _b2 := second.setup(DotSettingsStoreFile.new(scratch), false)
+	var _b2 := second.setup(GSSettingsStoreFile.new(scratch), false)
 	_check(second.settings.get_bool(&"gore", true) == false,
 		"a fresh settings manager loading that file reads gore as off")
 	var blood := ZzBlood.new()
@@ -209,7 +209,7 @@ func _check_gore_persist() -> void:
 	_check(not DirAccess.dir_exists_absolute(real), "the scratch settings directory is removed afterwards")
 
 
-## The client on dot-game's DotGameClient: the loading cover is up at the start and blocks
+## The client on dot-game's GSGameClient: the loading cover is up at the start and blocks
 ## input, lifts once the player is in, and Tab goes through the menu (it holds the board).
 func _test_the_client_platform() -> void:
 	_section("the client: the cover lifts, Tab holds the board through the menu, the wheel is a row")
@@ -224,7 +224,7 @@ func _test_the_client_platform() -> void:
 	client.standalone_content = false
 	client.offline_bots = 0
 	add_child(client)
-	var platform: DotGameClient = client.platform
+	var platform: GSGameClient = client.platform
 	var covered := platform != null and platform.gate != null and not platform.is_shown() \
 		and platform.is_input_blocked()
 	for _i in 600:
@@ -241,7 +241,7 @@ func _test_the_client_platform() -> void:
 	tab.physical_keycode = KEY_TAB
 	tab.pressed = true
 	var _a: bool = client.settings.menu.handle_event(tab)
-	var board: DotMenuScoreboard = client.board
+	var board: GSMenuScoreboard = client.board
 	_check(board != null and board.is_open() and board.rows().any(func(r: Dictionary) -> bool: return bool(r.get("you", false))),
 		"Tab holds the scoreboard up, with this player on it", str(board.rows()) if board != null else "no board")
 	tab.pressed = false
@@ -284,7 +284,7 @@ func _test_the_client_platform() -> void:
 
 
 ## A survivor outside the built map puts the cover back, and it lifts again.
-func _check_client_cover(client: ZzClient, platform: DotGameClient) -> void:
+func _check_client_cover(client: ZzClient, platform: GSGameClient) -> void:
 	# Connected, a survivor the server moved to the next map's start before that map arrived stands in
 	# the old map's void: the cover comes back, and goes once they are inside the built map again.
 	client._offline = false
@@ -309,10 +309,10 @@ func _check_client_wheel(client: ZzClient) -> void:
 	var wheel := InputEventMouseButton.new()
 	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	wheel.pressed = true
-	_check(wheel.is_action_pressed(DotMenuBindings.WEAPON_NEXT_ACTION) and client.settings.bindings.key_for(DotMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
+	_check(wheel.is_action_pressed(GSMenuBindings.WEAPON_NEXT_ACTION) and client.settings.bindings.key_for(GSMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
 		"the wheel changes weapon through a rebindable row")
-	var binds: DotMenuBindings = client.settings.bindings
-	_check(binds.key_for(DotMenuBindings.WEAPON_PREVIOUS_ACTION) == "Wheel up" and binds.key_for(DotMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
+	var binds: GSMenuBindings = client.settings.bindings
+	_check(binds.key_for(GSMenuBindings.WEAPON_PREVIOUS_ACTION) == "Wheel up" and binds.key_for(GSMenuBindings.WEAPON_NEXT_ACTION) == "Wheel down",
 		"the wheel rows default to previous (up) and next (down)")
 	var jump_wheel := InputEventMouseButton.new()
 	jump_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
@@ -342,7 +342,7 @@ func _check_client_wheel(client: ZzClient) -> void:
 
 ## The client's ending: the first-person arms, the slow motion, and the spectator's view of it.
 func _check_client_endings(client: ZzClient, rules: ZzEndCameraRules, spot: Vector3) -> void:
-	var arms: DotPlayerViewArms = client.view_arms
+	var arms: GSPlayerViewArms = client.view_arms
 	var arms_up: bool = arms != null and arms.get_parent() != null and arms.get_parent() is Node3D and not (arms.get_parent() is Camera3D)
 	_check(arms_up and not arms.shown and not arms.arms().visible, "the first-person arms are mounted under a yaw pivot, hidden while up")
 	_hurt(client.game, client.player, 500.0)
@@ -372,7 +372,7 @@ func _check_client_endings(client: ZzClient, rules: ZzEndCameraRules, spot: Vect
 	_check(Engine.time_scale == 1.0, "and a reset brings it back")
 	rules.blend = 0.05
 	rules.orbit = 0.0
-	client.game.spectate.apply_view(client.player.player_id, DotSpectatorView.Mode.FIXED, &"", &"", Vector3.ZERO)
+	client.game.spectate.apply_view(client.player.player_id, GSSpectatorView.Mode.FIXED, &"", &"", Vector3.ZERO)
 	for _i in 4:
 		await get_tree().process_frame
 	_check(client.is_spectating(), "a dead survivor is a spectator", str(client.game.spectate.mode_of(client.player.player_id)))
@@ -397,7 +397,7 @@ func _test_spectate_tap() -> void:
 	var id := a.player_id
 	a.watching = true
 	game.spectate.on_died(id, others[0], false, Vector3(0, 2, 0), 0.0, 0)
-	game.spectate.manager.set_mode(String(id), DotSpectatorView.Mode.CHASE)
+	game.spectate.manager.set_mode(String(id), GSSpectatorView.Mode.CHASE)
 	var client := ZzClient.new()
 	client.game = game
 	client._adopt(a)
@@ -464,10 +464,10 @@ func _test_the_hud() -> void:
 	hud._process(0.0)
 	_check(
 		hud.vitals.number_text() == "30" and is_equal_approx(hud.vitals.bonus, 25.0) and hud.vitals.status == "",
-		"DotVitals: real health as the number, borrowed health as its bonus", str(hud.vitals.describe())
+		"GSVitals: real health as the number, borrowed health as its bonus", str(hud.vitals.describe())
 	)
 	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit x1" and str(hud.kits.rows[0][1]) != "",
-		"the medkit is a DotKeyHints row with its key", str(hud.kits.rows))
+		"the medkit is a GSKeyHints row with its key", str(hud.kits.rows))
 
 	_check_hud_roster(game, me, hud)
 	_hurt(game, me, 500.0)
@@ -486,8 +486,8 @@ func _test_the_hud() -> void:
 		game.objective_states[0] = &"holding"
 		game.objective_progress[0] = game.now() + 42.2
 		hud._process(0.0)
-		_check(hud.strip.clock == DotScoreStrip.clock_text(42.2) and hud.strip.under_text().ends_with("hold out"),
-			"a hold-out's time left is DotScoreStrip's clock", str(hud.strip.describe()))
+		_check(hud.strip.clock == GSScoreStrip.clock_text(42.2) and hud.strip.under_text().ends_with("hold out"),
+			"a hold-out's time left is GSScoreStrip's clock", str(hud.strip.describe()))
 
 	# A survivor's hit, as dot-combat applies it, is confirmed by the world, and the HUD draws
 	# the marker and the number from that confirmation.
@@ -498,13 +498,13 @@ func _test_the_hud() -> void:
 	# On the street: nothing spawns in a safe room, which is where the team starts.
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0, 0, -6), &"test")
 	await _sim(game, 0.1)
-	var shot := DotDamage.make(me.entity_id, game.horde.entity_id_for(npc), 7.0, null)
+	var shot := GSDamage.make(me.entity_id, game.horde.entity_id_for(npc), 7.0, null)
 	shot.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(shot)
 	_check(confirmed.size() == 1 and confirmed[0][0] == me.player_id and absf(float(confirmed[0][2]) - 7.0) < 0.01
 		and not bool(confirmed[0][3]), "a survivor's hit on a zombie is confirmed, by whom and how much", str(confirmed))
 	_check(hud.hit_marker.alpha() > 0.0 and hud.damage_numbers.texts().size() == 1,
-		"and the HUD flashes DotHitMarker and puts up a DotDamageNumbers number", str(hud.damage_numbers.texts()))
+		"and the HUD flashes GSHitMarker and puts up a GSDamageNumbers number", str(hud.damage_numbers.texts()))
 	_hurt_npc(game, npc, 7.0)
 	_check(confirmed.size() == 1, "the world's damage confirms nothing", str(confirmed))
 
@@ -521,9 +521,9 @@ func _test_the_hud() -> void:
 ## The health plate against a full chat log.
 func _check_hud_plate(hud: ZzHud) -> void:
 	# Both bottom-anchored, so the arithmetic holds at any height.
-	var chat := DotGameChatClient.new()
+	var chat := GSGameChatClient.new()
 	add_child(chat)
-	var w: DotChatWindow = chat.window
+	var w: GSChatWindow = chat.window
 	var log_top := w.margin_bottom + w.entry_height + float(w.max_lines) * (w.line_height + w.line_gap)
 	_check(ZzHud.PLATE_BOTTOM >= log_top and is_equal_approx(-hud.vitals.offset_bottom, ZzHud.PLATE_BOTTOM),
 		"the health plate stays above a full chat log",
@@ -553,7 +553,7 @@ func _check_hud_aim(hud: ZzHud, me: ZzPlayer) -> void:
 	hud.set_aim(1.0, false)
 	var aimed := _crosshair_alpha(hud)
 	hud.set_aim(1.0, true)
-	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or DotAddonApi.build_level("dot_ui") < 5)
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("dot_ui") < 5)
 		and _crosshair_alpha(hud) == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
 		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
@@ -575,7 +575,7 @@ func _check_hud_aim(hud: ZzHud, me: ZzPlayer) -> void:
 		str(_script_errors.seen().slice(before)))
 	hud.set_aim(0.0, false)
 	var cross: Control = hud._crosshair
-	var hides := DotAddonApi.build_level("dot_ui") >= 14
+	var hides := GSAddonApi.build_level("dot_ui") >= 14
 	if hides:
 		cross.call(&"_process", 0.016)
 	_check(not hides or bool(cross.call(&"is_shown")), "the crosshair is drawn while the survivor lives")
@@ -586,7 +586,7 @@ func _check_hud_aim(hud: ZzHud, me: ZzPlayer) -> void:
 	me.health.alive = true
 
 
-## What the crosshair shows: DotCrosshair fades itself (and hides when scoped), the old dot by modulate.
+## What the crosshair shows: GSCrosshair fades itself (and hides when scoped), the old dot by modulate.
 func _crosshair_alpha(hud: ZzHud) -> float:
 	var c: Control = hud._crosshair
 	if c.has_method(&"set_aim"):
@@ -629,12 +629,12 @@ func _test_the_first_play_test() -> void:
 	# Christian asked for a darker HUD by default that the menu's theme restyles.
 	var settings := ZzSettings.new()
 	add_child(settings)
-	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
+	var _built: GSResult = settings.setup(GSSettingsStoreMemory.new())
 	hud.follow_menu(settings.menu)
 	var plate := hud.vitals.colour(&"plate")
 	_check(plate.get_luminance() < 0.1 and plate.a >= 0.7, "the HUD is dark by default, in the menu's theme", str(plate))
 	var _t := settings.settings.set_value(&"ui_theme", &"contrast")
-	var contrast: DotMenuPalette = settings.menu.palette()
+	var contrast: GSMenuPalette = settings.menu.palette()
 	_check(contrast.id == &"contrast" and hud.vitals.colour(&"plate") == contrast.hud_plate and hud.strip.colour(&"text") == contrast.hud_text,
 		"a theme picked in the menu reaches every piece at once")
 	_check(hud.vitals.colour(&"highlight") == ZzHud.AMBER and hud._top.get_theme_color(&"font_color") == contrast.hud_text,
@@ -713,8 +713,8 @@ func _check_font_coverage() -> void:
 
 ## A pack naming dot-ui's glance pieces does not parse on a shell whose dot-ui predates them,
 ## so the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
-## The trader menu is the one modal this game frees the mouse for; it must hold the pointer through DotGameClient.
-func _check_trader_menu_holds_pointer(client: ZzClient, platform: DotGameClient) -> void:
+## The trader menu is the one modal this game frees the mouse for; it must hold the pointer through GSGameClient.
+func _check_trader_menu_holds_pointer(client: ZzClient, platform: GSGameClient) -> void:
 	var feet: Vector3 = client.player.feet() if client.player != null else Vector3.ZERO
 	client.shop_state = {"menu": true, "open": true, "radius": 3.5, "at": [[feet.x, feet.y, feet.z]], "items": []}
 	client.open_shop()
@@ -733,9 +733,9 @@ func _check_trader_menu_holds_pointer(client: ZzClient, platform: DotGameClient)
 
 
 func _check_requires() -> void:
-	var asks := DotAddonApi.derive()
+	var asks := GSAddonApi.derive()
 	_check(
-		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
 		"the pack asks a shell for dot-ui level 4, the glance pieces",
 		str(asks.get("dot_ui"))
 	)
@@ -752,7 +752,7 @@ func _check_survivor_tag() -> void:
 	add_child(camera)
 	camera.global_position = Vector3(0.0, 2.0, 6.0)
 	other.present_tag(true, Vector3.ZERO, camera, 0.016)
-	var tag := other.get_node_or_null("HealthTag") as DotHealthTag
+	var tag := other.get_node_or_null("HealthTag") as GSHealthTag
 	_check(tag != null and tag.visible, "another survivor wears a health tag over the drawn body")
 	_check(tag != null and tag.global_position.y > ZzPlayer.BODY_HEIGHT and absf(tag.global_transform.basis.z.normalized().dot(Vector3.UP)) < 0.5,
 		"above the head, turned to the camera")

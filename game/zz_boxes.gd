@@ -100,7 +100,7 @@ var _next_effect: int = 1
 var _rng := RandomNumberGenerator.new()
 
 ## Per-event sounds from each type's `sounds` profile key (spawn, approach, open, reward, deny, effect_end); signals fire on any end, sound only with an audio manager.
-var sounds := DotBoxSounds.new()
+var sounds := GSBoxSounds.new()
 var _open_box: StringName = &""
 var _open_at := Vector3.ZERO
 
@@ -117,30 +117,30 @@ func load_file(path: String) -> int:
 	var text := FileAccess.get_file_as_string(full)
 
 	if text == "":
-		DotLog.warn(CHANNEL, "no box file; boxes are off", {"path": full})
+		GSLog.warn(CHANNEL, "no box file; boxes are off", {"path": full})
 		return 0
 
 	var loaded := load_text(text)
 
 	if not loaded.ok:
-		DotLog.error(CHANNEL, "the box file is refused", {"why": loaded.error.message, "detail": loaded.error.detail})
+		GSLog.error(CHANNEL, "the box file is refused", {"why": loaded.error.message, "detail": loaded.error.detail})
 		return 0
 
-	DotLog.info(CHANNEL, "boxes loaded", {"types": types.size()})
+	GSLog.info(CHANNEL, "boxes loaded", {"types": types.size()})
 	return types.size()
 
 
 ## Reads and checks a box document. Refuses the whole file on the first bad entry, naming it.
-func load_text(text: String) -> DotResult:
+func load_text(text: String) -> GSResult:
 	var parsed: Variant = JSON.parse_string(text)
 
 	if not (parsed is Dictionary):
-		return DotResult.fail(DotError.CODE_PARSE, "The box file is not a JSON object.")
+		return GSResult.fail(GSError.CODE_PARSE, "The box file is not a JSON object.")
 
 	var doc := parsed as Dictionary
 
 	if int(doc.get("format", 0)) != FORMAT:
-		return DotResult.fail(DotError.CODE_INVALID, "The box file's format is not %d." % FORMAT)
+		return GSResult.fail(GSError.CODE_INVALID, "The box file's format is not %d." % FORMAT)
 
 	var out := {}
 	var ids: Array[StringName] = []
@@ -156,29 +156,29 @@ func load_text(text: String) -> DotResult:
 		ids.append(entry["id"])
 
 	if out.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "The box file has no boxes.")
+		return GSResult.fail(GSError.CODE_INVALID, "The box file has no boxes.")
 
 	types = out
 	order = ids
-	return DotResult.success(types.size())
+	return GSResult.success(types.size())
 
 
 ## Reads and checks one box document ([param taken] holds the boxes read so far, for a repeated id). The value is the type.
-func read_box(raw: Variant, taken: Dictionary = {}) -> DotResult:
+func read_box(raw: Variant, taken: Dictionary = {}) -> GSResult:
 	if not (raw is Dictionary):
-		return DotResult.fail(DotError.CODE_INVALID, "A box is not an object.")
+		return GSResult.fail(GSError.CODE_INVALID, "A box is not an object.")
 
 	var box := raw as Dictionary
 	var id := StringName(str(box.get("id", "")))
 
 	if id == &"" or taken.has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "A box has no id, or a second one with the same id.", String(id))
+		return GSResult.fail(GSError.CODE_INVALID, "A box has no id, or a second one with the same id.", String(id))
 
 	var outcomes: Array = []
 
 	for o: Variant in box.get("outcomes", []):
 		if not (o is Dictionary):
-			return DotResult.fail(DotError.CODE_INVALID, "An outcome of %s is not an object." % id)
+			return GSResult.fail(GSError.CODE_INVALID, "An outcome of %s is not an object." % id)
 
 		var checked := _check_actions((o as Dictionary).get("actions", []), "%s/%s" % [id, str((o as Dictionary).get("id", "?"))])
 
@@ -194,7 +194,7 @@ func read_box(raw: Variant, taken: Dictionary = {}) -> DotResult:
 		})
 
 	if outcomes.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "Box %s has no outcomes." % id)
+		return GSResult.fail(GSError.CODE_INVALID, "Box %s has no outcomes." % id)
 
 	var schema := _read_schema(box, id)
 
@@ -213,11 +213,11 @@ func read_box(raw: Variant, taken: Dictionary = {}) -> DotResult:
 		"sounds": box.get("sounds", {}),
 	}
 	entry.merge(schema.value)
-	return DotResult.success(entry)
+	return GSResult.success(entry)
 
 
 ## Plays through [param manager] (a client's); installs the stock sounds and every type's slots. Returns the synth recipes for the bank.
-func use_audio(manager: DotAudioManager) -> Dictionary:
+func use_audio(manager: GSAudioManager) -> Dictionary:
 	sounds.manager = manager
 	var recipes := sounds.install(manager.catalogue)
 
@@ -234,14 +234,14 @@ func _sounds_for(id: StringName) -> Dictionary:
 
 ## Lays the `box` profiles (cfg/game/<game>/box, the server's layer, live edits) over the types read from the file: a profile of a known
 ## id replaces that type, one of a new id adds a type. A profile that does not read is logged and the file's type stays.
-func overlay_profiles(set: DotProfileSet) -> int:
+func overlay_profiles(set: GSProfileSet) -> int:
 	var applied := 0
 
 	for pid in set.list_ids():
-		var res := DotBoxProfiles.load_box(set, pid)
+		var res := GSBoxProfiles.load_box(set, pid)
 
 		if not res.ok:
-			DotLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": res.error.message, "detail": res.error.detail})
+			GSLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": res.error.message, "detail": res.error.detail})
 			continue
 
 		var doc: Dictionary = ZzBoxProfiles.doc_of(res.value)
@@ -249,7 +249,7 @@ func overlay_profiles(set: DotProfileSet) -> int:
 		var read := read_box(doc)
 
 		if not read.ok:
-			DotLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": read.error.message})
+			GSLog.error(CHANNEL, "box profile skipped", {"id": pid, "why": read.error.message})
 			continue
 
 		var id := StringName(pid)
@@ -266,27 +266,27 @@ func overlay_profiles(set: DotProfileSet) -> int:
 
 ## The schema half of a box: polarity, impact, radius, stacks, max_stacks, duration, survives_round
 ## and params, defaulted and checked. A bad enum refuses the file, naming the box.
-func _read_schema(box: Dictionary, id: StringName) -> DotResult:
+func _read_schema(box: Dictionary, id: StringName) -> GSResult:
 	var polarity := str(box.get("polarity", "mixed"))
 	var impact := str(box.get("impact", "self"))
 
 	if not POLARITIES.has(polarity):
-		return DotResult.fail(DotError.CODE_INVALID, "Box %s: polarity '%s' is not one of %s." % [id, polarity, ", ".join(POLARITIES)])
+		return GSResult.fail(GSError.CODE_INVALID, "Box %s: polarity '%s' is not one of %s." % [id, polarity, ", ".join(POLARITIES)])
 
 	if not IMPACTS.has(impact):
-		return DotResult.fail(DotError.CODE_INVALID, "Box %s: impact '%s' is not one of %s." % [id, impact, ", ".join(IMPACTS)])
+		return GSResult.fail(GSError.CODE_INVALID, "Box %s: impact '%s' is not one of %s." % [id, impact, ", ".join(IMPACTS)])
 
 	var raw: Variant = box.get("duration", {})
 	var spec: Dictionary = raw if raw is Dictionary else {}
 	var mode := str(spec.get("mode", "instant"))
 
 	if not MODES.has(mode):
-		return DotResult.fail(DotError.CODE_INVALID, "Box %s: duration mode '%s' is not one of %s." % [id, mode, ", ".join(MODES)])
+		return GSResult.fail(GSError.CODE_INVALID, "Box %s: duration mode '%s' is not one of %s." % [id, mode, ", ".join(MODES)])
 
 	var low := maxf(float(spec.get("min", 0.0)), 0.0)
 	var high := maxf(float(spec.get("max", low)), low)
 
-	return DotResult.success({
+	return GSResult.success({
 		"polarity": polarity,
 		"impact": impact,
 		"radius": maxf(float(box.get("radius", 0.0)), 0.0),
@@ -298,19 +298,19 @@ func _read_schema(box: Dictionary, id: StringName) -> DotResult:
 	})
 
 
-func _check_actions(actions: Variant, where: String) -> DotResult:
+func _check_actions(actions: Variant, where: String) -> GSResult:
 	if not (actions is Array):
-		return DotResult.fail(DotError.CODE_INVALID, "%s: 'actions' is not a list." % where)
+		return GSResult.fail(GSError.CODE_INVALID, "%s: 'actions' is not a list." % where)
 
 	for a: Variant in actions:
 		if not (a is Dictionary) or not ACTIONS.has(str((a as Dictionary).get("do", ""))):
-			return DotResult.fail(DotError.CODE_INVALID,
+			return GSResult.fail(GSError.CODE_INVALID,
 				"%s: '%s' is not something a box can do." % [where, str((a as Dictionary).get("do", "?")) if a is Dictionary else str(a)],
 				", ".join(ACTIONS))
 
 		if str((a as Dictionary)["do"]) == "effect" and not HANDLERS.has(str((a as Dictionary).get("name", ""))) \
 				and not _handlers.has(str((a as Dictionary).get("name", ""))):
-			return DotResult.fail(DotError.CODE_INVALID, "%s: no box effect is named '%s'." % [where, str((a as Dictionary).get("name", "?"))],
+			return GSResult.fail(GSError.CODE_INVALID, "%s: no box effect is named '%s'." % [where, str((a as Dictionary).get("name", "?"))],
 				", ".join(HANDLERS.keys()))
 
 		if str((a as Dictionary)["do"]) == "random":
@@ -319,7 +319,7 @@ func _check_actions(actions: Variant, where: String) -> DotResult:
 				if not inner.ok:
 					return inner
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func title_of(type_id: StringName) -> String:
@@ -491,7 +491,7 @@ func open(type_id: StringName, player, at: Vector3) -> void:
 	if game.progress != null:
 		game.progress.on_box(player.player_id)
 
-	DotLog.info(CHANNEL, "a box was opened", {
+	GSLog.info(CHANNEL, "a box was opened", {
 		"by": String(player.player_id), "box": String(type_id), "outcome": str(outcome["id"]),
 	})
 
@@ -579,7 +579,7 @@ func _do_temp_health(a: Dictionary, ctx: Dictionary) -> void:
 ## Damage, from nobody. Enough of it is a down.
 func _do_hurt(a: Dictionary, ctx: Dictionary) -> void:
 	for p in _who(a, ctx):
-		var hit := DotDamage.make(0, p.entity_id, float(a.get("amount", 20.0)), game.combat.damage_type(&"strike"))
+		var hit := GSDamage.make(0, p.entity_id, float(a.get("amount", 20.0)), game.combat.damage_type(&"strike"))
 		hit.tick = game.current_tick()
 		hit.weapon_id = &"box"
 		hit.context = {"why": game.BY_BOX}
@@ -761,7 +761,7 @@ func _do_special(a: Dictionary, _ctx: Dictionary) -> void:
 		var _s = game.horde.spawn_special(kind)
 
 
-## Stands a sentry turret where the opener is looking (dot-combat's DotSentry; the rules are
+## Stands a sentry turret where the opener is looking (dot-combat's GSSentry; the rules are
 ## `zz_turrets.gd`). `seconds`, `ammo`, `damage`, `reach` and `interval` come from the outcome. When
 ## there is nowhere to stand it, the opener is told and the box goes back in their hands.
 func _do_turret(a: Dictionary, ctx: Dictionary) -> void:
@@ -770,14 +770,14 @@ func _do_turret(a: Dictionary, ctx: Dictionary) -> void:
 	if game.turrets == null or opener == null:
 		return
 
-	var res: DotResult = game.turrets.deploy(opener, a)
+	var res: GSResult = game.turrets.deploy(opener, a)
 
 	if not res.ok:
 		# Not spent: the box goes back in the hands it came from, and the player is told why.
 		opener.carried.push_front(ctx["box"])
 		ctx["refused"] = true
 		game.refused.emit(opener.player_id, str(res.error.message))
-		DotLog.debug(CHANNEL, "a turret was refused", {"why": res.error.detail})
+		GSLog.debug(CHANNEL, "a turret was refused", {"why": res.error.detail})
 
 
 func _do_brute(_a: Dictionary, _ctx: Dictionary) -> void:
@@ -799,7 +799,7 @@ func _do_kill_zombies(a: Dictionary, ctx: Dictionary) -> void:
 			continue
 		if kinds == "specials" and npc.def.id == ZzNpcs.COMMON:
 			continue
-		var hit := DotDamage.make(ctx["opener"].entity_id if ctx["opener"] != null else 0,
+		var hit := GSDamage.make(ctx["opener"].entity_id if ctx["opener"] != null else 0,
 			game.horde.entity_id_for(npc), 100000.0, game.combat.damage_type(&"blast"))
 		hit.tick = game.current_tick()
 		hit.weapon_id = &"box"
@@ -878,7 +878,7 @@ func _do_airstrike(a: Dictionary, ctx: Dictionary) -> void:
 				for i in count:
 					if all.is_empty():
 						break
-					spots.append((all[_rng.randi_range(0, all.size() - 1)] as DotNpcInstance).position())
+					spots.append((all[_rng.randi_range(0, all.size() - 1)] as GSNpcInstance).position())
 		_:
 			var who := a.duplicate()
 			who["who"] = {"nearest": "nearest", "team": "team", "random": "random", "opener": "opener"}.get(str(a.get("target", "nearest")), "nearest")

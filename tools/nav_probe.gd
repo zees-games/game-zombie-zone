@@ -11,7 +11,7 @@ const TICK := 1.0 / 64.0
 
 func _ready() -> void:
 	# --verbose keeps the info and debug lines (the bake's tiles, why it failed).
-	DotLog.set_level(DotLog.Level.DEBUG if OS.get_cmdline_user_args().has("--verbose") else DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.DEBUG if OS.get_cmdline_user_args().has("--verbose") else GSLog.Level.ERROR)
 	_run.call_deferred()
 
 

@@ -24,9 +24,9 @@ const DEFAULT_RADIUS := 200.0
 
 ## The server's interest rule. Always relevant: players, the boss, and everything announced by event.
 ## Zombies are by distance (274 of 302 ms a tick at 128 survivors went to sending all of them,
-## docs/survival.md), by tag through [DotNetInterestDistance] since a special needs a wider radius.
-static func make_interest(config: ZzConfig = null) -> DotNetInterest:
-	var interest := DotNetInterestDistance.new()
+## docs/survival.md), by tag through [GSNetInterestDistance] since a special needs a wider radius.
+static func make_interest(config: ZzConfig = null) -> GSNetInterest:
+	var interest := GSNetInterestDistance.new()
 	interest.radius = DEFAULT_RADIUS
 	interest.radius_by_tag = {TAG_COMMON: COMMON_RADIUS, TAG_SPECIAL: SPECIAL_RADIUS}
 	apply_interest_config(interest, config)
@@ -34,11 +34,11 @@ static func make_interest(config: ZzConfig = null) -> DotNetInterest:
 
 
 ## Copies [param config]'s net_* radii and thinning into [param interest]; nothing without a config.
-static func apply_interest_config(interest: DotNetInterest, config: ZzConfig) -> void:
+static func apply_interest_config(interest: GSNetInterest, config: ZzConfig) -> void:
 	if config == null or interest == null:
 		return
-	if interest is DotNetInterestDistance:
-		(interest as DotNetInterestDistance).radius_by_tag = {
+	if interest is GSNetInterestDistance:
+		(interest as GSNetInterestDistance).radius_by_tag = {
 			TAG_COMMON: config.net_common_radius, TAG_SPECIAL: config.net_special_radius,
 		}
 	interest.far_every = config.net_far_every

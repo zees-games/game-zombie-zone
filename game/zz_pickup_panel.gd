@@ -5,8 +5,8 @@ extends Node
 const ZzBindings := preload("zz_bindings.gd")
 
 var game = null
-var view: DotWeaponPickupView = null
-var hold := DotWeaponUseHold.new()
+var view: GSWeaponPickupView = null
+var hold := GSWeaponUseHold.new()
 
 
 ## What the prompt shows when there is nothing to pick up; read, never changed.
@@ -14,7 +14,7 @@ const _NO_INFO: Dictionary = {}
 
 
 func _process(delta: float) -> void:
-	var layer: DotWeaponDrops = game.weapon_layer.drops if game != null else null
+	var layer: GSWeaponDrops = game.weapon_layer.drops if game != null else null
 	var camera := get_viewport().get_camera_3d()
 	if layer == null or camera == null or layer.count() == 0 or DisplayServer.get_name() == "headless":
 		if view != null:
@@ -25,7 +25,7 @@ func _process(delta: float) -> void:
 	if me != null and me.weapons != null and me.weapons.arsenal != null and me.is_alive() and not me.is_down():
 		info = layer.prompt_for(me.weapons.arsenal, camera.global_position, -camera.global_basis.z, me.class_def)
 	if view == null:
-		view = DotWeaponPickupView.new()
+		view = GSWeaponPickupView.new()
 		view.name = "PickupView"
 		add_child(view)
 	hold.hold_time = layer.rules.hold_time

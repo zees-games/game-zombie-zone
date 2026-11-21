@@ -45,7 +45,7 @@ func _physics_process(_delta: float) -> void:
 		var angle := _rng.randf() * TAU
 		var reach := _rng.randf_range(_ring.x, _ring.y)
 		var at := _stand + Vector3(cos(angle) * reach, 0.0, sin(angle) * reach)
-		var npc: DotNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(at), &"bench", Basis(Vector3.UP, _rng.randf() * TAU))
+		var npc: GSNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(at), &"bench", Basis(Vector3.UP, _rng.randf() * TAU))
 		if npc != null and npc.brain != null:
 			npc.brain.call(&"force_target", _human.player_id)
 

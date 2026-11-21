@@ -137,7 +137,7 @@ enum Kind {
 	WEAPON_GONE,
 	## Where a shot left marks on the map: up to a dozen points with a surface normal each (a bullet hole, both faces of a wall it went through, each bounce). To everybody.
 	IMPACT,
-	## A thrown knife flew, bounced, lay, stuck or was taken (dot-weapon's DotWeaponKnifeWire). Also one per knife out at signon.
+	## A thrown knife flew, bounced, lay, stuck or was taken (dot-weapon's GSWeaponKnifeWire). Also one per knife out at signon.
 	KNIFE,
 	## Which zombie body this one player now drives (its net id), or 0 when they let go. To its owner only.
 	POSSESS,
@@ -164,7 +164,7 @@ enum Ask {
 	SPECTATE,
 	## I want to buy this item from the trader. The server checks reach, window, stock and points.
 	BUY,
-	## Fit this weapon so (`DotWeaponAttachments.encode`; 0 takes everything off). The server
+	## Fit this weapon so (`GSWeaponAttachments.encode`; 0 takes everything off). The server
 	## decodes against its own catalogue and refuses a fitting that is not legal.
 	FIT,
 }
@@ -220,15 +220,15 @@ static func ask_name(ask: int) -> String:
 	return String(names[ask]) if ask >= 0 and ask < names.size() else "?"
 
 
-static func _w() -> DotNetWriter:
-	return DotNetWriter.new()
+static func _w() -> GSNetWriter:
+	return GSNetWriter.new()
 
 
-static func _pos(w: DotNetWriter, at: Vector3) -> void:
+static func _pos(w: GSNetWriter, at: Vector3) -> void:
 	w.write_vector3_range(at, -WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 
 
-static func _read_pos(r: DotNetReader) -> Vector3:
+static func _read_pos(r: GSNetReader) -> Vector3:
 	return r.read_vector3_range(-WORLD_EXTENT, WORLD_EXTENT, POS_BITS)
 
 
@@ -259,7 +259,7 @@ static func write_hello(player_id: int, tick_rate: int, server_tick: int, diffic
 	return w.to_bytes()
 
 
-static func read_hello(r: DotNetReader) -> Dictionary:
+static func read_hello(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var tick_rate := r.read_uint(9)
 	var server_tick := r.read_varint()
@@ -291,7 +291,7 @@ static func write_toys(map_id: StringName, net_ids: PackedInt64Array) -> PackedB
 	return w.to_bytes()
 
 
-static func read_toys(r: DotNetReader) -> Dictionary:
+static func read_toys(r: GSNetReader) -> Dictionary:
 	var map_id := StringName(r.read_string(ID_BYTES))
 	var count := r.read_varint()
 	var ids := PackedInt64Array()
@@ -308,7 +308,7 @@ static func write_map(encoded: PackedByteArray) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_map(r: DotNetReader) -> Dictionary:
+static func read_map(r: GSNetReader) -> Dictionary:
 	var encoded := r.read_bytes(MAP_BYTES)
 	return {"encoded": encoded, "ok": r.ok() and not encoded.is_empty()}
 
@@ -329,7 +329,7 @@ static func write_map_parts(encoded: PackedByteArray, seq: int) -> Array[PackedB
 	return out
 
 
-static func read_map_part(r: DotNetReader) -> Dictionary:
+static func read_map_part(r: GSNetReader) -> Dictionary:
 	var seq := r.read_varint()
 	var index := r.read_varint()
 	var count := r.read_varint()
@@ -343,7 +343,7 @@ static func read_map_part(r: DotNetReader) -> Dictionary:
 ## A join, or a change to who somebody is. Appended, never inserted.
 static func write_join(
 	player_id: int, net_id: int, display_name: String, team: int,
-	avatar: DotAvatar = null
+	avatar: GSAvatar = null
 ) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
@@ -354,20 +354,20 @@ static func write_join(
 	return w.to_bytes()
 
 
-static func read_join(r: DotNetReader) -> Dictionary:
+static func read_join(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var net_id := r.read_varint()
 	var display_name := r.read_string(NAME_BYTES)
 	var team := r.read_varint()
 	var text := r.read_string(AVATAR_BYTES)
-	var avatar: DotAvatar = null
+	var avatar: GSAvatar = null
 
 	# A document that does not parse is the stock person, not a refused join.
 	if text != "":
 		var parsed: Variant = JSON.parse_string(text)
 
 		if parsed is Dictionary:
-			var built := DotAvatar.from_dict(parsed)
+			var built := GSAvatar.from_dict(parsed)
 
 			if built.ok:
 				avatar = built.value
@@ -384,7 +384,7 @@ static func write_player(player_id: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_player(r: DotNetReader) -> int:
+static func read_player(r: GSNetReader) -> int:
 	return r.read_varint()
 
 
@@ -395,18 +395,18 @@ static func write_team(player_id: int, team: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_team(r: DotNetReader) -> Dictionary:
+static func read_team(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var team := r.read_varint()
 	return {"player_id": player_id, "team": team, "ok": r.ok()}
 
 
 ## A death or a down: who, by whom (a session, or 0), by what (a zombie kind, or empty), why.
-## [param death] is how the body falls (dot-player-char's [DotPlayerDeath], the server's pick),
+## [param death] is how the body falls (dot-player-char's [GSPlayerDeath], the server's pick),
 ## last and optional, so every client draws the same fall and an older one reads the rest.
 ## [param weapon_id] is what landed the hit (empty for a claw), for the killcam's icon.
 static func write_death(player_id: int, by: int, why: StringName, by_kind: StringName = &"",
-		death: DotPlayerDeath = null, weapon_id: StringName = &"") -> PackedByteArray:
+		death: GSPlayerDeath = null, weapon_id: StringName = &"") -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
 	w.write_varint(by)
@@ -418,7 +418,7 @@ static func write_death(player_id: int, by: int, why: StringName, by_kind: Strin
 	return w.to_bytes()
 
 
-static func read_death(r: DotNetReader) -> Dictionary:
+static func read_death(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var by := r.read_varint()
 	var why := r.read_string(ID_BYTES)
@@ -428,7 +428,7 @@ static func read_death(r: DotNetReader) -> Dictionary:
 		"weapon_id": StringName(weapon_id)}
 	# A byte or more left is the fall; less is the padding to the last byte.
 	if r.bits_remaining() >= 8:
-		out["death"] = DotPlayerDeath.read_from(r)
+		out["death"] = GSPlayerDeath.read_from(r)
 	out["ok"] = r.ok()
 	return out
 
@@ -441,7 +441,7 @@ static func write_pair(player_id: int, other: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_pair(r: DotNetReader) -> Dictionary:
+static func read_pair(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var other := r.read_varint()
 	return {"player_id": player_id, "other": other, "ok": r.ok()}
@@ -454,7 +454,7 @@ static func write_armed(player_id: int, weapon_id: StringName) -> PackedByteArra
 	return w.to_bytes()
 
 
-static func read_armed(r: DotNetReader) -> Dictionary:
+static func read_armed(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var weapon_id := r.read_string(ID_BYTES)
 	return {"player_id": player_id, "weapon_id": StringName(weapon_id), "ok": r.ok()}
@@ -464,11 +464,11 @@ static func read_armed(r: DotNetReader) -> Dictionary:
 
 ## The clock: the map number, its phase and how long it has been in it, a survival hold's time
 ## and goal (0 for none), who is left, the objective in play and its state.
-static func _write_clock_seconds(w: DotNetWriter, seconds: float) -> void:
+static func _write_clock_seconds(w: GSNetWriter, seconds: float) -> void:
 	w.write_varint(maxi(int(round(seconds * CLOCK_STEP)), 0))
 
 
-static func _read_clock_seconds(r: DotNetReader) -> float:
+static func _read_clock_seconds(r: GSNetReader) -> float:
 	return float(r.read_varint()) / CLOCK_STEP
 
 
@@ -492,7 +492,7 @@ static func write_clock(
 	return w.to_bytes()
 
 
-static func read_clock(r: DotNetReader) -> Dictionary:
+static func read_clock(r: GSNetReader) -> Dictionary:
 	var round_number := r.read_varint()
 	var phase := r.read_uint(PHASE_BITS)
 	var elapsed := _read_clock_seconds(r)
@@ -527,7 +527,7 @@ static func write_round(number: int, began: bool, won: bool, why: String = "", n
 	return w.to_bytes()
 
 
-static func read_round(r: DotNetReader) -> Dictionary:
+static func read_round(r: GSNetReader) -> Dictionary:
 	var number := r.read_varint()
 	var began := r.read_bool()
 	var won := r.read_bool()
@@ -544,7 +544,7 @@ static func write_phase(phase: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_phase(r: DotNetReader) -> Dictionary:
+static func read_phase(r: GSNetReader) -> Dictionary:
 	var phase := r.read_uint(PHASE_BITS)
 	return {"phase": phase, "ok": r.ok()}
 
@@ -560,7 +560,7 @@ static func write_nav(percent: int) -> PackedByteArray:
 
 
 ## `percent` is -1 when no build is running.
-static func read_nav(r: DotNetReader) -> Dictionary:
+static func read_nav(r: GSNetReader) -> Dictionary:
 	var value := r.read_uint(7)
 	return {"percent": -1 if value > 100 else value, "ok": r.ok()}
 
@@ -580,7 +580,7 @@ static func write_spectate(
 	return w.to_bytes()
 
 
-static func read_spectate(r: DotNetReader) -> Dictionary:
+static func read_spectate(r: GSNetReader) -> Dictionary:
 	var viewer := r.read_varint()
 	var mode := r.read_uint(3)
 	var target := r.read_varint()
@@ -599,7 +599,7 @@ static func write_possess(net_id: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_possess(r: DotNetReader) -> Dictionary:
+static func read_possess(r: GSNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	return {"net_id": net_id, "ok": r.ok()}
 
@@ -611,7 +611,7 @@ static func write_ask_spectate(direction: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_ask_spectate(r: DotNetReader) -> Dictionary:
+static func read_ask_spectate(r: GSNetReader) -> Dictionary:
 	var raw := r.read_uint(2)
 	return {"direction": clampi(raw, 0, 2) - 1, "ok": r.ok()}
 
@@ -627,7 +627,7 @@ static func write_npc(net_id: int, kind: StringName, variant: int, at: Vector3) 
 	return w.to_bytes()
 
 
-static func read_npc(r: DotNetReader) -> Dictionary:
+static func read_npc(r: GSNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
 	var variant := r.read_uint(16)
@@ -638,7 +638,7 @@ static func read_npc(r: DotNetReader) -> Dictionary:
 ## A zombie gone: [param killed] says it died rather than being tidied away, so a client can
 ## leave a body, and [param death] (dot-player-char's, the server's pick) how that body falls.
 ## The death is last and behind a flag, so a client that predates it reads the rest.
-static func write_npc_gone(net_id: int, killed: bool, death: DotPlayerDeath = null) -> PackedByteArray:
+static func write_npc_gone(net_id: int, killed: bool, death: GSPlayerDeath = null) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(net_id)
 	w.write_bool(killed)
@@ -650,15 +650,15 @@ static func write_npc_gone(net_id: int, killed: bool, death: DotPlayerDeath = nu
 	return w.to_bytes()
 
 
-static func read_npc_gone(r: DotNetReader) -> Dictionary:
+static func read_npc_gone(r: GSNetReader) -> Dictionary:
 	var net_id := r.read_varint()
 	var killed := r.read_bool()
-	var death: DotPlayerDeath = null
+	var death: GSPlayerDeath = null
 
 	# The flag reads false off a message's zero padding, so an older server's NPC_GONE is a death
 	# with no reaction rather than a misread.
 	if r.bits_remaining() > 0 and r.read_bool():
-		death = DotPlayerDeath.read_from(r)
+		death = GSPlayerDeath.read_from(r)
 
 	return {"net_id": net_id, "killed": killed, "death": death, "ok": r.ok()}
 
@@ -672,7 +672,7 @@ static func write_pin(player_id: int, npc_net_id: int, kind: StringName) -> Pack
 	return w.to_bytes()
 
 
-static func read_pin(r: DotNetReader) -> Dictionary:
+static func read_pin(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var npc_net_id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
@@ -691,7 +691,7 @@ static func write_loot(id: int, kind: StringName, item: StringName, at: Vector3,
 	return w.to_bytes()
 
 
-static func read_loot(r: DotNetReader) -> Dictionary:
+static func read_loot(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
 	var item := r.read_string(ID_BYTES)
@@ -714,7 +714,7 @@ static func write_weapon_drop(id: int, weapon: StringName, magazine: int, reserv
 	return w.to_bytes()
 
 
-static func read_weapon_drop(r: DotNetReader) -> Dictionary:
+static func read_weapon_drop(r: GSNetReader) -> Dictionary:
 	var out := {"id": r.read_varint(), "weapon": StringName(r.read_string(ID_BYTES)), "magazine": r.read_varint(), "reserve": r.read_varint()}
 	var origin := _read_pos(r)
 	out["at"] = Transform3D(Basis(r.read_quaternion(9)), origin)
@@ -728,12 +728,12 @@ static func read_weapon_drop(r: DotNetReader) -> Dictionary:
 ## A thrown knife's change, in dot-weapon's own wire format.
 static func write_knife(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> PackedByteArray:
 	var w := _w()
-	DotWeaponKnifeWire.write_knife(w, id, owner, phase, victim, at, motion)
+	GSWeaponKnifeWire.write_knife(w, id, owner, phase, victim, at, motion)
 	return w.to_bytes()
 
 
-static func read_knife(r: DotNetReader) -> Dictionary:
-	return DotWeaponKnifeWire.read_knife(r)
+static func read_knife(r: GSNetReader) -> Dictionary:
+	return GSWeaponKnifeWire.read_knife(r)
 
 
 static func write_weapon_settled(id: int, at: Transform3D) -> PackedByteArray:
@@ -744,7 +744,7 @@ static func write_weapon_settled(id: int, at: Transform3D) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_weapon_settled(r: DotNetReader) -> Dictionary:
+static func read_weapon_settled(r: GSNetReader) -> Dictionary:
 	var out := {"id": r.read_varint()}
 	var origin := _read_pos(r)
 	out["at"] = Transform3D(Basis(r.read_quaternion(9)), origin)
@@ -765,7 +765,7 @@ static func write_loot_moved(batch: Array) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_loot_moved(r: DotNetReader) -> Dictionary:
+static func read_loot_moved(r: GSNetReader) -> Dictionary:
 	var n := r.read_varint()
 	var rows: Array = []
 	for i in n:
@@ -782,7 +782,7 @@ static func write_loot_gone(id: int, by: int) -> PackedByteArray:
 	return write_pair(id, by)
 
 
-static func read_loot_gone(r: DotNetReader) -> Dictionary:
+static func read_loot_gone(r: GSNetReader) -> Dictionary:
 	var pair := read_pair(r)
 	return {"id": pair["player_id"], "by": pair["other"], "ok": pair["ok"]}
 
@@ -797,7 +797,7 @@ static func write_box(player_id: int, type_id: StringName, title: String, messag
 	return w.to_bytes()
 
 
-static func read_box(r: DotNetReader) -> Dictionary:
+static func read_box(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var type_id := r.read_string(ID_BYTES)
 	var title := r.read_string(NAME_BYTES)
@@ -817,7 +817,7 @@ static func write_effects(summary: Array) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_effects(r: DotNetReader) -> Dictionary:
+static func read_effects(r: GSNetReader) -> Dictionary:
 	var text := r.read_string(EFFECTS_BYTES)
 	var rows: Array = []
 	var parsed: Variant = JSON.parse_string(text) if text != "" else []
@@ -842,7 +842,7 @@ static func write_hazard(id: int, kind: StringName, at: Vector3, radius: float, 
 	return w.to_bytes()
 
 
-static func read_hazard(r: DotNetReader) -> Dictionary:
+static func read_hazard(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
 	var at := _read_pos(r)
@@ -860,7 +860,7 @@ static func write_turret(id: int, at: Vector3, yaw: float, seconds: float) -> Pa
 	return w.to_bytes()
 
 
-static func read_turret(r: DotNetReader) -> Dictionary:
+static func read_turret(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var at := _read_pos(r)
 	var yaw := r.read_float_range(-PI, PI, 10)
@@ -875,7 +875,7 @@ static func write_turret_fire(id: int, target: Vector3) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_turret_fire(r: DotNetReader) -> Dictionary:
+static func read_turret_fire(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var target := _read_pos(r)
 	return {"id": id, "target": target, "ok": r.ok()}
@@ -887,7 +887,7 @@ static func write_id(id: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_id(r: DotNetReader) -> Dictionary:
+static func read_id(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	return {"id": id, "ok": r.ok()}
 
@@ -901,7 +901,7 @@ static func write_throw(id: int, kind: StringName, from: Vector3, velocity: Vect
 	return w.to_bytes()
 
 
-static func read_throw(r: DotNetReader) -> Dictionary:
+static func read_throw(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
 	var from := _read_pos(r)
@@ -917,7 +917,7 @@ static func write_bounce(id: int, at: Vector3, velocity: Vector3) -> PackedByteA
 	return w.to_bytes()
 
 
-static func read_bounce(r: DotNetReader) -> Dictionary:
+static func read_bounce(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var at := _read_pos(r)
 	var velocity := r.read_vector3_range(-SPEED_MAX, SPEED_MAX, SPEED_BITS)
@@ -932,7 +932,7 @@ static func write_landed(id: int, kind: StringName, at: Vector3) -> PackedByteAr
 	return w.to_bytes()
 
 
-static func read_landed(r: DotNetReader) -> Dictionary:
+static func read_landed(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var kind := r.read_string(ID_BYTES)
 	var at := _read_pos(r)
@@ -947,7 +947,7 @@ static func write_blast(at: Vector3, radius: float, kind: StringName) -> PackedB
 	return w.to_bytes()
 
 
-static func read_blast(r: DotNetReader) -> Dictionary:
+static func read_blast(r: GSNetReader) -> Dictionary:
 	var at := _read_pos(r)
 	var radius := r.read_float_range(0.0, 64.0, 12)
 	var kind := r.read_string(ID_BYTES)
@@ -961,7 +961,7 @@ static func write_bile(player_id: int, seconds: float) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_bile(r: DotNetReader) -> Dictionary:
+static func read_bile(r: GSNetReader) -> Dictionary:
 	var player_id := r.read_varint()
 	var seconds := r.read_float_range(0.0, 120.0, 12)
 	return {"player_id": player_id, "seconds": seconds, "ok": r.ok()}
@@ -977,7 +977,7 @@ static func write_objective(index: int, state: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_objective(r: DotNetReader) -> Dictionary:
+static func read_objective(r: GSNetReader) -> Dictionary:
 	var index := r.read_varint()
 	var state := r.read_uint(2)
 	return {"index": index, "state": state, "ok": r.ok()}
@@ -994,7 +994,7 @@ static func write_mover(state: Array, index: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_mover(r: DotNetReader) -> Dictionary:
+static func read_mover(r: GSNetReader) -> Dictionary:
 	var index := r.read_varint()
 	var start := r.read_varint()
 	var from := r.read_uint(10)
@@ -1015,7 +1015,7 @@ static func write_copy(id: int, model: int, offset: Vector3, alive: bool, mover:
 	return w.to_bytes()
 
 
-static func read_copy(r: DotNetReader) -> Dictionary:
+static func read_copy(r: GSNetReader) -> Dictionary:
 	var id := r.read_varint()
 	var model := r.read_varint()
 	var offset := _read_pos(r)
@@ -1030,7 +1030,7 @@ static func write_gate(gate: String) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_gate(r: DotNetReader) -> Dictionary:
+static func read_gate(r: GSNetReader) -> Dictionary:
 	var gate := r.read_string(ID_BYTES)
 	return {"gate": gate, "ok": r.ok()}
 
@@ -1052,7 +1052,7 @@ static func write_survival(state: Dictionary) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_survival(r: DotNetReader) -> Dictionary:
+static func read_survival(r: GSNetReader) -> Dictionary:
 	var style := r.read_uint(2)
 	var stage := r.read_uint(2)
 	var index := r.read_varint()
@@ -1076,7 +1076,7 @@ static func write_barricade(id: String, fraction: float, intact: bool) -> Packed
 	return w.to_bytes()
 
 
-static func read_barricade(r: DotNetReader) -> Dictionary:
+static func read_barricade(r: GSNetReader) -> Dictionary:
 	var id := r.read_string(ID_BYTES)
 	var fraction := float(r.read_uint(8)) / 255.0
 	var intact := r.read_bool()
@@ -1091,7 +1091,7 @@ static func write_hurt(amount: float, from: Vector3) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_hurt(r: DotNetReader) -> Dictionary:
+static func read_hurt(r: GSNetReader) -> Dictionary:
 	var amount := r.read_float_range(0.0, 500.0, 12)
 	var from := _read_pos(r)
 	return {"amount": amount, "from": from, "ok": r.ok()}
@@ -1103,14 +1103,14 @@ static func read_hurt(r: DotNetReader) -> Dictionary:
 ## numbers, which are drawn from this and never from the local prediction.
 static func write_hit(victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> PackedByteArray:
 	var w := _w()
-	w.write_uint(clampi(victim % DotEntity.STRIDE, 0, 0xFFFFFFFF), 32)
+	w.write_uint(clampi(victim % GSEntity.STRIDE, 0, 0xFFFFFFFF), 32)
 	w.write_float_range(clampf(amount, 0.0, 1000.0), 0.0, 1000.0, 14)
 	_pos(w, point)
 	w.write_uint((1 if killed else 0) | (2 if headshot else 0), 2)
 	return w.to_bytes()
 
 
-static func read_hit(r: DotNetReader) -> Dictionary:
+static func read_hit(r: GSNetReader) -> Dictionary:
 	var victim := r.read_uint(32)
 	var amount := r.read_float_range(0.0, 1000.0, 14)
 	var point := _read_pos(r)
@@ -1131,7 +1131,7 @@ static func write_splat(point: Vector3, normal: Vector3) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func _put_surface(w: DotNetWriter, point: Vector3, normal: Vector3) -> void:
+static func _put_surface(w: GSNetWriter, point: Vector3, normal: Vector3) -> void:
 	_pos(w, point)
 	var n := normal.normalized() if normal.length_squared() > 0.0001 else Vector3.UP
 	var o := Vector2(n.x, n.z) / (absf(n.x) + absf(n.y) + absf(n.z))
@@ -1145,13 +1145,13 @@ static func _sign(v: float) -> float:
 	return -1.0 if v < 0.0 else 1.0
 
 
-static func read_splat(r: DotNetReader) -> Dictionary:
+static func read_splat(r: GSNetReader) -> Dictionary:
 	var s := _get_surface(r)
 	s["ok"] = r.ok()
 	return s
 
 
-static func _get_surface(r: DotNetReader) -> Dictionary:
+static func _get_surface(r: GSNetReader) -> Dictionary:
 	var point := _read_pos(r)
 	var x := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
 	var z := float(r.read_uint(NORMAL_BITS)) / NORMAL_TOP * 2.0 - 1.0
@@ -1177,7 +1177,7 @@ static func write_impact(marks: Array) -> PackedByteArray:
 	return w.to_bytes()
 
 
-static func read_impact(r: DotNetReader) -> Dictionary:
+static func read_impact(r: GSNetReader) -> Dictionary:
 	var count := mini(r.read_uint(4), IMPACT_MAX)
 	var marks: Array = []
 	for i in count:

@@ -46,13 +46,13 @@ var _prev_map := &""
 var _prev_pos := Vector3.ZERO
 var _open_frames := 0
 var _client: Node = null
-var _gate: DotLoadGate = null
+var _gate: GSLoadGate = null
 
 var _server_pid := -1
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("mode="):
 			_mode = a.get_slice("=", 1)
@@ -82,7 +82,7 @@ func _serve() -> void:
 			if builds[0] > 1:
 				OS.delay_msec(STALL_MS))
 
-	var server_config := DotServerConfig.new()
+	var server_config := GSServerConfig.new()
 	server_config.hostname = "render cover"
 	server_config.port = PORT
 	server_config.query_port = PORT + 1
@@ -96,24 +96,24 @@ func _serve() -> void:
 	server_config.autoexec_config = ""
 	server_config.stdin_console_enabled = false
 	server_config.log_level = "error"
-	var server := DotServer.new()
+	var server := GSServer.new()
 	server.name = "Server"
 	server.config = server_config
 	server.config_file = ""
 	server.auto_boot = false
 	add_child(server)
-	var booted: DotResult = await server.boot()
+	var booted: GSResult = await server.boot()
 	if not booted.ok:
 		printerr("render_cover server: ", booted.error)
 		get_tree().quit(1)
 		return
-	var loaded: DotResult = await server.modules.load_module("res://game/zz_module.gd")
+	var loaded: GSResult = await server.modules.load_module("res://game/zz_module.gd")
 	if not loaded.ok:
 		printerr("render_cover server: ", loaded.error)
 		get_tree().quit(1)
 		return
 	if StringName(str(game.map_doc.get("id", ""))) != FIRST_MAP:
-		var _first: DotResult = game.change_map_now(FIRST_MAP)
+		var _first: GSResult = game.change_map_now(FIRST_MAP)
 	print("render_cover server: ready on %d, map %s" % [PORT, game.map_doc.get("id", "?")])
 	# The client asks for the map change by writing this file; the server obeys it once.
 	var trigger := ProjectSettings.globalize_path("%s/change.txt" % data)
@@ -121,7 +121,7 @@ func _serve() -> void:
 		await get_tree().create_timer(0.1).timeout
 		if FileAccess.file_exists(trigger):
 			var _gone := DirAccess.remove_absolute(trigger)
-			var changed: DotResult = game.change_map_now(SECOND_MAP)
+			var changed: GSResult = game.change_map_now(SECOND_MAP)
 			print("render_cover server: change_map_now ok=", changed.ok)
 
 
@@ -145,11 +145,11 @@ func _run() -> void:
 		relay.set(&"threaded", true)
 		relay.call(&"set_impairment", true, 0.05, 150.0, 40.0)
 		relay.call(&"set_impairment", false, 0.08, 250.0, 80.0)
-		var started: DotResult = relay.call(&"start", RELAY_PORT, "127.0.0.1", PORT)
+		var started: GSResult = relay.call(&"start", RELAY_PORT, "127.0.0.1", PORT)
 		print("render_cover: relay ", started.ok)
 		port = RELAY_PORT
 
-	var link := DotClientLink.new()
+	var link := GSClientLink.new()
 	link.name = "Server"
 	link.player_name = "Cover"
 	link.transport_preference = "udp"

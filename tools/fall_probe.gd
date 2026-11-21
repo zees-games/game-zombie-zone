@@ -66,7 +66,7 @@ static func ids_in_checkout() -> PackedStringArray:
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -351,7 +351,7 @@ func _nav_check(map: Node, space: PhysicsDirectSpaceState3D, mask: int, starts: 
 	var props_size := func(pid: StringName) -> Vector3:
 		return game.props_catalogue.size_of(pid) if game.props_catalogue.has(pid) else Vector3.ZERO
 	var nav_doc := ZzNpcs.with_nav_extra(doc, map.read_nav_extra(str(game.catalogue.roots.get(StringName(str(doc.get("id", ""))), ""))))
-	var graph := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size, gates))
+	var graph := GSNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size, gates))
 	var pts: PackedVector3Array = graph.data.points
 	out["points"] = pts.size()
 	var labels: PackedInt32Array = graph.get("_component")

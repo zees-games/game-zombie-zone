@@ -11,7 +11,7 @@ var _game: ZzGame
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -46,7 +46,7 @@ func _bench(id: String, horde: int) -> void:
 	for i in 10:
 		_game.simulate(0.05)
 		await get_tree().physics_frame
-	var graph := _game.horde.spawner.nav as DotNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
+	var graph := _game.horde.spawner.nav as GSNpcNavGraph if _game.horde != null and _game.horde.spawner != null else null
 	if graph == null or graph.data == null:
 		print("%s: no nav" % id)
 		return

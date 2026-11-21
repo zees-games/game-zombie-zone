@@ -5,7 +5,7 @@ extends SceneTree
 ## views at --fps (60 by default) for tools/visual_qa_shot.sh (dot-game's shot tool) to turn into contact sheets and clips.
 ##   survivor: f = first person (the main viewport), t = behind-right of your own body, o = an opponent four metres in front.
 ##   infected: f = the victim's eye in front of it, t = behind-right, o = an opponent four metres in front.
-## The outside views and frame saving are dot-game's DotGameVisualQaViews. The scene itself stays here, not a DotGameVisualQaCapture:
+## The outside views and frame saving are dot-game's GSGameVisualQaViews. The scene itself stays here, not a GSGameVisualQaCapture:
 ## the survivor is staged in the real offline client, which needs awaited setup (client start, world draw, weapon switch).
 ## Per clip it prints `VISUALQA {json}` (the shared verdict line) and `ANIMFRAMES {json}` (every frame's numbers) on stdout.
 ## User args: --out DIR --fps N [--only id,id|all|none] [--clips a,b] [--avatar] [--zombies kind,kind|all].
@@ -65,10 +65,10 @@ var _started := false
 var _stand := Vector3.ZERO
 var _stand_yaw := 0.0
 var _done := false
-var _views := DotGameVisualQaViews.new()
+var _views := GSGameVisualQaViews.new()
 var _eye: Camera3D = null
 var _frames: Array[Dictionary] = []
-var _body := DotClipMetrics.new()
+var _body := GSClipMetrics.new()
 var _skeleton: Skeleton3D = null
 var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
@@ -178,8 +178,8 @@ func _run_survivor() -> void:
 	# Your own legs in first person (cl_legs) pose the one figure with no head or arms, and the client sets that again
 	# every frame, after which the outside views' THIRD comes a frame late: off for the capture, put back after.
 	var store: Object = (_client.get("settings") as Object).get("settings")
-	var legs: Variant = store.call("chosen_value", DotOwnBodySetting.KEY)
-	var _off: DotResult = store.call("set_value", DotOwnBodySetting.KEY, false, &"visual_qa")
+	var legs: Variant = store.call("chosen_value", GSOwnBodySetting.KEY)
+	var _off: GSResult = store.call("set_value", GSOwnBodySetting.KEY, false, &"visual_qa")
 	# The delivered world draws after the round starts (bench.gd waits the same way): stood on before it, you fall.
 	var map: Object = _game.get("map")
 	var waited := 0
@@ -228,7 +228,7 @@ func _run_survivor() -> void:
 		else:
 			_missing("all", "could not bring %s into hand" % held)
 	_release_all()
-	var _back: DotResult = store.call("set_value", DotOwnBodySetting.KEY, legs, &"visual_qa")
+	var _back: GSResult = store.call("set_value", GSOwnBodySetting.KEY, legs, &"visual_qa")
 	_done = true
 
 
@@ -245,7 +245,7 @@ func _hold(id: StringName) -> bool:
 		return false
 	var def := ZzWeapons.def_of(id)
 	_client.set("_slot", def.slot)
-	var arsenal: DotWeaponArsenal = (_client.get("weapons") as Object).get("arsenal")
+	var arsenal: GSWeaponArsenal = (_client.get("weapons") as Object).get("arsenal")
 	await _wait(0.8)
 	for _i in 6:
 		var now := arsenal.current()
@@ -287,7 +287,7 @@ func _weapon_clip(id: StringName, clip: String) -> void:
 		"reload":
 			# A full magazine refuses the reload and the clip filmed a still gun: spend two rounds first, off camera, so the
 			# clip is a partial reload whatever ran before it (a by-the-round reload of two shells, a magazine swap).
-			var arsenal: DotWeaponArsenal = (_client.get("weapons") as Object).get("arsenal")
+			var arsenal: GSWeaponArsenal = (_client.get("weapons") as Object).get("arsenal")
 			for _shot in 6:
 				var now := arsenal.current()
 				if now == null or now.magazine_space() >= 2 or now.magazine <= 1:
@@ -357,7 +357,7 @@ func _capture(clip: String, count: int, step: Callable) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	_frames.clear()
 	if _zombie == null:
-		_body = DotClipMetrics.new()
+		_body = GSClipMetrics.new()
 		_skeleton = null
 	_parts.clear()
 	_last_places.clear()
@@ -401,7 +401,7 @@ func _stage() -> void:
 	var _shown: bool = _local.call("present_body", false, feet, _game.call("side_colour", 1), false)
 	var figure: Node = _local.get("figure")
 	if figure != null:
-		var _tagged := DotGameVisualQaViews.tag_layers(figure, BODY_LAYER)
+		var _tagged := GSGameVisualQaViews.tag_layers(figure, BODY_LAYER)
 	_views.place(feet, deg_to_rad(float(_local.get("controller").get("state").get("yaw"))))
 
 
@@ -530,7 +530,7 @@ func _finish(count: int) -> void:
 					at = n
 			if longest > _limit("hidden_frames"):
 				fail.append("weapon hidden %d frames to #%d" % [longest, at])
-	var limits := DotClipMetrics.limits_for("res://tools/filmstrip_thresholds.json", "")
+	var limits := GSClipMetrics.limits_for("res://tools/filmstrip_thresholds.json", "")
 	for row in _body.evaluate(limits):
 		if row.get("skip", false) or String(row.get("check", "")) == "framing":
 			continue
@@ -634,7 +634,7 @@ func _build_zombie(kind: StringName) -> void:
 	_zombie.call("build", kind, 1)
 	_zpos = Vector3.ZERO
 	_zombie.position = _zpos
-	_body = DotClipMetrics.new()
+	_body = GSClipMetrics.new()
 	_skeleton = null
 
 

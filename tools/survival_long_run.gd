@@ -61,7 +61,7 @@ var _finished_waves := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
@@ -124,7 +124,7 @@ func _run() -> void:
 	print("wave  twist      secs   sent  peak  downs deaths broken  up    tick ms mean/worst   wall s   end")
 
 	var t := 0.0
-	var schedule: DotNpcDirectorWaves = null
+	var schedule: GSNpcDirectorWaves = null
 	var last_index := -1
 	var last_stage := -1
 	var spent := 0
@@ -150,7 +150,7 @@ func _run() -> void:
 		if _game.survival == null or _game.survival.waves == null:
 			continue
 
-		var w: DotNpcDirectorWaves = _game.survival.waves
+		var w: GSNpcDirectorWaves = _game.survival.waves
 		schedule = w
 		peak = maxi(peak, _game.horde.commons())
 
@@ -161,17 +161,17 @@ func _run() -> void:
 		# --from=K: the warm-up leads into wave K, as if K - 1 had been cleared (the caches'
 		# tier follows `cleared`). Barricades start whole and nobody is carrying damage, so a
 		# late wave played this way is easier than the same wave reached.
-		if _from > 1 and w.stage == DotNpcDirectorWaves.Stage.QUIET and w.index < _from and last_stage == -1:
+		if _from > 1 and w.stage == GSNpcDirectorWaves.Stage.QUIET and w.index < _from and last_stage == -1:
 			w.index = _from
 			_game.survival.cleared = _from - 1
 
 		if w.stage != last_stage or w.index != last_index:
-			if last_stage == DotNpcDirectorWaves.Stage.HORDE:
+			if last_stage == GSNpcDirectorWaves.Stage.HORDE:
 				_finished_waves += 1
 				_close_wave(last_index, t - started_at, w, peak, spent, worst, ticks, wall)
 				if last_index >= _until:
 					break
-			if w.stage == DotNpcDirectorWaves.Stage.HORDE:
+			if w.stage == GSNpcDirectorWaves.Stage.HORDE:
 				_current = {"index": w.index, "twist": String(_game.survival.twist), "budget": w.budget}
 				started_at = t
 				spent = 0
@@ -182,7 +182,7 @@ func _run() -> void:
 			last_stage = w.stage
 			last_index = w.index
 
-	if last_stage == DotNpcDirectorWaves.Stage.HORDE and not _current.is_empty() and schedule != null:
+	if last_stage == GSNpcDirectorWaves.Stage.HORDE and not _current.is_empty() and schedule != null:
 		_close_wave(last_index, t - started_at, schedule, peak, spent, worst, ticks, wall)
 	_print_result(t, team)
 	get_tree().quit(0)
@@ -344,7 +344,7 @@ func _profiled_step() -> void:
 
 ## Where the wave's zombies are: within 6 m of a survivor, 6 to 25, 25 to 60, beyond; how
 ## many are at a barricade, have a target, are in a pending queue; and the survivors' state.
-func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
+func _print_watch(t: float, w: GSNpcDirectorWaves) -> void:
 	var near := 0
 	var mid := 0
 	var far := 0
@@ -352,7 +352,7 @@ func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
 	var bashing := 0
 	var targeted := 0
 	var still := 0
-	for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+	for npc: GSNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
 		if not npc.is_alive():
 			continue
 		var best := INF
@@ -395,7 +395,7 @@ func _print_watch(t: float, w: DotNpcDirectorWaves) -> void:
 ## The few survivors' nearest zombies, with what each can see of them.
 func _print_near_detail() -> void:
 	var shown := 0
-	for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+	for npc: GSNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
 		if not npc.is_alive() or shown >= 6:
 			continue
 		var nearest = null
@@ -418,7 +418,7 @@ func _print_near_detail() -> void:
 ## And a few of the far ones, still: what a stalled wave is doing out there.
 func _print_far_still() -> void:
 	var far_shown := 0
-	for npc: DotNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
+	for npc: GSNpcInstance in _game.horde.spawner.npcs_of(_game.horde.WAVE):
 		if not npc.is_alive() or far_shown >= 4 or npc.brain == null:
 			continue
 		var best := INF
@@ -429,7 +429,7 @@ func _print_far_still() -> void:
 		if best < 25.0 or body == null or (body as CharacterBody3D).velocity.length() >= 0.2:
 			continue
 		far_shown += 1
-		var path: DotNpcPath = npc.brain.get(&"path")
+		var path: GSNpcPath = npc.brain.get(&"path")
 		print("      far %s at %s, %.1f m from anybody; state %s forced '%s' target '%s' wish %s floor %s; path %d points%s, next %s, ends %s" % [
 			npc.def.id, npc.position().snappedf(0.1), best, npc.brain.get(&"state"), npc.brain.get(&"forced"), npc.target_id,
 			(body.get(&"wish") as Vector3).snappedf(0.1), (body as CharacterBody3D).is_on_floor(), path.points.size() if path != null else -1,
@@ -455,7 +455,7 @@ func _print_exodus_watch(t: float) -> void:
 	var count := maxi(_game.survivors().size(), 1)
 	var centre := sum / float(count)
 	var alive_npcs := 0
-	for npc: DotNpcInstance in npcs:
+	for npc: GSNpcInstance in npcs:
 		if not npc.is_alive():
 			continue
 		alive_npcs += 1
@@ -475,7 +475,7 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	h._advance_lures()
 	h._advance_bile()
 	at = _part("h.alerts", at)
-	var sp: DotNpcSpawner = h.spawner
+	var sp: GSNpcSpawner = h.spawner
 	sp._now += delta
 	sp._ticks += 1
 	sp._perception.perceive()
@@ -490,7 +490,7 @@ func _profiled_horde(h, delta: float, at: int) -> int:
 	sp._perception.reclaim()
 	at = _part("h.reclaim", at)
 	var speed: float = h.zombie_speed_scale * h.wave_speed_scale
-	for npc: DotNpcInstance in h.spawner.all_npcs():
+	for npc: GSNpcInstance in h.spawner.all_npcs():
 		if npc.is_alive() and npc.node != null and npc.node.has_method(&"tick"):
 			npc.node.speed_scale = speed
 			npc.node.tick(delta)
@@ -535,7 +535,7 @@ func _part(part: String, since: int) -> int:
 	return now
 
 
-func _close_wave(index: int, seconds: float, w: DotNpcDirectorWaves, peak: int, spent: int, worst: int, ticks: int,
+func _close_wave(index: int, seconds: float, w: GSNpcDirectorWaves, peak: int, spent: int, worst: int, ticks: int,
 		wall: int) -> void:
 	var up := 0
 	for player in _game.survivors():
@@ -546,7 +546,7 @@ func _close_wave(index: int, seconds: float, w: DotNpcDirectorWaves, peak: int, 
 	var fallen: int = _game.horde.fallen_count - _fallen_before
 	_fallen_before = _game.horde.fallen_count
 	var alive := 0
-	for npc: DotNpcInstance in _game.horde.spawner.all_npcs():
+	for npc: GSNpcInstance in _game.horde.spawner.all_npcs():
 		if npc.is_alive():
 			alive += 1
 	var row := {

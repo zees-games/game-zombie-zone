@@ -68,8 +68,8 @@ const AMBIENT := 3.4
 
 const FILL := 2.4
 
-static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
-	var p := DotLightProfile.painted()
+static func light_profile(ambient_energy: float = 0.5) -> GSLightProfile:
+	var p := GSLightProfile.painted()
 	p.sun_shadows = true
 	p.ambient_energy *= ambient_energy * AMBIENT
 	p.fill_energy *= ambient_energy * FILL

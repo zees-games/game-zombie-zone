@@ -2,7 +2,7 @@ extends RefCounted
 
 ## A survivor's attachment fittings, one per weapon id (not slot; they outlive the weapon being dropped): what the
 ## fitting screen saves, what a client asks for, put on an arsenal. [method apply_to] keeps only what
-## [method DotWeaponAttachments.conform] keeps; the server validates (`ZzGame.fit_weapon`). Text form: `m4:optic=x;ak:...`.
+## [method GSWeaponAttachments.conform] keeps; the server validates (`ZzGame.fit_weapon`). Text form: `m4:optic=x;ak:...`.
 
 const SETTING := &"weapon_fittings"
 ## The setting's length cap, and so how much [method parse] reads.
@@ -11,7 +11,7 @@ const MAX_WEAPONS := 64
 const MAX_MOUNTS := 8
 
 
-## Weapon id -> [DotWeaponFitting] from [param text]; malformed parts are skipped.
+## Weapon id -> [GSWeaponFitting] from [param text]; malformed parts are skipped.
 static func parse(text: String) -> Dictionary:
 	var out: Dictionary = {}
 
@@ -25,7 +25,7 @@ static func parse(text: String) -> Dictionary:
 		if weapon == "":
 			continue
 
-		var fitting := DotWeaponFitting.make(StringName(weapon))
+		var fitting := GSWeaponFitting.make(StringName(weapon))
 
 		for pair in head[1].split(",", false):
 			if fitting.mounts().size() >= MAX_MOUNTS:
@@ -48,7 +48,7 @@ static func format(fittings: Dictionary) -> String:
 	var parts := PackedStringArray()
 
 	for id: Variant in ids:
-		var fitting := fittings[id] as DotWeaponFitting
+		var fitting := fittings[id] as GSWeaponFitting
 
 		if fitting == null or fitting.is_empty():
 			continue
@@ -66,7 +66,7 @@ static func format(fittings: Dictionary) -> String:
 ## Fits every weapon in hand in [param arsenal] that [param fittings] names and does not
 ## already wear it. Returns how many changed. Idempotent: fitting emits `carried_changed`,
 ## and the second pass finds nothing to do.
-static func apply_to(arsenal: DotWeaponArsenal, fittings: Dictionary) -> int:
+static func apply_to(arsenal: GSWeaponArsenal, fittings: Dictionary) -> int:
 	if arsenal == null or arsenal.attachments == null or fittings.is_empty():
 		return 0
 
@@ -74,7 +74,7 @@ static func apply_to(arsenal: DotWeaponArsenal, fittings: Dictionary) -> int:
 
 	for slot in arsenal.slots():
 		var now := arsenal.fitting_at(slot)
-		var wanted := fittings.get(now.weapon_id) as DotWeaponFitting
+		var wanted := fittings.get(now.weapon_id) as GSWeaponFitting
 		var base := arsenal.catalogue.get_def(now.weapon_id) if wanted != null else null
 
 		if base == null:
@@ -90,7 +90,7 @@ static func apply_to(arsenal: DotWeaponArsenal, fittings: Dictionary) -> int:
 
 ## Keeps [param arsenal] wearing [param fittings] (held by reference: change the dictionary,
 ## not the variable) as weapons are given, picked up and swapped off the shelf.
-static func watch(arsenal: DotWeaponArsenal, fittings: Dictionary) -> void:
+static func watch(arsenal: GSWeaponArsenal, fittings: Dictionary) -> void:
 	var follow := func() -> void:
 		var _changed := apply_to(arsenal, fittings)
 

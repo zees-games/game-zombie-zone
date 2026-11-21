@@ -43,12 +43,12 @@ var _rise := Vector3.ZERO
 ## [param required] (spawns, posts) keeps a piece holding one joined to the next by a bridge edge even through a floor.
 ## Returns (points dropped, edges dropped); (0, 0) when there is no collision to ask. Each of [param ladders] is then
 ## joined foot to head, which this prune may cut; [param passable] bodies (doors that open to walkers) block nothing.
-static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = []) -> Vector2i:
+static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = []) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN, passable)
 	var bare := new()
 	bare._setup(space, mask, 0.0, passable)
-	var prune := DotNpcNavPrune.new()
+	var prune := GSNpcNavPrune.new()
 	prune.point_blocked = pruner._point_blocked
 	prune.edge_blocked = pruner._edge_blocked
 	# The margin is for smoothing; where only the bare body fits, that gap is still the way between two pieces.
@@ -61,14 +61,14 @@ static func apply(nav: DotNpcNavData, space: PhysicsDirectSpaceState3D, mask: in
 	var climbs := join_ladders(nav, ladders, ladder_side(space, mask, passable))
 
 	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or prune.bridged_edges > 0 or climbs > 0:
-		DotLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
+		GSLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
 
 	return dropped
 
 
 ## Joins the floor points nearest each ladder's foot and head; returns how many ladders were joined. With [param side]
 ## (from [method ladder_side]) an end is only a point on the ladder's side of the wall it is mounted on.
-static func join_ladders(nav: DotNpcNavData, ladders: Array[AABB], side: Callable = Callable()) -> int:
+static func join_ladders(nav: GSNpcNavData, ladders: Array[AABB], side: Callable = Callable()) -> int:
 	var joined := 0
 
 	for box in ladders:
@@ -85,7 +85,7 @@ static func join_ladders(nav: DotNpcNavData, ladders: Array[AABB], side: Callabl
 	return joined
 
 
-static func _ladder_end(nav: DotNpcNavData, at: Vector3, over: float, box: AABB, side: Callable) -> int:
+static func _ladder_end(nav: GSNpcNavData, at: Vector3, over: float, box: AABB, side: Callable) -> int:
 	return nav.nearest_point_where(at, LADDER_REACH, func(p: int) -> bool:
 		var rise := nav.points[p].y - at.y
 		return rise >= -LADDER_HEIGHT and rise <= over and (not side.is_valid() or bool(side.call(box, nav.points[p]))))
@@ -138,7 +138,7 @@ static func edge_test(space: PhysicsDirectSpaceState3D, mask: int, passable: Arr
 	pruner._setup(space, mask, MARGIN, passable)
 	# A lambda holds the pruner; a bound method would leave the Callable dangling once this returns.
 	return func(a: Vector3, b: Vector3) -> bool:
-		return DotNpcNavPrune.level_change_blocked(pruner._edge_blocked, pruner._point_blocked, a, b, CLIMB)
+		return GSNpcNavPrune.level_change_blocked(pruner._edge_blocked, pruner._point_blocked, a, b, CLIMB)
 
 
 func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float, passable: Array[RID] = []) -> void:

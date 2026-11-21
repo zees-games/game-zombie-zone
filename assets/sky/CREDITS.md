@@ -1,6 +1,6 @@
 # Sky panoramas
 
-Equirectangular, CC0-1.0, from Poly Haven (https://polyhaven.com), 2k HDR files exposed and saved as JPEG by `magick` (picked by DotMapBspMesh.sky_kind).
+Equirectangular, CC0-1.0, from Poly Haven (https://polyhaven.com), 2k HDR files exposed and saved as JPEG by `magick` (picked by GSMapBspMesh.sky_kind).
 
 | File | Source | Author | Licence |
 | --- | --- | --- | --- |

@@ -1,10 +1,10 @@
-extends DotNetBehaviour
+extends GSNetBehaviour
 
 const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
 
 ## A zombie over the wire: where it is, which way it faces, how hurt it is, what it is doing.
 ##
-## dot-npc's [DotNpcNetSync] fields, plus the two this game needs to draw one: the animation
+## dot-npc's [GSNpcNetSync] fields, plus the two this game needs to draw one: the animation
 ## state ([member ZzZombieBody.anim]) and the flags (burning, enraged, startled). Server
 ## authoritative and never predicted, for dot-npc's reason: a zombie's position comes out of a
 ## graph, a brain and a crowd, none of which a client could reproduce, so the client draws it
@@ -14,7 +14,7 @@ const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
 ## NPC event that announces it; a per-tick field would send the same sixteen bits forty times a
 ## second per zombie for ever.
 
-var npc: DotNpcInstance = null
+var npc: GSNpcInstance = null
 
 ## The body this moves: the server's zombie, or a client's mirror of it.
 var body: ZzZombieBody = null
@@ -33,8 +33,8 @@ var state_msec: int = 0
 
 
 func _register_net_vars() -> void:
-	for spec in DotNpcNetSync.specs():
-		var field := replicate(spec["property"], DotNetVar.Type[spec["type"]])
+	for spec in GSNpcNetSync.specs():
+		var field := replicate(spec["property"], GSNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
 			field.bits(int(spec["bits"]))
@@ -42,21 +42,21 @@ func _register_net_vars() -> void:
 		if bool(spec["interpolated"]):
 			field.interpolated()
 
-	for spec in DotNpcNetSync.limb_specs():
-		replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"]))
+	for spec in GSNpcNetSync.limb_specs():
+		replicate(spec["property"], GSNetVar.Type[spec["type"]]).bits(int(spec["bits"]))
 
-	replicate(&"net_anim", DotNetVar.Type.UINT).bits(5)
-	replicate(&"net_flags", DotNetVar.Type.UINT).bits(5)
+	replicate(&"net_anim", GSNetVar.Type.UINT).bits(5)
+	replicate(&"net_flags", GSNetVar.Type.UINT).bits(5)
 
 
 func pull() -> void:
 	if npc == null or not npc.is_alive() or body == null:
 		return
 
-	DotNpcNetSync.pull(npc, self, DotNpcNetSync.State.ATTACKING if npc.has_target() else DotNpcNetSync.State.IDLE)
+	GSNpcNetSync.pull(npc, self, GSNpcNetSync.State.ATTACKING if npc.has_target() else GSNpcNetSync.State.IDLE)
 	net_anim = clampi(body.anim, 0, 31)
 	net_flags = body.flags & 31
-	net_limbs = body.limb_mask & ((1 << DotNpcNetSync.LIMB_BITS) - 1)
+	net_limbs = body.limb_mask & ((1 << GSNpcNetSync.LIMB_BITS) - 1)
 
 
 func _net_simulate(_tick: int, _delta: float) -> void:
@@ -86,4 +86,4 @@ func _draw() -> void:
 	if identity != null and identity.is_authoritative:
 		return
 
-	DotNpcNetSync.apply(body, self)
+	GSNpcNetSync.apply(body, self)

@@ -26,16 +26,16 @@ const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 ## remote player, `render_state()` for one this process simulates — and nothing here
 ## computes one.
 ##
-## [b]One of the family's people[/b] (dot-player-char's `DotHumanoidFigure`: animated, on the
+## [b]One of the family's people[/b] (dot-player-char's `GSHumanoidFigure`: animated, on the
 ## rig every game's players, bots and NPCs share, the same style as the zombies of the family's
 ## zombie game), because a player is somebody to see coming and a capsule does not say which way
 ## somebody is facing from forty metres. Which person a player is still comes from the blocky
 ## kit's atlas their avatar names ([constant ATLASES]): the atlas letter is a look
-## (`DotHumanoidLook.from_letter`), so every avatar document written before the people arrived
+## (`GSHumanoidLook.from_letter`), so every avatar document written before the people arrived
 ## dresses the same person on every client. [b]The side is on the top[/b], [constant TEAM_TINT] of
 ## the way: the first thing anybody needs to read off a body is whose side it is on.
 ##
-## [b]The weapon is in the person's own hand[/b] (`DotHumanoidFigure.attachment`, the gun hand of
+## [b]The weapon is in the person's own hand[/b] (`GSHumanoidFigure.attachment`, the gun hand of
 ## the kit's clips), so it moves with the gun clips and a melee swing; the legs keep walking under
 ## a swing because the figure plays it on the upper body only.
 
@@ -88,7 +88,7 @@ var _fit_code: int = -1
 var _fit_for: StringName = &""
 
 ## The person, under this node.
-var person: DotHumanoidFigure = null
+var person: GSHumanoidFigure = null
 
 ## Whether the held gun is being reloaded, as [method hold] was last told. Read by the suite.
 var reloading_now: bool = false
@@ -113,7 +113,7 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	if person != null:
 		remove_child(person)
 		person.queue_free()
-	person = DotHumanoidFigure.new()
+	person = GSHumanoidFigure.new()
 	person.name = "Person"
 	_carry_kind = &"-"
 	add_child(person)
@@ -132,13 +132,13 @@ static var _hat_materials: Dictionary = {}
 
 ## Swaps [param who]'s hat swatches ([constant HATS]) for the look's hair colour: the person's shared material plus
 ## the swaps, one copy per look (a look's colours make the key).
-static func _hat_in_hair(who: DotHumanoidFigure, look: DotHumanoidLook) -> void:
+static func _hat_in_hair(who: GSHumanoidFigure, look: GSHumanoidLook) -> void:
 	var hats: Array = HATS.get(look.body, [])
 	if hats.is_empty():
 		return
 	var key := look.key()
 	if not _hat_materials.has(key):
-		var base := DotHumanoidFigure.material_for(look)
+		var base := GSHumanoidFigure.material_for(look)
 		var made := base.duplicate() as ShaderMaterial
 		var used: int = made.get_shader_parameter(&"swaps")
 		var from: PackedVector4Array = made.get_shader_parameter(&"from_colour")
@@ -170,10 +170,10 @@ static func _hat_in_hair(who: DotHumanoidFigure, look: DotHumanoidLook) -> void:
 ## The look [param atlas_path] names, with [param colour] on the top; the first-person arms wear the same. The atlas
 ## letter picks the body; skin, hair and clothes are drawn from natural palettes by [param seed] (a hash of the
 ## player's id; 0 takes the atlas's), so two survivors on one body are not twins and nobody is blob-dark under dim light.
-static func look_for(atlas_path: String, colour: Color, seed: int = 0) -> DotHumanoidLook:
-	var look := DotHumanoidLook.from_letter(atlas_path)
+static func look_for(atlas_path: String, colour: Color, seed: int = 0) -> GSHumanoidLook:
+	var look := GSHumanoidLook.from_letter(atlas_path)
 	if look == null:
-		look = DotHumanoidLook.stock(hash(atlas_path))
+		look = GSHumanoidLook.stock(hash(atlas_path))
 	else:
 		look = _natural(look, seed if seed != 0 else hash(atlas_path))
 	if colour != Color.WHITE:
@@ -190,12 +190,12 @@ const HAIR_CONTRAST := 0.2
 
 
 ## [param look] with a natural skin, hair and clothes picked by [param seed], keeping its body.
-static func _natural(look: DotHumanoidLook, seed: int) -> DotHumanoidLook:
+static func _natural(look: GSHumanoidLook, seed: int) -> GSHumanoidLook:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	var tone := Color(DotHumanoidLook.SKIN_TONES[rng.randi_range(0, DotHumanoidLook.SKIN_TONES.size() - 1)])
-	var top := Color(DotHumanoidLook.TOPS[rng.randi_range(0, DotHumanoidLook.TOPS.size() - 1)])
-	var bottom := Color(DotHumanoidLook.BOTTOMS[rng.randi_range(0, DotHumanoidLook.BOTTOMS.size() - 1)])
+	var tone := Color(GSHumanoidLook.SKIN_TONES[rng.randi_range(0, GSHumanoidLook.SKIN_TONES.size() - 1)])
+	var top := Color(GSHumanoidLook.TOPS[rng.randi_range(0, GSHumanoidLook.TOPS.size() - 1)])
+	var bottom := Color(GSHumanoidLook.BOTTOMS[rng.randi_range(0, GSHumanoidLook.BOTTOMS.size() - 1)])
 	var pick := rng.randi_range(0, HAIR.size() - 1)
 	var hair := Color(HAIR[pick])
 
@@ -206,7 +206,7 @@ static func _natural(look: DotHumanoidLook, seed: int) -> DotHumanoidLook:
 		pick = (pick + 1) % HAIR.size()
 		hair = Color(HAIR[pick])
 
-	return DotHumanoidLook.make(look.body, tone, hair, top, bottom)
+	return GSHumanoidLook.make(look.body, tone, hair, top, bottom)
 
 
 ## The drawn model, for a death that breaks it apart or falls. Null before [method build].
@@ -215,7 +215,7 @@ func body_node() -> Node3D:
 
 
 ## How the player moves besides its ground speed: `on_floor`, `vertical`, `crouched`, `downed`
-## and the rest [method DotHumanoidFigure.set_motion] reads.
+## and the rest [method GSHumanoidFigure.set_motion] reads.
 func set_motion(motion: Dictionary) -> void:
 	if person != null:
 		person.set_motion(motion)
@@ -268,7 +268,7 @@ func hold(id: StringName, switching: bool, reloading: bool = false) -> void:
 
 		if art is ZeeWeaponArt:
 			# A profile's `extra: art:` (grip, hands, sprint carry) over the table's art.
-			var def: DotWeaponDef = ZzWeapons.def_of(id)
+			var def: GSWeaponDef = ZzWeapons.def_of(id)
 			var _drawn := held.equip((art as ZeeWeaponArt).with_overrides(def.params.get("art") if def != null else null))
 		else:
 			held.clear()
@@ -292,10 +292,10 @@ func fitted(code: int) -> void:
 
 	_fit_code = code
 	_fit_for = held.equipped()
-	var base: DotWeaponDef = ZzWeapons.def_of(_fit_for) if _fit_for != &"" else null
+	var base: GSWeaponDef = ZzWeapons.def_of(_fit_for) if _fit_for != &"" else null
 	var catalogue := ZzPacks.attachment_catalogue()
 
-	if base != null and catalogue.code_bits(base) <= DotWeaponNetSync.FITTED_BITS:
+	if base != null and catalogue.code_bits(base) <= GSWeaponNetSync.FITTED_BITS:
 		held.set_fitting(catalogue.decode(base, code))
 
 
@@ -305,16 +305,16 @@ func _set_hold_kind() -> void:
 	if person == null:
 		return
 	# The held-gun arms are written over every clip but a gun's, which would flatten a dance or a sit.
-	if holding == &"" or held == null or not held.visible or DotHumanoidActions.is_full_body(person.action):
-		person.set_hold(DotHumanoidFigure.Hold.NONE)
+	if holding == &"" or held == null or not held.visible or GSHumanoidActions.is_full_body(person.action):
+		person.set_hold(GSHumanoidFigure.Hold.NONE)
 		return
 	var pose := _pose_of(holding)
 	if pose == ZeeWeaponArtTable.POSE_MELEE:
-		person.set_hold(DotHumanoidFigure.Hold.MELEE)
+		person.set_hold(GSHumanoidFigure.Hold.MELEE)
 	elif pose == ZeeWeaponArtTable.POSE_THROWN:
-		person.set_hold(DotHumanoidFigure.Hold.NONE)
+		person.set_hold(GSHumanoidFigure.Hold.NONE)
 	else:
-		person.set_hold(DotHumanoidFigure.Hold.GUN)
+		person.set_hold(GSHumanoidFigure.Hold.GUN)
 
 
 ## The person's gun carry for what is held: its class (a pistol is not carried as a rifle, and a
@@ -331,7 +331,7 @@ func _set_carry(switching: bool) -> void:
 	carry.switching = switching
 
 
-## The carry class ([method DotHumanoidCarry.for_class]) a weapon is held as: from its art's pose,
+## The carry class ([method GSHumanoidCarry.for_class]) a weapon is held as: from its art's pose,
 ## then its picture's kind (an smg, a shotgun, a scoped rifle, a launcher). Empty for none.
 static func carry_class(id: StringName) -> StringName:
 	if id == &"":
@@ -388,7 +388,7 @@ func fired(times: int, kind: int) -> void:
 
 	# [b]A swing is the arm, not a kick[/b]: the person's slash, over whatever the legs do.
 	if kind == ZeeWeaponNet.KIND_SWING and person != null:
-		person.swing(DotHumanoidClips.SLASH)
+		person.swing(GSHumanoidClips.SLASH)
 
 
 ## The carried box: on the back while it is packed, in front of the chest once it is out (the

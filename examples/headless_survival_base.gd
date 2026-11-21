@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## The personas, the stuck rescue and the world helpers of [headless_survival.gd], split off to keep each file under the size gate.
 
@@ -42,13 +42,13 @@ func _test_personas() -> void:
 	var all_assigned := true
 	for bot in bots:
 		var memory: Dictionary = game.bots._memory(bot)
-		all_assigned = all_assigned and memory.get("persona") is DotBotPersona
-		if game.bots.persona_act(bot, DotFpsCommand.new(), memory):
+		all_assigned = all_assigned and memory.get("persona") is GSBotPersona
+		if game.bots.persona_act(bot, GSFpsCommand.new(), memory):
 			acted += 1
 			picked[String(memory.get("behave", &""))] = true
 	_check(all_assigned, "every stand-in is given a persona from the server's pool")
 	_check(acted == bots.size(), "each acts on a behaviour while infected remain", "%d of %d" % [acted, bots.size()])
-	_check(not picked.is_empty() and picked.keys().all(func(k: String) -> bool: return DotBotPersona.BEHAVIOURS.has(StringName(k))),
+	_check(not picked.is_empty() and picked.keys().all(func(k: String) -> bool: return GSBotPersona.BEHAVIOURS.has(StringName(k))),
 		"and it is one of hunt, loot, hold, support, scout", str(picked.keys()))
 
 	var before: Vector3 = bots[0].feet()
@@ -57,20 +57,20 @@ func _test_personas() -> void:
 	_check(gap > 0.5, "they walk rather than stand", "%.1f m" % gap)
 
 	var base := "user://zz_personas_selftest"
-	var runtime := DotProfileRuntime.new()
-	var set: DotProfileSet = game.bot_persona_set()
+	var runtime := GSProfileRuntime.new()
+	var set: GSProfileSet = game.bot_persona_set()
 	runtime.add_set(set)
 	runtime.save_root = base
 	runtime.permit = func(_actor: Variant, _flag: String) -> bool: return true
 	var ids_before := set.list_ids().size()
-	var added := runtime.handle_request("admin", DotProfileRuntime.make_request("add", DotBotPersona.KIND, "sentry", "", {"weight": 3.0}))
+	var added := runtime.handle_request("admin", GSProfileRuntime.make_request("add", GSBotPersona.KIND, "sentry", "", {"weight": 3.0}))
 	game.reload_personas()
 	_check(added.ok and set.has_id("sentry") and set.list_ids().size() == ids_before + 1, "a persona is added through the runtime")
 	_check(game.personas().weight_of(_persona(game, "sentry")) > 0.0, "and the server's pool draws on it after a reload")
-	var removed := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "sentry"))
+	var removed := runtime.handle_request("admin", GSProfileRuntime.make_request("delete", GSBotPersona.KIND, "sentry"))
 	game.reload_personas()
 	_check(removed.ok and not set.has_id("sentry") and _persona(game, "sentry") == null, "and deleted, it leaves the set and the pool")
-	var shipped := runtime.handle_request("admin", DotProfileRuntime.make_request("delete", DotBotPersona.KIND, "scout"))
+	var shipped := runtime.handle_request("admin", GSProfileRuntime.make_request("delete", GSBotPersona.KIND, "scout"))
 	game.reload_personas()
 	_check(shipped.ok and _persona(game, "scout") == null and _persona(game, "hunter") != null, "a shipped persona can be deleted and the rest stay")
 	game.config.bot_personas = "hunter:1"
@@ -79,7 +79,7 @@ func _test_personas() -> void:
 	_finished()
 
 
-func _persona(game: ZzGame, id: String) -> DotBotPersona:
+func _persona(game: ZzGame, id: String) -> GSBotPersona:
 	for p in game.personas().personas:
 		if p.id == StringName(id):
 			return p
@@ -110,7 +110,7 @@ func _test_stuck_rescue() -> void:
 		c.stuck_low_count = 0
 		c.brute_every_waves = 0, 1)
 	await _sim(game, 3.0)
-	var npc: DotNpcInstance = null
+	var npc: GSNpcInstance = null
 	for n in game.horde.spawner.npcs_of(game.horde.WAVE):
 		if n.is_alive() and n.node is ZzZombieBody:
 			npc = n
@@ -180,9 +180,9 @@ func _hold(configure: Callable, count: int, map: StringName = &"") -> ZzGame:
 ## Kills the wave in play until wave [param index] is over.
 func _clear_wave(game: ZzGame, index: int) -> void:
 	for i in 400:
-		if game.survival == null or game.survival.waves.index > index or game.survival.waves.stage == DotNpcDirectorWaves.Stage.DONE:
+		if game.survival == null or game.survival.waves.index > index or game.survival.waves.stage == GSNpcDirectorWaves.Stage.DONE:
 			return
-		if game.survival.waves.stage == DotNpcDirectorWaves.Stage.QUIET and game.survival.waves.index > index:
+		if game.survival.waves.stage == GSNpcDirectorWaves.Stage.QUIET and game.survival.waves.index > index:
 			return
 		for npc in game.horde.spawner.npcs_of(game.horde.WAVE):
 			if npc.is_alive():
@@ -250,7 +250,7 @@ func _sim(game: ZzGame, seconds: float) -> void:
 
 func _aim(player: ZzPlayer, target: Vector3) -> void:
 	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	player.controller.apply_command(command)
@@ -259,13 +259,13 @@ func _aim(player: ZzPlayer, target: Vector3) -> void:
 
 
 func _hurt(game: ZzGame, player: ZzPlayer, amount: float) -> void:
-	var hit := DotDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
+	var hit := GSDamage.make(0, player.entity_id, amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 
 
-func _hurt_npc(game: ZzGame, npc: DotNpcInstance, amount: float) -> void:
-	var hit := DotDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
+func _hurt_npc(game: ZzGame, npc: GSNpcInstance, amount: float) -> void:
+	var hit := GSDamage.make(0, game.horde.entity_id_for(npc), amount, game.combat.damage_type(&"strike"))
 	hit.tick = game.current_tick()
 	var _applied := game.combat.apply_damage(hit)
 

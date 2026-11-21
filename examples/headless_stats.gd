@@ -13,7 +13,7 @@ var _stats_file := ""
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -34,7 +34,7 @@ func _run() -> void:
 
 
 func _hit(game: ZzGame, p: ZzPlayer, group: StringName, weapon: StringName, ctx: Dictionary, lethal: bool = false) -> void:
-	var d := DotDamage.make(p.entity_id, 0x7fff0001, 20.0, game.combat.damage_type(&"strike"))
+	var d := GSDamage.make(p.entity_id, 0x7fff0001, 20.0, game.combat.damage_type(&"strike"))
 	d.weapon_id = weapon
 	d.hit_group = group
 	d.health_lost = 20.0
@@ -80,27 +80,27 @@ func _test_stats() -> void:
 	var game := await _team(1, _quiet)
 	var p := game.survivors()[0]
 	_check(game.progress != null and game.progress.feed != null, "the progress node builds an event feed")
-	var schema: DotStatsSchema = game.progress.stats.schema
-	_check(schema.has(DotStatsHitzones.HITS) and schema.has(DotStatsPenetration.HITS), "the schema declares hitzone and penetration stats")
+	var schema: GSStatsSchema = game.progress.stats.schema
+	_check(schema.has(GSStatsHitzones.HITS) and schema.has(GSStatsPenetration.HITS), "the schema declares hitzone and penetration stats")
 	_hit(game, p, &"head", &"zz_m4", {})
 	_hit(game, p, &"generic", &"zz_m4", {})
-	_check(_stat(game, p, DotStatsHitzones.HITS) == 1.0, "a zoned hit counts and a generic one does not", str(_stat(game, p, DotStatsHitzones.HITS)))
+	_check(_stat(game, p, GSStatsHitzones.HITS) == 1.0, "a zoned hit counts and a generic one does not", str(_stat(game, p, GSStatsHitzones.HITS)))
 	_hit(game, p, &"chest", &"zz_m4", {"penetrated": true, "wallbang": true})
-	_check(_stat(game, p, DotStatsPenetration.HITS) == 1.0, "a wallbang counts as a penetrating hit", str(_stat(game, p, DotStatsPenetration.HITS)))
-	_check(_stat(game, p, DotStatsPenetration.DAMAGE) > 0.0, "with its damage")
+	_check(_stat(game, p, GSStatsPenetration.HITS) == 1.0, "a wallbang counts as a penetrating hit", str(_stat(game, p, GSStatsPenetration.HITS)))
+	_check(_stat(game, p, GSStatsPenetration.DAMAGE) > 0.0, "with its damage")
 	_hit(game, p, &"chest", &"zz_m4", {"ricochet": true})
-	_check(_stat(game, p, DotStatsPenetration.HITS) == 2.0, "a ricochet counts too")
+	_check(_stat(game, p, GSStatsPenetration.HITS) == 2.0, "a ricochet counts too")
 	_hit(game, p, &"legs", &"zz_m4", {}, true)
-	_check(_stat(game, p, DotStatsHitzones.HITS) == 4.0 and _stat(game, p, DotStatsHitzones.KILLS) == 1.0, "a lethal zoned hit counts as a zone kill")
-	var shot := DotShot.new()
+	_check(_stat(game, p, GSStatsHitzones.HITS) == 4.0 and _stat(game, p, GSStatsHitzones.KILLS) == 1.0, "a lethal zoned hit counts as a zone kill")
+	var shot := GSShot.new()
 	shot.attacker = p.entity_id
 	shot.weapon_id = &"zz_m4"
 	game.combat.shot_resolved.emit(shot)
-	var d := DotDamage.make(p.entity_id, 0x7fff0001, 20.0, game.combat.damage_type(&"strike"))
+	var d := GSDamage.make(p.entity_id, 0x7fff0001, 20.0, game.combat.damage_type(&"strike"))
 	d.health_lost = 20.0
 	shot.damages.append(d)
 	game.combat.shot_resolved.emit(shot)
-	_check(_stat(game, p, DotStatsShots.SHOTS) == 2.0 and _stat(game, p, DotStatsShots.HITS) == 1.0, "a resolved shot files accuracy: two shots, one landed", "%s %s" % [_stat(game, p, DotStatsShots.SHOTS), _stat(game, p, DotStatsShots.HITS)])
+	_check(_stat(game, p, GSStatsShots.SHOTS) == 2.0 and _stat(game, p, GSStatsShots.HITS) == 1.0, "a resolved shot files accuracy: two shots, one landed", "%s %s" % [_stat(game, p, GSStatsShots.SHOTS), _stat(game, p, GSStatsShots.HITS)])
 	_finished()
 
 
@@ -133,26 +133,26 @@ func _test_rejoin() -> void:
 	var progress := game.progress
 	var p := game.survivors()[0]
 	var tracker := progress.stats
-	_check(tracker.store is DotStatsStoreFile, "a game with stats_file keeps a file store")
+	_check(tracker.store is GSStatsStoreFile, "a game with stats_file keeps a file store")
 	var id := p.player_id
 	var key := progress.key_of(id)
 	var heads := StringName(progress.HEADSHOTS)
 	progress.record(id, heads, 3.0)
 	progress.leave(id)
-	var _w: DotResult = await tracker.flush_store()
+	var _w: GSResult = await tracker.flush_store()
 	var stored: float = (await tracker.store.values_for(key)).value.get_value(heads)
 	_check(stored == 3.0, "a leave files the session into the lifetime store", str(stored))
 	progress.record(id, heads, 2.0)
-	var base: DotStatsValues = progress.rank.baselines.get(id, null)
+	var base: GSStatsValues = progress.rank.baselines.get(id, null)
 	_check(base != null and base.get_value(heads) == 3.0, "a rejoin reads the stored total as the rank baseline")
-	var _w2: DotResult = await tracker.flush()
+	var _w2: GSResult = await tracker.flush()
 	var after: float = (await tracker.store.values_for(key)).value.get_value(heads)
 	_check(after == 5.0, "a flush after the rejoin adds only the new session", str(after))
-	var _w3: DotResult = await tracker.flush()
+	var _w3: GSResult = await tracker.flush()
 	_check((await tracker.store.values_for(key)).value.get_value(heads) == 5.0, "a second flush adds nothing")
 	# The file store writes once per flush on a worker; finish() is the write a fresh process would find.
 	tracker.store.finish()
-	var reread := DotStatsStoreFile.new(path)
+	var reread := GSStatsStoreFile.new(path)
 	reread.schema = tracker.schema
 	_check((await reread.values_for(key)).value.get_value(heads) == 5.0, "the file holds the same total for a fresh process")
 	_finished()

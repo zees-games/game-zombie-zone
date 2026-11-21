@@ -11,14 +11,14 @@ func _ready() -> void:
 	var audio := ZzAudio.new()
 	add_child(audio)
 	var ready_now := audio.setup()
-	var sink := audio.manager.sink as DotAudioSinkGodot
+	var sink := audio.manager.sink as GSAudioSinkGodot
 	var ok := ready_now.ok and sink != null
 	print("driver=%s sink=%s" % [AudioServer.get_driver_name(), sink != null])
 
 	for id: StringName in [ZzAudio.MAP_START, ZzAudio.MOAN, ZzAudio.STRANGLER, ZzAudio.EXPLOSION, ZzAudio.BOX_OPEN, ZzAudio.MUSIC_HORDE]:
 		# Made in code, it is in the bank; read from a file, the sink loads the path when played.
 		var stream: Variant = sink.bank.get(id) if sink != null else null
-		var def: DotAudioDef = audio.manager.catalogue.find(id)
+		var def: GSAudioDef = audio.manager.catalogue.find(id)
 		if stream == null and def != null and def.path != "":
 			stream = load(def.path)
 		var length := (stream as AudioStream).get_length() if stream is AudioStream else 0.0

@@ -8,7 +8,7 @@ const ZzPaths := preload("../game/zz_paths.gd")
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -31,7 +31,7 @@ func _run() -> void:
 		if a.begins_with("--texmax="):
 			(load(ZzMap.MESH_SCRIPT) as GDScript).set("model_texture_max", int(a.substr(9)))
 	print("start ", _mb())
-	var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	var read: GSResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	print("read ", read.ok, " ", _mb())
 	var extras := ZzMap.new()
 	extras.doc = doc

@@ -277,7 +277,7 @@ static func give_ammo(player, fraction: float = 1.0) -> int:
 	if player.weapons == null or player.weapons.arsenal == null:
 		return 0
 
-	var arsenal: DotWeaponArsenal = player.weapons.arsenal
+	var arsenal: GSWeaponArsenal = player.weapons.arsenal
 	var total := 0
 
 	for pool in arsenal.ammo().pools():

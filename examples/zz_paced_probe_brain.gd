@@ -36,7 +36,7 @@ func _think_now(delta: float) -> void:
 	thoughts += 1
 	_log(["think", npc.seed, director.now(), delta])
 	var others: Array = director.call(&"all_npcs")
-	var other: DotNpcInstance = others[absi(hash([npc.seed, thoughts, 3])) % others.size()]
+	var other: GSNpcInstance = others[absi(hash([npc.seed, thoughts, 3])) % others.size()]
 
 	if other == npc or other.brain == null:
 		return
@@ -47,7 +47,7 @@ func _think_now(delta: float) -> void:
 			_log(["stagger", npc.seed, other.seed])
 		3:
 			if other.brain.drive == null:
-				var held := DotNpcDrive.new()
+				var held := GSNpcDrive.new()
 				held.grab(&"p")
 				other.brain.drive = held
 				_log(["drive", npc.seed, other.seed])
@@ -62,10 +62,10 @@ func _think_now(delta: float) -> void:
 		7:
 			var made: Variant = director.call(&"spawn", npc.def.id, npc.position() + Vector3(0.5, 0, 0.5))
 			if made != null:
-				_log(["spawn", npc.seed, (made as DotNpcInstance).seed])
+				_log(["spawn", npc.seed, (made as GSNpcInstance).seed])
 		8:
 			if drive == null:
-				var mine := DotNpcDrive.new()
+				var mine := GSNpcDrive.new()
 				mine.grab(&"q")
 				drive = mine
 				_log(["self-drive", npc.seed])

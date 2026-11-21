@@ -44,7 +44,7 @@ var _signature: int = 0
 
 func _init() -> void:
 	name = "ShopMenu"
-	var theme_source := DotUiTheme.dark()
+	var theme_source := GSUiTheme.dark()
 	theme = theme_source.build(1.0)
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	custom_minimum_size = Vector2(940.0, 540.0)

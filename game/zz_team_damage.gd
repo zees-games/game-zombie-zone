@@ -6,7 +6,7 @@ extends RefCounted
 ## reflected onto themselves ([method reflects], by [member ZzConfig.friendly_fire_mode]); too
 ## much of it inside the window asks for a voteban ([signal voteban_wanted]); a hard ceiling
 ## inside it bans outright ([signal ban_wanted]). The game wires the last two to dot-vote's
-## `DotVoteBans.start` and to the server's ban list; this file knows neither.
+## `GSVoteBans.start` and to the server's ban list; this file knows neither.
 ##
 ## [b]The total is counted before reflection.[/b] A new player's bullets land on themselves, but
 ## what they meant to do to a friend is what they did, and a reflected spray that stopped
@@ -83,13 +83,13 @@ func record(attacker: Object, amount: float, now: float) -> void:
 
 	if ceiling > 0.0 and total >= ceiling and now - float(_banned_at.get(id, -INF)) >= window:
 		_banned_at[id] = now
-		DotLog.warn(CHANNEL, "a team damage ceiling was crossed", {"player": String(id), "damage": total, "window": window})
+		GSLog.warn(CHANNEL, "a team damage ceiling was crossed", {"player": String(id), "damage": total, "window": window})
 		ban_wanted.emit(id, total, float(config.team_damage_ban_minutes))
 		return
 
 	if ask > 0.0 and total >= ask and now - float(_voted_at.get(id, -INF)) >= window:
 		_voted_at[id] = now
-		DotLog.info(CHANNEL, "too much team damage, a voteban is wanted", {"player": String(id), "damage": total, "window": window})
+		GSLog.info(CHANNEL, "too much team damage, a voteban is wanted", {"player": String(id), "damage": total, "window": window})
 		voteban_wanted.emit(id, total)
 
 

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
@@ -7,7 +7,7 @@ const ZzGame := preload("../game/zz_game.gd")
 const ZzVote := preload("../game/zz_vote.gd")
 const ZzWorkshop := preload("../game/zz_workshop.gd")
 
-## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex]: a solo map is listed on the map menu
+## What a subscribed map pack does to this game's lists, against a fixture [GSContentIndex]: a solo map is listed on the map menu
 ## and the ballot with its pack's name, an online session lists none, a map kind the game does not accept is left out, the game's own ids win,
 ## a pack's map entry builds from the document its `scene` names, and a malformed document is refused. `godot --headless --path . res://examples/headless_workshop.tscn`
 
@@ -22,7 +22,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -42,9 +42,9 @@ func _run() -> void:
 
 ## A pack with a survival map, a race map the game does not accept, and a map that claims the
 ## id of the built-in practice street.
-func _index(session: StringName) -> DotContentIndex:
+func _index(session: StringName) -> GSContentIndex:
 	_write_fixtures()
-	var index := DotContentIndex.new()
+	var index := GSContentIndex.new()
 	index.set_session(session)
 	var added := index.add_pack({
 		"content_id": "fixture/ruins", "version": "1.0.0", "prefix": DIR,
@@ -84,7 +84,7 @@ func _put(file: String, text: String) -> void:
 		f.store_string(text)
 
 
-func _game(index: DotContentIndex) -> ZzGame:
+func _game(index: GSContentIndex) -> ZzGame:
 	var game := ZzGame.new()
 	game.config = ZzConfig.new()
 	game.catalogue = ZzCatalogue.new()
@@ -102,7 +102,7 @@ func _names(rows: Array) -> PackedStringArray:
 	return out
 
 
-func _vote(index: DotContentIndex) -> ZzVote:
+func _vote(index: GSContentIndex) -> ZzVote:
 	var vote := ZzVote.new()
 	vote.content_index = index
 	vote.config_path = ""
@@ -129,7 +129,7 @@ func _test_accepts() -> void:
 
 func _test_solo() -> void:
 	_entered += 1
-	var index := _index(DotContentIndex.SESSION_SOLO)
+	var index := _index(GSContentIndex.SESSION_SOLO)
 	var listed := _game(index)
 	var names := _names(listed.map_rows())
 	listed.free()
@@ -149,7 +149,7 @@ func _test_lazy_solo() -> void:
 	_entered += 1
 	var catalogue := ZzCatalogue.new()
 	catalogue.lazy = true
-	catalogue.follow_content(_index(DotContentIndex.SESSION_SOLO), ZzWorkshop.accepted_map_kinds())
+	catalogue.follow_content(_index(GSContentIndex.SESSION_SOLO), ZzWorkshop.accepted_map_kinds())
 	_check(catalogue.maps.has(StringName(MAP)) and catalogue.maps[StringName(MAP)].get("_stub", false),
 		"lazy: the pack's map is held as a stand-in")
 	_check(catalogue.display_name(StringName(MAP)) == "Fixture Ruin [Ruins Pack]", "lazy: the stand-in names it with its pack")
@@ -201,8 +201,8 @@ func _test_ballot_needs_two() -> void:
 func _test_online() -> void:
 	_entered += 1
 	# A subscribed pack is tagged solo; the session then goes online, as it does on joining a server.
-	var index := _index(DotContentIndex.SESSION_SOLO)
-	index.set_session(DotContentIndex.SESSION_ONLINE)
+	var index := _index(GSContentIndex.SESSION_SOLO)
+	index.set_session(GSContentIndex.SESSION_ONLINE)
 	var listed := _game(index)
 	var names := _names(listed.map_rows())
 	listed.free()
@@ -217,7 +217,7 @@ func _test_online() -> void:
 
 func _test_ids() -> void:
 	_entered += 1
-	var index := _index(DotContentIndex.SESSION_SOLO)
+	var index := _index(GSContentIndex.SESSION_SOLO)
 	var game := _game(index)
 	var names := _names(game.map_rows())
 	_check(not names.has("Not The Street [Ruins Pack]") and str(game.catalogue.maps[ZzCatalogue.PRACTICE]["name"]) == "Practice Street"
@@ -229,7 +229,7 @@ func _test_ids() -> void:
 
 func _test_refused() -> void:
 	_entered += 1
-	var game := _game(_index(DotContentIndex.SESSION_SOLO))
+	var game := _game(_index(GSContentIndex.SESSION_SOLO))
 	var names := _names(game.map_rows())
 	_check(not names.has("Fixture Bad [Ruins Pack]"), "a malformed document is not listed")
 	var why := ""
@@ -253,7 +253,7 @@ func _test_play() -> void:
 	solo.authoritative = true
 	solo.register_service = false
 	solo.tick_rate = 30
-	solo.content_index = _index(DotContentIndex.SESSION_SOLO)
+	solo.content_index = _index(GSContentIndex.SESSION_SOLO)
 	add_child(solo)
 	solo.set_physics_process(false)
 	await get_tree().physics_frame
@@ -271,8 +271,8 @@ func _test_play() -> void:
 	solo.free()
 
 	# Online the same pack is not even a catalogue entry.
-	var index := _index(DotContentIndex.SESSION_SOLO)
-	index.set_session(DotContentIndex.SESSION_ONLINE)
+	var index := _index(GSContentIndex.SESSION_SOLO)
+	index.set_session(GSContentIndex.SESSION_ONLINE)
 	var online := _game(index)
 	online.authoritative = true
 	var denied := online.change_map_now(StringName(MAP))

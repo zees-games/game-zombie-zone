@@ -43,7 +43,7 @@ static func feed(h: Object) -> void:
 		ZzNpcs.common_chase_speed(config, stacks, true), angry, config.angry_runner_fraction, down_attack)
 
 	# The spawner's repath tuning, which the stored walk (`walk_stored`) paths by.
-	var sp: DotNpcSpawner = h.spawner
+	var sp: GSNpcSpawner = h.spawner
 	if sp != null and native.has_method(&"set_repath"):
 		native.call(&"set_repath", sp.repath_drift, sp.repath_interval, sp.repath_drift_ratio, sp.repath_interval_per_m)
 

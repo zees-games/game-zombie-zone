@@ -120,7 +120,7 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 | `defib_price` | 400 | Trader price (also a shelf defibrillator with no site price); 0 not sold |
 | `defib_hear_range` | 25.0 | Metres from which others hear it charging (0 only the user) |
 
-Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `DotDefib`; `tests: ./game.sh test headless_defib`.
+Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `GSDefib`; `tests: ./game.sh test headless_defib`.
 
 ## Controls
 
@@ -248,7 +248,7 @@ Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-cha
 
 Converted maps may carry moving doors and lifts, buttons, timers and counters, and hurt, teleport, push and gravity zones from the source map; the server runs them. Invisible clip boxes stop survivors and zombies but not bullets.
 
-The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they aim and shoot is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
+The bot cvars are the family's shared ones: how many is dot-server's `GSBotQuota`, how they aim and shoot is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 

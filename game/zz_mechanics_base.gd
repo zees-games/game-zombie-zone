@@ -27,7 +27,7 @@ const DOOR_PAD := 1.5
 
 const MAX_FIRES := 256
 
-## Volumes the server runs through dot-map's DotMapVolumes; push and gravity are also read by prediction.
+## Volumes the server runs through dot-map's GSMapVolumes; push and gravity are also read by prediction.
 const VOLUME_KINDS := ["hurt", "push", "teleport", "gravity"]
 
 const PREDICTED_KINDS := ["push", "gravity"]

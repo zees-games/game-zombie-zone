@@ -9,8 +9,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZOMBIES := "~zombies"
 
 ## The killcam at a map's end. Client side: every frame drawn goes into dot-replay's
-## [DotKillcamBuffer], each decisive moment (the last death, the final wave cleared) is
-## noted, and at the map's end [DotKillcam] replays it from that survivor's eyes.
+## [GSKillcamBuffer], each decisive moment (the last death, the final wave cleared) is
+## noted, and at the map's end [GSKillcam] replays it from that survivor's eyes.
 ## The length is `mp_killcam_time`; 0 skips straight to [signal over].
 
 const CHANNEL := "zz.killcam"
@@ -51,18 +51,18 @@ var now_fn: Callable = func() -> float: return Time.get_ticks_usec() / 1000000.0
 ## Nodes hidden while the replay runs (the HUD): anything with `visible`.
 var hide_while_playing: Array = []
 
-var buffer := DotKillcamBuffer.new()
-var killcam: DotKillcam = null
+var buffer := GSKillcamBuffer.new()
+var killcam: GSKillcam = null
 var camera: Camera3D = null
 
-## Where the camera sits ([enum DotKillViewRules.Camera]): the server's `mp_killview_camera`.
-var camera_mode_fn: Callable = func() -> int: return DotKillViewRules.Camera.EYE
+## Where the camera sits ([enum GSKillViewRules.Camera]): the server's `mp_killview_camera`.
+var camera_mode_fn: Callable = func() -> int: return GSKillViewRules.Camera.EYE
 
 ## Layers the camera boom stops against (the level's).
 var world_mask: int = 1
 
 var _previous_camera: Camera3D = null
-var _framing: DotKillcamFraming = null
+var _framing: GSKillcamFraming = null
 var _base_fov: float = 75.0
 var _touched: Dictionary = {}
 var _hidden: Dictionary = {}
@@ -72,7 +72,7 @@ var _last_real: float = -1.0
 
 
 func _ready() -> void:
-	killcam = DotKillcam.new()
+	killcam = GSKillcam.new()
 	killcam.name = "Killcam"
 	killcam.skip_actions = SKIP_ACTIONS
 	killcam.icon_provider = func(id: String) -> Texture2D:
@@ -94,7 +94,7 @@ func is_playing() -> bool:
 ## re-applies the replayed frame instead, over what presentation just drew.
 func frame() -> void:
 	if is_playing():
-		if killcam.state == DotKillcam.State.WAITING:
+		if killcam.state == GSKillcam.State.WAITING:
 			_record()
 		return
 	_record()
@@ -132,7 +132,7 @@ func map_ended() -> bool:
 		"hint": "Jump to skip",
 	})
 	if not played.ok:
-		DotLog.debug(CHANNEL, "no killcam", {"why": played.error.message})
+		GSLog.debug(CHANNEL, "no killcam", {"why": played.error.message})
 		over.emit(false)
 		return false
 	return true
@@ -168,7 +168,7 @@ func _state_of(p: Node) -> Array:
 	var controller: Object = p.get(&"controller")
 	if controller == null or not feet_fn.is_valid():
 		return []
-	var st: DotFpsState = controller.get(&"state")
+	var st: GSFpsState = controller.get(&"state")
 	var speed := Vector2(st.velocity.x, st.velocity.z).length()
 	return [feet_fn.call(p), st.yaw, st.pitch, bool(p.call(&"is_alive")), speed, bool(p.call(&"is_down"))]
 
@@ -192,7 +192,7 @@ func _on_started(_kill: Dictionary) -> void:
 		if n is Object and is_instance_valid(n) and (n as Object).get(&"visible") != null:
 			_hidden[n] = bool((n as Object).get(&"visible"))
 			(n as Object).set(&"visible", false)
-	DotLog.info(CHANNEL, "map killcam", killcam.describe())
+	GSLog.info(CHANNEL, "map killcam", killcam.describe())
 
 
 func _apply(s: Dictionary) -> void:
@@ -200,7 +200,7 @@ func _apply(s: Dictionary) -> void:
 	var b: Dictionary = s["b"]
 	var alpha: float = s["alpha"]
 	var subject := String(killcam.kill()["data"].get("subject", ""))
-	var behind := int(camera_mode_fn.call()) == DotKillViewRules.Camera.BEHIND
+	var behind := int(camera_mode_fn.call()) == GSKillViewRules.Camera.BEHIND
 	var eye := Transform3D.IDENTITY
 	var target: Variant = null
 	var seen := false
@@ -230,7 +230,7 @@ func _apply(s: Dictionary) -> void:
 			_place_body(p, feet, yaw, alive, pitch, lerpf(ra[4], rb[4], alpha), rb[5] if alpha >= 0.5 else ra[5])
 	if seen:
 		if _framing == null:
-			_framing = DotKillcamFraming.new(camera.get_world_3d() if is_inside_tree() else null, world_mask)
+			_framing = GSKillcamFraming.new(camera.get_world_3d() if is_inside_tree() else null, world_mask)
 		_framing.probe.collision_mask = world_mask
 		var v := _framing.place(int(camera_mode_fn.call()), eye, _base_fov, target, get_process_delta_time())
 		camera.global_transform = v["transform"]

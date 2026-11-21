@@ -15,7 +15,7 @@ const HEIGHTS := [0.4, 0.9]
 const TRIM := 0.15
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 

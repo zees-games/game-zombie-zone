@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bake the maps' light: one lightmaps/<id>.res per map, which the game's pack ships and a client
-# lays over the map it builds (ZzMap._attach_bake; dot-lighting's DotLightBake).
+# lays over the map it builds (ZzMap._attach_bake; dot-lighting's GSLightBake).
 #
 #   tools/bake_lightmaps.sh                    # every map (the practice street and maps/)
 #   tools/bake_lightmaps.sh zz_lot zz_chapel   # these

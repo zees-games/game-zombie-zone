@@ -7,7 +7,7 @@ extends RefCounted
 const GAME := "game-zombie-zone"
 
 
-static func make_set(roots: PackedStringArray = PackedStringArray()) -> DotProfileSet:
-	var s := DotProfileSet.create("dot-bot", GAME, DotBotPersona.KIND, DotBotPersona.schema())
+static func make_set(roots: PackedStringArray = PackedStringArray()) -> GSProfileSet:
+	var s := GSProfileSet.create("dot-bot", GAME, GSBotPersona.KIND, GSBotPersona.schema())
 	s.roots = roots
 	return s

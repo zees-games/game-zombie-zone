@@ -4,9 +4,9 @@ static func is_special(kind: StringName) -> bool:
 	return kind != COMMON and kind != &""
 
 ## The built-in kinds (twelve) with their `npc` profiles laid over them; [param roots] replaces the config roots (tests).
-static func catalogue(config: ZzConfig = null, roots: PackedStringArray = PackedStringArray()) -> DotNpcCatalogue:
+static func catalogue(config: ZzConfig = null, roots: PackedStringArray = PackedStringArray()) -> GSNpcCatalogue:
 	var c := config if config != null else ZzConfig.new()
-	var out := DotNpcCatalogue.new()
+	var out := GSNpcCatalogue.new()
 	out.meta = {"game": "zombiezone"}
 	var set := ZzNpcProfiles.make_set(roots)
 	var base_config := ZzConfig.new()
@@ -26,7 +26,7 @@ static func catalogue(config: ZzConfig = null, roots: PackedStringArray = Packed
 		var added := out.add(def)
 
 		if not added.ok:
-			DotLog.warn(CHANNEL, "a zombie could not be catalogued", {
+			GSLog.warn(CHANNEL, "a zombie could not be catalogued", {
 				"npc": String(def.id), "why": added.error.message
 			})
 
@@ -50,7 +50,7 @@ static func _pack_defs(c: ZzConfig) -> Array:
 		var health := float(s.get("health", 200.0)) * (c.special_health_scale() if not m.boss else 1.0)
 		var brain := str(s.get("brain", "")) if s.has("brain") else COMMON_BRAIN
 		var def := _def(m.id, m.title, brain, health, float(s.get("speed", 4.4)), 3 if not m.boss else 8,
-			DotNpcDef.Weight.NORMAL if not m.boss else DotNpcDef.Weight.HEAVY)
+			GSNpcDef.Weight.NORMAL if not m.boss else GSNpcDef.Weight.HEAVY)
 		def.sight_range = 40.0
 		def.sight_half_angle_deg = 90.0
 		def.hearing_range = 18.0
@@ -95,8 +95,8 @@ static func _fit_collider(meta: Dictionary) -> void:
 
 ## The population a map runs under. Commons are cheap; a special costs what it is worth, so the
 ## world budget is a real ceiling on how bad things can get at once.
-static func limits(config: ZzConfig, survivors: int) -> DotNpcLimits:
-	var out := DotNpcLimits.new()
+static func limits(config: ZzConfig, survivors: int) -> GSNpcLimits:
+	var out := GSNpcLimits.new()
 	out.world_budget = config.commons_cap(survivors) + 8 * (config.specials_cap(survivors) + 2)
 	out.per_kind_cap = config.commons_cap(survivors)
 	out.spawn_interval = 0.0
@@ -121,8 +121,8 @@ static func limits(config: ZzConfig, survivors: int) -> DotNpcLimits:
 # --- The kinds -----------------------------------------------------------------------------
 
 static func _def(id: StringName, title: String, brain: String, health: float, speed: float,
-		cost: int, weight: DotNpcDef.Weight) -> DotNpcDef:
-	var def := DotNpcDef.make(id, SCENE)
+		cost: int, weight: GSNpcDef.Weight) -> GSNpcDef:
+	var def := GSNpcDef.make(id, SCENE)
 	def.display_name = title
 	def.category = &"zombie"
 	def.faction = FACTION
@@ -135,7 +135,7 @@ static func _def(id: StringName, title: String, brain: String, health: float, sp
 	return def
 
 ## Every kind looks from near the top of itself: a brute over a car, a rider from knee height.
-static func _eyes(def: DotNpcDef) -> DotNpcDef:
+static func _eyes(def: GSNpcDef) -> GSNpcDef:
 	def.eye_height = float(def.meta.get("height", 1.75)) * 0.9
 	return def
 
@@ -145,7 +145,7 @@ static func common_chase_speed(c: ZzConfig, hard_stacks: int, runner: bool) -> f
 	if not c.common_speed_scaling or runner:
 		return c.common_run_speed
 
-	return DotStackScale.ramp(c.common_speed_base, c.common_speed_per_hard_stack, c.common_speed_max, hard_stacks)
+	return GSStackScale.ramp(c.common_speed_base, c.common_speed_per_hard_stack, c.common_speed_max, hard_stacks)
 
 ## How see-through a zombie is drawn at the Hard Box stacks now on (`zz_mutant_fade*`, `zz_common_fade`).
 ## [param c] is a ZzConfig; commons stay solid unless `zz_common_fade` is on.
@@ -156,15 +156,15 @@ static func fade_alpha(c: Object, kind: StringName, stacks: int) -> float:
 	if kind == &"common" and int(c.get(&"common_fade")) != 1:
 		return 1.0
 
-	return DotStackScale.fade_alpha(stacks, float(c.get(&"mutant_fade_per_stack")), float(c.get(&"mutant_min_alpha")))
+	return GSStackScale.fade_alpha(stacks, float(c.get(&"mutant_fade_per_stack")), float(c.get(&"mutant_min_alpha")))
 
 ## The crowd.
 ##
 ## [b]Short sight and good ears while it idles, which is what makes sneaking past one a thing a
 ## player can do.[/b] Its brain widens both once it is alert; the senses read the instance's
 ## `sight_scale`, which the brain sets.
-static func _common(c: ZzConfig) -> DotNpcDef:
-	var def := _def(COMMON, "Infected", COMMON_BRAIN, c.common_health, c.common_run_speed, 1, DotNpcDef.Weight.NORMAL)
+static func _common(c: ZzConfig) -> GSNpcDef:
+	var def := _def(COMMON, "Infected", COMMON_BRAIN, c.common_health, c.common_run_speed, 1, GSNpcDef.Weight.NORMAL)
 	def.sight_range = 30.0
 	def.sight_half_angle_deg = 75.0
 	def.hearing_range = 10.0
@@ -175,8 +175,8 @@ static func _common(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _leaper(c: ZzConfig) -> DotNpcDef:
-	var def := _def(LEAPER, "Leaper", LEAPER_BRAIN, 250.0 * c.special_health_scale(), 7.4, 4, DotNpcDef.Weight.LIGHT)
+static func _leaper(c: ZzConfig) -> GSNpcDef:
+	var def := _def(LEAPER, "Leaper", LEAPER_BRAIN, 250.0 * c.special_health_scale(), 7.4, 4, GSNpcDef.Weight.LIGHT)
 	def.sight_range = 60.0
 	def.sight_half_angle_deg = 100.0
 	def.hearing_range = 20.0
@@ -189,8 +189,8 @@ static func _leaper(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _strangler(c: ZzConfig) -> DotNpcDef:
-	var def := _def(STRANGLER, "Strangler", STRANGLER_BRAIN, 250.0 * c.special_health_scale(), 4.6, 4, DotNpcDef.Weight.NORMAL)
+static func _strangler(c: ZzConfig) -> GSNpcDef:
+	var def := _def(STRANGLER, "Strangler", STRANGLER_BRAIN, 250.0 * c.special_health_scale(), 4.6, 4, GSNpcDef.Weight.NORMAL)
 	def.sight_range = 50.0
 	def.sight_half_angle_deg = 90.0
 	def.hearing_range = 18.0
@@ -202,8 +202,8 @@ static func _strangler(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _bloater(c: ZzConfig) -> DotNpcDef:
-	var def := _def(BLOATER, "Bloater", BLOATER_BRAIN, 50.0, 4.0, 3, DotNpcDef.Weight.HEAVY)
+static func _bloater(c: ZzConfig) -> GSNpcDef:
+	var def := _def(BLOATER, "Bloater", BLOATER_BRAIN, 50.0, 4.0, 3, GSNpcDef.Weight.HEAVY)
 	def.sight_range = 40.0
 	def.sight_half_angle_deg = 90.0
 	def.hearing_range = 16.0
@@ -215,8 +215,8 @@ static func _bloater(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _ram(c: ZzConfig) -> DotNpcDef:
-	var def := _def(RAM, "Ram", RAM_BRAIN, 600.0 * c.special_health_scale(), 5.6, 5, DotNpcDef.Weight.HEAVY)
+static func _ram(c: ZzConfig) -> GSNpcDef:
+	var def := _def(RAM, "Ram", RAM_BRAIN, 600.0 * c.special_health_scale(), 5.6, 5, GSNpcDef.Weight.HEAVY)
 	def.sight_range = 45.0
 	def.sight_half_angle_deg = 80.0
 	def.hearing_range = 16.0
@@ -228,8 +228,8 @@ static func _ram(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _spitter(c: ZzConfig) -> DotNpcDef:
-	var def := _def(SPITTER, "Spitter", SPITTER_BRAIN, 100.0 * c.special_health_scale(), 5.2, 3, DotNpcDef.Weight.LIGHT)
+static func _spitter(c: ZzConfig) -> GSNpcDef:
+	var def := _def(SPITTER, "Spitter", SPITTER_BRAIN, 100.0 * c.special_health_scale(), 5.2, 3, GSNpcDef.Weight.LIGHT)
 	def.sight_range = 50.0
 	def.sight_half_angle_deg = 90.0
 	def.hearing_range = 16.0
@@ -241,8 +241,8 @@ static func _spitter(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _mutant(c: ZzConfig) -> DotNpcDef:
-	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, DotNpcDef.Weight.HEAVY)
+static func _mutant(c: ZzConfig) -> GSNpcDef:
+	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, GSNpcDef.Weight.HEAVY)
 	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
 	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 60.0
@@ -261,9 +261,9 @@ static func _mutant(c: ZzConfig) -> DotNpcDef:
 	return def
 
 ## The oil monster: slides, leaves a trail, spits goo that blinds and pools. `goo_*` keys are the spit's puddle, `trail_*` the trail's
-## (dot-effects' DotHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
-static func _oil_monster(c: ZzConfig) -> DotNpcDef:
-	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, DotNpcDef.Weight.HEAVY)
+## (dot-effects' GSHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
+static func _oil_monster(c: ZzConfig) -> GSNpcDef:
+	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, GSNpcDef.Weight.HEAVY)
 	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
 	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 50.0
@@ -285,8 +285,8 @@ static func _oil_monster(c: ZzConfig) -> DotNpcDef:
 	}
 	return def
 
-static func _rider(c: ZzConfig) -> DotNpcDef:
-	var def := _def(RIDER, "Rider", RIDER_BRAIN, 325.0 * c.special_health_scale(), 7.0, 4, DotNpcDef.Weight.LIGHT)
+static func _rider(c: ZzConfig) -> GSNpcDef:
+	var def := _def(RIDER, "Rider", RIDER_BRAIN, 325.0 * c.special_health_scale(), 7.0, 4, GSNpcDef.Weight.LIGHT)
 	def.sight_range = 45.0
 	def.sight_half_angle_deg = 100.0
 	def.hearing_range = 18.0
@@ -299,8 +299,8 @@ static func _rider(c: ZzConfig) -> DotNpcDef:
 	return def
 
 ## The boss. Its health is set at spawn from how many survivors there are; see [method brute_health].
-static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
-	var def := _def(BRUTE, "Brute", BRUTE_BRAIN, brute_health(c, survivors), 6.1, 12, DotNpcDef.Weight.HEAVY)
+static func _brute(c: ZzConfig, survivors: int) -> GSNpcDef:
+	var def := _def(BRUTE, "Brute", BRUTE_BRAIN, brute_health(c, survivors), 6.1, 12, GSNpcDef.Weight.HEAVY)
 	def.nav_exclude_flags = ZzNavGraph.NARROW
 	def.sight_range = 80.0
 	def.sight_half_angle_deg = 120.0
@@ -314,12 +314,12 @@ static func _brute(c: ZzConfig, survivors: int) -> DotNpcDef:
 	}
 	return def
 
-static func brute_health(c: ZzConfig, survivors: int, def: DotNpcDef = null) -> float:
+static func brute_health(c: ZzConfig, survivors: int, def: GSNpcDef = null) -> float:
 	var base: float = float(def.meta.get("brute_health", c.brute_health)) if def != null else c.brute_health
 	return (base + c.brute_health_per_survivor * float(maxi(survivors - 1, 0))) * c.special_health_scale()
 
-static func _sleeper(c: ZzConfig) -> DotNpcDef:
-	var def := _def(SLEEPER, "Sleeper", SLEEPER_BRAIN, 1000.0 * c.special_health_scale(), 7.8, 0, DotNpcDef.Weight.NORMAL)
+static func _sleeper(c: ZzConfig) -> GSNpcDef:
+	var def := _def(SLEEPER, "Sleeper", SLEEPER_BRAIN, 1000.0 * c.special_health_scale(), 7.8, 0, GSNpcDef.Weight.NORMAL)
 	def.sight_range = 14.0
 	def.sight_half_angle_deg = 180.0
 	def.hearing_range = 10.0
@@ -333,8 +333,8 @@ static func _sleeper(c: ZzConfig) -> DotNpcDef:
 
 ## Thin and quick to kill; what it does is call the horde. Health is low on purpose: it is the
 ## special a team wins by noticing, not by emptying a magazine into.
-static func _screamer(c: ZzConfig) -> DotNpcDef:
-	var def := _def(SCREAMER, "Screamer", SCREAMER_BRAIN, 90.0 * c.special_health_scale(), 5.4, 3, DotNpcDef.Weight.LIGHT)
+static func _screamer(c: ZzConfig) -> GSNpcDef:
+	var def := _def(SCREAMER, "Screamer", SCREAMER_BRAIN, 90.0 * c.special_health_scale(), 5.4, 3, GSNpcDef.Weight.LIGHT)
 	def.sight_range = 55.0
 	def.sight_half_angle_deg = 100.0
 	def.hearing_range = 20.0
@@ -348,8 +348,8 @@ static func _screamer(c: ZzConfig) -> DotNpcDef:
 
 ## Low enough that a shot over the crowd's heads misses it, and slow; its danger is where it
 ## lies, not how fast it comes.
-static func _crawler(c: ZzConfig) -> DotNpcDef:
-	var def := _def(CRAWLER, "Crawler", CRAWLER_BRAIN, 150.0 * c.special_health_scale(), 2.6, 3, DotNpcDef.Weight.LIGHT)
+static func _crawler(c: ZzConfig) -> GSNpcDef:
+	var def := _def(CRAWLER, "Crawler", CRAWLER_BRAIN, 150.0 * c.special_health_scale(), 2.6, 3, GSNpcDef.Weight.LIGHT)
 	def.sight_range = 25.0
 	def.sight_half_angle_deg = 120.0
 	def.hearing_range = 14.0
@@ -361,8 +361,8 @@ static func _crawler(c: ZzConfig) -> DotNpcDef:
 	return def
 
 ## Walks into fire behind a shield (`shield` is the share of a frontal hit that gets through).
-static func _riot(c: ZzConfig) -> DotNpcDef:
-	var def := _def(RIOT, "Riot", RIOT_BRAIN, 260.0 * c.special_health_scale(), 4.4, 3, DotNpcDef.Weight.HEAVY)
+static func _riot(c: ZzConfig) -> GSNpcDef:
+	var def := _def(RIOT, "Riot", RIOT_BRAIN, 260.0 * c.special_health_scale(), 4.4, 3, GSNpcDef.Weight.HEAVY)
 	def.sight_range = 40.0
 	def.sight_half_angle_deg = 90.0
 	def.hearing_range = 18.0
@@ -453,7 +453,7 @@ static func prop_obstacles(at: Vector3, yaw: float, size: Vector3) -> Array[AABB
 
 	return out
 
-static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> DotNpcNavData:
+static func nav_for(doc: Dictionary, props_size: Callable, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = [], cache: bool = false) -> GSNpcNavData:
 	var job := nav_job(doc, props_size, open_gates, extra_solids, cache, false)
 	var built := job.run_blocking()
 	job.flush_log()
@@ -475,9 +475,9 @@ static func nav_job(doc: Dictionary, props_size: Callable, open_gates: PackedStr
 
 	var job := ZzNavJob.new()
 	var known := props_size.is_valid()
-	job.make_builder = func(heights: Array, info: Dictionary) -> DotNpcNavBuilder:
+	job.make_builder = func(heights: Array, info: Dictionary) -> GSNpcNavBuilder:
 		return _builder_for(source, sizes if known else {}, known, open_gates, extra_solids, heights, info)
-	job.reach = func(nav: DotNpcNavData) -> Vector2i:
+	job.reach = func(nav: GSNpcNavData) -> Vector2i:
 		return _reach(nav, source)
 	job.map_id = StringName(str(source.get("id", "map")))
 	job.digest = digest_of(source, open_gates, extra_solids)
@@ -550,14 +550,14 @@ static func _row_key(row: Array, keys: int) -> String:
 
 ## The map's posts whose nearest point is joined to the first survivor spawn's on [param nav]; every post when none
 ## is (a map whose graph has no spawn point is not judged).
-static func reachable_posts(nav: DotNpcNavData, doc: Dictionary) -> Array:
+static func reachable_posts(nav: GSNpcNavData, doc: Dictionary) -> Array:
 	var posts: Array = doc.get("posts", [])
 	var spawns: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
 
 	if spawns.is_empty() or posts.is_empty():
 		return posts
 
-	var graph := DotNpcNavGraph.new(nav)
+	var graph := GSNpcNavGraph.new(nav)
 	var home := nav.nearest_point(ZzMapDoc.v3(spawns[0]["at"]), POST_SNAP)
 
 	if home < 0:
@@ -574,8 +574,8 @@ static func reachable_posts(nav: DotNpcNavData, doc: Dictionary) -> Array:
 	return kept if not kept.is_empty() else posts
 
 ## The posts and the points of the ground joined to the first survivor spawn on [param nav].
-static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
-	var graph := DotNpcNavGraph.new(nav)
+static func _reach(nav: GSNpcNavData, doc: Dictionary) -> Vector2i:
+	var graph := GSNpcNavGraph.new(nav)
 	var spawns: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
 
 	if spawns.is_empty():
@@ -602,9 +602,9 @@ static func _reach(nav: DotNpcNavData, doc: Dictionary) -> Vector2i:
 
 	return Vector2i(posts, points)
 
-static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> DotNpcNavBuilder:
+static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, open_gates: PackedStringArray, extra_solids: Array[AABB], heights: Array, info: Dictionary) -> GSNpcNavBuilder:
 	var nav_doc: Dictionary = doc.get("nav", {})
-	var builder := DotNpcNavBuilder.new()
+	var builder := GSNpcNavBuilder.new()
 	builder.spacing = float(nav_doc.get("spacing", 1.0))
 	builder.point_radius = builder.spacing * 1.25
 	builder.neighbour_reach = 1.6
@@ -625,9 +625,9 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 		builder.add_floor(area, float(f[4]))
 
 	if doc.has("terrain"):
-		var ground := DotMapTerrain.from_dict(doc["terrain"])
+		var ground := GSMapTerrain.from_dict(doc["terrain"])
 		if ground.ok:
-			builder.add_points((ground.value as DotMapTerrain).walk_points(builder.spacing), DotMapTerrain.WALK_RISE)
+			builder.add_points((ground.value as GSMapTerrain).walk_points(builder.spacing), GSMapTerrain.WALK_RISE)
 
 	var solids: Array[AABB] = []
 	## The boxes taken for floors: no wall to a link, but a link that falls through one is no drop.
@@ -706,7 +706,7 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	info["rejected"] = rejected
 
 	if rejected > 0:
-		DotLog.debug(CHANNEL, "nav links through solid geometry dropped", {"map": doc.get("id", ""), "dropped": rejected})
+		GSLog.debug(CHANNEL, "nav links through solid geometry dropped", {"map": doc.get("id", ""), "dropped": rejected})
 
 	return builder
 
@@ -816,7 +816,7 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 ## the PRUNED graph (ZzHorde._prune_blocked), so the document's choice of colliding world hulls and its solid props are
 ## part of the key. Without them a map whose `world_collision` changed kept its old cuts on every box that had run it.
 static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> String:
-	return DotNpcNavData.digest_of([
+	return GSNpcNavData.digest_of([
 		str(doc.get("id", "")), JSON.stringify(doc.get("nav", {})), str(doc.get("terrain", {}).get("data", "")).sha256_text(),
 		JSON.stringify(doc.get("boxes", [])).sha256_text(), JSON.stringify(doc.get("props", [])).sha256_text(),
 		JSON.stringify(doc.get("solid_props", [])).sha256_text(), JSON.stringify(doc.get("world_collision", {})),

@@ -6,7 +6,7 @@ const CHANNEL := "zz.infection"
 const FALLBACK_KIND := &"common"
 
 ## The turned survivor takes the zombie they became: [ZzPossession] feeds their command to its brain
-## ([DotNpcDrive]) until it dies, then they are dead as before. Only the plain walk and swing are
+## ([GSNpcDrive]) until it dies, then they are dead as before. Only the plain walk and swing are
 ## driven; a special's own ability is not.
 
 var game = null
@@ -53,11 +53,11 @@ func turn(player: Object) -> void:
 
 	# An unknown kind (a typo in zz_infect_kind) falls back to the common, so a turned survivor is never just gone.
 	if npc == null and kind != FALLBACK_KIND:
-		DotLog.warn(CHANNEL, "unknown zz_infect_kind, turning into a common", {"kind": String(kind)})
+		GSLog.warn(CHANNEL, "unknown zz_infect_kind, turning into a common", {"kind": String(kind)})
 		npc = game.horde.spawner.spawn(FALLBACK_KIND, at, &"infected")
 
 	if npc == null:
-		DotLog.warn(CHANNEL, "a turned survivor left no zombie", {"kind": String(kind)})
+		GSLog.warn(CHANNEL, "a turned survivor left no zombie", {"kind": String(kind)})
 		return
 
 	turned += 1

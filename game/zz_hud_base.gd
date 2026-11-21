@@ -15,8 +15,8 @@ const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 const ZzNavMeter := preload("zz_nav_meter.gd")
 
 ## What a survivor needs on screen, and nothing that would make a dark street less dark. [codeblock] bottom left your health: real health green, borrowed health white over it; down, a red bleed bar and how many downs are left; your medkit and pills left the team: each name, their health, and whether they are up, down, held or dead bottom right what you are holding and how much is in it top the objective, a hold-out's clock, a survival map's clock centre the crosshair, what E would do, the bar of what
-## you are holding E for, and the bar of somebody picking you up right what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12") over it all which way a hit came from; bile, a flash, fire, the last-life grey [/codeblock] [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the action is on NOW, from the same table the menu's Controls page edits. [b]The glance pieces are dot-ui's[/b]: health is a [DotVitals] (borrowed health as its `bonus`, DOWN and DEAD as
-## its `status`), the weapon a [DotAmmoCounter] (an endless reserve as ∞), a hold-out's or a survival map's clock a [DotScoreStrip] under the title, the medkit and pills [DotKeyHints], and every hit the server confirms a [DotHitMarker] and a [DotDamageNumbers] number on the body. The number on the health plate is real health; the borrowed part is the white length after it, which drains, and a number that included it would fall on its own while nobody was hitting you.
+## you are holding E for, and the bar of somebody picking you up right what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12") over it all which way a hit came from; bile, a flash, fire, the last-life grey [/codeblock] [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the action is on NOW, from the same table the menu's Controls page edits. [b]The glance pieces are dot-ui's[/b]: health is a [GSVitals] (borrowed health as its `bonus`, DOWN and DEAD as
+## its `status`), the weapon a [GSAmmoCounter] (an endless reserve as ∞), a hold-out's or a survival map's clock a [GSScoreStrip] under the title, the medkit and pills [GSKeyHints], and every hit the server confirms a [GSHitMarker] and a [GSDamageNumbers] number on the body. The number on the health plate is real health; the borrowed part is the white length after it, which drains, and a number that included it would fall on its own while nobody was hitting you.
 
 const BLIND_FADE_SEC := 0.25
 
@@ -41,7 +41,7 @@ const AMBER := Color(0.98, 0.84, 0.5)
 ## high-contrast theme can change them. Static so a render tool can use it.
 static func piece_theme() -> Theme:
 	var t := Theme.new()
-	var type := DotHudPiece.THEME_TYPE
+	var type := GSHudPiece.THEME_TYPE
 	t.set_color(&"highlight", type, AMBER)
 	t.set_color(&"good", type, HEALTH_COLOUR)
 	return t
@@ -59,9 +59,9 @@ func _follow() -> void:
 	if _root != null and _menu != null and _menu.has_method(&"follow_hud"):
 		_menu.call(&"follow_hud", _root, piece_theme())
 
-## The player's `cl_hud_show_<element>` switches (dot-ui's [DotHudElementCvars]; `cl_hud_scale` is
+## The player's `cl_hud_show_<element>` switches (dot-ui's [GSHudElementCvars]; `cl_hud_scale` is
 ## the menu's own HUD size, so it is not registered). The pieces below are attached in [method _attach_elements].
-var elements := DotHudElementCvars.new()
+var elements := GSHudElementCvars.new()
 
 ## element id -> the controls it hides; a piece that sets its own visibility each frame is put
 ## back to hidden after the draw (see [method _hold_hidden_elements]).
@@ -97,13 +97,13 @@ func _hold_hidden_elements() -> void:
 func bind_elements(local: Object) -> void:
 	if local == null or not local.has_method(&"add_var"):
 		return
-	for id: StringName in DotHudElementCvars.ELEMENTS:
-		var name := DotHudElementCvars.cvar_name(id)
-		local.call(&"add_var", StringName(name), String((DotHudElementCvars.ELEMENTS[id] as Array)[1]) + " (0 hides, 1 shows)",
+	for id: StringName in GSHudElementCvars.ELEMENTS:
+		var name := GSHudElementCvars.cvar_name(id)
+		local.call(&"add_var", StringName(name), String((GSHudElementCvars.ELEMENTS[id] as Array)[1]) + " (0 hides, 1 shows)",
 			func() -> Variant: return "1" if elements.is_shown(id) else "0",
 			func(v: Variant) -> Variant:
 				if not elements.set_cvar(name, str(v)):
-					return DotResult.fail(DotError.CODE_INVALID, "unreadable value: " + str(v))
+					return GSResult.fail(GSError.CODE_INVALID, "unreadable value: " + str(v))
 				elements.apply()
 				return null)
 
@@ -133,38 +133,38 @@ var _top: Label = null
 var _top_sub: Label = null
 
 ## Health: real, borrowed (its bonus), and DOWN or DEAD in place of the number.
-var vitals: DotVitals = null
+var vitals: GSVitals = null
 
 ## What is in hand and how much is in it.
-var ammo: DotAmmoCounter = null
+var ammo: GSAmmoCounter = null
 
 ## The carried weapon's sprite above the counter (`cl_weapon_icons`); hidden when the weapon has none.
-var _weapon_icon: DotWeaponIconPlate = null
+var _weapon_icon: GSWeaponIconPlate = null
 
 ## The held gun's fire modes, above the ammunition.
-var fire_mode: DotFireModeIndicator = null
+var fire_mode: GSFireModeIndicator = null
 
 ## A hold-out's or a survival map's clock, under the title; nothing on a map without one.
-var strip: DotScoreStrip = null
+var strip: GSScoreStrip = null
 
 ## The medkit and pills, each with its key.
-var kits: DotKeyHints = null
+var kits: GSKeyHints = null
 
-var stamina_bar: DotStatBar = null
+var stamina_bar: GSStatBar = null
 
 var _stamina_pct: float = 100.0
 
 ## Four ticks round the crosshair on a hit the server confirmed.
-## The marker and numbers layer ([DotHitFeedback]); [member hit_marker] and
+## The marker and numbers layer ([GSHitFeedback]); [member hit_marker] and
 ## [member damage_numbers] are its two pieces.
-var hit_fx: DotHitFeedback = null
+var hit_fx: GSHitFeedback = null
 
-var hit_marker: DotHitMarker = null
+var hit_marker: GSHitMarker = null
 
 ## The confirmed hits' numbers, on the bodies they landed on.
-var damage_numbers: DotDamageNumbers = null
+var damage_numbers: GSDamageNumbers = null
 
-var _status: DotStatusLines = null
+var _status: GSStatusLines = null
 
 var _nav_meter: PanelContainer = null
 
@@ -175,7 +175,7 @@ var _team: Control = null
 
 var _team_rows: Array[Dictionary] = []
 
-var _effects: DotStatusLines = null
+var _effects: GSStatusLines = null
 
 var _prompt: Label = null
 
@@ -216,13 +216,13 @@ var aim_fraction: float = 0.0
 
 var _scoped: bool = false
 
-## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
-var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
+## Whether the host's dot-ui has `GSCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = GSAddonApi.build_level("dot_ui") >= 5
 
 var _bile: ColorRect = null
 
 ## The black goo a spit leaves on the screen; stacks come from the server in `net_status`.
-var _goo: DotFxScreenGoo = null
+var _goo: GSFxScreenGoo = null
 
 var _blind: ColorRect = null
 

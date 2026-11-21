@@ -1,10 +1,10 @@
 extends RefCounted
 
 ## The slide cvars (`zz_slide`, `_boost`, `_min_speed`, `_duration`, `_friction`, `_cooldown`): names and words are
-## [method DotFpsSlidePreset.cvar_table]. Part of the predicted motor, so each is REPLICATED and a client follows it
+## [method GSFpsSlidePreset.cvar_table]. Part of the predicted motor, so each is REPLICATED and a client follows it
 ## ([method follow_cvars]) as [ZzCrawlRules] does the crawl. ZZ's slide is the sprint one (only a sprinter holding C).
 
-## `zz_slide_min_speed` 0 means the preset's floor, just over a run ([constant DotFpsSlidePreset.SPRINT_MIN_FACTOR]).
+## `zz_slide_min_speed` 0 means the preset's floor, just over a run ([constant GSFpsSlidePreset.SPRINT_MIN_FACTOR]).
 ## The slide's top speed is not in the shared table and stays a [ZzConfig] number.
 
 signal changed
@@ -30,12 +30,12 @@ var slide_cooldown: float = 1.0
 
 
 func _init() -> void:
-	slide_friction = DotFpsTunables.new().slide_friction
+	slide_friction = GSFpsTunables.new().slide_friction
 
 
 ## cvar name -> [member, help].
 static func table() -> Dictionary:
-	return DotFpsSlidePreset.cvar_table(PREFIX)
+	return GSFpsSlidePreset.cvar_table(PREFIX)
 
 
 ## Registers the cvars ([param add] is the module's `add_cvar`, taking flags as a fourth
@@ -113,8 +113,8 @@ func _on_replicated(cvar_name: String, value: String) -> void:
 
 ## Puts the slide on [param t], ZZ's way. [param p_max_speed] is the slide's top speed
 ## ([member ZzConfig.slide_max_speed]); [param p_sprint] whether sprinting is on at all.
-func apply(t: DotFpsTunables, p_max_speed: float, p_sprint: bool) -> void:
-	DotFpsSlidePreset.apply_sprint(t, slide_enabled >= 0.5 and p_sprint, slide_boost, p_max_speed, slide_duration, slide_cooldown)
+func apply(t: GSFpsTunables, p_max_speed: float, p_sprint: bool) -> void:
+	GSFpsSlidePreset.apply_sprint(t, slide_enabled >= 0.5 and p_sprint, slide_boost, p_max_speed, slide_duration, slide_cooldown)
 	t.slide_friction = slide_friction
 
 	if slide_min_speed > 0.0:

@@ -101,7 +101,7 @@ func sample() -> void:
 			if player.is_alive() and not player.watching:
 				here.append(player.feet())
 
-		for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+		for npc: GSNpcInstance in game.horde.spawner.all_npcs():
 			var key := "z%d" % npc.instance_id
 			seen[key] = true
 			var kind := &"special" if ZzNpcs.is_special(npc.def.id) else &"common"
@@ -179,8 +179,8 @@ func _capture(key: String, kind: StringName, who: Variant, still: float) -> Stri
 	var head := "CAPTURE %s %s t %.1f still %.1f s" % [kind, key, game.now(), still]
 	var body: CharacterBody3D = null
 
-	if who is DotNpcInstance:
-		var npc: DotNpcInstance = who
+	if who is GSNpcInstance:
+		var npc: GSNpcInstance = who
 		var brain = npc.brain
 		body = npc.node as CharacterBody3D
 		out.append("%s %s at %s" % [head, npc.def.id, npc.position().snappedf(0.01)])
@@ -193,7 +193,7 @@ func _capture(key: String, kind: StringName, who: Variant, still: float) -> Stri
 			brain.get(&"state"), npc.target_id, brain.quarry(), brain.get(&"bashing"), brain.swinging(), brain.staggered(),
 			float(brain.get(&"_watch_for")), brain.get(&"_watch_stage"), brain.get(&"_hops")])
 		out.append("  remedies [%s]" % ", ".join(brain.get(&"unstick_log") if brain.get(&"unstick_log") != null else PackedStringArray()))
-		var path: DotNpcPath = brain.get(&"path")
+		var path: GSNpcPath = brain.get(&"path")
 		if path != null:
 			var pts := PackedStringArray()
 			for i in mini(path.points.size(), 14):
@@ -204,7 +204,7 @@ func _capture(key: String, kind: StringName, who: Variant, still: float) -> Stri
 		if h != null and h.has_method(&"barricade_in_way"):
 			out.append("  barricade_in_way '%s'" % h.barricade_in_way(npc.position(), body.get(&"wish")))
 		var crowd := 0
-		for other: DotNpcInstance in h.spawner.all_npcs():
+		for other: GSNpcInstance in h.spawner.all_npcs():
 			if other != npc and other.position().distance_to(npc.position()) < 1.5:
 				crowd += 1
 		out.append("  zombies within 1.5 m: %d" % crowd)
@@ -332,11 +332,11 @@ func _vec(v: Variant) -> String:
 
 
 func _why(who: Variant) -> String:
-	if who is DotNpcInstance:
-		var npc: DotNpcInstance = who
+	if who is GSNpcInstance:
+		var npc: GSNpcInstance = who
 		var brain = npc.brain
 		var body := npc.node as CharacterBody3D
-		var path: DotNpcPath = brain.get(&"path") if brain != null else null
+		var path: GSNpcPath = brain.get(&"path") if brain != null else null
 		return "%s state %s lure %s (%d active) target '%s' wish %s floor %s path %s next %s ends %s" % [
 			npc.def.id, (brain.get(&"state") if brain != null else "-"), _vec(brain.get(&"lure") if brain != null else null), game.horde._lures.size(), npc.target_id, _vec(body.get(&"wish") if body != null else null),
 			body.is_on_floor() if body != null else "-", path.points.size() if path != null else -1,
@@ -351,7 +351,7 @@ func _why(who: Variant) -> String:
 		if other != who and other.feet().distance_to(who.feet()) < 1.5:
 			mates.append("%s %.1f m" % [other.player_id, other.feet().distance_to(who.feet())])
 	var kept: Variant = memory.get("last_command")
-	var move: Variant = (kept as DotFpsCommand).move.snappedf(0.1) if kept is DotFpsCommand else "-"
+	var move: Variant = (kept as GSFpsCommand).move.snappedf(0.1) if kept is GSFpsCommand else "-"
 	return "t %.1f phase %s move %s using '%s' goal %s path %d points, next %s, blocked by %s, velocity %s floor %s hops %s mates [%s]" % [game.now(), game.phase, move, who.using, (memory["goal"] as Vector3).snappedf(0.1), path.size(),
 		path[0].snappedf(0.1) if not path.is_empty() else "-", _blocker(who, path[0] if not path.is_empty() else Vector3.INF),
 		who.velocity.snappedf(0.1), who.is_on_floor(), memory.get("hops", 0), ", ".join(mates)] + _sliding(who) + _touching(who, who.controller.state)
@@ -380,7 +380,7 @@ func _standin_walks(player) -> bool:
 
 
 ## The horde's own rule (game/zz_watch_cull.gd), so the meter and the cull agree on who has a goal.
-func _zombie_walks(npc: DotNpcInstance, survivors: Array) -> bool:
+func _zombie_walks(npc: GSNpcInstance, survivors: Array) -> bool:
 	return game.horde.wcull != null and game.horde.wcull.walks(npc, survivors)
 
 ## Stuck seconds over seconds with a goal, 0 to 1. [param at_least] floors the denominator: stand-ins

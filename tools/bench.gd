@@ -13,7 +13,7 @@ var _bench_seed := 7
 var _measure := 20.0
 var _warm := 4.0
 var _ring := Vector2(8.0, 40.0)
-var _clock := DotMenuFrameClock.new()
+var _clock := GSMenuFrameClock.new()
 var _rows: Array[PackedInt32Array] = []
 var _recording := false
 ## --profile: the game's tick is stepped here part by part (survival_long_run's split) and the
@@ -24,19 +24,19 @@ var _profiler: Node = null
 ## h.brains/h.bodies are summed per arm, so both arms run in one process on one box (AB lines).
 var _ab_reuse := -1
 ## --ab-native (with --profile): every 64 ticks the horde's crowd grid flips between the script (0) and dot-sim's
-## `DotSimCrowdGrid` (1) through `ZzConfig.native_crowd`; h.grid, h.brains and h.bodies are summed per arm (AB lines).
+## `GSSimCrowdGrid` (1) through `ZzConfig.native_crowd`; h.grid, h.brains and h.bodies are summed per arm (AB lines).
 var _ab_native := false
 ## --crowd-parity (with --profile): every tick the live crowd grid's entries are copied into a fresh script grid and a
 ## fresh native one, and every zombie's spacing push and two neighbour queries are asked of all three (PARITY line).
 var _crowd_parity := false
 ## --ab-senses (with --profile): every 64 ticks the horde's senses flip between the script (0) and dot-sim's
-## `DotSimSenses` (1) through `ZzConfig.native_senses`; h.senses is summed per arm (AB lines).
+## `GSSimSenses` (1) through `ZzConfig.native_senses`; h.senses is summed per arm (AB lines).
 var _ab_senses := false
 ## --senses-verify (with --profile): every perception pass runs native and script and counts the NPCs whose
 ## target or timestamps differ (PARITY senses line); the script's answers are the ones kept.
 var _senses_verify := false
 ## --ab-brains (with --profile): every 64 ticks the zombies' brains flip between the script (0) and dot-sim's
-## `DotSimZombieBrains` (1) through `ZzConfig.native_brains`; h.brains is summed per arm (AB lines).
+## `GSSimZombieBrains` (1) through `ZzConfig.native_brains`; h.brains is summed per arm (AB lines).
 var _ab_brains := false
 ## --brains-verify (with --profile): every native chase choice, barricade check, nearest survivor and spaced heading is
 ## also worked out in script and the pairs that differ counted (PARITY brains line); the script's answers are kept.
@@ -128,23 +128,23 @@ func _read_args() -> void:
 			_ab_pacing = true
 		elif arg == "--ab-walk":
 			_ab_walk = true
-			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"steer_walk"):
-				push_error("bench: --ab-walk needs a dot-sim build with DotSimZombieBrains.steer_walk")
+			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"steer_walk"):
+				push_error("bench: --ab-walk needs a dot-sim build with GSSimZombieBrains.steer_walk")
 				get_tree().quit(1)
 		elif arg == "--ab-move":
 			_ab_move = true
-			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk"):
-				push_error("bench: --ab-move needs a dot-sim build with DotSimZombieBrains.walk")
+			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"walk"):
+				push_error("bench: --ab-move needs a dot-sim build with GSSimZombieBrains.walk")
 				get_tree().quit(1)
 		elif arg == "--ab-store":
 			_ab_store = true
-			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"walk_stored"):
-				push_error("bench: --ab-store needs a dot-sim build with DotSimZombieBrains.walk_stored")
+			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"walk_stored"):
+				push_error("bench: --ab-store needs a dot-sim build with GSSimZombieBrains.walk_stored")
 				get_tree().quit(1)
 		elif arg == "--ab-decide":
 			_ab_decide = true
-			if not ClassDB.class_has_method(&"DotSimZombieBrains", &"chase"):
-				push_error("bench: --ab-decide needs a dot-sim build with DotSimZombieBrains.chase")
+			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"chase"):
+				push_error("bench: --ab-decide needs a dot-sim build with GSSimZombieBrains.chase")
 				get_tree().quit(1)
 		elif arg == "--pacing-verify":
 			_pacing_verify = true
@@ -171,16 +171,16 @@ func _print_profile() -> void:
 		print("AB senses=%d h.senses %.3f ms/tick over %d ticks" % [side,
 			float(_abs_us[side]) / 1000.0 / maxf(1.0, _abs_ticks[side]), _abs_ticks[side]])
 	if _senses_verify:
-		var senses: DotNpcSenses = (_client.get("game") as ZzGame).horde.senses
+		var senses: GSNpcSenses = (_client.get("game") as ZzGame).horde.senses
 		print("PARITY senses decided=%d mismatches=%d checks=%d casts=%d native=%s" % [senses.native_decided,
-			senses.native_mismatches, senses.sight_checks, senses.los_casts, ClassDB.class_exists(&"DotSimSenses")])
+			senses.native_mismatches, senses.sight_checks, senses.los_casts, ClassDB.class_exists(&"GSSimSenses")])
 	for side: int in _abb_ticks:
 		print("AB brains=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abb_us[side]) / 1000.0 / maxf(1.0, _abb_ticks[side]), _abb_ticks[side]])
 	if _brains_verify:
 		var horde: Node = (_client.get("game") as ZzGame).horde
 		print("PARITY brains decided=%d mismatches=%d native=%s" % [horde.get(&"brains_decided"),
-			horde.get(&"brains_mismatches"), ClassDB.class_exists(&"DotSimZombieBrains")])
+			horde.get(&"brains_mismatches"), ClassDB.class_exists(&"GSSimZombieBrains")])
 	for side: int in _abp_ticks:
 		print("AB pacing=%d h.brains %.3f ms/tick over %d ticks" % [side,
 			float(_abp_us[side]) / 1000.0 / maxf(1.0, _abp_ticks[side]), _abp_ticks[side]])
@@ -198,7 +198,7 @@ func _print_profile() -> void:
 	if _pacing_verify:
 		var sp: Node = (_client.get("game") as ZzGame).horde.spawner
 		print("PARITY pacing checked=%d mismatches=%d native=%s" % [sp.get(&"pacing_checked"),
-			sp.get(&"pacing_mismatches"), ClassDB.class_exists(&"DotSimThinkPacer")])
+			sp.get(&"pacing_mismatches"), ClassDB.class_exists(&"GSSimThinkPacer")])
 	if _crowd_parity:
 		print("PARITY crowd compared=%d differ=%d pushes=%d" % [_parity["compared"], _parity["differ"], _parity["pushes"]])
 	_profiler.free()
@@ -242,7 +242,7 @@ func _run() -> void:
 		if arg.begins_with("--without="):
 			_without(arg.trim_prefix("--without=").split(","))
 	await _seconds_of(1.0)
-	for v in get_tree().root.find_children("*", "DotMapVisibility", true, false):
+	for v in get_tree().root.find_children("*", "GSMapVisibility", true, false):
 		print("VIS ", v.call(&"describe"))
 
 	if "--micro" in OS.get_cmdline_user_args():
@@ -454,7 +454,7 @@ func _without(kinds: PackedStringArray) -> void:
 					(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if n is GeometryInstance3D and "mesh_shadows" in kinds:
 			(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	for v in get_tree().root.find_children("*", "DotMapVisibility", true, false):
+	for v in get_tree().root.find_children("*", "GSMapVisibility", true, false):
 		if "vis_noshadow" in kinds:
 			v.set(&"shadows", 0)
 			v.set(&"_dirty", true)
@@ -554,7 +554,7 @@ func _physics_process(_delta: float) -> void:
 		_ticks = 0
 	var arm := (_ab_reuse if ((Engine.get_physics_frames() >> 6) & 1) == 1 else 0) if _ab_reuse >= 0 else -1
 	if arm >= 0:
-		for npc: DotNpcInstance in (_client.get("game") as ZzGame).horde.spawner.all_npcs():
+		for npc: GSNpcInstance in (_client.get("game") as ZzGame).horde.spawner.all_npcs():
 			if npc.brain != null:
 				npc.brain.set(&"path_reuse_thoughts", arm)
 	var native_arm := ((Engine.get_physics_frames() >> 6) & 1) if _ab_native else -1
@@ -656,11 +656,11 @@ static func _paired_line(name: String, part: String, windows: Dictionary) -> Str
 ## The live grid's entries, in its order, into a fresh script grid and a fresh native grid; every entry's push
 ## (as a brain asks it, from a little off where it was added) and its 6 m and 32 m neighbours from all three.
 func _check_crowd(horde: Object) -> void:
-	if not ClassDB.class_exists(&"DotSimCrowdGrid"):
+	if not ClassDB.class_exists(&"GSSimCrowdGrid"):
 		return
 	var live: Variant = horde.get(&"crowd")
-	var script_grid := DotNpcAiCrowdGrid.new(4.0)
-	var native: Object = ClassDB.instantiate(&"DotSimCrowdGrid")
+	var script_grid := GSNpcAiCrowdGrid.new(4.0)
+	var native: Object = ClassDB.instantiate(&"GSSimCrowdGrid")
 	native.call(&"setup", 4.0)
 	var n: int = live.size()
 	for i in n:
@@ -702,7 +702,7 @@ func _keep_crowd(game: ZzGame, local, stand: Vector3, rng: RandomNumberGenerator
 		var angle := rng.randf() * TAU
 		var reach := rng.randf_range(_ring.x, _ring.y)
 		var at := stand + Vector3(cos(angle) * reach, 0.0, sin(angle) * reach)
-		var npc: DotNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(at), &"bench", Basis(Vector3.UP, rng.randf() * TAU))
+		var npc: GSNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, game.horde.snap_to_nav(at), &"bench", Basis(Vector3.UP, rng.randf() * TAU))
 		if npc != null and npc.brain != null:
 			npc.brain.call(&"force_target", local.player_id)
 

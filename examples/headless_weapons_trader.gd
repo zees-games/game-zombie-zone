@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzClient := preload("../game/zz_client.gd")
 const ZzHud := preload("../game/zz_hud.gd")

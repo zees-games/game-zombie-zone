@@ -16,7 +16,7 @@ const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## optional functions, because a row is data and a rig needs the real definition:
 ##
 ## [codeblock]
-## static func weapon_defs(types: Dictionary = {}) -> Array[DotWeaponDef]   # joins every rig's catalogue (zee add_source)
+## static func weapon_defs(types: Dictionary = {}) -> Array[GSWeaponDef]   # joins every rig's catalogue (zee add_source)
 ## static func weapon_art() -> Dictionary              # optional: id -> ZeeWeaponArt (zee passes the damage table as `types`)
 ## [/codeblock]
 ##
@@ -28,7 +28,7 @@ const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## which also takes `meta`, merged into the definition's, and knows zz-historical-monsters' layout). Both ends scan, so both end up with the same catalogue.
 ##
 ## [b]Tuning is `cfg/addon/zombie_zone/*.yml`[/b], every file read by dot-core's
-## `DotAddonConfig` (see its docs/addon-config.md); the defaults are [constant DEFAULTS].
+## `GSAddonConfig` (see its docs/addon-config.md); the defaults are [constant DEFAULTS].
 
 const CHANNEL := "zz.packs"
 const PROVIDER_FILE := "spawn_provider.gd"
@@ -105,7 +105,7 @@ static var monsters: Array[Monster] = []
 static var _sources: Array[StringName] = []
 ## The attachment art lookups registered with [ZeeAttachmentArt], one per pack that draws its own.
 static var _art_sources: Array[StringName] = []
-static var _attachments: DotWeaponAttachments = null
+static var _attachments: GSWeaponAttachments = null
 static var _notes: PackedStringArray = PackedStringArray()
 
 
@@ -123,7 +123,7 @@ static func scan(from: String = "") -> int:
 			continue
 
 		if (config.get("skip", []) as Array).has(dir_name):
-			DotLog.info(CHANNEL, "pack skipped: listed in packs skip (not this game's)", {"dir": dir_name})
+			GSLog.info(CHANNEL, "pack skipped: listed in packs skip (not this game's)", {"dir": dir_name})
 			continue
 
 		var path := "%s/%s/%s" % [base, dir_name, PROVIDER_FILE]
@@ -140,7 +140,7 @@ static func scan(from: String = "") -> int:
 
 	_collect_class_roots()
 
-	DotLog.info(CHANNEL, "packs scanned", {
+	GSLog.info(CHANNEL, "packs scanned", {
 		"providers": found, "weapons": weapon_rows.size(), "monsters": monsters.size(),
 	})
 	return found
@@ -183,10 +183,10 @@ static func clear() -> void:
 
 
 static func _load_config() -> void:
-	var res := DotAddonConfig.load_dir(ADDON, DEFAULTS)
+	var res := GSAddonConfig.load_dir(ADDON, DEFAULTS)
 
 	if not res.ok:
-		DotLog.warn(CHANNEL, "the pack settings do not load, defaults used", {"why": res.error.message})
+		GSLog.warn(CHANNEL, "the pack settings do not load, defaults used", {"why": res.error.message})
 		config = DEFAULTS.duplicate(true)
 		return
 
@@ -210,7 +210,7 @@ static func _set_pack_game(dir: String) -> void:
 
 
 ## A pack delivered by dot-cloud sits under `<mount prefix>/addons/<pack>/`, and its profiles under `<prefix>/cfg`
-## (`DotCloudMounter.cfg_root_of`); a pack linked into `res://addons` has no root of its own, so this is empty.
+## (`GSCloudMounter.cfg_root_of`); a pack linked into `res://addons` has no root of its own, so this is empty.
 static func _mounted_cfg_root(dir: String) -> String:
 	var at := dir.find("/addons/")
 	var prefix := dir.substr(0, at) if at >= 0 else ""
@@ -223,12 +223,12 @@ static func _mounted_cfg_root(dir: String) -> String:
 
 
 static func cfg(path: String, fallback: Variant) -> Variant:
-	return DotAddonConfig.get_value(config, path, fallback)
+	return GSAddonConfig.get_value(config, path, fallback)
 
 
 static func _take(pack: String, provider: Object, dir: String = "") -> void:
 	if not provider.has_method(&"spawn_entries"):
-		DotLog.warn(CHANNEL, "a provider has no spawn_entries", {"pack": pack})
+		GSLog.warn(CHANNEL, "a provider has no spawn_entries", {"pack": pack})
 		return
 
 	var rows: Array = provider.call(&"spawn_entries")
@@ -257,7 +257,7 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 		seen += 1
 
 		if seen > MAX_ENTRIES_PER_PROVIDER:
-			DotLog.warn(CHANNEL, "a provider offers too many entries, the rest ignored", {"pack": pack})
+			GSLog.warn(CHANNEL, "a provider offers too many entries, the rest ignored", {"pack": pack})
 			break
 
 		if not row_var is Dictionary:
@@ -277,7 +277,7 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 			if weapon_ids.has(wid) or weapon_ids.has(id):
 				weapon_rows.append(row)
 			else:
-				DotLog.warn(CHANNEL, "a weapon row has no definition here (provider lacks weapon_defs or the weapon is excluded)",
+				GSLog.warn(CHANNEL, "a weapon row has no definition here (provider lacks weapon_defs or the weapon is excluded)",
 					{"pack": pack, "id": id})
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row, dir)
@@ -286,9 +286,9 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 ## Every attachment a weapon here can take: zee's own, then each pack's (its provider's
 ## `attachments()`). The arsenals' `attachments`, server and client alike, so both validate
 ## and apply a fitting against the same numbers.
-static func attachment_catalogue() -> DotWeaponAttachments:
+static func attachment_catalogue() -> GSWeaponAttachments:
 	if _attachments == null:
-		_attachments = DotWeaponAttachments.new()
+		_attachments = GSWeaponAttachments.new()
 
 		for att in ZeeAttachmentPack.attachment_defs():
 			var _added := _attachments.add(att)
@@ -301,14 +301,14 @@ static func attachment_catalogue() -> DotWeaponAttachments:
 ## an attachment fits a weapon by its mounts, and a pack's attachments are for its guns.
 static func _take_attachments(pack: String, source: StringName, provider: Object) -> void:
 	if provider.has_method(&"attachments"):
-		var theirs := provider.call(&"attachments") as DotWeaponAttachments
+		var theirs := provider.call(&"attachments") as GSWeaponAttachments
 		var into := attachment_catalogue()
 
 		for id in theirs.ids() if theirs != null else ([] as Array[StringName]):
 			var added := into.add(theirs.get_attachment(id))
 
 			if not added.ok:
-				DotLog.warn(CHANNEL, "a pack's attachment was not added", {"pack": pack, "why": added.error.message})
+				GSLog.warn(CHANNEL, "a pack's attachment was not added", {"pack": pack, "why": added.error.message})
 
 	if provider.has_method(&"attachment_art"):
 		ZeeAttachmentArt.add_source(source, Callable(provider.get_script(), &"attachment_art"))
@@ -335,7 +335,7 @@ static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> voi
 	m.weight = maxf(float(weights.get(String(m.id), cfg("monsters.weight", 1.0))), 0.0)
 
 	if RESERVED.has(m.id):
-		DotLog.warn(CHANNEL, "a pack monster shares a built-in kind's name, ignored", {"pack": pack, "id": String(m.id)})
+		GSLog.warn(CHANNEL, "a pack monster shares a built-in kind's name, ignored", {"pack": pack, "id": String(m.id)})
 		return
 
 	if m.weight <= 0.0:

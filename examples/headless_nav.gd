@@ -21,7 +21,7 @@ const HOLDS_CHECKS := 40
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -40,8 +40,8 @@ func _run() -> void:
 	if await _dev_only(only):
 		return
 
-	if shard == "waves" and DotGameShardArgs.is_merge():
-		_merge_waves(DotGameShardArgs.merge_logs())
+	if shard == "waves" and GSGameShardArgs.is_merge():
+		_merge_waves(GSGameShardArgs.merge_logs())
 		return
 
 	var waves_played: Array[StringName] = []
@@ -53,12 +53,12 @@ func _run() -> void:
 			for id: String in STUCK_BANDS:
 				await _test_stuck(StringName(id))
 		"waves":
-			var part := DotGameShardArgs.shard()
+			var part := GSGameShardArgs.shard()
 			if part != "" and not part in _wave_shard_names():
 				push_error("headless_nav_waves: unknown shard %s (have %s)" % [part, _wave_shard_names()])
 				get_tree().quit(1)
 				return
-			waves_played.assign(DotGameShardArgs.slice(_survival_maps(), part, WAVE_SHARDS, "w"))
+			waves_played.assign(GSGameShardArgs.slice(_survival_maps(), part, WAVE_SHARDS, "w"))
 			for id in waves_played:
 				await _test_wave_origin(id)
 		_:
@@ -161,7 +161,7 @@ func _test_async_build() -> void:
 ## does neither, and a climbing zombie goes both ways.
 func _test_graph() -> void:
 	_section("the graph: drops are one way and the zombies' alone")
-	var data := DotNpcNavData.new()
+	var data := GSNpcNavData.new()
 	data.map_id = &"drop_test"
 	data.source_digest = "test"
 	data.grid_spacing = 1.0
@@ -178,10 +178,10 @@ func _test_graph() -> void:
 		var _a := data.connect_points(high[i], high[i + 1])
 		var _b := data.connect_points(low[i], low[i + 1])
 
-	var cached := DotNpcNavData.from_cache_bytes(data.to_cache_bytes())
+	var cached := GSNpcNavData.from_cache_bytes(data.to_cache_bytes())
 	_check(cached != null and cached.matches("test"), "a graph survives the cache to the byte's digest")
 	_check(cached != null and cached.points == data.points and cached.edges == data.edges, "with its points and edges whole")
-	_check(DotNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
+	_check(GSNpcNavData.from_cache_bytes(PackedByteArray([1, 2, 3])) == null, "and garbage bytes are no graph")
 	_check_cache_key()
 
 	_check_thinned_spawns()
@@ -519,23 +519,23 @@ func _test_repeatable() -> void:
 		_finished()
 		return
 
-	var verify_before := DotParallel.verify
-	var failures_before := DotParallel.verify_failures
+	var verify_before := GSParallel.verify
+	var failures_before := GSParallel.verify_failures
 	var off: Array = await _repeat_run(0, 0)
 	var off_again: Array = await _repeat_run(0, 0)
-	DotParallel.verify = true
+	GSParallel.verify = true
 	var on: Array = await _repeat_run(2, 0)
 	var queued: Array = await _repeat_run(2, 2)
-	DotParallel.verify = verify_before
+	GSParallel.verify = verify_before
 	var line := "off %s, off %s, sense+think workers 2 %s, and path workers 2 %s" % [off, off_again, on, queued]
-	var threads := "" if DotParallel.resolve_workers(2) > 0 else " (no threads here: inline)"
+	var threads := "" if GSParallel.resolve_workers(2) > 0 else " (no threads here: inline)"
 	_check(off[1] > 0 and off[2] > 0, "the hash covers a horde that moved and searched paths", line)
 	_check(off[0] == off_again[0], "off against off: the same hash of %d ticks" % REPEAT_TICKS, line)
 	_check(on[0] == off[0], "sense and think workers 2 against off: the same hash", line + threads)
 	_check(queued[0] == off[0] and queued[2] == off[2] and queued[2] > 0,
 		"sense, think and path workers 2 against off: the same hash and searches", line + threads)
-	_check(DotParallel.verify_failures == failures_before, "and verify found no task that differs between runs",
-		"%d failures" % (DotParallel.verify_failures - failures_before))
+	_check(GSParallel.verify_failures == failures_before, "and verify found no task that differs between runs",
+		"%d failures" % (GSParallel.verify_failures - failures_before))
 	_finished()
 
 
@@ -558,7 +558,7 @@ func _repeat_run(workers: int, path_workers: int) -> Array:
 		p.health.invulnerable = true
 
 	game.start()
-	var spawner: DotNpcSpawner = game.horde.spawner
+	var spawner: GSNpcSpawner = game.horde.spawner
 	spawner.sense_workers = workers
 	spawner.path_workers = path_workers
 	spawner.think_workers = workers
@@ -643,9 +643,9 @@ func _wave_shard_names() -> Array:
 
 ## The merge run: every shard's log is there and together they entered a section per survival map.
 func _merge_waves(logs: PackedStringArray) -> void:
-	var absent := DotGameShardArgs.missing(logs)
+	var absent := GSGameShardArgs.missing(logs)
 	_check(logs.size() == WAVE_SHARDS and absent.is_empty(), "every wave shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := DotGameShardArgs.sections_entered(logs)
+	var entered := GSGameShardArgs.sections_entered(logs)
 	var want := _survival_maps().size()
 	_check(entered == want, "the wave shards entered a section per survival map (%d of %d)" % [entered, want])
 	_report_sections(1, 1, 1, 2)

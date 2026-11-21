@@ -19,14 +19,14 @@ func _dress_board() -> void:
 
 	board.title_text = "Zombie Zone"
 	board.columns = [
-		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
+		{"key": &"avatar", "kind": GSMenuScoreboard.KIND_AVATAR, "width": 0.0},
 		{"key": &"name", "title": "Survivor", "width": 3.0},
-		{"key": &"health", "title": "Health", "kind": DotMenuScoreboard.KIND_TEXT},
-		{"key": &"downs", "title": "Downs left", "kind": DotMenuScoreboard.KIND_TEXT},
-		{"key": &"kills", "title": "Kills", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"specials", "title": "Specials", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"points", "title": "Points", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
+		{"key": &"health", "title": "Health", "kind": GSMenuScoreboard.KIND_TEXT},
+		{"key": &"downs", "title": "Downs left", "kind": GSMenuScoreboard.KIND_TEXT},
+		{"key": &"kills", "title": "Kills", "kind": GSMenuScoreboard.KIND_NUMBER},
+		{"key": &"specials", "title": "Specials", "kind": GSMenuScoreboard.KIND_NUMBER},
+		{"key": &"points", "title": "Points", "kind": GSMenuScoreboard.KIND_NUMBER},
+		{"key": &"ping", "title": "Ping", "kind": GSMenuScoreboard.KIND_PING},
 	]
 	board.sort_by = &"points"
 	board.decorate = _decorate_row
@@ -160,7 +160,7 @@ func _build_killcam() -> void:
 	killcam.world_mask = game.world_mask()
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_map())
 	add_child(killcam)
-	winner_reveal = DotWinnerReveal.new()
+	winner_reveal = GSWinnerReveal.new()
 	winner_reveal.name = "WinnerReveal"
 	winner_reveal.skip_actions = ZzKillcam.SKIP_ACTIONS
 	winner_reveal.hold_seconds = 4.0
@@ -173,7 +173,7 @@ func _on_killcam_cvar(cvar_name: String, value: String) -> void:
 	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
 		_killcam_sec = maxf(value.to_float(), 0.0)
 	elif cvar_name == "mp_killview_camera" and value.strip_edges().is_valid_float():
-		_killcam_camera = DotKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else DotKillViewRules.Camera.EYE
+		_killcam_camera = GSKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else GSKillViewRules.Camera.EYE
 
 
 ## The HUD and the chat window: hidden while the replay or the reveal owns the screen.
@@ -208,7 +208,7 @@ func _begin_map_end(won: bool, why: String) -> void:
 	if not killcam.map_ended():
 		return
 
-	DotLog.debug(CHANNEL, "the reveal waits for the killcam")
+	GSLog.debug(CHANNEL, "the reveal waits for the killcam")
 
 
 ## The survivors by points on a podium, after the killcam and before the board.

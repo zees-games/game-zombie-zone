@@ -38,7 +38,7 @@ var _between := PackedFloat64Array()
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -167,7 +167,7 @@ func _job_for(game: Node, doc: Dictionary) -> Object:
 
 
 ## Each graph point's label: the first point of its connected piece, counting only points inside the swept area.
-func _piece_labels(data: DotNpcNavData, graph: DotNpcNavGraph, lo: Vector3, hi: Vector3) -> Array[int]:
+func _piece_labels(data: GSNpcNavData, graph: GSNpcNavGraph, lo: Vector3, hi: Vector3) -> Array[int]:
 	var label: Array[int] = []
 	label.resize(data.point_count())
 	var local: Array[int] = []
@@ -192,8 +192,8 @@ func _piece_labels(data: DotNpcNavData, graph: DotNpcNavGraph, lo: Vector3, hi: 
 
 ## `gap x y z piece`: a standing spot of the physics world with no graph point within 0.8 m across and 0.6 m up; piece is the nearest graph point's piece within 2 m, else -1.
 func _list_gaps(game: Node) -> void:
-	var data: DotNpcNavData = game.horde.spawner.nav.data
-	var graph := DotNpcNavGraph.new(data)
+	var data: GSNpcNavData = game.horde.spawner.nav.data
+	var graph := GSNpcNavGraph.new(data)
 	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
 	var mask: int = game.physics.layer_mask(&"world")
 	var body: Object = ZzNavPrune.new()
@@ -268,8 +268,8 @@ func _list_gaps(game: Node) -> void:
 
 ## For each pair of pieces, the three nearest point pairs the physics world lets a body walk between: `bridge P Q dist [link]`.
 func _list_bridges(game: Node) -> void:
-	var data: DotNpcNavData = game.horde.spawner.nav.data
-	var graph := DotNpcNavGraph.new(data)
+	var data: GSNpcNavData = game.horde.spawner.nav.data
+	var graph := GSNpcNavGraph.new(data)
 	var test: Callable = ZzNavPrune.edge_test(game.get_world_3d().direct_space_state, game.physics.layer_mask(&"world"))
 	var label: Array[int] = []
 
@@ -345,7 +345,7 @@ func _explain(game: Node) -> void:
 		blockers = game.map.mechanics.rest_blockers()
 
 	var job := ZzNpcs.nav_job(horde.nav_doc(), props_size, horde.open_gates, blockers, false, false)
-	var builder: DotNpcNavBuilder = job.make_builder.call([], {})
+	var builder: GSNpcNavBuilder = job.make_builder.call([], {})
 	var a := Vector3(_between[0], _between[1], _between[2])
 	var b := Vector3(_between[3], _between[4], _between[5])
 	var hit := {}
@@ -366,8 +366,8 @@ func _explain(game: Node) -> void:
 
 
 func _report(game: Node) -> String:
-	var data: DotNpcNavData = game.horde.spawner.nav.data
-	var graph := DotNpcNavGraph.new(data)
+	var data: GSNpcNavData = game.horde.spawner.nav.data
+	var graph := GSNpcNavGraph.new(data)
 	var doc: Dictionary = game.map.doc
 	var spawns: Array = (doc.get("spawns", {}) as Dictionary).get("survivors", [])
 	var home := -1 if spawns.is_empty() else data.nearest_point(ZzMapDoc.v3(spawns[0]["at"]), SNAP)
@@ -445,8 +445,8 @@ func _graph_ready(game: Node) -> bool:
 
 ## `trace i a b adjacent`: the last 8 doc links, the graph points their ends snap to (nearest within 2 m) and whether the two are joined by an edge.
 func _trace_links(game: Node) -> void:
-	var data: DotNpcNavData = game.horde.spawner.nav.data
-	var graph := DotNpcNavGraph.new(data)
+	var data: GSNpcNavData = game.horde.spawner.nav.data
+	var graph := GSNpcNavGraph.new(data)
 	var links: Array = (game.horde.nav_doc().get("nav", {}) as Dictionary).get("links", [])
 
 	for k in range(maxi(links.size() - 13, 0), links.size()):

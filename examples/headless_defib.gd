@@ -16,7 +16,7 @@ const STREET := Vector3(0.0, 0.05, 14.0)
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -146,7 +146,7 @@ func _test_items() -> void:
 	game.loot.use(game.loot.add(ZzLoot.DEFIB, &"defib", me.feet()), me)
 	_check(me.defibs == 50, "zz_defib_charges has no upper limit: 50 charges stay 50", "%d" % me.defibs)
 	game.config.defib_charges = 1
-	var pair := ZzEvents.read_pair(DotNetReader.new(ZzEvents.write_pair(5, 9)))
+	var pair := ZzEvents.read_pair(GSNetReader.new(ZzEvents.write_pair(5, 9)))
 	_check(pair["player_id"] == 5 and pair["other"] == 9 and int(ZzEvents.Kind.DEFIB) < 256, "the event carries who and by whom")
 	_check(game.drops.item_weights(&"brute").has(&"defib") or game.drops.rolls_for(&"brute") >= 0.0, "the drop table knows the item")
 

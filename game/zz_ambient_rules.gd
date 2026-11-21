@@ -1,4 +1,4 @@
-extends DotAmbienceRules
+extends GSAmbienceRules
 
 ## The `zz_ambient*` cvars: dot-audio's rules under this game's prefix.
 

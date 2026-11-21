@@ -1,4 +1,4 @@
-extends DotWeaponCvarRules
+extends GSWeaponCvarRules
 
 ## Zombie Zone's own copy (2026-11-16) of the grenade code first written for fc-weapons: the game depends on no FC addon.
 

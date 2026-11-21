@@ -15,7 +15,7 @@ func _run() -> void:
 	var at := Vector3(float(parts[0]), float(parts[2]) if parts.size() > 2 else 2.0, float(parts[1]))
 	p.place_at(at, 0.0)
 	var walk := OS.get_cmdline_user_args().has("--walk")
-	var c := DotFpsCommand.new()
+	var c := GSFpsCommand.new()
 	c.move = Vector2(0, 1) if walk else Vector2.ZERO
 	var times: Array = []
 	var lowest := INF

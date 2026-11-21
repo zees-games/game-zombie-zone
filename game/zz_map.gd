@@ -6,7 +6,7 @@ signal copy_changed(id: int, model: int, offset: Vector3, alive: bool)
 ## The map's own logic asked the game for something (a HUD line, a zombie, a setting): see [signal ZzMechanics.logic_event].
 signal logic_event(kind: String, data: Dictionary)
 
-var physics: DotPhysicsLayout = null
+var physics: GSPhysicsLayout = null
 
 ## The catalogue every prop's size and model come from.
 var catalogue: ZzProps = null
@@ -29,17 +29,17 @@ var _gates: Dictionary = {}
 ## AABB, mat, tint, intact, fraction}.
 var _barricades: Dictionary = {}
 
-## The map's toys (dot-props' [DotPropBodyBox]): loose ones only on this game's maps (barrels,
+## The map's toys (dot-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
-var toys: DotPropBodyBox = null
+var toys: GSPropBodyBox = null
 
-## Breakables of a drawn world with loose props on them ([DotMapSupport]); a shot breaks one and what stood on it falls.
-var supports: Array[DotMapSupport] = []
+## Breakables of a drawn world with loose props on them ([GSMapSupport]); a shot breaks one and what stood on it falls.
+var supports: Array[GSMapSupport] = []
 
 var authoritative: bool = true
 
-var toy_rules: DotPropBodyRules = null
+var toy_rules: GSPropBodyRules = null
 
 var gravity: float = 20.0
 
@@ -78,7 +78,7 @@ var _daylight: float = 0.0
 var _bounds: AABB = AABB()
 
 ## The converted map's displacement ground (the document's `terrain`), or null.
-var terrain: DotMapTerrain = null
+var terrain: GSMapTerrain = null
 
 var _missing: PackedStringArray = PackedStringArray()
 
@@ -124,11 +124,11 @@ func id() -> StringName:
 ## failed allocation names the section it died in).
 func _mark(name: StringName, since: int) -> int:
 	if OS.has_feature("web"):
-		DotLog.info(CHANNEL, "map section", {"section": String(name)})
+		GSLog.info(CHANNEL, "map section", {"section": String(name)})
 	return ZzLaps.lap(sections, name, since)
 
 ## Builds [param p_doc], which [ZzMapDoc.validate] has already normalised.
-func build(p_doc: Dictionary) -> DotResult:
+func build(p_doc: Dictionary) -> GSResult:
 	clear()
 	doc = p_doc
 
@@ -179,21 +179,21 @@ func build(p_doc: Dictionary) -> DotResult:
 		lap = ZzLaps.lap(sections, &"env_bake", lap)
 
 	if not _missing.is_empty():
-		DotLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
+		GSLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
 			"map": String(id()), "missing": ", ".join(_missing),
 		})
 
-	DotLog.debug(CHANNEL, "built a map", {
+	GSLog.debug(CHANNEL, "built a map", {
 		"id": String(id()), "boxes": (doc["boxes"] as Array).size(), "props": props.size(),
 	})
 	built.emit()
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 ## The toys, on their own layer: a loose one (a barrel, a ball) on `toy`, which the world, the
 ## furniture and other toys stop and a survivor or a zombie never does (they walk through it,
 ## and a survivor pushes it, `ZzGame._advance_toys`).
 func _build_toys() -> void:
-	toys = DotPropBodyBox.new()
+	toys = GSPropBodyBox.new()
 	toys.name = "Toys"
 	toys.authoritative = authoritative
 	toys.draw = draw_world
@@ -214,12 +214,12 @@ func _build_toys() -> void:
 	placed.append_array(doc.get("loose_toys", []))
 	var built := toys.build(placed)
 	if built.ok and not (doc.get("supports", []) as Array).is_empty() and physics != null:
-		supports = DotMapSupport.build_all(doc["supports"], physics.layer_mask(&"toy"), authoritative, first_loose)
+		supports = GSMapSupport.build_all(doc["supports"], physics.layer_mask(&"toy"), authoritative, first_loose)
 		for support in supports:
 			add_child(support)
 			var _c := support.broken.connect(_on_support_broken.bind(support.index))
 	if not built.ok:
-		DotLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
+		GSLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
 
 ## What stood on a broken support wakes and falls (a barrel rolls on).
 func _on_support_broken(held: PackedInt32Array, _at: Vector3, index: int) -> void:
@@ -383,7 +383,7 @@ func _new_solid() -> void:
 ## Adds a world shape, to a new Solid body once the current one holds [member solid_body_shapes].
 func _add_solid(shape: CollisionShape3D) -> void:
 	if solid_body_shapes < 0:
-		DotLog.error(CHANNEL, "solid_body_shapes is negative; 0 means one body", {"value": solid_body_shapes})
+		GSLog.error(CHANNEL, "solid_body_shapes is negative; 0 means one body", {"value": solid_body_shapes})
 	elif solid_body_shapes > 0 and _solid.get_child_count() >= solid_body_shapes:
 		_new_solid()
 	_solid.add_child(shape)
@@ -395,7 +395,7 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 	var applied := physics.apply_to(body, layer)
 
 	if not applied.ok:
-		DotLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
+		GSLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
 
 
 # Building
@@ -562,7 +562,7 @@ func _build_boxes() -> void:
 			if absf(top) < 0.05 and size.y <= 0.5 and not _ground_below(at, size):
 				cube.size.y = size.y + GROUND_DEPTH
 				shape.transform.origin.y -= GROUND_DEPTH * 0.5
-			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
+			# What a footstep on it sounds like (dot-audio's GSAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "asphalt" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			if bool(box.get("visible", true)):
@@ -620,7 +620,7 @@ func _build_boxes() -> void:
 		# lightmap cannot hold, so it stays unlit by the lightmap and the lamps light it live.
 		mesh.name = "%s_%d" % ["Shiny" if batch["shiny"] else "Boxes", index]
 		index += 1
-		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# dot-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so, and a player is meant to walk through it.
 		# a batch of nothing but trim has no shape by ZzMapDoc.is_trim's rule, not by a loss
 		if bool(batch["ghost"]) or bool(batch.get("trim", false)):
@@ -652,7 +652,7 @@ func _terrain_cache_read(key: String) -> Dictionary:
 	var d: Variant = f.get_var()
 	if typeof(d) != TYPE_DICTIONARY or int(d.get("v", 0)) != TERRAIN_CACHE_VERSION:
 		return {}
-	var t := DotMapTerrain.new()
+	var t := GSMapTerrain.new()
 	t.nx = int(d["nx"])
 	t.nz = int(d["nz"])
 	t.cell = float(d["cell"])
@@ -695,9 +695,9 @@ func _build_terrain() -> void:
 	var faces := PackedVector3Array()
 	var box := AABB()
 	if kept.is_empty():
-		var res := DotMapTerrain.from_dict(doc["terrain"])
+		var res := GSMapTerrain.from_dict(doc["terrain"])
 		if not res.ok:
-			DotLog.warn(CHANNEL, "a map's terrain would not read; it has no ground there", {"map": String(id()), "error": str(res)})
+			GSLog.warn(CHANNEL, "a map's terrain would not read; it has no ground there", {"map": String(id()), "error": str(res)})
 			return
 		terrain = res.value
 		faces = terrain.faces()
@@ -778,7 +778,7 @@ func _build_objective_props() -> void:
 		var drawn := ZzFixtures.objective_prop(o, gate_box if str(o.get("prop", "")) == "padlock" else {})
 		if drawn == null:
 			continue
-		# dot-core's DotCollisionAudit: a padlock hangs on a gate that has its own body, a lever
+		# dot-core's GSCollisionAudit: a padlock hangs on a gate that has its own body, a lever
 		# or a radio is something you reach and use. None of them should stop a survivor.
 		drawn.set_meta(&"dot_no_collision", true)
 		_drawn.add_child(drawn)
@@ -1042,12 +1042,12 @@ func _process(delta: float) -> void:
 	if camera != null and _drawn != null:
 		_lamp_budget.update(_lamps, _drawn.to_local(camera.global_position), delta)
 
-## Whether the host's dot-lighting can lay a bake (API level 5: DotLightBake, DotLightmapSheet). Those
+## Whether the host's dot-lighting can lay a bake (API level 5: GSLightBake, GSLightmapSheet). Those
 ## classes are reached by path, never by name: a host shell with an older dot-lighting would fail to
 ## parse this whole script on the name, and the map would not load. Without them the map is drawn
 ## with its live lamps.
 static func can_bake() -> bool:
-	return DotAddonApi.build_level("dot_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
+	return GSAddonApi.build_level("dot_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
 			and ResourceLoader.exists(SHEET_SCRIPT)
 
 ## What this map's bake must have been made from: the boxes, the lamps and the sky, and the
@@ -1068,7 +1068,7 @@ func _attach_bake() -> void:
 	if not can_bake():
 		return
 
-	var res: DotResult = (load(BAKE_SCRIPT) as GDScript).call(&"attach", self, path, light_fingerprint())
+	var res: GSResult = (load(BAKE_SCRIPT) as GDScript).call(&"attach", self, path, light_fingerprint())
 
 	if not res.ok:
 		return
@@ -1083,9 +1083,9 @@ func _attach_bake() -> void:
 	if _environment != null:
 		_baked_exposure = _environment.environment.tonemap_exposure
 
-	DotLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
+	GSLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
 
-## Whether this host can read a map's drawn world: dot-map's [code]DotMapBspMesh[/code], reached by
+## Whether this host can read a map's drawn world: dot-map's [code]GSMapBspMesh[/code], reached by
 ## path for the reason [method can_bake] gives (a shell with an older dot-map would fail to parse
 ## this script on the name).
 static func can_draw_world() -> bool:
@@ -1096,7 +1096,7 @@ static func can_draw_world() -> bool:
 func local_world_prefix() -> String:
 	return ZzPaths.rebase(LOCAL_WORLD % [str(doc.get("world", "")), String(id())])
 
-## Collides with the hulls of [param world] (a [code]DotMapBspMesh[/code]) that the document's
+## Collides with the hulls of [param world] (a [code]GSMapBspMesh[/code]) that the document's
 ## `world_collision` selects: the solids the wire budget dropped from its boxes. Once per map.
 func attach_world_collision(world: RefCounted) -> void:
 	var sel: Dictionary = doc.get("world_collision", {})
@@ -1147,7 +1147,7 @@ func attach_world_collision(world: RefCounted) -> void:
 	_put_on(clip, &"clip")
 	add_child(clip)
 	world_clip = clip
-	DotLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
+	GSLog.debug(CHANNEL, "the map collides with its world's hulls", {"map": String(id()), "hulls": body.get_child_count(), "clip": clip.get_child_count()})
 
 ## The document's `solid_props` as one body of boxes on the prop layer, the same on a server and a client.
 func _build_solid_props() -> void:
@@ -1177,7 +1177,7 @@ func attach_world_props(world: RefCounted) -> void:
 	_put_on(body, &"prop")
 	add_child(body)
 	world_props = body
-	DotLog.debug(CHANNEL, "the map collides with its solid props", {"map": String(id()), "boxes": body.get_child_count()})
+	GSLog.debug(CHANNEL, "the map collides with its solid props", {"map": String(id()), "boxes": body.get_child_count()})
 
 ## [method attach_world_props] on a dev server from the checkout's world, for a document with no `solid_props`.
 func build_world_props_local() -> bool:
@@ -1186,9 +1186,9 @@ func build_world_props_local() -> bool:
 	var prefix := local_world_prefix()
 	if not FileAccess.file_exists(prefix + ".json"):
 		return false
-	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	var read: GSResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	if not read.ok:
-		DotLog.warn(CHANNEL, "a map's world would not read for its props", {"map": String(id()), "at": prefix, "why": read.error.message})
+		GSLog.warn(CHANNEL, "a map's world would not read for its props", {"map": String(id()), "at": prefix, "why": read.error.message})
 		return false
 	attach_world_props(read.value)
 	return world_props != null
@@ -1211,9 +1211,9 @@ func read_nav_extra(root: String = "") -> Dictionary:
 				# The hulls the physics prune runs against are not in the boxes: their files' hash joins the graph's cache key.
 				parsed["hull_sha"] = (FileAccess.get_sha256(prefix + ".json") + FileAccess.get_sha256(prefix + ".bin")).sha256_text()
 				return parsed
-			DotLog.warn(CHANNEL, "a map's navigation extra would not read", {"map": String(id()), "at": prefix})
+			GSLog.warn(CHANNEL, "a map's navigation extra would not read", {"map": String(id()), "at": prefix})
 			return {}
-	DotLog.warn(CHANNEL, "a map's navigation extra was not found; the horde walks the document's floor only", {"map": String(id())})
+	GSLog.warn(CHANNEL, "a map's navigation extra was not found; the horde walks the document's floor only", {"map": String(id())})
 	return {}
 
 ## [method attach_world_collision] on a server, which loads no world: from the maps pack's
@@ -1224,12 +1224,12 @@ func build_world_collision_local(root: String = "") -> bool:
 	for prefix in _hull_prefixes(root):
 		if not FileAccess.file_exists(prefix + ".json"):
 			continue
-		var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+		var read: GSResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 		if read.ok:
 			attach_world_collision(read.value)
 			return true
-		DotLog.warn(CHANNEL, "a map's hulls would not read", {"map": String(id()), "at": prefix, "why": read.error.message})
-	DotLog.warn(CHANNEL, "a map's hulls were not found; it collides with its boxes only", {"map": String(id())})
+		GSLog.warn(CHANNEL, "a map's hulls would not read", {"map": String(id()), "at": prefix, "why": read.error.message})
+	GSLog.warn(CHANNEL, "a map's hulls were not found; it collides with its boxes only", {"map": String(id())})
 	return false
 
 ## Draws the map with its own geometry ([member doc]'s `world`, zombie-zone-maps'
@@ -1239,10 +1239,10 @@ func build_world_collision_local(root: String = "") -> bool:
 ## A world that cannot be had leaves the boxes drawn: the map plays the same either way.
 ##
 ## Succeeds with true when the world is drawn, false when there is none to draw.
-func load_world() -> DotResult:
+func load_world() -> GSResult:
 	var pack := str(doc.get("world", ""))
 	if not draw_world or not use_worlds or pack == "" or not can_draw_world() or _drawn == null:
-		return DotResult.success(false)
+		return GSResult.success(false)
 
 	var wanted := id()
 	# A rebuild while this awaits (start() rebuilds the map _ready laid out) replaces _drawn; its own load is the one that draws.
@@ -1252,52 +1252,52 @@ func load_world() -> DotResult:
 	if not local_worlds or not FileAccess.file_exists(prefix + ".json"):
 		var key := str(doc.get("world_key", ""))
 		if key == "":
-			return DotResult.success(false)
-		var got: DotResult = await DotGameContent.ensure_one(key)
+			return GSResult.success(false)
+		var got: GSResult = await GSGameContent.ensure_one(key)
 		if id() != wanted or _drawn != drawn_for:
-			return DotResult.success(false)
+			return GSResult.success(false)
 		if not got.ok:
-			DotLog.warn(CHANNEL, "a map's world could not be fetched; its boxes are drawn", {
+			GSLog.warn(CHANNEL, "a map's world could not be fetched; its boxes are drawn", {
 				"map": String(wanted), "pack": key, "why": got.error.message,
 			})
 			return got
-		prefix = DotGameContent.mount_of(key) + "/" + String(wanted)
+		prefix = GSGameContent.mount_of(key) + "/" + String(wanted)
 
 	var t_read := Time.get_ticks_msec()
-	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	var read: GSResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	var read_ms := Time.get_ticks_msec() - t_read
 
 	if read.ok:
 		# The shared PBR and model slice this world names (dot-map's store); a world without one reads its own folder.
 		var t_store := Time.get_ticks_msec()
-		var stored: DotResult = await DotMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"))
-		DotLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
+		var stored: GSResult = await GSMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"dot_cloud_client"))
+		GSLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
 		if not stored.ok:
-			DotLog.debug(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
+			GSLog.debug(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
 		if id() != wanted or _drawn != drawn_for:
-			return DotResult.success(false)
+			return GSResult.success(false)
 
 	if not read.ok:
-		DotLog.warn(CHANNEL, "a map's world would not read; its boxes are drawn", {
+		GSLog.warn(CHANNEL, "a map's world would not read; its boxes are drawn", {
 			"map": String(wanted), "at": prefix, "why": read.error.message,
 		})
 		return read
 
 	var attached: bool = await attach_world(read.value, prefix.get_base_dir())
 	if id() != wanted or _drawn != drawn_for:
-		return DotResult.success(false)
-	return DotResult.success(attached)
+		return GSResult.success(false)
+	return GSResult.success(attached)
 
 ## Fades and spins the drawn world's ambient players on the map's `sound_fade` and `sound_spin` events; null without ambient sounds.
-var sound_driver: DotMapSoundDriver = null
+var sound_driver: GSMapSoundDriver = null
 
 ## The converted world's `sounds` block (soundscapes, ambient sounds): they pick the ambience mood.
 var world_sounds: Dictionary = {}
 
-## The drawn world's credit line (DotMapCredits.line): the map's author and the art whose licence asks for a name.
+## The drawn world's credit line (GSMapCredits.line): the map's author and the art whose licence asks for a name.
 var world_credits: String = ""
 
-## Lays [param world] (a [code]DotMapBspMesh[/code]) over the map: its meshes in, the box batches
+## Lays [param world] (a [code]GSMapBspMesh[/code]) over the map: its meshes in, the box batches
 ## out. Gates, barricades, fixtures and the boxes the converter added (`zz.keep_boxes`) stay
 ## drawn as boxes; they are not in the original's faces. A bake is made from the boxes, so it is
 ## taken off and the lamps light the world live.
@@ -1339,7 +1339,7 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 	var zz: Dictionary = (world.get("manifest") as Dictionary).get("zz", {})
 	var mats: Dictionary = zz.get("materials", {})
 	world_sounds = (world.get("manifest") as Dictionary).get("sounds", {})
-	world_credits = DotMapCredits.line(world.get("manifest") as Dictionary)
+	world_credits = GSMapCredits.line(world.get("manifest") as Dictionary)
 	var map_id := String(id())
 	var material_for := func(rec: Dictionary) -> Material:
 		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
@@ -1351,7 +1351,7 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
 		surfaces.set(&"use_lightmap", use_lightmaps)
 		surfaces.set(&"max_texture_size", texture_max)
-		DotMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), DotRegistry.get_service(&"dot_cloud_client"), surfaces, world)
+		GSMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"dot_cloud_client"), surfaces, world)
 		lap = _lap(stages, "store_apply", lap)
 		await surfaces.call(&"prefetch", world, dir)
 		if _drawn != drawn_for or not is_instance_valid(drawn_for):
@@ -1416,10 +1416,10 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 	lap = _lap(stages, "mechanics_kept", lap)
 	_attach_visibility(world, node)
 	_lap(stages, "visibility", lap)
-	DotLog.info(CHANNEL, "world attached", {"map": map_id, "ms": stages})
+	GSLog.info(CHANNEL, "world attached", {"map": map_id, "ms": stages})
 	world_drawn = true
 	_attach_extras_later(world, node)
-	DotLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
+	GSLog.debug(CHANNEL, "the map is drawn with its own geometry", {"map": map_id, "counts": str(world.call(&"counts"))})
 	return true
 
 ## Probes, sounds, prop stand-ins and fx after the first drawn frames: they cost about 3 s on the biggest map and nothing needs them to play.
@@ -1433,7 +1433,7 @@ func _attach_extras_later(world: RefCounted, node: Node3D) -> void:
 			return
 	var started := Time.get_ticks_msec()
 	_attach_world_extras(world, node)
-	DotLog.info(CHANNEL, "world extras attached", {"map": String(id()), "ms": Time.get_ticks_msec() - started})
+	GSLog.info(CHANNEL, "world extras attached", {"map": String(id()), "ms": Time.get_ticks_msec() - started})
 
 ## Adds the milliseconds since [param since] to [param stages] under [param name]; returns now.
 static func _lap(stages: Dictionary, name: String, since: int) -> int:
@@ -1456,9 +1456,9 @@ func _attach_visibility(world: RefCounted, node: Node3D) -> void:
 	vis.name = "Visibility"
 	vis.set(&"mode", vis.call(&"parse_mode", vis_mode))
 	add_child(vis)
-	var res: DotResult = vis.call(&"setup", world, node)
+	var res: GSResult = vis.call(&"setup", world, node)
 	if not res.ok:
-		DotLog.debug(CHANNEL, "the world is drawn without culling", {"why": res.error.message})
+		GSLog.debug(CHANNEL, "the world is drawn without culling", {"why": res.error.message})
 		vis.queue_free()
 		return
 	visibility = vis
@@ -1526,7 +1526,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	var sounds: Node3D = world.call(&"build_sounds")
 	if sounds.get_child_count() > 0:
 		node.add_child(sounds)
-		sound_driver = DotMapSoundDriver.new()
+		sound_driver = GSMapSoundDriver.new()
 		sound_driver.root = sounds
 		sounds.add_child(sound_driver)
 	else:
@@ -1556,7 +1556,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 	lap = _lap(stages, "props", lap)
 	_attach_fx(world, node)
 	_lap(stages, "fx", lap)
-	DotLog.info(CHANNEL, "world extras stages", {"ms": stages})
+	GSLog.info(CHANNEL, "world extras stages", {"ms": stages})
 	_bind_support_visuals()
 
 ## The player's `light_floor` cvar; a map's own `light_floor` (document top level) can only lower it.
@@ -1609,7 +1609,7 @@ func set_sun_shadow_splits(splits: int) -> void:
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if splits <= 1 \
 		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if splits == 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 
-## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's DotMapFx), capped per map.
+## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's GSMapFx), capped per map.
 func _attach_fx(world: RefCounted, node: Node3D) -> void:
 	var path := local_world_prefix() + ".doc.json"
 	if DisplayServer.get_name() == "headless" or OS.get_environment("ZZ_NO_FX") != "" or "--zz-map-fx=false" in OS.get_cmdline_user_args() or not FileAccess.file_exists(path):
@@ -1617,7 +1617,7 @@ func _attach_fx(world: RefCounted, node: Node3D) -> void:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not parsed is Dictionary:
 		return
-	var fx := DotMapFx.new()
+	var fx := GSMapFx.new()
 	fx.unit_scale = float(((world.get("manifest") as Dictionary).get("units", {}) as Dictionary).get("metres_per_unit", 0.0254))
 	var mask := physics.layer_mask(&"world") if physics != null else 1
 	fx.ray_fn = func(from: Vector3, to: Vector3) -> Dictionary:
@@ -1634,7 +1634,7 @@ func moving_node_named(target: String) -> Node3D:
 			return found
 	return _drawn.find_child(target.validate_node_name(), true, false) as Node3D if _drawn != null else null
 
-## Builds the world's movers and triggers from [param world] (a DotMapBspMesh) once: colliders
+## Builds the world's movers and triggers from [param world] (a GSMapBspMesh) once: colliders
 ## for the solid ones, the outputs that drive them. A second call keeps the first.
 ## [param doors_only]: a global pack's hinged prop doors alone (its brush doors are already in the boxes).
 func attach_mechanics(world: RefCounted, doors_only: bool = false) -> void:
@@ -1680,9 +1680,9 @@ func build_mechanics_local() -> bool:
 	var prefix := local_world_prefix()
 	if not FileAccess.file_exists(prefix + ".json"):
 		return false
-	var read: DotResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+	var read: GSResult = (load(MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 	if not read.ok:
-		DotLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
+		GSLog.warn(CHANNEL, "a map's world would not read; it has no moving parts", {"map": String(id()), "why": read.error.message})
 		return false
 	var own := (read.value.get("manifest") as Dictionary).has("zz") or bool(doc.get("mechanics", false)) or bring_global_mechanics
 	attach_mechanics(read.value, not own)
@@ -1728,7 +1728,7 @@ func _build_environment() -> void:
 	var lighting := Node3D.new()
 	lighting.name = "Lighting"
 	add_child(lighting)
-	_sun = DotLightRig.apply(lighting, DotLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)),
+	_sun = GSLightRig.apply(lighting, GSLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)),
 		ZzMapLight.light_profile(float(env_doc["ambient_energy"])))
 
 	if _sun != null:
@@ -1815,7 +1815,7 @@ func _capture_day() -> void:
 	_night_light = _light_values(_sun, _environment, _fill)
 	var day_doc: Dictionary = doc.get("day_environment", ZzMapDoc.DEFAULT_ENV)
 	var scratch := Node3D.new()
-	var day_sun := DotLightRig.apply(scratch, DotLightDocument.from_dictionary(ZzMapLight.light_document(day_doc)),
+	var day_sun := GSLightRig.apply(scratch, GSLightDocument.from_dictionary(ZzMapLight.light_document(day_doc)),
 		ZzMapLight.light_profile(float(day_doc["ambient_energy"])))
 	var day_env: WorldEnvironment = null
 
@@ -1847,7 +1847,7 @@ static func _aim_fill(lighting: Node, env_doc: Dictionary, sun: DirectionalLight
 	var fill := lighting.get_node_or_null("Fill") as DirectionalLight3D
 	if fill == null:
 		return null
-	var aimed := DotLightRig.fill(DotLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)), sun.rotation,
+	var aimed := GSLightRig.fill(GSLightDocument.from_dictionary(ZzMapLight.light_document(env_doc)), sun.rotation,
 		ZzMapLight.light_profile(float(env_doc["ambient_energy"])))
 	fill.rotation = aimed.rotation
 	aimed.free()
@@ -2032,7 +2032,7 @@ func prop_containing(point: Vector3) -> int:
 		var pieces := catalogue.pieces_of(prop["id"]) if catalogue != null else []
 
 		if not pieces.is_empty():
-			if DotPropPieces.contains(pieces, local, HIT_MARGIN):
+			if GSPropPieces.contains(pieces, local, HIT_MARGIN):
 				return index
 			continue
 

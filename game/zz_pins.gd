@@ -61,7 +61,7 @@ func _init(p_game: Object) -> void:
 
 ## [param npc] takes hold of [param victim]. False when they cannot be held: dead, already held,
 ## or the special already holds somebody.
-func pin(entity: int, npc: DotNpcInstance, victim: StringName, kind: StringName) -> bool:
+func pin(entity: int, npc: GSNpcInstance, victim: StringName, kind: StringName) -> bool:
 	var player = game.player_by_id(victim)
 
 	if player == null or not player.is_alive() or player.is_pinned() or player.watching:
@@ -105,7 +105,7 @@ func release(victim: StringName, why: StringName) -> void:
 		player.pin_kind = &""
 		var _off: bool = player.controller.remove_modifier(ZzController.PINNED)
 
-	var npc: DotNpcInstance = (held as Dictionary)["npc"]
+	var npc: GSNpcInstance = (held as Dictionary)["npc"]
 
 	if npc != null and npc.node != null and is_instance_valid(npc.node) and npc.node is ZzZombieBody:
 		(npc.node as ZzZombieBody).anchored = false
@@ -132,7 +132,7 @@ func victim_of(entity: int) -> StringName:
 	return &""
 
 
-func holder_of(victim: StringName) -> DotNpcInstance:
+func holder_of(victim: StringName) -> GSNpcInstance:
 	var held: Variant = pins.get(victim)
 	return (held as Dictionary)["npc"] if held != null else null
 
@@ -146,14 +146,14 @@ func kind_of(victim: StringName) -> StringName:
 func steer(delta: float) -> void:
 	for victim: StringName in pins.keys():
 		var held: Dictionary = pins[victim]
-		var npc: DotNpcInstance = held["npc"]
+		var npc: GSNpcInstance = held["npc"]
 		var player = game.player_by_id(victim)
 
 		if player == null or npc == null or not npc.is_alive() or npc.node == null or not is_instance_valid(npc.node):
 			release(victim, &"killed")
 			continue
 
-		var state: DotFpsState = player.controller.state
+		var state: GSFpsState = player.controller.state
 		var from: Vector3 = state.position
 		var special: Vector3 = npc.position()
 
@@ -193,7 +193,7 @@ func steer(delta: float) -> void:
 func advance(delta: float) -> void:
 	for victim: StringName in pins.keys():
 		var held: Dictionary = pins[victim]
-		var npc: DotNpcInstance = held["npc"]
+		var npc: GSNpcInstance = held["npc"]
 		var player = game.player_by_id(victim)
 
 		if player == null or not player.is_alive():

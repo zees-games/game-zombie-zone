@@ -17,7 +17,7 @@ const TICK := 1.0 / 64.0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -144,7 +144,7 @@ func _draw_layer(notes: ZzNavNotes, team: Array[Vector3]) -> Node3D:
 	# The picture of the layer: its own node, so the level can be hidden under it.
 	var layer := Node3D.new()
 	add_child(layer)
-	var debug := DotNpcAiNavDebug.new()
+	var debug := GSNpcAiNavDebug.new()
 	layer.add_child(debug)
 	debug.show_annotations(notes.annotations)
 	var lines := ImmediateMesh.new()

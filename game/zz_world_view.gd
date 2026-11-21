@@ -3,7 +3,7 @@ extends "zz_world_view_things.gd"
 var audio: ZzAudio = null
 
 ## The client's effects layer: where the smoke and fire clouds spawn.
-var effects: DotFxManager = null
+var effects: GSFxManager = null
 
 ## The config the fade cvars live in, and the Hard Box stacks last heard of; a change of either redraws.
 var fade_config: Object = null
@@ -49,21 +49,21 @@ var _rng := RandomNumberGenerator.new()
 ## cap is the machine's (four in a browser tab) and the server's `max_count`; a death past the
 ## cap, or with `sv_ragdoll 0`, is the view's animated fall instead (`ZzZombieView.die`), so a
 ## horde dying at once is a few ragdolls and the rest falling by the clip.
-var ragdolls: DotPlayerRagdolls = null
+var ragdolls: GSPlayerRagdolls = null
 
 ## What a ragdoll lands on: the level's world and prop layers (`ZzGame.world_mask`).
 var ragdoll_mask: int = 1
 
 ## The server's `sv_ragdoll*` rules (`ZzGame.ragdoll_rules`, followed through the link), set
 ## before this enters the tree. Null: the stock rules with [constant CORPSE_SECONDS].
-var ragdoll_rules: DotPlayerRagdollRules = null
+var ragdoll_rules: GSPlayerRagdollRules = null
 
 ## How far each zombie is animated, shadowed and drawn; the client points it at `crowd_detail`.
 var lod := ZzZombieLod.new()
 
 func _ready() -> void:
 	_rng.seed = Time.get_ticks_usec()
-	ragdolls = DotPlayerRagdolls.new()
+	ragdolls = GSPlayerRagdolls.new()
 	ragdolls.name = "Ragdolls"
 	if ragdoll_rules != null:
 		ragdolls.rules = ragdoll_rules
@@ -79,7 +79,7 @@ func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
 
 ## Drops a survivor's [param figure] the way [param death] says: the same yard and rules as the
 ## zombies, so the cap counts both and the oldest body (a zombie, as a rule) makes room.
-func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> DotPlayerRagdoll:
+func drop_survivor(figure: Node3D, death: GSPlayerDeath, velocity: Vector3) -> GSPlayerRagdoll:
 	if ragdolls == null or figure == null or not figure.is_inside_tree():
 		return null
 	ragdolls.rules.collision_mask = ragdoll_mask
@@ -89,7 +89,7 @@ func drop_survivor(figure: Node3D, death: DotPlayerDeath, velocity: Vector3) -> 
 	if gun is Node3D and is_instance_valid(gun) and (gun as Node3D).is_inside_tree() and (gun as Node3D).visible:
 		if ragdolls.drop_prop(gun as Node3D, velocity) != null:
 			(gun as Node3D).visible = false
-	return ragdolls.spawn(figure, death if death != null else DotPlayerDeath.new(), velocity)
+	return ragdolls.spawn(figure, death if death != null else GSPlayerDeath.new(), velocity)
 
 
 # Zombies
@@ -195,12 +195,12 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	# the view and the server's body go now.
 	var picked: Variant = old_body.get(&"death") if old_body != null and is_instance_valid(old_body) else null
 	# `sv_ragdoll_style hide`: the body goes at once, ragdoll or not.
-	if ragdolls != null and ragdolls.rules.effective_style() == DotPlayerRagdollRules.Style.HIDE:
+	if ragdolls != null and ragdolls.rules.effective_style() == GSPlayerRagdollRules.Style.HIDE:
 		view.queue_free()
 		if body != null and is_instance_valid(body):
 			body.queue_free()
 		return
-	if picked is DotPlayerDeath and _ragdoll(view, picked as DotPlayerDeath):
+	if picked is GSPlayerDeath and _ragdoll(view, picked as GSPlayerDeath):
 		view.queue_free()
 		if body != null and is_instance_valid(body):
 			body.queue_free()
@@ -217,8 +217,8 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 
 	# The server's pick of how it falls (dot-player-char's reactions); a body nobody was told
 	# about drops where it stands.
-	if death is DotPlayerDeath:
-		var d := death as DotPlayerDeath
+	if death is GSPlayerDeath:
+		var d := death as GSPlayerDeath
 		view.die(d.reaction, d.direction * clampf(d.damage / 40.0, 0.6, 2.2), d.roll_seed)
 	else:
 		view.die(&"limp", Vector3.ZERO, 0)
@@ -228,7 +228,7 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 
 ## Drops [param view] as a ragdoll the way [param death] says, or false when this machine is
 ## at its cap or the server turned ragdolls off (the caller draws the animated fall instead).
-func _ragdoll(view: ZzZombieView, death: DotPlayerDeath) -> bool:
+func _ragdoll(view: ZzZombieView, death: GSPlayerDeath) -> bool:
 	if ragdolls == null or not ragdolls.rules.enabled or ragdolls.standing_count() >= ragdolls.cap():
 		return false
 	if not view.is_inside_tree() or not view.visible:
@@ -468,7 +468,7 @@ func remove_hazard(id: int) -> void:
 func throw(id: int, kind: StringName, from: Vector3, velocity: Vector3) -> void:
 	if kind == &"beam_zap" or kind == &"beam_pull":
 		var zap := kind == &"beam_zap"
-		var _beam := DotFxBeam.zap(self, from, from + velocity,
+		var _beam := GSFxBeam.zap(self, from, from + velocity,
 			Color(0.5, 0.85, 1.0) if zap else Color(0.9, 0.5, 1.0), 0.25, 0.3 if zap else 0.2)
 		if audio != null:
 			var _zzt := audio.cue_at(&"mutant", &"zap" if zap else &"grab", from)
@@ -985,7 +985,7 @@ func _particles(colour: Color, radius: float, amount: int, additive: bool = true
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.5)
 	# dot-fx's soft sprite: an untextured quad was a hard square, the "big pixels" of the fire.
-	var material := DotFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0), additive)
+	var material := GSFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0), additive)
 	quad.material = material
 	p.mesh = quad
 	var gradient := Gradient.new()

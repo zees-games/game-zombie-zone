@@ -6,7 +6,7 @@ const StuckMeter := preload("stuck_meter.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 
 ## Bot soak on the real game: the map's team of stand-in survivors holds a map for M simulated
-## minutes through dot-bot's DotBotSoak, fed by dot-spawn's DotSpawnWatch. Kills, deaths and damage
+## minutes through dot-bot's GSBotSoak, fed by dot-spawn's GSSpawnWatch. Kills, deaths and damage
 ## come from the game's own signals.
 ##
 ## [codeblock]
@@ -14,7 +14,7 @@ const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 ## godot --headless --path . res://tools/soak.tscn -- --map zz_high_school --bots 4 --minutes 2
 ## [/codeblock]
 ##
-## Takes the harness's own flags too (--soak-max-stuck-sec and the rest of DotBotSoakConfig).
+## Takes the harness's own flags too (--soak-max-stuck-sec and the rest of GSBotSoakConfig).
 ## Writes .godot/test-logs/soak-<map>.json, prints the SOAK line, exits 1 when the run fails.
 
 const DEFAULT_MAP := &"zz_high_school"
@@ -42,7 +42,7 @@ var _worst_tick := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -56,7 +56,7 @@ func _arg(name: String, fallback: String) -> String:
 
 func _run() -> void:
 	var map_id := StringName(_arg("map", String(DEFAULT_MAP)))
-	var cfg := DotBotSoakConfig.new()
+	var cfg := GSBotSoakConfig.new()
 	cfg.minutes = DEFAULT_MINUTES
 	cfg.max_object_growth_pct = 40.0
 	cfg.apply_cli()
@@ -84,11 +84,11 @@ func _run() -> void:
 		_game.loot.added.connect(_on_laid)
 		_game.loot.removed.connect(func(_id: int, by: StringName) -> void: _taken += 1 if by != &"" else 0)
 
-	var watch := DotSpawnWatch.new()
+	var watch := GSSpawnWatch.new()
 	watch.rules.enabled = true
 	watch.rules.kill_y = -200.0
 
-	var soak := DotBotSoak.new(cfg)
+	var soak := GSBotSoak.new(cfg)
 	soak.watch = watch
 	soak.movers_fn = _movers
 	soak.stats_fn = func() -> Dictionary: return {"kills": _kills, "deaths": _deaths, "damage": _damage}
@@ -124,8 +124,8 @@ func _run() -> void:
 	if _spawn_failed:
 		report["ok"] = false
 		print("SOAKFAIL spawn: waves expected on %s but no zombie was ever alive (peak 0, kills 0)" % map_id)
-	print(DotBotSoak.summary(report))
-	print(DotBotSoak.report_line(report))
+	print(GSBotSoak.summary(report))
+	print(GSBotSoak.report_line(report))
 	var path := ProjectSettings.globalize_path("res://.godot/test-logs/soak-%s.json" % map_id)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	if soak.write_report(report, path) != OK:
@@ -152,7 +152,7 @@ func _build_game(map_id: StringName) -> void:
 	_game.set_physics_process(false)
 
 
-func _step(soak: DotBotSoak, delta: float) -> void:
+func _step(soak: GSBotSoak, delta: float) -> void:
 	var notes: ZzNavNotes = _game.horde.notes if _game.horde != null else null
 	var baked_before := notes.bake_ms if notes != null else 0.0
 	var began := Time.get_ticks_usec()

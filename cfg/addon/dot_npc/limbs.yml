@@ -1,4 +1,4 @@
-# Shootable limbs (dot-npc's DotNpcLimbs). `zombie` is every kind's body; a kind named under it
+# Shootable limbs (dot-npc's GSNpcLimbs). `zombie` is every kind's body; a kind named under it
 # changes only the keys it lists. Bones are the skinned zombie skeleton's (all bodies share them),
 # the first comes off with everything below it; radius and tip are metres of the drawn body.
 # `share` is the limb's health as a fraction of the kind's health (`health` is a flat number).

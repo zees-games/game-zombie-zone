@@ -72,7 +72,7 @@ With the last floor recorded (`fallen_from`, `fallen_how`), about a hundred long
 
 ## zz_trace.gd removed (2026-10-16)
 
-dot-combat 3977e7a (tag v0.1.6, API level 2) moved the stacked-team-mate rule into `DotCombatManager.pass_through_sets`, so `zz_trace.gd` is gone and `ZzGame` uses the stock `DotTracePhysics`; the stand-ins' friend check asks `DotHitboxSet.contains_point`. **Do not tag or push this commit until the client shell carrying dot-combat 3977e7a is live**: a delivered pack runs against the host's dot-combat, and on an older host nothing would skip a stacked friend.
+dot-combat 3977e7a (tag v0.1.6, API level 2) moved the stacked-team-mate rule into `GSCombatManager.pass_through_sets`, so `zz_trace.gd` is gone and `ZzGame` uses the stock `GSTracePhysics`; the stand-ins' friend check asks `GSHitboxSet.contains_point`. **Do not tag or push this commit until the client shell carrying dot-combat 3977e7a is live**: a delivered pack runs against the host's dot-combat, and on an older host nothing would skip a stacked friend.
 
 ## An investigating common sat 24 s on a floor seam (2026-10-22)
 

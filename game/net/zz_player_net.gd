@@ -1,10 +1,10 @@
-extends DotNetBehaviour
+extends GSNetBehaviour
 
 const ZzNetCommand := preload("zz_net_command.gd")
 const ZzPlayer := preload("../zz_player.gd")
 
 ## What a networked survivor replicates: the movement state, health, weapons, and the state of the body (up, down or held, borrowed health, the use bar).
-## [b]The movement half is dot-player-controller's own table[/b] ([DotFpsNetSync.state_specs]); listing the fields here would be a second copy to drift. [b]The game fields are not derivable from it[/b]: health, sitting a round out and the beacon are the server's decisions.
+## [b]The movement half is dot-player-controller's own table[/b] ([GSFpsNetSync.state_specs]); listing the fields here would be a second copy to drift. [b]The game fields are not derivable from it[/b]: health, sitting a round out and the beacon are the server's decisions.
 ## [b]Down, held, borrowed health and the use bar ARE here[/b] because each is a fact the next snapshot must be able to correct (a missed pick-up event would leave a friend on the floor); events carry the moment, these carry the truth. [b]Which side somebody is on is NOT here[/b]: a per-tick property is for what changes per tick, an event for what changes on a decision.
 
 ## Somebody this client is watching used their weapon, [param times] times since the last
@@ -25,7 +25,7 @@ var net_crouch: float = 0.0
 var net_flags: int = 0
 var net_modifiers: int = 0
 
-## Owner-only packed stamina (DotFpsNetSync.pack_stamina) so a predicting client's rewind restores it.
+## Owner-only packed stamina (GSFpsNetSync.pack_stamina) so a predicting client's rewind restores it.
 var net_stamina: int = 0
 
 ## Hit points, and the one field with a hard cap on the wire.
@@ -81,7 +81,7 @@ var net_watching: bool = false
 # The magazine and the reserve are `owner_only`: exact ammunition is information an opponent should not have.
 
 var net_slot: int = 0
-## The held gun's attachments (`DotWeaponNetSync.fitting_specs`), for the hand a watcher draws.
+## The held gun's attachments (`GSWeaponNetSync.fitting_specs`), for the hand a watcher draws.
 var net_fitted: int = 0
 var net_magazine: int = 0
 var net_reserve: int = 0
@@ -115,7 +115,7 @@ var _seen_fire_seq: int = 0
 
 ## Retained, not cleared: a player whose packet was lost keeps moving in a straight line
 ## rather than stopping dead. The controller says the same of its own command.
-var last_move: DotFpsCommand = DotFpsCommand.new()
+var last_move: GSFpsCommand = GSFpsCommand.new()
 
 ## And the slot they last asked for, which is simulation state for a survivor: the arsenal is
 ## edge-triggered against it.
@@ -125,8 +125,8 @@ var last_state_tick: int = -1
 
 
 func _register_net_vars() -> void:
-	for spec in DotFpsNetSync.state_specs():
-		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
+	for spec in GSFpsNetSync.state_specs():
+		var declaration := replicate(spec["property"], GSNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
 			declaration.bits(int(spec["bits"]))
@@ -138,38 +138,38 @@ func _register_net_vars() -> void:
 			declaration.range_of(0.0, 1.0)
 
 	# Owner-only jump timers; guarded, a shell without API 10 has no rewind_specs().
-	if DotAddonApi.build_level("dot_player_controller") >= 10:
-		for spec in DotFpsNetSync.rewind_specs():
-			var _timers := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
+	if GSAddonApi.build_level("dot_player_controller") >= 10:
+		for spec in GSFpsNetSync.rewind_specs():
+			var _timers := replicate(spec["property"], GSNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
-	for spec in DotFpsNetSync.stamina_specs():
-		var _stamina := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
+	for spec in GSFpsNetSync.stamina_specs():
+		var _stamina := replicate(spec["property"], GSNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
 	# Server-driven: only pull() writes these, never the owner's prediction, so a change is not a misprediction.
-	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(14).server_driven()
-	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(12).server_driven()
-	replicate(&"net_life", DotNetVar.Type.UINT).bits(2).server_driven()
-	replicate(&"net_incaps", DotNetVar.Type.UINT).bits(4).server_driven()
-	replicate(&"net_temp", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 400.0).bits(10).server_driven()
-	replicate(&"net_pin", DotNetVar.Type.UINT).bits(3).server_driven()
-	replicate(&"net_use", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
-	replicate(&"net_helped", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
-	replicate(&"net_using", DotNetVar.Type.UINT).bits(4).server_driven()
-	replicate(&"net_kits", DotNetVar.Type.VARINT).server_driven()
-	replicate(&"net_pills", DotNetVar.Type.VARINT).server_driven()
-	replicate(&"net_defibs", DotNetVar.Type.VARINT).server_driven()
-	replicate(&"net_status", DotNetVar.Type.UINT).bits(6).server_driven()
-	replicate(&"net_flash", DotNetVar.Type.UINT).bits(5).server_driven()
-	replicate(&"net_carry", DotNetVar.Type.UINT).bits(10).server_driven()
-	replicate(&"net_points", DotNetVar.Type.VARINT).server_driven()
-	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
-	replicate(&"net_watching", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_health", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(14).server_driven()
+	replicate(&"net_max_health", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 2000.0).bits(12).server_driven()
+	replicate(&"net_life", GSNetVar.Type.UINT).bits(2).server_driven()
+	replicate(&"net_incaps", GSNetVar.Type.UINT).bits(4).server_driven()
+	replicate(&"net_temp", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 400.0).bits(10).server_driven()
+	replicate(&"net_pin", GSNetVar.Type.UINT).bits(3).server_driven()
+	replicate(&"net_use", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
+	replicate(&"net_helped", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).server_driven()
+	replicate(&"net_using", GSNetVar.Type.UINT).bits(4).server_driven()
+	replicate(&"net_kits", GSNetVar.Type.VARINT).server_driven()
+	replicate(&"net_pills", GSNetVar.Type.VARINT).server_driven()
+	replicate(&"net_defibs", GSNetVar.Type.VARINT).server_driven()
+	replicate(&"net_status", GSNetVar.Type.UINT).bits(6).server_driven()
+	replicate(&"net_flash", GSNetVar.Type.UINT).bits(5).server_driven()
+	replicate(&"net_carry", GSNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_points", GSNetVar.Type.VARINT).server_driven()
+	replicate(&"net_ping", GSNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_watching", GSNetVar.Type.BOOL).server_driven()
 
 	var weapon_specs := ZeeWeaponNet.all_specs()
-	weapon_specs.append_array(DotWeaponNetSync.fire_mode_specs())
-	weapon_specs.append_array(DotWeaponNetSync.fitting_specs())
+	weapon_specs.append_array(GSWeaponNetSync.fire_mode_specs())
+	weapon_specs.append_array(GSWeaponNetSync.fitting_specs())
 	for spec in weapon_specs:
-		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
+		var declaration := replicate(spec["property"], GSNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
 			declaration.bits(int(spec["bits"]))
@@ -182,13 +182,13 @@ func _register_net_vars() -> void:
 
 	# [b]Per-player state rather than an event[/b]: a client that joins after `beacon`, a lost snapshot or a re-laid field is corrected by the next snapshot, where an event sent once is missed. The blind goes to its owner alone.
 	# [b]No relevance change for a beacon[/b]: every player here is already always relevant (`ZzNetBridge`), and a beacon turned OFF that reset `always_relevant` would drop the player from everybody's snapshot.
-	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only().server_driven()
-	replicate(&"net_beacon", DotNetVar.Type.BOOL).server_driven()
-	replicate(&"net_flashlight", DotNetVar.Type.BOOL).server_driven()
-	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4).server_driven()
+	var _blind := replicate(&"net_blind", GSNetVar.Type.BOOL).to_owner_only().server_driven()
+	replicate(&"net_beacon", GSNetVar.Type.BOOL).server_driven()
+	replicate(&"net_flashlight", GSNetVar.Type.BOOL).server_driven()
+	replicate(&"net_warp", GSNetVar.Type.UINT).bits(4).server_driven()
 
 
-func _net_apply_input(input: DotNetInput, _tick: int) -> void:
+func _net_apply_input(input: GSNetInput, _tick: int) -> void:
 	var command := input as ZzNetCommand
 
 	if command != null:
@@ -225,7 +225,7 @@ func pull() -> void:
 	if player == null:
 		return
 
-	DotFpsNetSync.pull(player.controller.state, self)
+	GSFpsNetSync.pull(player.controller.state, self)
 
 	if player.health != null:
 		net_health = player.health.health
@@ -267,7 +267,7 @@ func _net_state_applied(tick: int) -> void:
 
 	last_state_tick = tick
 	_forget_the_path()
-	DotFpsNetSync.push(self, player.controller.state)
+	GSFpsNetSync.push(self, player.controller.state)
 	_adopt()
 
 	# NOT the node, on a predicted entity: `receive_snapshot` calls this BEFORE the predictor reconciles, and reconcile reads the node as what the client is showing.
@@ -286,8 +286,8 @@ func _forget_the_path() -> void:
 
 	if _seen_warp >= 0 and net_warp != _seen_warp and bridge != null:
 		var manager: Variant = bridge.get(&"net")
-		if manager is DotNetManager and (manager as DotNetManager).interpolator != null:
-			(manager as DotNetManager).interpolator.forget(identity.net_id)
+		if manager is GSNetManager and (manager as GSNetManager).interpolator != null:
+			(manager as GSNetManager).interpolator.forget(identity.net_id)
 
 	_seen_warp = net_warp
 
@@ -298,7 +298,7 @@ func _net_interpolated(_tick: int) -> void:
 	if player == null:
 		return
 
-	DotFpsNetSync.push(self, player.controller.state)
+	GSFpsNetSync.push(self, player.controller.state)
 	player.global_position = player.controller.state.position
 
 

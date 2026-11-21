@@ -91,12 +91,12 @@ func _wear_fittings() -> void:
 	var _now := ZzFittings.apply_to(weapons.arsenal, saved)
 
 	for id: Variant in saved.keys():
-		if not (saved[id] as DotWeaponFitting).is_empty():
-			_send_fitting(saved[id] as DotWeaponFitting)
+		if not (saved[id] as GSWeaponFitting).is_empty():
+			_send_fitting(saved[id] as GSWeaponFitting)
 
 
 ## Tells the authority about [param fitting]; it validates, applies and replicates it.
-func _send_fitting(fitting: DotWeaponFitting) -> void:
+func _send_fitting(fitting: GSWeaponFitting) -> void:
 	var base := ZzWeapons.def_of(fitting.weapon_id)
 
 	if base == null:
@@ -105,7 +105,7 @@ func _send_fitting(fitting: DotWeaponFitting) -> void:
 	if bridge != null and not _offline:
 		bridge.ask_fit(base.id, ZzPacks.attachment_catalogue().encode(base, fitting))
 	elif game.authoritative and player != null:
-		var fitted: DotResult = game.fit_weapon(player, base.id, fitting)
+		var fitted: GSResult = game.fit_weapon(player, base.id, fitting)
 
 		if not fitted.ok:
 			game.notice.emit(fitted.error.message)
@@ -182,7 +182,7 @@ func _fit_requested(mount: StringName, id: StringName) -> void:
 		game.notice.emit(toggled.error.message)
 		return
 
-	var fitting := toggled.value as DotWeaponFitting
+	var fitting := toggled.value as GSWeaponFitting
 	var saved := _saved_fittings()
 	saved[base.id] = fitting
 

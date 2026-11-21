@@ -47,7 +47,7 @@ func _build() -> void:
 	_wet = _cover("Wet", Color(0.04, 0.30, 0.40))
 	_bile = _cover("Bile", Color(0.38, 0.52, 0.08))
 	_fire = _cover("Fire", Color(0.95, 0.4, 0.05))
-	_goo = DotFxScreenGoo.new()
+	_goo = GSFxScreenGoo.new()
 	_goo.name = "Goo"
 	_goo.layer = layer - 1
 	_goo.status_fade_in = 1.0
@@ -61,7 +61,7 @@ func _build() -> void:
 	scope.name = "Scope"
 	_root.add_child(scope)
 
-	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
+	# The glance pieces read their colours from the theme on the type GSHudPiece; set on
 	# the root, every piece under it inherits them. See [method piece_theme].
 	_root.theme = piece_theme()
 	_follow()
@@ -81,7 +81,7 @@ func _build() -> void:
 
 	# Under the title, where the objective line is when there is no clock: a hold-out's time
 	# left, or how long a survival map has been held, with what it is under it.
-	strip = DotScoreStrip.new()
+	strip = GSScoreStrip.new()
 	strip.name = "Clock"
 	strip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	strip.offset_top = 50.0
@@ -114,7 +114,7 @@ func _build() -> void:
 	_banner_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 	# Bottom left, above the chat box: the health plate, the kits over it, the downs over them.
-	vitals = DotVitals.new()
+	vitals = GSVitals.new()
 	vitals.name = "Vitals"
 	vitals.bar_end = 300.0
 	vitals.fill_colour = HEALTH_COLOUR
@@ -126,7 +126,7 @@ func _build() -> void:
 	_root.add_child(vitals)
 
 	# Stamina, a thin bar right over the health plate; only drawn once it is below full.
-	stamina_bar = DotStatBar.new()
+	stamina_bar = GSStatBar.new()
 	stamina_bar.name = "Stamina"
 	stamina_bar.max_value = 100.0
 	stamina_bar.show_text = false
@@ -144,14 +144,14 @@ func _build() -> void:
 	var _bound := stamina_bar.bind(func() -> Variant: return _stamina_pct)
 	_root.add_child(stamina_bar)
 
-	kits = DotKeyHints.new()
+	kits = GSKeyHints.new()
 	kits.name = "Kits"
 	kits.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	kits.offset_left = 24.0
 	kits.offset_right = 24.0 + 300.0
 	_root.add_child(kits)
 
-	_status = DotStatusLines.new()
+	_status = GSStatusLines.new()
 	_status.name = "Status"
 	_status.font_size = 16
 	_status.max_lines = 1
@@ -172,7 +172,7 @@ func _build() -> void:
 	_root.add_child(_team)
 
 	# Weapon and ammunition, bottom right: the counter right-aligns to its own right edge.
-	ammo = DotAmmoCounter.new()
+	ammo = GSAmmoCounter.new()
 	ammo.name = "Ammo"
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	ammo.offset_left = -420.0
@@ -181,7 +181,7 @@ func _build() -> void:
 	ammo.offset_bottom = -24.0
 	_root.add_child(ammo)
 
-	_weapon_icon = DotWeaponIconPlate.new()
+	_weapon_icon = GSWeaponIconPlate.new()
 	_weapon_icon.name = "WeaponIcon"
 	_weapon_icon.show_plate = false
 	_weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -191,7 +191,7 @@ func _build() -> void:
 	_weapon_icon.offset_bottom = -28.0
 	_root.add_child(_weapon_icon)
 
-	fire_mode = DotFireModeIndicator.new()
+	fire_mode = GSFireModeIndicator.new()
 	fire_mode.name = "FireMode"
 	fire_mode.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	fire_mode.offset_left = -420.0
@@ -205,7 +205,7 @@ func _build() -> void:
 	_root.add_child(_nav_meter)
 
 	# What the boxes are doing, right side.
-	_effects = DotStatusLines.new()
+	_effects = GSStatusLines.new()
 	_effects.name = "Effects"
 	_effects.align_right = true
 	_effects.font_size = 15
@@ -275,7 +275,7 @@ func _build() -> void:
 	_held.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 
 	# Full rect, centred on the crosshair; both draw only what the server confirmed.
-	hit_fx = DotHitFeedback.mount(_root)
+	hit_fx = GSHitFeedback.mount(_root)
 	hit_marker = hit_fx.marker
 	damage_numbers = hit_fx.numbers
 
@@ -390,10 +390,10 @@ func _top_rebuild() -> void:
 		var held := game.survival_elapsed
 		lines.append(str(game.map_doc.get("name", "")))
 		# Counting up: whole seconds held, never one ahead of them.
-		clock = DotScoreStrip.clock_text(floorf(held))
+		clock = GSScoreStrip.clock_text(floorf(held))
 		under = "held"
 		if game.survival_goal > 0.0:
-			under = "held — rescue in %s" % DotScoreStrip.clock_text(maxf(game.survival_goal - held, 0.0))
+			under = "held — rescue in %s" % GSScoreStrip.clock_text(maxf(game.survival_goal - held, 0.0))
 	else:
 		lines.append(str(game.map_doc.get("name", "")))
 
@@ -404,7 +404,7 @@ func _top_rebuild() -> void:
 
 		if game.objective_states[index] == &"holding":
 			var left := maxf(game.objective_progress[index] - game.now(), 0.0)
-			clock = DotScoreStrip.clock_text(left)
+			clock = GSScoreStrip.clock_text(left)
 			clock_low = left <= LOW_CLOCK_SEC
 			under = "%s — hold out" % str(o["label"])
 		elif sub == "" and clock == "":
@@ -456,13 +456,13 @@ func _draw_streak() -> void:
 
 ## The line under the title while the start grace runs; static so a suite reads it without a screen.
 static func grace_line(seconds: float) -> String:
-	return "Zombies arrive in %s" % DotScoreStrip.clock_text(ceilf(seconds))
+	return "Zombies arrive in %s" % GSScoreStrip.clock_text(ceilf(seconds))
 
 ## What the top says between a decided map and the next: `[title, clock, under the clock]`.
 ## Static, so a suite can read it without a screen.
 static func next_round_lines(seconds: float, next_map: StringName, this_map: StringName, next_name: String) -> Array:
 	var again := next_map == &"" or next_map == this_map
-	return ["Trying again" if again else "Next: %s" % next_name, DotScoreStrip.clock_text(ceilf(seconds)),
+	return ["Trying again" if again else "Next: %s" % next_name, GSScoreStrip.clock_text(ceilf(seconds)),
 		"until this map starts again" if again else "until the next map"]
 
 func _map_name(id: StringName) -> String:
@@ -488,26 +488,26 @@ static func survival_lines(hold: Dictionary) -> Array:
 	var left := float(hold.get("left", -1.0))
 	var twist := str(hold.get("twist", ""))
 	var low := left >= 0.0 and left <= LOW_CLOCK_SEC
-	var clock := DotScoreStrip.clock_text(ceilf(left)) if left >= 0.0 else ""
+	var clock := GSScoreStrip.clock_text(ceilf(left)) if left >= 0.0 else ""
 
 	match style:
-		DotNpcDirectorWaves.Style.ROUNDS:
-			if stage == DotNpcDirectorWaves.Stage.HORDE:
+		GSNpcDirectorWaves.Style.ROUNDS:
+			if stage == GSNpcDirectorWaves.Stage.HORDE:
 				var title := ("Wave %d of %d" % [index, count]) if index < count else "The last wave"
 				if twist != "":
 					title += " · %s" % twist.capitalize()
 				return [title, "%d" % maxi(int(hold.get("remaining", 0)), 0), "left", "", false]
-			if stage == DotNpcDirectorWaves.Stage.QUIET:
+			if stage == GSNpcDirectorWaves.Stage.QUIET:
 				# The hint goes under the clock, not under the title: the title's second line is
 				# where the strip's clock sits, and the two were drawn over each other.
 				var opening := index <= 1
 				return ["Get ready" if opening else "Breather", clock,
 					"until wave %d · %s" % [index, "find the doors and the caches" if opening else "mend the barricades, restock"], "", low]
 			return ["All %d waves held" % count, "", "", "", false]
-		DotNpcDirectorWaves.Style.CYCLE:
-			if stage == DotNpcDirectorWaves.Stage.HORDE:
+		GSNpcDirectorWaves.Style.CYCLE:
+			if stage == GSNpcDirectorWaves.Stage.HORDE:
 				return [("Night %d of %d" % [index, count]) if index < count else "The last night", clock, "until dawn", "", low]
-			if stage == DotNpcDirectorWaves.Stage.QUIET:
+			if stage == GSNpcDirectorWaves.Stage.QUIET:
 				return ["Day %d" % index, clock, "until dark · mend the barricades, restock", "", low]
 			return ["Morning", "", "", "", false]
 
@@ -727,8 +727,8 @@ func _team_row(index: int) -> Dictionary:
 ## One of the glance pieces' colours from the theme the root has now (this game's, or the
 ## menu's when it follows one), or [param fallback] when the theme does not say.
 func _piece_colour(colour: StringName, fallback: Color) -> Color:
-	if _root != null and _root.has_theme_color(colour, DotHudPiece.THEME_TYPE):
-		return _root.get_theme_color(colour, DotHudPiece.THEME_TYPE)
+	if _root != null and _root.has_theme_color(colour, GSHudPiece.THEME_TYPE):
+		return _root.get_theme_color(colour, GSHudPiece.THEME_TYPE)
 	return fallback
 
 ## What the team list says, row by row, for a suite: `"name|state|bar fraction"`.
@@ -772,8 +772,8 @@ func set_carry(state: Dictionary) -> void:
 	_weight_text_stale = true
 
 func _draw_stamina() -> void:
-	var s: DotFpsState = player.controller.state if player.controller != null else null
-	var tunables: DotFpsTunables = player.controller.tunables if player.controller != null else null
+	var s: GSFpsState = player.controller.state if player.controller != null else null
+	var tunables: GSFpsTunables = player.controller.tunables if player.controller != null else null
 	var shown := s != null and tunables != null and tunables.stamina_enabled and tunables.can_sprint \
 		and player.is_alive() and (s.stamina < 0.999 or s.sprinting)
 	stamina_bar.visible = shown
@@ -805,7 +805,7 @@ func _draw_weight() -> void:
 	_weight.text = _weight_text
 	_weight.add_theme_color_override("font_color", colour)
 
-const FIRE_NAMES := {DotWeaponDef.Fire.AUTO: &"auto", DotWeaponDef.Fire.SEMI: &"semi", DotWeaponDef.Fire.BURST: &"burst"}
+const FIRE_NAMES := {GSWeaponDef.Fire.AUTO: &"auto", GSWeaponDef.Fire.SEMI: &"semi", GSWeaponDef.Fire.BURST: &"burst"}
 
 ## Scratch for the fire modes on offer, reused each frame.
 var _offered: Array = []
@@ -981,7 +981,7 @@ func _effects_rebuild(since: float) -> void:
 		if scale != 1.0 and scale > 0.0:
 			title += " x%s" % (str(snappedf(scale, 0.01)) if scale < 10.0 else str(int(scale)))
 			stacks = 1
-		lines.append({"text": DotStatusLines.effect_text(title, stacks, left if timed else -1.0), "colour": AMBER})
+		lines.append({"text": GSStatusLines.effect_text(title, stacks, left if timed else -1.0), "colour": AMBER})
 
 	_effects.show_lines(lines)
 
@@ -1049,7 +1049,7 @@ func _draw_hurt(delta: float) -> void:
 
 ## The ring round the crosshair that fills while the use key is held over a dropped weapon (dot-ui API 18).
 func set_hold_progress(fraction: float) -> void:
-	if _crosshair != null and DotAddonApi.build_level("dot_ui") >= 18:
+	if _crosshair != null and GSAddonApi.build_level("dot_ui") >= 18:
 		_crosshair.set(&"hold_progress", fraction)
 
 func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:

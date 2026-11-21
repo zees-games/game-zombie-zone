@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## Per-weapon force on each kind of loose prop: a multiplier table (`props/forces.json`, rows weapon ids and `*`, columns toy kinds and `default`).
-## Pure data so a server owner retunes it without code; the push itself is dot-props' [method DotPropBodyBox.hit].
+## Pure data so a server owner retunes it without code; the push itself is dot-props' [method GSPropBodyBox.hit].
 
 const ZzPaths := preload("zz_paths.gd")
 const PATH := "res://props/forces.json"

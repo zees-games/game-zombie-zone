@@ -54,7 +54,7 @@ static func _limit(cvar: String, text: String, current: int) -> int:
 	var t := text.strip_edges()
 
 	if not t.is_valid_int() or t.to_int() < 0:
-		DotLog.error(CHANNEL, "%s needs a whole number from 0 (0 = unlimited); keeping %d" % [cvar, current], {"value": text})
+		GSLog.error(CHANNEL, "%s needs a whole number from 0 (0 = unlimited); keeping %d" % [cvar, current], {"value": text})
 		return current
 
 	return t.to_int()
@@ -64,7 +64,7 @@ static func _floor_at(cvar: String, text: String, lowest: float, current: float)
 	var t := text.strip_edges()
 
 	if not t.is_valid_float() or t.to_float() < lowest:
-		DotLog.error(CHANNEL, "%s needs a number of at least %s (no ceiling); keeping %s" % [cvar, lowest, current], {"value": text})
+		GSLog.error(CHANNEL, "%s needs a number of at least %s (no ceiling); keeping %s" % [cvar, lowest, current], {"value": text})
 		return current
 
 	return t.to_float()

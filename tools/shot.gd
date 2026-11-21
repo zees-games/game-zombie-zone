@@ -5,13 +5,13 @@ const _BenchCrowd := preload("bench_sim_crowd.gd")
 
 func _cloud_store(spec: String) -> void:
 	var parts := spec.split(",")
-	var config := DotCloudConfig.new()
+	var config := GSCloudConfig.new()
 	config.cache_dir = "user://store_e2e_cache"
-	DotPaths.remove_tree(config.cache_dir)
+	GSPaths.remove_tree(config.cache_dir)
 	config.require_signed_manifests = true
 	var pub := FileAccess.get_file_as_string(parts[1])
 	config.trusted_keys = {"e2e": pub, "default": pub}
-	var cloud := DotCloudClient.new()
+	var cloud := GSCloudClient.new()
 	cloud.name = "Cloud"
 	cloud.config = config
 	cloud.config_file = ""
@@ -39,11 +39,11 @@ func _ready() -> void:
 	add_child(_client)
 	if _world_key != "":
 		_client.get("game").world_key_fn = func(_doc: Dictionary) -> String: return _world_key
-	# --view=cover: the loading cover dot-game's DotGameClient puts up first, before it lifts.
+	# --view=cover: the loading cover dot-game's GSGameClient puts up first, before it lifts.
 	if _view == "cover":
 		for _i in 2:
 			await RenderingServer.frame_post_draw
-		var platform: DotGameClient = _client.get("platform")
+		var platform: GSGameClient = _client.get("platform")
 		print("cover %s" % ("lifted" if platform.is_shown() else "up"))
 		var cover_path := ProjectSettings.globalize_path(_out)
 		DirAccess.make_dir_recursive_absolute(cover_path.get_base_dir())
@@ -61,7 +61,7 @@ func _take_arg(arg: String) -> void:
 	elif arg == "--board":
 		_board = true
 	elif arg == "--touch=1":
-		DotPlatform.touch_override = 1
+		GSPlatform.touch_override = 1
 	elif arg.begins_with("--seconds="):
 		_seconds = arg.trim_prefix("--seconds=").to_float()
 	elif arg.begins_with("--out="):
@@ -139,9 +139,9 @@ static func _subscribe_fixture() -> void:
 	var f := FileAccess.open(dir + "ruin.json", FileAccess.WRITE)
 	f.store_string(JSON.stringify(doc))
 	f.close()
-	var added := DotContentIndex.shared().add_pack({
+	var added := GSContentIndex.shared().add_pack({
 		"content_id": "fixture/ruins", "version": "1.0.0", "prefix": dir,
-		"session": DotContentIndex.SESSION_SOLO, "source": &"subscription",
+		"session": GSContentIndex.SESSION_SOLO, "source": &"subscription",
 		"provides": {"schema": 1, "title": "Ruins Pack", "kinds": ["map"], "entries": [
 			{"kind": "map", "id": "fixture_ruin", "name": "Fixture Ruin", "scene": "ruin.json", "map_kind": "exodus"},
 		]},
@@ -191,7 +191,7 @@ func _drive_mechanics(game: ZzGame) -> void:
 	if not _fires.is_empty() and game.map.mechanics != null and game.map.mechanics.logic() != null:
 		for spec in _fires:
 			var bits := spec.split(":")
-			var sent: DotResult = game.map.mechanics.logic().send(bits[0], bits[1])
+			var sent: GSResult = game.map.mechanics.logic().send(bits[0], bits[1])
 			print("fire ", spec, " -> ", sent.ok, " copies ", game.map.mechanics.copies())
 			for cid: int in (game.map.mechanics.get("_copies") as Dictionary):
 				var cn: Variant = (game.map.mechanics.get("_copies") as Dictionary)[cid]["node"]
@@ -234,7 +234,7 @@ func _run() -> void:
 	var local = _client.get("player")
 	await _await_world(game)
 	# Waits past the load cover (slow on a cold GPU box) before any timing starts; capped, so a stuck cover cannot hang the shot.
-	if not await DotShotGate.wait_lifted(get_tree(), _client.get("platform")):
+	if not await GSShotGate.wait_lifted(get_tree(), _client.get("platform")):
 		printerr("shot: load cover still up after the wait; shooting anyway")
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
@@ -364,7 +364,7 @@ func _finish(local, stand: Vector3) -> void:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
-	await DotShotSeq.new().record(get_tree(), path)
+	await GSShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
 
 
@@ -372,7 +372,7 @@ func _spawn_requested(game: ZzGame, local, stand: Vector3) -> void:
 	for entry: Array in _spawn:
 		for n in int(entry[1]):
 			var at := stand + Vector3(randf_range(-3.0, 3.0), 0.0, -6.0 - randf_range(0.0, 8.0))
-			var npc: DotNpcInstance = game.horde.call(&"spawn_brute", at) if entry[0] == ZzNpcs.BRUTE \
+			var npc: GSNpcInstance = game.horde.call(&"spawn_brute", at) if entry[0] == ZzNpcs.BRUTE \
 				else game.horde.spawner.spawn(entry[0], game.horde.snap_to_nav(at), &"shot", Basis(Vector3.UP, PI))
 			if npc != null and npc.brain != null and entry[0] == ZzNpcs.COMMON:
 				npc.brain.call(&"force_target", local.player_id)

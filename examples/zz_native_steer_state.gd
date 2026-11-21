@@ -8,14 +8,14 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## What a steer leaves behind: the body's transform and wish, the character's turn, the brain's cruise and watch.
 static func take(brain: Object) -> Array:
 	var b: ZzZombieBody = brain.npc.node
-	var c: DotNpcAiCharacter = brain.character
+	var c: GSNpcAiCharacter = brain.character
 	var rough: float = brain.path.rough_until if brain.path != null else 0.0
 	var index: int = brain.path.index if brain.path != null else -99
 	var st := [b.global_transform, b.wish, c._peak_turn, c._over_amt, c._over_axis, c._turns, brain._cruise_to,
 		brain._cruise_dest, brain._progress_at, brain._progress_since, rough, index, brain._waypoint]
 	# The rest of the path: a stuck steer goes rough (its points dropped, its arrive radius cut), and a due one's
 	# search reads is_rough, which puts the radius back.
-	var p: DotNpcPath = brain.path
+	var p: GSNpcPath = brain.path
 	if p != null:
 		st.append_array([p.points.duplicate(), p.arrive_radius, p._arrive_before, p.computed_at, p.goal_at_compute,
 			p.partial])
@@ -25,7 +25,7 @@ static func take(brain: Object) -> Array:
 ## Puts back what [method take] read, so the native steer starts where the script's did.
 static func put(brain: Object, st: Array) -> void:
 	var b: ZzZombieBody = brain.npc.node
-	var c: DotNpcAiCharacter = brain.character
+	var c: GSNpcAiCharacter = brain.character
 	b.global_transform = st[0]
 	b.wish = st[1]
 	c._peak_turn = st[2]

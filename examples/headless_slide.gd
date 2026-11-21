@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
@@ -16,7 +16,7 @@ var _sections_finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -30,8 +30,8 @@ func _run() -> void:
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
 
-func _command(forward: float, buttons: int) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func _command(forward: float, buttons: int) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(0.0, forward)
 	c.buttons = buttons
 	return c
@@ -46,9 +46,9 @@ class _Link extends RefCounted:
 		return String(held.get(cvar_name, fallback))
 
 
-func _run_for(motor: DotFpsMotor, buttons: int, seconds: float) -> DotFpsState:
-	var s := DotFpsState.new()
-	s.mode = DotFpsState.Mode.GROUND
+func _run_for(motor: GSFpsMotor, buttons: int, seconds: float) -> GSFpsState:
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.GROUND
 
 	for _i in range(int(seconds / STEP)):
 		motor.simulate(s, _command(1.0, buttons), STEP)
@@ -75,7 +75,7 @@ func _test_tunables() -> void:
 	var tuned := ZzPlayer.tunables_for(ZzConfig.new(), null, rules)
 	_check(tuned.slide_enabled and is_equal_approx(tuned.slide_boost, 4.0) and is_equal_approx(tuned.slide_min_speed, 9.0), "the cvars reach the tunables")
 	var names := ZzSlideRules.table().keys()
-	_check(names == DotFpsSlidePreset.cvar_table("zz_slide").keys() and names.has("zz_slide_cooldown"), "the names are the addon's table under zz_slide")
+	_check(names == GSFpsSlidePreset.cvar_table("zz_slide").keys() and names.has("zz_slide_cooldown"), "the names are the addon's table under zz_slide")
 	var link := _Link.new()
 	link.held["zz_slide_duration"] = "2.5"
 	var follower := ZzSlideRules.new()
@@ -89,9 +89,9 @@ func _test_gated() -> void:
 	_sections_entered += 1
 	print("no slide from a walk, a plain run or a crouch alone")
 	var t := ZzPlayer.tunables_for(ZzConfig.new())
-	var motor := DotFpsMotor.new(t, DotFpsFlatBody.with_floor(0.0))
-	var crouch := DotFpsCommand.BUTTON_CROUCH
-	var sprint := DotFpsCommand.BUTTON_SPRINT
+	var motor := GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
+	var crouch := GSFpsCommand.BUTTON_CROUCH
+	var sprint := GSFpsCommand.BUTTON_SPRINT
 
 	var standing := _run_for(motor, 0, 0.5)
 	motor.simulate(standing, _command(0.0, crouch), STEP)
@@ -101,8 +101,8 @@ func _test_gated() -> void:
 	motor.simulate(run, _command(1.0, crouch), STEP)
 	_check(not run.is_sliding(), "crouch at a plain run does not slide")
 
-	var walk := _run_for(motor, DotFpsCommand.BUTTON_WALK, 2.0)
-	motor.simulate(walk, _command(1.0, DotFpsCommand.BUTTON_WALK | crouch), STEP)
+	var walk := _run_for(motor, GSFpsCommand.BUTTON_WALK, 2.0)
+	motor.simulate(walk, _command(1.0, GSFpsCommand.BUTTON_WALK | crouch), STEP)
 	_check(not walk.is_sliding(), "crouch at a walk does not slide")
 
 	var fast := _run_for(motor, sprint, 3.0)
@@ -115,11 +115,11 @@ func _test_sprint_slide() -> void:
 	_sections_entered += 1
 	print("sprint and C together slide")
 	var t := ZzPlayer.tunables_for(ZzConfig.new())
-	var motor := DotFpsMotor.new(t, DotFpsFlatBody.with_floor(0.0))
-	var s := _run_for(motor, DotFpsCommand.BUTTON_SPRINT, 3.0)
+	var motor := GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
+	var s := _run_for(motor, GSFpsCommand.BUTTON_SPRINT, 3.0)
 	var before := s.horizontal_speed()
 	_check(before >= t.slide_min_speed, "a sprint is fast enough to slide", "%.2f vs %.2f" % [before, t.slide_min_speed])
-	motor.simulate(s, _command(1.0, DotFpsCommand.BUTTON_SPRINT | DotFpsCommand.BUTTON_CROUCH), STEP)
+	motor.simulate(s, _command(1.0, GSFpsCommand.BUTTON_SPRINT | GSFpsCommand.BUTTON_CROUCH), STEP)
 	_check(s.is_sliding(), "sprint plus crouch starts a slide")
 	_check(s.horizontal_speed() > before, "it starts with a burst")
 	_sections_finished += 1

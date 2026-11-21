@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
 const ZzConfig := preload("../game/zz_config.gd")
@@ -9,7 +9,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 
 const SECTIONS := 3
 const CHECKS := 9
-const NATIVE := &"DotSimCrowdGrid"
+const NATIVE := &"GSSimCrowdGrid"
 const GRID := 4.0
 const SEEDS := 24
 
@@ -18,7 +18,7 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 

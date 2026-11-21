@@ -19,7 +19,7 @@ var _bad := false
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
 			_maps = arg.substr(6).split(",")
@@ -96,7 +96,7 @@ func _map(id: StringName) -> void:
 		var at: Vector3 = ZzMapDoc.v3(spawns[(i / 2) % spawns.size()]) if i % 2 == 0 and not spawns.is_empty() \
 			else nav.data.points[rng.randi_range(0, nav.data.points.size() - 1)]
 		at = game.horde.snap_to_nav(at)
-		var npc: DotNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, at, &"qa")
+		var npc: GSNpcInstance = game.horde.spawner.spawn(ZzNpcs.COMMON, at, &"qa")
 		if npc == null:
 			print("  spawn refused at %s" % at)
 			continue
@@ -147,7 +147,7 @@ func _reaches(nav: ZzNavGraph, from: Vector3, to: Vector3) -> bool:
 
 
 func _watch(m: Dictionary) -> void:
-	var npc: DotNpcInstance = m["npc"]
+	var npc: GSNpcInstance = m["npc"]
 	if not npc.is_alive():
 		return
 	var y := npc.position().y
@@ -174,7 +174,7 @@ func _summarize(id: StringName, movers: Array[Dictionary], meter: StuckMeter) ->
 	var rescued := 0
 	var stuck: Array[String] = []
 	for m in movers:
-		var npc: DotNpcInstance = m["npc"]
+		var npc: GSNpcInstance = m["npc"]
 		climbers += 1 if float(m["climbed"]) >= 1.0 else 0
 		reached += 1 if float(m["closest"]) < REACHED else 0
 		islands += 1 if m["island"] else 0

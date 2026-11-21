@@ -14,9 +14,9 @@ func _initialize() -> void:
 func _run() -> void:
 	var settings := ZzSettings.new()
 	root.add_child(settings)
-	var store := DotSettingsStoreMemory.new()
-	var _built: DotResult = settings.setup(store)
-	var menu: DotMenu = settings.menu
+	var store := GSSettingsStoreMemory.new()
+	var _built: GSResult = settings.setup(store)
+	var menu: GSMenu = settings.menu
 	await _frames(4)
 	menu.open(&"video")
 	await _frames(4)

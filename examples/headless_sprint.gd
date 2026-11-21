@@ -11,7 +11,7 @@ const CHECKS := 9
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -45,13 +45,13 @@ func _server_speed(game: ZzGame, buttons: int, seconds: float = 1.5) -> float:
 	me.controller.state.velocity = Vector3.ZERO
 	me.controller.state.stamina = 1.0
 	me.controller.state.stamina_exhausted = false
-	var go := DotFpsCommand.new()
+	var go := GSFpsCommand.new()
 	go.move = Vector2(0.0, 1.0)
 	go.buttons = buttons
 	me.controller.apply_command(go)
 	await _sim(game, seconds)
 	var speed := Vector2(me.controller.state.velocity.x, me.controller.state.velocity.z).length()
-	me.controller.apply_command(DotFpsCommand.new())
+	me.controller.apply_command(GSFpsCommand.new())
 	await _sim(game, 0.6)
 	return speed
 
@@ -65,7 +65,7 @@ func _test_server() -> void:
 	me.health.invulnerable = true
 	var ratio := game.config.sprint_speed_scale
 	var run := await _server_speed(game, 0)
-	var sprint := await _server_speed(game, DotFpsCommand.BUTTON_SPRINT)
+	var sprint := await _server_speed(game, GSFpsCommand.BUTTON_SPRINT)
 	print("    run %.2f sprint %.2f ratio %.3f configured %.2f load %.2f weight_scale %.2f" % [run, sprint, sprint / maxf(run, 0.01), ratio, me.controller.motor.load_fraction, me.carry_scale])
 	_check(run > 3.0, "a run moves", "%.2f" % run)
 	var load0 := me.controller.motor.load_fraction
@@ -75,7 +75,7 @@ func _test_server() -> void:
 	var _a := game.arm(me, heavy[0]) if heavy.size() > 0 else false
 	await _sim(game, 0.3)
 	var run_w := await _server_speed(game, 0)
-	var sprint_w := await _server_speed(game, DotFpsCommand.BUTTON_SPRINT)
+	var sprint_w := await _server_speed(game, GSFpsCommand.BUTTON_SPRINT)
 	var load := me.controller.motor.load_fraction
 	var expect := 1.0 + (ratio - 1.0) * (1.0 - clampf(load * game.config.sprint_load_speed, 0.0, 1.0))
 	print("    armed: run %.2f sprint %.2f ratio %.3f expected %.3f load %.2f weight_scale %.2f" % [run_w, sprint_w, sprint_w / maxf(run_w, 0.01), expect, load, me.carry_scale])
@@ -89,10 +89,10 @@ func _test_client() -> void:
 	var t := ZzPlayer.tunables_for(ZzConfig.new())
 	var ratio := t.sprint_speed_scale
 	var run := _motor_speed(t, 0, 0.0)
-	var sprint := _motor_speed(t, DotFpsCommand.BUTTON_SPRINT, 0.0)
+	var sprint := _motor_speed(t, GSFpsCommand.BUTTON_SPRINT, 0.0)
 	print("    client run %.2f sprint %.2f ratio %.3f" % [run, sprint, sprint / maxf(run, 0.01)])
 	_check(absf(sprint / run - ratio) < 0.03, "unloaded: sprint is the configured ratio of a run", "%.3f vs %.2f" % [sprint / run, ratio])
-	var loaded := _motor_speed(t, DotFpsCommand.BUTTON_SPRINT, 0.4) / run
+	var loaded := _motor_speed(t, GSFpsCommand.BUTTON_SPRINT, 0.4) / run
 	_check(loaded > 1.05 and loaded < sprint / run, "a 40 percent load trims the bonus but keeps it", "%.3f" % loaded)
 	# The key reaches the command: Shift is bound to the sprint action (and not the slow walk), and holding it sets the sprint bit.
 	ZzPlayer.register_actions()
@@ -100,25 +100,25 @@ func _test_client() -> void:
 	for event in InputMap.action_get_events(&"dot_fps_sprint"):
 		shift = shift or (event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_SHIFT)
 	_check(shift, "Shift is bound to the sprint action")
-	var sampler := DotFpsSampler.new(t)
+	var sampler := GSFpsSampler.new(t)
 	Input.action_press(&"dot_fps_sprint")
 	Input.action_press(&"dot_fps_forward")
 	var command := sampler.sample(TICK)
 	Input.action_release(&"dot_fps_sprint")
 	Input.action_release(&"dot_fps_forward")
-	_check(command.is_pressed(DotFpsCommand.BUTTON_SPRINT) and command.move.y > 0.9, "holding the sprint action sets the sprint bit on the command")
+	_check(command.is_pressed(GSFpsCommand.BUTTON_SPRINT) and command.move.y > 0.9, "holding the sprint action sets the sprint bit on the command")
 	_finished()
 
 
-func _motor_speed(t: DotFpsTunables, buttons: int, load: float) -> float:
-	var motor := DotFpsMotor.new(t, DotFpsFlatBody.with_floor(0.0))
+func _motor_speed(t: GSFpsTunables, buttons: int, load: float) -> float:
+	var motor := GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
 	motor.load_fraction = load
-	var s := DotFpsState.new()
-	var c := DotFpsCommand.new()
+	var s := GSFpsState.new()
+	var c := GSFpsCommand.new()
 	c.move = Vector2(0.0, 1.0)
 	c.buttons = buttons
 	for _i in 4:
-		motor.simulate(s, DotFpsCommand.new(), TICK)
+		motor.simulate(s, GSFpsCommand.new(), TICK)
 	for _i in 160:
 		motor.simulate(s, c, TICK)
 	return Vector2(s.velocity.x, s.velocity.z).length()

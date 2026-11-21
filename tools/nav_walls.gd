@@ -16,7 +16,7 @@ const STEP := 0.35
 static var _last := AABB()
 
 
-static func count(nav: DotNpcNavData, doc: Dictionary) -> Dictionary:
+static func count(nav: GSNpcNavData, doc: Dictionary) -> Dictionary:
 	var solids: Array[AABB] = []
 
 	for box: Dictionary in doc.get("boxes", []):
@@ -51,7 +51,7 @@ static func count(nav: DotNpcNavData, doc: Dictionary) -> Dictionary:
 
 
 ## A wall top with ground at its own height on both sides is part of the floor (a retaining wall flush with the yard).
-static func _flush(nav: DotNpcNavData, p: Vector3, solids: Array[AABB]) -> bool:
+static func _flush(nav: GSNpcNavData, p: Vector3, solids: Array[AABB]) -> bool:
 	for box in solids:
 		if absf(p.y - box.end.y) >= 0.15 or box.size.y < WALL_HEIGHT or minf(box.size.x, box.size.z) > WALL_THICK:
 			continue

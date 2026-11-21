@@ -6,9 +6,9 @@ extends "zz_special_brain.gd"
 ##
 ## [b]Its weaknesses are its machinery.[/b] A gun shot off stops (and drops what it holds); the
 ## jetpack shot out falls it out of the sky and it never flies again. Parts are the body's
-## [DotNpcLimbs] (`gunL`, `gunR`, `pack`), so a shot reaches them the way it reaches a limb.
+## [GSNpcLimbs] (`gunL`, `gunR`, `pack`), so a shot reaches them the way it reaches a limb.
 ##
-## [b]Flight does not follow the navmesh.[/b] [DotNpcHover] flies straight at a goal; this brain
+## [b]Flight does not follow the navmesh.[/b] [GSNpcHover] flies straight at a goal; this brain
 ## raises the cruise height to clear the highest ground sampled along the way.
 
 const WALK := &"walk"
@@ -21,7 +21,7 @@ const GUNS: Array[StringName] = [&"gunL", &"gunR"]
 ## Local offsets of the gun muzzles from the feet (x is the side, z the front).
 const MUZZLE := Vector3(0.8, 2.1, -0.4)
 
-var hover := DotNpcHover.new()
+var hover := GSNpcHover.new()
 var _guns: Array[Dictionary] = [{}, {}]
 var _flight_until: float = -1.0
 var _flight_ready_at: float = 0.0
@@ -211,13 +211,13 @@ func _fly(b: ZzZombieBody, at: Vector3, delta: float) -> void:
 	face(at - here)
 	b.anim = ZzZombieBody.Anim.FLY
 
-	var up := hover.state == DotNpcHover.State.CRUISE or hover.state == DotNpcHover.State.HOVER
+	var up := hover.state == GSNpcHover.State.CRUISE or hover.state == GSNpcHover.State.HOVER
 
 	if _angry and up and now() >= _dive_cool_until and here.y - _ground_here() > 6.0:
 		go(CHARGE)
 		return
 
-	if hover.state == DotNpcHover.State.GROUNDED and not wants:
+	if hover.state == GSNpcHover.State.GROUNDED and not wants:
 		b.hovering = false
 		_flight_ready_at = now() + tune(&"fly_rest", 4.0)
 		go(WALK)
@@ -247,7 +247,7 @@ func _dive(b: ZzZombieBody, _delta: float) -> void:
 	if low or stuck or in_state_for() > 4.0:
 		b.hover_velocity = Vector3.ZERO
 		b.hovering = false
-		hover.state = DotNpcHover.State.GROUNDED
+		hover.state = GSNpcHover.State.GROUNDED
 		hover.fuel = 0.0
 		if h != null:
 			var _n = h.call(&"slam", npc, here, tune(&"slam_radius", 7.0), tune(&"slam_damage", 30.0))
@@ -417,13 +417,13 @@ func _advance_props() -> void:
 
 
 func _rand() -> float:
-	return DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 10.0) + 17)
+	return GSNpcAiNode.deterministic_unit(npc.seed, int(now() * 10.0) + 17)
 
 
 ## State for the console and the probes.
 func status() -> Dictionary:
 	return {
 		"state": String(state), "angry": _angry, "fuel": snappedf(hover.fuel, 0.1),
-		"hover": DotNpcHover.State.keys()[hover.state], "parts": _known_parts,
+		"hover": GSNpcHover.State.keys()[hover.state], "parts": _known_parts,
 		"guns": [String(_guns[0]["mode"]), String(_guns[1]["mode"])],
 	}

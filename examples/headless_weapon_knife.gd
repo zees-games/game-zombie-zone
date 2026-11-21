@@ -3,7 +3,7 @@ extends "zz_suite.gd"
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
-## The aim key with the knife in hand throws it (dot-weapon's DotWeaponKnives): it leaves the hand,
+## The aim key with the knife in hand throws it (dot-weapon's GSWeaponKnives): it leaves the hand,
 ## kills a zombie it meets, sticks in it, and is taken back; the cvars and the wire round-trip.
 
 const SECTIONS := 4
@@ -12,7 +12,7 @@ const SPOT := Vector3(0.0, 0.05, 14.0)
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	load("res://game/zz_packs.gd").root = "res://addons"
 	_run.call_deferred()
 
@@ -99,7 +99,7 @@ func _test_hit_and_return() -> void:
 	var spawned := game.horde.spawn_common_at(target)
 	await _sim(game, 0.3)
 	_check(spawned and game.horde.spawner.npcs_near(target, 6.0).size() > 0, "a zombie stands in front")
-	var npc: DotNpcInstance = game.horde.spawner.npcs_near(target, 6.0)[0]
+	var npc: GSNpcInstance = game.horde.spawner.npcs_near(target, 6.0)[0]
 	var at: Vector3 = (npc.node as Node3D).global_position + Vector3.UP * 1.0
 	game.weapon_layer.knife_rules["pickup"] = 0.0
 	_aim(p, at)
@@ -107,11 +107,11 @@ func _test_hit_and_return() -> void:
 	await _sim(game, 1.0)
 	var stuck := false
 	for e in seen:
-		if int(e[0]) == DotWeaponKnives.Phase.STUCK and int(e[1]) != 0:
+		if int(e[0]) == GSWeaponKnives.Phase.STUCK and int(e[1]) != 0:
 			stuck = true
 	_check(stuck, "it stuck in a body", str(seen))
 	_check(not is_instance_valid(npc.node) or not npc.is_alive(), "the zombie died of it")
-	var knife: DotWeaponKnives.Knife = knives.entries()[0] if knives.count() > 0 else null
+	var knife: GSWeaponKnives.Knife = knives.entries()[0] if knives.count() > 0 else null
 	_check(knife != null, "the knife is out")
 	game.weapon_layer.knife_rules["pickup"] = 2.0
 	if knife != null:
@@ -131,7 +131,7 @@ func _test_rules() -> void:
 	var q := bad.survivors()[0]
 	var _held := await _knife_in_hand(bad, q)
 	q.life = ZzPlayer.Life.DOWN
-	bad.weapon_layer.knife_input(q, DotWeaponCommand.new())
+	bad.weapon_layer.knife_input(q, GSWeaponCommand.new())
 	_check(bad.weapon_layer.knives.count() == 0, "a downed survivor throws nothing")
 	q.life = ZzPlayer.Life.UP
 	_finished()
@@ -140,7 +140,7 @@ func _test_rules() -> void:
 func _test_wire() -> void:
 	_section("wire: KNIFE round-trips through ZzEvents")
 	var at := Vector3(1.0, 2.0, 3.0)
-	var k := ZzEvents.read_knife(DotNetReader.new(ZzEvents.write_knife(5, 7, DotWeaponKnives.Phase.STUCK, 9, at, Vector3(0.0, 0.0, -1.0))))
+	var k := ZzEvents.read_knife(GSNetReader.new(ZzEvents.write_knife(5, 7, GSWeaponKnives.Phase.STUCK, 9, at, Vector3(0.0, 0.0, -1.0))))
 	_check(bool(k["ok"]) and int(k["id"]) == 5 and int(k["owner"]) == 7 and int(k["victim"]) == 9, "ids and phase survive", str(k))
 	_check((k["at"] as Vector3).distance_to(at) < 0.05, "the place survives", str(k["at"]))
 	_check(ZzEvents.Kind.KNIFE < (1 << 6), "the kind fits the event header")

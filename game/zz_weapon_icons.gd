@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Zombie Zone's weapon pictures: weapon id to sprite tag; the rest is dot-ui's [DotWeaponIconStyle].
+## Zombie Zone's weapon pictures: weapon id to sprite tag; the rest is dot-ui's [GSWeaponIconStyle].
 
 const TAGS := {
 	&"zz_aa12": &"drum_shotgun", &"zz_ak": &"assault_rifle", &"zz_axe": &"axe", &"zz_bat": &"hammer",
@@ -23,10 +23,10 @@ const TAGS := {
 }
 
 ## The one instance the HUD, the trader and the console share.
-static var shared: DotWeaponIconStyle = _make()
+static var shared: GSWeaponIconStyle = _make()
 
 
-static func _make() -> DotWeaponIconStyle:
-	var s := DotWeaponIconStyle.new()
+static func _make() -> GSWeaponIconStyle:
+	var s := GSWeaponIconStyle.new()
 	s.tags = TAGS
 	return s

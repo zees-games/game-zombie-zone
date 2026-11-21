@@ -13,7 +13,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	var cover := DotHitchLog.new()
+	var cover := GSHitchLog.new()
 	cover.threshold_ms = 50.0
 	cover.start(get_tree())
 	var client: Node = ZzClientScript.new()
@@ -48,7 +48,7 @@ func _watch_after_gate() -> void:
 			secs = float(arg.get_slice("=", 1))
 	if secs <= 0.0:
 		return
-	var hitch := DotHitchLog.new()
+	var hitch := GSHitchLog.new()
 	hitch.threshold_ms = 50.0
 	hitch.start(get_tree())
 	await get_tree().create_timer(secs).timeout
@@ -56,7 +56,7 @@ func _watch_after_gate() -> void:
 	_print_hitches("after gate %.0f s" % secs, hitch)
 
 
-func _print_hitches(label: String, hitch: DotHitchLog) -> void:
+func _print_hitches(label: String, hitch: GSHitchLog) -> void:
 	var stall := 0.0
 	for h: Dictionary in hitch.hitches:
 		stall += float(h.ms)

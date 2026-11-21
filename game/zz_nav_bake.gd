@@ -1,6 +1,6 @@
-extends DotBotNav
+extends GSBotNav
 
-## [DotBotNav] that bakes a map too big for one Recast grid in tiles and joins them into one mesh. Godot's baker refuses a bake whose cell grid is over 30 million cells ("suspiciously big") while `navigation/baking/use_crash_prevention_checks` is on, and one Recast poly mesh holds under 65535 vertices. At ZZ's 0.1016 m cell (the survivors' radius in exactly 4 cells) rp_southside, rp_asheville, gm_boreas, gm_vyten,
+## [GSBotNav] that bakes a map too big for one Recast grid in tiles and joins them into one mesh. Godot's baker refuses a bake whose cell grid is over 30 million cells ("suspiciously big") while `navigation/baking/use_crash_prevention_checks` is on, and one Recast poly mesh holds under 65535 vertices. At ZZ's 0.1016 m cell (the survivors' radius in exactly 4 cells) rp_southside, rp_asheville, gm_boreas, gm_vyten,
 ## gm_bigisland and gm_valley are over the first, and a wider cell still baked nothing on rp_southside (the second). So such a map is baked at the same cell in square tiles, each with a border of cells around it the way Recast's tiled meshes are (its regions end exactly on the tile line), and the tiles are joined: the vertices two tiles share on a line are welded, and a tile's edge along the line is split at the other
 ## side's vertices, so every seam is a shared edge, the navigation server connects it, and the annotator sees one floor. A map within the budget bakes exactly as before (one grid, same mesh, same cache file). Nothing is clamped: a tile size the engine would refuse, or a negative one, fails the bake saying so. A tiled bake in dot-bot itself would let this override go (nightly dotbot-nav-max-cells-1).
 
@@ -32,8 +32,8 @@ var _origin := Vector3.ZERO
 var _counts := Vector2i.ZERO
 
 
-## [method DotBotNav.bake], tiled when the map needs it.
-func bake(root: Node3D, agent: Dictionary = {}, mask: int = 0, bodies: Array = []) -> DotResult:
+## [method GSBotNav.bake], tiled when the map needs it.
+func bake(root: Node3D, agent: Dictionary = {}, mask: int = 0, bodies: Array = []) -> GSResult:
 	var parsed := _parse(root, agent, mask, bodies)
 
 	if not parsed.ok:
@@ -45,8 +45,8 @@ func bake(root: Node3D, agent: Dictionary = {}, mask: int = 0, bodies: Array = [
 	return bake_now(parsed.value)
 
 
-## [method DotBotNav.bake_in_background], the tiles baked side by side on the server's workers.
-func bake_in_background(root: Node3D, agent: Dictionary = {}, mask: int = 0, bodies: Array = [], done: Callable = Callable()) -> DotResult:
+## [method GSBotNav.bake_in_background], the tiles baked side by side on the server's workers.
+func bake_in_background(root: Node3D, agent: Dictionary = {}, mask: int = 0, bodies: Array = [], done: Callable = Callable()) -> GSResult:
 	var parsed := _parse(root, agent, mask, bodies)
 
 	if not parsed.ok:
@@ -54,7 +54,7 @@ func bake_in_background(root: Node3D, agent: Dictionary = {}, mask: int = 0, bod
 
 	var source: NavigationMeshSourceGeometryData3D = parsed.value
 
-	if _cache_load(source) or not DotPlatform.has_threads():
+	if _cache_load(source) or not GSPlatform.has_threads():
 		var res := _take_in() if last_bake_cached else bake_now(source)
 		if done.is_valid():
 			done.call(res)
@@ -64,7 +64,7 @@ func bake_in_background(root: Node3D, agent: Dictionary = {}, mask: int = 0, bod
 
 	if _tiles.is_empty():
 		NavigationServer3D.bake_from_source_geometry_data_async(mesh, source, _on_baked.bind(_generation, mesh, done))
-		return DotResult.success(0)
+		return GSResult.success(0)
 
 	var parts: Array[NavigationMesh] = []
 	var landed := [0]
@@ -75,11 +75,11 @@ func bake_in_background(root: Node3D, agent: Dictionary = {}, mask: int = 0, bod
 	for part in parts:
 		NavigationServer3D.bake_from_source_geometry_data_async(part, source, _on_tile.bind(_generation, mesh, parts, landed, done))
 
-	return DotResult.success(0)
+	return GSResult.success(0)
 
 
 ## The sync bake of an already parsed [param source], one grid or tiled.
-func bake_now(source: NavigationMeshSourceGeometryData3D) -> DotResult:
+func bake_now(source: NavigationMeshSourceGeometryData3D) -> GSResult:
 	if _tiles.is_empty():
 		NavigationServer3D.bake_from_source_geometry_data(mesh, source)
 		return _take_in()
@@ -120,11 +120,11 @@ func cache_path() -> String:
 	return path.trim_suffix(".nav.res") + ".tile%d.nav.res" % roundi(tile_cut * 1000.0)
 
 
-func _parse(root: Node3D, agent: Dictionary, mask: int, bodies: Array) -> DotResult:
+func _parse(root: Node3D, agent: Dictionary, mask: int, bodies: Array) -> GSResult:
 	_tiles.clear()
 	tiles_cut = 0
 	tile_cut = 0.0
-	var parsed: DotResult = super(root, agent, mask, bodies)
+	var parsed: GSResult = super(root, agent, mask, bodies)
 
 	if not parsed.ok:
 		return parsed
@@ -144,32 +144,32 @@ func border() -> float:
 
 
 ## Splits the map into tiles when [member tile_size] or the engine's limit asks for it.
-func _plan(source: NavigationMeshSourceGeometryData3D) -> DotResult:
+func _plan(source: NavigationMeshSourceGeometryData3D) -> GSResult:
 	var engine_checks := bool(ProjectSettings.get_setting("navigation/baking/use_crash_prevention_checks", true))
 	var bounds := source.get_bounds()
 	var cell := mesh.cell_size
 
 	if tile_size < 0.0:
-		return DotResult.fail(DotError.CODE_INVALID, "zz_nav_notes_bake_tile is %.1f; it is metres, 0 for auto" % tile_size)
+		return GSResult.fail(GSError.CODE_INVALID, "zz_nav_notes_bake_tile is %.1f; it is metres, 0 for auto" % tile_size)
 
 	var side := tile_size
 
 	if side == 0.0:
 		if not engine_checks or grid_cells(bounds.size, cell) <= ENGINE_MAX_CELLS:
-			return DotResult.success(0)
+			return GSResult.success(0)
 		side = AUTO_TILE
 
 	side = ceilf(side / cell - 0.001) * cell
 	var pad := border()
 
 	if side < 4.0 * pad:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"zz_nav_notes_bake_tile %.2f m is under four times the %.2f m border each tile bakes around it; raise it or set 0 for auto" % [side, pad])
 
 	var with_border := Vector3(side + 2.0 * pad, 0.0, side + 2.0 * pad)
 
 	if engine_checks and grid_cells(with_border, cell) > ENGINE_MAX_CELLS:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"zz_nav_notes_bake_tile %.0f m needs %d cells a tile, over the engine's %d while navigation/baking/use_crash_prevention_checks is on; lower it or set 0 for auto" % [
 				side, grid_cells(with_border, cell), ENGINE_MAX_CELLS])
 
@@ -184,10 +184,10 @@ func _plan(source: NavigationMeshSourceGeometryData3D) -> DotResult:
 
 	tile_cut = side
 	tiles_cut = _tiles.size()
-	DotLog.info(LOG, "navigation bake: the map is baked in tiles", {
+	GSLog.info(LOG, "navigation bake: the map is baked in tiles", {
 		"extent": "%.0fx%.0f m" % [bounds.size.x, bounds.size.z], "cells": grid_cells(bounds.size, cell),
 		"tile": snappedf(side, 0.001), "tiles": "%dx%d" % [_counts.x, _counts.y], "border": snappedf(pad, 0.001)})
-	return DotResult.success(_tiles.size())
+	return GSResult.success(_tiles.size())
 
 
 ## A copy of [member mesh]'s settings that bakes [param box] and a border round it.
@@ -200,7 +200,7 @@ func _tile_mesh(box: AABB) -> NavigationMesh:
 
 
 ## Joins the baked [param parts] into [member mesh] and takes it in.
-func _joined(parts: Array[NavigationMesh]) -> DotResult:
+func _joined(parts: Array[NavigationMesh]) -> GSResult:
 	var began := Time.get_ticks_usec()
 	var vertices := PackedVector3Array()
 	var tris := PackedInt32Array()
@@ -235,7 +235,7 @@ func _joined(parts: Array[NavigationMesh]) -> DotResult:
 	for t in range(0, tris.size(), 3):
 		mesh.add_polygon(PackedInt32Array([tris[t], tris[t + 1], tris[t + 2]]))
 
-	DotLog.info(LOG, "navigation bake: tiles joined", {"tiles": parts.size(), "polygons": tris.size() / 3,
+	GSLog.info(LOG, "navigation bake: tiles joined", {"tiles": parts.size(), "polygons": tris.size() / 3,
 		"vertices": kept.size(), "seam_splits": seams, "join_ms": snappedf((Time.get_ticks_usec() - began) / 1000.0, 0.1)})
 	return _take_in()
 

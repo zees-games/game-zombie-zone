@@ -23,30 +23,30 @@ const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 
 ## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the clocks the genre runs on top of a director. Server only.
 ## The director keeps a calm-rising population of commons; this file adds mobs, specials, the brute, panic while an objective is held, survival intensity and waves.
-## Barricades stay on the zombies' ground so the horde paths at them and bashes ([method barricade_in_way], [method bash]); a combat id comes from the game's [DotEntityTable] and carries its kind.
+## Barricades stay on the zombies' ground so the horde paths at them and bashes ([method barricade_in_way], [method bash]); a combat id comes from the game's [GSEntityTable] and carries its kind.
 
 const CHANNEL := "zz.horde"
 
 ## Where brains find this. See `zz_zombie_brain.gd`.
 const HORDE_META := &"zz_horde"
 
-signal zombie_spawned(npc: DotNpcInstance)
-signal zombie_removed(npc: DotNpcInstance)
-signal zombie_died(npc: DotNpcInstance, killer: StringName, damage: DotDamage)
+signal zombie_spawned(npc: GSNpcInstance)
+signal zombie_removed(npc: GSNpcInstance)
+signal zombie_died(npc: GSNpcInstance, killer: StringName, damage: GSDamage)
 ## A zombie a map's spawner made is dead, gone, or never came to be: its spawner's live count drops.
 signal maker_child_gone(maker: int)
 signal mob_started(size: int)
-signal special_spawned(npc: DotNpcInstance)
-signal brute_spawned(npc: DotNpcInstance)
+signal special_spawned(npc: GSNpcInstance)
+signal brute_spawned(npc: GSNpcInstance)
 
 ## The game this horde serves (`zz_game.gd`), untyped: it preloads this file.
 var game = null
 var config: ZzConfig = null
 
-var spawner: DotNpcSpawner = null
+var spawner: GSNpcSpawner = null
 ## The game's end of the monsters' host seam (also the spawner's meta `zhm_host`).
 var monster_host: MonsterHost = null
-var director: DotNpcDirector = null
+var director: GSNpcDirector = null
 ## Every spawn point the graph gave, safe rooms left out: the wanderers' and the notes' ground. The
 ## director's own `spawn_points` are those a zombie can walk to a survivor from ([code]_keep_reaching[/code]).
 var spawn_ground: PackedVector3Array = PackedVector3Array()
@@ -54,21 +54,21 @@ var _spawn_ground_nodes: PackedInt32Array = PackedInt32Array()
 ## Seconds between [code]_keep_reaching[/code] passes, and the horde time of the next one.
 const REACH_REFRESH := 1.0
 var _reach_due: float = 0.0
-var senses: DotNpcSenses = null
-var squads: DotNpcAiSquads = DotNpcAiSquads.new()
+var senses: GSNpcSenses = null
+var squads: GSNpcAiSquads = GSNpcAiSquads.new()
 
 ## The server's `npc_skill`, `npc_reaction_scale` and `npc_reaction_min`, which move every kind
-## toward easy or nightmare without making them one monster (dot-npc-ai's [DotNpcAiSkill]).
-var skill: DotNpcAiSkill = DotNpcAiSkill.new()
-var sounds: DotNpcAiSounds = DotNpcAiSounds.new()
-var nav: DotNpcNavData = null
+## toward easy or nightmare without making them one monster (dot-npc-ai's [GSNpcAiSkill]).
+var skill: GSNpcAiSkill = GSNpcAiSkill.new()
+var sounds: GSNpcAiSounds = GSNpcAiSounds.new()
+var nav: GSNpcNavData = null
 
 ## The map's annotations worked into chokes, drops and holds (`ZzNavNotes`); never null.
 var notes: ZzNavNotes = ZzNavNotes.new()
 
 ## Graph points a brute does not fit at (kept off its paths), for suites and describe.
 var narrow_points: int = 0
-var catalogue: DotNpcCatalogue = null
+var catalogue: GSNpcCatalogue = null
 
 ## Whether the pacing runs: false in a start area, between maps, in warmup.
 var pacing: bool = false
@@ -98,17 +98,17 @@ var wave_index: int = 0
 var barricades: Dictionary = {}
 
 ## Every living zombie by four-metre cell, built once a tick ([method _rebuild_grid]) for spacing and threat scans.
-## The script grid (by path: an old pack shell lacks the class name), or dot-sim's `DotSimCrowdGrid` (same answers
+## The script grid (by path: an old pack shell lacks the class name), or dot-sim's `GSSimCrowdGrid` (same answers
 ## to the bit) while [member ZzConfig.native_crowd] is on and the library is loaded: untyped, so either answers.
 const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
-const NATIVE_CROWD := &"DotSimCrowdGrid"
+const NATIVE_CROWD := &"GSSimCrowdGrid"
 var crowd: Variant = CrowdGrid.new(GRID)
 ## Whether [member crowd] is the native grid now.
 var crowd_native: bool = false
 
-## dot-sim's `DotSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
+## dot-sim's `GSSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
 ## the commons' chase plan off a survivor table fed once a tick ([code]_feed_brains[/code]).
-const NATIVE_BRAINS := &"DotSimZombieBrains"
+const NATIVE_BRAINS := &"GSSimZombieBrains"
 var brains_native: Object = null
 ## What a brain asks while the brains think in [method tick] (null outside it, so a tool or suite that calls a brain
 ## by hand gets the script): [member brains_native], and the native crowd for the spaced heading when it is on too.
@@ -131,7 +131,7 @@ var brains_mismatches: int = 0
 var _brain_ids: Array[StringName] = []
 var _brain_at := PackedVector3Array()
 var _brain_flags := PackedInt32Array()
-var _crowd_npcs: Array[DotNpcInstance] = []
+var _crowd_npcs: Array[GSNpcInstance] = []
 var _near_scratch := PackedInt32Array()
 const GRID := 4.0
 
@@ -151,7 +151,7 @@ var open_gates: PackedStringArray = PackedStringArray()
 
 ## How a zombie falls when it dies: dot-player-char's reactions, picked here on the server from
 ## the killing hit and sent with the zombie's end (NPC_GONE), so every screen draws the same fall.
-var death_reactions: DotPlayerDeathReactions = DotPlayerDeathReactions.stock()
+var death_reactions: GSPlayerDeathReactions = GSPlayerDeathReactions.stock()
 
 ## Screams heard this map, for a suite and `describe`.
 var screams: int = 0
@@ -170,12 +170,12 @@ var _doc: Dictionary = {}
 var _nav_extra: Dictionary = {}
 
 var _usable_posts: Array = []
-var _usable_posts_for: DotNpcNavData = null
+var _usable_posts_for: GSNpcNavData = null
 var _populated: bool = true
 var _time: float = 0.0
 
 ## Infected that make no progress toward the survivors: repath, then relocate near them out of sight.
-var stuck := DotNpcStuckRescue.new()
+var stuck := GSNpcStuckRescue.new()
 ## Sideways nudges given to stuck infected (a repath step), for [method describe].
 var stuck_nudges: int = 0
 

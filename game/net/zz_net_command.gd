@@ -1,27 +1,27 @@
-extends DotNetInput
+extends GSNetInput
 
 const ZzNetCommand := preload("zz_net_command.gd")
 
 ## One tick of a player's intent, on the wire: a movement command, a weapon slot, and the hands.
 ##
-## [b]The three game buttons ride in [member DotFpsCommand.buttons] for the reason a jump
+## [b]The three game buttons ride in [member GSFpsCommand.buttons] for the reason a jump
 ## does:[/b] they are per-tick, they are held rather than pressed once, and they have to be
 ## ordered against the movement they were aimed with. A shot sent as a reliable request
 ## would arrive a round trip later and be resolved against a position the player has
 ## already left.
 ##
-## The slot is the exception and is a field of its own, because [DotFpsCommand] has eight
+## The slot is the exception and is a field of its own, because [GSFpsCommand] has eight
 ## buttons and no room for a number — see [member ZzPlayer.wanted_slot].
 
 ## Fire. `BUTTON_USER_0`, which dot-player-controller reserves.
-const BUTTON_FIRE := DotFpsCommand.BUTTON_USER_0
+const BUTTON_FIRE := GSFpsCommand.BUTTON_USER_0
 
 ## The shove. On the alt button, as the genre puts it, and NOT handed to the weapon: zee's
 ## alt-fire is a bash with the gun, and a shove is the game's — it staggers a crowd and knocks a
 ## special off a friend, which no weapon's bash knows how to do.
-const BUTTON_SHOVE := DotFpsCommand.BUTTON_USER_1
+const BUTTON_SHOVE := GSFpsCommand.BUTTON_USER_1
 
-const BUTTON_RELOAD := DotFpsCommand.BUTTON_USER_2
+const BUTTON_RELOAD := GSFpsCommand.BUTTON_USER_2
 
 ## How many bits the slot takes. Eight slots is one more than the pack uses.
 const SLOT_BITS := 3
@@ -51,21 +51,21 @@ const ACT_GIVE_PILLS := 1024
 const ACT_GIVE_KIT := 2048
 const ACT_BITS := 12
 
-var move: DotFpsCommand = DotFpsCommand.new()
+var move: GSFpsCommand = GSFpsCommand.new()
 
 ## Which weapon the player has asked for, or zero for "leave it alone".
 var slot: int = 0
 
 var actions: int = 0
 
-func _write(writer: DotNetWriter) -> void:
+func _write(writer: GSNetWriter) -> void:
 	move.write(writer)
 	writer.write_uint(clampi(slot, 0, (1 << SLOT_BITS) - 1), SLOT_BITS)
 	writer.write_uint(actions & ((1 << ACT_BITS) - 1), ACT_BITS)
 
 
-func _read(reader: DotNetReader) -> void:
-	move = DotFpsCommand.new()
+func _read(reader: GSNetReader) -> void:
+	move = GSFpsCommand.new()
 	move.read(reader)
 	slot = reader.read_uint(SLOT_BITS)
 	actions = reader.read_uint(ACT_BITS)
@@ -86,6 +86,6 @@ func _neutralise() -> void:
 	actions = 0
 
 
-func _equals(other: DotNetInput) -> bool:
+func _equals(other: GSNetInput) -> bool:
 	var them := other as ZzNetCommand
 	return them != null and slot == them.slot and actions == them.actions and move.equals(them.move)

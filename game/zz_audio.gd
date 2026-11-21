@@ -16,7 +16,7 @@ const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 ## [b]Recordings where there are recordings, stand-ins where there are not.[/b] The zombies'
 ## voices, the explosions, the slime, the punches and the music are CC0 files in `sounds/`
 ## (see its CREDITS.md); the interface and the guns are dot-audio's synthesised stand-ins until
-## somebody drops a file at the path. [DotAudioSinkGodot] consults the file before the stand-in.
+## somebody drops a file at the path. [GSAudioSinkGodot] consults the file before the stand-in.
 ##
 ## [b]Never on a server, and never deciding anything.[/b]
 
@@ -93,19 +93,19 @@ const SPECIAL_VOICES := {
 	&"screamer": SCREAMER, &"crawler": CRAWLER, &"riot": RIOT, &"mutant": BRUTE,
 }
 
-var manager: DotAudioManager = null
+var manager: GSAudioManager = null
 
 ## kind -> {key -> cue id}, read from the profiles on first use.
 var _cues: Dictionary = {}
 
 ## Everybody's footsteps by what they stand on (dot-audio's stock: Kenney, CC0).
-var steps: DotAudioFootsteps = null
+var steps: GSAudioFootsteps = null
 
-## The creepy ambience under a map: dot-audio's [DotAmbienceDirector] over its stock mood set. The
+## The creepy ambience under a map: dot-audio's [GSAmbienceDirector] over its stock mood set. The
 ## old generated beds in [member ambience] only play when no mood loaded.
-var director: DotAmbienceDirector = null
-var ambient: DotAmbience = null
-var ambience: DotAudioAmbience = null
+var director: GSAmbienceDirector = null
+var ambient: GSAmbience = null
+var ambience: GSAudioAmbience = null
 
 ## Mood a map falls back to when neither its document nor its sounds say.
 const DEFAULT_MOOD := &"outdoor_night"
@@ -127,11 +127,11 @@ static func _file(name: String) -> String:
 	return "%s/%s.ogg" % [SOUND_DIR, name]
 
 
-static func sound_catalogue() -> DotAudioCatalogue:
-	var c := DotAudioCatalogue.new()
+static func sound_catalogue() -> GSAudioCatalogue:
+	var c := GSAudioCatalogue.new()
 
 	# Footsteps and ambience beds, the family's stock.
-	DotAudioStock.add_to(c)
+	GSAudioStock.add_to(c)
 
 	c.add(_flat(MAP_START, &"UI", 1, 85, ""))
 	c.add(_flat(HORDE, &"SFX", 1, 90, "horde_distant"))
@@ -226,7 +226,7 @@ static func sound_catalogue() -> DotAudioCatalogue:
 
 	# A body landing, survivor or zombie: dot-player-char's stock death sounds (Kenney, CC0),
 	# shipped in the addon.
-	for row: Dictionary in DotPlayerDeathSounds.rows():
+	for row: Dictionary in GSPlayerDeathSounds.rows():
 		var fall := _placed(row["id"], 45.0, 8.0, 3, 50, float(row["pitch_min"]), float(row["pitch_max"]), "")
 		fall.path = row["path"]
 		fall.variants = row["variants"]
@@ -236,7 +236,7 @@ static func sound_catalogue() -> DotAudioCatalogue:
 
 	# The map's toys: dot-props' stock toy sounds (Kenney, CC0), shipped in the addon, under the
 	# horde in priority.
-	for row: Dictionary in DotPropBodySounds.rows():
+	for row: Dictionary in GSPropBodySounds.rows():
 		var toy := _placed(row["id"], float(row["distance"]), 6.0, 3, 30, float(row["pitch_min"]), float(row["pitch_max"]), "")
 		toy.path = row["path"]
 		toy.variants = row["variants"]
@@ -247,7 +247,7 @@ static func sound_catalogue() -> DotAudioCatalogue:
 
 
 ## `real_<event>` for every recorded set: all its files as variants, the first-generation file as the path.
-static func _add_real(c: DotAudioCatalogue) -> void:
+static func _add_real(c: GSAudioCatalogue) -> void:
 	# event: [fallback file, max distance, unit size, concurrent, priority, pitch min, pitch max]
 	var rows := {
 		&"moan": ["moan_1", 30.0, 4.0, 5, 30, 0.85, 1.12], &"rage": ["fastzombie1", 45.0, 6.0, 4, 60, 0.9, 1.15],
@@ -290,54 +290,54 @@ static func _real_files(event: StringName) -> PackedStringArray:
 	return out
 
 
-## Bakes [param recipes] (id to DotAudioSynth.Voice) into the bank beside the game's own, for sounds added after setup.
+## Bakes [param recipes] (id to GSAudioSynth.Voice) into the bank beside the game's own, for sounds added after setup.
 func add_recipes(recipes: Dictionary) -> void:
-	var godot_sink := manager.sink as DotAudioSinkGodot if manager != null else null
+	var godot_sink := manager.sink as GSAudioSinkGodot if manager != null else null
 
 	if godot_sink != null:
-		godot_sink.bank.merge(DotAudioSynth.bank(manager.catalogue, recipes), true)
+		godot_sink.bank.merge(GSAudioSynth.bank(manager.catalogue, recipes), true)
 
 
 ## The synthesised stand-ins, for every id with no file.
 static func sound_recipes() -> Dictionary:
 	return {
-		MAP_START: DotAudioSynth.Voice.SPAWN,
-		OBJECTIVE: DotAudioSynth.Voice.BLIP,
-		YOU_ARE_DOWN: DotAudioSynth.Voice.DIE,
-		YOU_ARE_UP: DotAudioSynth.Voice.PICKUP,
-		YOU_ARE_DEAD: DotAudioSynth.Voice.DIE,
-		MAP_WON: DotAudioSynth.Voice.PICKUP,
-		MAP_LOST: DotAudioSynth.Voice.DENY,
-		PICKUP: DotAudioSynth.Voice.PICKUP,
-		HEALED: DotAudioSynth.Voice.PICKUP,
-		DEFIB_CHARGE: DotAudioSynth.Voice.SPAWN,
-		DEFIB_ZAP: DotAudioSynth.Voice.SHOT_TIGHT,
-		UI_CLICK: DotAudioSynth.Voice.CLICK,
-		UI_DENY: DotAudioSynth.Voice.DENY,
-		WEAPON_SHOT: DotAudioSynth.Voice.SHOT,
-		WEAPON_SWING: DotAudioSynth.Voice.STEP,
-		WEAPON_LAUNCH: DotAudioSynth.Voice.SHOT_HEAVY,
-		WEAPON_BEAM: DotAudioSynth.Voice.SHOT_TIGHT,
-		WEAPON_THROW: DotAudioSynth.Voice.CLICK,
+		MAP_START: GSAudioSynth.Voice.SPAWN,
+		OBJECTIVE: GSAudioSynth.Voice.BLIP,
+		YOU_ARE_DOWN: GSAudioSynth.Voice.DIE,
+		YOU_ARE_UP: GSAudioSynth.Voice.PICKUP,
+		YOU_ARE_DEAD: GSAudioSynth.Voice.DIE,
+		MAP_WON: GSAudioSynth.Voice.PICKUP,
+		MAP_LOST: GSAudioSynth.Voice.DENY,
+		PICKUP: GSAudioSynth.Voice.PICKUP,
+		HEALED: GSAudioSynth.Voice.PICKUP,
+		DEFIB_CHARGE: GSAudioSynth.Voice.SPAWN,
+		DEFIB_ZAP: GSAudioSynth.Voice.SHOT_TIGHT,
+		UI_CLICK: GSAudioSynth.Voice.CLICK,
+		UI_DENY: GSAudioSynth.Voice.DENY,
+		WEAPON_SHOT: GSAudioSynth.Voice.SHOT,
+		WEAPON_SWING: GSAudioSynth.Voice.STEP,
+		WEAPON_LAUNCH: GSAudioSynth.Voice.SHOT_HEAVY,
+		WEAPON_BEAM: GSAudioSynth.Voice.SHOT_TIGHT,
+		WEAPON_THROW: GSAudioSynth.Voice.CLICK,
 		# Stand-ins only for a build without dot-props' toy files.
-		DotPropBodySounds.BOUNCE: DotAudioSynth.Voice.IMPACT,
-		DotPropBodySounds.THUMP: DotAudioSynth.Voice.IMPACT,
-		DotPropBodySounds.KNOCK: DotAudioSynth.Voice.IMPACT,
-		DotPropBodySounds.PIN: DotAudioSynth.Voice.CLICK,
-		DotPropBodySounds.WOOD: DotAudioSynth.Voice.IMPACT,
-		DotPropBodySounds.RUBBER: DotAudioSynth.Voice.IMPACT,
-		DotPropBodySounds.PUNCH: DotAudioSynth.Voice.HURT,
-		DotPropBodySounds.METAL: DotAudioSynth.Voice.CLICK,
-		DotPropBodySounds.BELL: DotAudioSynth.Voice.PICKUP,
-		DotPropBodySounds.CLICK: DotAudioSynth.Voice.CLICK,
-		DotPropBodySounds.WATER: DotAudioSynth.Voice.STEP,
-		DotPropBodySounds.BOING: DotAudioSynth.Voice.SPAWN,
-		DotPropBodySounds.HORN: DotAudioSynth.Voice.BLIP,
+		GSPropBodySounds.BOUNCE: GSAudioSynth.Voice.IMPACT,
+		GSPropBodySounds.THUMP: GSAudioSynth.Voice.IMPACT,
+		GSPropBodySounds.KNOCK: GSAudioSynth.Voice.IMPACT,
+		GSPropBodySounds.PIN: GSAudioSynth.Voice.CLICK,
+		GSPropBodySounds.WOOD: GSAudioSynth.Voice.IMPACT,
+		GSPropBodySounds.RUBBER: GSAudioSynth.Voice.IMPACT,
+		GSPropBodySounds.PUNCH: GSAudioSynth.Voice.HURT,
+		GSPropBodySounds.METAL: GSAudioSynth.Voice.CLICK,
+		GSPropBodySounds.BELL: GSAudioSynth.Voice.PICKUP,
+		GSPropBodySounds.CLICK: GSAudioSynth.Voice.CLICK,
+		GSPropBodySounds.WATER: GSAudioSynth.Voice.STEP,
+		GSPropBodySounds.BOING: GSAudioSynth.Voice.SPAWN,
+		GSPropBodySounds.HORN: GSAudioSynth.Voice.BLIP,
 		# Stand-ins only for a build without dot-player-char's files.
-		DotPlayerDeathReactions.SOUND_THUD: DotAudioSynth.Voice.IMPACT,
-		DotPlayerDeathReactions.SOUND_FACE_PLANT: DotAudioSynth.Voice.IMPACT,
-		DotPlayerDeathReactions.SOUND_SLUMP: DotAudioSynth.Voice.STEP,
-		DotPlayerDeathReactions.SOUND_WHOOSH: DotAudioSynth.Voice.SPAWN,
+		GSPlayerDeathReactions.SOUND_THUD: GSAudioSynth.Voice.IMPACT,
+		GSPlayerDeathReactions.SOUND_FACE_PLANT: GSAudioSynth.Voice.IMPACT,
+		GSPlayerDeathReactions.SOUND_SLUMP: GSAudioSynth.Voice.STEP,
+		GSPlayerDeathReactions.SOUND_WHOOSH: GSAudioSynth.Voice.SPAWN,
 	}
 
 
@@ -360,11 +360,11 @@ static func weapon_sound(kind: int) -> StringName:
 static func _placed(
 	id: StringName, max_distance: float, unit_size: float, concurrent: int, priority: int,
 	pitch_min: float, pitch_max: float, file: String
-) -> DotAudioDef:
-	var def := DotAudioDef.new()
+) -> GSAudioDef:
+	var def := GSAudioDef.new()
 	def.id = id
 	def.path = _file(file if file != "" else String(id))
-	def.kind = DotAudioDef.Kind.POSITIONAL_3D
+	def.kind = GSAudioDef.Kind.POSITIONAL_3D
 	def.bus = &"SFX"
 	def.max_distance = max_distance
 	def.unit_size = unit_size
@@ -375,8 +375,8 @@ static func _placed(
 	return def
 
 
-static func _flat(id: StringName, bus: StringName, concurrent: int, priority: int, file: String) -> DotAudioDef:
-	var def := DotAudioDef.new()
+static func _flat(id: StringName, bus: StringName, concurrent: int, priority: int, file: String) -> GSAudioDef:
+	var def := GSAudioDef.new()
 	def.id = id
 	def.path = _file(file if file != "" else String(id))
 	def.bus = bus
@@ -385,11 +385,11 @@ static func _flat(id: StringName, bus: StringName, concurrent: int, priority: in
 	return def
 
 
-func setup() -> DotResult:
-	manager = DotAudioManager.new()
+func setup() -> GSResult:
+	manager = GSAudioManager.new()
 	manager.name = "Audio"
 	manager.catalogue = sound_catalogue()
-	manager.mixer = DotAudioMixer.new()
+	manager.mixer = GSAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 32
 	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): at +6 two 40 s runs
@@ -404,12 +404,12 @@ func setup() -> DotResult:
 	if not ready_now.ok:
 		return ready_now.wrap("zombiezone audio")
 
-	steps = DotAudioFootsteps.new()
+	steps = GSAudioFootsteps.new()
 	steps.name = "Footsteps"
 	steps.manager = manager
 	steps.default_surface = &"concrete"
 	add_child(steps)
-	director = DotAmbienceDirector.new()
+	director = GSAmbienceDirector.new()
 	director.name = "Ambient"
 	director.manager = manager
 	director.default_mood = DEFAULT_MOOD
@@ -418,9 +418,9 @@ func setup() -> DotResult:
 	var made := director.setup()
 	ambient = director.ambient
 	if not made.ok:
-		DotLog.warn(CHANNEL, "no ambience set; the stock bed plays", {"why": made.error.message})
+		GSLog.warn(CHANNEL, "no ambience set; the stock bed plays", {"why": made.error.message})
 	# Under the mood, only if there is none: the generated beds are the family's fallback.
-	ambience = DotAudioAmbience.new()
+	ambience = GSAudioAmbience.new()
 	ambience.name = "Ambience"
 	ambience.manager = manager
 	ambience.fallback_bed = &"amb_night"
@@ -429,12 +429,12 @@ func setup() -> DotResult:
 	if not director.has_moods():
 		ambience.set_map_bed(&"amb_night")
 
-	var godot_sink := manager.sink as DotAudioSinkGodot
+	var godot_sink := manager.sink as GSAudioSinkGodot
 
 	if godot_sink != null:
-		godot_sink.bank = DotAudioSynth.bank(manager.catalogue, sound_recipes())
+		godot_sink.bank = GSAudioSynth.bank(manager.catalogue, sound_recipes())
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Each map's bed outdoors and the ground nobody named, for a document that says neither
@@ -503,8 +503,8 @@ func follow_roof(delta: float, eye: Vector3, space: PhysicsDirectSpaceState3D, w
 		director.follow_roof(delta, eye, space, world_mask)
 
 
-## The server's cvars and the player's own sliders, multiplied (see [DotAmbienceDirector.follow_settings]).
-func follow_settings(store: Object, rules: DotAmbienceRules) -> void:
+## The server's cvars and the player's own sliders, multiplied (see [GSAmbienceDirector.follow_settings]).
+func follow_settings(store: Object, rules: GSAmbienceRules) -> void:
 	if director != null:
 		director.follow_settings(store, rules)
 
@@ -522,7 +522,7 @@ func listen_from(at: Vector3) -> void:
 		manager.listener_position = at
 
 
-## The optional scales let DotHurtSound, which calls play(id, volume, pitch), drive this wrapper.
+## The optional scales let GSHurtSound, which calls play(id, volume, pitch), drive this wrapper.
 func play(id: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
 	return manager != null and manager.play(id, volume_scale, pitch_scale) != 0
 
@@ -579,8 +579,8 @@ func _read_cues(kind: StringName) -> Dictionary:
 		var res := set.load_profile(String(kind))
 		if res.ok:
 			for key: String in ZzCues.KEYS:
-				if (res.value as DotProfile).extra.has("cue_" + key):
-					out[key] = (res.value as DotProfile).extra["cue_" + key]
+				if (res.value as GSProfile).extra.has("cue_" + key):
+					out[key] = (res.value as GSProfile).extra["cue_" + key]
 	return out
 
 
@@ -627,7 +627,7 @@ func deny() -> bool:
 func describe() -> Dictionary:
 	return {
 		"ids": ids().size(),
-		"device": manager != null and manager.sink is DotAudioSinkGodot,
+		"device": manager != null and manager.sink is GSAudioSinkGodot,
 		"music": String(manager.music_id()) if manager != null else "",
 		"ambient": director.describe() if director != null else {},
 		"ambient_mood_from": mood_for_map(),

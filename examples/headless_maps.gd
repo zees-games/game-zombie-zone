@@ -2,18 +2,18 @@ extends "headless_maps_base.gd"
 
 func _ready() -> void:
 	ZzCatalogue.practice_toys = ZzTestToys.PRACTICE
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 func _run() -> void:
 	print("zombiezone maps")
 	print("")
 
-	if DotGameShardArgs.is_merge():
-		_merge(DotGameShardArgs.merge_logs())
+	if GSGameShardArgs.is_merge():
+		_merge(GSGameShardArgs.merge_logs())
 		return
 
-	var shard := DotGameShardArgs.shard()
+	var shard := GSGameShardArgs.shard()
 	var core := shard == "" or shard == "core"
 	var light := shard == "" or shard == "light"
 	var worlds := shard == "" or shard == "worlds"
@@ -40,7 +40,7 @@ func _run() -> void:
 		played = _maps.duplicate()
 	elif shard not in ["core", "light", "worlds"]:
 		_maps = _linked_maps()
-		played = DotGameShardArgs.slice(_maps, shard, MAP_SHARDS)
+		played = GSGameShardArgs.slice(_maps, shard, MAP_SHARDS)
 
 	var only := ""
 
@@ -162,7 +162,7 @@ func _test_solid_prop_budget() -> void:
 	var parts := ZzEvents.write_map_parts(encoded, 7)
 	var joined := PackedByteArray()
 	for part in parts:
-		var told := ZzEvents.read_map_part(DotNetReader.new(part))
+		var told := ZzEvents.read_map_part(GSNetReader.new(part))
 		joined.append_array(told["piece"])
 	_check(encoded.size() > ZzEvents.MAP_PART_BYTES and not parts.is_empty() and joined == encoded, "a document past one message is cut into pieces that join back", "%d bytes, %d pieces" % [encoded.size(), parts.size()])
 	var small := (game.catalogue.maps[&"zz_practice"] as Dictionary).duplicate(true)
@@ -268,7 +268,7 @@ func _test_baked_light() -> void:
 			if str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Prop_") or str((users[i] as NodePath).get_name((users[i] as NodePath).get_name_count() - 1)).begins_with("Shiny_"):
 				casters.append(id)
 				break
-		if data == null or str(data.get_meta(DotLightBake.META_FINGERPRINT, "")) != map.light_fingerprint():
+		if data == null or str(data.get_meta(GSLightBake.META_FINGERPRINT, "")) != map.light_fingerprint():
 			stale.append(id)
 		map.free()
 
@@ -292,8 +292,8 @@ func _test_baked_light() -> void:
 
 	var host := Node3D.new()
 	add_child(host)
-	var res := DotLightBake.attach(host, ZzMap.BAKE_PATH % "zz_practice", before)
-	_check(not res.ok and res.error.code == DotError.CODE_UNSUPPORTED and host.get_child_count() == 0,
+	var res := GSLightBake.attach(host, ZzMap.BAKE_PATH % "zz_practice", before)
+	_check(not res.ok and res.error.code == GSError.CODE_UNSUPPORTED and host.get_child_count() == 0,
 		"a headless process (a server) never lays a bake over its world", "%s" % [res.error.message if not res.ok else "attached"])
 	host.free()
 
@@ -304,7 +304,7 @@ func _test_baked_light() -> void:
 		if not f.ends_with(".gd"):
 			continue
 		for line in FileAccess.get_file_as_string("res://game/" + f).split("\n"):
-			if not line.strip_edges().begins_with("#") and (line.contains("DotLightBake") or line.contains("DotLightmapSheet")):
+			if not line.strip_edges().begins_with("#") and (line.contains("GSLightBake") or line.contains("GSLightmapSheet")):
 				named.append("%s: %s" % [f, line.strip_edges()])
 	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 dot-lighting class", "%s" % [named])
 	var cfg := ZzConfig.new()
@@ -347,7 +347,7 @@ func _test_worlds() -> void:
 			continue
 
 		_worlds_read += 1
-		var read: DotResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
+		var read: GSResult = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"load_prefix", prefix)
 		_check(read.ok, "%s: its world reads" % id, "" if read.ok else read.error.message)
 
 		if not read.ok:
@@ -539,9 +539,9 @@ func _test_map(id: StringName) -> void:
 		return game.props_catalogue.size_of(pid) if game.props_catalogue.has(pid) else Vector3.ZERO
 	var nav_doc := ZzNpcs.with_nav_extra(doc, game.map.read_nav_extra(str(game.catalogue.roots.get(StringName(str(doc.get("id", ""))), ""))))
 	var open_job := ZzNpcs.nav_job(nav_doc, props_size, gates, [], false, false)
-	var open := DotNpcNavGraph.new(open_job.run_blocking())
+	var open := GSNpcNavGraph.new(open_job.run_blocking())
 	var link_report := open_job.link_report()
-	var shut := DotNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size))
+	var shut := GSNpcNavGraph.new(ZzNpcs.nav_for(nav_doc, props_size))
 	var from: Vector3 = game.map.spawn("survivors", 0)[0]
 	var unreached: Array = []
 	var places: Array = []
@@ -731,12 +731,12 @@ func _spawner_sites(game: ZzGame, doc: Dictionary) -> void:
 		_check(site_floating.is_empty(), "every spawner and shelf the config adds stands over something", "; ".join(site_floating.slice(0, 6)))
 		_check(str(doc.get("mode", "")) == "exodus" or shelves > 0, "a survival world has a trader", str(shelves))
 
-## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing
+## dot-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing
 ## in `Drawn` (batched into chunks) and its shapes in `Solid`, so the audit is the lenient one;
 ## the exact half is the document: a visible box that is not solid is drawn and walked through.
 func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	var drawn := await _world(id, true)
-	var res := DotCollisionAudit.audit(drawn.map, true)
+	var res := GSCollisionAudit.audit(drawn.map, true)
 	var ghosts: Array = []
 
 	for box: Dictionary in doc["boxes"]:
@@ -744,14 +744,14 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 			ghosts.append(str(box.get("mat", "")))
 
 	if res.ok:
-		var report: DotCollisionAudit = res.value
+		var report: GSCollisionAudit = res.value
 		print("  collision audit: %d meshes with no shape near them of %d, %d visible boxes not solid" % [report.count(), report.examined, ghosts.size()])
 
 		for line in report.describe_lines().slice(1, 8):
 			print("  %s" % line)
 
-	var found: PackedStringArray = (res.value as DotCollisionAudit).paths() if res.ok else PackedStringArray()
-	_check(res.ok and (res.value as DotCollisionAudit).examined > 0 and found.is_empty(),
+	var found: PackedStringArray = (res.value as GSCollisionAudit).paths() if res.ok else PackedStringArray()
+	_check(res.ok and (res.value as GSCollisionAudit).examined > 0 and found.is_empty(),
 		"everything drawn has collision, or says it is decoration (dot_no_collision)", "; ".join(found.slice(0, 6)) if res.ok else res.error.message)
 	await _dispose(drawn)
 	# Both worlds share one physics space: let the server drop the drawn one's bodies before the
@@ -763,7 +763,7 @@ func lay_block(game: ZzGame, _doc: Dictionary) -> Dictionary:
 	return game.spawners.spawner.game_block()
 
 ## Whether the graph has the edge a-b (a link through an obstacle that the floors already join round is dropped, so it has none).
-func _joined(data: DotNpcNavData, a: int, b: int) -> bool:
+func _joined(data: GSNpcNavData, a: int, b: int) -> bool:
 	var edges := data.edges
 
 	for k in range(0, edges.size(), 2):

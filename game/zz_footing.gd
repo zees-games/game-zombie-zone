@@ -148,7 +148,7 @@ func _put_back(game: Node, player: Object, rec: Dictionary, why: String, feet: V
 	rec["anchor"] = at
 	rec["warps"] = int(player.get("warps"))
 	rescued += 1
-	DotLog.warn(CHANNEL, "a survivor was put back on the ground", {"player": String(player.get("player_id")), "why": why,
+	GSLog.warn(CHANNEL, "a survivor was put back on the ground", {"player": String(player.get("player_id")), "why": why,
 		"from": "%.1f,%.1f,%.1f" % [feet.x, feet.y, feet.z] if feet.is_finite() else "nan", "to": "%.1f,%.1f,%.1f" % [at.x, at.y, at.z],
 		"map": String(map.call(&"id"))})
 	return true

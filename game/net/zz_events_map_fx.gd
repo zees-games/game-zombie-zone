@@ -58,7 +58,7 @@ static func write_map_end(won: bool, time_scale: float, seconds: float, camera: 
 
 
 ## Decoded and clamped again: a fade's volumes are 0-1, a spin's pitches 1-255, a beat's number 0-255, with -1 for none.
-static func read_map_fx(r: DotNetReader) -> Dictionary:
+static func read_map_fx(r: GSNetReader) -> Dictionary:
 	var fx := r.read_uint(2)
 	if fx == ZzEvents.MapFx.END:
 		var won := r.read_bool()

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzBlood := preload("../game/zz_blood.gd")
@@ -8,7 +8,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzTouch := preload("../game/zz_touch.gd")
 
-## Blood behind a hit body (zz_blood.gd over dot-fx's DotFxDecals) and which end of a hold's day a map's own light becomes
+## Blood behind a hit body (zz_blood.gd over dot-fx's GSFxDecals) and which end of a hold's day a map's own light becomes
 ## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
 
 const CHECKS := 35
@@ -16,7 +16,7 @@ const CHECKS := 35
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -46,12 +46,12 @@ func _blood() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var npc := DotEntity.make_id(DotEntity.KIND_NPC, 1)
+	var npc := GSEntity.make_id(GSEntity.KIND_NPC, 1)
 	var from := Vector3(0, 1.7, 8)
 	_check(blood.on_body_hit(npc, Vector3(0, 1.2, -1), from, 8.0) != null, "a hit NPC splatters the wall behind it")
 	_check(blood.decals.blood_count() == 1, "one splatter is counted (%d)" % blood.decals.blood_count())
-	_check(blood.on_body_hit(DotEntity.make_id(DotEntity.KIND_PLAYER, 2), Vector3(1, 1.2, -1), from, 8.0) != null, "a hit player splatters it too")
-	_check(blood.on_body_hit(DotEntity.make_id(DotEntity.KIND_PROP, 3), Vector3(1, 1.2, -1), from, 8.0) == null, "a prop bleeds nothing")
+	_check(blood.on_body_hit(GSEntity.make_id(GSEntity.KIND_PLAYER, 2), Vector3(1, 1.2, -1), from, 8.0) != null, "a hit player splatters it too")
+	_check(blood.on_body_hit(GSEntity.make_id(GSEntity.KIND_PROP, 3), Vector3(1, 1.2, -1), from, 8.0) == null, "a prop bleeds nothing")
 	_check(blood.on_body_hit(npc, Vector3(0, 1.2, -1), from, 1.0) == null, "no surface in reach, no splatter")
 	for i in 300:
 		var _s := blood.on_body_hit(npc, Vector3(-5 + (i % 10), 1.0 + (i % 4) * 0.5, -1), from, 8.0)
@@ -74,11 +74,11 @@ func _blood() -> void:
 	_check(blood.splat_at(Vector3(0, 1.5, -300), Vector3.BACK) == null, "a splat beyond 60 m of the camera is dropped")
 	blood.clear()
 
-	var off := DotFxDecalConfig.new()
+	var off := GSFxDecalConfig.new()
 	off.gore = false
 	blood.decals.apply_config(off)
 	_check(blood.on_body_hit(npc, Vector3(0, 1.2, -1), from, 8.0) == null or blood.decals.blood_count() == 0, "gore off draws none")
-	var low := DotFxDecalConfig.new()
+	var low := GSFxDecalConfig.new()
 	low.quality = 0
 	blood.decals.apply_config(low)
 	var _q := blood.on_body_hit(npc, Vector3(0, 1.2, -1), from, 8.0)
@@ -122,7 +122,7 @@ func _fade() -> void:
 	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"spitter", 3), 1.0 - 3.0 * c.mutant_fade_per_stack), "three stacks: alpha is 1 - 3 * step")
 	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"brute", 40), c.mutant_min_alpha), "any number of stacks stops at the minimum alpha")
 	c.mutant_min_alpha = 0.0
-	_check(ZzNpcs.fade_alpha(c, &"ram", 99) >= DotStackScale.ALPHA_FLOOR, "a minimum of 0 still leaves the mutant visible")
+	_check(ZzNpcs.fade_alpha(c, &"ram", 99) >= GSStackScale.ALPHA_FLOOR, "a minimum of 0 still leaves the mutant visible")
 	c.mutant_min_alpha = 0.25
 	_check(is_equal_approx(ZzNpcs.fade_alpha(c, &"common", 5), 1.0), "commons are untouched by default")
 	c.common_fade = 1
@@ -167,17 +167,17 @@ func _fade() -> void:
 	b.queue_free()
 
 
-## The phone's buttons through dot-game's DotGameScreenFit (what ZzClient._build_touch hands to fit_touch_buttons):
+## The phone's buttons through dot-game's GSGameScreenFit (what ZzClient._build_touch hands to fit_touch_buttons):
 ## every one at least 44 real px across on a landscape phone.
 func _touch_fit() -> void:
 	for phone: Vector2i in [Vector2i(844, 390), Vector2i(667, 375)]:
-		var fit := DotGameScreenFit.new()
+		var fit := GSGameScreenFit.new()
 		fit.size_override = phone
 		fit.dpi_override = 160.0
 		fit.attach(get_tree().root)
 		var host := Control.new()
 		add_child(host)
-		var buttons := DotTouchButtons.new()
+		var buttons := GSTouchButtons.new()
 		buttons.set_buttons(ZzTouch.LAYOUT.duplicate())
 		host.add_child(buttons)
 		var k := fit.fit_buttons(buttons, ZzTouch.LAYOUT)

@@ -22,7 +22,7 @@ var _trace := ""
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--map="):
@@ -150,7 +150,7 @@ func _report_idle(game: ZzGame, player, here: Vector3, t: float, still: float) -
 	var memory: Dictionary = game.bots._memory(player)
 	var near_zombies := 0
 	if game.horde != null:
-		for z: DotNpcInstance in game.horde.spawner.all_npcs():
+		for z: GSNpcInstance in game.horde.spawner.all_npcs():
 			if (z.position() as Vector3).distance_to(here) < 20.0:
 				near_zombies += 1
 	var pick := int(memory.get("pick", -1))
@@ -200,4 +200,4 @@ func _print_trace(game, t: float) -> void:
 		var last = memory.get("last_command")
 		print("TRACE t=%.0f at=%s pick=%d kind=%s spot=%s eye_gap=%.2f using=%s carried=%s actions=%d move=%s pts=%d" % [t, player.feet().snapped(Vector3.ONE * 0.1), pick, kind,
 			spot.snapped(Vector3.ONE * 0.1), player.eye_position().distance_to(spot) if spot != Vector3.INF else -1.0, player.using, player.carried, player.actions,
-			(last as DotFpsCommand).move.snapped(Vector2.ONE * 0.1) if last != null else Vector2.ZERO, player.points])
+			(last as GSFpsCommand).move.snapped(Vector2.ONE * 0.1) if last != null else Vector2.ZERO, player.points])

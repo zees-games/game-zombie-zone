@@ -39,7 +39,7 @@ var _total: Dictionary = {}
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -114,7 +114,7 @@ func _run() -> void:
 
 func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 	var horde = game.horde
-	var data: DotNpcNavData = horde.spawner.nav.data
+	var data: GSNpcNavData = horde.spawner.nav.data
 	var targets: Array[Vector3] = []
 
 	for sid in horde.survivor_ids():
@@ -124,12 +124,12 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 	var parts := PackedStringArray()
 
 	for kind in kinds:
-		var def: DotNpcDef = horde.spawner.catalogue.get_npc(kind)
-		var graph: DotNpcNavGraph = horde.spawner.nav
+		var def: GSNpcDef = horde.spawner.catalogue.get_npc(kind)
+		var graph: GSNpcNavGraph = horde.spawner.nav
 		graph.filter = null
 
 		if def != null and def.nav_exclude_flags != 0:
-			graph.filter = DotNpcNavFilter.new()
+			graph.filter = GSNpcNavFilter.new()
 			graph.filter.exclude_flags = def.nav_exclude_flags
 
 		var paths := 0
@@ -182,8 +182,8 @@ func _map(id: String, game: Node, kinds: Array[StringName]) -> void:
 
 
 func _dump_edges(game: Node) -> void:
-	var nav: DotNpcNavGraph = game.horde.spawner.nav
-	var data: DotNpcNavData = nav.data
+	var nav: GSNpcNavGraph = game.horde.spawner.nav
+	var data: GSNpcNavData = nav.data
 	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
 
 	for i in data.points.size():
@@ -205,7 +205,7 @@ func _dump_edges(game: Node) -> void:
 
 
 ## Hint spawns spread over the list, then the horde's own pick.
-func _pick_origins(game: Node, data: DotNpcNavData) -> Array[Vector3]:
+func _pick_origins(game: Node, data: GSNpcNavData) -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	var hints: Array = game.map.doc.get("zombie_spawns", [])
 	var n := mini(_origins, hints.size())
@@ -233,7 +233,7 @@ func _length(route: PackedVector3Array) -> float:
 ## Seconds until the kind stood within REACH of a survivor, -1 if it never did.
 func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 	var horde = game.horde
-	var npc: DotNpcInstance = horde.spawn_special(kind, origin, &"reach_probe")
+	var npc: GSNpcInstance = horde.spawn_special(kind, origin, &"reach_probe")
 
 	if npc == null:
 		if _diag:
@@ -312,7 +312,7 @@ func _sim(game: Node, kind: StringName, origin: Vector3) -> float:
 	return best
 
 
-func _trace_print(npc: DotNpcInstance, kind: StringName, tick: int) -> void:
+func _trace_print(npc: GSNpcInstance, kind: StringName, tick: int) -> void:
 	var b = npc.brain.body()
 	var p = npc.brain.get(&"path")
 	print("   t=%4.1f %s pos %s state %s wish %s vel %.1f path %s partial %s left %.1f" % [tick * TICK, kind, npc.position().snapped(Vector3.ONE * 0.1), npc.brain.get(&"state"), b.wish.snapped(Vector3.ONE * 0.1), b.velocity.length(), "-" if p == null else str(p.points.size()), "-" if p == null else str(p.partial), 0.0 if p == null else p.remaining_length(npc.position())])
@@ -334,7 +334,7 @@ func _trace_print(npc: DotNpcInstance, kind: StringName, tick: int) -> void:
 
 
 ## What a shape of the body's size overlaps where it stands, enlarged a little: names of the bodies touching it.
-func _blockers(npc: DotNpcInstance) -> String:
+func _blockers(npc: GSNpcInstance) -> String:
 	var body: CharacterBody3D = npc.brain.body() if npc.brain != null else null
 
 	if body == null:
@@ -378,7 +378,7 @@ func _barricade_near(game: Node, at: Vector3) -> String:
 
 
 ## A ranged kind stands off at its minimum range (scream_min, spit_min, pounce_min) and counts as arrived there.
-func _reach_of(def: DotNpcDef) -> float:
+func _reach_of(def: GSNpcDef) -> float:
 	var out := REACH
 
 	if not _ai:

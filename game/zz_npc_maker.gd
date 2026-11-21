@@ -1,4 +1,4 @@
-extends DotMapEntity
+extends GSMapEntity
 
 ## npc_template_maker: Spawn (or its own timer once enabled) asks the game for one zombie at the maker, up to MaxNPCCount in all
 ## and MaxLiveChildren alive at once. The game tells it when one is gone (`child_gone`): the cap frees a place, and the last
@@ -11,13 +11,13 @@ var _armed := false
 
 
 func on_map_spawn(p_io: RefCounted) -> void:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	if enabled:
 		_arm(io)
 
 
 func _input(p_io: RefCounted, name: String, param: String, activator: Variant, _caller: Variant) -> bool:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	match name:
 		"spawn":
 			_spawn(io, activator)
@@ -46,7 +46,7 @@ func _input(p_io: RefCounted, name: String, param: String, activator: Variant, _
 
 ## One of this maker's zombies died, was removed, or could not be placed.
 func child_gone(p_io: RefCounted) -> void:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	_live = maxi(_live - 1, 0)
 	if _live == 0:
 		fire(io, "OnAllLiveChildrenDead", null)
@@ -60,14 +60,14 @@ func live() -> int:
 
 
 func _enabled_changed(p_io: RefCounted, on: bool) -> void:
-	var io: DotMapIO = p_io
+	var io: GSMapIO = p_io
 	_gen += 1
 	_armed = false
 	if on:
 		_arm(io)
 
 
-func _arm(io: DotMapIO) -> void:
+func _arm(io: GSMapIO) -> void:
 	var every := key_float("spawnfrequency", 5.0)
 	if every <= 0.0 or _spawned >= _limit():
 		_armed = false
@@ -87,7 +87,7 @@ func _live_limit() -> int:
 	return n if n > 0 else 1 << 30
 
 
-func _spawn(io: DotMapIO, activator: Variant) -> void:
+func _spawn(io: GSMapIO, activator: Variant) -> void:
 	if _spawned >= _limit() or _live >= _live_limit():
 		return
 	_spawned += 1

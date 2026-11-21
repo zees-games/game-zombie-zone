@@ -3,7 +3,7 @@ extends "zz_game_state.gd"
 
 
 ## Builds the services only a server runs: pins, hazards, turrets, loot, crates, spawners, shop, drops, boxes and bots.
-func _build_services(box_profiles: DotProfileSet) -> void:
+func _build_services(box_profiles: GSProfileSet) -> void:
 	pins = ZzPins.new(self)
 	hazards = ZzHazards.new(self)
 	turrets = ZzTurrets.new(self)
@@ -29,7 +29,7 @@ func _build_services(box_profiles: DotProfileSet) -> void:
 func _load_catalogue(solo_dirs: PackedStringArray) -> void:
 	catalogue = ZzCatalogue.new()
 	# Subscribed (solo) pack maps are map documents and join the catalogue; online none.
-	catalogue.follow_content(content_index if content_index != null else DotContentIndex.shared(),
+	catalogue.follow_content(content_index if content_index != null else GSContentIndex.shared(),
 		ZzWorkshop.accepted_map_kinds())
 	var _loaded := catalogue.load_from(config.map_directory)
 	# Solo in the client shell: the map packs it mounted for this game, which a server

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
@@ -17,7 +17,7 @@ var _sections_finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -99,7 +99,7 @@ func _foot_band(kind: StringName, speed: float) -> Vector2:
 		var low := 99.0
 
 		for f in feet:
-			low = minf(low, (skeleton.global_transform * DotHumanoidIk.global_pose(skeleton, f)).origin.y)
+			low = minf(low, (skeleton.global_transform * GSHumanoidIk.global_pose(skeleton, f)).origin.y)
 
 		band = Vector2(minf(band.x, low), maxf(band.y, low))
 

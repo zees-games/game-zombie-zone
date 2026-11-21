@@ -187,19 +187,19 @@ signal survival_changed()
 @export var config: ZzConfig = null
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by whoever loaded the config.
-var config_binder: DotGameConfigBinder = null
+var config_binder: GSGameConfigBinder = null
 ## The flashlight's config and binder, made on first use so a suite that builds a game by hand still has one.
-var flashlight_config: DotFlashlightConfig = null
-var flashlight_binder: DotGameConfigBinder = null
+var flashlight_config: GSFlashlightConfig = null
+var flashlight_binder: GSGameConfigBinder = null
 
 ## The runtime layer the workbench edits through (the config set and dot-team's noblock kind); made on demand.
-var profile_runtime: DotProfileRuntime = null
+var profile_runtime: GSProfileRuntime = null
 
 ## The actor of an edit made on the process itself: the server console, or offline play.
 const LOCAL_ACTOR := &"__local"
 
 
-## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
+## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
 var block_rules: Object = null:
 	set(value):
 		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
@@ -223,20 +223,20 @@ var map: ZzMap = null
 var catalogue: ZzCatalogue = null
 
 ## Where subscribed Workshop maps are read from; null is dot-core's shared index. A test gives its own.
-var content_index: DotContentIndex = null
+var content_index: GSContentIndex = null
 var props_catalogue: ZzProps = null
-var combat: DotCombatManager = null
+var combat: GSCombatManager = null
 
 ## Ammo profiles (`cfg/game/game-zombie-zone/ammo`): what each gun's round can penetrate and ricochet off.
-var ammo_types: DotWeaponAmmoTypes = _load_ammo_types()
+var ammo_types: GSWeaponAmmoTypes = _load_ammo_types()
 
 ## `func(player_id: StringName) -> bool`: whether a survivor may be hurt now, assigned by the
 ## module from dot-game's `can_peer_be_harmed`. Unset offline, and a stand-in is never loading.
 var harm_gate: Callable = Callable()
-var match_node: DotMatch = null
-var random: DotRandomManager = null
-var physics: DotPhysicsLayout = null
-var effects: DotFxManager = null
+var match_node: GSMatch = null
+var random: GSRandomManager = null
+var physics: GSPhysicsLayout = null
+var effects: GSFxManager = null
 var spectate: ZzSpectate = null
 var progress: ZzProgress = null
 
@@ -279,12 +279,12 @@ var boxes: ZzBoxes = null
 var carry := ZzCarry.new()
 var bots: ZzBots = null
 
-var _persona_set: DotProfileSet = null
-var _personas: DotBotPersonaPool = null
+var _persona_set: GSProfileSet = null
+var _personas: GSBotPersonaPool = null
 var _personas_text := ""
 
 
-var _box_set: DotProfileSet = null
+var _box_set: GSProfileSet = null
 
 
 ## player id -> [ZzPlayer].
@@ -293,12 +293,12 @@ var players: Dictionary = {}
 ## dot-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do survivors and stand-ins block each other). Bound by the module
 ## (REPLICATED) and followed by a client through its link.
-var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
-var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+var view_rules: GSPlayerViewRules = GSPlayerViewRules.new()
+var body_rules: GSPlayerBodyRules = GSPlayerBodyRules.new()
 
 ## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
 ## server applies it through [member combat], a client never does.
-var fall_rules: DotFallDamageRules = _make_fall_rules()
+var fall_rules: GSFallDamageRules = _make_fall_rules()
 
 ## `zz_pass_barricades`: whether survivors walk through barricades. Bound by the module
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
@@ -313,12 +313,12 @@ var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
 ## dot-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the
 ## module (REPLICATED), followed by the client's overlay. Auto-fire is allowed here, so a touch player starts with it.
-var mobile_rules: DotMobileRules = _make_mobile_rules()
+var mobile_rules: GSMobileRules = _make_mobile_rules()
 
 
-static func _make_mobile_rules() -> DotMobileRules:
-	var rules := DotMobileRules.new()
-	rules.autofire = DotMobileRules.ALLOWED
+static func _make_mobile_rules() -> GSMobileRules:
+	var rules := GSMobileRules.new()
+	rules.autofire = GSMobileRules.ALLOWED
 	return rules
 
 
@@ -326,7 +326,7 @@ static func _make_mobile_rules() -> DotMobileRules:
 var slide_rules: ZzSlideRules = ZzSlideRules.new()
 
 ## `sv_downed_*`: what a downed survivor holds and whether they crawl with it. REPLICATED, followed by a client.
-var downed_rules: DotDownedRules = DotDownedRules.new()
+var downed_rules: GSDownedRules = GSDownedRules.new()
 
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults. One per game, not
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
@@ -336,7 +336,7 @@ var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 var feel_rules: ZeeViewFeel = ZeeViewFeel.new()
 
 ## Movement-dependent spread, recoil patterns, sprint and stamina (`sv_spread*`, `sv_recoil*`, `sv_sprint*`, `sv_stamina*`, REPLICATED, on here) and the `cl_crosshair_*` cvars: dot-game's opt-in.
-var combat_feel: DotGameCombatFeel = DotGameCombatFeel.new(true)
+var combat_feel: GSGameCombatFeel = GSGameCombatFeel.new(true)
 
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
 ## movement ones are REPLICATED and a client follows them (see [ZzWaterRules]).
@@ -354,15 +354,15 @@ var team_damage: ZzTeamDamage = ZzTeamDamage.new()
 ## What a dead body does and which death reactions the server allows: dot-player-char's `sv_ragdoll*` cvars,
 ## bound by the module (REPLICATED) and followed by a client through its link. One set for survivors and zombies.
 ## A body lies [constant CORPSE_SECONDS] by default.
-var ragdoll_rules: DotPlayerRagdollRules = _corpse_rules()
+var ragdoll_rules: GSPlayerRagdollRules = _corpse_rules()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
-var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
+var toy_rules: GSPropBodyRules = GSPropBodyRules.new()
 ## The harm a barrel does by rolling into a survivor (dot-props); server only.
-var rolling := DotPropRolling.new()
+var rolling := GSPropRolling.new()
 ## The zombies' own scan: a separate cooldown clock from the survivors'.
-var rolling_zombies := DotPropRolling.new()
+var rolling_zombies := GSPropRolling.new()
 
 ## player id -> side. Everybody is a survivor today.
 var sides: Dictionary = {}
@@ -374,7 +374,7 @@ var round_number: int = 0
 var phase: int = Phase.IDLE
 var phase_elapsed: float = 0.0
 var map_doc: Dictionary = {}
-var entities := DotEntityTable.new()
+var entities := GSEntityTable.new()
 
 ## Survival: seconds held, and the clock style's goal. An exodus map leaves them at zero.
 var survival_elapsed: float = 0.0
@@ -391,7 +391,7 @@ var possession: ZzPossession = null
 var remote_survival: Dictionary = {}
 
 ## The start grace: no zombies for the first seconds of a map (`zz_escape_grace_seconds`). The server's; a client reads [member remote_grace_left].
-var grace := DotNpcDirectorGrace.new()
+var grace := GSNpcDirectorGrace.new()
 ## Seconds of grace a client was told are left (0 when none, or the HUD countdown is off).
 var remote_grace_left: float = 0.0
 
@@ -479,8 +479,8 @@ var hold_clock: Callable = Callable()
 
 
 ## Console, chat and map-menu handlers that build the map or ask the physics space wait here for
-## the next tick (dot-physics' DotTickGate). Armed by ZzModule on a server; solo leaves it open.
-var tick_gate := DotTickGate.new()
+## the next tick (dot-physics' GSTickGate). Armed by ZzModule on a server; solo leaves it open.
+var tick_gate := GSTickGate.new()
 
 
 ## Microseconds spent inside [method simulate] since the start (tools/bench.gd reads it).
@@ -499,21 +499,21 @@ var horde_frame_us: int = 0
 const TOY_BLAST_SPEED := 12.0
 
 
-static func _load_ammo_types() -> DotWeaponAmmoTypes:
-	var types := DotWeaponAmmoTypes.new()
-	var _n := types.load_set(DotWeaponAmmoTypes.make_set("", "game-zombie-zone"))
+static func _load_ammo_types() -> GSWeaponAmmoTypes:
+	var types := GSWeaponAmmoTypes.new()
+	var _n := types.load_set(GSWeaponAmmoTypes.make_set("", "game-zombie-zone"))
 	return types
 
 
 ## The stock rules with the game's corpse time: a horde dies by the dozen, and a body lying ten
 ## seconds (dot-player-char's default) kept the floor of a survival wave covered.
-static func _corpse_rules() -> DotPlayerRagdollRules:
-	var rules := DotPlayerRagdollRules.new()
+static func _corpse_rules() -> GSPlayerRagdollRules:
+	var rules := GSPlayerRagdollRules.new()
 	rules.lifetime = CORPSE_SECONDS
 	return rules
 
 
-static func _make_fall_rules() -> DotFallDamageRules:
-	var rules := DotFallDamageRules.new()
+static func _make_fall_rules() -> GSFallDamageRules:
+	var rules := GSFallDamageRules.new()
 	rules.enabled = true
 	return rules

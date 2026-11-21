@@ -17,27 +17,27 @@ const DIR := "res://cfg/game/game-zombie-zone/npc"
 const COST_IN_CODE: Array[StringName] = [&"sleeper"]
 
 
-static func make_set(roots: PackedStringArray = PackedStringArray()) -> DotProfileSet:
-	return DotNpcProfiles.make_set(GAME, roots)
+static func make_set(roots: PackedStringArray = PackedStringArray()) -> GSProfileSet:
+	return GSNpcProfiles.make_set(GAME, roots)
 
 
 ## Lays the profile of [param def] over it; [param base] is the same kind built from default
 ## config, [param base_config] that config. Returns true when a profile file existed.
-static func overlay(def: DotNpcDef, base: DotNpcDef, c: RefCounted, base_config: RefCounted, set: DotProfileSet) -> bool:
+static func overlay(def: GSNpcDef, base: GSNpcDef, c: RefCounted, base_config: RefCounted, set: GSProfileSet) -> bool:
 	if not set.has_id(String(def.id)):
 		return false
 	var res := set.load_profile(String(def.id))
 	if not res.ok:
-		DotLog.error(CHANNEL, "npc profile skipped", {"id": String(def.id), "why": res.error.message})
+		GSLog.error(CHANNEL, "npc profile skipped", {"id": String(def.id), "why": res.error.message})
 		return false
-	var p: DotProfile = res.value
+	var p: GSProfile = res.value
 	var scale := _scale(def.id, c)
 	var base_health := unscaled_health(base, base_config)
 	_set_if(p, "name", base.display_name, func(v: Variant) -> void: def.display_name = str(v))
 	_set_if(p, "category", String(base.category), func(v: Variant) -> void: def.category = StringName(str(v)))
 	_set_if(p, "faction", String(base.faction), func(v: Variant) -> void: def.faction = StringName(str(v)))
 	_set_if(p, "weight", weight_name(base.weight), func(v: Variant) -> void:
-		def.weight = maxi(DotNpcDef.Weight.keys().find(str(v).to_upper()), 0) as DotNpcDef.Weight)
+		def.weight = maxi(GSNpcDef.Weight.keys().find(str(v).to_upper()), 0) as GSNpcDef.Weight)
 	if not COST_IN_CODE.has(def.id):
 		_set_if(p, "cost", base.cost, func(v: Variant) -> void: def.cost = int(v))
 	_set_if(p, "health", base_health, func(v: Variant) -> void:
@@ -62,17 +62,17 @@ static func overlay(def: DotNpcDef, base: DotNpcDef, c: RefCounted, base_config:
 
 
 ## A kind's health before the special scale (a brute's: before the per-survivor share too).
-static func unscaled_health(def: DotNpcDef, c: RefCounted) -> float:
+static func unscaled_health(def: GSNpcDef, c: RefCounted) -> float:
 	if def.id == &"brute":
 		return float(def.meta.get("brute_health", c.get("brute_health")))
 	return def.max_health / _scale(def.id, c)
 
 
 static func weight_name(w: int) -> String:
-	return String(DotNpcDef.Weight.keys()[w]).to_lower()
+	return String(GSNpcDef.Weight.keys()[w]).to_lower()
 
 
-static func yaml_of(def: DotNpcDef, c: RefCounted) -> String:
+static func yaml_of(def: GSNpcDef, c: RefCounted) -> String:
 	var lines := PackedStringArray([
 		"name: %s" % def.display_name, "category: %s" % def.category, "faction: %s" % def.faction,
 		"weight: %s" % weight_name(def.weight), "cost: %d" % maxi(def.cost, 1),
@@ -104,7 +104,7 @@ static func _differs(a: Variant, b: Variant) -> bool:
 	return a != b
 
 
-static func _set_if(p: DotProfile, key: String, base_value: Variant, apply: Callable) -> void:
+static func _set_if(p: GSProfile, key: String, base_value: Variant, apply: Callable) -> void:
 	var v: Variant = p.get_value(key)
 	if v != null and _differs(v, base_value) and _differs(v, _schema_default(key)):
 		apply.call(v)
@@ -112,7 +112,7 @@ static func _set_if(p: DotProfile, key: String, base_value: Variant, apply: Call
 
 ## A value equal to the schema default counts as unstated, so a file naming one key leaves the rest to the code.
 static func _schema_default(key: String) -> Variant:
-	for f: Dictionary in DotNpcProfiles.schema():
+	for f: Dictionary in GSNpcProfiles.schema():
 		if f["name"] == key:
 			return f["default"]
 	return null

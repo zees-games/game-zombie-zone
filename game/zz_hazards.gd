@@ -74,10 +74,10 @@ var _burning: Dictionary = {}
 var _next_id: int = 1
 
 ## Ground hazards that hurt by standing in them (acid; the oil monster's goo): dot-effects' pool.
-var pool := DotHazardPool.new()
+var pool := GSHazardPool.new()
 
-## Hazard kind -> its [DotHazardProfile]; a kind not here is simulated by this file.
-var profiles: Dictionary = {ACID: DotHazardProfile.acid(), GOO: goo_profile(), GOO_TRAIL: trail_profile()}
+## Hazard kind -> its [GSHazardProfile]; a kind not here is simulated by this file.
+var profiles: Dictionary = {ACID: GSHazardProfile.acid(), GOO: goo_profile(), GOO_TRAIL: trail_profile()}
 
 ## The slow of the puddles a survivor stood in at the last tick, by player id (1 is none).
 func slow_of(player_id: StringName) -> float:
@@ -114,15 +114,15 @@ func _victim_key(player: Object) -> Variant:
 
 
 ## The spit's puddle: black, slow, hurts at once and at a steady rate, fades out over its last seconds.
-static func goo_profile() -> DotHazardProfile:
-	return DotHazardProfile.from_values({"kind": "goo", "radius": 2.6, "seconds": 9.0, "dps": 9.0, "dps_start": 9.0,
+static func goo_profile() -> GSHazardProfile:
+	return GSHazardProfile.from_values({"kind": "goo", "radius": 2.6, "seconds": 9.0, "dps": 9.0, "dps_start": 9.0,
 		"ramp_seconds": 0.0, "tick_interval": 0.25, "slow_factor": 0.6, "fade_seconds": 2.0, "global_cap": 40,
 		"color": "050508cc"})
 
 
 ## What the oil monster leaves behind as it slides: small, short, weaker than the spit's puddle.
-static func trail_profile() -> DotHazardProfile:
-	return DotHazardProfile.from_values({"kind": "goo_trail", "radius": 1.1, "seconds": 6.0, "dps": 5.0, "dps_start": 5.0,
+static func trail_profile() -> GSHazardProfile:
+	return GSHazardProfile.from_values({"kind": "goo_trail", "radius": 1.1, "seconds": 6.0, "dps": 5.0, "dps_start": 5.0,
 		"ramp_seconds": 0.0, "tick_interval": 0.5, "slow_factor": 0.75, "fade_seconds": 1.5, "grow_seconds": 0.4,
 		"start_fraction": 0.5, "max_per_owner": 30, "global_cap": 120, "trail_spacing": 1.4, "trail_interval": 0.2,
 		"color": "0a0a10b3"})
@@ -134,7 +134,7 @@ func configure_from_meta(meta: Dictionary) -> void:
 	for pair: Array in [[GOO, "goo_"], [GOO_TRAIL, "trail_"]]:
 		var values := {}
 
-		for key: String in DotHazardProfile.KEYS:
+		for key: String in GSHazardProfile.KEYS:
 			# trail_spacing and trail_interval are the profile's own names; the trail's radius and life are its `radius` and `seconds`.
 			var mk: String = key if key.begins_with("trail_") else String(pair[1]) + key
 
@@ -172,7 +172,7 @@ func _take_id() -> int:
 
 ## Sets profile keys for a hazard kind from a dot-profile's values or a cvar dump.
 func configure(kind: StringName, values: Dictionary) -> void:
-	profiles[kind] = DotHazardProfile.from_values(values, profiles.get(kind, DotHazardProfile.new()))
+	profiles[kind] = GSHazardProfile.from_values(values, profiles.get(kind, GSHazardProfile.new()))
 
 
 func add(kind: StringName, at: Vector3, radius: float, seconds: float, amount: float, owner: int = 0) -> int:
@@ -383,7 +383,7 @@ func _advance_burning(delta: float) -> void:
 	var now: float = game.now()
 
 	for instance_id: int in _burning.keys():
-		var npc: DotNpcInstance = game.horde.spawner.get_npc(instance_id)
+		var npc: GSNpcInstance = game.horde.spawner.get_npc(instance_id)
 
 		if npc == null or not npc.is_alive():
 			_burning.erase(instance_id)
@@ -403,7 +403,7 @@ func _advance_burning(delta: float) -> void:
 
 
 ## Sets [param npc] alight for [param seconds].
-func ignite(npc: DotNpcInstance, seconds: float = -1.0) -> void:
+func ignite(npc: GSNpcInstance, seconds: float = -1.0) -> void:
 	if seconds < 0.0:
 		seconds = _cfg().hazard_afterburn_seconds
 

@@ -12,9 +12,9 @@ const CHANNEL := "zz.nav"
 
 enum Step { CACHE, STRICT, KEPT, REACH_KEPT, TRY, SAVE, DONE }
 
-## Builds a configured, not yet begun builder: `(heights: Array, info: Dictionary) -> DotNpcNavBuilder`.
+## Builds a configured, not yet begun builder: `(heights: Array, info: Dictionary) -> GSNpcNavBuilder`.
 var make_builder: Callable
-## `(nav: DotNpcNavData) -> Vector2i`: posts and ground joined to the first spawn.
+## `(nav: GSNpcNavData) -> Vector2i`: posts and ground joined to the first spawn.
 var reach: Callable
 var map_id: StringName = &""
 var digest := ""
@@ -24,21 +24,21 @@ var strict_heights: Array = []
 ## Worker tasks the builder's edge and cover passes may use when this runs on a thread.
 var workers := 1
 ## The graph, once [method is_done].
-var nav: DotNpcNavData = null
+var nav: GSNpcNavData = null
 ## Whether the graph came off the disk.
 var from_cache := false
 ## Milliseconds the cache look-up took (read and decode), for the cold start's laps.
 var cache_ms := 0.0
-## `(nav: DotNpcNavData) -> Object`, run on the worker thread once the graph is done: what the game makes of it
+## `(nav: GSNpcNavData) -> Object`, run on the worker thread once the graph is done: what the game makes of it
 ## (its search graph), or null when that must wait for the main thread. Not called on a build stepped on the main thread.
 var make_graph: Callable
 ## What [member make_graph] made of [member nav], or null.
 var graph: Object = null
 
 var _step := Step.CACHE
-var _builder: DotNpcNavBuilder = null
-var _strict: DotNpcNavData = null
-var _kept: DotNpcNavData = null
+var _builder: GSNpcNavBuilder = null
+var _strict: GSNpcNavData = null
+var _kept: GSNpcNavData = null
 var _kept_reach := Vector2i.ZERO
 var _try := 0
 var _info := {}
@@ -55,7 +55,7 @@ var _stage_name := "preparing"
 
 
 ## Runs to the end on this thread. What a suite and a tool use.
-func run_blocking() -> DotNpcNavData:
+func run_blocking() -> GSNpcNavData:
 	while not advance(0.0):
 		pass
 
@@ -187,7 +187,7 @@ func _do_cache() -> void:
 		return
 
 	var began := Time.get_ticks_usec()
-	var cached := DotNpcNavData.from_cache_bytes(FileAccess.get_file_as_bytes(cache_path))
+	var cached := GSNpcNavData.from_cache_bytes(FileAccess.get_file_as_bytes(cache_path))
 	cache_ms = float(Time.get_ticks_usec() - began) / 1000.0
 
 	if cached != null and cached.matches(digest):
@@ -199,7 +199,7 @@ func _do_cache() -> void:
 ## Steps the current builder, making it first from [param heights]; true when it finished.
 func _drive(heights: Array, deadline: int) -> bool:
 	if _builder == null:
-		var made: DotNpcNavBuilder = make_builder.call(heights, _info)
+		var made: GSNpcNavBuilder = make_builder.call(heights, _info)
 		made.workers = workers
 		made.log_summary = false
 		made.begin(map_id, digest)
@@ -228,7 +228,7 @@ func _after_build() -> void:
 
 ## The strictest link test that loses no post and under 1% of the ground, else the loose graph.
 func _do_try(deadline: int) -> void:
-	var tried: DotNpcNavData = _strict
+	var tried: GSNpcNavData = _strict
 
 	if _try == 1:
 		if not _drive([strict_heights[-1]], deadline):
@@ -252,12 +252,12 @@ func _do_try(deadline: int) -> void:
 
 
 ## Main thread: writes [param data] over the cache (the pruned graph, so the next load skips the physics pass).
-func save(data: DotNpcNavData) -> void:
+func save(data: GSNpcNavData) -> void:
 	nav = data
 	_do_save()
 
 	if _save_error != 0:
-		DotLog.warn(CHANNEL, "the pruned navigation cache could not be written", {"path": cache_path, "error": _save_error})
+		GSLog.warn(CHANNEL, "the pruned navigation cache could not be written", {"path": cache_path, "error": _save_error})
 
 
 func _do_save() -> void:
@@ -270,7 +270,7 @@ func _do_save() -> void:
 	if file != null:
 		file.store_buffer(nav.to_cache_bytes())
 		file.close()
-		DotWeb.sync_filesystem()
+		GSWeb.sync_filesystem()
 	else:
 		_save_error = FileAccess.get_open_error()
 
@@ -288,7 +288,7 @@ func flush_log() -> void:
 	var report: Dictionary = _reports.get(nav.get_instance_id(), {})
 
 	if not report.is_empty():
-		DotLog.warn("npc.nav", "navigation links found no point at one end", report)
+		GSLog.warn("npc.nav", "navigation links found no point at one end", report)
 
 	if _save_error != 0:
-		DotLog.warn(CHANNEL, "the navigation cache could not be written", {"path": cache_path, "error": _save_error})
+		GSLog.warn(CHANNEL, "the navigation cache could not be written", {"path": cache_path, "error": _save_error})

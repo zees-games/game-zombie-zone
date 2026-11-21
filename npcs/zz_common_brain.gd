@@ -46,7 +46,7 @@ const STUCK_SECONDS := 1.2
 const HOPS_BEFORE_NUDGE := 2
 
 ## [method _chase_plan]'s first value: chasing the forced survivor, its own target, nobody, or one it has no place for.
-## The same codes as dot-sim's `DotSimZombieBrains`.
+## The same codes as dot-sim's `GSSimZombieBrains`.
 const PLAN_FORCED := 0.0
 const PLAN_TARGET := 1.0
 const PLAN_NOBODY := -1.0
@@ -82,7 +82,7 @@ var _woken_at: float = INF
 
 func _build() -> void:
 	var seed_id := npc.seed if npc != null else 0
-	var roll := DotNpcAiNode.deterministic_unit(seed_id, 4111)
+	var roll := GSNpcAiNode.deterministic_unit(seed_id, 4111)
 
 	# Mostly standing and milling; a few sitting against things; fewer feeding on the floor.
 	if roll < 0.32:
@@ -96,15 +96,15 @@ func _build() -> void:
 	else:
 		idle_kind = Idle.FEED
 
-	pace = lerpf(0.88, 1.12, DotNpcAiNode.deterministic_unit(seed_id, 4127))
-	runner_roll = DotNpcAiNode.deterministic_unit(seed_id, 4153)
-	ring = lerpf(RING_MIN, RING_MAX, DotNpcAiNode.deterministic_unit(seed_id, 4133))
-	_alert_for = lerpf(ALERT_MIN, ALERT_MAX, DotNpcAiNode.deterministic_unit(seed_id, 4139))
+	pace = lerpf(0.88, 1.12, GSNpcAiNode.deterministic_unit(seed_id, 4127))
+	runner_roll = GSNpcAiNode.deterministic_unit(seed_id, 4153)
+	ring = lerpf(RING_MIN, RING_MAX, GSNpcAiNode.deterministic_unit(seed_id, 4133))
+	_alert_for = lerpf(ALERT_MIN, ALERT_MAX, GSNpcAiNode.deterministic_unit(seed_id, 4139))
 	home = npc.position() if npc != null else Vector3.ZERO
 
 	# Its own reactions: a sleepy one is a second slow, an edgy one is a tenth.
-	character = DotNpcAiCharacter.preset(&"normal").with_seed(seed_id)
-	character.reaction_time = lerpf(0.15, 0.9, DotNpcAiNode.deterministic_unit(seed_id, 4153))
+	character = GSNpcAiCharacter.preset(&"normal").with_seed(seed_id)
+	character.reaction_time = lerpf(0.15, 0.9, GSNpcAiNode.deterministic_unit(seed_id, 4153))
 	character.view_turn_deg = 360.0
 	character.memory_time = 12.0
 	character.alertness = 1.0
@@ -172,7 +172,7 @@ func _decide(_delta: float) -> void:
 				_begin_alert(forced, Vector3.INF, 0.1)
 			elif npc.has_target() and has_reacted():
 				_begin_alert(npc.target_id, Vector3.INF, 0.0)
-			elif c.has(DotNpcAiConditions.LIGHT_DAMAGE) or c.has(DotNpcAiConditions.HEAR_COMBAT):
+			elif c.has(GSNpcAiConditions.LIGHT_DAMAGE) or c.has(GSNpcAiConditions.HEAR_COMBAT):
 				var heard := last_known_position()
 				_begin_alert(&"", heard if heard != Vector3.INF else npc.position(), 0.0)
 
@@ -195,7 +195,7 @@ func _decide(_delta: float) -> void:
 		&"investigate":
 			if quarry() != &"":
 				go(&"chase")
-			elif search(context, tune(&"walk_speed", 1.1) * 3.5 * pace, 1.1) != DotNpcAiNode.Status.RUNNING:
+			elif search(context, tune(&"walk_speed", 1.1) * 3.5 * pace, 1.1) != GSNpcAiNode.Status.RUNNING:
 				home = npc.position()
 				go(&"idle")
 				_set_sight(IDLE_SIGHT[Idle.STAND])
@@ -257,7 +257,7 @@ func _chase_speed() -> float:
 
 ## This tick's chase as [code][code, dropped, at.x, at.y, at.z, speed, gap, reach][/code]: whom ([code]PLAN_*[/code]),
 ## whether [member forced] is spent, where they stand, how fast and how far, and how near a swing lands. In dot-sim's
-## `DotSimZombieBrains` while the horde has one ([member ZzConfig.native_brains]); the script below otherwise, and
+## `GSSimZombieBrains` while the horde has one ([member ZzConfig.native_brains]); the script below otherwise, and
 ## beside it under the horde's `brains_verify`, whose answer is then the one used.
 func _chase_plan(b: ZzZombieBody) -> PackedFloat64Array:
 	var h := horde()
@@ -460,9 +460,9 @@ func _idle(b: ZzZombieBody) -> void:
 
 			if _mill_goal == Vector3.INF or flat_distance(npc.position(), _mill_goal) < 0.8:
 				if _mill_goal != Vector3.INF:
-					_mill_wait_until = now() + lerpf(1.5, 6.0, DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 10.0)))
-				var angle := DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 3.0) + 77) * TAU
-				var far := lerpf(1.5, wander, DotNpcAiNode.deterministic_unit(npc.seed, int(now() * 5.0) + 91))
+					_mill_wait_until = now() + lerpf(1.5, 6.0, GSNpcAiNode.deterministic_unit(npc.seed, int(now() * 10.0)))
+				var angle := GSNpcAiNode.deterministic_unit(npc.seed, int(now() * 3.0) + 77) * TAU
+				var far := lerpf(1.5, wander, GSNpcAiNode.deterministic_unit(npc.seed, int(now() * 5.0) + 91))
 				_mill_goal = home + Vector3(cos(angle), 0.0, sin(angle)) * far
 				var h := horde()
 				if h != null:

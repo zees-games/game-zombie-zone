@@ -67,8 +67,8 @@ var game: ZzGame = null
 var map_drop: Node = null
 var player: ZzPlayer = null
 ## The flashlight on the eye and the other survivors' beams (dot-flashlight); the server owns on/off.
-var flash: DotFlashlight = null
-var flash_crowd: DotFlashlightCrowd = null
+var flash: GSFlashlight = null
+var flash_crowd: GSFlashlightCrowd = null
 var _flash_ticks := 0
 ## Ticks left to hold ACT_FIRE_MODE after the fire-mode key was pressed.
 var _fire_mode_ticks := 0
@@ -85,23 +85,23 @@ var _mirror := ZzCarry.new()
 var _flash_msec := -100000
 
 ## Keeps the screen covered, and the local body and the input still, until the map, the
-## player and the camera are all in. The platform's; see [DotGameClient].
-var gate: DotLoadGate = null
+## player and the camera are all in. The platform's; see [GSGameClient].
+var gate: GSLoadGate = null
 
 ## dot-game's client platform: the cover, settings and menu, console, Tab, M, the pointer, the
 ## input block and the browser's filesystem flush.
-var platform: DotGameClient = null
+var platform: GSGameClient = null
 ## `--sim_host 1`: the solo game as a loopback server process this client joined ([ZzSimHost]), else null.
 var _sim_host: ZzSimHost = null
 var camera: Camera3D = null
 var hud: ZzHud = null
-var board: DotMenuScoreboard = null
-var chat: DotGameChatClient = null
+var board: GSMenuScoreboard = null
+var chat: GSGameChatClient = null
 var audio: ZzAudio = null
 var settings: ZzSettings = null
 
 ## The player's console (the platform's).
-var console: DotConsoleController = null
+var console: GSConsoleController = null
 var world_view: ZzWorldView = null
 ## Blood behind a body the local shooter hit (see zz_blood.gd).
 var blood: ZzBlood = null
@@ -119,16 +119,16 @@ var _defib_scratch: Dictionary = {}
 ## The crate in the hands while a box is out, a sibling of the gun under the camera.
 var box_hands: Node3D = null
 
-var net: DotNetManager = null
+var net: GSNetManager = null
 var bridge: ZzNetBridge = null
 var link: Node = null
 ## Asks a server whether this player may edit it (sv_workbench_remote); null offline.
-var workbench_remote: DotGameWorkbenchRemoteClient = null
+var workbench_remote: GSGameWorkbenchRemoteClient = null
 ## The tuning panel's host: F9 solo or hosting, the admin's remote panel on a server that allows it.
-var workbench: DotGameWorkbench = null
+var workbench: GSGameWorkbench = null
 ## Records every frame and replays the map's last moment ([ZzKillcam]); then the reveal.
 var killcam: ZzKillcam = null
-var winner_reveal: DotWinnerReveal = null
+var winner_reveal: GSWinnerReveal = null
 
 var third_person: bool = false
 
@@ -136,8 +136,8 @@ var _offline: bool = true
 ## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
 var _killcam_sec: float = -1.0
 
-## The server's `mp_killview_camera` ([enum DotKillViewRules.Camera]); the eye until it has said.
-var _killcam_camera: int = DotKillViewRules.Camera.EYE
+## The server's `mp_killview_camera` ([enum GSKillViewRules.Camera]); the eye until it has said.
+var _killcam_camera: int = GSKillViewRules.Camera.EYE
 
 ## Weapon pictures for the killcam banner, drawn from the weapon models on first ask.
 var _killcam_icons: ZzShopIcons = null
@@ -157,18 +157,18 @@ var _map_won: bool = false
 var _map_why: String = ""
 var _board_opened: bool = false
 var _covered_by_reveal: Dictionary = {}
-var _sampler: DotFpsSampler = null
+var _sampler: GSFpsSampler = null
 ## The hit flinch the platform drives; `blocked()` refuses the sights for a moment after a hit (sv_unscope_hit).
-var _hit_flinch: DotGameHitFlinch = null
+var _hit_flinch: GSGameHitFlinch = null
 ## The phone's on-screen buttons ([code]zz_touch.gd[/code]); null off touch.
 var _touch: RefCounted = null
 var _prewarmed := false
 var _watch_id: int = -1
-var _arm: DotCameraBoom = null
+var _arm: GSCameraBoom = null
 ## The local survivor's crawling arms in first person while down, under a yaw-only pivot at the eye.
-var view_arms: DotPlayerViewArms = null
+var view_arms: GSPlayerViewArms = null
 var _arms_yaw: Node3D = null
-var _fade: DotCameraFade = null
+var _fade: GSCameraFade = null
 var _rig_height: float = 0.0
 var _started_msec: int = Time.get_ticks_msec()
 
@@ -179,7 +179,7 @@ var _aiming: bool = false
 
 ## The lens before an aim zooms it: the menu's field of view lands here, not on the camera, so
 ## the zoom always scales the player's own setting and never compounds frame to frame.
-var base_fov: float = DotMenuApplier.vertical_from_horizontal_4_3(ZzSettings.DEFAULT_FOV)
+var base_fov: float = GSMenuApplier.vertical_from_horizontal_4_3(ZzSettings.DEFAULT_FOV)
 var _reloading: bool = false
 var _using: bool = false
 ## The trader's list as the server last said it ({menu, open, radius, at, items}), and its menu.
@@ -187,14 +187,14 @@ var shop_state: Dictionary = {}
 var _shop_menu: PanelContainer = null
 ## The fitting screen (I), and the fittings it saves in the settings ([constant ZzFittings.SETTING]):
 ## one dictionary for the session, which the local arsenal's watcher holds by reference.
-var _attach_menu: DotWeaponAttachMenu = null
+var _attach_menu: GSWeaponAttachMenu = null
 var _fittings: Dictionary = {}
 var _fittings_read: bool = false
 var _healing: bool = false
 var _pills: bool = false
 var _box_key: bool = false
 var _slot: int = 0
-var _wheel: DotWeaponWheel
+var _wheel: GSWeaponWheel
 
 ## Box types' colours, offline from the catalogue, connected from the file the server also has.
 var _box_colours: Dictionary = {}

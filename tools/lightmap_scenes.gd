@@ -25,7 +25,7 @@ const CASTER_PREFIX := "Prop_"
 const CASTER_MIN_SIZE := 0.6
 const CASTER_TEXEL := 4.0
 
-## Per map: LightmapGI settings for DotLightBake.prepare. The defaults suit a street; the big
+## Per map: LightmapGI settings for GSLightBake.prepare. The defaults suit a street; the big
 ## holds take a coarser texel so the file stays a browser download.
 ## How much of the live ambient each surface emits into the bake (see _with_emission): an open
 ## street already has its sky, a closed hold has none, so the holds take more. Tuned per map
@@ -61,7 +61,7 @@ var _unwrapped := {}
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -158,11 +158,11 @@ func _bake_scene(map: ZzMap) -> Node3D:
 
 	for node in lighting.get_children():
 		if node is DirectionalLight3D:
-			# The sun first (DotLightRig adds it before the fill).
+			# The sun first (GSLightRig adds it before the fill).
 			var light := node as DirectionalLight3D
 			light.light_bake_mode = Light3D.BAKE_DYNAMIC if node == lighting.get_child(0) else Light3D.BAKE_DISABLED
 
-	var gi := DotLightBake.prepare(root, map.light_fingerprint(), ZzMap.BAKE_PATH % String(map.id()), settings)
+	var gi := GSLightBake.prepare(root, map.light_fingerprint(), ZzMap.BAKE_PATH % String(map.id()), settings)
 	# The sky term is the map's own AMBIENT, not the bake scene's sky: the sky is a deep blue at
 	# night and a lightmap lit by it came out bluer and darker than the live ambient (a flat
 	# colour at the live energy) that every map is tuned under. The bake keeps what a flat

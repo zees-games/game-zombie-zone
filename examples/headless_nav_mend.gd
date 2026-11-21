@@ -206,19 +206,19 @@ func _test_hop_wedge() -> void:
 	for step in 30:
 		await _sim(game, 0.5)
 		for i in npcs.size():
-			var npc: DotNpcInstance = npcs[i]
+			var npc: GSNpcInstance = npcs[i]
 			if npc.is_alive():
 				var start: Vector3 = WEDGES[i][0]
 				furthest[i] = maxf(furthest[i], Vector2(npc.position().x - start.x, npc.position().z - start.z).length())
 
 	for i in npcs.size():
-		var npc: DotNpcInstance = npcs[i]
+		var npc: GSNpcInstance = npcs[i]
 		var remedies: PackedStringArray = npc.brain.get(&"unstick_log") if npc.is_alive() else PackedStringArray()
 		var detail := "from %s furthest %.1f m, remedies [%s]" % [WEDGES[i][0], furthest[i], ", ".join(remedies)]
 		_check(npc.is_alive() and furthest[i] > 3.0, "the common caught at %s gets 3 m clear within 15 s" % WEDGES[i][0], detail)
 
 	# The hop itself zeroes wish; the watchdog must pause through it, not start again.
-	var hopper: DotNpcInstance = npcs[0]
+	var hopper: GSNpcInstance = npcs[0]
 	var watched: Object = hopper.brain
 	var hop_body: Object = watched.call(&"body")
 	watched.set(&"bashing", false)
@@ -393,7 +393,7 @@ func _test_unstick_steps() -> void:
 ## A stand-in's first path legs must not run through the door frame.
 func _check_door_frames(game: ZzGame) -> void:
 	# Stand-ins at these spots had smoothing cut the corner of a door frame.
-	var nav: DotNpcNavGraph = game.horde.spawner.nav
+	var nav: GSNpcNavGraph = game.horde.spawner.nav
 	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
 
 	for pair: Array in [[Vector3(-4.57, 0.0, 4.35), Vector3(39.6, 0.0, -9.8)], [Vector3(6.35, 0.0, 3.73), Vector3(-39.4, 0.0, -10.3)]]:
@@ -461,7 +461,7 @@ func _test_lure_crowd() -> void:
 	var gaps: Array[float] = []
 	var states := {}
 
-	for npc: DotNpcInstance in game.horde.spawner.all_npcs():
+	for npc: GSNpcInstance in game.horde.spawner.all_npcs():
 		var st := str(npc.brain.get(&"state")) if npc.brain != null else "-"
 		states[st] = int(states.get(st, 0)) + 1
 		if npc.brain != null and npc.brain.get(&"state") == &"lure" and npc.brain.call(&"at_lure"):
@@ -480,7 +480,7 @@ func _test_lure_crowd() -> void:
 ## the one order a forward flood labels right; Roy Highway's deck was numbered after the street and its two zombie
 ## spawns were refused the way down they had.
 func _check_one_way() -> void:
-	var late := DotNpcNavData.new()
+	var late := GSNpcNavData.new()
 	late.map_id = &"late_test"
 	late.source_digest = "test"
 	late.grid_spacing = 1.0
@@ -532,7 +532,7 @@ func _check_one_way() -> void:
 
 
 ## A ladder is a two-way link, off the graph with `zz_zombie_ladder_speed` 0: [method _test_graph]'s two floors joined.
-func _check_ladder_link(data: DotNpcNavData, low: PackedInt32Array, high: PackedInt32Array) -> void:
+func _check_ladder_link(data: GSNpcNavData, low: PackedInt32Array, high: PackedInt32Array) -> void:
 	# A ladder is a two-way link: up the rungs as well as down, while zz_zombie_ladder_speed is over 0.
 	var ladder := ZzNavGraph.new()
 	var _rebuilt := ladder.rebuild(data)
@@ -554,12 +554,12 @@ func _check_ladder_link(data: DotNpcNavData, low: PackedInt32Array, high: Packed
 
 ## The grid thinning of spawn points keeps what the director's own loop keeps, in its order.
 func _check_thinned_spawns() -> void:
-	var cloud := DotNpcNavData.new()
+	var cloud := GSNpcNavData.new()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	for _i in 900:
 		var _p := cloud.add_point(Vector3(rng.randf_range(0.0, 60.0), rng.randf_range(0.0, 6.0), rng.randf_range(0.0, 60.0)))
-	var director := DotNpcDirector.new()
+	var director := GSNpcDirector.new()
 	var _n := director.set_spawn_points_from_nav(cloud, 6.0, null)
 	var thinned := ZzNpcs.thinned_points(cloud, 6.0, null)
 	var expected := director.spawn_points

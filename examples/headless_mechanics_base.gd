@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 
@@ -54,13 +54,13 @@ var _skipped := 0
 ## v0.1.30 and v0.1.31 failed validate on it: 77 checks ran, 79 then 83 expected).
 var _declared := -1
 
-## A world made of data, for the chain tests: the same calls a DotMapBspMesh answers.
+## A world made of data, for the chain tests: the same calls a GSMapBspMesh answers.
 class FakeWorld extends RefCounted:
 	var ents: Variant = null
 	var model_ids := PackedInt32Array()
 
 	func _init(manifest: Dictionary) -> void:
-		ents = DotMapEntities.from_manifest(manifest)
+		ents = GSMapEntities.from_manifest(manifest)
 		for rec: Dictionary in manifest["movers"]:
 			model_ids.append(int(rec["model"]))
 

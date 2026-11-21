@@ -57,7 +57,7 @@ var choke_traffic: float = 0.07
 var choke_routes: int = 768
 
 var state: State = State.OFF
-var annotations: DotNpcAiNavAnnotations = null
+var annotations: GSNpcAiNavAnnotations = null
 var bake_ms: float = 0.0
 ## The tiles the last bake was cut into (0 for one grid) and their side, metres ([member ZzConfig.nav_notes_bake_tile]).
 var bake_tiles: int = 0
@@ -100,10 +100,10 @@ var _world: World3D = null
 var _mask: int = 0
 var _seeds: PackedVector3Array = PackedVector3Array()
 var _frame: int = 0
-var _annotator: DotNpcAiNavAnnotator = null
+var _annotator: GSNpcAiNavAnnotator = null
 var _started_ms: int = 0
-var _bot: DotBotNav = null
-var _bot_result: DotResult = null
+var _bot: GSBotNav = null
+var _bot_result: GSResult = null
 
 ## npc key -> {"at": choke index or -1, "seen": time}
 var _assigned: Dictionary = {}
@@ -201,8 +201,8 @@ func _bake() -> bool:
 	# A map over the engine's cell limit bakes in tiles joined into one mesh, or fails saying why.
 	# dot-bot from API level 31 does that itself (agent key "tile"); a shell pinned below it runs
 	# ZzNavBake, this game's copy, until the pin catches up and that file can go.
-	var native_tiles := DotAddonApi.build_level("dot_bot") >= 31
-	var bot: DotBotNav = DotBotNav.new() if native_tiles else ZzNavBake.new()
+	var native_tiles := GSAddonApi.build_level("dot_bot") >= 31
+	var bot: GSBotNav = GSBotNav.new() if native_tiles else ZzNavBake.new()
 	if not native_tiles:
 		bot.set("tile_size", float(_config.nav_notes_bake_tile))
 
@@ -222,10 +222,10 @@ func _bake() -> bool:
 	if native_tiles:
 		agent["tile"] = float(_config.nav_notes_bake_tile)
 
-	if background and DotPlatform.has_threads():
+	if background and GSPlatform.has_threads():
 		_bot = bot
 		_bot_result = null
-		var started := bot.bake_in_background(_root, agent, _mask, [], func(res: DotResult) -> void: _bot_result = res)
+		var started := bot.bake_in_background(_root, agent, _mask, [], func(res: GSResult) -> void: _bot_result = res)
 
 		if not started.ok:
 			_bot = null
@@ -258,24 +258,24 @@ func _bake_landed() -> bool:
 	return _baked(bot)
 
 
-func _bake_failed(res: DotResult) -> bool:
+func _bake_failed(res: GSResult) -> bool:
 	bake_error = res.error.message
-	DotLog.warn(CHANNEL, "navigation notes: the bake failed", {"why": res.error.message})
+	GSLog.warn(CHANNEL, "navigation notes: the bake failed", {"why": res.error.message})
 	state = State.FAILED
 	return false
 
 
 ## The bake is in: the annotator takes over (or the cached annotations are the answer).
-func _baked(bot: DotBotNav) -> bool:
+func _baked(bot: GSBotNav) -> bool:
 	bake_ms = bot.bake_ms
 	bake_cached = bot.last_bake_cached
-	var native := DotAddonApi.build_level("dot_bot") >= 31
+	var native := GSAddonApi.build_level("dot_bot") >= 31
 	var cut := "tiles_used" if native else "tiles_cut"
 	var side := "tile_used" if native else "tile_cut"
 	bake_tiles = int(bot.get(cut))
 	bake_tile = float(bot.get(side))
 	var mesh := bot.mesh
-	var annotator := DotNpcAiNavAnnotator.new(mesh, _world)
+	var annotator := GSNpcAiNavAnnotator.new(mesh, _world)
 	annotator.agent_radius = ZzBody.BODY_RADIUS
 	annotator.stand_height = ZzBody.BODY_HEIGHT
 	annotator.climb = 0.4
@@ -292,7 +292,7 @@ func _baked(bot: DotBotNav) -> bool:
 	annotator.slice = 24
 	var key := annotator.cache_key()
 	var path := "user://nav/%s.json" % key
-	var loaded := DotNpcAiNavAnnotations.load_file(path, key)
+	var loaded := GSNpcAiNavAnnotations.load_file(path, key)
 
 	if loaded.ok:
 		annotations = loaded.value
@@ -309,7 +309,7 @@ func _baked(bot: DotBotNav) -> bool:
 
 func _annotated() -> bool:
 	if _annotator.result == null or not _annotator.result.ok:
-		DotLog.warn(CHANNEL, "navigation notes: the annotation failed", {
+		GSLog.warn(CHANNEL, "navigation notes: the annotation failed", {
 			"why": _annotator.result.error.message if _annotator.result != null else "no result"})
 		state = State.FAILED
 		return false
@@ -320,7 +320,7 @@ func _annotated() -> bool:
 	var saved := annotations.save("user://nav/%s.json" % annotations.key)
 
 	if not saved.ok:
-		DotLog.debug(CHANNEL, "navigation notes: not cached", {"why": saved.error.message})
+		GSLog.debug(CHANNEL, "navigation notes: not cached", {"why": saved.error.message})
 
 	_annotator = null
 	state = State.READY
@@ -437,7 +437,7 @@ func plan(graph, zombie_spawns: PackedVector3Array, posts: PackedVector3Array) -
 						entry["fallback"] = index_of[next_ci]
 						break
 
-	DotLog.info(CHANNEL, "navigation notes planned", {
+	GSLog.info(CHANNEL, "navigation notes planned", {
 		"routes": routes.size(), "chokes": chokes.size(), "found": all_chokes.size(),
 		"drops": drops_applied, "climbs": climbs_applied,
 	})
@@ -493,9 +493,9 @@ func _collect_links() -> void:
 	for link in annotations.links:
 		var kind := int(link["kind"])
 
-		if kind == DotNpcAiNavAnnotations.LINK_DROP:
+		if kind == GSNpcAiNavAnnotations.LINK_DROP:
 			_drops.append([link["from"], link["to"]])
-		elif kind == DotNpcAiNavAnnotations.LINK_JUMP_UP:
+		elif kind == GSNpcAiNavAnnotations.LINK_JUMP_UP:
 			_climbs.append([link["from"], link["to"]])
 
 

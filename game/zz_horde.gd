@@ -3,7 +3,7 @@ extends "zz_horde_base.gd"
 const ZzBrainsFeed := preload("zz_brains_feed.gd")
 const ZzZombieHitboxes := preload("zz_zombie_hitboxes.gd")
 
-func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
+func setup(p_game: Object, p_config: ZzConfig) -> GSResult:
 	game = p_game
 	config = p_config
 	var lap := Time.get_ticks_usec()
@@ -15,18 +15,18 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	_world.name = "Zombies"
 	add_child(_world)
 
-	senses = DotNpcSenses.new()
+	senses = GSNpcSenses.new()
 	senses.switch_ratio = 0.6
 	senses.commitment_grace = 3.0
 	senses.line_of_sight_enabled = true
 	senses.occlusion_mask = game.world_mask()
 
-	spawner = DotNpcSpawner.new()
+	spawner = GSNpcSpawner.new()
 	spawner.name = "Npcs"
 	spawner.catalogue = catalogue
 	spawner.limits = ZzNpcs.limits(config, 4)
 	spawner.authoritative = true
-	spawner.world_ref = DotNodeRef.of_path(NodePath("../Zombies"))
+	spawner.world_ref = GSNodeRef.of_path(NodePath("../Zombies"))
 	spawner.smooth_paths = true
 	spawner.allow_partial_paths = true
 	# Smooth only a path's first metres: a zombie repaths every second and a half and never
@@ -47,7 +47,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	# comes from the session's seed and its spawn count, so a server given the same seed plays
 	# the same zombies. Never their object id: see dot-npc's docs/runtime.md.
 	spawner.seed_base = config.seed_value
-	# Before add_child: DotNpcSpawner._ready makes its own senses when it finds none.
+	# Before add_child: GSNpcSpawner._ready makes its own senses when it finds none.
 	spawner.senses = senses
 	squads.pull_reports = config.squad_pull_reports
 	squads.attach(spawner)
@@ -69,7 +69,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	spawner.removed.connect(_on_removed)
 	spawner.died.connect(_on_died)
 
-	director = DotNpcDirector.new()
+	director = GSNpcDirector.new()
 	director.name = "Director"
 	director.spawner = spawner
 	director.rules = _rules()
@@ -81,11 +81,11 @@ func setup(p_game: Object, p_config: ZzConfig) -> DotResult:
 	game.combat.entity_killed.connect(_on_entity_killed)
 	game.combat.damage_applied.connect(_on_damage_applied)
 	lap = ZzLaps.lap(sections, &"setup_director", lap)
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 ## Builds the horde for a map: its graph, its spawn points, its route, its sleepers, and the
 ## commons standing about in it.
-func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
+func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> GSResult:
 	clear()
 	_doc = doc
 	_nav_extra = nav_extra
@@ -111,7 +111,7 @@ func build_for_map(doc: Dictionary, nav_extra: Dictionary = {}) -> DotResult:
 	if _nav_job == null:
 		_finish_map_build()
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 ## What waits on the first graph of a map: its route, its sleepers and wanderers, and the bake.
 func _finish_map_build() -> void:
@@ -122,7 +122,7 @@ func _finish_map_build() -> void:
 	var route := PackedVector3Array()
 	for p: Array in _doc.get("route", []):
 		route.append(ZzMapDoc.v3(p))
-	director.flow = DotNpcDirectorFlow.new(route) if route.size() >= 2 else null
+	director.flow = GSNpcDirectorFlow.new(route) if route.size() >= 2 else null
 
 	# A survival map is empty until its hold's first wave ([method populate_map]).
 	_populated = false
@@ -230,7 +230,7 @@ func nav_doc() -> Dictionary:
 ## Builds (or starts building) the graph for the map and the gates now open. Synchronous unless
 ## [member nav_async]; then the graph lands from [method tick] and a graph already in use stays in
 ## use until the new one is ready.
-func rebuild_navigation() -> DotResult:
+func rebuild_navigation() -> GSResult:
 	var props_size := Callable()
 
 	if game.props_catalogue != null:
@@ -244,7 +244,7 @@ func rebuild_navigation() -> DotResult:
 
 	_drop_nav_job()
 	_nav_started = Time.get_ticks_msec()
-	var threads := config.nav_threads if DotPlatform.has_threads() else 0
+	var threads := config.nav_threads if GSPlatform.has_threads() else 0
 	var lap := Time.get_ticks_usec()
 	var doc := nav_doc()
 	lap = ZzLaps.lap(sections, &"nav_doc", lap)
@@ -263,8 +263,8 @@ func rebuild_navigation() -> DotResult:
 		job.make_graph = _graph_off_thread
 		job.start_thread()
 
-	DotLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
-	return DotResult.success(0)
+	GSLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
+	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
 	if _nav_job != null:
@@ -285,14 +285,14 @@ func _poll_nav() -> void:
 	var applied := _apply_nav(job.nav, job)
 
 	if not applied.ok:
-		DotLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": applied.error.message})
+		GSLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": applied.error.message})
 		_map_nav_pending = false
 		return
 
 	if _map_nav_pending:
 		_finish_map_build()
 
-func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
+func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:
 	nav = graph
 	sections[&"nav_cache_read"] = snappedf(job.cache_ms, 0.1)
 	sections[&"nav_cache_hit"] = 1.0 if job.from_cache else 0.0
@@ -319,7 +319,7 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	_usable_posts_for = nav
 	lap = ZzLaps.lap(sections, &"nav_posts", lap)
 
-	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, DotNpcNavFilter.walking_only())
+	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, GSNpcNavFilter.walking_only())
 	lap = ZzLaps.lap(sections, &"spawns_thin", lap)
 	_add_hinted_spawns()
 	var kept := _keep_out_of_safe_rooms()
@@ -327,15 +327,15 @@ func _apply_nav(graph: DotNpcNavData, job: ZzNavJob) -> DotResult:
 	_set_spawn_ground()
 	lap = ZzLaps.lap(sections, &"nav_spawns", lap)
 
-	DotLog.info(CHANNEL, "navigation built", {
+	GSLog.info(CHANNEL, "navigation built", {
 		"map": str(_doc.get("id", "")), "points": nav.point_count(), "edges": nav.edge_count(),
 		"spawns": kept, "ms": Time.get_ticks_msec() - _nav_started, "cached": job.from_cache,
 		"cache": job.cache_path.get_file() if job.cache_path != "" else "off", "cache_file": job.cache_path != "" and FileAccess.file_exists(job.cache_path),
 	})
-	return DotResult.success(kept)
+	return GSResult.success(kept)
 
 ## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
-func _prune_blocked(data: DotNpcNavData, job: ZzNavJob) -> void:
+func _prune_blocked(data: GSNpcNavData, job: ZzNavJob) -> void:
 	if int(data.meta.get("pruned", 0)) >= PRUNE_VERSION or game == null or game.physics == null or not game.is_inside_tree():
 		return
 
@@ -479,7 +479,7 @@ func clear() -> void:
 	wcull = null
 
 	if spawner != null:
-		var _cleared := spawner.clear_all(DotNpcSpawner.REASON_CLEANUP)
+		var _cleared := spawner.clear_all(GSNpcSpawner.REASON_CLEANUP)
 
 	_pending.clear()
 	_maker_of.clear()
@@ -518,7 +518,7 @@ func start_pacing(p_survival: bool) -> void:
 		_next_brute = INF
 
 	director.enabled = config.director_enabled
-	DotLog.info(CHANNEL, "the horde is coming", {"survival": survival})
+	GSLog.info(CHANNEL, "the horde is coming", {"survival": survival})
 
 ## A wave is on: perception, brains and panic run, and nothing spawns but what the survival
 ## runtime releases through [method spawn_wave], [method spawn_special] and [method spawn_brute].
@@ -546,7 +546,7 @@ func _place_sleepers() -> void:
 		var npc := spawner.spawn(ZzNpcs.SLEEPER, at, &"map", Basis(Vector3.UP, deg_to_rad(float(s[3]))))
 
 		if npc == null:
-			DotLog.warn(CHANNEL, "a sleeper could not be placed", {"at": str(at)})
+			GSLog.warn(CHANNEL, "a sleeper could not be placed", {"at": str(at)})
 
 ## The share of the commons cap a survival map's wanderers may take. The waves are the hold;
 ## the ballpark's floor area put sixty-five wanderers on it, idle in the far stands, and a wave
@@ -564,9 +564,9 @@ func _place_wanderers() -> void:
 	for f: Array in (_doc.get("nav", {}) as Dictionary).get("floors", []):
 		area += (float(f[2]) - float(f[0])) * (float(f[3]) - float(f[1]))
 	if _doc.has("terrain"):
-		var ground := DotMapTerrain.from_dict(_doc["terrain"])
+		var ground := GSMapTerrain.from_dict(_doc["terrain"])
 		if ground.ok:
-			var t: DotMapTerrain = ground.value
+			var t: GSMapTerrain = ground.value
 			area += float(t.describe()["walk"]) * t.cell * t.cell
 
 	var share := SURVIVAL_WANDERER_SHARE if str(_doc.get("mode", "")) == "survival" else 0.8
@@ -604,7 +604,7 @@ func _place_wanderers() -> void:
 			if npc != null:
 				placed += 1
 
-	DotLog.debug(CHANNEL, "wanderers placed", {"wanted": wanted, "placed": placed})
+	GSLog.debug(CHANNEL, "wanderers placed", {"wanted": wanted, "placed": placed})
 
 ## The team the map in play is built for, or the survivors there are, whichever is more.
 func _planned_team() -> int:
@@ -717,7 +717,7 @@ func _rebuild_candidates() -> void:
 
 	for player in game.survivors():
 		var id: StringName = player.player_id
-		var state: DotFpsState = player.controller.state
+		var state: GSFpsState = player.controller.state
 		# A seat behind its loading cover is not a target: not chased, not spawned at, not counted
 		# in the crowd's size (dot-game's "still loading"); it is still alive for the round.
 		var alive: bool = not grace_on and player.is_alive() and not player.watching and game.can_be_harmed(id)
@@ -745,9 +745,9 @@ func _rebuild_candidates() -> void:
 		if state.is_crouched():
 			loudness *= 0.3
 
-		var cand: DotNpcSenses.Candidate = _cand_of.get(id)
+		var cand: GSNpcSenses.Candidate = _cand_of.get(id)
 		if cand == null:
-			cand = DotNpcSenses.Candidate.new(id, Vector3.ZERO, &"survivor")
+			cand = GSNpcSenses.Candidate.new(id, Vector3.ZERO, &"survivor")
 			_cand_of[id] = cand
 		cand.position = state.position + Vector3(0.0, 1.0, 0.0)
 		cand.loudness = loudness
@@ -881,7 +881,7 @@ func _pick_crowd() -> void:
 	var brains := config != null and config.native_brains and ClassDB.class_exists(NATIVE_BRAINS)
 	# Through `set` so an older dot-npc without pacing is simply not told.
 	if spawner != null:
-		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"DotSimThinkPacer"))
+		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"GSSimThinkPacer"))
 
 	if brains != (brains_native != null):
 		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null
@@ -912,7 +912,7 @@ var fallen_count: int = 0
 const FALLEN_KEPT := 16
 
 ## Records where a zombie the watch found below the map left the floor, for a tool or console.
-func note_fallen(npc: DotNpcInstance) -> void:
+func note_fallen(npc: GSNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
 	var from: Vector3 = b.last_floor_at if b != null else Vector3.INF
 	var how := "walked"
@@ -926,12 +926,12 @@ func note_fallen(npc: DotNpcInstance) -> void:
 		fallen_from.remove_at(0)
 		fallen_how.remove_at(0)
 
-	DotLog.warn(CHANNEL, "a zombie fell out of the map", {"kind": String(npc.def.id) if npc.def != null else "?",
+	GSLog.warn(CHANNEL, "a zombie fell out of the map", {"kind": String(npc.def.id) if npc.def != null else "?",
 		"last_on_floor": str(from.snappedf(0.1)), "at": str(npc.position().snappedf(0.1)), "how": how})
 
 ## Living zombies within [param radius] of [param point] (in 3D), from this tick's grid.
-func zombies_near(point: Vector3, radius: float) -> Array[DotNpcInstance]:
-	var out: Array[DotNpcInstance] = []
+func zombies_near(point: Vector3, radius: float) -> Array[GSNpcInstance]:
+	var out: Array[GSNpcInstance] = []
 	for i in crowd.near(point, radius, _near_scratch):
 		var npc := _crowd_npcs[i]
 		if npc.is_alive():
@@ -953,13 +953,13 @@ func infected_left() -> int:
 
 	return _left
 
-func _sitting_sleeper(npc: DotNpcInstance) -> bool:
+func _sitting_sleeper(npc: GSNpcInstance) -> bool:
 	return npc.def != null and npc.def.id == ZzNpcs.SLEEPER and npc.brain != null and str(npc.brain.get(&"state")) == "sitting"
 
 ## The live zombie nearest [param point], or null: a stand-in told to hunt the rest of the horde asks this.
 ## A sleeper still sitting is left alone, and so is one the survivors cannot reach.
-func nearest_zombie(point: Vector3) -> DotNpcInstance:
-	var best: DotNpcInstance = null
+func nearest_zombie(point: Vector3) -> GSNpcInstance:
+	var best: GSNpcInstance = null
 	var best_gap := INF
 
 	for npc in spawner.all_npcs():
@@ -975,7 +975,7 @@ func nearest_zombie(point: Vector3) -> DotNpcInstance:
 	return best
 
 ## Tells the rescue where [param npc] is, and acts on its answer: a repath, or a relocation close to the survivors and out of their sight.
-func _rescue_if_stuck(npc: DotNpcInstance) -> void:
+func _rescue_if_stuck(npc: GSNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or b.anchored or npc.owner_id == &"map" or _sitting_sleeper(npc):
@@ -1000,20 +1000,20 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 	stuck.remove_after_relocations = config.stuck_remove_after
 	var action := stuck.observe(npc.instance_id, nearest, _time, infected_left())
 
-	if action == DotNpcStuckRescue.NONE:
+	if action == GSNpcStuckRescue.NONE:
 		return
 
 	var kind := String(npc.def.id) if npc.def != null else "?"
 
-	if action == DotNpcStuckRescue.REPATH or action == DotNpcStuckRescue.RELOCATE:
+	if action == GSNpcStuckRescue.REPATH or action == GSNpcStuckRescue.RELOCATE:
 		_mark_stall(npc)
 
 	var edge := _last_edge
 
-	if action == DotNpcStuckRescue.REPATH:
+	if action == GSNpcStuckRescue.REPATH:
 		if npc.brain != null:
 			if npc.brain.get(&"path") != null:
-				(npc.brain.get(&"path") as DotNpcPath).clear()
+				(npc.brain.get(&"path") as GSNpcPath).clear()
 
 			npc.brain.call(&"force_target", nearest_id)
 
@@ -1021,15 +1021,15 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 		stuck_nudges += int(nudged)
 		if stuck_log_at < 0.0 or _time < stuck_log_at or _time - stuck_log_at >= config.stuck_log_interval:
 			stuck_log_at = _time
-			DotLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged, "edge": edge,
+			GSLog.info(CHANNEL, "stuck infected repathed", {"kind": kind, "at": str(npc.position().snappedf(0.1)), "nudged": nudged, "edge": edge,
 				"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", "")), "suppressed": stuck_log_skipped})
 			stuck_log_skipped = 0
 		else:
 			stuck_log_skipped += 1
 		return
 
-	if action == DotNpcStuckRescue.REMOVE:
-		DotLog.warn(CHANNEL, "stuck infected removed after relocations changed nothing", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
+	if action == GSNpcStuckRescue.REMOVE:
+		GSLog.warn(CHANNEL, "stuck infected removed after relocations changed nothing", {"kind": kind, "at": str(npc.position().snappedf(0.1)),
 			"survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 
 		# The wave owes it again, as for one that fell out of the map.
@@ -1037,7 +1037,7 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 			refused_wave += 1
 
 		stuck.forget(npc.instance_id)
-		var _gone := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+		var _gone := spawner.remove(npc.instance_id, GSNpcSpawner.REASON_CLEANUP)
 		return
 
 	var spot := _spawn_point(14.0, 45.0, false)
@@ -1046,7 +1046,7 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 		spot = _wave_origin()
 
 	if spot == Vector3.INF:
-		DotLog.warn(CHANNEL, "stuck infected has nowhere to be moved to", {"kind": kind, "at": str(npc.position().snappedf(0.1))})
+		GSLog.warn(CHANNEL, "stuck infected has nowhere to be moved to", {"kind": kind, "at": str(npc.position().snappedf(0.1))})
 		return
 
 	var from := npc.position()
@@ -1055,7 +1055,7 @@ func _rescue_if_stuck(npc: DotNpcInstance) -> void:
 	if npc.brain != null:
 		npc.brain.call(&"force_target", nearest_id)
 
-	DotLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
+	GSLog.info(CHANNEL, "stuck infected relocated near the survivors", {"kind": kind, "from": str(from.snappedf(0.1)),
 		"to": str(spot.snappedf(0.1)), "edge": edge, "survivor_gap": snappedf(nearest, 0.1), "left": infected_left(), "map": String(_doc.get("id", ""))})
 
 ## The distance to, and the id of, the survivor nearest [param at] (INF and an empty id with none).
@@ -1074,15 +1074,15 @@ func _nearest_survivor(at: Vector3) -> Array:
 
 ## Costs up, for the whole horde, the place [param npc] stalled at and the next corner of the path it was on, so later paths go round
 ## them; the pair is kept in [member _last_edge] for the log line.
-func _mark_stall(npc: DotNpcInstance) -> void:
+func _mark_stall(npc: GSNpcInstance) -> void:
 	_last_edge = "-"
 
-	if spawner == null or not spawner.nav is DotNpcNavGraph:
+	if spawner == null or not spawner.nav is GSNpcNavGraph:
 		return
 
-	var graph := spawner.nav as DotNpcNavGraph
+	var graph := spawner.nav as GSNpcNavGraph
 	graph.expire_bad(_time)
-	var path: DotNpcPath = npc.brain.get(&"path") if npc.brain != null else null
+	var path: GSNpcPath = npc.brain.get(&"path") if npc.brain != null else null
 	var next := path.current(Vector3.INF) if path != null else Vector3.INF
 	var here := graph.mark_bad(npc.position(), _time + config.stuck_bad_edge_seconds)
 	var there := graph.mark_bad(next, _time + config.stuck_bad_edge_seconds) if next != Vector3.INF else -1
@@ -1111,7 +1111,7 @@ func _nudge_sideways(b: ZzZombieBody, toward: Vector3) -> bool:
 
 ## Puts [param npc] at [param at] facing [param yaw_degrees] (a map's teleport), stopped, with its path forgotten so it paths from
 ## there and not along the walk it had.
-func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
+func warp(npc: GSNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or not is_instance_valid(b) or b.anchored:
@@ -1127,14 +1127,14 @@ func warp(npc: DotNpcInstance, at: Vector3, yaw_degrees: float) -> void:
 	var brain: Variant = npc.brain
 
 	if brain != null and brain.get(&"path") != null:
-		(brain.get(&"path") as DotNpcPath).clear()
+		(brain.get(&"path") as GSNpcPath).clear()
 
 ## Upward speed (m/s) past which a volume's throw lifts a zombie off the floor as a leap.
 const THROW_LIFT := 0.5
 
 ## A push volume's throw: [param velocity] (m/s) as a shove along the floor, else a leap unless it is already moving that way
 ## at least as fast.
-func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
+func throw_zombie(npc: GSNpcInstance, velocity: Vector3) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b == null or not is_instance_valid(b) or b.anchored:
@@ -1157,7 +1157,7 @@ func throw_zombie(npc: DotNpcInstance, velocity: Vector3) -> void:
 
 ## Where the zombies round [param npc] are (dot-npc-ai's `neighbours`); spacing itself goes
 ## through [member crowd] without this array ([method ZzZombieBrain.separation]).
-func neighbour_positions(npc: DotNpcInstance, radius: float) -> Array:
+func neighbour_positions(npc: GSNpcInstance, radius: float) -> Array:
 	var out: Array = []
 	var own: int = crowd.index_of(npc.instance_id)
 	var here: Vector3 = crowd.position_of(own) if own >= 0 else npc.position()
@@ -1230,7 +1230,7 @@ func snap_to_nav(at: Vector3) -> Vector3:
 
 ## A zombie's swing landed on [param victim]. Through the game: the difficulty, the down, the
 ## slowdown and the stats are all its.
-func melee(npc: DotNpcInstance, victim: StringName, amount: float) -> void:
+func melee(npc: GSNpcInstance, victim: StringName, amount: float) -> void:
 	if npc == null or not npc.is_alive():
 		return
 
@@ -1239,30 +1239,30 @@ func melee(npc: DotNpcInstance, victim: StringName, amount: float) -> void:
 
 ## Everything a special does that touches a survivor goes through the game, which owns pins
 ## and hazards. These are the names a special's brain calls.
-func pin(npc: DotNpcInstance, victim: StringName, kind: StringName) -> bool:
+func pin(npc: GSNpcInstance, victim: StringName, kind: StringName) -> bool:
 	return bool(game.pins.pin(entity_id_for(npc), npc, victim, kind))
 
-func eat_finished(npc: DotNpcInstance, victim: StringName) -> void:
+func eat_finished(npc: GSNpcInstance, victim: StringName) -> void:
 	var entity := entity_id_for(npc)
 	game.pins.release(victim, &"eaten")
 	game.eat_victim(entity, victim)
 
-func unpin(npc: DotNpcInstance) -> void:
+func unpin(npc: GSNpcInstance) -> void:
 	game.pins.release_by(entity_id_for(npc), &"let go")
 
-func pinning(npc: DotNpcInstance) -> StringName:
+func pinning(npc: GSNpcInstance) -> StringName:
 	return game.pins.victim_of(entity_id_for(npc))
 
-func hazard(kind: StringName, at: Vector3, radius: float, seconds: float, amount: float, npc: DotNpcInstance = null) -> void:
+func hazard(kind: StringName, at: Vector3, radius: float, seconds: float, amount: float, npc: GSNpcInstance = null) -> void:
 	game.hazards.add(kind, at, radius, seconds, amount, entity_id_for(npc) if npc != null else 0)
 
-func projectile(kind: StringName, from: Vector3, velocity: Vector3, npc: DotNpcInstance, amount: float) -> void:
+func projectile(kind: StringName, from: Vector3, velocity: Vector3, npc: GSNpcInstance, amount: float) -> void:
 	game.hazards.launch(kind, from, velocity, entity_id_for(npc) if npc != null else 0, amount)
 
-func bile(victim: StringName, seconds: float, by: DotNpcInstance = null) -> void:
+func bile(victim: StringName, seconds: float, by: GSNpcInstance = null) -> void:
 	game.bile_survivor(victim, seconds, entity_id_for(by) if by != null else 0)
 
-func knock(victim: StringName, from: Vector3, amount: float, npc: DotNpcInstance) -> void:
+func knock(victim: StringName, from: Vector3, amount: float, npc: GSNpcInstance) -> void:
 	game.knock_survivor(victim, from, amount, entity_id_for(npc) if npc != null else 0)
 
 ## A gravity-gun beam (`beam_zap` or `beam_pull`) drawn on every machine; it does no harm itself.
@@ -1274,14 +1274,14 @@ func configure_goo(meta: Dictionary) -> void:
 	game.hazards.configure_from_meta(meta)
 
 ## Leaves a trail puddle behind [param npc] if it has moved far enough since the last; returns its id or 0.
-func goo_trail(npc: DotNpcInstance) -> int:
+func goo_trail(npc: GSNpcInstance) -> int:
 	return game.hazards.trail(entity_id_for(npc), npc.position())
 
-func end_goo_trail(npc: DotNpcInstance) -> void:
+func end_goo_trail(npc: GSNpcInstance) -> void:
 	game.hazards.end_trail(entity_id_for(npc))
 
 ## The mutant's dive landing: survivors within [param radius] take [param amount] and are thrown.
-func slam(npc: DotNpcInstance, at: Vector3, radius: float, amount: float) -> int:
+func slam(npc: GSNpcInstance, at: Vector3, radius: float, amount: float) -> int:
 	return game.hazards.slam(at, radius, amount, entity_id_for(npc) if npc != null else 0)
 
 ## Where the world is below [param at] (Y of the first hit within [param depth]), or [param at].y minus depth.
@@ -1321,7 +1321,7 @@ func now() -> float:
 # --- Alerts, lures, bile ---------------------------------------------------------------------
 
 ## A zombie screamed: every idle common within `zz_alert_radius` wakes, one after another.
-func spread_alert(npc: DotNpcInstance, who: StringName, where: Vector3) -> void:
+func spread_alert(npc: GSNpcInstance, who: StringName, where: Vector3) -> void:
 	if spawner == null or npc == null:
 		return
 
@@ -1335,7 +1335,7 @@ func spread_alert(npc: DotNpcInstance, who: StringName, where: Vector3) -> void:
 
 ## A screamer screamed: everything idle within twice the alert radius wakes, and a mob of
 ## [param size] comes for [param victim] from out of sight. Returns the mob's size.
-func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
+func scream(npc: GSNpcInstance, victim: StringName, size: int) -> int:
 	if spawner == null or npc == null or not npc.is_alive():
 		return 0
 
@@ -1351,7 +1351,7 @@ func scream(npc: DotNpcInstance, victim: StringName, size: int) -> int:
 	if survival:
 		grown = int(round(float(size) * intensity))
 
-	DotLog.debug(CHANNEL, "a scream", {"victim": String(victim), "mob": grown})
+	GSLog.debug(CHANNEL, "a scream", {"victim": String(victim), "mob": grown})
 	return spawn_mob(maxi(int(round(float(grown) * mob_size_scale)), 0), victim)
 
 func _land_alerts() -> void:
@@ -1484,7 +1484,7 @@ func spawn_mob(size: int, target: StringName = &"") -> int:
 			origins.append(spot)
 
 	if origins.is_empty():
-		DotLog.debug(CHANNEL, "a mob found nowhere out of sight to come from", {})
+		GSLog.debug(CHANNEL, "a mob found nowhere out of sight to come from", {})
 		return 0
 
 	for i in size:
@@ -1492,7 +1492,7 @@ func spawn_mob(size: int, target: StringName = &"") -> int:
 		_pending.append([ZzNpcs.COMMON, origins[i % origins.size()], who, ZzZombieBody.FLAG_MOB])
 
 	mob_started.emit(size)
-	DotLog.debug(CHANNEL, "a mob is coming", {"size": size, "from": origins.size()})
+	GSLog.debug(CHANNEL, "a mob is coming", {"size": size, "from": origins.size()})
 	return size
 
 ## One common zombie from a map's own spawner at [param at], going for a survivor. False with nobody to go for.
@@ -1639,7 +1639,7 @@ func _wave_origin() -> Vector3:
 	var nodes := _survivor_nodes()
 	var hints: Array = _doc.get("zombie_spawns", [])
 	# The horde's seeded stream, never Array.shuffle (the global RNG): a seeded round repeats.
-	var order: Array = DotRandomStream.new(_rng.randi()).next_shuffled(range(hints.size()))
+	var order: Array = GSRandomStream.new(_rng.randi()).next_shuffled(range(hints.size()))
 
 	for i: int in order:
 		var p := ZzMapDoc.v3(hints[i])
@@ -1735,7 +1735,7 @@ func wave_brutes() -> int:
 ## the breather into the next wave (zz-survival-retune-2).
 func clear_wave_stragglers(far: float = 30.0) -> int:
 	var ids := survivor_ids()
-	var lost: Array[DotNpcInstance] = []
+	var lost: Array[GSNpcInstance] = []
 
 	for npc in spawner.npcs_of(WAVE):
 		if not npc.is_alive():
@@ -1767,7 +1767,7 @@ func dawn(far: float = 30.0) -> int:
 			nearest = minf(nearest, npc.position().distance_to(survivor_position(id)))
 
 		if nearest > far:
-			var _removed := spawner.remove(npc.instance_id, DotNpcSpawner.REASON_CLEANUP)
+			var _removed := spawner.remove(npc.instance_id, GSNpcSpawner.REASON_CLEANUP)
 			gone += 1
 
 	return gone
@@ -1834,11 +1834,11 @@ func barricade_centre(id: String) -> Vector3:
 
 ## A zombie spent [param delta] seconds tearing at barricade [param id]. Through the game, which
 ## owns its strength. A brute's arms are ten of a common's; a special's two.
-func bash(id: String, npc: DotNpcInstance, delta: float) -> void:
+func bash(id: String, npc: GSNpcInstance, delta: float) -> void:
 	if game == null or npc == null or not npc.is_alive():
 		return
 
-	var arms := 10.0 if npc.def.id == ZzNpcs.BRUTE or (ZzPackList.is_pack_kind(npc.def.id) and npc.def.weight == DotNpcDef.Weight.HEAVY) \
+	var arms := 10.0 if npc.def.id == ZzNpcs.BRUTE or (ZzPackList.is_pack_kind(npc.def.id) and npc.def.weight == GSNpcDef.Weight.HEAVY) \
 		else 4.0 if ZzPackList.is_pack_kind(npc.def.id) else 2.0 if ZzNpcs.is_special(npc.def.id) else 1.0
 	game.bash_barricade(id, config.barricade_bash * arms * delta)
 
@@ -1918,7 +1918,7 @@ func _advance_specials() -> void:
 
 ## One special, from wherever is worst for the team. Returns it, or null. [param owner] is
 ## `wave` for a wave's own, which the wave counts as left until it is dead.
-func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"special") -> DotNpcInstance:
+func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"special") -> GSNpcInstance:
 	var where := at
 
 	if where == Vector3.INF:
@@ -1938,7 +1938,7 @@ func spawn_special(kind: StringName, at: Vector3 = Vector3.INF, owner: StringNam
 		_rescale_health(npc, special_health_scale * wave_health_scale)
 
 	special_spawned.emit(npc)
-	DotLog.debug(CHANNEL, "a special", {"kind": String(kind), "at": str(where)})
+	GSLog.debug(CHANNEL, "a special", {"kind": String(kind), "at": str(where)})
 	return npc
 
 func _advance_brute() -> void:
@@ -1974,7 +1974,7 @@ func _boss_alive() -> int:
 	return n
 
 ## An installed pack's boss, sized like a brute for the team. Returns it, or null.
-func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
+func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> GSNpcInstance:
 	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
 
 	if where == Vector3.INF:
@@ -1987,10 +1987,10 @@ func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringN
 
 	_set_health(npc, npc.def.max_health * special_health_scale * wave_health_scale)
 	brute_spawned.emit(npc)
-	DotLog.info(CHANNEL, "a pack boss", {"kind": String(kind), "at": str(where)})
+	GSLog.info(CHANNEL, "a pack boss", {"kind": String(kind), "at": str(where)})
 	return npc
 
-func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> DotNpcInstance:
+func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> GSNpcInstance:
 	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
 
 	if where == Vector3.INF and owner == WAVE:
@@ -2007,7 +2007,7 @@ func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> Dot
 	var health := ZzNpcs.brute_health(config, _survivor_count(), catalogue.get_npc(ZzNpcs.BRUTE)) * special_health_scale
 	_set_health(npc, health)
 	brute_spawned.emit(npc)
-	DotLog.info(CHANNEL, "a brute", {"health": health, "at": str(where)})
+	GSLog.info(CHANNEL, "a brute", {"health": health, "at": str(where)})
 	return npc
 
 
@@ -2017,7 +2017,7 @@ func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> Dot
 func panic(seconds: float) -> void:
 	_panic_until = maxf(_panic_until, _time + seconds)
 	_next_panic_mob = _time + 2.0
-	DotLog.info(CHANNEL, "panic", {"seconds": seconds})
+	GSLog.info(CHANNEL, "panic", {"seconds": seconds})
 
 ## Whether a mob is still pouring out, or is on its way: a special's cue that the team is busy.
 func mob_incoming() -> bool:
@@ -2072,7 +2072,7 @@ func shove(origin: Vector3, facing: Vector3, reach: float, half_angle_deg: float
 			npc.brain.call(&"stagger", to if to.length() > 0.1 else flat, 0.9, 5.5)
 
 		if damage > 0.0:
-			var hit := DotDamage.make(attacker, entity_id_for(npc), damage, game.combat.damage_type(&"strike"))
+			var hit := GSDamage.make(attacker, entity_id_for(npc), damage, game.combat.damage_type(&"strike"))
 			hit.weapon_id = &"shove"
 			hit.tick = game.current_tick()
 			var _applied = game.combat.apply_damage(hit)
@@ -2088,14 +2088,14 @@ func blast(at: Vector3, radius: float) -> void:
 			var away := npc.position() - at
 			npc.brain.call(&"stagger", away, 1.2, 9.0)
 
-func _rescale_health(npc: DotNpcInstance, factor: float) -> void:
-	var health: DotHealth = npc.node.get_node_or_null(^"Health")
+func _rescale_health(npc: GSNpcInstance, factor: float) -> void:
+	var health: GSHealth = npc.node.get_node_or_null(^"Health")
 
 	if health != null:
 		_set_health(npc, health.max_health * factor)
 
-func _set_health(npc: DotNpcInstance, amount: float) -> void:
-	var health: DotHealth = npc.node.get_node_or_null(^"Health")
+func _set_health(npc: GSNpcInstance, amount: float) -> void:
+	var health: GSHealth = npc.node.get_node_or_null(^"Health")
 
 	if health == null:
 		return
@@ -2107,40 +2107,40 @@ func _set_health(npc: DotNpcInstance, amount: float) -> void:
 
 # --- Combat ------------------------------------------------------------------------------------
 
-func entity_id_for(npc: DotNpcInstance) -> int:
+func entity_id_for(npc: GSNpcInstance) -> int:
 	if npc == null or npc.node == null or not is_instance_valid(npc.node):
 		return 0
 
 	return game.entities.id_for_node(npc.node)
 
 static func is_npc_entity(entity_id: int) -> bool:
-	return DotEntity.is_kind(entity_id, DotEntity.KIND_NPC)
+	return GSEntity.is_kind(entity_id, GSEntity.KIND_NPC)
 
-func npc_for_entity(entity_id: int) -> DotNpcInstance:
+func npc_for_entity(entity_id: int) -> GSNpcInstance:
 	return _by_entity.get(entity_id)
 
 ## Hitboxes and health, sized to the kind: a head a headshot can find, a body.
-func _register_combat(npc: DotNpcInstance) -> void:
-	var opened: DotResult = game.entities.open(
-		DotEntity.KIND_NPC, npc.node, &"", &"", game.now()
+func _register_combat(npc: GSNpcInstance) -> void:
+	var opened: GSResult = game.entities.open(
+		GSEntity.KIND_NPC, npc.node, &"", &"", game.now()
 	)
 
 	if not opened.ok:
-		DotLog.error(CHANNEL, "could not open an entity for a zombie", {
+		GSLog.error(CHANNEL, "could not open an entity for a zombie", {
 			"npc": String(npc.def.id), "why": opened.error.message,
 		})
 		return
 
-	var entity: int = (opened.value as DotEntityHandle).id
+	var entity: int = (opened.value as GSEntityHandle).id
 	var def := npc.def
 	var height := float(def.meta.get("height", 1.75))
 	var radius := float(def.meta.get("radius", 0.32))
 
 	# The health first, and that is not tidiness. A hitbox finds its owner as the nearest
-	# ancestor carrying a DotHealth and remembers the answer; built before the health, every
+	# ancestor carrying a GSHealth and remembers the answer; built before the health, every
 	# hitbox settled on its own set as the owner, and every shot that hit a zombie was
 	# credited to a node dot-combat had never heard of — and did nothing.
-	var health := DotHealth.new()
+	var health := GSHealth.new()
 	health.name = "Health"
 	health.max_health = def.max_health
 	health.max_armour = 0.0
@@ -2168,7 +2168,7 @@ var _in_limb_hit := false
 ## takes the head, any other the limb under the point (the head is never taken by a body shot
 ## near the neck). A head off kills it, through the same damage path a bullet uses, credited to
 ## the shooter and counted as a headshot.
-func limb_hit(damage: DotDamage) -> void:
+func limb_hit(damage: GSDamage) -> void:
 	if _in_limb_hit or damage.refused or damage.amount <= 0.0 or not is_npc_entity(damage.victim):
 		return
 
@@ -2179,7 +2179,7 @@ func limb_hit(damage: DotDamage) -> void:
 		return
 
 	var limbs := body.limbs
-	var head := damage.hit_group == DotHitGroup.HEAD
+	var head := damage.hit_group == GSHitGroup.HEAD
 	var limb: StringName = &"head" if head else limbs.limb_at(damage.point)
 
 	if limb == &"" or (limb == &"head" and not head):
@@ -2196,13 +2196,13 @@ func limb_hit(damage: DotDamage) -> void:
 	if not limbs.is_lethal():
 		return
 
-	var health := npc.node.get_node_or_null(^"Health") as DotHealth
+	var health := npc.node.get_node_or_null(^"Health") as GSHealth
 
 	if health == null or not health.alive:
 		return
 
-	var kill := DotDamage.make(damage.attacker, damage.victim, health.health + health.armour + 1.0, damage.type)
-	kill.hit_group = DotHitGroup.HEAD
+	var kill := GSDamage.make(damage.attacker, damage.victim, health.health + health.armour + 1.0, damage.type)
+	kill.hit_group = GSHitGroup.HEAD
 	kill.point = damage.point
 	kill.direction = damage.direction
 	_in_limb_hit = true
@@ -2211,7 +2211,7 @@ func limb_hit(damage: DotDamage) -> void:
 
 ## What a hit does to a limb. Limbs are sized from the kind's base health, so a later wave's or a
 ## brute's real health, and Instakill's boosted damage, would strip them in a hit or two.
-func limb_damage(npc: DotNpcInstance, damage: DotDamage) -> float:
+func limb_damage(npc: GSNpcInstance, damage: GSDamage) -> float:
 	if not game.config.limb_follow_health:
 		return damage.amount
 
@@ -2220,14 +2220,14 @@ func limb_damage(npc: DotNpcInstance, damage: DotDamage) -> float:
 	if game.boxes != null and game.boxes.is_active(&"instakill"):
 		amount = minf(amount, damage.base_amount) if damage.base_amount > 0.0 else amount
 
-	var health := npc.node.get_node_or_null(^"Health") as DotHealth
+	var health := npc.node.get_node_or_null(^"Health") as GSHealth
 
 	if health != null and health.max_health > 0.0 and npc.def.max_health > 0.0:
 		amount *= npc.def.max_health / health.max_health
 
 	return amount
 
-func _forget_combat(npc: DotNpcInstance) -> void:
+func _forget_combat(npc: GSNpcInstance) -> void:
 	var entity := entity_id_for(npc)
 
 	if entity == 0:
@@ -2236,10 +2236,10 @@ func _forget_combat(npc: DotNpcInstance) -> void:
 	if game.combat != null and is_instance_valid(game.combat):
 		game.combat.forget(entity)
 
-	game.entities.close(entity, DotEntityTable.REASON_KILLED)
+	game.entities.close(entity, GSEntityTable.REASON_KILLED)
 	_by_entity.erase(entity)
 
-func _on_spawned(npc: DotNpcInstance) -> void:
+func _on_spawned(npc: GSNpcInstance) -> void:
 	var b := npc.node as ZzZombieBody
 
 	if b != null:
@@ -2266,22 +2266,22 @@ func set_spawn_distance_scale(scale: float) -> void:
 		director.rules.spawn_ahead = 35.0 * spawn_distance_scale
 
 ## Tells the map's spawner (once) that its zombie is no more.
-func _release_maker_child(npc: DotNpcInstance) -> void:
+func _release_maker_child(npc: GSNpcInstance) -> void:
 	if _maker_of.has(npc.instance_id):
 		var maker: int = _maker_of[npc.instance_id]
 		var _gone := _maker_of.erase(npc.instance_id)
 		maker_child_gone.emit(maker)
 
-func _on_removed(npc: DotNpcInstance, _reason: StringName) -> void:
+func _on_removed(npc: GSNpcInstance, _reason: StringName) -> void:
 	_release_maker_child(npc)
 	zombie_removed.emit(npc)
 	_forget_combat(npc)
 
-func _on_died(npc: DotNpcInstance, by: StringName) -> void:
+func _on_died(npc: GSNpcInstance, by: StringName) -> void:
 	_release_maker_child(npc)
 	crowd.forget(crowd.index_of(npc.instance_id))
-	var health: DotHealth = npc.node.get_node_or_null(^"Health") if npc.node != null else null
-	var fatal: DotDamage = health.last_fatal if health != null else null
+	var health: GSHealth = npc.node.get_node_or_null(^"Health") if npc.node != null else null
+	var fatal: GSDamage = health.last_fatal if health != null else null
 	var b := npc.node as ZzZombieBody
 
 	if b != null:
@@ -2291,7 +2291,7 @@ func _on_died(npc: DotNpcInstance, by: StringName) -> void:
 ## How [param npc] falls, from the hit that killed it: a headshot or a heavy weapon may throw it,
 ## anything else drops it. Seeded from the zombie and the tick, never `randf()`, so a test can
 ## say what it will be.
-func decide_death(npc: DotNpcInstance, fatal: DotDamage) -> DotPlayerDeath:
+func decide_death(npc: GSNpcInstance, fatal: GSDamage) -> GSPlayerDeath:
 	var weapon: Object = null
 	var direction := Vector3.ZERO
 	var headshot := false
@@ -2304,16 +2304,16 @@ func decide_death(npc: DotNpcInstance, fatal: DotDamage) -> DotPlayerDeath:
 		amount = fatal.amount
 
 	var tick: int = game.current_tick() if game != null else 0
-	return DotPlayerDeath.decide(death_reactions, headshot, amount, direction,
-		DotPlayerDeath.seed_of(npc.seed, tick), weapon)
+	return GSPlayerDeath.decide(death_reactions, headshot, amount, direction,
+		GSPlayerDeath.seed_of(npc.seed, tick), weapon)
 
 ## dot-combat decided a death; dot-npc has to be told, so the brain hears it and the budget
 ## comes back.
-func _on_entity_killed(entity_id: int, damage: DotDamage) -> void:
+func _on_entity_killed(entity_id: int, damage: GSDamage) -> void:
 	if not is_npc_entity(entity_id):
 		return
 
-	var npc: DotNpcInstance = _by_entity.get(entity_id)
+	var npc: GSNpcInstance = _by_entity.get(entity_id)
 
 	if npc == null:
 		return
@@ -2322,16 +2322,16 @@ func _on_entity_killed(entity_id: int, damage: DotDamage) -> void:
 
 ## A zombie was hurt: its brain hears who did it, its mirror of its health follows, and a
 ## heavy enough hit at close range staggers it.
-func _on_damage_applied(damage: DotDamage) -> void:
+func _on_damage_applied(damage: GSDamage) -> void:
 	if not is_npc_entity(damage.victim) or damage.health_lost <= 0.0:
 		return
 
-	var npc: DotNpcInstance = _by_entity.get(damage.victim)
+	var npc: GSNpcInstance = _by_entity.get(damage.victim)
 
 	if npc == null or not npc.is_alive():
 		return
 
-	var health: DotHealth = npc.node.get_node_or_null(^"Health")
+	var health: GSHealth = npc.node.get_node_or_null(^"Health")
 	if health != null:
 		npc.health = health.health
 		if npc.node is ZzZombieBody:
@@ -2341,7 +2341,7 @@ func _on_damage_applied(damage: DotDamage) -> void:
 	npc.engaged_at = spawner.now()
 
 	if npc.brain != null:
-		(npc.brain as DotNpcBrain).damaged(damage.health_lost, by)
+		(npc.brain as GSNpcBrain).damaged(damage.health_lost, by)
 
 	# A weapon that says it burns (zed-dot-weapons' flamethrower) sets what it hits alight.
 	if damage.weapon_id != &"" and game.hazards != null:

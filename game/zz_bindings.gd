@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Every key this game reads, as one [DotMenuBindings] table: the action, the setting that
+## Every key this game reads, as one [GSMenuBindings] table: the action, the setting that
 ## stores it, the words a player sees, the default, and the card it goes on.
 ##
 ## [b]A table, because four things read it:[/b] the client matches events against the actions,
@@ -58,15 +58,15 @@ const SLOTS: Array[StringName] = [&"zz_slot_1", &"zz_slot_2", &"zz_slot_3", &"zz
 const SLOT_NAMES: Array[String] = ["melee", "sidearm", "primary", "heavy", "thrown"]
 
 
-static func make() -> DotMenuBindings:
-	var keys := DotMenuBindings.new()
+static func make() -> GSMenuBindings:
+	var keys := GSMenuBindings.new()
 	keys.add_movement()
 	keys.add(USE, &"bind_use", "Use, pick up, revive (hold)", "E", "Hands")
 	keys.add(HEAL, &"bind_heal", "Medkit on yourself or a friend (hold)", "G", "Hands")
 	keys.add(PILLS, &"bind_pills", "Take pills (hold)", "P", "Hands")
 	keys.add(GIVE_PILLS, &"bind_give_pills", "Give a friend pills", "N", "Hands")
 	keys.add(GIVE_KIT, &"bind_give_medkit", "Give a friend a medkit", "K", "Hands")
-	keys.add(DotWeaponAttachMenu.ACTION, &"bind_weapon_attach", "Weapon attachments", "I", "Weapons")
+	keys.add(GSWeaponAttachMenu.ACTION, &"bind_weapon_attach", "Weapon attachments", "I", "Weapons")
 	keys.add(DROP, &"bind_drop_weapon", "Drop the weapon in hand", "Q", "Hands")
 	keys.add(SHOVE, &"bind_shove", "Shove", "T", "Hands")
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "F", "Hands")

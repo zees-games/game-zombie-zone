@@ -27,13 +27,13 @@ const ZzNpcs := preload("../zz_npcs.gd")
 ## The interest rule: zombie tags, their radii, the net_* config ([code]zz_net_interest.gd[/code]).
 const Interest := preload("zz_net_interest.gd")
 
-## Joins a [ZzGame] to a [DotNetManager]: the netcode seam, and the only file that names both.
+## Joins a [ZzGame] to a [GSNetManager]: the netcode seam, and the only file that names both.
 ## Survivors are predicted; zombies are server-owned entities (`NPC`, snapshots, `NPC_GONE`); the map arrives once as `MAP`; a joiner learns the current world on READY.
 ## dot-net ticks per entity but this game's tick is the whole world, so [method ensure_game_ticked] runs it on the first behaviour through.
 
 const CHANNEL := "zz.net"
 
-## Bytes of acknowledgement in front of every input packet. [method DotNetManager.encode_ack].
+## Bytes of acknowledgement in front of every input packet. [method GSNetManager.encode_ack].
 const ACK_BYTES := 4
 
 ## Commands per input packet: this tick's and the four before, so a lost packet costs no tick unless five go missing.
@@ -71,7 +71,7 @@ signal shop_received(json: String)
 signal carry_received(json: String)
 
 ## Client side: the server moved this client's own camera. [param mode] is
-## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
+## [enum GSSpectatorView.Mode]; the view has already been adopted by the world's mirror.
 signal spectate_received(viewer: int, mode: int, target: int)
 
 ## Client side: the server gave this client a zombie body to drive (its net id), or took it (0).
@@ -130,11 +130,11 @@ signal impact_received(marks: Array)
 signal npc_added(net_id: int, kind: StringName, variant: int, body: Node3D)
 signal npc_removed(net_id: int, killed: bool, body: Node3D)
 
-## Somebody pressed Enter. Server side; the bridge carries chat and decides nothing, [DotChatRouter] does.
+## Somebody pressed Enter. Server side; the bridge carries chat and decides nothing, [GSChatRouter] does.
 signal say_requested(peer_id: int, channel_id: StringName, text: String)
 
 ## A voice frame arrived. Server side; the payload is unparsed and must not be trusted —
-## [method DotVoiceRouter.relay] is what stamps the speaker, from the peer id below.
+## [method GSVoiceRouter.relay] is what stamps the speaker, from the peer id below.
 signal voice_requested(peer_id: int, payload: PackedByteArray)
 ## Server: [param peer_id] said READY and has been told the world; it can receive from here on.
 signal peer_admitted(peer_id: int)
@@ -144,25 +144,25 @@ signal chat_received(wire: Dictionary)
 signal voice_arrived(payload: PackedByteArray)
 
 var game: ZzGame = null
-var net: DotNetManager = null
+var net: GSNetManager = null
 var link: ZzNetLink = null
 
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
 
-## Where the clock learns the link latency in ms ([method DotClientLink.ping_ms]).
+## Where the clock learns the link latency in ms ([method GSClientLink.ping_ms]).
 ## With no sample the clock assumes zero and stamps commands for ticks the server has already run,
 ## so every command is discarded as late.
 var rtt_source: Callable = Callable()
 
-## Where a voice frame goes on the server. Assigned by [DotGameModule] to the services
+## Where a voice frame goes on the server. Assigned by [GSGameModule] to the services
 ## layer's `relay_voice`, because the bridge is the only thing that names both ends.
 var voice_relay_fn: Callable = Callable()
 
 ## Server: messages to a peer not yet READY, dropped rather than sent to a link it has not built.
 var unready_dropped: int = 0
 
-## `func(session_id: int) -> DotAvatar`: what a player looks like, asked once as they are
+## `func(session_id: int) -> GSAvatar`: what a player looks like, asked once as they are
 ## seated. Assigned by the module, which is what has the identity layer; unset, or answering
 ## null, is the stock person, which is what everybody was before there was one.
 var avatar_fn: Callable = Callable()
@@ -189,7 +189,7 @@ var _ready_unseated: Dictionary = {}
 var _tick: int = 0
 var _game_ticked_for: int = -1
 
-## Server only: whether [method DotNetManager.server_tick] is on the stack, and the net ids let go of meanwhile.
+## Server only: whether [method GSNetManager.server_tick] is on the stack, and the net ids let go of meanwhile.
 ## A removal inside the first player behaviour's tick would let the history record recreate a
 ## lag-compensation track for it, so the ids are forgotten again once the manager has dropped its list.
 var _in_server_tick := false
@@ -213,7 +213,7 @@ var _zombie_mirrors: Dictionary = {}
 var _stale_clock := 0.0
 var _interest_applied: Array = []
 ## Carries the game's profile runtime (rows down) over this manager; null when the types would not register.
-var profile_link: DotNetProfileLink = null
+var profile_link: GSNetProfileLink = null
 var _zombie_world: Node3D = null
 
 ## Whether the last thing that removed a zombie was its death, so NPC_GONE can say so.

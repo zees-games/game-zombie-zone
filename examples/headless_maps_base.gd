@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 
@@ -84,9 +84,9 @@ func _linked_maps() -> Array:
 	return MAPS.duplicate() if linked else ["zz_practice"]
 
 func _merge(logs: Array) -> void:
-	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
+	var absent := GSGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARD_NAMES.size() and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
+	var entered := GSGameShardArgs.sections_entered(PackedStringArray(logs))
 	var want := CORE_SECTIONS + WORLD_SECTIONS + _linked_maps().size()
 	_check(entered == want, "the shards entered every section (%d of %d)" % [entered, want])
 	_report_sections(1, 1, 1, 2)
@@ -105,8 +105,8 @@ func _ground_y(doc: Dictionary, at: Vector3) -> float:
 			best = y
 			found = true
 	if doc.has("terrain"):
-		var ground := DotMapTerrain.from_dict(doc["terrain"])
-		var y := (ground.value as DotMapTerrain).height_at(at.x, at.z) if ground.ok else NAN
+		var ground := GSMapTerrain.from_dict(doc["terrain"])
+		var y := (ground.value as GSMapTerrain).height_at(at.x, at.z) if ground.ok else NAN
 		if not is_nan(y) and (not found or absf(y - at.y) < absf(best - at.y)):
 			best = y
 	return best
