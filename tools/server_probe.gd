@@ -180,10 +180,19 @@ func _ready() -> void:
 func _run() -> void:
 	Engine.physics_ticks_per_second = _rate
 	_build_game()
+	var vb := "--verbose" in OS.get_cmdline_user_args()
 	if not _start_net():
 		return
+	if vb:
+		print("[probe] net up %d ms" % Time.get_ticks_msec())
 	await get_tree().physics_frame
+	if str(_game.map_doc.get("id", "")) != String(_map):
+		push_error("server_probe: map %s did not load (got %s); link maps/ and world/ (tools/link_worktree.sh)" % [_map, str(_game.map_doc.get("id", ""))])
+		get_tree().quit(2)
+		return
 	_admit_players()
+	if vb:
+		print("[probe] admitted %d ms" % Time.get_ticks_msec())
 	var tick := 0
 	var measured := 0
 	var window := int(_seconds * float(_rate))
@@ -199,7 +208,10 @@ func _run() -> void:
 			Engine.set_meta(&"_prof", {})
 		if measuring:
 			_detail_ticks += 1
+		var t0 := Time.get_ticks_usec()
 		_one_tick(tick)
+		if vb and tick % 256 == 0:
+			print("[probe] tick %d took %d us, up_at %d, phase %s, nav_blocks %s, survival %s, map %s mode %s, wall %d ms" % [tick, Time.get_ticks_usec() - t0, _up_at, str(_game.phase), str(_game.horde.nav_blocks_play()) if _game.horde != null else "nohorde", str(_game.survival != null), str(_game.map_doc.get("id", "?")), str(_game.map_doc.get("mode", "?")), Time.get_ticks_msec()])
 		if measuring:
 			for id in _game.horde.spawner._npcs:
 				var inst: DotNpcInstance = _game.horde.spawner._npcs[id]
