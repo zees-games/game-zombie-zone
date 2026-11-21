@@ -1,11 +1,11 @@
 extends SceneTree
 
-## Zombie Zone's visual QA capture (docs/visual-qa.md; the loop is dot-game's docs/visual-qa.md): every weapon's clips in the survivor's hands, the
+## Zombie Zone's visual QA capture (docs/visual-qa.md; the loop is gs-game's docs/visual-qa.md): every weapon's clips in the survivor's hands, the
 ## survivor's own locomotion, and every infected kind's walk, run, attack, flinch and death, each saved frame by frame in three
-## views at --fps (60 by default) for tools/visual_qa_shot.sh (dot-game's shot tool) to turn into contact sheets and clips.
+## views at --fps (60 by default) for tools/visual_qa_shot.sh (gs-game's shot tool) to turn into contact sheets and clips.
 ##   survivor: f = first person (the main viewport), t = behind-right of your own body, o = an opponent four metres in front.
 ##   infected: f = the victim's eye in front of it, t = behind-right, o = an opponent four metres in front.
-## The outside views and frame saving are dot-game's GSGameVisualQaViews. The scene itself stays here, not a GSGameVisualQaCapture:
+## The outside views and frame saving are gs-game's GSGameVisualQaViews. The scene itself stays here, not a GSGameVisualQaCapture:
 ## the survivor is staged in the real offline client, which needs awaited setup (client start, world draw, weapon switch).
 ## Per clip it prints `VISUALQA {json}` (the shared verdict line) and `ANIMFRAMES {json}` (every frame's numbers) on stdout.
 ## User args: --out DIR --fps N [--only id,id|all|none] [--clips a,b] [--avatar] [--zombies kind,kind|all].
@@ -22,11 +22,11 @@ const WEAPON_CLIPS: PackedStringArray = ["idle", "draw", "sprint", "ads", "fire"
 ## A clip that needs a magazine or a sight: melee and thrown weapons have neither.
 const NEEDS_GUN: PackedStringArray = ["ads", "reload"]
 const NO_GUN_TIERS: Array[StringName] = [&"melee", &"thrown"]
-const AVATAR_KEYS := {"walk": [&"dot_fps_forward"], "strafe": [&"dot_fps_left"], "run": [&"dot_fps_forward", &"dot_fps_sprint"],
-	"crouch": [&"dot_fps_crouch"], "jump": [&"dot_fps_jump"]}
-const MOVE_KEYS: Array[StringName] = [&"dot_fps_forward", &"dot_fps_back", &"dot_fps_left", &"dot_fps_right",
-	&"dot_fps_sprint", &"dot_fps_crouch", &"dot_fps_jump", &"dot_fps_walk"]
-const SPRINT_KEYS: Array[StringName] = [&"dot_fps_forward", &"dot_fps_sprint"]
+const AVATAR_KEYS := {"walk": [&"gs_fps_forward"], "strafe": [&"gs_fps_left"], "run": [&"gs_fps_forward", &"gs_fps_sprint"],
+	"crouch": [&"gs_fps_crouch"], "jump": [&"gs_fps_jump"]}
+const MOVE_KEYS: Array[StringName] = [&"gs_fps_forward", &"gs_fps_back", &"gs_fps_left", &"gs_fps_right",
+	&"gs_fps_sprint", &"gs_fps_crouch", &"gs_fps_jump", &"gs_fps_walk"]
+const SPRINT_KEYS: Array[StringName] = [&"gs_fps_forward", &"gs_fps_sprint"]
 const ZOMBIE_CLIPS: PackedStringArray = ["walk", "run", "attack", "flinch", "die"]
 const ZOMBIE_KINDS: Array[StringName] = [&"common", &"leaper", &"strangler", &"bloater", &"ram", &"spitter", &"rider", &"brute",
 	&"sleeper", &"screamer", &"crawler", &"riot", &"mutant", &"oil_monster"]

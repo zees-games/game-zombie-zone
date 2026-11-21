@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The horde's mover watch and cull (dot-spawn's GSSpawnWatch and GSSpawnCull): who is stuck or
+## The horde's mover watch and cull (gs-spawn's GSSpawnWatch and GSSpawnCull): who is stuck or
 ## has fallen out of the map, and what is done about it. The game applies the actions; the watch
 ## is also what tools/stuck_meter.gd and the long run read, so "stuck" means one thing.
 

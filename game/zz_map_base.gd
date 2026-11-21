@@ -20,11 +20,11 @@ const ZzPaths := preload("zz_paths.gd")
 
 const ZzMechanics := preload("zz_mechanics.gd")
 
-## Loaded, not preloaded: a client whose dot-map predates it still parses this file and draws a plain sheet.
-const WATER_SHADER_PATH := "res://addons/dot_map/surfaces/liquid.gdshader"
+## Loaded, not preloaded: a client whose gs-map predates it still parses this file and draws a plain sheet.
+const WATER_SHADER_PATH := "res://addons/gs_map/surfaces/liquid.gdshader"
 
 ## A map document, built: the building, the furniture, the lights and the sky. [b]The same document on every machine, and a server builds only what collides.[/b] Boxes become one static body of box shapes on the world layer; props become one static body of box shapes on the prop layer, each shape knowing which prop it is. A client also draws them. A server draws nothing, so a dedicated server holds a few thousand shapes and no meshes. [b]Boxes are drawn batched, by material and by twelve-metre chunk.[/b] A school is a thousand boxes, and a mesh per box is a thousand draw calls, which a browser does not give you. One mesh per material is the other extreme and is wrong for a reason only the renderer knows: the compatibility renderer the shell uses lights each mesh with at most eight omni lights, so one floor mesh for the whole school would be lit by eight of its forty lamps and every other room would be dark. A chunk is about a room, which is about a lamp. [b]Props are drawn as [MultiMeshInstance3D]s, one per model mesh.[/b] Two hundred chairs are one draw call per chair mesh, not two hundred. They never move. [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
-## it.[/b] A tree is its trunk, branches and leaf clumps, a table its top and legs (dot-props' [GSPropPieces], measured offline into `props/pieces.json`). What a shot stops on and what a player walks into are the same shapes, so the two can never disagree about where the car is; a zombie still paths round the prop's box, which only keeps it further off. [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`), which come and go: broken by the horde, mended by the survivors ([method set_barricade]), and drawn darker as they weaken so a defender sees which window is about to go. [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by `tools/bake_lightmaps.sh`; dot-lighting's [GSLightBake]). Every opaque box batch carries a second UV set ([GSLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only), because the bake names its meshes by path and was made from this same code. A bake whose fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
+## it.[/b] A tree is its trunk, branches and leaf clumps, a table its top and legs (gs-props' [GSPropPieces], measured offline into `props/pieces.json`). What a shot stops on and what a player walks into are the same shapes, so the two can never disagree about where the car is; a zombie still paths round the prop's box, which only keeps it further off. [b]A gate's boxes are kept apart[/b] (`_gates`), with their own body and mesh, so that an objective opening a gate takes it away whole. [b]So are a barricade's[/b] (`_barricades`), which come and go: broken by the horde, mended by the survivors ([method set_barricade]), and drawn darker as they weaken so a defender sees which window is about to go. [b]Baked light, where the game ships a bake for the map[/b] (`lightmaps/<id>.res`, made by `tools/bake_lightmaps.sh`; gs-lighting's [GSLightBake]). Every opaque box batch carries a second UV set ([GSLightmapSheet]) and a name that is the same on every build (`Boxes_<n>`, or `Shiny_<n>` for brushed metal, a caster only), because the bake names its meshes by path and was made from this same code. A bake whose fingerprint ([method light_fingerprint]) is not this document's is stale and refused with a
 ## WARN; with none, or refused, the lamps light the map live, as before bakes existed. Baked, the lamps turn `BAKE_STATIC`: they no longer light the boxes (the lightmap does, with their shadows and bounce) but still light every zombie, survivor and prop. The moon or sun stays live (a hold's day turns it) and only its bounce is baked. Static props are bake-time casters only (their shadows and bounce are in the boxes' lightmap; the bake carries no prop meshes), and so are brushed-metal batches (`Shiny_<n>`): a lamp's highlight is what makes metal look like metal and a lightmap holds diffuse light only, so metal stays live-lit. Everything that moves (gates, barricades, toys, doors, zombies, survivors, weapons) is lit by the LightmapGI probes plus the live lamps. A lightmap ignores the Environment's ambient, and a closed room has no sky for the bake's own sky term to show, so the bake makes every surface emit the ambient colour (tools/lightmap_scenes.gd, `EMIT_BY_MAP`): the flat fill the live map has, with occlusion. What a day raises is carried by `BAKED_DAY_EXPOSURE`. Glass and water are not in the bake. A server never loads one ([member draw_world] is false).
 
 const CHANNEL := "zz.map"
@@ -56,9 +56,9 @@ const SPAWN_SEARCH := 3.0
 
 ## What a bake of this game's maps means beyond the document (which boxes and lights are in it,
 ## its settings in tools/lightmap_scenes.gd). Bump it and every committed bake reads as stale.
-const BAKE_SCRIPT := "res://addons/dot_lighting/bake/dot_light_bake.gd"
+const BAKE_SCRIPT := "res://addons/gs_lighting/bake/gs_light_bake.gd"
 
-const SHEET_SCRIPT := "res://addons/dot_lighting/bake/dot_lightmap_sheet.gd"
+const SHEET_SCRIPT := "res://addons/gs_lighting/bake/gs_lightmap_sheet.gd"
 
 const BAKE_VERSION := 3
 
@@ -76,19 +76,19 @@ static var use_bakes: bool = true
 ## draws the boxes, as before the worlds existed.
 static var use_worlds: bool = true
 
-## Whether a checkout's own `world/` is read when it is there; off, the world is always fetched through dot-cloud by `world_key` (the delivery check).
+## Whether a checkout's own `world/` is read when it is there; off, the world is always fetched through gs-cloud by `world_key` (the delivery check).
 static var local_worlds: bool = true
 
-## dot-map's reader of a converted map's mesh, by path ([method can_draw_world]).
+## gs-map's reader of a converted map's mesh, by path ([method can_draw_world]).
 const SKY_ROOT := "res://assets/sky"
 
-const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
+const MESH_SCRIPT := "res://addons/gs_map/bsp/gs_map_bsp_mesh.gd"
 
-const LIT_SCRIPT := "res://addons/dot_map/bsp/dot_map_lit_world.gd"
+const LIT_SCRIPT := "res://addons/gs_map/bsp/gs_map_lit_world.gd"
 
-const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
+const SURFACES_SCRIPT := "res://addons/gs_map/surfaces/gs_map_surfaces.gd"
 
-const VIS_SCRIPT := "res://addons/dot_map/bsp/dot_map_visibility.gd"
+const VIS_SCRIPT := "res://addons/gs_map/bsp/gs_map_visibility.gd"
 
 ## Where a checkout keeps a map's world: `world/<pack>/<id>`.
 const LOCAL_WORLD := "res://world/%s/%s"
@@ -96,7 +96,7 @@ const LOCAL_WORLD := "res://world/%s/%s"
 ## True once [method attach_world] has drawn this map's own geometry.
 var world_drawn: bool = false
 
-## How a drawn world is culled (dot-map GSMapVisibility): off, pvs, occluders or both.
+## How a drawn world is culled (gs-map GSMapVisibility): off, pvs, occluders or both.
 var vis_mode: String = "both"
 
 ## Draw the world pack's baked lightmap when it has one (`zz_lightmaps`).
@@ -121,7 +121,7 @@ var world_props: StaticBody3D = null
 
 ## Whether a world's movers are built (off in suites that want the boxes alone).
 var use_mechanics: bool = true
-## Builds the movers of a world from dot-map's global converter too (they are skipped by default because the document's boxes
+## Builds the movers of a world from gs-map's global converter too (they are skipped by default because the document's boxes
 ## already stand where its doors are); a map document says `"mechanics": true` when its boxes leave the movers out. Suites set this.
 static var bring_global_mechanics: bool = false
 

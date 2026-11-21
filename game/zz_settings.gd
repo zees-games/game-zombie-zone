@@ -15,21 +15,21 @@ const ZzBindings := preload("zz_bindings.gd")
 ## settings.open()                     # Escape does this in the client
 ## [/codeblock]
 ##
-## [b]dot-menu's `GSMenuGameSettings` with this game's spec[/b] (2026-11-07). It was a 250-line
+## [b]gs-menu's `GSMenuGameSettings` with this game's spec[/b] (2026-11-07). It was a 250-line
 ## copy of mg-wipeout's file, then a [GSMenuSettings] subclass; what is left is the spec: where the
 ## document lives, its extra settings and rows, the view transform, the v1 migration and the help text.
 ##
 ## [b]The scopes are the family's, not this game's.[/b] `sensitivity` is ACCOUNT under the
 ## shared `tmc_account` namespace — a person's hand, the same number in every game here.
 ## `field_of_view` is SERVER_CLAMPED: a wide view is an advantage a server may cap, and
-## dot-settings gives a server no way to READ it. The volumes are this machine's.
+## gs-settings gives a server no way to READ it. The volumes are this machine's.
 
 const SCHEMA_VERSION := 2
 
-## Where this game's own document lives. The shared account document is dot-settings'.
+## Where this game's own document lives. The shared account document is gs-settings'.
 const SETTINGS_DIR := "user://zombiezone_settings"
 
-## The app's namespace. ACCOUNT settings are shared under dot-menu's `tmc_account`.
+## The app's namespace. ACCOUNT settings are shared under gs-menu's `tmc_account`.
 const APP_NAMESPACE := &"zombiezone"
 
 ## Horizontal degrees on a 4:3 frame (the family's measure), about 100 across a 16:9 window.
@@ -52,7 +52,7 @@ static func schema_for() -> GSSettingsSchema:
 	return spec_for().make_schema()
 
 
-## The game's settings as data. Help and Leave are dot-menu's stock: H opens help, Leave leaves the server or quits a solo game.
+## The game's settings as data. Help and Leave are gs-menu's stock: H opens help, Leave leaves the server or quits a solo game.
 static func spec_for() -> GSMenuGameSpec:
 	var s := GSMenuGameSpec.new()
 	s.schema_version = SCHEMA_VERSION

@@ -273,10 +273,10 @@ func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
 	local.health.invulnerable = true
 	if _view == "crawl_third":
 		_client.call("toggle_view")
-	Input.action_press(&"dot_fps_forward")
+	Input.action_press(&"gs_fps_forward")
 	await _seconds_of(_seconds)
 	print("crawled to ", local.feet(), " from ", stand, " speed ", game.crawl_rules.speed)
-	Input.action_release(&"dot_fps_forward")
+	Input.action_release(&"gs_fps_forward")
 	if _view == "crawl_down":
 		# The steepest look-down: the arms' edge, and the backpack, may peek in.
 		await _save_extra("_level")
@@ -337,7 +337,7 @@ func _view_defib(game: ZzGame, local, stand: Vector3) -> void:
 
 func _view_hit(game: ZzGame, local, stand: Vector3) -> void:
 	# Two hits the server confirms on the zombie nearest the crosshair, the second a head kill, through
-	# dot-combat as a shot would go: the marker and numbers the client draws. Hurt on borrowed health and
+	# gs-combat as a shot would go: the marker and numbers the client draws. Hurt on borrowed health and
 	# holding an objective, so the vitals' bonus and the hold-out clock are in the frame too.
 	await _seconds_of(maxf(_seconds - 0.5, 0.5))
 	# The one nearest the line of sight (straight ahead is -Z), so the number is on screen.

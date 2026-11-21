@@ -98,7 +98,7 @@ Anybody pinned needs a friend: shoot what holds them or shove it off. Every spec
 
 **Friendly fire is on**, at a tenth of the damage on normal and much more on expert. Stand-ins fill the team when there are not enough people (four, or the team the map is built for), and they shoot, revive, heal, mend and pick things up, and they do not shoot through you.
 
-**Modern weapons.** The game hands out [zz-modern-weapons](https://github.com/zees-games/zz-modern-weapons) (twenty-eight guns, blades and a grenade, each with a real CC0 or CC-BY model credited in its CREDITS.md); the maps, boxes, shop and stand-ins draw from it alone. zee-dot-weapons carries only its fists here (`ZeeWeaponPack.keep_only`); its toy blasters are not in the catalogue and an old id in data resolves to its modern successor.
+**Modern weapons.** The game hands out [zz-modern-weapons](https://github.com/zees-games/zz-modern-weapons) (twenty-eight guns, blades and a grenade, each with a real CC0 or CC-BY model credited in its CREDITS.md); the maps, boxes, shop and stand-ins draw from it alone. zee-gs-weapons carries only its fists here (`ZeeWeaponPack.keep_only`); its toy blasters are not in the catalogue and an old id in data resolves to its modern successor.
 
 There are ten maps: the **practice street** built into the game, and from [zombie-zone-maps](https://github.com/zees-games/zombie-zone-maps) the three-map **Blackout** exodus (Corner Shop, The Depot, The Pier) and six survival maps: **Westbrook High** (a school at night, twenty-one boarded doors and windows, for twelve), **Riverside Galleria** (a shopping mall with sixteen shops, a food court and eight ways in, for fourteen), **Harbor Park** (a ballpark under its floodlights: the concourse is theirs, the field is yours while the tunnels hold, for sixteen), **Relief Camp** (tents and trucks behind a plywood wall in the woods, for ten), **Parking Lot** and **Chapel Yard**. At the end of an exodus series or a survival map the players vote for what is next, and **M** opens the map list.
 
@@ -120,7 +120,7 @@ A defibrillator brings a dead teammate back where they lie. Pick one up (the wor
 | `defib_price` | 400 | Trader price (also a shelf defibrillator with no site price); 0 not sold |
 | `defib_hear_range` | 25.0 | Metres from which others hear it charging (0 only the user) |
 
-Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in dot-combat's `GSDefib`; `tests: ./game.sh test headless_defib`.
+Drop odds are the `defib` entry under `items` in `cfg/addon/zombie_zone/drops.yml` (0 by default for ordinary kills, higher for specials). A map places one with an item `kind: "defib"`, and a spawner sells one with `kind: defib` and `data: {price: N}`. The mechanic's numbers live in gs-combat's `GSDefib`; `tests: ./game.sh test headless_defib`.
 
 ## Controls
 
@@ -158,11 +158,11 @@ The two limits are what the network messages have room for (`game/zz_consumables
 
 ## Getting started
 
-You need [Godot 4.7](https://godotengine.org/download). The game is built from many GameSpice addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
+You need [Godot 4.7](https://godotengine.org/download). The game is built from many GameSpice addons, each in its own repository, so the easiest way to get everything is [gs-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
 
 ```bash
 git clone https://github.com/gamespice-platform/bootstrap.git
-cd dot-bootstrap
+cd gs-bootstrap
 ./bootstrap.sh
 cd projects/game-zombie-zone
 ./game.sh
@@ -170,7 +170,7 @@ cd projects/game-zombie-zone
 
 On Windows, run `bootstrap.ps1` instead and open the project in Godot.
 
-The maps come from the zombie-zone-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice street, and the server owner picks the maps pack (`gamemann/zombie-zone-maps`, or their own) in dot-server-deploy's `cfg/content.yml`.
+The maps come from the zombie-zone-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice street, and the server owner picks the maps pack (`gamemann/zombie-zone-maps`, or their own) in gs-server-deploy's `cfg/content.yml`.
 
 `game.sh` does everything else:
 
@@ -184,7 +184,7 @@ The maps come from the zombie-zone-maps checkout, which bootstrap links into `ma
 | `./game.sh shot` | Save a screenshot to `screenshots/`. `tools/shot.sh` lists the views |
 | `./game.sh help` | All of the options |
 
-`online` and `server` use [dot-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
+`online` and `server` use [gs-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
 
@@ -242,15 +242,15 @@ zz_bots 1                      // 0 to turn the stand-ins off
 
 **Setup time and respawns (survival).** A survival map starts with a setup stage of `zz_prestart_time` seconds (the HUD counts it down as "Get ready"): no zombie exists in it, not a sleeper or a wanderer, and the horde and the map's own zombies appear when the first wave begins. `zz_respawn_on_wave_end` brings the dead back beside the team as each breather begins. Timed respawn (`zz_timed_respawn 1`, off by default) replaces the slow rescue clock: a survivor who dies returns after `delay = (base + per_wave x (wave - 1)) x lerp(scarce_scale, healthy_scale, fraction_up) x (1 + difficulty_step x (difficulty - 1))`, clamped to `[min, max]`, where `fraction_up` is the share of the other survivors still alive when they died (a healthy team brings them back sooner, a collapsing one later), and they are invulnerable for `zz_respawn_protect` seconds. The formula is `ZzRespawn.delay` in `game/zz_respawn.gd`. Start-early-when-all-ready is not built.
 
-Every dead body, a survivor's or a zombie's, drops as a ragdoll ([dot-player-char](https://github.com/gamespice-platform/player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
+Every dead body, a survivor's or a zombie's, drops as a ragdoll ([gs-player-char](https://github.com/gamespice-platform/player-char)); the server picks how each one goes down and everybody sees the same fall, and past the machine's limit (four in a browser) a zombie falls by its death animation instead. `sv_ragdoll 0` makes every death that animated or scripted fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` (6 here) and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off).
 
 **The trader, the navigation graph and the ambience.** Each survivor can start a map with points (`zz_start_points`) and spend them at a trader during the setup window (`zz_trader`, `zz_trader_when`, `zz_trader_despawn`): E near it opens a menu of weapons, grenades, ammo, supplies and deployable boxes, and the server prices and sells ([operators](docs/operators.md#the-trader-at-the-start)). A large map's navigation graph takes a minute or more to build, so a hosted game builds it off the frame (`zz_nav_threads` worker tasks, or `zz_nav_budget_ms` slices with 0), shows a percentage while the round waits to start, and keeps the finished graph in `user://nav_cache` (`zz_nav_cache`, on by default) for the next time. Each map plays a mood of creepy ambience under its sound (`zz_ambient`, `zz_ambient_volume`, `zz_ambient_frequency`, `zz_ambient_mood`); right mouse aims down the sights, with the numbers set in `cfg/addon/zee_weapons/ads.yml` and sent to every player.
 
 Converted maps may carry moving doors and lifts, buttons, timers and counters, and hurt, teleport, push and gravity zones from the source map; the server runs them. Invisible clip boxes stop survivors and zombies but not bullets.
 
-The bot cvars are the family's shared ones: how many is dot-server's `GSBotQuota`, how they aim and shoot is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
+The bot cvars are the family's shared ones: how many is gs-server's `GSBotQuota`, how they aim and shoot is [gs-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (reaction, aim error and how fast it settles, turn speed, bursts and more; `bot_settings` lists them). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `zz_min_players` still works and sets `bot_quota`, and `zz_bot_reaction` sets `bot_reaction`; both are deprecated.
 
-`mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
+`mp_teammate_passthrough` is the family's shared one from gs-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
 ```
 zz_spectate_camera 0           // who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody
@@ -308,11 +308,11 @@ Maps are JSON documents. The format, and how to add one, is in [zombie-zone-maps
 
 ## Credits
 
-Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDITS.md`, `assets/surfaces/CREDITS.md` and `addons/dot_audio/stock/moods/CREDITS.md` list every file with URL, author and licence.
+Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDITS.md`, `assets/surfaces/CREDITS.md` and `addons/gs_audio/stock/moods/CREDITS.md` list every file with URL, author and licence.
 
 | Asset | Author / source | License | Where |
 | --- | --- | --- | --- |
-| Zombies (three zombies, four survivors turned zombies) and survivors | [Quaternius](https://quaternius.com), [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), simplified and recoloured by `tools/build_zombie_models.py` | CC0 | dot-player-char |
+| Zombies (three zombies, four survivors turned zombies) and survivors | [Quaternius](https://quaternius.com), [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), simplified and recoloured by `tools/build_zombie_models.py` | CC0 | gs-player-char |
 | Construction-worker zombie gear, sentry turret | Made for this game (`art-src/zombie_worker.py`, `art-src/turret.py`) | MIT | `art-src/` |
 | Realistic common infected | [Male City Zombie](https://opengameart.org/node/111870), OpenGameArt; decimated and rigged by `art-src/zombie_city.py` | CC0 | `art-src/` |
 | Walking-dead commons (`gent`, `cop`, `punk`, `convict`) | [Animated Zombie Characters Walking Dead loop](https://sketchfab.com/3d-models/animated-zombie-characters-walking-dead-loop-8088449c35634de18cbf531c58544f26) by LasquetiSpice, modified | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `art-src/zombie_sketchfab.py` |
@@ -327,15 +327,15 @@ Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDI
 | Recorded zombie, special, Mutant and gore sounds | OpenGameArt packs by artisticdude, ArcadeParty, saturn91, Darsycho, rubberduck, Ogrebane, StarNinjas, trazzz123, Zane Little, Eldritch Grim, qubodup, EZduzziteh and Kenney; Freesound sounds by OwNathan, ArriGD, JollyGreenZ, perrybassin, GaryQ, jacksonacademyashmore, velcronator and MostyXS | CC0 | `sounds/real/CREDITS.md` |
 | Zombie Pain | [Zombie Pain](https://opengameart.org/content/zombie-pain) by Vinrax | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) | `sounds/real/CREDITS.md` |
 | Other sounds and music | Kenney | CC0 | `sounds/CREDITS.md` |
-| Weapons | [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) and [zed-dot-weapons](https://github.com/zees-games/zed-dot-weapons) (Kenney's Blaster, Weapon, Survival and Food Kits; kitbashed guns use parts of Quaternius' [Ultimate Low Poly Guns Pack](https://opengameart.org/content/low-poly-guns-pack)) | CC0 | `assets/low-poly-guns/LICENSE.txt` |
+| Weapons | [zee-gs-weapons](https://github.com/zees-games/zee-gs-weapons) and [zed-gs-weapons](https://github.com/zees-games/zed-gs-weapons) (Kenney's Blaster, Weapon, Survival and Food Kits; kitbashed guns use parts of Quaternius' [Ultimate Low Poly Guns Pack](https://opengameart.org/content/low-poly-guns-pack)) | CC0 | `assets/low-poly-guns/LICENSE.txt` |
 | Modern weapons | [zz-modern-weapons](https://github.com/zees-games/zz-modern-weapons): M4 by SpatialNeglect (Mateusz Woliński), Sniper by DJMaesen, Ka-Bar knife by vitvitskyi, SMG-M32 by Frostoise, M69 grenade by Riley Lewand, Colt Python by HYQQM, MP5, SPAS 12 and AK-47 by quick_loop, M249 by Kendrick Russell, M14 by Ecler, M79 by denis1.eremin, SCAR-H by notcplkerry, Bren 2 by D_U, Glock 17 by Friendly, Desert Eagle by ELIZION, P90 by TastyTony, AA-12 by Jawa, RPG-7 by Tactical_Beard (Sketchfab) | CC BY 4.0 | that repo's `CREDITS.md` |
 | Modern weapons, public domain | VSS Vintorez by Arms Museum, P35 pistol and shotgun by Virtual Museums of Małopolska (Sketchfab), machete from Poly Haven (Ulan Cabanilla) | CC0 | that repo's `CREDITS.md` |
 | Walls, floors, roads, roofs | [ambientCG](https://ambientcg.com) (Lennart Demes and contributors): Concrete047A, Concrete034, PaintedPlaster017, Bricks097, Tiles107, Tiles074, WoodFloor041, Planks039, Asphalt012, Metal063, CorrugatedSteel009, Grass004, Ground037, each at `https://ambientcg.com/view?id=<name>` | CC0 | `assets/surfaces/CREDITS.md` |
 | Fallback textures (carpet, lockers, hedges, rubber) | Kenney, Prototype Textures | CC0 | `assets/` |
 | Glass, water, lines | Drawn in code | none | in code |
-| Footsteps | Kenney, Impact Sounds | CC0 | `addons/dot_audio/stock/CREDITS.md` |
-| Ambience under each map (eight moods) | 51 recordings from OpenGameArt, normalised and looped with ffmpeg | CC0 | `addons/dot_audio/stock/moods/CREDITS.md` |
-| Toys (barrels, tyres, balls, a bowling set) | [dot-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
+| Footsteps | Kenney, Impact Sounds | CC0 | `addons/gs_audio/stock/CREDITS.md` |
+| Ambience under each map (eight moods) | 51 recordings from OpenGameArt, normalised and looped with ffmpeg | CC0 | `addons/gs_audio/stock/moods/CREDITS.md` |
+| Toys (barrels, tyres, balls, a bowling set) | [gs-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/gs_props/toys/sounds/CREDITS.md` |
 
 If you made one of these assets and want it removed, open an issue.
 

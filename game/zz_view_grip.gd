@@ -10,7 +10,7 @@ const ONE_HAND: Array[StringName] = [&"melee", &"thrown", &"fists"]
 
 
 static func available() -> bool:
-	return GSAddonApi.build_level("dot_player_char") >= NEEDS_LEVEL
+	return GSAddonApi.build_level("gs_player_char") >= NEEDS_LEVEL
 
 
 ## The grip for a hands_reached call, reusing [param old] while the weapon and hand count hold.

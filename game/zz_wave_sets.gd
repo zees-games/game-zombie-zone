@@ -1,5 +1,5 @@
 extends RefCounted
-## Wave sets as config (dot-npc-ai-director's GSWaveSet): which set a map plays and the
+## Wave sets as config (gs-npc-ai-director's GSWaveSet): which set a map plays and the
 ## game's own keys in `extra.zz`.
 
 const GAME := "game-zombie-zone"

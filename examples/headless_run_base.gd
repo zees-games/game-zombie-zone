@@ -120,7 +120,7 @@ func _check_old_settings_document() -> void:
 
 
 ## The family's rule since the first play test: M opens the map list, and solo a choice
-## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and dot-vote.
+## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and gs-vote.
 func _test_the_map_menu() -> void:
 	_section("M opens the map list, and solo a choice changes it")
 	var game := await _world(func(c: ZzConfig) -> void: c.map_ids = PackedStringArray())
@@ -209,7 +209,7 @@ func _check_gore_persist() -> void:
 	_check(not DirAccess.dir_exists_absolute(real), "the scratch settings directory is removed afterwards")
 
 
-## The client on dot-game's GSGameClient: the loading cover is up at the start and blocks
+## The client on gs-game's GSGameClient: the loading cover is up at the start and blocks
 ## input, lifts once the player is in, and Tab goes through the menu (it holds the board).
 func _test_the_client_platform() -> void:
 	_section("the client: the cover lifts, Tab holds the board through the menu, the wheel is a row")
@@ -317,7 +317,7 @@ func _check_client_wheel(client: ZzClient) -> void:
 	var jump_wheel := InputEventMouseButton.new()
 	jump_wheel.button_index = MOUSE_BUTTON_WHEEL_UP
 	jump_wheel.pressed = true
-	_check(not jump_wheel.is_action_pressed(&"dot_fps_jump") and not wheel.is_action_pressed(&"dot_fps_jump"),
+	_check(not jump_wheel.is_action_pressed(&"gs_fps_jump") and not wheel.is_action_pressed(&"gs_fps_jump"),
 		"the wheel is not on jump")
 	var slots: Array = client.weapons.arsenal.slots() if client.weapons != null and client.weapons.arsenal != null else []
 	var before: int = client._slot
@@ -448,10 +448,10 @@ func _finished() -> void:
 	_sections_finished += 1
 
 
-## The HUD draws health, the clock, the kits and confirmed hits through dot-ui's glance pieces.
+## The HUD draws health, the clock, the kits and confirmed hits through gs-ui's glance pieces.
 ## A headless viewport is 64 x 64, so the layout is checked as arithmetic (`tools/shot.sh --view=hit`).
 func _test_the_hud() -> void:
-	_section("the HUD: dot-ui's vitals, clock, kits, and hits the server confirmed")
+	_section("the HUD: gs-ui's vitals, clock, kits, and hits the server confirmed")
 	var game := await _team(1)
 	var me: ZzPlayer = game.survivors()[0]
 	var hud := ZzHud.new()
@@ -489,7 +489,7 @@ func _test_the_hud() -> void:
 		_check(hud.strip.clock == GSScoreStrip.clock_text(42.2) and hud.strip.under_text().ends_with("hold out"),
 			"a hold-out's time left is GSScoreStrip's clock", str(hud.strip.describe()))
 
-	# A survivor's hit, as dot-combat applies it, is confirmed by the world, and the HUD draws
+	# A survivor's hit, as gs-combat applies it, is confirmed by the world, and the HUD draws
 	# the marker and the number from that confirmation.
 	var confirmed: Array = []
 	game.hit_landed.connect(func(id: StringName, victim: int, amount: float, point: Vector3, killed: bool, headshot: bool) -> void:
@@ -547,17 +547,17 @@ func _check_hud_roster(game: ZzGame, me: ZzPlayer, hud: ZzHud) -> void:
 
 ## The crosshair down the sights, the scope preference and the death of the crosshair.
 func _check_hud_aim(hud: ZzHud, me: ZzPlayer) -> void:
-	# Down the sights the dot fades with the aim (dot-ui's curve), and a scope hides it.
+	# Down the sights the dot fades with the aim (gs-ui's curve), and a scope hides it.
 	hud.set_aim(0.0, false)
 	var hip := _crosshair_alpha(hud)
 	hud.set_aim(1.0, false)
 	var aimed := _crosshair_alpha(hud)
 	hud.set_aim(1.0, true)
-	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("dot_ui") < 5)
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("gs_ui") < 5)
 		and _crosshair_alpha(hud) == 0.0 and is_equal_approx(hud.scope.fraction, 1.0),
 		"the crosshair is whole at the hip, gone down the sights, and a scope replaces it",
 		"hip %.2f aimed %.2f scope %.2f" % [hip, aimed, hud.scope.fraction])
-	var scope_prefs := load("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
+	var scope_prefs := load("res://addons/gs_weapon/view/gs_weapon_scope_prefs.gd")
 	var probe := ZeeViewModel.new()
 	scope_prefs.mode = 2
 	scope_prefs.apply(probe)
@@ -575,7 +575,7 @@ func _check_hud_aim(hud: ZzHud, me: ZzPlayer) -> void:
 		str(_script_errors.seen().slice(before)))
 	hud.set_aim(0.0, false)
 	var cross: Control = hud._crosshair
-	var hides := GSAddonApi.build_level("dot_ui") >= 14
+	var hides := GSAddonApi.build_level("gs_ui") >= 14
 	if hides:
 		cross.call(&"_process", 0.016)
 	_check(not hides or bool(cross.call(&"is_shown")), "the crosshair is drawn while the survivor lives")
@@ -711,8 +711,8 @@ func _check_font_coverage() -> void:
 	_check(missing.is_empty(), "every character the game writes is in the HUD's font", ", ".join(missing))
 
 
-## A pack naming dot-ui's glance pieces does not parse on a shell whose dot-ui predates them,
-## so the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+## A pack naming gs-ui's glance pieces does not parse on a shell whose gs-ui predates them,
+## so the requires.json gs-ci derives must ask for gs-ui 4, and nothing may lower it.
 ## The trader menu is the one modal this game frees the mouse for; it must hold the pointer through GSGameClient.
 func _check_trader_menu_holds_pointer(client: ZzClient, platform: GSGameClient) -> void:
 	var feet: Vector3 = client.player.feet() if client.player != null else Vector3.ZERO
@@ -735,13 +735,13 @@ func _check_trader_menu_holds_pointer(client: ZzClient, platform: GSGameClient) 
 func _check_requires() -> void:
 	var asks := GSAddonApi.derive()
 	_check(
-		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
-		"the pack asks a shell for dot-ui level 4, the glance pieces",
-		str(asks.get("dot_ui"))
+		int(asks.get("gs_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
+		"the pack asks a shell for gs-ui level 4, the glance pieces",
+		str(asks.get("gs_ui"))
 	)
 
 
-## Another survivor wears dot-ui's name and health pill over the drawn body; the own player and
+## Another survivor wears gs-ui's name and health pill over the drawn body; the own player and
 ## the hidden or dead wear none. Presentation only.
 func _check_survivor_tag() -> void:
 	var game := await _world()

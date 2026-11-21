@@ -29,7 +29,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ##
 ## [b]A pinned survivor's own client mispredicts the drag[/b], because it does not know the
 ## special's velocity: it is corrected every snapshot, which on screen is being hauled along in
-## steps. That is the honest cost of not predicting NPCs (dot-npc's CLAUDE.md), and a pinned
+## steps. That is the honest cost of not predicting NPCs (gs-npc's CLAUDE.md), and a pinned
 ## player has no input to feel the correction in.
 
 const POUNCE := &"pounce"
@@ -231,7 +231,7 @@ func advance(delta: float) -> void:
 			else float(npc.def.meta.get("pin_dps", DAMAGE_PER_SECOND.get(held["kind"], 5.0)))
 		held["dealt"] = float(held["dealt"]) + rate * delta
 
-		# Whole points, a few a second: dot-combat is told about every one, and a stream of
+		# Whole points, a few a second: gs-combat is told about every one, and a stream of
 		# 0.15 hits would be a kill feed and a hurt flash sixty times a second.
 		if float(held["dealt"]) >= 2.0:
 			var amount := floorf(float(held["dealt"]))

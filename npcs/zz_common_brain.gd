@@ -46,7 +46,7 @@ const STUCK_SECONDS := 1.2
 const HOPS_BEFORE_NUDGE := 2
 
 ## [method _chase_plan]'s first value: chasing the forced survivor, its own target, nobody, or one it has no place for.
-## The same codes as dot-sim's `GSSimZombieBrains`.
+## The same codes as gs-sim's `GSSimZombieBrains`.
 const PLAN_FORCED := 0.0
 const PLAN_TARGET := 1.0
 const PLAN_NOBODY := -1.0
@@ -113,7 +113,7 @@ func _build() -> void:
 
 
 ## How far it sees and hears, as a share of the kind's. Through the character's alertness,
-## which dot-npc-ai writes onto the instance's `sight_scale` and also reads for hearing: a
+## which gs-npc-ai writes onto the instance's `sight_scale` and also reads for hearing: a
 ## sight scale written straight onto the instance was overwritten by the brain on its next
 ## character refresh, and an idle common saw as far as an alert one.
 func _set_sight(scale: float) -> void:
@@ -256,7 +256,7 @@ func _chase_speed() -> float:
 
 
 ## This tick's chase as [code][code, dropped, at.x, at.y, at.z, speed, gap, reach][/code]: whom ([code]PLAN_*[/code]),
-## whether [member forced] is spent, where they stand, how fast and how far, and how near a swing lands. In dot-sim's
+## whether [member forced] is spent, where they stand, how fast and how far, and how near a swing lands. In gs-sim's
 ## `GSSimZombieBrains` while the horde has one ([member ZzConfig.native_brains]); the script below otherwise, and
 ## beside it under the horde's `brains_verify`, whose answer is then the one used.
 func _chase_plan(b: ZzZombieBody) -> PackedFloat64Array:
@@ -324,7 +324,7 @@ func _chase_plan_script(b: ZzZombieBody) -> PackedFloat64Array:
 
 
 ## This tick's chase choice: [method _chase_plan]'s eight values, the act ([code]ACT_*[/code]) and 1 when it must ask
-## [method claim_attack_slot] first. dot-sim's `chase` while the brains decide natively ([code]_decides[/code]), else
+## [method claim_attack_slot] first. gs-sim's `chase` while the brains decide natively ([code]_decides[/code]), else
 ## the script's; under `brains_verify` both, and the script's answer is used.
 func _chase_decide(b: ZzZombieBody) -> PackedFloat64Array:
 	var h := horde()

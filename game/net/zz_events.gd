@@ -6,7 +6,7 @@ const ZzGame := preload("../zz_game.gd")
 ##
 ## Encoders and decoders in pairs, and nothing checks that they are inverses for you —
 ## `headless_net` round-trips every one of them, because this family has already shipped a
-## serialisation whose two ends never met: dot-moderation wrote `"voice muted"` and read
+## serialisation whose two ends never met: gs-moderation wrote `"voice muted"` and read
 ## back a warning, and the one thing that addon existed for silently did nothing.
 ##
 ## [b]The map is a document, and it travels whole.[/b] `MAP` carries the normalised document
@@ -137,7 +137,7 @@ enum Kind {
 	WEAPON_GONE,
 	## Where a shot left marks on the map: up to a dozen points with a surface normal each (a bullet hole, both faces of a wall it went through, each bounce). To everybody.
 	IMPACT,
-	## A thrown knife flew, bounced, lay, stuck or was taken (dot-weapon's GSWeaponKnifeWire). Also one per knife out at signon.
+	## A thrown knife flew, bounced, lay, stuck or was taken (gs-weapon's GSWeaponKnifeWire). Also one per knife out at signon.
 	KNIFE,
 	## Which zombie body this one player now drives (its net id), or 0 when they let go. To its owner only.
 	POSSESS,
@@ -171,7 +171,7 @@ enum Ask {
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.
 ##
-## [b]A reader past its end returns plausible zeros rather than failing.[/b] dot-net shipped
+## [b]A reader past its end returns plausible zeros rather than failing.[/b] gs-net shipped
 ## with exhaustion that was not sticky, so a decoder that skipped this check got a
 ## believable value for the field AFTER the overrun — and a truncated packet decodes as a
 ## valid message about nothing.
@@ -402,7 +402,7 @@ static func read_team(r: GSNetReader) -> Dictionary:
 
 
 ## A death or a down: who, by whom (a session, or 0), by what (a zombie kind, or empty), why.
-## [param death] is how the body falls (dot-player-char's [GSPlayerDeath], the server's pick),
+## [param death] is how the body falls (gs-player-char's [GSPlayerDeath], the server's pick),
 ## last and optional, so every client draws the same fall and an older one reads the rest.
 ## [param weapon_id] is what landed the hit (empty for a claw), for the killcam's icon.
 static func write_death(player_id: int, by: int, why: StringName, by_kind: StringName = &"",
@@ -567,7 +567,7 @@ static func read_nav(r: GSNetReader) -> Dictionary:
 
 # Watching
 
-## A view dot-spectate decided, for the one player it belongs to. Sessions, 0 is nobody.
+## A view gs-spectate decided, for the one player it belongs to. Sessions, 0 is nobody.
 static func write_spectate(
 	viewer: int, mode: int, target: int, killer: int, death_at: Vector3
 ) -> PackedByteArray:
@@ -636,7 +636,7 @@ static func read_npc(r: GSNetReader) -> Dictionary:
 
 
 ## A zombie gone: [param killed] says it died rather than being tidied away, so a client can
-## leave a body, and [param death] (dot-player-char's, the server's pick) how that body falls.
+## leave a body, and [param death] (gs-player-char's, the server's pick) how that body falls.
 ## The death is last and behind a flag, so a client that predates it reads the rest.
 static func write_npc_gone(net_id: int, killed: bool, death: GSPlayerDeath = null) -> PackedByteArray:
 	var w := _w()
@@ -725,7 +725,7 @@ static func read_weapon_drop(r: GSNetReader) -> Dictionary:
 	return out
 
 
-## A thrown knife's change, in dot-weapon's own wire format.
+## A thrown knife's change, in gs-weapon's own wire format.
 static func write_knife(id: int, owner: int, phase: int, victim: int, at: Vector3, motion: Vector3) -> PackedByteArray:
 	var w := _w()
 	GSWeaponKnifeWire.write_knife(w, id, owner, phase, victim, at, motion)

@@ -12,7 +12,7 @@ func _test_a_gate_reaches_the_client() -> void:
 	_finished()
 
 
-## A world of one hinged prop door, as dot-map's manifest writes it.
+## A world of one hinged prop door, as gs-map's manifest writes it.
 class DoorWorld extends RefCounted:
 	var ents: Variant = GSMapEntities.from_manifest({"movers": [{"entity": 900, "model": null, "kind": "rotate", "classname": "prop_door_rotating",
 		"targetname": "", "origin": [60.0, 0.0, 60.0], "axis": [0.0, 1.0, 0.0], "degrees": 90.0, "speed": 100.0, "travel_time": 0.9, "wait": 4.0,

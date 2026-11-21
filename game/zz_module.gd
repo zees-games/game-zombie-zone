@@ -32,13 +32,13 @@ func _game_load() -> GSResult:
 			world.config.team_roster = new_value.strip_edges() == "1")
 
 	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a team-mate holding
-	# the muzzle (default), 2 every one in the line. dot-combat's cvar, live from the next shot; NOTIFY,
+	# the muzzle (default), 2 every one in the line. gs-combat's cvar, live from the next shot; NOTIFY,
 	# and REPLICATED because every client's manager predicts its tracers under it.
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 		_reconcile_friendly_fire(world, _passthrough)
 
-	# sv_falldamage, _threshold, _scale: dot-combat's, on by default in this game. Server-side
+	# sv_falldamage, _threshold, _scale: gs-combat's, on by default in this game. Server-side
 	# only, so no REPLICATED: the damage is the server's and arrives as health.
 	var _fall := world.fall_rules.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY)
 
@@ -56,7 +56,7 @@ func _game_load() -> GSResult:
 
 	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
 	var _camera := add_cvar("mp_killview_camera", "0",
-		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay GSKillcamFraming)",
+		"Killcam camera: 0 the killer's eye, 1 behind the killer (gs-replay GSKillcamFraming)",
 		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 	_bind_rule_cvars(world)
@@ -69,7 +69,7 @@ func _game_load() -> GSResult:
 		"Automatic stand-ins: 1 keeps as many as bot_quota and bot_quota_mode say, 0 none at all."
 	)
 
-	# How many is dot-server's [GSBotQuota], so `bot_quota` and `bot_quota_mode` mean the same on every
+	# How many is gs-server's [GSBotQuota], so `bot_quota` and `bot_quota_mode` mean the same on every
 	# server in the family. Default: this game's `minimum_players` in fill mode; `zz_bots` stays the
 	# switch it always was.
 	_quota = GSBotQuota.install(self, world.config.minimum_players)
@@ -84,7 +84,7 @@ func _game_load() -> GSResult:
 	if vote != null:
 		vote.refresh_maps()
 
-	# dot-game's "still loading": a seat behind its client's cover is neither hurt, pinned nor
+	# gs-game's "still loading": a seat behind its client's cover is neither hurt, pinned nor
 	# hunted (see ZzGame.harm_gate). Asked by player id, resolved to a peer through the bridge.
 	world.harm_gate = func(player_id: StringName) -> bool:
 		if bridge == null:
@@ -104,7 +104,7 @@ func _game_load() -> GSResult:
 func _game_commands(world: ZzGame) -> void:
 	add_command("zz_status", _cmd_status, "Show the map, the survivors and the horde")
 	add_command("zz_net", _cmd_net, "Show what the netcode is doing")
-	# The map commands are renameable from maps.yml's `commands:` block, like dot-vote's roles.
+	# The map commands are renameable from maps.yml's `commands:` block, like gs-vote's roles.
 	for name in world.command_names("zz_maps"):
 		add_command(name, _cmd_maps, "List the maps, and any refused file")
 	for name in world.command_names("zz_reload"):
@@ -137,7 +137,7 @@ func _game_commands(world: ZzGame) -> void:
 
 
 ## Who somebody is reaches the world: a face as they are seated, and the real name and face
-## once dot-platform has them. All three events end in [method ZzNetBridge.refresh_player].
+## once gs-platform has them. All three events end in [method ZzNetBridge.refresh_player].
 func _wire_identity() -> void:
 	var link := bridge as ZzNetBridge
 
@@ -160,7 +160,7 @@ func _on_profile(event: GSEvent) -> void:
 
 	link.refresh_player(session_id, session.display_name, _avatar_for(session_id))
 
-## dot-combat's `mp_friendlyfire` and this game's `zz_friendly_fire` / `zz_friendly_fire_mode` set the same rule, and the config's won on every difficulty change. Now `mp_friendlyfire 0` means mode 0 (off), `1` turns an off mode back to the default 2, and the cvar mirrors what the config resolved to. Defaults are unchanged.
+## gs-combat's `mp_friendlyfire` and this game's `zz_friendly_fire` / `zz_friendly_fire_mode` set the same rule, and the config's won on every difficulty change. Now `mp_friendlyfire 0` means mode 0 (off), `1` turns an off mode back to the default 2, and the cvar mirrors what the config resolved to. Defaults are unchanged.
 func _reconcile_friendly_fire(world: ZzGame, made: Array) -> void:
 	var ff: Object = null
 	for cv: Variant in made:
@@ -235,7 +235,7 @@ func _game_tick(_tick: int, delta: float) -> void:
 	_keep_the_round_full()
 	_note_pings()
 
-## The horde's sense workers and level of detail follow the cvars (dot-game's GSGameNpcLod).
+## The horde's sense workers and level of detail follow the cvars (gs-game's GSGameNpcLod).
 func _follow_npc_threads() -> void:
 	var world := game as ZzGame
 	if world == null or world.horde == null or world.horde.spawner == null:
@@ -249,7 +249,7 @@ func _follow_npc_threads() -> void:
 	if npc_lod == null or npc_lod.spawner != world.horde.spawner:
 		var _lod := attach_npc_lod(world.horde.spawner)
 
-## Each session's ping onto its player, for the Tab board. dot-server already keeps it.
+## Each session's ping onto its player, for the Tab board. gs-server already keeps it.
 func _note_pings() -> void:
 	var world := game as ZzGame
 	if world == null or server == null:
@@ -312,7 +312,7 @@ func _keep_the_round_full() -> void:
 		bridge.call("remove_player", ZzNetBridge.session_of(leaving))
 
 ## Names for the stand-ins, so a scoreboard of four is readable: one nobody in [param world] has yet,
-## from this game's survivors through dot-bot's [GSBotNames] (never doubles one up, same from run
+## from this game's survivors through gs-bot's [GSBotNames] (never doubles one up, same from run
 ## to run). Random drawing once gave a dedicated run three called Odell.
 static func _bot_name(world: ZzGame) -> String:
 	var taken: Array = []
@@ -332,7 +332,7 @@ func _wire_chat() -> void:
 	bridge.connect("say_requested", _on_say_requested)
 	services.connect("command_entered", _on_chat_command)
 
-## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`. Opened
+## The players' vote for the next map, over gs-vote: `!vote`, `!rtv`, `!nominate`. Opened
 ## [member ZzVote.open_after_sec] into the last round, applied when it ends (game/zz_vote.gd); tuned in
 ## `user://cfg/zombiezone_vote.json` or `game.yml`; one that cannot be built is a WARN, never a halt.
 func _build_vote(world: ZzGame) -> void:
@@ -347,7 +347,7 @@ func _build_vote(world: ZzGame) -> void:
 		var out: Array = []
 
 		for id in world.catalogue.rotating(world.config.map_ids):
-			# Pack maps join the ballot through dot-vote's follow_content, with their pack's name.
+			# Pack maps join the ballot through gs-vote's follow_content, with their pack's name.
 			if not world.catalogue.is_content(id):
 				out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
 
@@ -425,9 +425,9 @@ func _build_vote(world: ZzGame) -> void:
 	var commanded := vote.install_commands(self)
 	GSLog.result(CHANNEL, "the map vote's commands", commanded)
 
-	# The map menu (M), dot-vote's: a player holding the owner's `sv_map_menu_flag` changes the
+	# The map menu (M), gs-vote's: a player holding the owner's `sv_map_menu_flag` changes the
 	# map now, not after this one, and sees the same rows a solo player does. Read by name,
-	# because a server on a dot-vote older than the menu has no `map_menu` and runs without it.
+	# because a server on a gs-vote older than the menu has no `map_menu` and runs without it.
 	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
 	if menu_half is Object:
 		(menu_half as Object).set(&"change_fn", world.change_map_in_tick)
@@ -458,14 +458,14 @@ func _build_vote(world: ZzGame) -> void:
 				vote.forget_voter(StringName(str(session.userid)))
 		)
 
-## Votebans, dot-vote's `GSVoteBans`, for team damage: a vote ([member ZzConfig.team_damage_vote])
-## and a ban ([member ZzConfig.team_damage_ban]). Loaded by path so a host whose dot-vote predates
+## Votebans, gs-vote's `GSVoteBans`, for team damage: a vote ([member ZzConfig.team_damage_vote])
+## and a ban ([member ZzConfig.team_damage_ban]). Loaded by path so a host whose gs-vote predates
 ## them runs without; voter ids are the session's userid.
 func _build_voteban(world: ZzGame) -> void:
-	var path := "res://addons/dot_vote/runtime/dot_vote_bans.gd"
+	var path := "res://addons/gs_vote/runtime/gs_vote_bans.gd"
 
 	if not ResourceLoader.exists(path):
-		log_info("this host's dot-vote has no votebans; team damage can still ban")
+		log_info("this host's gs-vote has no votebans; team damage can still ban")
 		return
 
 	voteban = (load(path) as GDScript).new()
@@ -557,7 +557,7 @@ func _announce(line: String) -> void:
 	elif server != null:
 		server.broadcast_message(line)
 
-## Bans a connected person for [param minutes] (0 for ever) and removes them, the way dot-server's
+## Bans a connected person for [param minutes] (0 for ever) and removes them, the way gs-server's
 ## own `ban` command does: by account, by address for a guest.
 func _ban_player(userid: int, minutes: float, reason: String, by: String) -> void:
 	var session := server.session_by_userid(userid) if server != null else null
@@ -589,7 +589,7 @@ func _wire_map(world: ZzGame) -> void:
 		_attach_visibility(world)
 	)
 
-## The checkout's converted world's PVS as the snapshot visibility (cvar net_visibility; dot-game 52). A map
+## The checkout's converted world's PVS as the snapshot visibility (cvar net_visibility; gs-game 52). A map
 ## whose world is not on disk here (a server running the maps pack) clears it and sends by distance alone.
 func _attach_visibility(world: ZzGame) -> void:
 	if not has_method(&"use_map_visibility") or world.map == null:
@@ -597,7 +597,7 @@ func _attach_visibility(world: ZzGame) -> void:
 	var mesh: Object = null
 	var prefix: String = world.map.local_world_prefix() if str(world.map.doc.get("world", "")) != "" else ""
 	if prefix != "" and world.map.can_draw_world() and FileAccess.file_exists(prefix + ".json"):
-		var read: GSResult = (load("res://addons/dot_map/bsp/dot_map_bsp_mesh.gd") as GDScript).call(&"load_prefix", prefix)
+		var read: GSResult = (load("res://addons/gs_map/bsp/gs_map_bsp_mesh.gd") as GDScript).call(&"load_prefix", prefix)
 		mesh = read.value if read.ok else null
 	var _on: Variant = call(&"use_map_visibility", mesh)
 
@@ -607,7 +607,7 @@ func _wire_progress(world: ZzGame) -> void:
 	if bridge == null:
 		return
 
-	# Filed under dot-game's stable per-server key (guests too), so it outlives the connection
+	# Filed under gs-game's stable per-server key (guests too), so it outlives the connection
 	# and a restart; see [ZzProgress].
 	if world.progress != null and stats_feed != null:
 		# The board reads ZzProgress's own tracker, under the feed's own key (what durable_key_fn
@@ -1036,7 +1036,7 @@ func _bind_config(world: ZzGame) -> void:
 		var text := world.config.survival_style_name() if key == "survival_style" else GSGameConfigBinder._to_text(value)
 		console.set_cvar(hand[key], text))
 
-## Puts the gore cvars on dot-npc's process-wide dial; live, so a workbench edit takes effect on the next shot.
+## Puts the gore cvars on gs-npc's process-wide dial; live, so a workbench edit takes effect on the next shot.
 func _apply_gore(config: GSConfig) -> void:
 	GSNpcGore.level = int(config.get(&"gore_level"))
 	GSNpcGore.max_gibs = int(config.get(&"gore_max_gibs"))

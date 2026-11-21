@@ -7,11 +7,11 @@ const ZzPlayer := preload("zz_player.gd")
 ## [b]The numbers are the ones only this game has.[/b] What a co-operative survival game is
 ## judged by is not kills alone: it is the friends you picked up, the ones you shoved a leaper off,
 ## the medkits you spent on somebody else, the maps you finished, the holds you survived. Each is
-## declared once, in [method schema], counted as it happens and reported by dot-stats as a DELTA —
+## declared once, in [method schema], counted as it happens and reported by gs-stats as a DELTA —
 ## "add one", never "now has forty" — so two servers reporting one player add up rather than
 ## overwrite.
 ##
-## [b]Achievements are rules over those numbers and nothing else.[/b] dot-achievements never
+## [b]Achievements are rules over those numbers and nothing else.[/b] gs-achievements never
 ## hears about a revive; it hears that a number moved, through [GSAchievementStatsLink].
 ##
 ## [b]Stand-ins are never counted.[/b] An achievement a bot can earn is noise in every log an
@@ -20,7 +20,7 @@ const ZzPlayer := preload("zz_player.gd")
 ## [b]Server side, and on an offline client — wherever the world is authoritative.[/b]
 ##
 ## [b]A player's numbers are filed under a stable per-server key[/b]: [member durable_key_fn]
-## supplies it (dot-game's GSGameStatsFeed.key_for); without one the key is the world's id.
+## supplies it (gs-game's GSGameStatsFeed.key_for); without one the key is the world's id.
 
 const CHANNEL := "zz.progress"
 
@@ -44,9 +44,9 @@ const TEAM_HEALS := &"zz.team_heals"
 const BOXES_OPENED := &"zz.boxes_opened"
 const DOWNS := &"zz.downs"
 const DEATHS := &"zz.deaths"
-## The published skill figure the site orders by (dot-stats' GSStatsRank).
+## The published skill figure the site orders by (gs-stats' GSStatsRank).
 const RANK_SCORE := &"rank_score"
-## Lifetime points, scored by dot-stats' GSStatsPoints from the events the game reports.
+## Lifetime points, scored by gs-stats' GSStatsPoints from the events the game reports.
 const POINTS := &"zz.points"
 
 ## Seconds a person has been in the game, lifetime. Not a schema stat (nothing shows it): it is
@@ -77,7 +77,7 @@ var _in_round: Dictionary = {}
 var _map_kills: Dictionary = {}
 
 ## `func(player_id: StringName) -> String`: the durable key to file this player under, or
-## "" for none. Set by the module from dot-platform; see the class note.
+## "" for none. Set by the module from gs-platform; see the class note.
 var durable_key_fn: Callable = Callable()
 
 ## A user:// JSON file the lifetime totals persist in; empty keeps none. Set before [method setup].
@@ -331,7 +331,7 @@ func _build_feed() -> void:
 	rank.key_fn = func(who: Variant) -> StringName: return _key(StringName(who))
 
 
-## Every wall a resolved shot crossed, for the site's Penetration cost panel (the shape is dot-stats').
+## Every wall a resolved shot crossed, for the site's Penetration cost panel (the shape is gs-stats').
 func report_shot(shot: GSShot) -> void:
 	if feed != null and stats != null:
 		var _walls := GSStatsDamage.report_shot(feed, shot)

@@ -1,6 +1,6 @@
 extends GSGameCheckSuite
 ## Collision against the drawn mesh on 4-Way Tunnel (nightly zz-4way-blocked-1): a warehouse shelf boxed a whole grid cell (0.26 m) proud of
-## its posts, which read as an invisible wall beside the red door frame. dot-map's decomposition now cuts each box back to the surface.
+## its posts, which read as an invisible wall beside the red door frame. gs-map's decomposition now cuts each box back to the surface.
 
 const CollideProbe := preload("../tools/collide_probe.gd")
 
@@ -40,7 +40,7 @@ func _run() -> void:
 		var all := sweep.count("invisible_wall") + sweep.count("invisible_floor")
 		_check(all <= MAX_INVISIBLE, "at most %d invisible hits, found %d" % [MAX_INVISIBLE, all])
 	else:
-		print("SKIPPED: the tunnel's world is not linked (as in CI); run dot-bootstrap for the full suite")
+		print("SKIPPED: the tunnel's world is not linked (as in CI); run gs-bootstrap for the full suite")
 		_skipped = 5
 	_finished += 1
 	probe.queue_free()

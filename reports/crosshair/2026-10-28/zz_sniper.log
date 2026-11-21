@@ -12,7 +12,7 @@ heavy: waiting for a build slot (181s). Held by:
   christian@x-tmc-dev02 pid 3291331 since 01:03:06: timeout 400 godot --headless --path . --script tools/measure_props.gd -- --check
   christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
 heavy: waiting for a build slot (241s). Held by:
-  christian@x-tmc-dev02 pid 3300915 since 01:06:22: /home/christian/godot/dot-cloud/tools/publish_pack.sh --source /home/christian/godot/mg-deathrun-maps --id mg-deathrun-maps --version 1.0.0 --dry-run --out /tmp/claude-1000/-home-christian-godot/b661fc09-b700-42ac-bb7e-29ea120ac1cf/scratchpad/out --l
+  christian@x-tmc-dev02 pid 3300915 since 01:06:22: /home/christian/godot/gs-cloud/tools/publish_pack.sh --source /home/christian/godot/mg-deathrun-maps --id mg-deathrun-maps --version 1.0.0 --dry-run --out /tmp/claude-1000/-home-christian-godot/b661fc09-b700-42ac-bb7e-29ea120ac1cf/scratchpad/out --l
   christian@x-tmc-dev02 pid 3285900 since 01:02:03: timeout 600 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
 heavy: waiting for a build slot (301s). Held by:
   christian@x-tmc-dev02 pid 3285577 since 01:06:28: timeout 600 ../gpu.sh shot game-fatal-contact tools/screenshot.sh dm_box --feel --weapons=pistol:2
@@ -39,7 +39,7 @@ WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by 
      at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
 OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
 
-WRN game.locked_content a content.lock.json is shipped but there is no dot-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
+WRN game.locked_content a content.lock.json is shipped but there is no gs-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
 inf config   applied command line keys=4
 inf game.config layer applied from="" game=game-zombie-zone keys="warmup_seconds, start_grace_seconds, wanderer_density, map_ids" layer=argv
 inf zz.packs packs scanned monsters=6 providers=4 weapons=47

@@ -15,7 +15,7 @@ const ZzNpcProfiles := preload("zz_npc_profiles.gd")
 ##
 ## [b]Recordings where there are recordings, stand-ins where there are not.[/b] The zombies'
 ## voices, the explosions, the slime, the punches and the music are CC0 files in `sounds/`
-## (see its CREDITS.md); the interface and the guns are dot-audio's synthesised stand-ins until
+## (see its CREDITS.md); the interface and the guns are gs-audio's synthesised stand-ins until
 ## somebody drops a file at the path. [GSAudioSinkGodot] consults the file before the stand-in.
 ##
 ## [b]Never on a server, and never deciding anything.[/b]
@@ -98,10 +98,10 @@ var manager: GSAudioManager = null
 ## kind -> {key -> cue id}, read from the profiles on first use.
 var _cues: Dictionary = {}
 
-## Everybody's footsteps by what they stand on (dot-audio's stock: Kenney, CC0).
+## Everybody's footsteps by what they stand on (gs-audio's stock: Kenney, CC0).
 var steps: GSAudioFootsteps = null
 
-## The creepy ambience under a map: dot-audio's [GSAmbienceDirector] over its stock mood set. The
+## The creepy ambience under a map: gs-audio's [GSAmbienceDirector] over its stock mood set. The
 ## old generated beds in [member ambience] only play when no mood loaded.
 var director: GSAmbienceDirector = null
 var ambient: GSAmbience = null
@@ -224,7 +224,7 @@ static func sound_catalogue() -> GSAudioCatalogue:
 	brute_music.looping = true
 	c.add(brute_music)
 
-	# A body landing, survivor or zombie: dot-player-char's stock death sounds (Kenney, CC0),
+	# A body landing, survivor or zombie: gs-player-char's stock death sounds (Kenney, CC0),
 	# shipped in the addon.
 	for row: Dictionary in GSPlayerDeathSounds.rows():
 		var fall := _placed(row["id"], 45.0, 8.0, 3, 50, float(row["pitch_min"]), float(row["pitch_max"]), "")
@@ -234,7 +234,7 @@ static func sound_catalogue() -> GSAudioCatalogue:
 		fall.cooldown_ms = int(row["cooldown_ms"])
 		c.add(fall)
 
-	# The map's toys: dot-props' stock toy sounds (Kenney, CC0), shipped in the addon, under the
+	# The map's toys: gs-props' stock toy sounds (Kenney, CC0), shipped in the addon, under the
 	# horde in priority.
 	for row: Dictionary in GSPropBodySounds.rows():
 		var toy := _placed(row["id"], float(row["distance"]), 6.0, 3, 30, float(row["pitch_min"]), float(row["pitch_max"]), "")
@@ -319,7 +319,7 @@ static func sound_recipes() -> Dictionary:
 		WEAPON_LAUNCH: GSAudioSynth.Voice.SHOT_HEAVY,
 		WEAPON_BEAM: GSAudioSynth.Voice.SHOT_TIGHT,
 		WEAPON_THROW: GSAudioSynth.Voice.CLICK,
-		# Stand-ins only for a build without dot-props' toy files.
+		# Stand-ins only for a build without gs-props' toy files.
 		GSPropBodySounds.BOUNCE: GSAudioSynth.Voice.IMPACT,
 		GSPropBodySounds.THUMP: GSAudioSynth.Voice.IMPACT,
 		GSPropBodySounds.KNOCK: GSAudioSynth.Voice.IMPACT,
@@ -333,7 +333,7 @@ static func sound_recipes() -> Dictionary:
 		GSPropBodySounds.WATER: GSAudioSynth.Voice.STEP,
 		GSPropBodySounds.BOING: GSAudioSynth.Voice.SPAWN,
 		GSPropBodySounds.HORN: GSAudioSynth.Voice.BLIP,
-		# Stand-ins only for a build without dot-player-char's files.
+		# Stand-ins only for a build without gs-player-char's files.
 		GSPlayerDeathReactions.SOUND_THUD: GSAudioSynth.Voice.IMPACT,
 		GSPlayerDeathReactions.SOUND_FACE_PLANT: GSAudioSynth.Voice.IMPACT,
 		GSPlayerDeathReactions.SOUND_SLUMP: GSAudioSynth.Voice.STEP,
@@ -392,7 +392,7 @@ func setup() -> GSResult:
 	manager.mixer = GSAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 32
-	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): at +6 two 40 s runs
+	# Measured toward the family's -17 LUFS (gs-audio docs/loudness.md): at +6 two 40 s runs
 	# read -19.4 LUFS; at +8 two runs whose camera went over 100 m read -16.1 and -16.9. A run
 	# where the player is cornered or dead most of the time (camera under 40 m) reads about
 	# 2 LU lower, so read the capture's camera line before believing a number.

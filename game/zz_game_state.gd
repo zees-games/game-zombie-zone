@@ -71,7 +71,7 @@ const SERVICE := &"zz_game"
 
 ## Where a host that runs this game with no server (the client shell's Solo play) publishes
 ## the map packs it mounted for it. See [method solo_map_dirs].
-const SOLO_SERVICE := &"dot_solo"
+const SOLO_SERVICE := &"gs_solo"
 
 ## Snapshots a second. A crowd running at you is what a client is reading.
 const NET_SNAPSHOT_RATE := 30
@@ -79,7 +79,7 @@ const NET_SNAPSHOT_RATE := 30
 ## How far a position may be from the origin, in metres, on the wire. Both ends read it here.
 const NET_WORLD_EXTENT := 1024.0
 
-## The two sides, as dot-combat and dot-match see them. Only one has players.
+## The two sides, as gs-combat and gs-match see them. Only one has players.
 const SURVIVORS := 1
 const INFECTED := 2
 
@@ -192,14 +192,14 @@ var config_binder: GSGameConfigBinder = null
 var flashlight_config: GSFlashlightConfig = null
 var flashlight_binder: GSGameConfigBinder = null
 
-## The runtime layer the workbench edits through (the config set and dot-team's noblock kind); made on demand.
+## The runtime layer the workbench edits through (the config set and gs-team's noblock kind); made on demand.
 var profile_runtime: GSProfileRuntime = null
 
 ## The actor of an edit made on the process itself: the server console, or offline play.
 const LOCAL_ACTOR := &"__local"
 
 
-## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
+## gs-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`. They feed [member body_rules]'s `pair_fn`.
 var block_rules: Object = null:
 	set(value):
 		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
@@ -222,7 +222,7 @@ var world_key_fn: Callable = Callable()
 var map: ZzMap = null
 var catalogue: ZzCatalogue = null
 
-## Where subscribed Workshop maps are read from; null is dot-core's shared index. A test gives its own.
+## Where subscribed Workshop maps are read from; null is gs-core's shared index. A test gives its own.
 var content_index: GSContentIndex = null
 var props_catalogue: ZzProps = null
 var combat: GSCombatManager = null
@@ -231,7 +231,7 @@ var combat: GSCombatManager = null
 var ammo_types: GSWeaponAmmoTypes = _load_ammo_types()
 
 ## `func(player_id: StringName) -> bool`: whether a survivor may be hurt now, assigned by the
-## module from dot-game's `can_peer_be_harmed`. Unset offline, and a stand-in is never loading.
+## module from gs-game's `can_peer_be_harmed`. Unset offline, and a stand-in is never loading.
 var harm_gate: Callable = Callable()
 var match_node: GSMatch = null
 var random: GSRandomManager = null
@@ -290,13 +290,13 @@ var _box_set: GSProfileSet = null
 ## player id -> [ZzPlayer].
 var players: Dictionary = {}
 
-## dot-player-controller's `mp_forceview` (may a player switch to third person) and
+## gs-player-controller's `mp_forceview` (may a player switch to third person) and
 ## `mp_solidplayers` (do survivors and stand-ins block each other). Bound by the module
 ## (REPLICATED) and followed by a client through its link.
 var view_rules: GSPlayerViewRules = GSPlayerViewRules.new()
 var body_rules: GSPlayerBodyRules = GSPlayerBodyRules.new()
 
-## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
+## `sv_falldamage*`: landing hard hurts. On in this game (gs-combat's default is off); the
 ## server applies it through [member combat], a client never does.
 var fall_rules: GSFallDamageRules = _make_fall_rules()
 
@@ -311,7 +311,7 @@ var footing: ZzFooting = ZzFooting.new()
 ## (REPLICATED) and followed by a client, which predicts its own player under it.
 var crawl_rules: ZzCrawlRules = ZzCrawlRules.new()
 
-## dot-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the
+## gs-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the
 ## module (REPLICATED), followed by the client's overlay. Auto-fire is allowed here, so a touch player starts with it.
 var mobile_rules: GSMobileRules = _make_mobile_rules()
 
@@ -332,10 +332,10 @@ var downed_rules: GSDownedRules = GSDownedRules.new()
 ## per process, so a client in the same process as its server adopts the server's rather than sharing them.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 
-## The view model's motion amounts: zee-dot-weapons' `mp_vm_*` cvars and `cl_vm_kick` (REPLICATED). The client's view model is handed this object, so one cvar change reaches the drawn hands.
+## The view model's motion amounts: zee-gs-weapons' `mp_vm_*` cvars and `cl_vm_kick` (REPLICATED). The client's view model is handed this object, so one cvar change reaches the drawn hands.
 var feel_rules: ZeeViewFeel = ZeeViewFeel.new()
 
-## Movement-dependent spread, recoil patterns, sprint and stamina (`sv_spread*`, `sv_recoil*`, `sv_sprint*`, `sv_stamina*`, REPLICATED, on here) and the `cl_crosshair_*` cvars: dot-game's opt-in.
+## Movement-dependent spread, recoil patterns, sprint and stamina (`sv_spread*`, `sv_recoil*`, `sv_sprint*`, `sv_stamina*`, REPLICATED, on here) and the `cl_crosshair_*` cvars: gs-game's opt-in.
 var combat_feel: GSGameCombatFeel = GSGameCombatFeel.new(true)
 
 ## The `zz_water*` settings: how survivors wade, swim and drown, and how the horde wades. The
@@ -351,15 +351,15 @@ var end_camera_rules: ZzEndCameraRules = ZzEndCameraRules.new()
 ## what a voteban and a ban do.
 var team_damage: ZzTeamDamage = ZzTeamDamage.new()
 
-## What a dead body does and which death reactions the server allows: dot-player-char's `sv_ragdoll*` cvars,
+## What a dead body does and which death reactions the server allows: gs-player-char's `sv_ragdoll*` cvars,
 ## bound by the module (REPLICATED) and followed by a client through its link. One set for survivors and zombies.
 ## A body lies [constant CORPSE_SECONDS] by default.
 var ragdoll_rules: GSPlayerRagdollRules = _corpse_rules()
 
-## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
+## gs-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: GSPropBodyRules = GSPropBodyRules.new()
-## The harm a barrel does by rolling into a survivor (dot-props); server only.
+## The harm a barrel does by rolling into a survivor (gs-props); server only.
 var rolling := GSPropRolling.new()
 ## The zombies' own scan: a separate cooldown clock from the survivors'.
 var rolling_zombies := GSPropRolling.new()
@@ -479,7 +479,7 @@ var hold_clock: Callable = Callable()
 
 
 ## Console, chat and map-menu handlers that build the map or ask the physics space wait here for
-## the next tick (dot-physics' GSTickGate). Armed by ZzModule on a server; solo leaves it open.
+## the next tick (gs-physics' GSTickGate). Armed by ZzModule on a server; solo leaves it open.
 var tick_gate := GSTickGate.new()
 
 
@@ -495,7 +495,7 @@ var _horde_owed: int = 0
 var horde_frame_us: int = 0
 
 
-## A blast's speed at its centre, m/s to a toy (dot-props' `blast`).
+## A blast's speed at its centre, m/s to a toy (gs-props' `blast`).
 const TOY_BLAST_SPEED := 12.0
 
 
@@ -506,7 +506,7 @@ static func _load_ammo_types() -> GSWeaponAmmoTypes:
 
 
 ## The stock rules with the game's corpse time: a horde dies by the dozen, and a body lying ten
-## seconds (dot-player-char's default) kept the floor of a survival wave covered.
+## seconds (gs-player-char's default) kept the floor of a survival wave covered.
 static func _corpse_rules() -> GSPlayerRagdollRules:
 	var rules := GSPlayerRagdollRules.new()
 	rules.lifetime = CORPSE_SECONDS

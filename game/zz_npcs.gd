@@ -261,7 +261,7 @@ static func _mutant(c: ZzConfig) -> GSNpcDef:
 	return def
 
 ## The oil monster: slides, leaves a trail, spits goo that blinds and pools. `goo_*` keys are the spit's puddle, `trail_*` the trail's
-## (dot-effects' GSHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
+## (gs-effects' GSHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
 static func _oil_monster(c: ZzConfig) -> GSNpcDef:
 	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, GSNpcDef.Weight.HEAVY)
 	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).

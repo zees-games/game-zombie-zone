@@ -1,6 +1,6 @@
 extends RefCounted
 
-## ZZ's carry-weight rules: one [GSWeaponCarry] (dot-weapon owns the logic) fed from `zz_weight_*` and from the boxes.
+## ZZ's carry-weight rules: one [GSWeaponCarry] (gs-weapon owns the logic) fed from `zz_weight_*` and from the boxes.
 ##
 ## The server's carry refuses and drops; a client's ([member mirror]) only stows several weapons
 ## per slot like the server, because the weights it shows come from the server's CARRY event.

@@ -21,7 +21,7 @@ const CHANNEL := "zz.props"
 
 const CATALOGUE := "res://props/catalogue.json"
 
-## The part-shaped collision `tools/measure_props.gd` cuts out of the models with dot-props'
+## The part-shaped collision `tools/measure_props.gd` cuts out of the models with gs-props'
 ## [GSPropPieces]: a tree as a trunk, branches and leaf clumps, a table as a top and legs. A
 ## prop not in it collides as its box. The zombies' graph still goes round the box.
 const PIECES := "res://props/pieces.json"

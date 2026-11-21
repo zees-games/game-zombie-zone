@@ -2,7 +2,7 @@ extends GSBotNav
 
 ## [GSBotNav] that bakes a map too big for one Recast grid in tiles and joins them into one mesh. Godot's baker refuses a bake whose cell grid is over 30 million cells ("suspiciously big") while `navigation/baking/use_crash_prevention_checks` is on, and one Recast poly mesh holds under 65535 vertices. At ZZ's 0.1016 m cell (the survivors' radius in exactly 4 cells) rp_southside, rp_asheville, gm_boreas, gm_vyten,
 ## gm_bigisland and gm_valley are over the first, and a wider cell still baked nothing on rp_southside (the second). So such a map is baked at the same cell in square tiles, each with a border of cells around it the way Recast's tiled meshes are (its regions end exactly on the tile line), and the tiles are joined: the vertices two tiles share on a line are welded, and a tile's edge along the line is split at the other
-## side's vertices, so every seam is a shared edge, the navigation server connects it, and the annotator sees one floor. A map within the budget bakes exactly as before (one grid, same mesh, same cache file). Nothing is clamped: a tile size the engine would refuse, or a negative one, fails the bake saying so. A tiled bake in dot-bot itself would let this override go (nightly dotbot-nav-max-cells-1).
+## side's vertices, so every seam is a shared edge, the navigation server connects it, and the annotator sees one floor. A map within the budget bakes exactly as before (one grid, same mesh, same cache file). Nothing is clamped: a tile size the engine would refuse, or a negative one, fails the bake saying so. A tiled bake in gs-bot itself would let this override go (nightly gsbot-nav-max-cells-1).
 
 const LOG := "zz.nav"
 

@@ -4,9 +4,9 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzMap := preload("../game/zz_map.gd")
 const ZzPaths := preload("../game/zz_paths.gd")
-const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.gd")
+const MapThreads := preload("res://addons/gs_game/runtime/gs_game_map_threads.gd")
 
-## A drawn world awaits dot-map's texture prefetch without stopping the main thread: the map reaches "built" with frames advancing, and a baked
+## A drawn world awaits gs-map's texture prefetch without stopping the main thread: the map reaches "built" with frames advancing, and a baked
 ## texture is preferred when present, a plain decode otherwise. `godot --headless --path . res://examples/headless_prefetch.tscn`
 
 const MAP := &"zm_lila_panic"
@@ -32,7 +32,7 @@ func _run() -> void:
 func _test_world() -> void:
 	_entered += 1
 	if not ZzMap.can_draw_world() or not FileAccess.file_exists(ZzPaths.rebase(ZzMap.LOCAL_WORLD % ["zz_world_zm_lila_panic", String(MAP)]) + ".json"):
-		print("SKIPPED: %s's world is not linked (run dot-bootstrap)" % MAP)
+		print("SKIPPED: %s's world is not linked (run gs-bootstrap)" % MAP)
 		_checks -= 6
 		_finished += 1
 		return
@@ -105,7 +105,7 @@ func _test_baked() -> void:
 	var img := Image.create(64, 64, false, Image.FORMAT_RGB8)
 	img.fill(Color(0.8, 0.3, 0.1))
 	var _saved := img.save_png(png)
-	var surfaces := GSMapSurfaces.new("res://addons/dot_map/surfaces")
+	var surfaces := GSMapSurfaces.new("res://addons/gs_map/surfaces")
 	var variant := GSMapSurfaces.baked_variant()
 	_check(surfaces.call(&"_baked_texture", png) == null, "with no baked file the plain decode is used")
 	var baked := GSMapTextureBake.bake_file(png, dir.path_join("albedo"), 0)

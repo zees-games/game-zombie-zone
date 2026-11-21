@@ -15,7 +15,7 @@ const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 const ZzNavMeter := preload("zz_nav_meter.gd")
 
 ## What a survivor needs on screen, and nothing that would make a dark street less dark. [codeblock] bottom left your health: real health green, borrowed health white over it; down, a red bleed bar and how many downs are left; your medkit and pills left the team: each name, their health, and whether they are up, down, held or dead bottom right what you are holding and how much is in it top the objective, a hold-out's clock, a survival map's clock centre the crosshair, what E would do, the bar of what
-## you are holding E for, and the bar of somebody picking you up right what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12") over it all which way a hit came from; bile, a flash, fire, the last-life grey [/codeblock] [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the action is on NOW, from the same table the menu's Controls page edits. [b]The glance pieces are dot-ui's[/b]: health is a [GSVitals] (borrowed health as its `bonus`, DOWN and DEAD as
+## you are holding E for, and the bar of somebody picking you up right what the boxes are doing to the game, stacked ("Horde frenzy x4 1:12") over it all which way a hit came from; bile, a flash, fire, the last-life grey [/codeblock] [b]The keys are read from the bindings, not written here.[/b] Every prompt says the key the action is on NOW, from the same table the menu's Controls page edits. [b]The glance pieces are gs-ui's[/b]: health is a [GSVitals] (borrowed health as its `bonus`, DOWN and DEAD as
 ## its `status`), the weapon a [GSAmmoCounter] (an endless reserve as ∞), a hold-out's or a survival map's clock a [GSScoreStrip] under the title, the medkit and pills [GSKeyHints], and every hit the server confirms a [GSHitMarker] and a [GSDamageNumbers] number on the body. The number on the health plate is real health; the borrowed part is the white length after it, which drains, and a number that included it would fall on its own while nobody was hitting you.
 
 const BLIND_FADE_SEC := 0.25
@@ -46,9 +46,9 @@ static func piece_theme() -> Theme:
 	t.set_color(&"good", type, HEALTH_COLOUR)
 	return t
 
-## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the theme on the HUD's root now and at
+## The Escape menu, whose theme this HUD follows (gs-menu's `follow_hud`): the menu sets the theme on the HUD's root now and at
 ## every theme change, and applies the player's HUD size. A play test asked for a darker HUD a player
-## can restyle in the menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
+## can restyle in the menu. Duck-typed and called by name, for a client shell older than gs-menu 7.
 var _menu: Object = null
 
 func follow_menu(menu: Object) -> void:
@@ -59,7 +59,7 @@ func _follow() -> void:
 	if _root != null and _menu != null and _menu.has_method(&"follow_hud"):
 		_menu.call(&"follow_hud", _root, piece_theme())
 
-## The player's `cl_hud_show_<element>` switches (dot-ui's [GSHudElementCvars]; `cl_hud_scale` is
+## The player's `cl_hud_show_<element>` switches (gs-ui's [GSHudElementCvars]; `cl_hud_scale` is
 ## the menu's own HUD size, so it is not registered). The pieces below are attached in [method _attach_elements].
 var elements := GSHudElementCvars.new()
 
@@ -216,8 +216,8 @@ var aim_fraction: float = 0.0
 
 var _scoped: bool = false
 
-## Whether the host's dot-ui has `GSCrosshair.opacity_for_aim` (API 5).
-var _fades: bool = GSAddonApi.build_level("dot_ui") >= 5
+## Whether the host's gs-ui has `GSCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = GSAddonApi.build_level("gs_ui") >= 5
 
 var _bile: ColorRect = null
 

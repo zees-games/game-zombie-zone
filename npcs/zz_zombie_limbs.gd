@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The wiring of a zombie's shootable limbs (dot-npc's GSNpcLimbs): which limbs a kind has, where
+## The wiring of a zombie's shootable limbs (gs-npc's GSNpcLimbs): which limbs a kind has, where
 ## they sit on the body as drawn, and the view that cuts them off. No class_name (a mounted pack
 ## cannot register one); callers preload it.
 
@@ -10,8 +10,8 @@ const ZzZombieView := preload("zz_zombie_view.gd")
 const BASE := &"zombie"
 
 
-## The zone a limb belongs to when a shot lands on it, as dot-combat's [GSHitGroup] ids. Under `mp_hitzones` 0
-## dot-combat folds knee and foot into leg, hand into arm (GSHitzone.coarse), so these never change damage then.
+## The zone a limb belongs to when a shot lands on it, as gs-combat's [GSHitGroup] ids. Under `mp_hitzones` 0
+## gs-combat folds knee and foot into leg, hand into arm (GSHitzone.coarse), so these never change damage then.
 const LIMB_ZONE := {&"head": GSHitGroup.HEAD, &"armL": GSHitGroup.ARM, &"armR": GSHitGroup.ARM,
 	&"legL": GSHitGroup.LEG, &"legR": GSHitGroup.LEG}
 ## Fractions of body height (from the feet): below FOOT is foot, FOOT to KNEE_TOP a shin or knee band is knee.

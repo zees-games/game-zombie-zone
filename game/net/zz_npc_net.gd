@@ -4,9 +4,9 @@ const ZzZombieBody := preload("../../npcs/zz_zombie_body.gd")
 
 ## A zombie over the wire: where it is, which way it faces, how hurt it is, what it is doing.
 ##
-## dot-npc's [GSNpcNetSync] fields, plus the two this game needs to draw one: the animation
+## gs-npc's [GSNpcNetSync] fields, plus the two this game needs to draw one: the animation
 ## state ([member ZzZombieBody.anim]) and the flags (burning, enraged, startled). Server
-## authoritative and never predicted, for dot-npc's reason: a zombie's position comes out of a
+## authoritative and never predicted, for gs-npc's reason: a zombie's position comes out of a
 ## graph, a brain and a crowd, none of which a client could reproduce, so the client draws it
 ## a few ticks in the past and is never corrected.
 ##

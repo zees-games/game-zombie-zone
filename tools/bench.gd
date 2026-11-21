@@ -23,19 +23,19 @@ var _profiler: Node = null
 ## --ab-reuse=N (with --profile): every 64 ticks every brain's `path_reuse_thoughts` flips between 0 and N, and
 ## h.brains/h.bodies are summed per arm, so both arms run in one process on one box (AB lines).
 var _ab_reuse := -1
-## --ab-native (with --profile): every 64 ticks the horde's crowd grid flips between the script (0) and dot-sim's
+## --ab-native (with --profile): every 64 ticks the horde's crowd grid flips between the script (0) and gs-sim's
 ## `GSSimCrowdGrid` (1) through `ZzConfig.native_crowd`; h.grid, h.brains and h.bodies are summed per arm (AB lines).
 var _ab_native := false
 ## --crowd-parity (with --profile): every tick the live crowd grid's entries are copied into a fresh script grid and a
 ## fresh native one, and every zombie's spacing push and two neighbour queries are asked of all three (PARITY line).
 var _crowd_parity := false
-## --ab-senses (with --profile): every 64 ticks the horde's senses flip between the script (0) and dot-sim's
+## --ab-senses (with --profile): every 64 ticks the horde's senses flip between the script (0) and gs-sim's
 ## `GSSimSenses` (1) through `ZzConfig.native_senses`; h.senses is summed per arm (AB lines).
 var _ab_senses := false
 ## --senses-verify (with --profile): every perception pass runs native and script and counts the NPCs whose
 ## target or timestamps differ (PARITY senses line); the script's answers are the ones kept.
 var _senses_verify := false
-## --ab-brains (with --profile): every 64 ticks the zombies' brains flip between the script (0) and dot-sim's
+## --ab-brains (with --profile): every 64 ticks the zombies' brains flip between the script (0) and gs-sim's
 ## `GSSimZombieBrains` (1) through `ZzConfig.native_brains`; h.brains is summed per arm (AB lines).
 var _ab_brains := false
 ## --brains-verify (with --profile): every native chase choice, barricade check, nearest survivor and spaced heading is
@@ -52,24 +52,24 @@ var _ab_pacing := false
 var _pacing_verify := false
 var _abp_us := {}
 var _abp_ticks := {}
-## --ab-walk (with --profile): every 64 ticks the zombie steer flips between dot-sim's `steer_step` (0, the brain's
+## --ab-walk (with --profile): every 64 ticks the zombie steer flips between gs-sim's `steer_step` (0, the brain's
 ## watch read through Object.get) and `steer_walk` (1, the watch passed in); h.brains is summed per arm (AB lines).
 var _ab_walk := false
 var _abw_us := {}
 var _abw_ticks := {}
 ## --ab-move (with --profile): every 64 ticks the zombie move flips between the script's path step plus `steer_walk`
-## (0) and dot-sim's `walk` (1, the path step and the steer in one call); h.brains is summed per arm (AB lines).
+## (0) and gs-sim's `walk` (1, the path step and the steer in one call); h.brains is summed per arm (AB lines).
 var _ab_move := false
 var _abm_us := {}
 var _abm_ticks := {}
 ## --ab-decide (with --profile): every 64 ticks the commons' chase choice, barricade check and nearest survivor flip
-## between the script (0) and dot-sim's `chase`, `barricade_in_way` and `nearest` (1); h.brains is summed per arm.
+## between the script (0) and gs-sim's `chase`, `barricade_in_way` and `nearest` (1); h.brains is summed per arm.
 var _ab_decide := false
 var _abd_us := {}
 var _abd_ticks := {}
 var _abs_us := {}
 var _abs_ticks := {}
-## --ab-store (with --profile): every 64 ticks the zombie move flips between dot-sim's by-value `walk`/`steer_walk`
+## --ab-store (with --profile): every 64 ticks the zombie move flips between gs-sim's by-value `walk`/`steer_walk`
 ## (0, the turn and watch handed across each call) and the native store's `walk_stored`/`steer_stored`/`face_stored`
 ## (1); h.brains is summed per 64-tick window and the pairs' difference printed (AB store line).
 var _ab_store := false
@@ -129,22 +129,22 @@ func _read_args() -> void:
 		elif arg == "--ab-walk":
 			_ab_walk = true
 			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"steer_walk"):
-				push_error("bench: --ab-walk needs a dot-sim build with GSSimZombieBrains.steer_walk")
+				push_error("bench: --ab-walk needs a gs-sim build with GSSimZombieBrains.steer_walk")
 				get_tree().quit(1)
 		elif arg == "--ab-move":
 			_ab_move = true
 			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"walk"):
-				push_error("bench: --ab-move needs a dot-sim build with GSSimZombieBrains.walk")
+				push_error("bench: --ab-move needs a gs-sim build with GSSimZombieBrains.walk")
 				get_tree().quit(1)
 		elif arg == "--ab-store":
 			_ab_store = true
 			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"walk_stored"):
-				push_error("bench: --ab-store needs a dot-sim build with GSSimZombieBrains.walk_stored")
+				push_error("bench: --ab-store needs a gs-sim build with GSSimZombieBrains.walk_stored")
 				get_tree().quit(1)
 		elif arg == "--ab-decide":
 			_ab_decide = true
 			if not ClassDB.class_has_method(&"GSSimZombieBrains", &"chase"):
-				push_error("bench: --ab-decide needs a dot-sim build with GSSimZombieBrains.chase")
+				push_error("bench: --ab-decide needs a gs-sim build with GSSimZombieBrains.chase")
 				get_tree().quit(1)
 		elif arg == "--pacing-verify":
 			_pacing_verify = true
@@ -740,7 +740,7 @@ func _report(draws: PackedInt32Array, objects: PackedInt32Array, prims: PackedIn
 	_print_perf(game, cols[0], mean.call(cols[1]), mean.call(as_f.call(draws)), p)
 
 
-## The line tools/perf_budget.sh compares (dot-game/tools): frame percentiles of the measured window, seconds until
+## The line tools/perf_budget.sh compares (gs-game/tools): frame percentiles of the measured window, seconds until
 ## a round is running, peak resident memory, GPU name, and the game's own physics, draw and node numbers.
 func _print_perf(game: ZzGame, wall: PackedFloat64Array, phys_ms: float, draws: float, pct: Callable) -> void:
 	var rss_kb := 0

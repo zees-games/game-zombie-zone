@@ -1,4 +1,4 @@
-extends "res://addons/dot_npc_ai/runtime/dot_npc_ai_brain.gd"
+extends "res://addons/gs_npc_ai/runtime/gs_npc_ai_brain.gd"
 ## The movement half of every zombie's mind (`zz_zombie_brain.gd` extends this): the horde it reports to, the body it
 ## moves, and the steering overrides (a wish written for the body, the crowd's spacing, and the native brains' steer
 ## step with its `brains_verify` check). Split out so each half stays a size a reader can hold.
@@ -10,18 +10,18 @@ const CHANNEL := "zz.zombie_brain"
 const HORDE_META := &"zz_horde"
 
 var _horde: Object = null
-## Whether the horde's dot-sim has [code]steer_walk[/code] (-1 until asked; one library a process).
+## Whether the horde's gs-sim has [code]steer_walk[/code] (-1 until asked; one library a process).
 static var _steer_walks: int = -1
-## Whether the horde's dot-sim has [code]walk[/code], the whole move in one call (-1 until asked; 0 also turns it off,
+## Whether the horde's gs-sim has [code]walk[/code], the whole move in one call (-1 until asked; 0 also turns it off,
 ## as `tools/bench.gd --ab-move` does).
 static var _walks: int = -1
-## Whether the horde's dot-sim decides too: [code]chase[/code] (the commons' whole chase choice), [code]nearest[/code]
+## Whether the horde's gs-sim decides too: [code]chase[/code] (the commons' whole chase choice), [code]nearest[/code]
 ## and [code]barricade_in_way[/code] (-1 until asked; 0 also turns them off, as `tools/bench.gd --ab-decide` does).
 static var _decides: int = -1
-## What [method _walk] hands dot-sim, kept so a move fills them in place rather than building them.
+## What [method _walk] hands gs-sim, kept so a move fills them in place rather than building them.
 var _walk_s := PackedFloat64Array()
 var _walk_n := PackedInt64Array()
-## Whether the horde's dot-sim keeps each zombie's turn and progress watch in its own store between thinks
+## Whether the horde's gs-sim keeps each zombie's turn and progress watch in its own store between thinks
 ## ([code]GSSimZombieBrains.store_put[/code], then [code]walk_stored[/code], [code]steer_stored[/code] and
 ## [code]face_stored[/code] read and write them there): -1 until asked; 0 also turns it off, as
 ## `tools/bench.gd --ab-store` does.
@@ -31,7 +31,7 @@ static var _stores: int = -1
 var _stored_in: Object = null
 ## The character whose turn state is in the store (another character is put afresh).
 var _stored_char: GSNpcAiCharacter = null
-## What [method _store_in] and [method _walk_stored] hand dot-sim, kept so they fill in place.
+## What [method _store_in] and [method _walk_stored] hand gs-sim, kept so they fill in place.
 var _store_s := PackedFloat64Array()
 var _walk_stored_s := PackedFloat64Array()
 var _walk_stored_n := PackedInt64Array()
@@ -76,7 +76,7 @@ func steer_toward(to: Vector3, speed: float, _delta: float) -> void:
 
 
 ## Overridden: while the turn is in the native store ([member _stored_in]) it turns there, in one call
-## ([code]face_stored[/code], dot-npc-ai's [code]face[/code] to the bit); anywhere else the store is taken back first.
+## ([code]face_stored[/code], gs-npc-ai's [code]face[/code] to the bit); anywhere else the store is taken back first.
 func face(direction: Vector3) -> void:
 	if _stored_in != null:
 		var h := horde()
@@ -185,7 +185,7 @@ func neighbours(radius: float) -> Array:
 	return h.call(&"neighbour_positions", npc, radius * 2.0)
 
 
-## [method steer_with_spacing]'s heading (seek, crowd push, blend) in one call to dot-sim's
+## [method steer_with_spacing]'s heading (seek, crowd push, blend) in one call to gs-sim's
 ## `GSSimCrowdGrid.spaced_direction` while the horde's brains and crowd are both native; the script otherwise,
 ## and beside it under the horde's `brains_verify`, whose answer is then the one used.
 func _spaced_direction(here: Vector3, goal: Vector3, spacing: float) -> Vector3:
@@ -225,7 +225,7 @@ func separation(here: Vector3, spacing: float, right: Vector3) -> Vector3:
 	return grid.separation(own, here, spacing, spacing * 2.0, right)
 
 
-## dot-npc-ai's steer in one native call: the whole move ([code]GSSimZombieBrains.walk[/code], path then steer) when
+## gs-npc-ai's steer in one native call: the whole move ([code]GSSimZombieBrains.walk[/code], path then steer) when
 ## the path is not due, else everything after the path ([code]steer_walk[/code], else [code]steer_step[/code]). The
 ## script ([method _steer_rest]) is the fallback, and under [code]brains_verify[/code] each native answer is checked.
 func steer_with_spacing(to: Vector3, speed: float, delta: float, spacing: float = 1.6) -> void:
@@ -299,7 +299,7 @@ func _steer_from(h: Object, b: ZzZombieBody, brains: Object, grid: Object, goal:
 		_progress_since = now
 
 
-## The whole move in one [code]GSSimZombieBrains.walk[/code]: dot-npc-ai's [code]_steer_goal[/code] (dot-npc's
+## The whole move in one [code]GSSimZombieBrains.walk[/code]: gs-npc-ai's [code]_steer_goal[/code] (gs-npc's
 ## [code]path_toward[/code]: its repath test and the path's advance) and then the steer, with the brain's, character's,
 ## path's and spawner's members handed in by value and the answer written back here. Only where the script's own
 ## [code]_steer_goal[/code] is exactly [code]path_toward[/code] (a nav graph and a path, no scheduler, no path reuse);
@@ -425,7 +425,7 @@ func _walk_apply(p: GSNpcPath, b: ZzZombieBody, out: PackedFloat64Array, goal: V
 
 
 ## [method _walk_native] with the turn and watch in the native store ([code]walk_stored[/code]): only the move's own
-## inputs are handed in, and dot-sim writes the turn, the watch and the look itself. False (nothing done) when the
+## inputs are handed in, and gs-sim writes the turn, the watch and the look itself. False (nothing done) when the
 ## store has no entry or no repath tuning, the store then taken back and the caller walking as before.
 func _walk_stored(h: Object, b: ZzZombieBody, brains: Object, grid: Object, p: GSNpcPath, sp: GSNpcSpawner,
 		to: Vector3, speed: float, delta: float, spacing: float, now: float) -> bool:
@@ -532,7 +532,7 @@ func _verify_stored_walk(h: Object, b: ZzZombieBody, brains: Object, grid: Objec
 	h.call(&"brains_tally", same)
 
 
-## dot-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.
+## gs-npc-ai's [code]steer_with_spacing[/code] after its [code]_steer_goal[/code], as the script runs it.
 func _steer_rest(goal: Vector3, to: Vector3, speed: float, delta: float, spacing: float) -> void:
 	var here := npc.position()
 	var direction := _spaced_direction(here, goal, spacing)

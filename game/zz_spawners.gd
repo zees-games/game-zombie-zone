@@ -4,10 +4,10 @@ const ZzLoot := preload("zz_loot.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzPaths := preload("zz_paths.gd")
 
-## The map's weapon and supply spawners: dot-weapon's [GSWeaponSpawner] driving [ZzLoot].
+## The map's weapon and supply spawners: gs-weapon's [GSWeaponSpawner] driving [ZzLoot].
 ##
 ## The sources of what lies on a map, all through the one spawner: the document's `spawners`, the converted world's `pickups` (weapon_*, item_*, ammo_* entities, mapped by the config's `classes:`), the config's per-map `game: spawners:` list (same fields as the document's), and traders (`traders` in the document or the config's `game: traders:`; a shelf of priced stock rolled from a pool).
-## A map document lists `spawners` (`{at, id?, pool?, tags_any?, respawn?, max?, kind?, item?...}`, the fields of dot-weapon's docs/spawners.md); pools, defaults and per-map blocks are `cfg/game/game-zombie-zone/dot_weapon/spawner.yml`, and `spawner_*` keys in a map's dot_map file. Each spawned item is an ordinary loot entry, so the wire, the look-and-press use and the HUD are unchanged; using or removing the entry is what starts the respawn timer.
+## A map document lists `spawners` (`{at, id?, pool?, tags_any?, respawn?, max?, kind?, item?...}`, the fields of gs-weapon's docs/spawners.md); pools, defaults and per-map blocks are `cfg/game/game-zombie-zone/gs_weapon/spawner.yml`, and `spawner_*` keys in a map's gs_map file. Each spawned item is an ordinary loot entry, so the wire, the look-and-press use and the HUD are unchanged; using or removing the entry is what starts the respawn timer.
 
 const CHANNEL := "zz.spawners"
 const GAME_ID := "game-zombie-zone"

@@ -1,6 +1,6 @@
 extends GSAmbienceRules
 
-## The `zz_ambient*` cvars: dot-audio's rules under this game's prefix.
+## The `zz_ambient*` cvars: gs-audio's rules under this game's prefix.
 
 
 func _init() -> void:

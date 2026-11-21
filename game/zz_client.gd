@@ -1,7 +1,7 @@
 extends "zz_client_ending.gd"
 
 const ZzViewGrip := preload("zz_view_grip.gd")
-const ScopePrefs := preload("res://addons/dot_weapon/view/dot_weapon_scope_prefs.gd")
+const ScopePrefs := preload("res://addons/gs_weapon/view/gs_weapon_scope_prefs.gd")
 
 
 func _ready() -> void:
@@ -342,7 +342,7 @@ func _fill_offline_team() -> void:
 		next += 1
 
 
-## A solo stand-in's name: the server's list, through dot-bot's pick, so solo and a server
+## A solo stand-in's name: the server's list, through gs-bot's pick, so solo and a server
 ## name them alike.
 static func _bot_name(index: int) -> String:
 	var taken: Array = []
@@ -351,7 +351,7 @@ static func _bot_name(index: int) -> String:
 	return GSBotNames.pick(taken, index, ZzBots.BOT_NAMES)
 
 
-## dot-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
+## gs-team's block rules followed from the server, and the F9 tuning panel where this process hosts the game.
 func _add_noblock_and_workbench() -> void:
 	if game == null:
 		return
@@ -1058,7 +1058,7 @@ func _on_hurt(amount: float, from: Vector3) -> void:
 		hud.hurt_from(from, amount)
 
 
-## The player's blood setting trims what is drawn (dot-npc's GSNpcGore.view_cap): off keeps clean stumps only. What comes off is the server's rule.
+## The player's blood setting trims what is drawn (gs-npc's GSNpcGore.view_cap): off keeps clean stumps only. What comes off is the server's rule.
 func _apply_gore_pref() -> void:
 	GSNpcGore.view_cap = GSNpcGore.MAX_LEVEL if settings.settings.get_bool(&"gore", true) else GSNpcGore.STUMPS
 
@@ -1327,7 +1327,7 @@ func _place_camera() -> void:
 
 		return
 
-	# dot-core's boom, swept from the eye with the height above it added in the world's up:
+	# gs-core's boom, swept from the eye with the height above it added in the world's up:
 	# a pivot raised above the head can itself be inside a beam, and the spring arm it
 	# replaced cast a ray from there and snapped to whatever it hit.
 	_arm = GSCameraBoom.new()
@@ -1418,7 +1418,7 @@ func _build_touch() -> void:
 	if GSPlatform.has_touch():
 		hud.shift_weight_left(_touch.weight_shift())
 		hud.lift_plate(_touch.plate_lift())
-		# dot-game's GSGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
+		# gs-game's GSGameScreenFit sizes the buttons from the DPI (44 real px at least) and keeps them sized on resize.
 		if platform != null and platform.has_method(&"fit_touch_buttons"):
 			var _scale: Variant = platform.call(&"fit_touch_buttons", _touch.get(&"buttons"), _touch.layout())
 
@@ -1519,7 +1519,7 @@ func _build_settings() -> void:
 	platform.look_position_fn = _look_position
 	platform.board_snapshot_fn = board_snapshot
 	# M: the map list. Solo a choice changes the map here at once; connected the server decides,
-	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (dot-vote's
+	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (gs-vote's
 	# map menu, wired in [ZzModule]).
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> GSResult: return game.change_map_now(id)
@@ -2181,7 +2181,7 @@ func _drive_spectator_camera(delta: float) -> bool:
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = false
 
-	# Chase and death cameras pulled out of the street by dot-spectate, given the level.
+	# Chase and death cameras pulled out of the street by gs-spectate, given the level.
 	var manager: GSSpectatorManager = game.spectate.manager
 	if manager != null and manager.camera_world == null:
 		manager.camera_world = camera.get_world_3d()
@@ -2248,7 +2248,7 @@ static func present_frame(
 		p_net.interpolate_frame(alpha)
 
 	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the clock stretches and shrinks its ticks while it settles on the server, so at the engine's fraction the eye stood still on one frame and moved double on the next.
-	# `GSFpsController.render_state` reads it from `render_clock` (dot-player-controller); by name both ways, so an older shell draws as before. Null offline, where every physics frame is one tick.
+	# `GSFpsController.render_state` reads it from `render_clock` (gs-player-controller); by name both ways, so an older shell draws as before. Null offline, where every physics frame is one tick.
 	if own != null and own.controller != null:
 		own.controller.set(&"render_clock", p_net.clock if networked else null)
 
@@ -2347,7 +2347,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif button.is_action(ZzBindings.AIM):
 			_aiming = button.pressed
 		elif button.pressed and _pointer_ours():
-			# The wheel, on dot-menu's previous/next weapon actions (rebindable).
+			# The wheel, on gs-menu's previous/next weapon actions (rebindable).
 			var _stepped := _wheel_pressed(event)
 
 	if player == null:
@@ -2522,7 +2522,7 @@ func describe() -> Dictionary:
 	return out
 
 
-## Where a roster row's player stands, for dot-game's look-to-gag key (G, K).
+## Where a roster row's player stands, for gs-game's look-to-gag key (G, K).
 func _look_position(row: Dictionary) -> Variant:
 	if game == null:
 		return null

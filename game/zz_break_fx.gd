@@ -1,6 +1,6 @@
 extends Node
 
-## Splinters where a barricade or a support gives way, drawn by dot-fx's GSFxBreak and following fx_quality.
+## Splinters where a barricade or a support gives way, drawn by gs-fx's GSFxBreak and following fx_quality.
 
 var break_fx: GSFxBreak = null
 

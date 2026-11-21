@@ -24,7 +24,7 @@ var zones: ZzUtilityZones = null
 var _flying: Dictionary = {}
 ## `{at, reach, until}` of each going-off grenade and burning fire: who [member zones] may hurt or blind.
 var _spots: Array[Dictionary] = []
-## hazard area id -> dot-npc sight blocker id, for the smoke clouds up
+## hazard area id -> gs-npc sight blocker id, for the smoke clouds up
 var _blockers: Dictionary = {}
 
 
@@ -95,9 +95,9 @@ func clear() -> void:
 		zones.call(&"clear")
 
 
-## True when dot-npc has the blind and sight-blocker hooks (API 6).
+## True when gs-npc has the blind and sight-blocker hooks (API 6).
 func has_senses() -> bool:
-	return GSAddonApi.build_level("dot_npc") >= 6 and game.horde != null and game.horde.senses != null
+	return GSAddonApi.build_level("gs_npc") >= 6 and game.horde != null and game.horde.senses != null
 
 
 ## `{position, normal}` of the first world hit on the segment, or empty.

@@ -252,7 +252,7 @@ func _serve_item_events() -> void:
 		game.possession.changed.connect(_on_possession_changed)
 
 
-## Hands dot-combat the rewind and restore callables that make lag compensation real: unset, it
+## Hands gs-combat the rewind and restore callables that make lag compensation real: unset, it
 ## resolves every shot against the present while the flag claims otherwise. The shooter is not excluded:
 ## `resolve_shot` fixes `shot.origin` before it rewinds, and the resolver refuses self damage.
 func _wire_lag_compensation() -> void:
@@ -288,7 +288,7 @@ func open_link(parent: Node) -> void:
 	GSGameLink.attach(link, parent, self, ZzNetLink.NODE_NAME)
 
 
-## How every dot-net message reaches a peer, routed by DELIVERY: snapshots on the unreliable call,
+## How every gs-net message reaches a peer, routed by DELIVERY: snapshots on the unreliable call,
 ## the rest reliable by direction (server events, client requests). Sending all as events silently
 ## drops every client request.
 func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
@@ -425,7 +425,7 @@ func _on_player_added(id: StringName) -> void:
 	if _behaviours.has(session_id):
 		return
 
-	# Every id on the wire is `u<session>`; anything else parses back to zero, dot-net's broadcast
+	# Every id on the wire is `u<session>`; anything else parses back to zero, gs-net's broadcast
 	# address, and a second such player would silently replace the first here. Refused with a line
 	# instead of accepted quietly.
 	if player_key(session_id) != id:
@@ -851,7 +851,7 @@ func _on_request(message: GSNetMessage) -> void:
 	if ask == null or net == null or not net.is_server:
 		return
 
-	# [b]From the message, which dot-net stamped from the TRANSPORT.[/b] A peer id inside a
+	# [b]From the message, which gs-net stamped from the TRANSPORT.[/b] A peer id inside a
 	# body is a claim; `sender_peer_id` is what the socket said, which is the only version
 	# of it a server may act on.
 	var peer_id := ask.sender_peer_id
@@ -1228,7 +1228,7 @@ func _splat_for_others(shooter: StringName, shooter_peer: int, point: Vector3) -
 		var _sent := splat(point, who.eye_position(), shooter_peer)
 
 
-## One peer, and never zero: `net.send(msg, 0)` is a BROADCAST in dot-net, so a missing peer id
+## One peer, and never zero: `net.send(msg, 0)` is a BROADCAST in gs-net, so a missing peer id
 ## passed straight through would send one player's private message to everybody.
 func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	if peer_id <= 0 or net == null or body.is_empty():
@@ -1665,7 +1665,7 @@ func _on_world_event_last(kind: int, reader: GSNetReader) -> void:
 # Zombies
 
 ## Seconds a zombie keeps being sent after it leaves a peer's radius: the time half of hysteresis
-## (dot-net's strategies have one radius), so a zombie pacing along the edge is not a spawn and a
+## (gs-net's strategies have one radius), so a zombie pacing along the edge is not a spawn and a
 ## despawn several times a second. Eight metres of walking at a common's pace.
 const ZOMBIE_LINGER_SEC := 3.0
 ## A client hides a mirror with no snapshot for this long (the server's radius is its own config,
@@ -1917,10 +1917,10 @@ func _adopt_tick_rate(rate: int) -> void:
 	# The LIVE one, which is built from the config back at `setup()` and is therefore not
 	# updated by writing the config alone.
 	net.clock.tick_rate = game.tick_rate
-	# dot-net API 7 has GSNetClock.adopt_tick_rate(), which also raises the engine's step cap to
+	# gs-net API 7 has GSNetClock.adopt_tick_rate(), which also raises the engine's step cap to
 	# a quarter second of ticks, so a slow-frame client keeps up with the server. A shell built
 	# before it gets the same rule here; remove this branch when the oldest shell is API 7.
-	if GSAddonApi.build_level("dot_net") >= 7:
+	if GSAddonApi.build_level("gs_net") >= 7:
 		GSNetClock.adopt_tick_rate(game.tick_rate)
 	else:
 		Engine.max_physics_steps_per_frame = maxi(Engine.max_physics_steps_per_frame, ceili(0.25 * float(game.tick_rate)))
@@ -2023,7 +2023,7 @@ func _release_toys() -> void:
 
 
 ## Client, on TOYS: a mirror for every id at once, under the holder, whether this end's toys exist yet.
-## A client must know every entity a snapshot carries: dot-net stops reading at the first unknown
+## A client must know every entity a snapshot carries: gs-net stops reading at the first unknown
 ## one, so a missing mirror froze every player after it. Paired with its toy by index once both are here.
 func _apply_toys(told: Dictionary) -> void:
 	if net == null or net.is_server:

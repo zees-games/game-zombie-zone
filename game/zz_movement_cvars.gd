@@ -2,7 +2,7 @@ extends RefCounted
 
 ## The shared movement cvar names (`sv_runspeed`, `sv_gravity`, `sv_walkspeed`, `sv_airaccelerate`) over [ZzConfig], which stays the one source of truth.
 ##
-## dot-game's `bind_movement_cvars` binds this through [method ZzGame.movement_targets]. zz builds a fresh `GSFpsTunables` per player from the config, so a write goes to the config and every player is re-tuned. Defaults are the config's own, so nothing changes until an operator sets one. `zz_gravity` and the config's other speeds are untouched.
+## gs-game's `bind_movement_cvars` binds this through [method ZzGame.movement_targets]. zz builds a fresh `GSFpsTunables` per player from the config, so a write goes to the config and every player is re-tuned. Defaults are the config's own, so nothing changes until an operator sets one. `zz_gravity` and the config's other speeds are untouched.
 
 const SOURCE_UNIT := 0.01905
 

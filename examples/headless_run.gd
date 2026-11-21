@@ -22,7 +22,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 ##
 ## [b]Counts sections AND checks, and the second is the one that matters.[/b] A script error
 ## inside a section aborts that function and the section counter is already satisfied,
-## because the section announced itself on the way in. dot-settings has the story.
+## because the section announced itself on the way in. gs-settings has the story.
 ##
 ## Every number about the map here is the built-in practice street's
 ## ([method ZzCatalogue.practice]), whose comment lists where everything is.
@@ -728,7 +728,7 @@ func _test_shots() -> void:
 	_finished()
 
 
-## dot-props' toys on the practice street: a survivor walking into the football sends it on, a
+## gs-props' toys on the practice street: a survivor walking into the football sends it on, a
 ## shot pushes the barrel it passes and the combat's trace sees straight through it (a toy is
 ## no cover), a pipe bomb throws the tyre, and a new map builds them all home again.
 func _test_toys() -> void:
@@ -858,7 +858,7 @@ func _test_supports() -> void:
 	_finished()
 
 
-## Ammo piles and boxes as rigid bodies (dot-props' crate toy, ZzCrates): pushed, thrown away from
+## Ammo piles and boxes as rigid bodies (gs-props' crate toy, ZzCrates): pushed, thrown away from
 ## a blast, shot, still usable where they came to rest, held static by the master cvar, capped.
 func _test_crates() -> void:
 	_section("ammo piles and boxes are physics crates")
@@ -1108,9 +1108,9 @@ func _test_ground_strike() -> void:
 	_finished()
 
 
-## Knees, feet, hands and the stomach are dot-combat zone ids on a zombie, and fold into leg, arm and chest with mp_hitzones 0.
+## Knees, feet, hands and the stomach are gs-combat zone ids on a zombie, and fold into leg, arm and chest with mp_hitzones 0.
 func _test_limb_zones() -> void:
-	_section("zombie limbs use dot-combat's zone ids (knee, foot, hand, stomach)")
+	_section("zombie limbs use gs-combat's zone ids (knee, foot, hand, stomach)")
 	const L := preload("../npcs/zz_zombie_limbs.gd")
 	_check(L.zone_of(&"legL", 0.27) == GSHitGroup.KNEE and L.zone_of(&"legR", 0.27) == GSHitGroup.KNEE, "a leg hit at knee height is the knee")
 	_check(L.zone_of(&"legL", 0.03) == GSHitGroup.FOOT, "a leg hit at the ground is the foot")
@@ -1587,7 +1587,7 @@ func _test_how_zombies_fall() -> void:
 	await _sim(game, 0.05)
 	var death: GSPlayerDeath = seen[0] if not seen.is_empty() else null
 	_check(not npc.is_alive() and death != null, "the server decides the fall")
-	_check(death != null and game.horde.death_reactions.has(death.reaction), "as one of dot-player-char's reactions",
+	_check(death != null and game.horde.death_reactions.has(death.reaction), "as one of gs-player-char's reactions",
 		String(death.reaction) if death != null else "-")
 	_check(death != null and death.direction.dot(Vector3(0, 0, -1)) > 0.5, "pushed the way the shot went",
 		str(death.direction) if death != null else "-")
@@ -1598,7 +1598,7 @@ func _test_how_zombies_fall() -> void:
 ## from the figure it draws into the same yard (and under the same sv_ragdoll* rules) as the
 ## zombies'.
 func _test_how_survivors_fall() -> void:
-	_section("a dead survivor falls as dot-player-char's ragdoll")
+	_section("a dead survivor falls as gs-player-char's ragdoll")
 	var game := await _team(2, _quiet)
 	var me := game.survivors()[0]
 	me.place_at(STREET, 0.0)
@@ -1912,7 +1912,7 @@ func _test_every_box_outcome() -> void:
 
 
 ## The Turret Box: opened where a survivor looks, a sentry stands on the floor and shoots the horde on
-## its own (the server's decision, dot-combat's GSSentry), wears out, is limited per survivor, and a
+## its own (the server's decision, gs-combat's GSSentry), wears out, is limited per survivor, and a
 ## spot with no floor gives the box back.
 func _test_turret_box() -> void:
 	_section("the turret box: deployed, shoots zombies, wears out, limited, refused with no floor")
@@ -2476,7 +2476,7 @@ func _test_stand_ins() -> void:
 		armed += 1 if player.weapons != null and player.weapons.arsenal != null and player.weapons.arsenal.has_slot(primary_slot) else 0
 	_check(armed > 0, "picking up what was left for them", "%d armed with a primary, %d free guns lying%s" % [armed, weapons_left, over])
 	# Survivors do not collide, so stand-ins stack up shoulder to shoulder or inside each other.
-	# Before dot-combat's pass-through and the hitbox-based friend check, every shot from inside a friend hit
+	# Before gs-combat's pass-through and the hitbox-based friend check, every shot from inside a friend hit
 	# that friend: 200 to 500 points of friendly damage in this minute on six seeds out of six,
 	# and half those first rounds lost. A stray pellet is allowed; shooting each other is not.
 	_check(friendly < 100.0, "and they do not shoot each other down", "%.0f friendly damage" % friendly)

@@ -1,5 +1,5 @@
-# Weapon and supply spawners (dot-weapon docs/spawners.md). A map document lists the places in
-# `spawners:`; this file says what they give. The operator overrides in cfg/server/game/game-zombie-zone/dot_weapon/.
+# Weapon and supply spawners (gs-weapon docs/spawners.md). A map document lists the places in
+# `spawners:`; this file says what they give. The operator overrides in cfg/server/game/game-zombie-zone/gs_weapon/.
 default_pool: wall_guns
 
 # Every pool has a `channel` (where it is offered); the weapons.not_in / weapons.weights keys of
@@ -131,7 +131,7 @@ sites:
 # Per map, add `maps:` with a block per map id or glob, e.g. zm_lot: then game: shop: prices: ...
 game:
   shop:
-    # The trader at the start. Override in cfg/server/game/game-zombie-zone/dot_weapon/spawner.yml, or live with
+    # The trader at the start. Override in cfg/server/game/game-zombie-zone/gs_weapon/spawner.yml, or live with
     # the cvars zz_trader, zz_trader_when, zz_trader_despawn, zz_start_points (-1 reads this file); docs/operators.md.
     enabled: true            # false: no trader on any map
     available: waves         # setup (before the horde runs) | waves (setup and a survival map's breathers) | always (also during a round)

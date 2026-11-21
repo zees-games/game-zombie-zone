@@ -6,7 +6,7 @@ const StuckMeter := preload("stuck_meter.gd")
 const ZzNavNotes := preload("../game/zz_nav_notes.gd")
 
 ## Bot soak on the real game: the map's team of stand-in survivors holds a map for M simulated
-## minutes through dot-bot's GSBotSoak, fed by dot-spawn's GSSpawnWatch. Kills, deaths and damage
+## minutes through gs-bot's GSBotSoak, fed by gs-spawn's GSSpawnWatch. Kills, deaths and damage
 ## come from the game's own signals.
 ##
 ## [codeblock]

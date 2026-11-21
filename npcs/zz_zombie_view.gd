@@ -706,7 +706,7 @@ func _lift_foot_bone(foot: int, floor_y: float) -> void:
 
 
 ## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
-## step (dot-player-char's GSFootPlant over the clip's own phase), the hips lowered where a leg
+## step (gs-player-char's GSFootPlant over the clip's own phase), the hips lowered where a leg
 ## would not reach and both legs bent to their feet. Weighted by [member _shamble].
 func _plant_feet() -> void:
 	var legs := _leg_chains()
@@ -1001,7 +1001,7 @@ func _draw_flags(flags: int) -> void:
 
 # Dying
 
-## Starts the fall: [param reaction] is a dot-player-char reaction id the server picked
+## Starts the fall: [param reaction] is a gs-player-char reaction id the server picked
 ## (`GSPlayerDeath`), [param push] the shot's direction scaled by its strength, [param seed] the
 ## death's own number. Animated, not physical: see [method _present_death].
 func die(reaction: StringName, push: Vector3, seed: int) -> void:

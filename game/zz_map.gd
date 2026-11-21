@@ -29,7 +29,7 @@ var _gates: Dictionary = {}
 ## AABB, mat, tint, intact, fraction}.
 var _barricades: Dictionary = {}
 
-## The map's toys (dot-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
+## The map's toys (gs-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
 var toys: GSPropBodyBox = null
@@ -64,7 +64,7 @@ var _environment: WorldEnvironment = null
 
 var _sun: DirectionalLight3D = null
 
-## dot-lighting's fill (painted()), turned with the sun; blended with it by set_daylight.
+## gs-lighting's fill (painted()), turned with the sun; blended with it by set_daylight.
 var _fill: DirectionalLight3D = null
 
 ## A map held by nights draws its day as well: the light at night (the map's own) and by day,
@@ -92,7 +92,7 @@ var _lamp_budget := ZzLampBudget.new()
 ## Cascades of the sun's shadow (1, 2 or 4), set by the client from `sun_shadow_splits`.
 var sun_shadow_splits := 4
 
-## Cap for decoded world texture files (dot-map's `max_texture_size`); 0 keeps them.
+## Cap for decoded world texture files (gs-map's `max_texture_size`); 0 keeps them.
 var texture_max: int = 2048
 
 ## Props shorter than this cast no sun shadow (0: all do); set by the client from `prop_shadow_min`.
@@ -307,7 +307,7 @@ func _build_water_volumes() -> void:
 		var size := ZzMapDoc.v3(pool["size"])
 		water_boxes.append(AABB(ZzMapDoc.v3(pool["at"]) - size * 0.5, size))
 
-## Each volume's surface: one sheet at the top face, with dot-map's liquid shader,
+## Each volume's surface: one sheet at the top face, with gs-map's liquid shader,
 ## which draws the ripples, the sheen and the lip. The volume has no walls: Source's water is a
 ## surface too, and a swimmer sees the pool's own sides through it.
 func _build_water_surfaces() -> void:
@@ -562,7 +562,7 @@ func _build_boxes() -> void:
 			if absf(top) < 0.05 and size.y <= 0.5 and not _ground_below(at, size):
 				cube.size.y = size.y + GROUND_DEPTH
 				shape.transform.origin.y -= GROUND_DEPTH * 0.5
-			# What a footstep on it sounds like (dot-audio's GSAudioFootsteps reads the hit
+			# What a footstep on it sounds like (gs-audio's GSAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "asphalt" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			if bool(box.get("visible", true)):
@@ -620,11 +620,11 @@ func _build_boxes() -> void:
 		# lightmap cannot hold, so it stays unlit by the lightmap and the lamps light it live.
 		mesh.name = "%s_%d" % ["Shiny" if batch["shiny"] else "Boxes", index]
 		index += 1
-		# dot-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# gs-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so, and a player is meant to walk through it.
 		# a batch of nothing but trim has no shape by ZzMapDoc.is_trim's rule, not by a loss
 		if bool(batch["ghost"]) or bool(batch.get("trim", false)):
-			mesh.set_meta(&"dot_no_collision", true)
+			mesh.set_meta(&"gs_no_collision", true)
 		var arrays := tool.commit()
 		if sheet != null:
 			arrays.lightmap_size_hint = sheet.size
@@ -778,9 +778,9 @@ func _build_objective_props() -> void:
 		var drawn := ZzFixtures.objective_prop(o, gate_box if str(o.get("prop", "")) == "padlock" else {})
 		if drawn == null:
 			continue
-		# dot-core's GSCollisionAudit: a padlock hangs on a gate that has its own body, a lever
+		# gs-core's GSCollisionAudit: a padlock hangs on a gate that has its own body, a lever
 		# or a radio is something you reach and use. None of them should stop a survivor.
-		drawn.set_meta(&"dot_no_collision", true)
+		drawn.set_meta(&"gs_no_collision", true)
 		_drawn.add_child(drawn)
 		if str(o.get("prop", "")) == "padlock" and _gates.has(gate_id):
 			((_gates[gate_id] as Dictionary)["drawn"] as Array).append(drawn)
@@ -1042,12 +1042,12 @@ func _process(delta: float) -> void:
 	if camera != null and _drawn != null:
 		_lamp_budget.update(_lamps, _drawn.to_local(camera.global_position), delta)
 
-## Whether the host's dot-lighting can lay a bake (API level 5: GSLightBake, GSLightmapSheet). Those
-## classes are reached by path, never by name: a host shell with an older dot-lighting would fail to
+## Whether the host's gs-lighting can lay a bake (API level 5: GSLightBake, GSLightmapSheet). Those
+## classes are reached by path, never by name: a host shell with an older gs-lighting would fail to
 ## parse this whole script on the name, and the map would not load. Without them the map is drawn
 ## with its live lamps.
 static func can_bake() -> bool:
-	return GSAddonApi.build_level("dot_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
+	return GSAddonApi.build_level("gs_lighting") >= 5 and ResourceLoader.exists(BAKE_SCRIPT) \
 			and ResourceLoader.exists(SHEET_SCRIPT)
 
 ## What this map's bake must have been made from: the boxes, the lamps and the sky, and the
@@ -1085,14 +1085,14 @@ func _attach_bake() -> void:
 
 	GSLog.debug(CHANNEL, "the map is drawn with its baked light", {"map": String(id())})
 
-## Whether this host can read a map's drawn world: dot-map's [code]GSMapBspMesh[/code], reached by
-## path for the reason [method can_bake] gives (a shell with an older dot-map would fail to parse
+## Whether this host can read a map's drawn world: gs-map's [code]GSMapBspMesh[/code], reached by
+## path for the reason [method can_bake] gives (a shell with an older gs-map would fail to parse
 ## this script on the name).
 static func can_draw_world() -> bool:
 	return ResourceLoader.exists(MESH_SCRIPT)
 
 ## Where a world sits beside the game in a checkout (`world/` is zombie-zone-maps' `world/`,
-## linked by dot-bootstrap and never shipped in the game's pack).
+## linked by gs-bootstrap and never shipped in the game's pack).
 func local_world_prefix() -> String:
 	return ZzPaths.rebase(LOCAL_WORLD % [str(doc.get("world", "")), String(id())])
 
@@ -1167,7 +1167,7 @@ func _build_solid_props() -> void:
 	add_child(body)
 	world_props = body
 
-## Collides with the solid props of [param world]'s manifest (dot-map's `build_prop_collision`) when the document carries no `solid_props` of its own. Once per map.
+## Collides with the solid props of [param world]'s manifest (gs-map's `build_prop_collision`) when the document carries no `solid_props` of its own. Once per map.
 func attach_world_props(world: RefCounted) -> void:
 	if world_props != null:
 		return
@@ -1235,7 +1235,7 @@ func build_world_collision_local(root: String = "") -> bool:
 ## Draws the map with its own geometry ([member doc]'s `world`, zombie-zone-maps'
 ## tools/build_worlds.py) in place of its boxes, which still collide and still are the horde's
 ## ground: the mesh is what a survivor sees, never what anything stands on. From the checkout's
-## `world/` when it is there, else fetched through dot-cloud by the `world_key` the server sent.
+## `world/` when it is there, else fetched through gs-cloud by the `world_key` the server sent.
 ## A world that cannot be had leaves the boxes drawn: the map plays the same either way.
 ##
 ## Succeeds with true when the world is drawn, false when there is none to draw.
@@ -1268,9 +1268,9 @@ func load_world() -> GSResult:
 	var read_ms := Time.get_ticks_msec() - t_read
 
 	if read.ok:
-		# The shared PBR and model slice this world names (dot-map's store); a world without one reads its own folder.
+		# The shared PBR and model slice this world names (gs-map's store); a world without one reads its own folder.
 		var t_store := Time.get_ticks_msec()
-		var stored: GSResult = await GSMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"dot_cloud_client"))
+		var stored: GSResult = await GSMapStore.ensure((read.value.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"gs_cloud_client"))
 		GSLog.info(CHANNEL, "world read and art slice", {"map": String(wanted), "read_ms": read_ms, "store_ms": Time.get_ticks_msec() - t_store})
 		if not stored.ok:
 			GSLog.debug(CHANNEL, "a map's art slice could not be fetched; generic art is drawn", {"map": String(wanted), "why": stored.error.message})
@@ -1344,14 +1344,14 @@ func _attach_world_now(world: RefCounted, dir: String, drawn_for: Node3D) -> boo
 	var material_for := func(rec: Dictionary) -> Material:
 		var mat := str(mats.get(str(rec.get("material", "")), "concrete"))
 		return ZzMaterials.material(mat, Color.WHITE, "wall", ZzMaterials.surface_for(map_id, mat, ""))
-	# A pack from dot-map's global converter has no `zz` block: it draws itself with free textures and glass.
+	# A pack from gs-map's global converter has no `zz` block: it draws itself with free textures and glass.
 	var global_pack := not (world.get("manifest") as Dictionary).has("zz")
 	if global_pack:
 		# The vendored kinds, rebased onto the mount: the addon's own folder never ships to a client.
 		var surfaces: RefCounted = (load(SURFACES_SCRIPT) as GDScript).new(ZzPaths.rebase(ZzMaterials.SURFACES_ROOT))
 		surfaces.set(&"use_lightmap", use_lightmaps)
 		surfaces.set(&"max_texture_size", texture_max)
-		GSMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"dot_cloud_client"), surfaces, world)
+		GSMapStore.apply((world.get("manifest") as Dictionary).get("licence", {}), GSRegistry.get_service(&"gs_cloud_client"), surfaces, world)
 		lap = _lap(stages, "store_apply", lap)
 		await surfaces.call(&"prefetch", world, dir)
 		if _drawn != drawn_for or not is_instance_valid(drawn_for):
@@ -1562,7 +1562,7 @@ func _attach_world_extras(world: RefCounted, node: Node3D) -> void:
 ## The player's `light_floor` cvar; a map's own `light_floor` (document top level) can only lower it.
 var _light_floor_setting := -1.0
 
-## Sets dot-map's visibility floor (before the world's materials are built); the `light_floor` cvar.
+## Sets gs-map's visibility floor (before the world's materials are built); the `light_floor` cvar.
 ## A map document's own `light_floor` lowers it for that map: a lightmapped mall or tunnel the
 ## author lit with real shadows reads flat at the family's 0.6, which every shadow is lifted to.
 func set_light_floor(value: float) -> void:
@@ -1576,17 +1576,17 @@ func _apply_light_floor() -> void:
 	if doc.has("light_floor"):
 		value = float(doc["light_floor"]) if value < 0.0 else minf(value, float(doc["light_floor"]))
 	if value < 0.0:
-		return    # neither the player's setting nor the map's: dot-map's own default stands
+		return    # neither the player's setting nor the map's: gs-map's own default stands
 	(load(MESH_SCRIPT) as GDScript).call(&"set_visibility_floor", value)
 
-## Sets dot-map's world shadow cost (before the world is built); the `shadow_proxy`, `shadow_range` and `shadow_translucent` cvars.
+## Sets gs-map's world shadow cost (before the world is built); the `shadow_proxy`, `shadow_range` and `shadow_translucent` cvars.
 func set_shadow_cost(proxy: bool, range_m: float, translucent: bool) -> void:
 	if can_draw_world():
 		var mesh := load(MESH_SCRIPT) as GDScript
 		mesh.call(&"set_shadow_cost", proxy, range_m)
 		mesh.call(&"set_shadow_translucent", translucent)
 
-## Sets dot-map's LOD size for library models (before the world is built); the `prop_lod_min_tris` cvar.
+## Sets gs-map's LOD size for library models (before the world is built); the `prop_lod_min_tris` cvar.
 func set_model_lod(min_tris: int, max_tris: int) -> void:
 	if can_draw_world():
 		(load(MESH_SCRIPT) as GDScript).call(&"set_model_lod", min_tris, max_tris)
@@ -1609,7 +1609,7 @@ func set_sun_shadow_splits(splits: int) -> void:
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL if splits <= 1 \
 		else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS if splits == 2 else DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 
-## Sprites, glows, spotlight cones and decals from the world's source document (dot-map's GSMapFx), capped per map.
+## Sprites, glows, spotlight cones and decals from the world's source document (gs-map's GSMapFx), capped per map.
 func _attach_fx(world: RefCounted, node: Node3D) -> void:
 	var path := local_world_prefix() + ".doc.json"
 	if DisplayServer.get_name() == "headless" or OS.get_environment("ZZ_NO_FX") != "" or "--zz-map-fx=false" in OS.get_cmdline_user_args() or not FileAccess.file_exists(path):
@@ -1718,7 +1718,7 @@ func _unbake() -> void:
 func lamps() -> Array[Light3D]:
 	return _lamps
 
-## The sky, the moon or the low sun, and the fill: a dot-lighting document made from the map's
+## The sky, the moon or the low sun, and the fill: a gs-lighting document made from the map's
 ## `environment` ([method light_document]), so every map has the family's light (filmic tone
 ## map, soft shadows, glow only from the lamps) while keeping its own hour: the blackout
 ## streets, the depot, the chapel and the lot stay night under a blue moon, the pier stays
@@ -1733,7 +1733,7 @@ func _build_environment() -> void:
 
 	if _sun != null:
 		# The map's own angle, in Godot's degrees as the map document has always written it,
-		# rather than through dot-lighting's source convention.
+		# rather than through gs-lighting's source convention.
 		_sun.rotation_degrees = Vector3(float(env_doc["sun_pitch"]), float(env_doc["sun_yaw"]), 0.0)
 		_fill = _aim_fill(lighting, env_doc, _sun)
 		_sun.shadow_blur = 1.5
@@ -1930,7 +1930,7 @@ func spawn(side: String, seat: int) -> Array:
 	return [clear_spot(at), float(base.get("yaw", 0.0))]
 
 ## Whether the physics space answers queries now. Always, unless physics runs on its own thread
-## (`physics/3d/run_on_separate_thread`, dot-server-deploy's `sv_physics_thread`): then only inside the
+## (`physics/3d/run_on_separate_thread`, gs-server-deploy's `sv_physics_thread`): then only inside the
 ## physics step, and a query from a join or a module load gets an engine error and nothing back.
 ## Read at startup; a suite sets it to drive the threaded path.
 static var threaded_physics: bool = bool(ProjectSettings.get_setting("physics/3d/run_on_separate_thread", false))

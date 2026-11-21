@@ -3,7 +3,7 @@ extends RefCounted
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzPickupPanel := preload("zz_pickup_panel.gd")
 
-## Weapons lying in the world, thrown with the drop key (Q) or left by the dead: dot-weapon's
+## Weapons lying in the world, thrown with the drop key (Q) or left by the dead: gs-weapon's
 ## [GSWeaponDrops] under `sv_weapon_drop*`, with the survivor's hands and carry rules as the hooks.
 ## An empty slot in reach takes a drop (so weight and quota still apply); a full slot swaps.
 

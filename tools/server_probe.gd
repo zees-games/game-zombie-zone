@@ -19,7 +19,7 @@ extends Node
 ## when it is up.
 ##
 ## [b]Phases[/b] are laps taken around ZzGame._step's own calls (kept in step with it, as
-## survival_long_run's profile is) and around the manager's half of the tick. dot-npc has no timer
+## survival_long_run's profile is) and around the manager's half of the tick. gs-npc has no timer
 ## inside a path search, so pathing is derived: searches per tick from
 ## [member GSNpcNavGraph.searches], times the cost of one search measured on the same graph after
 ## the window. The frame is split into the step (physics_frame to process_frame; engine_physics_ms) and the rest
@@ -62,7 +62,7 @@ var _net_fields: Dictionary = {}
 ## --acks: every peer acknowledges each snapshot ACK_LAG snapshots late, as a real client does
 ## (game-airdrift's load_probe LOAD_ACKS=1); without it every peer is the no-ack host.
 var _acks := false
-## --no-snapshot-auto: keep SNAPSHOT_RATE; by default dot-game's net_snapshot_auto tiers it by --n as a real server does.
+## --no-snapshot-auto: keep SNAPSHOT_RATE; by default gs-game's net_snapshot_auto tiers it by --n as a real server does.
 var _snapshot_auto := true
 ## --split: the inline snapshot path run here instead of the manager's, lapped as
 ## si_relevant, si_thin, si_scores, si_prioritise, si_budget and snap_build (_send_to_peer) per peer.
@@ -93,7 +93,7 @@ var _near_hist: Dictionary = {}
 var _detail_ticks := 0
 ## --cfg=field=value (repeatable): a ZzConfig field set before the game starts, e.g. squad_coalesce=true.
 var _cfg: Dictionary = {}
-## --cvar=name=value (repeatable): dot-game's GSGameNpcLod cvars (npc_lod, npc_lod_full, npc_sense_quiet ...) on a stand-in console.
+## --cvar=name=value (repeatable): gs-game's GSGameNpcLod cvars (npc_lod, npc_lod_full, npc_sense_quiet ...) on a stand-in console.
 var _cvars: Dictionary = {}
 var _lod: GSGameNpcLod = null
 ## Gameplay counters over the window: zombies killed, health zombies lost, health survivors lost, and zombies with a target per tick.
@@ -738,7 +738,7 @@ func _accum(key: String, usec: int) -> void:
 
 
 ## GSNpcSpawner._think, each brain lapped by its kind; every 64th tick, the NPCs' distances. With the spawner's
-## think pacing on (dot-npc GSNpcPacing) the counters live in the pacer, not the brains, so the tick is run through
+## think pacing on (gs-npc GSNpcPacing) the counters live in the pacer, not the brains, so the tick is run through
 ## it as the spawner runs it and lapped whole ("brain.paced"); per kind only with pacing off.
 func _think_detail(sp: GSNpcSpawner, delta: float) -> void:
 	var sample := sp._ticks % 64 == 0

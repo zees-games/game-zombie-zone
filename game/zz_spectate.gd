@@ -9,7 +9,7 @@ const ZzPlayer := preload("zz_player.gd")
 ## people with the most reason to see whether they get away with it. A joiner mid-round
 ## watches too.
 ##
-## [b]The camera part is four lines; who decides is the part that matters.[/b] dot-spectate
+## [b]The camera part is four lines; who decides is the part that matters.[/b] gs-spectate
 ## computes a transform and touches no camera, and the policy — may this person watch, whom,
 ## through which camera — is the server's, so a client that decided for itself what it may
 ## look at would be a client that may look at anything. On a server this runs an
@@ -18,7 +18,7 @@ const ZzPlayer := preload("zz_player.gd")
 ## already draws. That split is what keeps the wire to one small event per decision rather
 ## than a camera transform per frame.
 ##
-## [b]No delay, and it would protect nothing here.[/b] dot-spectate's delay exists because a
+## [b]No delay, and it would protect nothing here.[/b] gs-spectate's delay exists because a
 ## spectator watching live is a live intelligence feed — but every player in this game is
 ## always relevant (a map is a few rooms), so every client already receives every player's
 ## live position in its snapshots. A delayed spectator camera would hide nothing that the

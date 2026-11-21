@@ -19,4 +19,4 @@ if [[ -n ${first:-} ]]; then
   ffmpeg -v error -y -i "$out/$name.avi" -vf "select=gte(n\\,$first),setpts=N/(FRAME_RATE*TB)" -vsync passthrough -frames:v "$count" -c:v mjpeg -q:v 3 "$out/$name.cut.avi"
   mv "$out/$name.cut.avi" "$out/$name.avi"
 fi
-bash addons/dot_core/tools/dot_filmstrip.sh "$out/$name.avi" "$out/$name" --views "$view"
+bash addons/gs_core/tools/gs_filmstrip.sh "$out/$name.avi" "$out/$name" --views "$view"

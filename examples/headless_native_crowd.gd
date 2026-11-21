@@ -1,9 +1,9 @@
 extends GSGameCheckSuite
 
-const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
+const CrowdGrid := preload("res://addons/gs_npc_ai/steer/gs_npc_ai_crowd_grid.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 
-## The horde's crowd grid in dot-sim ([member ZzConfig.native_crowd], on by default) answers as dot-npc-ai's script
+## The horde's crowd grid in gs-sim ([member ZzConfig.native_crowd], on by default) answers as gs-npc-ai's script
 ## grid over seeded crowds: same index, neighbours in order and spacing push to the bit, also after forgetting some.
 ## Without the library the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
@@ -29,8 +29,8 @@ func _run() -> void:
 	print("the crowd is native by default, and the library is there")
 	_check(ZzConfig.new().native_crowd, "ZzConfig.native_crowd is on by default")
 	if not ClassDB.class_exists(NATIVE):
-		print("  dot-sim's crowd module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		print("  gs-sim's crowd module is not loaded: the native half is skipped")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, SECTIONS - 2, 2)
 		return

@@ -50,7 +50,7 @@ const PEEK_BYTES := 4096
 var parse_batch_bytes: int = 1 << 20
 
 ## The server's maps.yml, or null when there is none (every map rotates, as it always did).
-## dot-map's rotation file speaks GSMapDef; this catalogue holds map documents, so [member _defs]
+## gs-map's rotation file speaks GSMapDef; this catalogue holds map documents, so [member _defs]
 ## mirrors the ids and the file marks `in_rotation` on the mirror. See [method rotating].
 var rotation_file: GSMapRotationFile = null
 var _defs: GSMapCatalogue = GSMapCatalogue.new()
@@ -728,7 +728,7 @@ func describe_lines() -> PackedStringArray:
 
 # The one built in
 
-## Tests only: loose physics props (dot-props' toys) to put on the practice street; empty in play.
+## Tests only: loose physics props (gs-props' toys) to put on the practice street; empty in play.
 static var practice_toys: Array = []
 
 

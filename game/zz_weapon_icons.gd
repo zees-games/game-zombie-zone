@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Zombie Zone's weapon pictures: weapon id to sprite tag; the rest is dot-ui's [GSWeaponIconStyle].
+## Zombie Zone's weapon pictures: weapon id to sprite tag; the rest is gs-ui's [GSWeaponIconStyle].
 
 const TAGS := {
 	&"zz_aa12": &"drum_shotgun", &"zz_ak": &"assault_rifle", &"zz_axe": &"axe", &"zz_bat": &"hammer",

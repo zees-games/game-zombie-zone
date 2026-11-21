@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## The only server commands a map's `point_servercommand` may have run: a short list that maps onto
-## this game's tunables. Everything else (a gravity change, a cvar that is not ours) is denied by dot-map and logged.
+## this game's tunables. Everything else (a gravity change, a cvar that is not ours) is denied by gs-map and logged.
 
 ## Map cvar to `[tunable, scale]`: the value read is multiplied by scale.
 const ALIASES := {

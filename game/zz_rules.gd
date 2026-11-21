@@ -2,14 +2,14 @@ extends GSMatchRules
 
 ## A round ends when the game says so, and the game says who won.
 ##
-## [b]dot-match's elimination rule nearly fits, and nearly is the problem.[/b] It ends a round
+## [b]gs-match's elimination rule nearly fits, and nearly is the problem.[/b] It ends a round
 ## when a side has nobody alive — but a player who joined mid-round is benched rather than
 ## dead, the hiding half of a round must never end on a count, and the clock's winner is a
 ## server setting rather than "whoever has more people up". What decides is [ZzGame],
-## which knows all of that, and [GSMatchRules] is documented as the place a mode dot-match
+## which knows all of that, and [GSMatchRules] is documented as the place a mode gs-match
 ## does not ship goes, with the state machine left alone.
 ##
-## [b]The answer is read, never computed here.[/b] dot-match's rules are meant to be pure
+## [b]The answer is read, never computed here.[/b] gs-match's rules are meant to be pure
 ## functions of what they are handed; this one is a pure function of what the game decided,
 ## and a game that has not decided returns NONE every tick.
 
@@ -18,7 +18,7 @@ var decision_fn: Callable = Callable()
 
 
 static func make() -> GSMatchRules:
-	# Not this class's own name, for dot-match's reason: a script that names itself in an
+	# Not this class's own name, for gs-match's reason: a script that names itself in an
 	# expression cuts Godot 4.7.2's exit teardown short. See docs/gdscript-hazards.md.
 	var rules := new()
 	rules.id = &"zombiezone"
@@ -26,7 +26,7 @@ static func make() -> GSMatchRules:
 	rules.score_limit = 0
 	# The round keeps its own clock; this one is the BACKSTOP, set by [ZzGame] to the
 	# hiding, the seeking and a minute more. A round the game somehow never decided — a
-	# rule with a hole in it — ends on it as a draw rather than running for ever, and dot-match
+	# rule with a hole in it — ends on it as a draw rather than running for ever, and gs-match
 	# stops warning at every boot that nothing but a custom outcome can end a round.
 	rules.time_limit_sec = 600.0
 	rules.rounds_to_win = 999

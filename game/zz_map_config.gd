@@ -1,8 +1,8 @@
 extends RefCounted
 
-## Per-map settings: dot-game's [GSGameMapConfig] over the server cvars a map may change.
+## Per-map settings: gs-game's [GSGameMapConfig] over the server cvars a map may change.
 ##
-## `cfg/game/game-zombie-zone/dot_map/map/<name>.yml` (a glob covers a class of maps), overridable from `cfg/server/...`. Only the keys in [constant KEYS] are accepted. All are server-side rules; none is a movement setting, because a client predicts those and `zz_gravity` is not replicated.
+## `cfg/game/game-zombie-zone/gs_map/map/<name>.yml` (a glob covers a class of maps), overridable from `cfg/server/...`. Only the keys in [constant KEYS] are accepted. All are server-side rules; none is a movement setting, because a client predicts those and `zz_gravity` is not replicated.
 
 const GAME_ID := "game-zombie-zone"
 

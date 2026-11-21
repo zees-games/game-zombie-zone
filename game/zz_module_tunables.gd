@@ -138,16 +138,16 @@ func _add_tunables_zombies(world: ZzGame) -> void:
 		"Thoughts a zombie keeps its waypoint while its goal drifts under 3 m; 0 asks the graph every thought",
 		func(value: float) -> void: config.path_reuse_thoughts = maxi(int(value), 0))
 	_tunable("zz_native_crowd", 1.0 if config.native_crowd else 0.0,
-		"The horde's crowd grid runs in dot-sim's native library when loaded (the same answers); 0 keeps the script",
+		"The horde's crowd grid runs in gs-sim's native library when loaded (the same answers); 0 keeps the script",
 		func(value: float) -> void: config.native_crowd = value > 0.5)
 	_tunable("zz_native_senses", 1.0 if config.native_senses else 0.0,
-		"Zombie senses run in dot-sim's native library when loaded (the same targets); 0 keeps the script",
+		"Zombie senses run in gs-sim's native library when loaded (the same targets); 0 keeps the script",
 		func(value: float) -> void: config.native_senses = value > 0.5)
 	_tunable("zz_native_brains", 1.0 if config.native_brains else 0.0,
-		"Zombie chase plans and spaced headings run in dot-sim's native library when loaded (the same decisions); 0 keeps the script",
+		"Zombie chase plans and spaced headings run in gs-sim's native library when loaded (the same decisions); 0 keeps the script",
 		func(value: float) -> void: config.native_brains = value > 0.5)
 	_tunable("zz_native_pacing", 1.0 if config.native_pacing else 0.0,
-		"Which zombies think each tick is counted in dot-sim's native library when loaded (the same thoughts); 0 keeps each brain counting",
+		"Which zombies think each tick is counted in gs-sim's native library when loaded (the same thoughts); 0 keeps each brain counting",
 		func(value: float) -> void: config.native_pacing = value > 0.5)
 	_tunable("zz_bot_hold_chokes", 1.0 if config.bot_hold_chokes else 0.0,
 		"Survival stand-ins hold behind the chokes on the horde's routes and fall back when one is overrun; 0 posts only",
@@ -212,7 +212,7 @@ func _add_tunables_survivors(world: ZzGame) -> void:
 
 ## The movement, body, toy, water, ambience and view rules' cvars, replicated where a client predicts or draws under them.
 func _bind_rule_cvars(world: ZzGame) -> void:
-	# dot-player-controller's mp_forceview (the player's choice, or one held) and mp_solidplayers
+	# gs-player-controller's mp_forceview (the player's choice, or one held) and mp_solidplayers
 	# (survivors and stand-ins block each other, 1 by default). REPLICATED: the client places its camera
 	# under the first and predicts its player under the second.
 	var _views := world.view_rules.bind_cvars(
@@ -221,12 +221,12 @@ func _bind_rule_cvars(world: ZzGame) -> void:
 	var _bodies := world.body_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
-	# Dead bodies, survivors' and zombies' alike: dot-player-char's sv_ragdoll* set. The server
+	# Dead bodies, survivors' and zombies' alike: gs-player-char's sv_ragdoll* set. The server
 	# only picks each death's reaction from them; REPLICATED, because the clients draw the bodies.
 	var _ragdolls := world.ragdoll_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
-	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
+	# The map's toys: gs-props' sv_toys* set. REPLICATED, because a client hides the toys the
 	# server took away.
 	var _toys := world.toy_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
@@ -244,12 +244,12 @@ func _bind_rule_cvars(world: ZzGame) -> void:
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
-	# dot-mobile's touch, aim assist and auto-fire rules: REPLICATED, the overlay on a phone follows them.
+	# gs-mobile's touch, aim assist and auto-fire rules: REPLICATED, the overlay on a phone follows them.
 	var _mobile := world.mobile_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
-	# The slide's numbers (dot-player-controller's cvar table under `zz_slide`): REPLICATED, a client predicts its own slide.
+	# The slide's numbers (gs-player-controller's cvar table under `zz_slide`): REPLICATED, a client predicts its own slide.
 	var _slide := world.slide_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
@@ -341,7 +341,7 @@ func _add_tunables_specials(world: ZzGame) -> void:
 		func(value: float) -> void: config.oil_monster_chance = clampf(value, 0.0, 1.0))
 	_tunable("zz_oil_monster_min_wave", float(config.oil_monster_min_wave), "First wave the oil monster can appear on",
 		func(value: float) -> void: config.oil_monster_min_wave = maxi(int(value), 0))
-	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, dot-effects' GSHazardProfile keys).
+	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, gs-effects' GSHazardProfile keys).
 	var oil := ZzNpcs._oil_monster(config).meta
 	for row: Array in OIL_TUNABLES:
 		var key: String = row[0]
@@ -532,7 +532,7 @@ func _add_tunables_survival_2(world: ZzGame) -> void:
 			config.minimum_players = int(value)
 			if _quota != null and _quota.quota_cvar != null:
 				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
-	# How the stand-ins aim and shoot is dot-bot's: `bot_difficulty` and the `bot_*` settings it bundles.
+	# How the stand-ins aim and shoot is gs-bot's: `bot_difficulty` and the `bot_*` settings it bundles.
 	# Kept as game metadata, where ZzBots reads it, never the registry (two servers in one process).
 	# `zz_bot_reaction` stays as the old name for `bot_reaction`.
 	var bot_settings := GSBotSettings.of(game)
@@ -541,7 +541,7 @@ func _add_tunables_survival_2(world: ZzGame) -> void:
 		func(value: float) -> void:
 			var _set := bot_settings.set_value("reaction", str(value)))
 
-	# How clever and how quick the zombies are, as dot-npc-ai's server skill: `npc_skill`
+	# How clever and how quick the zombies are, as gs-npc-ai's server skill: `npc_skill`
 	# (-1..1 or a level), `npc_reaction_scale`, `npc_reaction_min`.
 	if world.horde != null:
 		var _bound := world.horde.skill.bind_cvars(add_cvar)

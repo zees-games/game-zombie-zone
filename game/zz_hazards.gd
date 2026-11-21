@@ -73,7 +73,7 @@ var _burning: Dictionary = {}
 
 var _next_id: int = 1
 
-## Ground hazards that hurt by standing in them (acid; the oil monster's goo): dot-effects' pool.
+## Ground hazards that hurt by standing in them (acid; the oil monster's goo): gs-effects' pool.
 var pool := GSHazardPool.new()
 
 ## Hazard kind -> its [GSHazardProfile]; a kind not here is simulated by this file.
@@ -170,7 +170,7 @@ func _take_id() -> int:
 	return _next_id - 1
 
 
-## Sets profile keys for a hazard kind from a dot-profile's values or a cvar dump.
+## Sets profile keys for a hazard kind from a gs-profile's values or a cvar dump.
 func configure(kind: StringName, values: Dictionary) -> void:
 	profiles[kind] = GSHazardProfile.from_values(values, profiles.get(kind, GSHazardProfile.new()))
 

@@ -103,7 +103,7 @@ var _warm_paths := PackedStringArray()
 
 ## Starts loading every enabled kind's scene and brain script on worker threads, so the map build
 ## and the first graph overlap them (on the main thread, as the spawner's warm() does it, they
-## cost about 0.9 s of a cold start). An older dot-npc without warm() loads them at first spawn.
+## cost about 0.9 s of a cold start). An older gs-npc without warm() loads them at first spawn.
 func _request_warm() -> void:
 	_drain_warm()
 

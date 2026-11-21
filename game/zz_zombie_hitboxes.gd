@@ -29,7 +29,7 @@ static func build(def: GSNpcDef, height: float, radius: float) -> GSHitboxSet:
 	chest.position = Vector3(0.0, height * 0.41, 0.0)
 	set_node.add_child(chest)
 
-	# The belly is a zone of its own (dot-combat's stomach), a band of the body that wins over the
+	# The belly is a zone of its own (gs-combat's stomach), a band of the body that wins over the
 	# capsule; with mp_hitzones 0 the resolver folds it into chest, so damage is unchanged.
 	var stomach := GSHitbox.new()
 	stomach.name = "Stomach"
@@ -41,7 +41,7 @@ static func build(def: GSNpcDef, height: float, radius: float) -> GSHitboxSet:
 	set_node.add_child(stomach)
 
 	# A riot zombie's shield: a hitbox of its own in front of it, nearer the gun than its body,
-	# so a frontal shot stops there (nearest entry wins in dot-combat) and does `shield` of its
+	# so a frontal shot stops there (nearest entry wins in gs-combat) and does `shield` of its
 	# damage. From the side or behind, the body is nearer and takes it all.
 	if def.meta.has("shield"):
 		var shield := GSHitbox.new()

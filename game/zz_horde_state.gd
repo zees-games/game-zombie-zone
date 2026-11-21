@@ -7,7 +7,7 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
-## Bumped when the prune records or tests more (6: the prop and clip layers too; 7: dot-npc v0.1.21 and the hull files in the key; 8: bridges between pieces holding a spawn or post; 11: ladder ends only on the ladder's side of its wall, knee to head, a head over its top only up an open column), so older caches prune again.
+## Bumped when the prune records or tests more (6: the prop and clip layers too; 7: gs-npc v0.1.21 and the hull files in the key; 8: bridges between pieces holding a spawn or post; 11: ladder ends only on the ladder's side of its wall, knee to head, a head over its top only up an open column), so older caches prune again.
 const PRUNE_VERSION := 11
 const ZzNavNotes := preload("zz_nav_notes.gd")
 const ZzLaps := preload("zz_laps.gd")
@@ -21,7 +21,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 
-## Every zombie: dot-npc's spawner, dot-npc-ai-director's pacing, dot-combat's health, and the clocks the genre runs on top of a director. Server only.
+## Every zombie: gs-npc's spawner, gs-npc-ai-director's pacing, gs-combat's health, and the clocks the genre runs on top of a director. Server only.
 ## The director keeps a calm-rising population of commons; this file adds mobs, specials, the brute, panic while an objective is held, survival intensity and waves.
 ## Barricades stay on the zombies' ground so the horde paths at them and bashes ([method barricade_in_way], [method bash]); a combat id comes from the game's [GSEntityTable] and carries its kind.
 
@@ -58,7 +58,7 @@ var senses: GSNpcSenses = null
 var squads: GSNpcAiSquads = GSNpcAiSquads.new()
 
 ## The server's `npc_skill`, `npc_reaction_scale` and `npc_reaction_min`, which move every kind
-## toward easy or nightmare without making them one monster (dot-npc-ai's [GSNpcAiSkill]).
+## toward easy or nightmare without making them one monster (gs-npc-ai's [GSNpcAiSkill]).
 var skill: GSNpcAiSkill = GSNpcAiSkill.new()
 var sounds: GSNpcAiSounds = GSNpcAiSounds.new()
 var nav: GSNpcNavData = null
@@ -98,15 +98,15 @@ var wave_index: int = 0
 var barricades: Dictionary = {}
 
 ## Every living zombie by four-metre cell, built once a tick ([method _rebuild_grid]) for spacing and threat scans.
-## The script grid (by path: an old pack shell lacks the class name), or dot-sim's `GSSimCrowdGrid` (same answers
+## The script grid (by path: an old pack shell lacks the class name), or gs-sim's `GSSimCrowdGrid` (same answers
 ## to the bit) while [member ZzConfig.native_crowd] is on and the library is loaded: untyped, so either answers.
-const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
+const CrowdGrid := preload("res://addons/gs_npc_ai/steer/gs_npc_ai_crowd_grid.gd")
 const NATIVE_CROWD := &"GSSimCrowdGrid"
 var crowd: Variant = CrowdGrid.new(GRID)
 ## Whether [member crowd] is the native grid now.
 var crowd_native: bool = false
 
-## dot-sim's `GSSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
+## gs-sim's `GSSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
 ## the commons' chase plan off a survivor table fed once a tick ([code]_feed_brains[/code]).
 const NATIVE_BRAINS := &"GSSimZombieBrains"
 var brains_native: Object = null
@@ -149,7 +149,7 @@ var zombie_speed_scale: float = 1.0
 ## Gates opened this map, so the graph is rebuilt without them.
 var open_gates: PackedStringArray = PackedStringArray()
 
-## How a zombie falls when it dies: dot-player-char's reactions, picked here on the server from
+## How a zombie falls when it dies: gs-player-char's reactions, picked here on the server from
 ## the killing hit and sent with the zombie's end (NPC_GONE), so every screen draws the same fall.
 var death_reactions: GSPlayerDeathReactions = GSPlayerDeathReactions.stock()
 

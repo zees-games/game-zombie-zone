@@ -97,15 +97,15 @@ func _test_client() -> void:
 	# The key reaches the command: Shift is bound to the sprint action (and not the slow walk), and holding it sets the sprint bit.
 	ZzPlayer.register_actions()
 	var shift := false
-	for event in InputMap.action_get_events(&"dot_fps_sprint"):
+	for event in InputMap.action_get_events(&"gs_fps_sprint"):
 		shift = shift or (event is InputEventKey and (event as InputEventKey).physical_keycode == KEY_SHIFT)
 	_check(shift, "Shift is bound to the sprint action")
 	var sampler := GSFpsSampler.new(t)
-	Input.action_press(&"dot_fps_sprint")
-	Input.action_press(&"dot_fps_forward")
+	Input.action_press(&"gs_fps_sprint")
+	Input.action_press(&"gs_fps_forward")
 	var command := sampler.sample(TICK)
-	Input.action_release(&"dot_fps_sprint")
-	Input.action_release(&"dot_fps_forward")
+	Input.action_release(&"gs_fps_sprint")
+	Input.action_release(&"gs_fps_forward")
 	_check(command.is_pressed(GSFpsCommand.BUTTON_SPRINT) and command.move.y > 0.9, "holding the sprint action sets the sprint bit on the command")
 	_finished()
 

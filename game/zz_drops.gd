@@ -9,7 +9,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 ##
 ## [b]Tuning is `cfg/addon/zombie_zone/drops.yml`[/b] (every `*.yml` there, then the game, then the
 ## operator's `cfg/server/...` tiers, then `ZOMBIE_ZONE_DROPS_*` and `--zombie_zone.drops.*`), read
-## by dot-core's [GSAddonConfig]. A kind's setting is the first found of `types.<kind>`, then its
+## by gs-core's [GSAddonConfig]. A kind's setting is the first found of `types.<kind>`, then its
 ## class (`common`, or `mutant` for every other kind, a pack's monster included), then the top level.
 
 const CHANNEL := "zz.drops"

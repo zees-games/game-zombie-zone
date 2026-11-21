@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The survivor's flashlight config and the server's rules for it (the beam is dot-flashlight's).
+## The survivor's flashlight config and the server's rules for it (the beam is gs-flashlight's).
 
 const ZzMapDocScript := preload("zz_map_doc.gd")
 const ZzAudio := preload("zz_audio.gd")

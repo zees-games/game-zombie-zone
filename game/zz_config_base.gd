@@ -49,7 +49,7 @@ const ZzCapsScript := preload("zz_caps.gd")
 
 @export_group("Survival")
 
-## How a survival map is held (dot-npc-ai-director's [GSNpcDirectorWaves]): [codeblock] waves a breather, then wave after wave,
+## How a survival map is held (gs-npc-ai-director's [GSNpcDirectorWaves]): [codeblock] waves a breather, then wave after wave,
 ## each a crowd to kill and bigger than the last nights a day to get ready, then a night to live through, harder every night
 ## clock one stretch of time that gets worse the longer it runs (the old survival) [/codeblock]
 @export_enum("waves", "nights", "clock") var survival_style: int = 0
@@ -151,7 +151,7 @@ func setup_seconds() -> float:
 
 @export_group("Trader")
 
-## Operator overrides of the `game: shop:` block of `dot_weapon/spawner.yml` (docs/operators.md); -1 leaves the file in charge.
+## Operator overrides of the `game: shop:` block of `gs_weapon/spawner.yml` (docs/operators.md); -1 leaves the file in charge.
 ## `zz_trader`: 0 no trader on any map, 1 one.
 @export_range(-1, 1) var trader_enabled: int = -1
 ## `zz_trader_when`: 0 the setup period only, 1 setup and a survival map's breathers, 2 always.
@@ -199,7 +199,7 @@ func setup_seconds() -> float:
 @export_range(5.0, 3600.0, 1.0, "or_greater") var team_damage_window: float = 60.0
 
 ## Team damage dealt within the window that starts a voteban against the player, through
-## dot-vote's API. 0 never. Counted before reflection, so a new player being reflected still
+## gs-vote's API. 0 never. Counted before reflection, so a new player being reflected still
 ## runs up their total.
 @export_range(0.0, 100000.0, 5.0, "or_greater") var team_damage_vote: float = 150.0
 
@@ -231,7 +231,7 @@ func setup_seconds() -> float:
 ## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
 @export_range(0.5, 14.0, 0.5, "or_greater") var nav_budget_ms: float = 6.0
 
-## Whether a map is annotated (dot-npc-ai's drops, chokepoints and covered spots) after its
+## Whether a map is annotated (gs-npc-ai's drops, chokepoints and covered spots) after its
 ## bake, and the bots and the horde use what it finds. Off plays as before the annotations.
 ## `zz_nav_notes`.
 @export var nav_notes: bool = true
@@ -297,23 +297,23 @@ func setup_seconds() -> float:
 ## where it asked, instead of asking the graph again each thought. 0 (the default) asks every thought: on the 56-zombie
 ## bench 4 moved brains -6%, +1%, -3% and -3% on three boxes, inside the noise (docs/survival.md). `zz_path_reuse_thoughts`.
 @export_range(0, 64, 1, "or_greater") var path_reuse_thoughts: int = 0
-## Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in dot-sim's native
-## `GSSimCrowdGrid` when the library is loaded: the same indices and pushes to the bit as dot-npc-ai's
+## Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in gs-sim's native
+## `GSSimCrowdGrid` when the library is loaded: the same indices and pushes to the bit as gs-npc-ai's
 ## script grid, which false (or no library, the web) keeps. `zz_native_crowd`.
 @export var native_crowd: bool = true
 
-## dot-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in dot-sim's `GSSimSenses`
+## gs-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in gs-sim's `GSSimSenses`
 ## when the library is loaded: the same targets at the same moments as the script, which false (or no
 ## library, the web) keeps. `zz_native_senses`.
 @export var native_senses: bool = true
 
-## The commons' chase plan (whom, where, how fast, how near) and every zombie's spaced heading in dot-sim's
+## The commons' chase plan (whom, where, how fast, how near) and every zombie's spaced heading in gs-sim's
 ## `GSSimZombieBrains` and `GSSimCrowdGrid.spaced_direction` when the library is loaded: the same decisions as
 ## the script, which false (or no library, the web) keeps. `zz_native_brains`.
 @export var native_brains: bool = true
 
-## dot-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tick in
-## dot-sim's `GSSimThinkPacer` when the library is loaded, calling only the zombies due: the same thoughts with the
+## gs-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tick in
+## gs-sim's `GSSimThinkPacer` when the library is loaded, calling only the zombies due: the same thoughts with the
 ## same seconds as each brain counting its own ticks, which false (or no library, the web) keeps. `zz_native_pacing`.
 @export var native_pacing: bool = true
 
@@ -322,7 +322,7 @@ func setup_seconds() -> float:
 @export_range(0, 256, 1, "or_greater") var bot_max: int = 0
 
 ## A stand-in with nothing pressed, nothing switching or reloading, ticks its weapon every this many
-## ticks (staggered per stand-in). 1 ticks every tick; the idle path is cheap since dot-weapon 0.1.39.
+## ticks (staggered per stand-in). 1 ticks every tick; the idle path is cheap since gs-weapon 0.1.39.
 ## `zz_bot_weapon_idle_every`.
 @export_range(1, 16, 1, "or_greater") var bot_weapon_idle_every: int = 1
 

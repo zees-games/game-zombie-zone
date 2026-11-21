@@ -180,7 +180,7 @@ func _remote_players() -> int:
 	return count
 
 
-## Every few seconds, one line: the tick rate held and what a tick cost (dot-net server counters).
+## Every few seconds, one line: the tick rate held and what a tick cost (gs-net server counters).
 func _report(net: GSNetManager) -> void:
 	var last: Dictionary = net.perf_counters()
 	var t0 := Time.get_ticks_usec()

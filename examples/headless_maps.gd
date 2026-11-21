@@ -53,7 +53,7 @@ func _run() -> void:
 			await _test_map(StringName(id))
 
 	if _worlds_skipped > 0:
-		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run dot-bootstrap for the full suite)" % _worlds_skipped)
+		print("SKIPPED: %d world maps' spawner checks (world/ is not linked; run gs-bootstrap for the full suite)" % _worlds_skipped)
 
 	var sections := (CORE_SECTIONS if core else 0) + (1 if light else 0) + (1 if worlds else 0) + played.size()
 	var checks := CHECKS_PER_MAP * played.size() + 3 * _spawner_worlds + _nav_extra_maps
@@ -145,7 +145,7 @@ func _test_solid_prop_budget() -> void:
 	var game := await _world(&"")
 	var source: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://maps/ze_biohazard_manor.json"))
 	if not (source is Dictionary):
-		print("SKIPPED: the solid prop budget (maps/ is not linked; run dot-bootstrap)")
+		print("SKIPPED: the solid prop budget (maps/ is not linked; run gs-bootstrap)")
 		_passed += SOLID_PROP_CHECKS
 		await _dispose(game)
 		_finished()
@@ -297,7 +297,7 @@ func _test_baked_light() -> void:
 		"a headless process (a server) never lays a bake over its world", "%s" % [res.error.message if not res.ok else "attached"])
 	host.free()
 
-	# A host with dot-lighting older than API level 5 must still parse the game: nothing under game/
+	# A host with gs-lighting older than API level 5 must still parse the game: nothing under game/
 	# may name a level-5 class, only reach it by path behind ZzMap.can_bake().
 	var named := PackedStringArray()
 	for f in Array(DirAccess.get_files_at("res://game")) + Array(DirAccess.get_files_at("res://game/net")).map(func(n): return "net/" + n):
@@ -306,7 +306,7 @@ func _test_baked_light() -> void:
 		for line in FileAccess.get_file_as_string("res://game/" + f).split("\n"):
 			if not line.strip_edges().begins_with("#") and (line.contains("GSLightBake") or line.contains("GSLightmapSheet")):
 				named.append("%s: %s" % [f, line.strip_edges()])
-	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 dot-lighting class", "%s" % [named])
+	_check(named.is_empty() and ZzMap.can_bake(), "no game script names a level-5 gs-lighting class", "%s" % [named])
 	var cfg := ZzConfig.new()
 	_check(cfg.shadow_proxy and is_zero_approx(cfg.shadow_range) and not cfg.shadow_translucent,
 		"the shadow cvars default to proxy on, range 0 (all), translucent off")
@@ -319,7 +319,7 @@ func _test_baked_light() -> void:
 		shadow_map.set_shadow_cost(true, 0.0, false)
 		shadow_map.free()
 		shadows_set = shadows_set and bool(mesh.get(&"shadow_proxy")) and not bool(mesh.get(&"shadow_translucent"))
-	_check(shadows_set, "set_shadow_cost reaches dot-map's proxy, range and translucent switches and restores them")
+	_check(shadows_set, "set_shadow_cost reaches gs-map's proxy, range and translucent switches and restores them")
 	await _dispose(game)
 	_finished()
 
@@ -365,7 +365,7 @@ func _test_worlds() -> void:
 		var orphans := 0
 		for rec: Dictionary in manifest.get("movers", []):
 			if rec.get("model") == null:
-				# A hinged prop door has no brush: dot-map's stand-in is its body.
+				# A hinged prop door has no brush: gs-map's stand-in is its body.
 				if rec.get("classname") != "prop_door_rotating":
 					orphans += 1
 			elif not models.has(int(rec["model"])):
@@ -388,13 +388,13 @@ func _test_worlds() -> void:
 		var wanted_props := 0
 		# A library model draws when the pack's model store resolves (the game's .stores link, present only
 		# while a tool such as solid_props.sh holds it) and otherwise becomes a proxy, so count both worlds.
-		# The world finds its own store (dot-map follows a linked world folder; a lexical `../` off res:// does not).
+		# The world finds its own store (gs-map follows a linked world folder; a lexical `../` off res:// does not).
 		var licence: Dictionary = manifest.get("licence", {})
 		var in_store := {}
 		for row: Dictionary in licence.get("model_stand_ins", []):
 			var stored: String = world.call(&"_library_path", str(row.get("stand_in", "")))
 			if stored != "" and FileAccess.file_exists(stored):
-				# A damaged model is drawn as its box (dot-map warns); it is a data defect to print, not a prop to count.
+				# A damaged model is drawn as its box (gs-map warns); it is a data defect to print, not a prop to count.
 				var defect: String = (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"gltf_defect", stored)
 				if defect != "":
 					print("  note  %s: %s" % [row.get("stand_in", ""), defect])
@@ -404,14 +404,14 @@ func _test_worlds() -> void:
 			if rec.has("box") or in_store.has(str(rec.get("stand_in", ""))):
 				wanted_props += 1
 			elif (load(ZzMap.MESH_SCRIPT) as GDScript).call(&"find_resource", str(rec.get("stand_in", "")),
-					PackedStringArray(["res://addons/dot_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
+					PackedStringArray(["res://addons/gs_map/props"]), PackedStringArray([".glb", ".tscn"])) != null:
 				wanted_props += 1
 		var props_node := host.get_node_or_null("Props")
-		# Low-detail boxes for library models this checkout lacks (dot-map's proxies) are counted apart.
+		# Low-detail boxes for library models this checkout lacks (gs-map's proxies) are counted apart.
 		var drawn_props := 0
 		var proxies := 0
 		for c in (props_node.get_children() if props_node != null else []):
-			if c.has_meta(&"dot_map_proxy") or c.name == &"UnseenProps":
+			if c.has_meta(&"gs_map_proxy") or c.name == &"UnseenProps":
 				proxies += 1
 			else:
 				drawn_props += 1
@@ -429,7 +429,7 @@ func _test_library_indices() -> void:
 	var store := ProjectSettings.globalize_path("res://.stores/model-library")
 	if DirAccess.dir_exists_absolute(store):
 		var out := []
-		var tool := ProjectSettings.globalize_path("res://addons/dot_map/store/check_gltf_indices.py")
+		var tool := ProjectSettings.globalize_path("res://addons/gs_map/store/check_gltf_indices.py")
 		var code := OS.execute("python3", ["-I", tool, store], out, true)
 		_check(code == 0, "every library model's indices are within its vertices", str(out[0] if out.size() > 0 else "no output").strip_edges().right(400))
 	else:
@@ -665,9 +665,9 @@ func _test_map(id: StringName) -> void:
 	await _dispose(game)
 	_finished()
 
-## The map's toys (dot-props', loose only), after two seconds of physics.
+## The map's toys (gs-props', loose only), after two seconds of physics.
 func _toys(game: ZzGame, doc: Dictionary) -> void:
-	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
+	# The toys (gs-props', loose only): all built, none inside a wall, a car or a shelf, and two
 	# seconds of physics later every one still where the map put it, not through a floor.
 	var box := game.map.toys
 	var placed := (doc.get("toys", []) as Array).size() + (doc.get("loose_toys", []) as Array).size()    # the world's loose props are built into the same box
@@ -691,7 +691,7 @@ func _toys(game: ZzGame, doc: Dictionary) -> void:
 				stuck.append("%s %d at %s" % [toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1)])
 				break
 	_check(box.count() == placed and box.missing.is_empty() and stuck.is_empty(),
-		"%d toys (maps carry none now: only the practice street's test props), every one dot-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
+		"%d toys (maps carry none now: only the practice street's test props), every one gs-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
 	for _i in range(120):
 		await get_tree().physics_frame
 	var strayed: Array = []
@@ -731,7 +731,7 @@ func _spawner_sites(game: ZzGame, doc: Dictionary) -> void:
 		_check(site_floating.is_empty(), "every spawner and shelf the config adds stands over something", "; ".join(site_floating.slice(0, 6)))
 		_check(str(doc.get("mode", "")) == "exodus" or shelves > 0, "a survival world has a trader", str(shelves))
 
-## dot-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing
+## gs-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing
 ## in `Drawn` (batched into chunks) and its shapes in `Solid`, so the audit is the lenient one;
 ## the exact half is the document: a visible box that is not solid is drawn and walked through.
 func _report_colliderless(id: StringName, doc: Dictionary) -> void:
@@ -752,7 +752,7 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 
 	var found: PackedStringArray = (res.value as GSCollisionAudit).paths() if res.ok else PackedStringArray()
 	_check(res.ok and (res.value as GSCollisionAudit).examined > 0 and found.is_empty(),
-		"everything drawn has collision, or says it is decoration (dot_no_collision)", "; ".join(found.slice(0, 6)) if res.ok else res.error.message)
+		"everything drawn has collision, or says it is decoration (gs_no_collision)", "; ".join(found.slice(0, 6)) if res.ok else res.error.message)
 	await _dispose(drawn)
 	# Both worlds share one physics space: let the server drop the drawn one's bodies before the
 	# checks that follow ask it about the same spot.

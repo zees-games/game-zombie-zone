@@ -2,7 +2,7 @@ extends RefCounted
 
 const ZzConfig := preload("zz_config.gd")
 
-## Ammo piles and boxes lying on the ground as real rigid bodies (dot-props' `crate` toy, in a
+## Ammo piles and boxes lying on the ground as real rigid bodies (gs-props' `crate` toy, in a
 ## [GSPropBodyBox] of their own so the map's toys keep their wire indexes): pushed by survivors and
 ## zombies, shot, thrown by a blast. The server simulates; a client is sent where the awake ones
 ## are, a few times a second ([signal moved_many]), and the loot entry's place follows the body,

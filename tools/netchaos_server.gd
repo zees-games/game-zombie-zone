@@ -3,7 +3,7 @@ extends GSGameNetchaosServer
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 
-## Zombie Zone's side of `tools/netchaos.sh` (dot-game's GSGameNetchaosServer): the practice street, no stand-ins, no horde.
+## Zombie Zone's side of `tools/netchaos.sh` (gs-game's GSGameNetchaosServer): the practice street, no stand-ins, no horde.
 
 var _game: ZzGame = null
 

@@ -16,7 +16,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("game-zombie-zone: per-map cvars")
 	var root := OS.get_cache_dir().path_join("zz_mapcfg_%d" % OS.get_process_id())
-	var dir := root.path_join("server/game/%s/dot_map/map" % ZzMapConfig.GAME_ID)
+	var dir := root.path_join("server/game/%s/gs_map/map" % ZzMapConfig.GAME_ID)
 	DirAccess.make_dir_recursive_absolute(dir)
 	_write(dir.path_join("zz_probe_hold.yml"), "zz_waves: 4\nzz_difficulty: 3\nzz_gravity: 1\n")
 

@@ -2,10 +2,10 @@ extends GSNpcNavGraph
 
 ## The zombies' graph with the one thing the grid cannot say: a way that only goes one way.
 ##
-## [b]Why a subclass and not edges in the data.[/b] dot-npc's edge list is undirected by
+## [b]Why a subclass and not edges in the data.[/b] gs-npc's edge list is undirected by
 ## declaration, and a drop is not: a zombie steps off a balcony and cannot step back up it. A
 ## graph that let it would route a horde to the foot of a wall and leave it pushing on the
-## brick. So the drops (`ZzNavNotes`, from dot-npc-ai's annotations) live here, beside the
+## brick. So the drops (`ZzNavNotes`, from gs-npc-ai's annotations) live here, beside the
 ## adjacency, and are read three ways:
 ##
 ## [codeblock]
@@ -14,10 +14,10 @@ extends GSNpcNavGraph
 ## [/codeblock]
 ##
 ## Which of the two is asking is the filter the spawner sets per search (`filter`), never a flag
-## on the graph, for the reason dot-npc gives for filters: one graph serves everybody.
+## on the graph, for the reason gs-npc gives for filters: one graph serves everybody.
 
 ## The filter a stand-in's search sets: no link at all. Its avoid cost is a number nothing else
-## uses, so the native search keeps a graph of its own for it (dot-npc keys them by signature).
+## uses, so the native search keeps a graph of its own for it (gs-npc keys them by signature).
 var bot_filter: GSNpcNavFilter = null
 
 ## Whether a zombie may climb the jump ups (`zz_zombie_climb`). A body that jumps a metre and a
@@ -365,7 +365,7 @@ func relabel() -> void:
 
 
 ## The pieces as a zombie walks them: points that reach each other BOTH ways, and [member _reach] says which piece leads to
-## which. dot-npc's flood in point order is right for two-way edges and wrong here: a ledge whose top was numbered after its
+## which. gs-npc's flood in point order is right for two-way edges and wrong here: a ledge whose top was numbered after its
 ## foot was "another piece" and the search refused the way down. They are the pieces of whoever [member filter] is.
 func _label_components() -> void:
 	var count := data.points.size()

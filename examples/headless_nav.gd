@@ -5,7 +5,7 @@ extends "headless_nav_mend.gd"
 ## cvars `zz_bot_hold_chokes` and `zz_zombie_spread` off are the old behaviour) and fails if the
 ## new one is not better: armed, so a bot that goes back to its post at a window turns this red.
 ##
-## Counts sections and checks (dot-settings' story).
+## Counts sections and checks (gs-settings' story).
 
 ## The suite is three scenes over this script, one per `shard` (game.sh caps a suite at 1200 s):
 ## headless_nav (core), headless_nav_holds and headless_nav_waves, which has one section and two
@@ -509,7 +509,7 @@ const REPEAT_TICKS := 2000
 
 
 ## sv_threads_npc's promise: the same seed gives the same horde, and worker threads change nothing.
-## The horde sets dot-npc's deferred_paths (ZzHorde.setup): every repath is queued and answered
+## The horde sets gs-npc's deferred_paths (ZzHorde.setup): every repath is queued and answered
 ## after every brain has thought, at 0 path workers too, so path workers 0 and 2 agree.
 func _test_repeatable() -> void:
 	_section("a seeded horde is the same horde twice, and with npc workers")

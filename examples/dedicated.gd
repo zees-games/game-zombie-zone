@@ -78,7 +78,7 @@ func _shut_down() -> void:
 func _boot() -> void:
 	_section("booting")
 
-	# `startup_config`, because `sv_tickrate` is startup-only and dot-server execs this file
+	# `startup_config`, because `sv_tickrate` is startup-only and gs-server execs this file
 	# before the listener for exactly that reason.
 	var cfg_path := "%s/server.cfg" % SERVER_DIR
 	var cfg := FileAccess.open(cfg_path, FileAccess.WRITE)
@@ -230,7 +230,7 @@ func _test_the_commands() -> void:
 
 	_check_bot_commands()
 
-	# Shooting through team-mates is the operator's: dot-combat's cvar, bound by the module to
+	# Shooting through team-mates is the operator's: gs-combat's cvar, bound by the module to
 	# the world's own combat rules, live from the next shot.
 	for feel_name in [ZeeViewFeel.CVAR_KICK, "mp_vm_sway", "mp_vm_bob"]:
 		var feel_cvar := server.console.find_cvar(feel_name)
@@ -255,7 +255,7 @@ func _test_the_commands() -> void:
 	var _hot := _run_command("zz_head_mult 6")
 	_check(is_equal_approx(zones.multiplier(GSHitGroup.HEAD), 6.0), "a changed zz_head_mult reaches the resolver's table")
 	var _cool := _run_command("zz_head_mult 4")
-	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
+	# And it is REPLICATED: gs-server sends it to every client before its scene loads and on
 	# every change, so a client's own combat manager (following its link) predicts tracers
 	# under the server's level rather than its default.
 	var shared := server.console.find_cvar("mp_teammate_passthrough")
@@ -266,7 +266,7 @@ func _test_the_commands() -> void:
 		str(server.console.replicated_values()))
 	var _one := _run_command("mp_teammate_passthrough 1")
 
-	# Dead bodies are the owner's too: dot-player-char's sv_ragdoll* set, REPLICATED (a client
+	# Dead bodies are the owner's too: gs-player-char's sv_ragdoll* set, REPLICATED (a client
 	# draws the bodies), on the world's own rules, and the horde picks a zombie's fall from them.
 	var ragdoll := server.console.find_cvar("sv_ragdoll")
 	var _crumple := _run_command("sv_ragdoll_reactions limp=0,face_plant=0,crumple=1,headshot_launch=0,power_launch=0")
@@ -461,7 +461,7 @@ func _test_the_map_vote() -> void:
 	_check(ids.has("zz_blackout_1") and ids.has("zz_lot"), "it offers the delivered maps", str(ids))
 
 	# The map menu's server half (M): the owner's flag changes the map now, anybody else
-	# gets a nomination and a rock-the-vote. Contexts as dot-server makes them for a chat line.
+	# gets a nomination and a rock-the-vote. Contexts as gs-server makes them for a chat line.
 	var menu_half: Object = vote.get("commands").get("map_menu")
 	_check(menu_half != null and server.console.find_command("mapmenu") != null
 		and server.console.find_cvar("sv_map_menu_flag").get_string() == "generic"
@@ -517,7 +517,7 @@ func _test_the_map_vote() -> void:
 
 	# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL the
 	# director opens nothing itself, a passed rtv included: it answered "Rocked. 1 of 1." and
-	# no ballot came. Past dot-vote's cooldown between two ballots, on the director alone so
+	# no ballot came. Past gs-vote's cooldown between two ballots, on the director alone so
 	# the map's own ballot timer does not open one first.
 	var laid := StringName(str(game.map_doc.get("id", "")))
 	_check(director.current_id() == laid and not director.is_voting(),
@@ -543,7 +543,7 @@ func _test_the_map_vote() -> void:
 
 
 ## [b]`time_up: finish_round` waits for a round being played, never for warmup.[/b] The game
-## hands dot-vote its match's answer (`round_in_progress_fn`); without it a limit that ran out
+## hands gs-vote its match's answer (`round_in_progress_fn`); without it a limit that ran out
 ## in warmup held the change for `finish_round_max_sec` over a round that had not started.
 ## Run on a director of its own carrying the game's own hook, so the real vote's clock is
 ## untouched; the match's state is set by hand and put back.
@@ -556,7 +556,7 @@ class CommandHost extends Node:
 		return null
 
 
-## `cfg/maps.yml`: which maps rotate. The format is dot-map's selftest's; this is what the GAME
+## `cfg/maps.yml`: which maps rotate. The format is gs-map's selftest's; this is what the GAME
 ## does with it: a map left out is installed and loadable and is never drawn, never on a ballot,
 ## marked in the map list; a switch of rotation takes effect; a renamed command is registered.
 func _test_rotation_file() -> void:
@@ -698,7 +698,7 @@ func _test_finish_round_waits_for_a_live_round() -> void:
 
 
 ## A director under `time_up: finish_round` carrying [param hook], its clock run out with a
-## winner already decided: what dot-vote's own suite builds, with the game's answer in it.
+## winner already decided: what gs-vote's own suite builds, with the game's answer in it.
 func _finish_round_probe(hook: Callable, applied: Array) -> GSVoteDirector:
 	var source := GSVoteListSource.new()
 	var _a := source.add(GSVoteChoice.of(&"a", "A"))
@@ -746,11 +746,11 @@ func _finish_round_probe(hook: Callable, applied: Array) -> GSVoteDirector:
 ## A reload keeps the maps the server names. `zz_reload` reads the map directory again with
 ## `load_from`, which forgets everything read before, and in two of the three games built this
 ## way it stopped there: every delivered map was gone until a restart, with nothing logged.
-## A pack "mounted" on the disk and a descriptor naming it stand in for dot-cloud and the
-## deployment's map config (dot-server-deploy's cfg/content.yml), which a suite has neither of.
+## A pack "mounted" on the disk and a descriptor naming it stand in for gs-cloud and the
+## deployment's map config (gs-server-deploy's cfg/content.yml), which a suite has neither of.
 func _test_a_reload_keeps_delivered_maps() -> void:
 	_section("a reload keeps the maps the server names")
-	var key := "dot-test/zz-delivered@1.0.0"
+	var key := "gs-test/zz-delivered@1.0.0"
 	var mount := GSGameContent.mount_of(key)
 	var dir := mount.path_join("maps")
 	var id := &"zz_delivered_check"
@@ -813,15 +813,15 @@ func _test_a_reload_keeps_delivered_maps() -> void:
 
 	DirAccess.remove_absolute(dir.path_join("delivered_check.json"))
 	var path := dir
-	while path != "res://dot_cloud":
+	while path != "res://gs_cloud":
 		DirAccess.remove_absolute(path)
 		path = path.get_base_dir()
-	DirAccess.remove_absolute("res://dot_cloud")
+	DirAccess.remove_absolute("res://gs_cloud")
 	_finished()
 
 
 ## [b]A seat whose client has not lifted its loading cover is not hurt, pinned or hunted, and is
-## once it does[/b] (dot-game's "still loading"), over a real ENet socket. A client joins and says
+## once it does[/b] (gs-game's "still loading"), over a real ENet socket. A client joins and says
 ## nothing, as one still loading its level; a zombie's bite, a friend's bullet and a pin are then
 ## refused, the horde does not count it as a target, and nobody spawns at it. An admin's slay
 ## still passes. The client then sends `game.cover` on the wire and the same hit lands and the

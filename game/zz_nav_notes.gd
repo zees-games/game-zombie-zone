@@ -1,6 +1,6 @@
 extends RefCounted
 
-## What the map means to somebody walking it, for this game: dot-npc-ai's annotations
+## What the map means to somebody walking it, for this game: gs-npc-ai's annotations
 ## (drops, chokepoints, covered spots) worked into the three things the bots and the horde use.
 ##
 ## [codeblock]
@@ -199,9 +199,9 @@ func tick() -> bool:
 
 func _bake() -> bool:
 	# A map over the engine's cell limit bakes in tiles joined into one mesh, or fails saying why.
-	# dot-bot from API level 31 does that itself (agent key "tile"); a shell pinned below it runs
+	# gs-bot from API level 31 does that itself (agent key "tile"); a shell pinned below it runs
 	# ZzNavBake, this game's copy, until the pin catches up and that file can go.
-	var native_tiles := GSAddonApi.build_level("dot_bot") >= 31
+	var native_tiles := GSAddonApi.build_level("gs_bot") >= 31
 	var bot: GSBotNav = GSBotNav.new() if native_tiles else ZzNavBake.new()
 	if not native_tiles:
 		bot.set("tile_size", float(_config.nav_notes_bake_tile))
@@ -214,10 +214,10 @@ func _bake() -> bool:
 		DirAccess.make_dir_recursive_absolute(bot.cache_dir)
 
 	# The survivors' 72-unit body; the default 0.175 m cell rounds its radius up to 0.525 m and shuts
-	# doors, a 0.1016 m cell is exactly 4 cells of it (dot-bot API level 23; older dot-bot ignores it).
+	# doors, a 0.1016 m cell is exactly 4 cells of it (gs-bot API level 23; older gs-bot ignores it).
 	var agent := {"radius": ZzBody.BODY_RADIUS, "height": ZzBody.BODY_HEIGHT, "climb": 0.4, "cell": 0.1016, "cell_height": 0.05}
 	# The map's edge-merge cell at its finest, so two edges a tenth of a cell apart stop counting as
-	# one (fewer edge errors from the engine; dot-bot API level 33, older dot-bot ignores the key).
+	# one (fewer edge errors from the engine; gs-bot API level 33, older gs-bot ignores the key).
 	agent["merge_scale"] = 0.01
 	if native_tiles:
 		agent["tile"] = float(_config.nav_notes_bake_tile)
@@ -269,7 +269,7 @@ func _bake_failed(res: GSResult) -> bool:
 func _baked(bot: GSBotNav) -> bool:
 	bake_ms = bot.bake_ms
 	bake_cached = bot.last_bake_cached
-	var native := GSAddonApi.build_level("dot_bot") >= 31
+	var native := GSAddonApi.build_level("gs_bot") >= 31
 	var cut := "tiles_used" if native else "tiles_cut"
 	var side := "tile_used" if native else "tile_cut"
 	bake_tiles = int(bot.get(cut))

@@ -38,7 +38,7 @@ func _run() -> void:
 					"CI has no world/ and expects the declared number; fix the argument")
 
 	if _skipped > 0:
-		print("SKIPPED: %d checks need world/ (not linked, as in CI); run dot-bootstrap for the full suite" % _skipped)
+		print("SKIPPED: %d checks need world/ (not linked, as in CI); run gs-bootstrap for the full suite" % _skipped)
 	_report_sections(_entered, _finished, SECTIONS, CHECKS - _skipped)
 
 func _sim(game: ZzGame, ticks: int) -> void:
@@ -679,7 +679,7 @@ func _volumes_push(game: ZzGame, mech: ZzMechanics) -> void:
 	_check(wire_ok, "a volume switched by the map's I/O is told to clients and applied as locked or not")
 
 
-# The map's logic (dot-map's GSMapIO under the mechanics)
+# The map's logic (gs-map's GSMapIO under the mechanics)
 
 func _logic_rec(entity: int, classname: String, targetname: String, keys: Dictionary) -> Dictionary:
 	return {"entity": entity, "classname": classname, "targetname": targetname, "target": "", "origin": [0.0, 0.0, 0.0], "treatment": "data", "keys": keys}
@@ -1052,7 +1052,7 @@ func _test_no_world() -> void:
 	_check(true, "and no input to press")
 	_finished += 1
 
-## The events dot-map added: a breakable's spawn_object, the ambient fade and spin, and a start point that begins disabled and is switched on by an input.
+## The events gs-map added: a breakable's spawn_object, the ambient fade and spin, and a start point that begins disabled and is switched on by an input.
 func _test_map_events() -> void:
 	_entered += 1
 	print("map events: spawn_object, sound fade and spin, disabled start points")
@@ -1116,8 +1116,8 @@ func _test_map_events() -> void:
 	add_child(driver_root)
 	var player := AudioStreamPlayer3D.new()
 	player.name = "hum"
-	player.set_meta(&"dot_map_entity", 7)
-	player.set_meta(&"dot_map_gain_scale", 1.0)
+	player.set_meta(&"gs_map_entity", 7)
+	player.set_meta(&"gs_map_gain_scale", 1.0)
 	driver_root.add_child(player)
 	var driver := GSMapSoundDriver.new()
 	driver.root = driver_root
@@ -1286,7 +1286,7 @@ func _test_ladder_from_water() -> void:
 	game.queue_free()
 	_finished += 1
 
-## sv_falldamage: a hard landing costs health through dot-combat, a short drop and the cvar off cost none.
+## sv_falldamage: a hard landing costs health through gs-combat, a short drop and the cvar off cost none.
 func _test_fall_damage() -> void:
 	_entered += 1
 	print("fall damage")

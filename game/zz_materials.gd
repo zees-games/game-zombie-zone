@@ -144,12 +144,12 @@ static func penetration_of(collider: Object, shape_index: int) -> StringName:
 	return StringName(PENETRATION_OF.get(str(node.get_meta(&"surface")), ""))
 
 
-## Where the photographic kinds are (dot-map's GSMapSurfaces), in this game's own tree: the
-## client shell bundles dot-map without its textures, so the ones used ship in this pack
-## (assets/surfaces, [code]tools/sync-surfaces.sh[/code] in dot-map writes it). Rebased, for a
+## Where the photographic kinds are (gs-map's GSMapSurfaces), in this game's own tree: the
+## client shell bundles gs-map without its textures, so the ones used ship in this pack
+## (assets/surfaces, [code]tools/sync-surfaces.sh[/code] in gs-map writes it). Rebased, for a
 ## delivered pack.
 const SURFACES_ROOT := "res://assets/surfaces"
-const SURFACES_SCRIPT := "res://addons/dot_map/surfaces/dot_map_surfaces.gd"
+const SURFACES_SCRIPT := "res://addons/gs_map/surfaces/gs_map_surfaces.gd"
 
 ## Which surface kind draws a map surface, by what the box is: a [b]wall[/b] (anything
 ## upright or small) or a [b]floor[/b] (a slab lying down, 0.6 m or thinner and wider than
@@ -177,7 +177,7 @@ const SURFACE_BY_MAP := {"zz_mall": {"tile_check": "tile_white"}}
 ## Kinds whose photograph is drawn with a softer copy (assets/surfaces_soft/<kind>.jpg, made from
 ## the vendored albedo by pulling it halfway toward its light squares): the school keeps a
 ## checker, with dark squares that are dark grey rather than black. Kept outside assets/surfaces
-## because dot-map's sync owns that folder.
+## because gs-map's sync owns that folder.
 const SOFT_ALBEDO := {"tile_checker": "res://assets/surfaces_soft/tile_checker.jpg"}
 
 ## A kind's own tint, multiplied under the map's. The photographs are mid-tone to bright

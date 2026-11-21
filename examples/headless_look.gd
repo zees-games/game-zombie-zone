@@ -8,7 +8,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzTouch := preload("../game/zz_touch.gd")
 
-## Blood behind a hit body (zz_blood.gd over dot-fx's GSFxDecals) and which end of a hold's day a map's own light becomes
+## Blood behind a hit body (zz_blood.gd over gs-fx's GSFxDecals) and which end of a hold's day a map's own light becomes
 ## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
 
 const CHECKS := 35
@@ -167,7 +167,7 @@ func _fade() -> void:
 	b.queue_free()
 
 
-## The phone's buttons through dot-game's GSGameScreenFit (what ZzClient._build_touch hands to fit_touch_buttons):
+## The phone's buttons through gs-game's GSGameScreenFit (what ZzClient._build_touch hands to fit_touch_buttons):
 ## every one at least 44 real px across on a landscape phone.
 func _touch_fit() -> void:
 	for phone: Vector2i in [Vector2i(844, 390), Vector2i(667, 375)]:

@@ -203,7 +203,7 @@ const HIT_AT := 0.37
 ## Clips that loop; the rest play once and hold their last frame.
 const LOOPING: Array[StringName] = [&"idle", &"walk", &"run", &"run_arms", &"crawl", &"attack_idle", &"jump_idle", &"attack_run", &"ual_zombie_idle", &"ual_zombie_walk", &"ual_sprint", &"ual_jog", &"ual_crouch_walk"]
 
-## Real clips (Universal Animation Library, CC0, baked by dot-player-char) a body plays in place
+## Real clips (Universal Animation Library, CC0, baked by gs-player-char) a body plays in place
 ## of the made one when they are in the library; absent, the made clip plays as before.
 const UAL_FOR := {&"idle": &"ual_zombie_idle", &"walk": &"ual_zombie_walk", &"run_arms": &"ual_sprint",
 	&"attack": &"ual_zombie_scratch", &"hit": &"ual_hit_chest"}
@@ -211,8 +211,8 @@ const UAL_FOR := {&"idle": &"ual_zombie_idle", &"walk": &"ual_zombie_walk", &"ru
 const JOG_BELOW := 4.2
 const JOG_NATURAL := 3.6
 const CROUCH_NATURAL := 1.4
-const UAL_LIBRARY := "res://addons/dot_player_char/people/people_ual.res"
-const UAL_FROM := "res://addons/dot_player_char/people/people_matt.glb"
+const UAL_LIBRARY := "res://addons/gs_player_char/people/people_ual.res"
+const UAL_FROM := "res://addons/gs_player_char/people/people_matt.glb"
 
 ## The palette shader: up to [constant SWAPS] atlas colours swapped within a tolerance, then dirt and blood
 ## from the vertex-colour noise, then the kind's glow. Compatibility renderer: no per-instance

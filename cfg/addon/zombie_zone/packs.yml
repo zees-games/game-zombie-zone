@@ -2,9 +2,9 @@
 # addon with a spawn_provider.gd). ALL .yml files in this directory are read, in name order, a
 # later file winning; keep a server's changes in its own file (e.g. 90-server.yml).
 # Addon directories never loaded as packs (Fatal Contact's weapon addon on a server hosting both games).
-skip: [fc_weapons, arena_weapons]
+skip: [fc_weapons, fc_weapons]
 weapons:
-  legacy: false      # true brings zee-dot-weapons' original blasters and tools (pistol, rifle, launcher, ...) back into every pool, the shop and the kits; the modern pack is the default set
+  legacy: false      # true brings zee-gs-weapons' original blasters and tools (pistol, rifle, launcher, ...) back into every pool, the shop and the kits; the modern pack is the default set
   enabled: true      # installed weapons join boxes, loot, the buy pool and the stand-ins' kits
   exclude: []        # weapon ids to keep out of the pool
   min_wave:          # first survival wave that lays the weapon out (heavy and drum-fed guns come late); exodus maps are not gated

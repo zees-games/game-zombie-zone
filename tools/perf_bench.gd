@@ -1,6 +1,6 @@
 extends GSGamePerfBench
 
-## Solo-client benchmark (dot-game's GSGamePerfBench: see it for the flags and the report). Runs the offline client on the
+## Solo-client benchmark (gs-game's GSGamePerfBench: see it for the flags and the report). Runs the offline client on the
 ## pinned map with `--bots N` stand-ins; windowed on a GPU box through tools/perf_bench.sh, not headless.
 
 

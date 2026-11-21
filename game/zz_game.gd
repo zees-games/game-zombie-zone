@@ -148,7 +148,7 @@ func _wire_rules() -> void:
 
 
 ## Map-pack `<pack>/<subdir>` directories a host with no server has mounted (the client shell's
-## Solo play, per dot-server-deploy's `client/solo.json`). Read as the module reads its server's.
+## Solo play, per gs-server-deploy's `client/solo.json`). Read as the module reads its server's.
 ## Empty elsewhere. Duck-typed: a delivered game may not name a host's class.
 static func solo_map_dirs(subdir: String) -> PackedStringArray:
 	var host: Object = GSRegistry.get_service(SOLO_SERVICE)
@@ -176,7 +176,7 @@ func _build_physics() -> void:
 				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary", &"clip"]
 			&"zombie":
 				layer.collides_with = [&"world", &"prop", &"barricade", &"boundary", &"clip"]
-			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never
+			# A map's loose toy (gs-props'): the world, the furniture and the other toys, never
 			# a survivor or a zombie, who walk through it (a survivor pushes it, `_advance_toys`).
 			&"toy":
 				layer.collides_with = [&"world", &"prop", &"toy", &"barricade", &"clip"]
@@ -272,7 +272,7 @@ func _on_body_rules_changed() -> void:
 	apply_pass_through()
 
 
-## The side a player is on for dot-team's block rules: survivors are one side, so they pass each other.
+## The side a player is on for gs-team's block rules: survivors are one side, so they pass each other.
 func team_of_side(id: Variant) -> Variant:
 	var side := int(sides.get(id, 0))
 	return str(side) if side > 0 else ""
@@ -497,7 +497,7 @@ func _object_place(data: Dictionary) -> Vector3:
 var friendly_fire_changed: Callable = Callable()
 
 
-## What dot-game's `bind_movement_cvars` binds: the shared `sv_*` movement names over the config.
+## What gs-game's `bind_movement_cvars` binds: the shared `sv_*` movement names over the config.
 func movement_targets() -> Array:
 	return [ZzMovementCvars.new(self)]
 
@@ -701,7 +701,7 @@ func _build_combat() -> void:
 	combat.config = settings
 
 	# A shot stops on a wall and on the furniture. A shot that starts inside a team-mate is not
-	# aimed at them: dot-combat's pass_through_sets does that (API level 2), under the rules.
+	# aimed at them: gs-combat's pass_through_sets does that (API level 2), under the rules.
 	var trace := GSTracePhysics.new()
 	trace.bind(get_world_3d())
 	trace.collision_mask = world_mask()
@@ -733,7 +733,7 @@ static func _type(id: StringName, armour_share: float) -> GSDamageType:
 	return t
 
 
-## Turns dot-combat's applied damage into [signal hit_landed] for a survivor hitting a zombie.
+## Turns gs-combat's applied damage into [signal hit_landed] for a survivor hitting a zombie.
 ## Friendly fire and a hit that took nothing (dead body, immune zombie) did not land.
 func _on_hit_landed(damage: GSDamage) -> void:
 	if not authoritative or damage.refused or damage.health_lost <= 0.0 \
@@ -756,7 +756,7 @@ func _on_limb_damage(damage: GSDamage) -> void:
 
 
 func _adjust_damage(damage: GSDamage) -> void:
-	# dot-game's "still loading": the one place every hurt on a survivor passes (a bite, a pin's
+	# gs-game's "still loading": the one place every hurt on a survivor passes (a bite, a pin's
 	# damage, acid, fire, a blast, a friend's bullet), so a seat behind its client's cover is
 	# neither hurt, downed nor killed. An admin's slay or slap is the operator's word and passes.
 	if GSEntity.is_kind(damage.victim, GSEntity.KIND_PLAYER) and not damage.context.get("admin", false):
@@ -1069,7 +1069,7 @@ func add_player(player_id: StringName, display_name: String, _wanted_side: int =
 		var seated := match_node.add_player(String(player_id), display_name, _tick, SURVIVORS)
 
 		if not seated.ok:
-			GSLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
+			GSLog.error(CHANNEL, "gs-match refused a player", {"id": String(player_id), "why": seated.error.message})
 
 	place_one(player)
 	if authoritative and spawners != null and phase != Phase.PLAY:
@@ -1386,7 +1386,7 @@ func _on_round_ended(number: int, _winner: int, _outcome: int) -> void:
 
 
 ## Every map this server plays, for the map menu (M): `{id, name, mode, detail, current}`.
-## Solo the client's list, online the server's (via dot-vote's map menu), so both say the same.
+## Solo the client's list, online the server's (via gs-vote's map menu), so both say the same.
 func map_rows() -> Array:
 	var out: Array = []
 	if catalogue == null:
@@ -1408,7 +1408,7 @@ func map_rows() -> Array:
 
 
 ## The map menu's change: [param id] now. The next map is set and a fresh round begins
-## (dot-match `begin_round_now`: the map called off is neither won nor lost); with no match
+## (gs-match `begin_round_now`: the map called off is neither won nor lost); with no match
 ## running it is simply built. Authority only.
 func change_map_now(id: StringName) -> GSResult:
 	if not authoritative:
@@ -1423,7 +1423,7 @@ func change_map_now(id: StringName) -> GSResult:
 	return GSResult.success(id)
 
 
-## The host's startup map (server.yml `map:`, `+map`, `sv_map`), duck-typed by dot-server-deploy's host,
+## The host's startup map (server.yml `map:`, `+map`, `sv_map`), duck-typed by gs-server-deploy's host,
 ## which cannot name this game's classes: the same path as `map <id>` and the map menu.
 func start_on_map(id: StringName) -> GSResult:
 	return await change_map_in_tick(id)
@@ -1491,7 +1491,7 @@ func rotation_commands() -> Dictionary:
 
 ## Every name a role of this game's own answers to (the first is the one help shows), from
 ## maps.yml's `commands:` block; the role's own name with no file. Lets `zz_map` and its siblings
-## be renamed the way dot-vote's roles are.
+## be renamed the way gs-vote's roles are.
 func command_names(role: String) -> PackedStringArray:
 	var spec := rotation_commands()
 	var names: Dictionary = spec.get("names", {})
@@ -3256,7 +3256,7 @@ func _die(player: ZzPlayer, by: StringName, why: StringName, damage: GSDamage = 
 	GSLog.debug(CHANNEL, "survivor dead", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 
-## The fall a survivor's death gets: dot-player-char's reaction rule, seeded from player and tick.
+## The fall a survivor's death gets: gs-player-char's reaction rule, seeded from player and tick.
 ## Killing hit's direction, else away from the killer; bleeding out and falling push nothing.
 ## A heavy friend's weapon may launch the body as it would a zombie.
 func decide_death(player: ZzPlayer, damage: GSDamage) -> GSPlayerDeath:
@@ -3743,7 +3743,7 @@ func _bot_weapon_idle(player: ZzPlayer, command: GSWeaponCommand) -> bool:
 	return (_tick + hash(player.entity_id)) % every != 0
 
 
-## What a weapon put into the world, as one of [ZzHazards]' projectiles. dot-weapon spawns nothing,
+## What a weapon put into the world, as one of [ZzHazards]' projectiles. gs-weapon spawns nothing,
 ## it says what should exist; a throwable is known by its tags (`molotov`, `pipe_bomb`, `bile`),
 ## anything else explosive is a grenade on its fuse, or on contact without one.
 func _throw(player: ZzPlayer, spawn: GSWeaponSpawn) -> void:
@@ -4062,7 +4062,7 @@ func _roll_into_zombies(delta: float) -> void:
 
 
 ## A survivor's shot against the toys: the first one on its ray, nearer than a wall, is pushed
-## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
+## (gs-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
 ## a barrel is never cover between a survivor and a zombie. Server side.
 func _shoot_toys(shot: GSShot) -> void:
 	if not authoritative or map == null:
@@ -4078,7 +4078,7 @@ func _shoot_toys(shot: GSShot) -> void:
 			var _broke := GSMapSupport.shoot(map.supports, shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, wall)
 
 
-## The first toy on a shot's ray, nearer than a wall, pushed as dot-props pushes it from the shot's damage times the weapon's
+## The first toy on a shot's ray, nearer than a wall, pushed as gs-props pushes it from the shot's damage times the weapon's
 ## `props/forces.json` multiplier for that kind of toy. The toy's index, or -1.
 func push_toy(shot: GSShot, direction: Vector3) -> int:
 	var box := map.toys

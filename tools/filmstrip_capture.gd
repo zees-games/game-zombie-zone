@@ -6,7 +6,7 @@ extends SceneTree
 
 ## Frame time (60 fps) a hop is judged at when the weapon's wall retract moved it.
 const REFERENCE_DT := 1.0 / 60.0
-const BUTTON_ACTIONS := {"sprint": &"dot_fps_sprint", "walk": &"dot_fps_walk", "crouch": &"dot_fps_crouch"}
+const BUTTON_ACTIONS := {"sprint": &"gs_fps_sprint", "walk": &"gs_fps_walk", "crouch": &"gs_fps_crouch"}
 
 var _clip: GSScenario = null
 var _view := "tp"
@@ -218,8 +218,8 @@ func _first_person_sample(feet: Vector3) -> void:
 
 
 func _actions(move: Array, want: Array) -> void:
-	var wanted := {&"dot_fps_forward": float(move[1]) < -0.1, &"dot_fps_back": float(move[1]) > 0.1,
-		&"dot_fps_left": float(move[0]) < -0.1, &"dot_fps_right": float(move[0]) > 0.1}
+	var wanted := {&"gs_fps_forward": float(move[1]) < -0.1, &"gs_fps_back": float(move[1]) > 0.1,
+		&"gs_fps_left": float(move[0]) < -0.1, &"gs_fps_right": float(move[0]) > 0.1}
 	for button: String in BUTTON_ACTIONS:
 		wanted[BUTTON_ACTIONS[button]] = want.has(button)
 	for action: StringName in wanted:

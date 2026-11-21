@@ -27,7 +27,7 @@ const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## common's chase and bite; a brain written for the pack's own body is seated on ours by [ZzPackBrains],
 ## which also takes `meta`, merged into the definition's, and knows zz-historical-monsters' layout). Both ends scan, so both end up with the same catalogue.
 ##
-## [b]Tuning is `cfg/addon/zombie_zone/*.yml`[/b], every file read by dot-core's
+## [b]Tuning is `cfg/addon/zombie_zone/*.yml`[/b], every file read by gs-core's
 ## `GSAddonConfig` (see its docs/addon-config.md); the defaults are [constant DEFAULTS].
 
 const CHANNEL := "zz.packs"
@@ -47,11 +47,11 @@ const TIERS_ALL: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee"
 const DEFAULTS := {
 	# Addon directories with a spawn_provider.gd that are not loaded as packs: another game's weapon addon
 	# (Fatal Contact's, on a server that hosts both games) is never part of this game. Each skip is logged.
-	"skip": ["fc_weapons", "arena_weapons"],
+	"skip": ["fc_weapons", "fc_weapons"],
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
-		# On brings zee-dot-weapons' own blasters and tools, zed-dot-weapons and every other pack's weapons back into every pool, the shop and the stand-ins' kits.
+		# On brings zee-gs-weapons' own blasters and tools, zed-gs-weapons and every other pack's weapons back into every pool, the shop and the stand-ins' kits.
 		"legacy": false,
 		# Weapon ids kept out of the pool.
 		"exclude": [],
@@ -209,7 +209,7 @@ static func _set_pack_game(dir: String) -> void:
 			script.set(&"pack_cfg_root", _mounted_cfg_root(dir))
 
 
-## A pack delivered by dot-cloud sits under `<mount prefix>/addons/<pack>/`, and its profiles under `<prefix>/cfg`
+## A pack delivered by gs-cloud sits under `<mount prefix>/addons/<pack>/`, and its profiles under `<prefix>/cfg`
 ## (`GSCloudMounter.cfg_root_of`); a pack linked into `res://addons` has no root of its own, so this is empty.
 static func _mounted_cfg_root(dir: String) -> String:
 	var at := dir.find("/addons/")

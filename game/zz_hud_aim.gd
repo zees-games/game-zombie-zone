@@ -3,16 +3,16 @@ extends "zz_hud_base.gd"
 ## The crosshair, the scope and how both follow the aim: the aiming part of [code]zz_hud.gd[/code], split
 ## off so the HUD stays a size the efficiency gate allows.
 
-## dot-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
-## directly, an older dot-ui fails to compile this script.
+## gs-ui's spread crosshair where the host has it (API 10), else the old dot. Through Variants: named
+## directly, an older gs-ui fails to compile this script.
 func _make_crosshair() -> Control:
-	if GSAddonApi.build_level("dot_ui") >= 10:
+	if GSAddonApi.build_level("gs_ui") >= 10:
 		var shape: Variant = GSCrosshair
 		var cross := (shape as GDScript).new() as Control
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# Dead or spectating: nothing in hand to aim (dot-ui API 14; older ones ignore the property).
-		if GSAddonApi.build_level("dot_ui") >= 14:
+		# Dead or spectating: nothing in hand to aim (gs-ui API 14; older ones ignore the property).
+		if GSAddonApi.build_level("gs_ui") >= 14:
 			cross.set(&"alive_source", func() -> bool: return player != null and player.is_alive() and not player.watching)
 		return cross
 
@@ -63,11 +63,11 @@ func set_aim(fraction: float, scoped: bool) -> void:
 	elif _crosshair != null:
 		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
 
-## How much of the dot [param fraction] leaves: dot-ui's curve where the host has it, else the
+## How much of the dot [param fraction] leaves: gs-ui's curve where the host has it, else the
 ## dot stays (an older shell had no aim to fade for).
 func crosshair_opacity(fraction: float) -> float:
 	if not _fades:
 		return 1.0
-	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
+	# Through a Variant: named directly, an older gs-ui without it fails to compile this script.
 	var crosshair: Variant = GSCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))

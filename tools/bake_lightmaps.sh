@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bake the maps' light: one lightmaps/<id>.res per map, which the game's pack ships and a client
-# lays over the map it builds (ZzMap._attach_bake; dot-lighting's GSLightBake).
+# lays over the map it builds (ZzMap._attach_bake; gs-lighting's GSLightBake).
 #
 #   tools/bake_lightmaps.sh                    # every map (the practice street and maps/)
 #   tools/bake_lightmaps.sh zz_lot zz_chapel   # these
@@ -8,7 +8,7 @@
 #   GPU_BOX=staging02 tools/bake_lightmaps.sh  # on the desktop's RTX 2070 (default: the laptop)
 #
 # Two steps: tools/lightmap_scenes.tscn writes a bake scene per map into lightbake_work/
-# (gitignored), then the editor bakes them (dot-lighting's editor plugin, enabled in
+# (gitignored), then the editor bakes them (gs-lighting's editor plugin, enabled in
 # project.godot and inert without its flag). Both need a renderer and the bake needs Vulkan.
 #
 # By default both run on the family's GPU box through ../gpu.sh (a real card bakes a map in
@@ -21,8 +21,8 @@ cd "$(dirname "$0")/.."
 project="$(basename "$PWD")"
 maps=$(IFS=,; echo "$*")
 scenes=(res://tools/lightmap_scenes.tscn -- --out=res://lightbake_work ${maps:+--maps=$maps})
-bake=(--editor --rendering-method forward_plus -- --dot-bake-lightmaps=res://lightbake_work)
-log=.godot/dot-light-bake.log
+bake=(--editor --rendering-method forward_plus -- --gs-bake-lightmaps=res://lightbake_work)
+log=.godot/gs-light-bake.log
 mkdir -p .godot
 
 if [[ -z "${BAKE_LOCAL:-}" && -x ../gpu.sh ]]; then
@@ -61,7 +61,7 @@ else
         --script res://tools/lightmap_trim.gd -- "$@" 2>&1 | grep -E '^LIGHTMAP_TRIM|SCRIPT ERROR' || true
 fi
 
-grep -E '^DOT_BAKE' "$log" || true
-grep -q '^DOT_BAKE end' "$log" || { echo "the bake did not finish; see $log" >&2; exit 1; }
-! grep -q '^DOT_BAKE fail' "$log" || exit 1
+grep -E '^GS_BAKE' "$log" || true
+grep -q '^GS_BAKE end' "$log" || { echo "the bake did not finish; see $log" >&2; exit 1; }
+! grep -q '^GS_BAKE fail' "$log" || exit 1
 ls -l lightmaps/

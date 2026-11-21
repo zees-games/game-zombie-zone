@@ -6,7 +6,7 @@ const ZzPins := preload("../game/zz_pins.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
-## The acid pool on dot-effects' shared GSHazardPool, and what it adds: caps, trail, slow. Counts sections AND checks.
+## The acid pool on gs-effects' shared GSHazardPool, and what it adds: caps, trail, slow. Counts sections AND checks.
 
 const SECTIONS := 7
 const CHECKS := 44

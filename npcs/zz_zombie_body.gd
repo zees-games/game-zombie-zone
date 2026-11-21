@@ -2,7 +2,7 @@ extends CharacterBody3D
 
 ## One zombie's body: where it is, how it moves, and what it looks like it is doing.
 ##
-## [b]The brain wishes, the body moves, once a tick.[/b] dot-npc's own steering calls
+## [b]The brain wishes, the body moves, once a tick.[/b] gs-npc's own steering calls
 ## `move_and_slide` from inside the brain, once per call, with gravity only while it is
 ## steering — so a zombie that stopped to swing hung in the air at whatever height it stood,
 ## and one that both steered and was shoved slid twice. Here a brain writes [member wish] (the

@@ -5,7 +5,7 @@ extends RefCounted
 ## [b]Three consequences, each its own cvar and each off at 0[/b]: a new player's team damage is
 ## reflected onto themselves ([method reflects], by [member ZzConfig.friendly_fire_mode]); too
 ## much of it inside the window asks for a voteban ([signal voteban_wanted]); a hard ceiling
-## inside it bans outright ([signal ban_wanted]). The game wires the last two to dot-vote's
+## inside it bans outright ([signal ban_wanted]). The game wires the last two to gs-vote's
 ## `GSVoteBans.start` and to the server's ban list; this file knows neither.
 ##
 ## [b]The total is counted before reflection.[/b] A new player's bullets land on themselves, but

@@ -2,7 +2,7 @@ extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 
-## The horde's senses in dot-sim ([member ZzConfig.native_senses], on by default) decide as dot-npc's script
+## The horde's senses in gs-sim ([member ZzConfig.native_senses], on by default) decide as gs-npc's script
 ## pass over seeded worlds: walls, smoke, blind and deaf zombies, cones, missing and duplicate candidates, held
 ## targets that leave, and several passes a seed, so the same targets at the same moments, the same rays and the
 ## same counters. Without the library the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
@@ -31,8 +31,8 @@ func _run() -> void:
 	print("the senses are native by default, and the library is there")
 	_check(ZzConfig.new().native_senses, "ZzConfig.native_senses is on by default")
 	if not ClassDB.class_exists(NATIVE):
-		print("  dot-sim's senses module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		print("  gs-sim's senses module is not loaded: the native half is skipped")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, SECTIONS - 2, 2)
 		return

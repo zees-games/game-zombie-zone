@@ -60,7 +60,7 @@ const IMPORTER_ENV := {
 	"ambient": [0.36, 0.4, 0.52], "ambient_energy": 0.3, "fog": 0.02,
 }
 
-## Sky names that are dark by name (dot-map's build_environment reads the same words).
+## Sky names that are dark by name (gs-map's build_environment reads the same words).
 const NIGHT_SKY_WORDS := ["night", "dark", "black", "space", "star"]
 
 ## True when [param env] is the converter's placeholder, so the drawn world's own entities decide.
@@ -71,7 +71,7 @@ static func is_importer_env(env: Dictionary) -> bool:
 	return true
 
 ## An `environment` block from a drawn world's own light_environment, env_fog_controller and sky
-## name (dot-map's `environment_data()`); {} when it has no sun or sky to read.
+## name (gs-map's `environment_data()`); {} when it has no sun or sky to read.
 static func environment_from_world(data: Dictionary) -> Dictionary:
 	var sun: Dictionary = data.get("sun", {})
 	if sun.is_empty() and not data.has("sky"):
@@ -316,9 +316,9 @@ static func validate(source: Dictionary) -> GSResult:
 
 	doc["props"] = props
 
-	# Toys: dot-props' GSPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# Toys: gs-props' GSPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
 	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
-	# with a toy a newer dot-props has still plays on an older server.
+	# with a toy a newer gs-props has still plays on an older server.
 	var toys: Array = []
 	for raw: Variant in source.get("toys", []):
 		var toy := GSPropBodyBox.normal_placement(raw)
@@ -331,7 +331,7 @@ static func validate(source: Dictionary) -> GSResult:
 
 	doc["toys"] = toys
 
-	# Loose props of a drawn world and the supports under them (dot-map's `loose_toys()` and `supports()`).
+	# Loose props of a drawn world and the supports under them (gs-map's `loose_toys()` and `supports()`).
 	var loose: Array = []
 	for raw: Variant in source.get("loose_toys", []):
 		var placed := GSPropBodyBox.normal_placement(raw)
@@ -632,7 +632,7 @@ static func _box(raw: Variant) -> Dictionary:
 	if b.has("tint"):
 		out["tint"] = _floats(_colour_list(b["tint"]), 3)
 
-	# A map's own word for what this box is made of ("brick", "asphalt"; dot-map's surface kinds
+	# A map's own word for what this box is made of ("brick", "asphalt"; gs-map's surface kinds
 	# and aliases), over the kind its `mat` would pick. Left alone here: an unknown word draws the
 	# mat's usual look, so the document is never refused for a texture name.
 	if b.has("surface") and str(b["surface"]) != "":

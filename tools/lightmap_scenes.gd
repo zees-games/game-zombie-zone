@@ -1,6 +1,6 @@
 extends Node
 
-## Writes one bake scene per map for dot-lighting's baker: the map built exactly as a client
+## Writes one bake scene per map for gs-lighting's baker: the map built exactly as a client
 ## builds it, its drawn half kept (the opaque box batches with their UV2, the lamps, the sun and
 ## the sky), a LightmapGI added and the map's fingerprint recorded. tools/bake_lightmaps.sh runs
 ## this and then the bake; nobody needs to run it alone.
@@ -11,7 +11,7 @@ extends Node
 ##
 ## [b]What the bake sees.[/b] The lamps are baked whole (BAKE_STATIC, with soft shadows they do
 ## not cast live); the moon or sun only gives its bounce (BAKE_DYNAMIC), because it stays live
-## and a hold's day turns it; dot-lighting's fill is left out (BAKE_DISABLED), being already
+## and a hold's day turns it; gs-lighting's fill is left out (BAKE_DISABLED), being already
 ## "more sky", which the environment gives the bake. Changing any of that changes what a bake
 ## means: bump ZzMap.BAKE_VERSION.
 

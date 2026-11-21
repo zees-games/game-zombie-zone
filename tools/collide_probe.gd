@@ -1,5 +1,5 @@
 extends Node
-## Compares the drawn world with what the server collides with (dot-core's GSCollisionSweep): drawn floor and walls with no
+## Compares the drawn world with what the server collides with (gs-core's GSCollisionSweep): drawn floor and walls with no
 ## collision, and collision with nothing drawn (fall_probe asks what a capsule does on the collision alone).
 ##   godot --headless --path . res://tools/collide_probe.tscn -- <map id>|--all [--step=2.0] [--stands=400] [--examples=6] [--max-invisible=N]
 

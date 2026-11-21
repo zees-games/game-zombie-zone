@@ -4,7 +4,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzController := preload("../game/zz_controller.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 
-## A survivor's motor in dot-sim ([member GSFpsMotor.native_tick], on by default) moves as the script motor: same
+## A survivor's motor in gs-sim ([member GSFpsMotor.native_tick], on by default) moves as the script motor: same
 ## seeded inputs, under every modifier (limp, tag, boxes, knocks, down, busy), same bytes every tick, whole or halved.
 ## Without the library the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
@@ -32,8 +32,8 @@ func _run() -> void:
 	_check(GSFpsMotor.native_tick, "GSFpsMotor.native_tick is on without the game turning it on")
 	var loaded := GSFpsPhysicsBody.native_full_available()
 	if not loaded:
-		print("  dot-sim's motor module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		print("  gs-sim's motor module is not loaded: the native half is skipped")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, SECTIONS - 2, 2)
 		return
@@ -50,7 +50,7 @@ func _run() -> void:
 	var script_run: Array[PackedByteArray] = await _replay(0, stream)
 	var full_run: Array[PackedByteArray] = await _replay(2, stream)
 	var native_calls := GSFpsPhysicsBody.native_ticks - before
-	_check(native_calls > TICKS / 2, "most ticks ran in dot-sim", "%d native calls in %d ticks" % [native_calls, TICKS])
+	_check(native_calls > TICKS / 2, "most ticks ran in gs-sim", "%d native calls in %d ticks" % [native_calls, TICKS])
 	var first := _first_difference(script_run, full_run)
 	_check(first < 0, "every tick's state is the same bytes", "first differs at tick %d" % first)
 	_check(_spread(script_run) > 20.0, "the run went somewhere (not a body stood still)", "%.1f m" % _spread(script_run))

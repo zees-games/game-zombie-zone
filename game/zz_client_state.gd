@@ -29,7 +29,7 @@ const ZzKillcam := preload("zz_killcam.gd")
 const ZzShopIcons := preload("zz_shop_icons.gd")
 const ZzLoot := preload("zz_loot.gd")
 const ZzMapDoc := preload("zz_map_doc.gd")
-const MapThreads := preload("res://addons/dot_game/runtime/dot_game_map_threads.gd")
+const MapThreads := preload("res://addons/gs_game/runtime/gs_game_map_threads.gd")
 const ZzNpcs := preload("zz_npcs.gd")
 const ZzPaths := preload("zz_paths.gd")
 const ZzImpactMarks := preload("zz_impact_marks.gd")
@@ -63,10 +63,10 @@ const CHASE_UP := 0.6
 @export_range(0, 12, 1, "or_greater") var offline_bots: int = 3
 
 var game: ZzGame = null
-## Maps dropped on the window or the executable, or named by --map-path= (null on dot-map older than API 26).
+## Maps dropped on the window or the executable, or named by --map-path= (null on gs-map older than API 26).
 var map_drop: Node = null
 var player: ZzPlayer = null
-## The flashlight on the eye and the other survivors' beams (dot-flashlight); the server owns on/off.
+## The flashlight on the eye and the other survivors' beams (gs-flashlight); the server owns on/off.
 var flash: GSFlashlight = null
 var flash_crowd: GSFlashlightCrowd = null
 var _flash_ticks := 0
@@ -88,7 +88,7 @@ var _flash_msec := -100000
 ## player and the camera are all in. The platform's; see [GSGameClient].
 var gate: GSLoadGate = null
 
-## dot-game's client platform: the cover, settings and menu, console, Tab, M, the pointer, the
+## gs-game's client platform: the cover, settings and menu, console, Tab, M, the pointer, the
 ## input block and the browser's filesystem flush.
 var platform: GSGameClient = null
 ## `--sim_host 1`: the solo game as a loopback server process this client joined ([ZzSimHost]), else null.

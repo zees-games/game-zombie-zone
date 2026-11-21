@@ -12,7 +12,7 @@ static func drawn_position(body: ZzPlayer, remote: bool) -> Vector3:
 
 
 
-## The Tab board: dot-menu's, with this game's columns. The platform feeds it and holds it on Tab.
+## The Tab board: gs-menu's, with this game's columns. The platform feeds it and holds it on Tab.
 func _dress_board() -> void:
 	if board == null:
 		return

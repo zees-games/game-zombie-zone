@@ -38,7 +38,7 @@ const LAMP_CHECKS := 8
 
 ## The maps actually checked: all of MAPS, or only the practice street where `maps/` is not linked in (CI, which clones this
 ## repository alone). As mg-deathrun's headless_courses does: the delivered maps are checked wherever they are present, which is
-## every machine that has run dot-bootstrap. Sections and checks are counted against this list.
+## every machine that has run gs-bootstrap. Sections and checks are counted against this list.
 var _maps: Array = []
 
 var _worlds_read := 0

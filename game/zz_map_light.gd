@@ -2,9 +2,9 @@ extends RefCounted
 
 const ZzMapDoc := preload("zz_map_doc.gd")
 
-## The light a map's `environment` describes, as dot-lighting documents and profiles (ZzMap applies it).
+## The light a map's `environment` describes, as gs-lighting documents and profiles (ZzMap applies it).
 
-## The dot-lighting document a map's `environment` describes.
+## The gs-lighting document a map's `environment` describes.
 ##
 ## [b]The sun is the map's, at the map's strength[/b]: 380 (game-fatal-contact's daylight) times the
 ## square of `sun_energy`, which for a night map's 0.12 is a faint moon (drawn below the rig's
@@ -49,10 +49,10 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 		},
 	}
 
-## What this machine draws of a map's light: dot-lighting's `painted()` (API level 3), the
+## What this machine draws of a map's light: gs-lighting's `painted()` (API level 3), the
 ## family's profile for hand-built worlds, with the map's ambient and fill.
 ##
-## [b]Shadows stay on in the browser[/b], unlike dot-lighting's `web()`: a moonlit street
+## [b]Shadows stay on in the browser[/b], unlike gs-lighting's `web()`: a moonlit street
 ## without them is every face lit alike, and the boxes are batched into a few dozen meshes.
 ## `painted()` matches its light to the renderer (the Compatibility renderer this game and the
 ## client shell use has no headroom above white), lowers the exposure, grades, and trades

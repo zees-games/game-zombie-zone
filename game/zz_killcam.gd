@@ -8,7 +8,7 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 ## Row key of the zombies in a recorded frame (a player's key is never this).
 const ZOMBIES := "~zombies"
 
-## The killcam at a map's end. Client side: every frame drawn goes into dot-replay's
+## The killcam at a map's end. Client side: every frame drawn goes into gs-replay's
 ## [GSKillcamBuffer], each decisive moment (the last death, the final wave cleared) is
 ## noted, and at the map's end [GSKillcam] replays it from that survivor's eyes.
 ## The length is `mp_killcam_time`; 0 skips straight to [signal over].
@@ -16,7 +16,7 @@ const ZOMBIES := "~zombies"
 const CHANNEL := "zz.killcam"
 
 ## Skip keys: jump, the use key and Escape.
-const SKIP_ACTIONS: PackedStringArray = ["dot_fps_jump", "ui_cancel"]
+const SKIP_ACTIONS: PackedStringArray = ["gs_fps_jump", "ui_cancel"]
 
 ## The killcam is over (or never began); the end-of-map flow goes on from here.
 signal over(skipped: bool)

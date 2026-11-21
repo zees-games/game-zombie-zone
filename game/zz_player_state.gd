@@ -15,7 +15,7 @@ const ZzAvatars := preload("zz_avatars.gd")
 ## At zero health a survivor goes down (bleed-out pool, DOWN modifier); [member ZzConfig.max_incaps] downs make the next zero death. Temporary health comes off first and drains by itself.
 ## [member pinned_by] is the special holding them and [member pin_kind] what it does; the PINNED modifier holds them on both ends.
 
-## 64 units on the 72-unit body (dot-player-controller default hull).
+## 64 units on the 72-unit body (gs-player-controller default hull).
 const EYE_HEIGHT := 1.6256
 const EYE_DOWN := 0.45
 
@@ -34,7 +34,7 @@ enum Life { UP, DOWN, DEAD }
 @export var samples_input: bool = false
 @export var is_bot: bool = false
 
-## What this player looks like, as a dot-user-avatar document; null is the stock person.
+## What this player looks like, as a gs-user-avatar document; null is the stock person.
 var avatar: GSAvatar = null
 ## The class this survivor plays (empty before the first spawn), the skin it gave them (empty: their
 ## own avatar) and its definition, which [method tunables_for] reads. Set by [method apply_class].
@@ -179,7 +179,7 @@ var previous_shove: bool = false
 ## the zombie they possess (see [ZzPossession]). Null until the first.
 var input_move: GSFpsCommand = null
 
-## An administrator's `blind` and `beacon`, as dot-moderation's tools set them.
+## An administrator's `blind` and `beacon`, as gs-moderation's tools set them.
 var blinded: bool = false
 var beacon: bool = false
 ## The flashlight is on (server-owned, replicated); `flashlight_ready` is cleared on a new map so the next tick sets its start state.
@@ -192,7 +192,7 @@ var in_end_area: bool = false
 
 ## What other people see this player as. Client side.
 var figure: ZzFigure = null
-## The name and health pill floating over this survivor for the others to read (dot-ui).
+## The name and health pill floating over this survivor for the others to read (gs-ui).
 var _tag: GSHealthTag = null
 
 ## How this survivor's body falls on their death: the server's pick ([method ZzGame.decide_death]),
@@ -264,11 +264,11 @@ enum WaterLevel { NONE, FEET, WAIST, EYES }
 ## The map's water volumes this player moves through, world space (see [method set_water]).
 var water: Array[AABB] = []
 
-## This player's swimming mode (dot-player-controller's GSFpsSwimMode), one per player in
+## This player's swimming mode (gs-player-controller's GSFpsSwimMode), one per player in
 ## `controller.extra_modes` so a style's rebuilt motor keeps it under the same id on every machine.
 var swim: GSFpsSwimMode = GSFpsSwimMode.new()
 
-## Ladder climbing (dot-player-controller's GSFpsLadderMode), fed the map's ladder brushes by [method ZzMechanics.ladder_boxes].
+## Ladder climbing (gs-player-controller's GSFpsLadderMode), fed the map's ladder brushes by [method ZzMechanics.ladder_boxes].
 var ladder: GSFpsLadderMode = GSFpsLadderMode.new()
 
 ## Breath left, in seconds under water; refilled with the head out. Each end counts its own
@@ -288,7 +288,7 @@ var tick_rate: int = 64:
 		if controller != null:
 			controller.tick_rate = value
 
-## The key dot-weapon's player bridge identifies this carrier by.
+## The key gs-weapon's player bridge identifies this carrier by.
 var player_key: String:
 	get:
 		return String(player_id)

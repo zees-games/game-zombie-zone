@@ -2,10 +2,10 @@ extends RefCounted
 
 ## Sentry turrets a box deploys: the server's, announced once and fired from there.
 ##
-## [b]The decision is dot-combat's [GSSentry]; this file is the rules.[/b] Where a turret may
+## [b]The decision is gs-combat's [GSSentry]; this file is the rules.[/b] Where a turret may
 ## stand ([method deploy] asks [method GSSentry.find_spot]), how many a survivor may have out,
 ## what it shoots (the horde, never a survivor: it has no friendly fire to be wrong about), and
-## how a shot becomes damage (the same dot-combat path as a survivor's, credited to its owner, so
+## how a shot becomes damage (the same gs-combat path as a survivor's, credited to its owner, so
 ## the score, the drop and the body falling are not a second implementation).
 ##
 ## A client is told three things and draws from them: [signal placed] (where, which way, for how

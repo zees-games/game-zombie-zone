@@ -47,7 +47,7 @@ func _until(condition: Callable, seconds: float) -> bool:
 
 ## The bot settings at the console: the preset, a single override and the old name.
 func _check_bot_commands() -> void:
-	# How the stand-ins aim and shoot is dot-bot's, the family's names: bot_difficulty sets the
+	# How the stand-ins aim and shoot is gs-bot's, the family's names: bot_difficulty sets the
 	# bundle, a single setting overrides it, and the old zz_bot_reaction still means bot_reaction.
 	var bots := GSBotSettings.of(game)
 	_check(server.console.get_string("bot_difficulty", "") == "medium" and bots.difficulty() == "medium",

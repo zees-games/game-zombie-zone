@@ -4,7 +4,7 @@ const ZzNetCommand := preload("zz_net_command.gd")
 const ZzPlayer := preload("../zz_player.gd")
 
 ## What a networked survivor replicates: the movement state, health, weapons, and the state of the body (up, down or held, borrowed health, the use bar).
-## [b]The movement half is dot-player-controller's own table[/b] ([GSFpsNetSync.state_specs]); listing the fields here would be a second copy to drift. [b]The game fields are not derivable from it[/b]: health, sitting a round out and the beacon are the server's decisions.
+## [b]The movement half is gs-player-controller's own table[/b] ([GSFpsNetSync.state_specs]); listing the fields here would be a second copy to drift. [b]The game fields are not derivable from it[/b]: health, sitting a round out and the beacon are the server's decisions.
 ## [b]Down, held, borrowed health and the use bar ARE here[/b] because each is a fact the next snapshot must be able to correct (a missed pick-up event would leave a friend on the floor); events carry the moment, these carry the truth. [b]Which side somebody is on is NOT here[/b]: a per-tick property is for what changes per tick, an event for what changes on a decision.
 
 ## Somebody this client is watching used their weapon, [param times] times since the last
@@ -14,7 +14,7 @@ signal weapon_used(times: int, kind: int)
 var player: ZzPlayer = null
 var bridge: Node = null
 
-## The jump timers (coyote, jump buffer, cooldown), owner only, for the owner's rewind. Opt-in on dot-player-controller API 10; see its docs/networking.md.
+## The jump timers (coyote, jump buffer, cooldown), owner only, for the owner's rewind. Opt-in on gs-player-controller API 10; see its docs/networking.md.
 var net_timers: int = 0
 
 var net_position: Vector3 = Vector3.ZERO
@@ -77,7 +77,7 @@ var net_ping: int = 0
 var net_watching: bool = false
 
 # The weapons: [b]seven fields, and the pack's own `all_specs()` names all of them.[/b] GDScript has no dynamic properties, so each entry needs a variable declared by hand;
-# call `ZeeWeaponNet.all_specs()` and never concatenate dot-weapon's three with the pack's four (forgetting the second half gives weapons silent for everybody but the holder).
+# call `ZeeWeaponNet.all_specs()` and never concatenate gs-weapon's three with the pack's four (forgetting the second half gives weapons silent for everybody but the holder).
 # The magazine and the reserve are `owner_only`: exact ammunition is information an opponent should not have.
 
 var net_slot: int = 0
@@ -138,7 +138,7 @@ func _register_net_vars() -> void:
 			declaration.range_of(0.0, 1.0)
 
 	# Owner-only jump timers; guarded, a shell without API 10 has no rewind_specs().
-	if GSAddonApi.build_level("dot_player_controller") >= 10:
+	if GSAddonApi.build_level("gs_player_controller") >= 10:
 		for spec in GSFpsNetSync.rewind_specs():
 			var _timers := replicate(spec["property"], GSNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 

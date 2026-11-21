@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The twelve kinds' numbers as dot-npc profiles (`cfg/game/game-zombie-zone/npc/<id>.yml`).
+## The twelve kinds' numbers as gs-npc profiles (`cfg/game/game-zombie-zone/npc/<id>.yml`).
 ##
 ## The code table in zz_npcs.gd is the floor and the source of the shipped files
 ## (tools/export_npc_profiles.gd; the packs suite fails when they are stale). A profile key

@@ -1,6 +1,6 @@
 extends RefCounted
 
-## What subscribed Workshop packs add to this game's lists, read from dot-core's content index.
+## What subscribed Workshop packs add to this game's lists, read from gs-core's content index.
 ##
 ## [b]Playable, as documents.[/b] A pack's `map` entry has `scene` pointing at a [ZzMapDoc]
 ## document (JSON) whose `id` equals the entry's; [ZzCatalogue] follows the index and builds it

@@ -162,7 +162,7 @@ func _light(root: Node3D) -> void:
 		sun.light_energy = 0.35
 
 
-## Each of dot-player-char's reactions as a row, a common falling with it over the columns
+## Each of gs-player-char's reactions as a row, a common falling with it over the columns
 ## (0, 0.15, 0.3, 0.5, 0.8 and 1.3 s after the killing shot, which comes from the camera's side).
 func _deaths(root: Node3D) -> void:
 	var reactions := [&"limp", &"headshot_launch", &"power_launch", &"face_plant", &"crumple"]

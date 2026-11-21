@@ -237,7 +237,7 @@ static func apply_slide(t: GSFpsTunables, p_config: ZzConfig, p_slide: ZzSlideRu
 ## The movement actions. Shift is sprint; the slow walk stays on Alt.
 static func register_actions(p_sampler: GSFpsSampler = null) -> void:
 	var _added := GSFpsSampler.register_default_actions(p_sampler)
-	var crouch := &"dot_fps_crouch"
+	var crouch := &"gs_fps_crouch"
 
 	# C beside Ctrl: Ctrl is a browser shortcut and a window manager's on some desktops.
 	if InputMap.has_action(crouch) and not _has_key(crouch, KEY_C):
@@ -245,7 +245,7 @@ static func register_actions(p_sampler: GSFpsSampler = null) -> void:
 		c.physical_keycode = KEY_C
 		InputMap.action_add_event(crouch, c)
 
-	var walk := &"dot_fps_walk"
+	var walk := &"gs_fps_walk"
 
 	if not InputMap.has_action(walk):
 		return
@@ -288,7 +288,7 @@ func simulate(tick: int, delta: float) -> void:
 ## The motor's tick at the weapon's ADS pace while the rig says it is aimed. Server, offline and a
 ## predicting client all come through here and read the same rig rule, so the prediction agrees.
 ## The top speed is scaled for the one tick and put back (the tunables are shared, and every
-## motor modifier slot is taken: dot-player-controller's admin set fills the 32).
+## motor modifier slot is taken: gs-player-controller's admin set fills the 32).
 func step_controller(tick: int, delta: float) -> void:
 	var rig := weapons if weapons != null else view_rig
 	var tunables := controller.tunables
@@ -501,7 +501,7 @@ func decay_temp(amount: float) -> void:
 # Bodies
 
 ## Where this player's eyes are: standing, crouched, or on the floor.
-## The weapons' arsenal, under the name dot-weapon's [GSWeaponKnives] reads a player by.
+## The weapons' arsenal, under the name gs-weapon's [GSWeaponKnives] reads a player by.
 var arsenal: GSWeaponArsenal:
 	get:
 		return weapons.arsenal if weapons != null else null
@@ -593,7 +593,7 @@ func fit_hitboxes() -> void:
 		head.position = Vector3(0.0, 0.4 if down else EYE_HEIGHT + 0.06, 0.0)
 
 
-## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
+## The duck-typed lookup gs-weapon's player bridge asks a carrier for.
 func component(type_name: StringName) -> Object:
 	match String(type_name):
 		"GSPlayerController", "GSFpsController":
@@ -754,7 +754,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color, own_legs: bool 
 			"downed": is_down(),
 			"propped": is_down() and not is_crawling(),
 			"sprinting": controller.state.sprinting and not is_down(),
-			# The view's pitch bends the figure's spine and gun arm (dot-player-char people.md).
+			# The view's pitch bends the figure's spine and gun arm (gs-player-char people.md).
 			"aim": deg_to_rad(controller.state.pitch),
 		})
 		figure.pose(at, deg_to_rad(controller.state.yaw), Vector2(velocity.x, velocity.z).length())

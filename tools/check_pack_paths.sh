@@ -1,6 +1,6 @@
 #!/bin/bash
 # Refuses a pack whose scripts reach this game's own files by an absolute res:// path that is not rebased.
-# A delivered pack mounts at res://dot_cloud/<owner>/<id>/<ver>/, so load("res://game/x.gd") finds the host's file or
+# A delivered pack mounts at res://gs_cloud/<owner>/<id>/<ver>/, so load("res://game/x.gd") finds the host's file or
 # nothing (null.new() then fails at run time, far from the cause). Wrap the path in the game's Paths.rebase(), use a
 # relative preload, or name res://addons/ (the host's). Flags, per .gd file the pack ships:
 #   1. a load-like call whose first argument is a literal "res://..." under the game's tree;
@@ -14,8 +14,8 @@ import os, re, sys
 root = sys.argv[1]
 SKIP = {".git", ".godot", "addons", "tools", "examples", "tests", "docs", "screenshots", "images", "reports", "art-src"}
 FN = r"(?:\bload|\bpreload|ResourceLoader\.(?:load|exists|load_threaded_request|list_directory)|FileAccess\.(?:open|file_exists|get_file_as_string|get_file_as_bytes|get_md5|get_sha256)|DirAccess\.(?:open|dir_exists_absolute|get_files_at|get_directories_at))"
-OWN = r'"res://(?!addons\b|dot_cloud\b)[^"]*"'
-lit = re.compile(FN + r"\(\s*\"res://(?!addons\b|dot_cloud\b)")
+OWN = r'"res://(?!addons\b|gs_cloud\b)[^"]*"'
+lit = re.compile(FN + r"\(\s*\"res://(?!addons\b|gs_cloud\b)")
 const = re.compile(r"^\s*(?:static\s+)?const\s+(\w+)\s*(?::\s*\w+\s*)?:?=\s*" + OWN + r"\s*(?:#.*)?$")
 bad = []
 for d, dirs, files in os.walk(root):

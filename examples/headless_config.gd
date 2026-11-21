@@ -259,7 +259,7 @@ func _templates(binder: GSGameConfigBinder) -> void:
 	for path: String in files:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
 			stale.append(path)
-	_check(stale.is_empty(), "the shipped files match the config (run addons/dot_game/qa/dot_game_cfg_templates.gd)", ",".join(stale))
+	_check(stale.is_empty(), "the shipped files match the config (run addons/gs_game/qa/gs_game_cfg_templates.gd)", ",".join(stale))
 
 
 ## The turret rules moved out of zz_turrets.gd keep the old constants as defaults, and a cvar changes what the rules read.

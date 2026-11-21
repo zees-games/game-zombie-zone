@@ -13,7 +13,7 @@ const ZzNetCommand := preload("zz_net_command.gd")
 ## The slot is the exception and is a field of its own, because [GSFpsCommand] has eight
 ## buttons and no room for a number — see [member ZzPlayer.wanted_slot].
 
-## Fire. `BUTTON_USER_0`, which dot-player-controller reserves.
+## Fire. `BUTTON_USER_0`, which gs-player-controller reserves.
 const BUTTON_FIRE := GSFpsCommand.BUTTON_USER_0
 
 ## The shove. On the alt button, as the genre puts it, and NOT handed to the weapon: zee's

@@ -17,7 +17,7 @@ on:
     pull_request:
     workflow_dispatch:
 
-# Two workflows (this and ci-rest.yml) because dot-ci's validate job is capped at 30 minutes and the suites take about 33; one workflow
+# Two workflows (this and ci-rest.yml) because gs-ci's validate job is capped at 30 minutes and the suites take about 33; one workflow
 # would share a concurrency group and cancel itself. A suite added to examples/ goes in one of the two lists.
 jobs:
     validate:
@@ -34,4 +34,4 @@ jobs:
             efficiency: true
             hygiene: true
         secrets:
-            DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
+            DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}

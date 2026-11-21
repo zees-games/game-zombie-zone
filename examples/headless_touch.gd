@@ -3,7 +3,7 @@ extends GSGameCheckSuite
 const ZzTouch := preload("../game/zz_touch.gd")
 const ZzGameState := preload("../game/zz_game_state.gd")
 
-## The phone's controls: the layout fits without overlapping, dot-mobile's overlay drives the client's sampler, the
+## The phone's controls: the layout fits without overlapping, gs-mobile's overlay drives the client's sampler, the
 ## server's rules govern it, and auto-fire's crosshair shoots zombies but holds fire on survivors and the dead.
 ## Run: `godot --headless --path . res://examples/headless_touch.tscn`
 

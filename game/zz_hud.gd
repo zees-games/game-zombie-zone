@@ -1047,9 +1047,9 @@ func _draw_hurt(delta: float) -> void:
 			3:
 				_place(rect, Vector2(-reach - 8, -60), Vector2(8, 120))
 
-## The ring round the crosshair that fills while the use key is held over a dropped weapon (dot-ui API 18).
+## The ring round the crosshair that fills while the use key is held over a dropped weapon (gs-ui API 18).
 func set_hold_progress(fraction: float) -> void:
-	if _crosshair != null and GSAddonApi.build_level("dot_ui") >= 18:
+	if _crosshair != null and GSAddonApi.build_level("gs_ui") >= 18:
 		_crosshair.set(&"hold_progress", fraction)
 
 func _place(rect: ColorRect, at: Vector2, size: Vector2) -> void:

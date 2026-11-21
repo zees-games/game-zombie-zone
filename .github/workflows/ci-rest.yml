@@ -22,4 +22,4 @@ jobs:
                 examples/headless_stats examples/headless_survival examples/headless_weapon_drop examples/headless_weapons
                 examples/headless_workbench examples/headless_workshop
         secrets:
-            DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
+            DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}

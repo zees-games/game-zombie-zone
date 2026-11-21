@@ -20,7 +20,7 @@ for c in doc["clips"]:
 PY
 )
 gpu_sh=${GPU_SH:-}
-for c in /home/gamedev/godot/dot-bootstrap/tools/gpu.sh ../gpu.sh; do
+for c in /home/gamedev/godot/gs-bootstrap/tools/gpu.sh ../gpu.sh; do
   [[ -z $gpu_sh && -f $c ]] && gpu_sh=$c
 done
 [[ -f $gpu_sh ]] || { echo "gpu.sh not found (set GPU_SH=path)" >&2; exit 1; }

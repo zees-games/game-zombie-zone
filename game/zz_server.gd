@@ -6,9 +6,9 @@ const ZzGame := preload("zz_game.gd")
 ## What a [GSServer] loads as its game scene. Never a client.
 ##
 ## [b]Small on purpose.[/b] Everything a dedicated server does is in `zz_module.gd`; this
-## exists because dot-server loads a SCENE and the game needs one, and because the world has
+## exists because gs-server loads a SCENE and the game needs one, and because the world has
 ## to be in the tree — registered under [constant ZzGame.SERVICE] — before the module looks
-## for it. dot-server loads the scene and then the module, in that order, for exactly this
+## for it. gs-server loads the scene and then the module, in that order, for exactly this
 ## reason.
 ##
 ## [b]It lives in `game/`, not beside its own scene in `scenes/`.[/b] That is a deployment

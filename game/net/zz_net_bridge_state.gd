@@ -29,7 +29,7 @@ const Interest := preload("zz_net_interest.gd")
 
 ## Joins a [ZzGame] to a [GSNetManager]: the netcode seam, and the only file that names both.
 ## Survivors are predicted; zombies are server-owned entities (`NPC`, snapshots, `NPC_GONE`); the map arrives once as `MAP`; a joiner learns the current world on READY.
-## dot-net ticks per entity but this game's tick is the whole world, so [method ensure_game_ticked] runs it on the first behaviour through.
+## gs-net ticks per entity but this game's tick is the whole world, so [method ensure_game_ticked] runs it on the first behaviour through.
 
 const CHANNEL := "zz.net"
 
@@ -172,7 +172,7 @@ var _entities: Node = null
 ## session id -> [ZzPlayerNet].
 var _behaviours: Dictionary = {}
 
-## The next session id for somebody the world made itself, well above anything dot-server issues.
+## The next session id for somebody the world made itself, well above anything gs-server issues.
 ## A player named `bot` parses back to session zero, so two bots would share one behaviour entry
 ## and a JOIN carrying the broadcast address.
 const FIRST_BOT_SESSION := 900000

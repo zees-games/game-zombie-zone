@@ -761,7 +761,7 @@ func _do_special(a: Dictionary, _ctx: Dictionary) -> void:
 		var _s = game.horde.spawn_special(kind)
 
 
-## Stands a sentry turret where the opener is looking (dot-combat's GSSentry; the rules are
+## Stands a sentry turret where the opener is looking (gs-combat's GSSentry; the rules are
 ## `zz_turrets.gd`). `seconds`, `ammo`, `damage`, `reach` and `interval` come from the outcome. When
 ## there is nowhere to stand it, the opener is told and the box goes back in their hands.
 func _do_turret(a: Dictionary, ctx: Dictionary) -> void:

@@ -80,7 +80,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 @export_range(1.0, 20.0, 0.1, "or_greater") var run_speed: float = 4.3
 @export_range(0.1, 1.0, 0.01) var walk_speed_scale: float = 0.45
 
-## Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_stamina*` in dot-player-controller.
+## Sprint (Shift, hold): a modest boost over a run so it never outruns a zombie. Each is `sv_sprint*` / `sv_stamina*` in gs-player-controller.
 @export var sprint_enabled: bool = true
 @export_range(1.0, 2.0, 0.01, "or_greater") var sprint_speed_scale: float = 1.45
 @export var stamina_enabled: bool = true
@@ -472,7 +472,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 
 @export_group("Gore")
 
-## How much dismemberment there is (dot-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
+## How much dismemberment there is (gs-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
 @export_range(0, 3, 1, "or_greater") var gore_level: int = 2
 
 ## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
@@ -493,7 +493,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## map's `next` always wins over both.
 @export var shuffle_maps: bool = false
 
-## The file that says which maps this server ROTATES: `cfg/maps.yml` (dot-map's
+## The file that says which maps this server ROTATES: `cfg/maps.yml` (gs-map's
 ## `GSMapRotationFile`: named rotations, `random` or `cycle`, wildcards, command names), looked
 ## for in the `--config` directory. Empty, or no such file, rotates every map. A map it leaves out
 ## stays installed (`zz_map <id>` and the map menu load it); it is only never drawn, balloted or
@@ -503,7 +503,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
-## How the client culls a world: off, pvs, occluders or both (dot-map's GSMapVisibility). Empty
+## How the client culls a world: off, pvs, occluders or both (gs-map's GSMapVisibility). Empty
 ## leaves it to the client's video setting. `--zz-vis-mode=`.
 @export var vis_mode: String = ""
 
@@ -511,7 +511,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## lit materials and the document's lamps. `--zz-lightmaps=`.
 @export var lightmaps: bool = true
 
-## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (dot-map's `GSMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
+## The least mean light a drawn converted map's surfaces and a survivor's ambient have, so a map the author lit darkly can be played (gs-map's `GSMapBspMesh.visibility_floor`, tinted by the map's own ambient). 0 is the author's light alone. `--zz-light-floor=`.
 @export_range(0.0, 2.0, 1.0, "or_greater") var light_floor: float = 0.6
 
 ## The least energy of a lightmapped map's sun on a client, for the shadowed interiors of a dim map (0 leaves the map's own). `--zz-sun-floor=`.
@@ -564,7 +564,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 @export_range(40.0, 1000.0, 5.0, "or_greater") var net_common_radius: float = 80.0
 @export_range(40.0, 1000.0, 5.0, "or_greater") var net_special_radius: float = 260.0
 ## Anything past [member net_far_distance] metres from a survivor (players included, never their
-## own) is sent every Nth snapshot only. 1 is off; dot-net's GSNetInterest.far_every.
+## own) is sent every Nth snapshot only. 1 is off; gs-net's GSNetInterest.far_every.
 @export_range(1, 16, 1, "or_greater") var net_far_every: int = 1
 @export_range(0.0, 1000.0, 5.0, "or_greater") var net_far_distance: float = 40.0
 ## Every survivor far from a zombie skips the same snapshots of it, so the server encodes it once
@@ -584,7 +584,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## to it: a high school wants a dozen, a street four.
 @export var team_from_map: bool = true
 
-# How a stand-in aims and how quickly it reacts are dot-bot's `bot_*` settings, shared by every
+# How a stand-in aims and how quickly it reacts are gs-bot's `bot_*` settings, shared by every
 # game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...), not numbers of this file.
 
 # Stand-in rules

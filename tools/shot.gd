@@ -39,7 +39,7 @@ func _ready() -> void:
 	add_child(_client)
 	if _world_key != "":
 		_client.get("game").world_key_fn = func(_doc: Dictionary) -> String: return _world_key
-	# --view=cover: the loading cover dot-game's GSGameClient puts up first, before it lifts.
+	# --view=cover: the loading cover gs-game's GSGameClient puts up first, before it lifts.
 	if _view == "cover":
 		for _i in 2:
 			await RenderingServer.frame_post_draw

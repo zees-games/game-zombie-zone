@@ -627,7 +627,7 @@ func _real_packs() -> void:
 	# The class pack (zz_ply_class_pack) is a provider too, with no weapon rows.
 	var class_pack := 1 if FileAccess.file_exists("res://addons/zz_ply_class_pack/%s" % ZzPacks.PROVIDER_FILE) else 0
 	var extra_rows := ZzPacks.weapon_rows.filter(func(r: Dictionary) -> bool: return str(r.get("id", "")).begins_with("aw_")).size()
-	_check(extra_rows == 0 and not ZzPacks.providers.has("arena_weapons") and not ZzPacks.providers.has("fc_weapons"), "Fatal Contact's weapon addon is never loaded as a pack", "%d" % extra_rows)
+	_check(extra_rows == 0 and not ZzPacks.providers.has("fc_weapons") and not ZzPacks.providers.has("fc_weapons"), "Fatal Contact's weapon addon is never loaded as a pack", "%d" % extra_rows)
 	_check(found == 3 + extra + class_pack, "the three packs and any optional weapon pack are loaded from addons/", "%d" % found)
 	_check(ZzPacks.weapon_rows.size() - extra_rows == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
 	_check(extra == 0 or extra_rows > 0, "an optional weapon pack's rows join the catalogue", "%d" % extra_rows)

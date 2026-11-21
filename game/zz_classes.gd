@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Survivor and stand-in classes as dot-player-class profiles (`cfg/game/game-zombie-zone/class/<id>.yml`).
+## Survivor and stand-in classes as gs-player-class profiles (`cfg/game/game-zombie-zone/class/<id>.yml`).
 ##
 ## An installed pack (zz-ply-class-pack, found through [ZzPacks]) is the weakest config root, so the
 ## game's `cfg/` and a server's own files still win. Without any class profile the game's own numbers

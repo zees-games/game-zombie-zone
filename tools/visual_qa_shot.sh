@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Zombie Zone's on-box visual QA capture (docs/visual-qa.md): dot-game's shot tool runs tools/visual_qa.gd, once for the
+# Zombie Zone's on-box visual QA capture (docs/visual-qa.md): gs-game's shot tool runs tools/visual_qa.gd, once for the
 # survivor in the offline client and once more with --zombies for the infected on their bare stage (one process cannot hold
-# both). Normally started by dot-game's driver:
-#   bash addons/dot_game/tools/dot_game_visual_qa.sh --shot tools/visual_qa_shot.sh -- [--only zz_m4,zz_glock|all|none]
+# both). Normally started by gs-game's driver:
+#   bash addons/gs_game/tools/gs_game_visual_qa.sh --shot tools/visual_qa_shot.sh -- [--only zz_m4,zz_glock|all|none]
 #        [--clips idle,fire] [--avatar] [--zombies common,brute|all]
 set -euo pipefail
-shot="$(dirname "$0")/../addons/dot_game/tools/dot_game_visual_qa_shot.sh"
+shot="$(dirname "$0")/../addons/gs_game/tools/gs_game_visual_qa_shot.sh"
 zombies=
 survivor=()
 args=("$@")

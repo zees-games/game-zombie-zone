@@ -29,7 +29,7 @@ const ZzNpcs := preload("zz_npcs.gd")
 
 ## This game, as a module a dedicated server loads. [b]What [GSGameModule] does not.[/b] [GSGameModule] holds the netcode and its four load-bearing constants, the bridge, the message seal, the identity layer, the roster, the authoritative tick and a teardown in the reverse order. Two of those five hand-written copies had the same line wrong and nobody could
 ## ever join those servers. What is left here is what is actually this game's: the cvars an operator turns between rounds, the console commands, the map vote, and the rule that keeps enough people in a round for one to happen. [b]No `class_name`, and that is a requirement rather than a style.[/b] [method GSModuleHost.load_module] takes a PATH and constructs
-## the module itself — it must, because that is the shape that lets an operator name one in a config file — and a module delivered inside a dot-cloud pack cannot have a `class_name` at all: a mounted pack's globals are not registered in the host. [codeblock] server.modules.load_module("res://game/zz_module.gd") [/codeblock]
+## the module itself — it must, because that is the shape that lets an operator name one in a config file — and a module delivered inside a gs-cloud pack cannot have a `class_name` at all: a mounted pack's globals are not registered in the host. [codeblock] server.modules.load_module("res://game/zz_module.gd") [/codeblock]
 
 # [b]No `const CHANNEL` here, and its absence is the point.[/b] [GSGameModule] already declares one and GDScript refuses to let a subclass
 # redeclare it — which is the right refusal: a module logs through [method GSModule.log_info], which stamps the module's own name, so a second
@@ -39,14 +39,14 @@ const ZzNpcs := preload("zz_npcs.gd")
 const ROSTER_INTERVAL := 2.0
 
 ## Where the services keep punishments. Empty is [GSGameServices]'s own default, `user://zombiezone_punishments.json` — the store a real server enforces. [b]Static, because nothing holds
-## this module before it exists[/b]: dot-server constructs it from a path inside `load_module`, so there is no instance for a host to set a field on first. `examples/dedicated.tscn` points it
+## this module before it exists[/b]: gs-server constructs it from a path inside `load_module`, so there is no instance for a host to set a field on first. `examples/dedicated.tscn` points it
 ## at a directory of its own; before it could, every run appended the live tools' audit warnings to the real store, 106 of them by the time anybody counted.
 static var punishments_file: String = ""
 
 ## The `zz_bots` cvar, held so the tick does not look it up sixty times a second.
 var _bots: GSConVar = null
 
-## How many stand-ins, from how many people: dot-server's one rule for every game. See
+## How many stand-ins, from how many people: gs-server's one rule for every game. See
 ## [method _keep_the_round_full].
 var _quota: GSBotQuota = null
 
@@ -58,8 +58,8 @@ var _bot_ids: Array[StringName] = []
 ## The players' vote for the next map; null when it could not be built.
 var vote: ZzVote = null
 
-## dot-vote's `GSVoteBans`: players' votes to ban a player, and the one team damage starts.
-## Null on a host whose dot-vote has none (API level under 8), which runs without them.
+## gs-vote's `GSVoteBans`: players' votes to ban a player, and the one team damage starts.
+## Null on a host whose gs-vote has none (API level under 8), which runs without them.
 var voteban: RefCounted = null
 
 ## The drawn ballot's notice topic. The client shell draws one menu per topic.
@@ -84,7 +84,7 @@ const OIL_TUNABLES: Array = [
 	["trail_global_cap", "Trail puddles at once on the server (0 no limit)", 0.0, 5000.0],
 ]
 
-## The cvars a map's `dot_map/map/<name>.yml` may set (zz_map_config.gd).
+## The cvars a map's `gs_map/map/<name>.yml` may set (zz_map_config.gd).
 func _map_config_keys() -> Dictionary:
 	var keys: Dictionary = ZzMapConfig.KEYS.duplicate()
 	keys.merge(GSWeaponSpawnerConfig.MAP_KEYS)
@@ -149,8 +149,8 @@ func _make_services() -> Node:
 	services.punishments_file = punishments_file
 	return services
 
-## Profiles, avatars and admission: dot-platform's [GSPlatformIdentity] over this game's one-slot schema. [GSGameModule] builds it before the services and loads dot-platform's own module beside it.
-## [b]Authentication is not here and was never this game's.[/b] Whether a player is proven to be somebody is the host's `dot_auth_server`, the same for every game it runs; what this layer does is
+## Profiles, avatars and admission: gs-platform's [GSPlatformIdentity] over this game's one-slot schema. [GSGameModule] builds it before the services and loads gs-platform's own module beside it.
+## [b]Authentication is not here and was never this game's.[/b] Whether a player is proven to be somebody is the host's `gs_auth_server`, the same for every game it runs; what this layer does is
 ## everything after — a scoped profile, the name on it, and a face. With authentication off everybody is a guest with a profile of their own, which is what a LAN server is.
 func _make_identity() -> Node:
 	var identity_layer := GSPlatformIdentity.new()
@@ -160,7 +160,7 @@ func _make_identity() -> Node:
 	return identity_layer
 
 ## The maps the SERVER names for this game, fetched and added to the catalogue. Returns how many documents they held. [b]The server's list, not this game's.[/b] A map pack was a `server_dependencies` entry in `game.yml`, which travels in this game's own pack — so a new map meant a release of the game, and a server owner could not choose which maps to run. The owner names them now in their
-## deployment's map config (dot-server-deploy's `cfg/content.yml`, which fills [member GSGameDescriptor.maps]); [GSGameContent] fetches each pack and hands back its `maps/` directory. A server that still names one under `server_dependencies` keeps working, because GSGameContent reads those too. [b]Still server-only.[/b] The server sends the map it is playing in MAP, so a client never needs a map file
+## deployment's map config (gs-server-deploy's `cfg/content.yml`, which fills [member GSGameDescriptor.maps]); [GSGameContent] fetches each pack and hands back its `maps/` directory. A server that still names one under `server_dependencies` keeps working, because GSGameContent reads those too. [b]Still server-only.[/b] The server sends the map it is playing in MAP, so a client never needs a map file
 ## and none of these is in a client's content sync. With nothing named, this game plays its built-in map. [b]Called after EVERY catalogue load[/b], not only the first: `load_from` forgets everything read before, and a reload that did not come back here dropped every delivered map — which is what mg-wipeout and mg-deathrun did until the three were moved onto GSGameContent.
 func _add_delivered_maps(world: ZzGame) -> int:
 	if server == null or world.catalogue == null:
@@ -174,7 +174,7 @@ func _add_delivered_maps(world: ZzGame) -> int:
 	return read
 
 ## Where a map's drawn world is published: its document's `world` pack, at the owner and version of the maps pack the
-## document came from (zombie-zone-maps' release publishes both from one tag, dot-ci's release-maps). Empty for a map
+## document came from (zombie-zone-maps' release publishes both from one tag, gs-ci's release-maps). Empty for a map
 ## from no pack: a client then draws its boxes, unless its own checkout has the world.
 func _world_key(doc: Dictionary) -> String:
 	var pack := str(doc.get("world", ""))
@@ -192,9 +192,9 @@ func _world_key(doc: Dictionary) -> String:
 	return ""
 
 
-## What a session looks like: what dot-platform resolved for them, or the stock person. [b]Through the platform module's `player_for`, and never the hub by a key made
+## What a session looks like: what gs-platform resolved for them, or the stock person. [b]Through the platform module's `player_for`, and never the hub by a key made
 ## here.[/b] The hub keys a player by their scoped profile key, which only admission knows; a lookup by `u<session>` finds nobody, every time, and falls through to stock —
-## which reads as "this player has no avatar" rather than as a wrong key. Duck-typed, because a server without dot-platform is a configuration.
+## which reads as "this player has no avatar" rather than as a wrong key. Duck-typed, because a server without gs-platform is a configuration.
 func _avatar_for(session_id: int) -> GSAvatar:
 	var session := server.session_by_userid(session_id) if server != null else null
 	var platform: Object = server.modules.get_module("platform") \

@@ -8,17 +8,17 @@ const ZzLadders := preload("../game/zz_ladders.gd")
 ## rather than have to find.
 ##
 ## [b]Extended by PATH rather than by name[/b] (the `extends` above), because a brain in a
-## mounted dot-cloud pack cannot resolve a `class_name`. The same goes for every brain under
+## mounted gs-cloud pack cannot resolve a `class_name`. The same goes for every brain under
 ## `npcs/`.
 ##
-## [b]No behaviour tree.[/b] dot-npc-ai's notes say it plainly: "a zombie has four states", and a
+## [b]No behaviour tree.[/b] gs-npc-ai's notes say it plainly: "a zombie has four states", and a
 ## tree for four states is a state machine with extra steps and worse debugging. Each kind's
-## brain is a hand-written machine in [method _decide]; what this class takes from dot-npc-ai is
+## brain is a hand-written machine in [method _decide]; what this class takes from gs-npc-ai is
 ## everything round the decision — the memory that forgets, the squad's attack slots and its
 ## ring round a survivor's back, what it can hear, its reaction time and turn rate — which is
 ## the part that took that addon's suite three hundred checks to get right.
 ##
-## [b]Steering writes a wish; the body moves.[/b] See [ZzZombieBody]. dot-npc's own
+## [b]Steering writes a wish; the body moves.[/b] See [ZzZombieBody]. gs-npc's own
 ## `steer_toward` moves the body itself, once per call; overridden here so steering, a shove
 ## and gravity are one move a tick.
 
@@ -368,7 +368,7 @@ func _npc_think(delta: float) -> void:
 	_every = _think_every()
 
 
-## The spawner counts the ticks between thoughts when its pacing is on (dot-npc GSNpcPacing): the same
+## The spawner counts the ticks between thoughts when its pacing is on (gs-npc GSNpcPacing): the same
 ## thoughts as [method _npc_think], without a call into every brain every tick.
 func paces() -> bool:
 	return true
@@ -610,7 +610,7 @@ func _barred(h: Object, b: ZzZombieBody) -> String:
 	return barred
 
 
-## Flat metres to the nearest living survivor, INF with nobody: dot-sim's [code]nearest[/code] off the tick's
+## Flat metres to the nearest living survivor, INF with nobody: gs-sim's [code]nearest[/code] off the tick's
 ## survivor table while the brains decide natively, the horde's script otherwise (and beside it under `brains_verify`).
 func _nearest_survivor(h: Object) -> float:
 	var native: Object = h.get(&"brains_now")

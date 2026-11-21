@@ -19,7 +19,7 @@ const ZzMap := preload("../game/zz_map.gd")
 ## [br]- join: the default above.
 ## [br]- change: a connected client sits through the server's map change (Practice Street to the
 ## Abandoned Mall) and every frame across the transition is measured.
-## [br]- slow: the client joins through a lossy, delaying UDP relay (dot_net_udp_relay.gd) and the
+## [br]- slow: the client joins through a lossy, delaying UDP relay (gs_net_udp_relay.gd) and the
 ## server stalls 3 s on its next map build, then the same map change runs on that link.
 ## [br]Every frame is measured (see [method _measure]); the frames that matter (cover up, the last
 ## covered frame, the frames right after each lift, +1 s) are written to
@@ -141,7 +141,7 @@ func _run() -> void:
 	var port := PORT
 	var relay: RefCounted = null
 	if _mode == "slow":
-		relay = (load("res://addons/dot_net/testing/dot_net_udp_relay.gd") as GDScript).new()
+		relay = (load("res://addons/gs_net/testing/gs_net_udp_relay.gd") as GDScript).new()
 		relay.set(&"threaded", true)
 		relay.call(&"set_impairment", true, 0.05, 150.0, 40.0)
 		relay.call(&"set_impairment", false, 0.08, 250.0, 80.0)

@@ -7,9 +7,9 @@ const CommonBrain := preload("../npcs/zz_common_brain.gd")
 const ZombieMove := preload("../npcs/zz_zombie_brain_move.gd")
 const DecideCases := preload("zz_native_decide_cases.gd")
 const SteerState := preload("zz_native_steer_state.gd")
-const CrowdGrid := preload("res://addons/dot_npc_ai/steer/dot_npc_ai_crowd_grid.gd")
+const CrowdGrid := preload("res://addons/gs_npc_ai/steer/gs_npc_ai_crowd_grid.gd")
 
-## The zombies' brains in dot-sim ([member ZzConfig.native_brains], on by default) decide as the script over seeded
+## The zombies' brains in gs-sim ([member ZzConfig.native_brains], on by default) decide as the script over seeded
 ## worlds: the commons' chase plan (whom, whether the forced survivor is spent, where, how fast, how far, how near a
 ## swing lands) under Hard Box stacks, Angry runners, downed, dead and missing survivors, crawlers and burning bodies,
 ## and every zombie's spaced heading off the native crowd, stacked bodies included, all to the bit. The script plan
@@ -64,8 +64,8 @@ func _run() -> void:
 	print("the brains are native by default, and the library is there")
 	_check(ZzConfig.new().native_brains, "ZzConfig.native_brains is on by default")
 	if not ClassDB.class_exists(NATIVE) or not ClassDB.class_exists(NATIVE_CROWD):
-		print("  dot-sim's zombie module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		print("  gs-sim's zombie module is not loaded: the native half is skipped")
+		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, 1, 2)
 		return

@@ -26,7 +26,7 @@ const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 ## remote player, `render_state()` for one this process simulates — and nothing here
 ## computes one.
 ##
-## [b]One of the family's people[/b] (dot-player-char's `GSHumanoidFigure`: animated, on the
+## [b]One of the family's people[/b] (gs-player-char's `GSHumanoidFigure`: animated, on the
 ## rig every game's players, bots and NPCs share, the same style as the zombies of the family's
 ## zombie game), because a player is somebody to see coming and a capsule does not say which way
 ## somebody is facing from forty metres. Which person a player is still comes from the blocky

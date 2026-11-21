@@ -30,13 +30,13 @@ func setup(p_game: Object, p_config: ZzConfig) -> GSResult:
 	spawner.smooth_paths = true
 	spawner.allow_partial_paths = true
 	# Smooth only a path's first metres: a zombie repaths every second and a half and never
-	# walks the rest. Through `set` so an older dot-npc without it is simply not told.
+	# walks the rest. Through `set` so an older gs-npc without it is simply not told.
 	spawner.set(&"smooth_horizon", 16)
 	spawner.set(&"repath_drift_ratio", config.repath_drift_ratio)
 	spawner.set(&"repath_interval_per_m", config.repath_interval_per_m)
 	spawner.occlusion_mask = game.world_mask()
 	# Every repath is queued and answered after every brain has thought, at 0 path workers too,
-	# so sv_threads_npc on and off play the same seeded round (dot-npc's deferred_paths).
+	# so sv_threads_npc on and off play the same seeded round (gs-npc's deferred_paths).
 	spawner.deferred_paths = true
 	var forced := forced_npc_workers()
 	if forced >= 0:
@@ -45,7 +45,7 @@ func setup(p_game: Object, p_config: ZzConfig) -> GSResult:
 		spawner.think_workers = forced
 	# Every zombie's own seed (`npc.seed`, what the brains draw their idle, pace and wander from)
 	# comes from the session's seed and its spawn count, so a server given the same seed plays
-	# the same zombies. Never their object id: see dot-npc's docs/runtime.md.
+	# the same zombies. Never their object id: see gs-npc's docs/runtime.md.
 	spawner.seed_base = config.seed_value
 	# Before add_child: GSNpcSpawner._ready makes its own senses when it finds none.
 	spawner.senses = senses
@@ -719,7 +719,7 @@ func _rebuild_candidates() -> void:
 		var id: StringName = player.player_id
 		var state: GSFpsState = player.controller.state
 		# A seat behind its loading cover is not a target: not chased, not spawned at, not counted
-		# in the crowd's size (dot-game's "still loading"); it is still alive for the round.
+		# in the crowd's size (gs-game's "still loading"); it is still alive for the round.
 		var alive: bool = not grace_on and player.is_alive() and not player.watching and game.can_be_harmed(id)
 
 		if not _facts_of.has(id):
@@ -879,7 +879,7 @@ func _pick_crowd() -> void:
 		senses.native_enabled = config != null and config.native_senses
 
 	var brains := config != null and config.native_brains and ClassDB.class_exists(NATIVE_BRAINS)
-	# Through `set` so an older dot-npc without pacing is simply not told.
+	# Through `set` so an older gs-npc without pacing is simply not told.
 	if spawner != null:
 		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"GSSimThinkPacer"))
 
@@ -1155,7 +1155,7 @@ func throw_zombie(npc: GSNpcInstance, velocity: Vector3) -> void:
 
 	b.leap(velocity)
 
-## Where the zombies round [param npc] are (dot-npc-ai's `neighbours`); spacing itself goes
+## Where the zombies round [param npc] are (gs-npc-ai's `neighbours`); spacing itself goes
 ## through [member crowd] without this array ([method ZzZombieBrain.separation]).
 func neighbour_positions(npc: GSNpcInstance, radius: float) -> Array:
 	var out: Array = []
@@ -2081,7 +2081,7 @@ func shove(origin: Vector3, facing: Vector3, reach: float, half_angle_deg: float
 
 	return moved
 
-## A blast: zombies inside stagger away from it. The damage is dot-combat's (`explode`).
+## A blast: zombies inside stagger away from it. The damage is gs-combat's (`explode`).
 func blast(at: Vector3, radius: float) -> void:
 	for npc in spawner.npcs_near(at, radius):
 		if npc.brain != null and npc.brain.has_method(&"stagger") and npc.def.id != ZzNpcs.BRUTE:
@@ -2139,7 +2139,7 @@ func _register_combat(npc: GSNpcInstance) -> void:
 	# The health first, and that is not tidiness. A hitbox finds its owner as the nearest
 	# ancestor carrying a GSHealth and remembers the answer; built before the health, every
 	# hitbox settled on its own set as the owner, and every shot that hit a zombie was
-	# credited to a node dot-combat had never heard of — and did nothing.
+	# credited to a node gs-combat had never heard of — and did nothing.
 	var health := GSHealth.new()
 	health.name = "Health"
 	health.max_health = def.max_health
@@ -2185,7 +2185,7 @@ func limb_hit(damage: GSDamage) -> void:
 	if limb == &"" or (limb == &"head" and not head):
 		return
 
-	# Which zone the hit was, in dot-combat's ids, for whoever reads the damage afterwards.
+	# Which zone the hit was, in gs-combat's ids, for whoever reads the damage afterwards.
 	var feet: float = (npc.node as Node3D).global_position.y
 	var tall := maxf(0.5, float(npc.def.meta.get("height", 1.75)))
 	damage.context[&"limb_zone"] = ZzZombieLimbs.zone_of(limb, (damage.point.y - feet) / tall)
@@ -2307,7 +2307,7 @@ func decide_death(npc: GSNpcInstance, fatal: GSDamage) -> GSPlayerDeath:
 	return GSPlayerDeath.decide(death_reactions, headshot, amount, direction,
 		GSPlayerDeath.seed_of(npc.seed, tick), weapon)
 
-## dot-combat decided a death; dot-npc has to be told, so the brain hears it and the budget
+## gs-combat decided a death; gs-npc has to be told, so the brain hears it and the budget
 ## comes back.
 func _on_entity_killed(entity_id: int, damage: GSDamage) -> void:
 	if not is_npc_entity(entity_id):
@@ -2343,7 +2343,7 @@ func _on_damage_applied(damage: GSDamage) -> void:
 	if npc.brain != null:
 		(npc.brain as GSNpcBrain).damaged(damage.health_lost, by)
 
-	# A weapon that says it burns (zed-dot-weapons' flamethrower) sets what it hits alight.
+	# A weapon that says it burns (zed-gs-weapons' flamethrower) sets what it hits alight.
 	if damage.weapon_id != &"" and game.hazards != null:
 		var def := ZzWeapons.def_of(damage.weapon_id)
 		if def != null and def.tags.has(&"incendiary"):

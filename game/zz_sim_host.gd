@@ -53,7 +53,7 @@ static func wanted() -> bool:
 static func wanted_for(args: PackedStringArray) -> bool:
 	if GSPlatform.is_web() or not GSPlatform.has_threads():
 		return false
-	if GSRegistry.get_service(&"dot_client_link") != null:
+	if GSRegistry.get_service(&"gs_client_link") != null:
 		return false
 	if forced >= 0:
 		return forced == 1

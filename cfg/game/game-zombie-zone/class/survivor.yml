@@ -1,4 +1,4 @@
-# The survivor class (dot-player-class). A number left out, or -1, keeps the ZzConfig value (zz_run_speed, zz_sprint_*, zz_stamina_*, zz_weight_limit).
+# The survivor class (gs-player-class). A number left out, or -1, keeps the ZzConfig value (zz_run_speed, zz_sprint_*, zz_stamina_*, zz_weight_limit).
 # An operator overrides in cfg/server/game/game-zombie-zone/class/survivor.yml; the change lands on the next spawn.
 # Run speed multiplier [0.05..10]
 # speed: 1.0

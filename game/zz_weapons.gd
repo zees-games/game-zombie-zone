@@ -5,14 +5,14 @@ extends RefCounted
 ## [b]The one file that knows where weapons come from.[/b] A box that gives "a heavy weapon", a
 ## map that leaves "a primary" on a table, and a rescue that hands back "a sidearm" all ask here
 ## by tier, so adding a second pack is adding it to [method all_defs] and nothing else in the
-## game changes. Tiers are dot-weapon's tags (zee-dot-weapons' `TAG_*`), not a list written here:
+## game changes. Tiers are gs-weapon's tags (zee-gs-weapons' `TAG_*`), not a list written here:
 ## a weapon says what it is.
 
 const TIERS: Array[StringName] = [&"sidearm", &"primary", &"heavy", &"melee", &"thrown"]
 
 const ZzPackList := preload("zz_packs.gd")
 
-## zee-dot-weapons' own catalogue, the toy-looking blasters and tools the game shipped with. They stay in
+## zee-gs-weapons' own catalogue, the toy-looking blasters and tools the game shipped with. They stay in
 ## the rigs' catalogue (an old save, `arm`, a console command still name them) but are offered nowhere
 ## (boxes, loot, caches, spawners, shop, stand-ins) unless `weapons.legacy` is on in packs.yml.
 ## Maps to the modern pack's weapon that takes the old one's place when an old id is named by data.
@@ -34,7 +34,7 @@ static var _defs: Array[GSWeaponDef] = []
 static var _by_id: Dictionary = {}
 
 
-## Leaves zee-dot-weapons' blasters out of the catalogue (only its fists stay, the arsenal's floor): every other weapon
+## Leaves zee-gs-weapons' blasters out of the catalogue (only its fists stay, the arsenal's floor): every other weapon
 ## comes from an installed pack. Called by the world before any rig is built, because a rig reads its catalogue once.
 static func use_packs() -> void:
 	ZeeWeaponPack.keep_only([&"fists"])
@@ -173,7 +173,7 @@ static func random_of(tier: StringName, rng: RandomNumberGenerator, channel: Str
 
 ## A spawner pool's weight for weapon [param id] on [param channel] (`spawner`, `wall`, `crate`, `trader`, plus the
 ## box, loot and cache ones): 0 when `weapons.not_in.<channel>` bars it, else [param weight] times `weapons.weights`.
-## Handed to dot-weapon's `GSWeaponSpawnerConfig.weigher`; ids that are no weapon (a medkit) pass through.
+## Handed to gs-weapon's `GSWeaponSpawnerConfig.weigher`; ids that are no weapon (a medkit) pass through.
 static func channel_weight(channel: StringName, id: StringName, weight: float) -> float:
 	if not exists(id):
 		return weight
@@ -308,7 +308,7 @@ static func command_for(fire: bool, reload: bool, held: bool, yaw: float, pitch:
 
 ## Whether the gun in hand is empty and has something to reload from.
 ##
-## [b]An empty magazine reloads itself, trigger held or not.[/b] dot-weapon starts a reload only
+## [b]An empty magazine reloads itself, trigger held or not.[/b] gs-weapon starts a reload only
 ## on a dry pull (`auto_reload`), so a survivor who let go on the last round stood with an empty
 ## gun until the next pull clicked: with a horde coming, that click is the reload starting a
 ## second late. A weapon with `auto_reload` off (a minigun, a beam) is left to the R key.

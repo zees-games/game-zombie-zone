@@ -1,6 +1,6 @@
 extends RefCounted
 
-## The box types as dot-profile `box` profiles (`cfg/game/game-zombie-zone/box/<id>.yml`).
+## The box types as gs-profile `box` profiles (`cfg/game/game-zombie-zone/box/<id>.yml`).
 ##
 ## boxes/boxes.json is the floor and the source of the shipped files (tools/export_box_profiles.gd; the packs suite fails when they are
 ## stale). A profile of the same id replaces that type, so an operator edits one in the workbench or in cfg/server/game/game-zombie-zone/box.

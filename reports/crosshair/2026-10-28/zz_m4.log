@@ -1,7 +1,7 @@
 gpu.sh: WARN no GPU box took the frame (down, busy or in use); rendering on dev02's CPU (llvmpipe), not a real GPU
 heavy: waiting for a build slot (0s). Held by:
   christian@x-tmc-dev02 pid 3321861 since 01:12:58: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
-  christian@x-tmc-dev02 pid 3321617 since 01:13:39: timeout 600 ../gpu.sh shot zee-dot-weapons tools/screenshot.sh pistol screenshots/wall_pistol.png
+  christian@x-tmc-dev02 pid 3321617 since 01:13:39: timeout 600 ../gpu.sh shot zee-gs-weapons tools/screenshot.sh pistol screenshots/wall_pistol.png
 heavy: waiting for a build slot (60s). Held by:
   christian@x-tmc-dev02 pid 3321861 since 01:12:58: timeout 900 godot --headless --path . res://examples/headless_nav.tscn -- --only=spread
   christian@x-tmc-dev02 pid 3320002 since 01:15:37: timeout 1500 ../gpu.sh shot game-zombie-zone tools/shot.sh --view=survivor --seconds=2
@@ -18,7 +18,7 @@ WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by 
      at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
 OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
 
-WRN game.locked_content a content.lock.json is shipped but there is no dot-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
+WRN game.locked_content a content.lock.json is shipped but there is no gs-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
 inf config   applied command line keys=4
 inf game.config layer applied from="" game=game-zombie-zone keys="warmup_seconds, start_grace_seconds, wanderer_density, map_ids" layer=argv
 inf zz.packs packs scanned monsters=6 providers=4 weapons=47

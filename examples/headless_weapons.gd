@@ -60,7 +60,7 @@ func _run() -> void:
 
 ## A delivered game has only what is vendored in assets/, so every model the weapon art table
 ## names must exist here; an unvendored gun loads as bare arms and nothing else fails. The
-## list and the check are the addon's; `tools/sync-art.sh` in zee-dot-weapons copies what it names.
+## list and the check are the addon's; `tools/sync-art.sh` in zee-gs-weapons copies what it names.
 func _test_the_weapon_art_is_vendored() -> void:
 	_section("Every model the weapon art table names is vendored in this game")
 	ZzWeapons.use_packs()
@@ -84,7 +84,7 @@ func _test_the_weapon_art_is_vendored() -> void:
 	_finished()
 
 
-## The modern pack's weapons each resolve a fire, draw and (guns) reload and dry sound from dot-audio's
+## The modern pack's weapons each resolve a fire, draw and (guns) reload and dry sound from gs-audio's
 ## stock, and a gun a reload clip; a melee weapon and a grenade a fire sound. A weapon missing from
 ## the pack's class table plays nothing, and no other suite would hear it.
 func _test_every_pack_weapon_sounds_and_reloads() -> void:

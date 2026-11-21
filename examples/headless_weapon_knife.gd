@@ -3,7 +3,7 @@ extends "zz_suite.gd"
 const ZzNetCommand := preload("../game/net/zz_net_command.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
 
-## The aim key with the knife in hand throws it (dot-weapon's GSWeaponKnives): it leaves the hand,
+## The aim key with the knife in hand throws it (gs-weapon's GSWeaponKnives): it leaves the hand,
 ## kills a zombie it meets, sticks in it, and is taken back; the cvars and the wire round-trip.
 
 const SECTIONS := 4

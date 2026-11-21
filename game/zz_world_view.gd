@@ -44,7 +44,7 @@ var _lens_view: Node3D = null
 
 var _rng := RandomNumberGenerator.new()
 
-## Where killed zombies fall as skeletal ragdolls: dot-player-char's yard, the same bodies and
+## Where killed zombies fall as skeletal ragdolls: gs-player-char's yard, the same bodies and
 ## reactions every player in the family falls with (a skinned body falls by its bones). Its
 ## cap is the machine's (four in a browser tab) and the server's `max_count`; a death past the
 ## cap, or with `sv_ragdoll 0`, is the view's animated fall instead (`ZzZombieView.die`), so a
@@ -72,7 +72,7 @@ func _ready() -> void:
 	ragdolls.sound_fn = _ragdoll_sound
 	add_child(ragdolls)
 
-## A dead body's landing (dot-player-char's stock death sounds), where it landed.
+## A dead body's landing (gs-player-char's stock death sounds), where it landed.
 func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
 	if audio != null:
 		var _played := audio.at(id, at, clampf(volume, 0.3, 1.0))
@@ -215,7 +215,7 @@ func remove_zombie(key: int, killed: bool, body: Node3D = null) -> void:
 	view.global_transform = keep
 	_corpses.append([view, maxf(ragdolls.rules.lifetime, 1.0) if ragdolls != null else CORPSE_SECONDS])
 
-	# The server's pick of how it falls (dot-player-char's reactions); a body nobody was told
+	# The server's pick of how it falls (gs-player-char's reactions); a body nobody was told
 	# about drops where it stands.
 	if death is GSPlayerDeath:
 		var d := death as GSPlayerDeath
@@ -984,7 +984,7 @@ func _particles(colour: Color, radius: float, amount: int, additive: bool = true
 	p.scale_amount_max = 0.5
 	var quad := QuadMesh.new()
 	quad.size = Vector2(0.5, 0.5)
-	# dot-fx's soft sprite: an untextured quad was a hard square, the "big pixels" of the fire.
+	# gs-fx's soft sprite: an untextured quad was a hard square, the "big pixels" of the fire.
 	var material := GSFxSoftSprite.material(Color(colour.r, colour.g, colour.b, 1.0), additive)
 	quad.material = material
 	p.mesh = quad

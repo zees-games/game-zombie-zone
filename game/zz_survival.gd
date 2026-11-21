@@ -10,7 +10,7 @@ const ZzWeapons := preload("zz_weapons.gd")
 
 ## A survival map held: the schedule, what each stage does to the horde, and the breather.
 ##
-## [b]The schedule is dot-npc-ai-director's[/b] ([GSNpcDirectorWaves]); this file is what it
+## [b]The schedule is gs-npc-ai-director's[/b] ([GSNpcDirectorWaves]); this file is what it
 ## means in this game. The server owner picks the style (`zz_survival`), and the default is the
 ## one the first play test asked for:
 ##

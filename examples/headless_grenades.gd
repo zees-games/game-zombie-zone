@@ -25,7 +25,7 @@ func _run() -> void:
 	print("zombiezone grenades")
 	print("")
 	if ZzWeapons.def_of(&"zz_frag") == null:
-		print("SKIPPED: zz-modern-weapons is not linked (its frag is the base of the test rows); run dot-bootstrap for the full suite")
+		print("SKIPPED: zz-modern-weapons is not linked (its frag is the base of the test rows); run gs-bootstrap for the full suite")
 		get_tree().quit(0)
 		return
 	await _test_which_weapons()

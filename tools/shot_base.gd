@@ -56,7 +56,7 @@ var _weapons: PackedStringArray = PackedStringArray()
 var _day := -1.0
 
 
-## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A dot-cloud client reads packs
+## `--cloud-store=<dir>,<public key file>,<id@version>`: the delivery check. A gs-cloud client reads packs
 ## published into <dir> (a URL fetches over the network, as a player's client does), trusting that key,
 ## and the map's world is fetched as <id>@<version> instead of read from the checkout.
 var _world_key := ""
@@ -65,7 +65,7 @@ var _world_key := ""
 ## Holds the stand-ins' pitch (`--aim`), every frame and every physics tick.
 const _AimHolder := preload("shot_aim_holder.gd")
 const _ShotCamera := preload("shot_camera.gd")
-const ReloadShots := preload("res://addons/dot_weapon/view/dot_weapon_reload_shots.gd")
+const ReloadShots := preload("res://addons/gs_weapon/view/gs_weapon_reload_shots.gd")
 
 ## `--frames=N`: how many frames `--view=reload` takes.
 var _frame_count := 12
@@ -157,7 +157,7 @@ func _reload_tiles(label: Label, id: StringName, local, rig: ZeeWeaponRig, fract
 
 ## `--view=reload [--weapons=ids|all] [--frames=N]`: each magazine gun's whole first-person reload, N frames
 ## (12 by default) full size as `reload_<id>_NN.png` and a contact sheet `reload_<id>_sheet.png` in `_out`, through
-## the real client and the real reload key. The shared fractions and sheet are dot-weapon's.
+## the real client and the real reload key. The shared fractions and sheet are gs-weapon's.
 func _reload_shots(game: ZzGame, local) -> void:
 	var ids := _magazine_ids()
 	var layer := CanvasLayer.new()
@@ -288,8 +288,8 @@ func _crosshair_frames(game: ZzGame, local) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	_client.set("_slot", ZzWeapons.def_of(id).slot)
 	var stages := {
-		"rest": [], "walk": ["dot_fps_forward", "dot_fps_walk"], "run": ["dot_fps_forward", "dot_fps_sprint"],
-		"crouch": ["dot_fps_crouch"], "aimed": [], "fired": [],
+		"rest": [], "walk": ["gs_fps_forward", "gs_fps_walk"], "run": ["gs_fps_forward", "gs_fps_sprint"],
+		"crouch": ["gs_fps_crouch"], "aimed": [], "fired": [],
 	}
 	for stage: String in stages:
 		for action: String in stages[stage]:
@@ -328,8 +328,8 @@ func _stamina_frames(local) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	var state: GSFpsState = local.controller.state
 	state.stamina = 1.0
-	Input.action_press("dot_fps_forward")
-	Input.action_press("dot_fps_sprint")
+	Input.action_press("gs_fps_forward")
+	Input.action_press("gs_fps_sprint")
 	var hud = _client.get("hud")
 	for stage: String in ["full", "half", "empty"]:
 		var waited := 0.0
@@ -342,8 +342,8 @@ func _stamina_frames(local) -> void:
 				await _seconds_of(0.1)
 				waited += 0.1
 		await _stamina_save(dir, stage, state, hud)
-	Input.action_release("dot_fps_sprint")
-	Input.action_release("dot_fps_forward")
+	Input.action_release("gs_fps_sprint")
+	Input.action_release("gs_fps_forward")
 	await _seconds_of(2.0)
 	await _stamina_save(dir, "recovering", state, hud)
 	await _seconds_of(6.0)

@@ -1,7 +1,7 @@
 extends "zz_mechanics_base.gd"
 
 ## A converted map's lifts, doors, buttons and triggers, run from the world pack's manifest
-## (dot-map's mover, volume and link records).
+## (gs-map's mover, volume and link records).
 ##
 ## The server owns every state change; a state is `(start tick, fraction then, direction)` and
 ## the pose at any tick follows from it, so a client told a state predicts the same pose as the
@@ -29,7 +29,7 @@ var _predicted: Array[Dictionary] = []
 
 var _vol_io: GSMapIO = null
 
-## Every entity of the map as a dot-map runtime, which owns the links: the lifts, buttons and volumes below are its targets.
+## Every entity of the map as a gs-map runtime, which owns the links: the lifts, buttons and volumes below are its targets.
 var _logic: GSMapIO = null
 
 var _logic_base: int = 0
@@ -154,7 +154,7 @@ func build(world: RefCounted, put_on: Callable, doors_only: bool = false) -> voi
 static func _is_brush_door(mv: Variant) -> bool:
 	return DOOR_CLASSES.has(str(mv.classname).to_lower()) and (mv.kind == "slide" or mv.kind == "rotate")
 
-## A prop door has no brush: dot-map's GSMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
+## A prop door has no brush: gs-map's GSMapDoorStandIn is its panel and body, hung at the hinge and swung as a whole.
 func _build_door(mv: Variant, put_on: Callable, free_for_all: bool) -> void:
 	var yaw: float = mv.panel_yaw if not is_nan(mv.panel_yaw) else mv.yaw
 	var node: Node3D = GSMapDoorStandIn.build(mv, yaw, GSMapDoorStandIn.SIZE, 1)
@@ -781,7 +781,7 @@ func _set_dir(m: Dictionary, d: int, tick: int) -> void:
 	elif d < 0 and before >= 0:
 		_fire(int(m["entity"]), "OnClose", tick)
 
-## Which way a door about to open turns: away from whoever opens it, as dot-map's mover node chooses.
+## Which way a door about to open turns: away from whoever opens it, as gs-map's mover node chooses.
 func _swing_away(m: Dictionary) -> void:
 	var at: Variant = _activator
 	if at == null and opener_fn.is_valid():
@@ -1055,7 +1055,7 @@ func _record_of(entity: int, classname: String, targetname: String, pairs: Array
 	return {"index": entity, "classname": classname, "targetname": targetname, "pairs": pairs, "outputs": outs}
 
 ## Builds (or rebuilds, for a new round) the logic runtime from the source document, else the manifest. The mover, button and
-## volume classes hand their inputs to this class; the logic classes, the makers and the texts run in dot-map and here.
+## volume classes hand their inputs to this class; the logic classes, the makers and the texts run in gs-map and here.
 func _build_logic() -> void:
 	_logic = null
 	_logic_synced = false

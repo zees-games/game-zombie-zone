@@ -15,7 +15,7 @@ WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by 
      at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
 OpenGL API 4.5 (Core Profile) Mesa 25.0.7-2+deb13u1 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 19.1.7, 256 bits)
 
-WRN game.locked_content a content.lock.json is shipped but there is no dot-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
+WRN game.locked_content a content.lock.json is shipped but there is no gs-cloud client to mount it lock=/home/christian/godot/zombie-zone-maps/content.lock.json
 inf config   applied command line keys=4
 inf game.config layer applied from="" game=game-zombie-zone keys="warmup_seconds, start_grace_seconds, wanderer_density, map_ids" layer=argv
 inf zz.packs packs scanned monsters=6 providers=4 weapons=47

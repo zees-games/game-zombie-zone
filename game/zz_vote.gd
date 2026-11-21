@@ -7,10 +7,10 @@ extends Node
 ## ([member due_fn]) and is applied when that round ends, so the next round starts on whatever
 ## was chosen. Rocking the vote opens one in any round and changes the map at that round's
 ## end. Everything about the ballot itself (how many options, the counting method, the
-## tie-break, nominations, cooldowns) is dot-vote's settings and none of it is restated here;
+## tie-break, nominations, cooldowns) is gs-vote's settings and none of it is restated here;
 ## [method _rules] only says which of them a few-rounds-per-map game wants by default.
 ##
-## [b]`trigger` is MANUAL, not ROUND_END.[/b] dot-vote's ROUND_END opens a ballot at a round's
+## [b]`trigger` is MANUAL, not ROUND_END.[/b] gs-vote's ROUND_END opens a ballot at a round's
 ## end and applies it at the NEXT round's end, which is a round late. Opening it during the
 ## last round and applying it at the end (`apply: END_OF_ROUND`) puts the choice on the very
 ## next round.
@@ -27,7 +27,7 @@ const CHANNEL := "zombiezone.vote"
 ## [code]metadata: map_vote:[/code] in a delivered game's [code]game.yml[/code].
 const METADATA_KEY := "map_vote"
 
-## The dot-vote API level at which the director opens a rocked vote itself under MANUAL.
+## The gs-vote API level at which the director opens a rocked vote itself under MANUAL.
 const RTV_OPENS_IN_DIRECTOR_LEVEL := 2
 
 ## What the vote command is called: `!vote 2` in chat, `vote 2` in a console.
@@ -38,7 +38,7 @@ const COMMAND_NAMES := {"vote": "vote"}
 @export var open_after_sec: float = 20.0
 
 ## The file a server owner configures the vote in, keyed exactly as [GSVoteRules]. Layered:
-## [code]_rules() < game.yml metadata map_vote: < this file < DOT_VOTE_* < --vote-*[/code].
+## [code]_rules() < game.yml metadata map_vote: < this file < GS_VOTE_* < --vote-*[/code].
 ## Empty skips the file. [code]{"enabled": false}[/code] turns the vote off and the rotation
 ## ([code]zz_shuffle_maps[/code]) decides alone.
 @export var config_path: String = "user://cfg/zombiezone_vote.json"
@@ -61,7 +61,7 @@ var voters_fn: Callable = Callable()
 ## Says a line to everybody.
 var announce_fn: Callable = Callable()
 
-## Whether a voter is an admin, for dot-vote's admin bypasses.
+## Whether a voter is an admin, for gs-vote's admin bypasses.
 var is_admin_fn: Callable = Callable()
 
 ## [code]func(state: Dictionary)[/code]: the ballot as a client draws it, sent when it changes.
@@ -71,11 +71,11 @@ var ballot_fn: Callable = Callable()
 var people_fn: Callable = Callable()
 
 ## [code]func() -> bool[/code]: whether a round is being played right now — not warmup, not
-## between rounds. Handed to dot-vote so [code]time_up: finish_round[/code] holds a change
+## between rounds. Handed to gs-vote so [code]time_up: finish_round[/code] holds a change
 ## only for a round in progress. The host's, because only the match knows.
 var round_in_progress_fn: Callable = Callable()
 
-## The content index subscribed maps are read from. Null is dot-core's shared one; a test hands
+## The content index subscribed maps are read from. Null is gs-core's shared one; a test hands
 ## its own so it never touches the process's.
 var content_index: GSContentIndex = null
 
@@ -86,8 +86,8 @@ var commands: GSVoteCommands = null
 ## `() -> Dictionary`: maps.yml's `commands:` block. Unset renames nothing.
 var commands_spec_fn: Callable = Callable()
 
-## `(id) -> bool`: maps.yml's active rotation, handed to the source so the pack maps dot-vote merges
-## are filtered like the game's own (dot-vote API level 12). Unset, every merged map is offered.
+## `(id) -> bool`: maps.yml's active rotation, handed to the source so the pack maps gs-vote merges
+## are filtered like the game's own (gs-vote API level 12). Unset, every merged map is offered.
 var in_rotation_fn: Callable = Callable()
 var feed: GSVoteBallotFeed = null
 
@@ -110,7 +110,7 @@ func setup() -> GSResult:
 	source.entries_fn = _own_choices
 	source.follow_content(content_index if content_index != null else GSContentIndex.shared(),
 		ZzWorkshop.accepted_map_kinds())
-	# By name, only where it exists: a delivered pack may run on an older shell dot-vote.
+	# By name, only where it exists: a delivered pack may run on an older shell gs-vote.
 	if "in_rotation_fn" in source:
 		source.set(&"in_rotation_fn", in_rotation_fn)
 	refresh_maps()
@@ -128,7 +128,7 @@ func setup() -> GSResult:
 	director.self_advance = false
 	director.round_based = true
 	# [b]Set by name, and only where it exists.[/b] A delivered pack runs on the shell's
-	# dot-vote, and one older than API 3 has no `round_in_progress_fn`: naming it would fail
+	# gs-vote, and one older than API 3 has no `round_in_progress_fn`: naming it would fail
 	# the pack's parse. There, a finish_round limit in warmup waits out finish_round_max_sec,
 	# which is what it did before. Read through this node's own field, so the order the host
 	# sets it in does not matter.
@@ -147,14 +147,14 @@ func setup() -> GSResult:
 
 	add_child(director)
 
-	# [b]Rock the vote opens its own ballot from dot-vote API level 2 on[/b]: the director's
+	# [b]Rock the vote opens its own ballot from gs-vote API level 2 on[/b]: the director's
 	# _on_vote_due opens a rocked vote under MANUAL as under any trigger, and a second
-	# start_vote here would only be refused. Below level 2 (an older shell dot-vote under a
+	# start_vote here would only be refused. Below level 2 (an older shell gs-vote under a
 	# delivered pack) MANUAL dropped it: the clock expired with reason rtv, the director did
 	# nothing, and `!rtv` answered "Rocked. 1 of 1." and nothing happened. Only there does
 	# this game open it, connected after the director's own handler. Any round, not only the
 	# last on a map (due_fn): rocking is the players asking now.
-	if GSAddonApi.build_level("dot_vote") < RTV_OPENS_IN_DIRECTOR_LEVEL:
+	if GSAddonApi.build_level("gs_vote") < RTV_OPENS_IN_DIRECTOR_LEVEL:
 		director.clock.expired.connect(func(reason: StringName) -> void:
 			if reason != GSVoteClock.REASON_RTV or director.is_voting():
 				return
@@ -193,7 +193,7 @@ func configured_rules() -> GSVoteRules:
 	return rules
 
 
-## What a one-map-per-round game wants from dot-vote by default. Every line is a default an
+## What a one-map-per-round game wants from gs-vote by default. Every line is a default an
 ## operator overrides in [member config_path].
 func _rules() -> GSVoteRules:
 	var rules := GSVoteRules.new()
@@ -203,13 +203,13 @@ func _rules() -> GSVoteRules:
 	# A rocked vote changes the map at the round's end too. Immediately would take the
 	# furniture out from under every prop in the middle of a round.
 	rules.rtv_apply = GSVoteRules.Apply.END_OF_ROUND
-	# No time limit: a map lasts a few rounds (`zz_rounds_per_map`), and dot-vote's 45-minute
+	# No time limit: a map lasts a few rounds (`zz_rounds_per_map`), and gs-vote's 45-minute
 	# default would expire and change it under a round in progress.
 	rules.duration_sec = 0.0
 	# There is no clock to extend, and "this map again" is a fair thing to want when a
 	# server has two.
 	rules.include_extend = false
-	# Rock the vote from the first round. dot-vote's two minutes keep a long map from being
+	# Rock the vote from the first round. gs-vote's two minutes keep a long map from being
 	# rocked the moment it loads; here they are longer than a round, a rocked vote waits for
 	# the round's end anyway (rtv_apply), and the delay made `!rtv` a command that never worked
 	# in the round people wanted to leave.
@@ -342,8 +342,8 @@ func is_voting() -> bool:
 	return director != null and director.is_voting()
 
 
-## dot-vote's commands on [param host]: `vote`, `rtv`, `nominate` and the operator's. Voters
-## are the bare session id, the same spelling [member voters_fn] lists — dot-vote's default is
+## gs-vote's commands on [param host]: `vote`, `rtv`, `nominate` and the operator's. Voters
+## are the bare session id, the same spelling [member voters_fn] lists — gs-vote's default is
 ## `u<userid>`, and two spellings of one voter is a player who rocks the vote twice.
 func install_commands(host: Object) -> GSResult:
 	if director == null:

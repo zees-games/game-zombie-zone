@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Writes a drawn world's solid prop boxes as JSON: `{id: [[x, y, z, sx, sy, sz, yaw], ...]}`, the
-## boxes dot-map's `build_prop_collision` makes. zombie-zone-maps' `tools/solid_props.sh` merges them
+## boxes gs-map's `build_prop_collision` makes. zombie-zone-maps' `tools/solid_props.sh` merges them
 ## into each document, so a server with no world pack collides where a client does.
 ##
 ## [codeblock]
@@ -13,13 +13,13 @@ extends SceneTree
 ## The counts must not depend on the checkout. Library models are read from the game's `.stores/model-library` by
 ## absolute path, so always through GLTFDocument: through res:// a model with a `.import` (the shared store holds
 ## some) loads only if this checkout's `.godot` has its imported scene, else `ResourceLoader.exists()` is true,
-## `load()` fails and dot-map drops the prop without a word, and a world's licence `model_store` is a path relative
+## `load()` fails and gs-map drops the prop without a word, and a world's licence `model_store` is a path relative
 ## to wherever it was converted. Every solid library model is loaded once first; one that does not load fails the
 ## run (exit 1, nothing written), so a prop is never silently left out.
 
-const MESH_SCRIPT := "res://addons/dot_map/bsp/dot_map_bsp_mesh.gd"
+const MESH_SCRIPT := "res://addons/gs_map/bsp/gs_map_bsp_mesh.gd"
 const NPCS_SCRIPT := "res://game/zz_npcs.gd"
-const GRAPH_SCRIPT := "res://addons/dot_npc/nav/dot_npc_nav_graph.gd"
+const GRAPH_SCRIPT := "res://addons/gs_npc/nav/gs_npc_nav_graph.gd"
 const SNAP := 2.5
 ## The shared model library, read outside res:// on purpose (see above).
 const STORE := "res://.stores/model-library"
