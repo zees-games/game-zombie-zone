@@ -129,3 +129,5 @@ Thumbs.db
 /reports/**/*.import
 /addons/dot_flashlight
 
+/addons/dot_sql
+/addons/godot-sqlite
