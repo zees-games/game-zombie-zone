@@ -65,7 +65,7 @@ func _run() -> void:
 	_check(ZzConfig.new().native_brains, "ZzConfig.native_brains is on by default")
 	if not ClassDB.class_exists(NATIVE) or not ClassDB.class_exists(NATIVE_CROWD):
 		print("  gs-sim's zombie module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		_check(OS.get_environment("GS_SIM_REQUIRE_NATIVE") != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, 1, 2)
 		return
