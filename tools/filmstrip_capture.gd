@@ -169,7 +169,10 @@ func _survivor_frame() -> void:
 		points.append(_unit(_camera, spot))
 	sample["points"] = points
 	_metrics.add(sample)
-	_log.append("%.2f pos=(%.1f,%.1f,%.1f) %s" % [_time, feet.x, feet.y, feet.z, str(sample.get("points", ""))])
+	var low := INF
+	for foot: Vector3 in sample.get("feet", []):
+		low = minf(low, foot.y - float(sample.get("ground_y", feet.y)))
+	_log.append("%.2f pos=(%.1f,%.1f,%.1f) low_foot=%.3f %s" % [_time, feet.x, feet.y, feet.z, low, str(sample.get("points", ""))])
 
 
 ## The hands and weapon in the eye's frame: their rotations feed the bone-pop check and the
@@ -181,7 +184,11 @@ func _first_person_sample(feet: Vector3) -> void:
 	if not is_instance_valid(cam) or not is_instance_valid(model):
 		return
 	if _parts.is_empty() or _parts.any(func(n) -> bool: return not is_instance_valid(n)):
-		_parts.assign(model.find_children("*", "Node3D", true, false))
+		# Only what the eye camera's viewport draws: the wall overlay keeps a Camera3D of its own in a SubViewport, and
+		# it holds its last transform while the pass is off, so against a moving eye it read as a metre-sized hop.
+		var eye_viewport: Viewport = (cam as Camera3D).get_viewport()
+		_parts.assign(model.find_children("*", "Node3D", true, false).filter(
+			func(n) -> bool: return n.get_viewport() == eye_viewport))
 		_last_places.clear()
 	var inverse: Transform3D = (cam as Camera3D).global_transform.affine_inverse()
 	var rotations: Array = []
