@@ -2,7 +2,7 @@
 # an operator overrides in cfg/server/game/game-zombie-zone/config_world/game.yml. Layers: defaults < this < env < argv.
 
 # --- Gore
-# How much dismemberment there is (gs-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, ... [0..]
+# How much dismemberment there is (gs-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 ... [0..]
 # gore_level: 2
 # The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_ma... [0..]
 # gore_max_gibs: 24
@@ -16,11 +16,11 @@
 # map_ids: []
 # Whether the next map is drawn at random (seeded) rather than taken in order; a campaign map's `next` always...
 # shuffle_maps: false
-# The file that says which maps this server ROTATES: `cfg/maps.yml` (gs-map's `GSMapRotationFile`: named ro...
+# The file that says which maps this server ROTATES: `cfg/maps.yml` (gs-map's `GSMapRotationFile`: named rota...
 # map_rotation_file: "cfg/maps.yml"
 # Where map documents are read from, relative to this game's root.
 # map_directory: "maps"
-# How the client culls a world: off, pvs, occluders or both (gs-map's GSMapVisibility). Empty leaves it to ...
+# How the client culls a world: off, pvs, occluders or both (gs-map's GSMapVisibility). Empty leaves it to th...
 # vis_mode: ""
 # Draws a converted map with the author's baked lighting when its world pack carries it. Off draws the lit ma...
 # lightmaps: true
