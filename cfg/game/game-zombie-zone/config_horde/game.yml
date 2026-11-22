@@ -178,7 +178,7 @@
 # rookie_minutes: 120.0
 # The window, in seconds, that team damage is added up over. [5.0..]
 # team_damage_window: 60.0
-# Team damage dealt within the window that starts a voteban against the player, through gs-vote's API. 0 nev... [0.0..]
+# Team damage dealt within the window that starts a voteban against the player, through gs-vote's API. 0 neve... [0.0..]
 # team_damage_vote: 150.0
 # Team damage within the window that bans the player outright, for team_damage_ban_minutes. 0 never. A hard c... [0.0..]
 # team_damage_ban: 400.0
@@ -194,7 +194,7 @@
 # nav_threads: 2
 # Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`. [0.5..]
 # nav_budget_ms: 6.0
-# Whether a map is annotated (gs-npc-ai's drops, chokepoints and covered spots) after its bake, and the bots...
+# Whether a map is annotated (gs-npc-ai's drops, chokepoints and covered spots) after its bake, and the bots ...
 # nav_notes: true
 # Side of the square tiles a navigation bake is cut into, metres; 0 = auto: one grid while the map is within ... [0.0..]
 # nav_notes_bake_tile: 0.0
@@ -232,13 +232,13 @@
 # dormant_think_every: 16
 # Thoughts a zombie keeps following the waypoint it was given while its goal drifts under 3 m and it stays wi... [0..]
 # path_reuse_thoughts: 0
-# Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in gs-sim's native `GSSi...
+# Whether the horde's crowd grid (spacing and who is near, rebuilt each tick) runs in gs-sim's native `GSSimC...
 # native_crowd: true
-# gs-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in gs-sim's `GSSimSenses` wh...
+# gs-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in gs-sim's `GSSimSenses` when ...
 # native_senses: true
-# The commons' chase plan (whom, where, how fast, how near) and every zombie's spaced heading in gs-sim's `D...
+# The commons' chase plan (whom, where, how fast, how near) and every zombie's spaced heading in gs-sim's `GS...
 # native_brains: true
-# gs-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tic...
+# gs-npc's think pacing (which zombies think this tick, and with how much time) counted in one batch per tick...
 # native_pacing: true
 # Most stand-ins a server keeps at once (people not counted); 0 is no cap. Each costs about 0.2 ms a tick at ... [0..]
 # bot_max: 0

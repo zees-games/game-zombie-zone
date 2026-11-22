@@ -33,7 +33,7 @@
 # survive_seconds: 480.0
 
 # --- Survival
-# How a survival map is held (gs-npc-ai-director's [GSNpcDirectorWaves]):  waves a breather, then wave afte...
+# How a survival map is held (gs-npc-ai-director's [GSNpcDirectorWaves]):  waves a breather, then wave after ...
 # survival_style: 0
 # Waves to clear, or nights to live through. [1..]
 # waves: 10
@@ -107,7 +107,7 @@
 # barricade_repair_seconds: 2.0
 
 # --- Trader
-# Operator overrides of the `game: shop:` block of `gs_weapon/spawner.yml` (docs/operators.md); -1 leaves th... [-1..1]
+# Operator overrides of the `game: shop:` block of `gs_weapon/spawner.yml` (docs/operators.md); -1 leaves the... [-1..1]
 # trader_enabled: -1
 # `zz_trader_when`: 0 the setup period only, 1 setup and a survival map's breathers, 2 always. [-1..]
 # trader_when: -1
