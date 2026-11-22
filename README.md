@@ -312,6 +312,7 @@ Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDI
 
 | Asset | Author / source | License | Where |
 | --- | --- | --- | --- |
+| Godot Engine logo (boot splash) | Andrea Calabró, [godotengine.org](https://godotengine.org/press/) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `branding/splash.png` |
 | Zombies (three zombies, four survivors turned zombies) and survivors | [Quaternius](https://quaternius.com), [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), simplified and recoloured by `tools/build_zombie_models.py` | CC0 | gs-player-char |
 | Construction-worker zombie gear, sentry turret | Made for this game (`art-src/zombie_worker.py`, `art-src/turret.py`) | MIT | `art-src/` |
 | Realistic common infected | [Male City Zombie](https://opengameart.org/node/111870), OpenGameArt; decimated and rigged by `art-src/zombie_city.py` | CC0 | `art-src/` |
