@@ -236,6 +236,12 @@ func _test_the_client_platform() -> void:
 	_check(covered, "the loading cover is up at the start and blocks input")
 	_check(platform.is_shown() and not platform.is_input_blocked() and platform.console != null,
 		"and lifts once the player is in, with the console built", str(platform.describe()))
+	var tier_quality: int = client.settings.settings.get_int(&"texture_quality", -1)
+	var tier_surfaces := GSMapSurfaces.new()
+	var _tier: Dictionary = GSMapTextureTier.apply_current(tier_surfaces)
+	_check(tier_quality >= 0 and GSMapTextureTier.current_quality == tier_quality
+		and tier_surfaces.max_texture_size == int(GSMapTextureTier.settings(tier_quality)["max_size"]),
+		"the video setting's texture quality caps the map art", "%d %d" % [GSMapTextureTier.current_quality, tier_surfaces.max_texture_size])
 	await _check_client_cover(client, platform)
 	var tab := InputEventKey.new()
 	tab.physical_keycode = KEY_TAB

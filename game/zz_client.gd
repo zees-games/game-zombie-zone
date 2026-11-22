@@ -1541,6 +1541,9 @@ func _build_settings() -> void:
 	if settings == null:
 		return
 
+	# The video setting's texture quality caps the map art the next map loads (512 / 1024 / 2048 / unlimited).
+	GSMapTextureTier.follow(settings.settings)
+
 	if blood != null:
 		blood.follow(settings.settings)
 
