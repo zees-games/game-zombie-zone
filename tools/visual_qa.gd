@@ -418,7 +418,10 @@ func _sample(i: int) -> Dictionary:
 	if (_skeleton == null or not is_instance_valid(_skeleton)) and figure != null:
 		var found := figure.find_children("*", "Skeleton3D", true, false)
 		_skeleton = null if found.is_empty() else found.front() as Skeleton3D
-	_body.add(_body.pose_sample(t, _skeleton if is_instance_valid(_skeleton) else null, feet, true))
+	# The controller's own on_floor, as the game's figure gets it: a jump is airborne, so its feet are not judged as planted.
+	# When grounded the root is the floor under the body, so pose_sample's ground_y (root.y) is the real ground height.
+	var on_floor := bool(_local.get("controller").call("motion").get("on_floor", true))
+	_body.add(_body.pose_sample(t, _skeleton if is_instance_valid(_skeleton) else null, feet, on_floor))
 	_carry_sample(figure, out)
 	# Untyped on purpose: a typed local holding a freed node is itself the script error.
 	var cam = _client.get("camera")
