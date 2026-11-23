@@ -72,7 +72,7 @@ static func _add(def: GSWeaponDef) -> void:
 	_by_id[def.id] = def
 
 
-## Whether [param id] may be handed out by a pool: a legacy blaster, zed gun or other pack's weapon only with `weapons.legacy` on,
+## Whether [param id] may be handed out by a pool: a legacy blaster or other pack's weapon only with `weapons.legacy` on,
 ## or when the modern pack is not installed (a checkout without it still has to play).
 static func offered(id: StringName) -> bool:
 	if not _is_older(id):

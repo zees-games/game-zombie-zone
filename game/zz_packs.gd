@@ -51,7 +51,7 @@ const DEFAULTS := {
 	"weapons": {
 		# Off: installed weapons stay out of boxes, loot and bot kits.
 		"enabled": true,
-		# On brings zee-gs-weapons' own blasters and tools, zed-gs-weapons and every other pack's weapons back into every pool, the shop and the stand-ins' kits.
+		# On brings zee-gs-weapons' own blasters and tools, and every other pack's weapons back into every pool, the shop and the stand-ins' kits.
 		"legacy": false,
 		# Weapon ids kept out of the pool.
 		"exclude": [],

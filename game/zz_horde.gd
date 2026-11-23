@@ -2343,7 +2343,7 @@ func _on_damage_applied(damage: GSDamage) -> void:
 	if npc.brain != null:
 		(npc.brain as GSNpcBrain).damaged(damage.health_lost, by)
 
-	# A weapon that says it burns (zed-gs-weapons' flamethrower) sets what it hits alight.
+	# A weapon that says it burns (a pack's flamethrower) sets what it hits alight.
 	if damage.weapon_id != &"" and game.hazards != null:
 		var def := ZzWeapons.def_of(damage.weapon_id)
 		if def != null and def.tags.has(&"incendiary"):
