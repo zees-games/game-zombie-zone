@@ -20,7 +20,7 @@ const = re.compile(r"^\s*(?:static\s+)?const\s+(\w+)\s*(?::\s*\w+\s*)?:?=\s*" + 
 bad = []
 for d, dirs, files in os.walk(root):
     rel = os.path.relpath(d, root)
-    dirs[:] = [x for x in dirs if not (rel == "." and x in SKIP) and not os.path.islink(os.path.join(d, x))]
+    dirs[:] = [x for x in dirs if not (rel == "." and x in SKIP) and not x.startswith(".") and not os.path.islink(os.path.join(d, x))]  # hidden folders (.scratch) never ship
     for f in files:
         if not f.endswith(".gd"):
             continue
