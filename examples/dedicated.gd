@@ -431,7 +431,7 @@ func _test_the_map_vote() -> void:
 		return
 
 	_check(server.console.find_command("vote") != null if server.console.has_method("find_command") else true,
-		"and registered dot-vote's vote command")
+		"and registered gs-vote's vote command")
 
 	# Hibernation: GSGameModule hands the director the server, the ballot's timer waits with
 	# it, and waking starts both again from the top.
