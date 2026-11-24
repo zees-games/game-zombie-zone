@@ -2,7 +2,7 @@ extends RefCounted
 ## Drops the nav points and edges a zombie's body cannot occupy in the physics world. The builder only knows the
 ## boxes the document names; hulls and small props that no box describes are what this catches.
 
-const ZzNavLadderSeed := preload("res://game/zz_nav_ladder_seed.gd")
+const ZzNavLadderSeed := preload("zz_nav_ladder_seed.gd")
 
 const CHANNEL := "zz.nav"
 const RADIUS := 0.32
