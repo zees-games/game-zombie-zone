@@ -18,7 +18,7 @@ const BODY_LAYER := 1 << 18
 const VIEW_LAYER := 1 << 19
 const ALL_LAYERS := 0xFFFFF
 ## Where the survivor stands for every clip (tools/filmstrip_scenarios.json's defaults: open ground on the offline map).
-const WEAPON_CLIPS: PackedStringArray = ["idle", "draw", "sprint", "ads", "fire", "reload"]
+const WEAPON_CLIPS: PackedStringArray = ["idle", "draw", "sprint", "ads", "fire", "reload", "inspect"]
 ## A clip that needs a magazine or a sight: melee and thrown weapons have neither.
 const NEEDS_GUN: PackedStringArray = ["ads", "reload"]
 const NO_GUN_TIERS: Array[StringName] = [&"melee", &"thrown"]
@@ -33,7 +33,7 @@ const ZOMBIE_KINDS: Array[StringName] = [&"common", &"leaper", &"strangler", &"b
 ## The zombie body's Anim each infected clip plays (npcs/zz_zombie_body.gd); flinch and die are events over an idle.
 const ZOMBIE_ANIM := {"walk": "WALK", "run": "RUN", "attack": "ATTACK", "flinch": "IDLE", "die": "IDLE"}
 ## Seconds per clip (frames = seconds * fps).
-const SECONDS := {"idle": 1.0, "draw": 1.4, "sprint": 1.8, "ads": 1.6, "fire": 1.6, "reload": 3.2,
+const SECONDS := {"idle": 1.0, "draw": 1.4, "sprint": 1.8, "ads": 1.6, "fire": 1.6, "reload": 3.2, "inspect": 3.2,
 	"walk": 2.4, "strafe": 2.4, "run": 2.4, "crouch": 2.0, "jump": 1.6,
 	"z_walk": 3.0, "z_run": 2.0, "z_attack": 2.4, "z_flinch": 2.0, "z_die": 3.0}
 ## Failure limits. Metres per frame at 30 fps for a step (_limit scales it to --fps), frames at 30 fps for a duration.
@@ -301,6 +301,15 @@ func _weapon_clip(id: StringName, clip: String) -> void:
 			await _wait(0.6)
 			await _capture(clip, count, func(i: int) -> void:
 				_reload = i >= _count(0.1) and i < _count(0.2))
+		"inspect":
+			# The look-over starts only at rest: no key is bound to it yet, so the capture asks the view model as a key would.
+			var model: Object = _client.get("view_model")
+			if model == null or not model.has_method("inspect"):
+				_missing(clip, "the view model has no inspect")
+				return
+			await _capture(clip, count, func(i: int) -> void:
+				if i == _count(0.1):
+					model.call("inspect"))
 		_:
 			await _capture(clip, count, func(_i: int) -> void: pass)
 	_release_all()
