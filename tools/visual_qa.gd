@@ -69,6 +69,8 @@ var _views := GSGameVisualQaViews.new()
 var _eye: Camera3D = null
 var _frames: Array[Dictionary] = []
 var _body := GSClipMetrics.new()
+## The floor's height under the survivor for this clip, from the first frame it stood on it (NAN until then).
+var _floor_y := NAN
 var _skeleton: Skeleton3D = null
 var _parts: Array[Node3D] = []
 var _last_places: Array[Vector3] = []
@@ -358,6 +360,7 @@ func _capture(clip: String, count: int, step: Callable) -> void:
 	_frames.clear()
 	if _zombie == null:
 		_body = GSClipMetrics.new()
+		_floor_y = NAN
 		_skeleton = null
 	_parts.clear()
 	_last_places.clear()
@@ -418,7 +421,16 @@ func _sample(i: int) -> Dictionary:
 	if (_skeleton == null or not is_instance_valid(_skeleton)) and figure != null:
 		var found := figure.find_children("*", "Skeleton3D", true, false)
 		_skeleton = null if found.is_empty() else found.front() as Skeleton3D
-	_body.add(_body.pose_sample(t, _skeleton if is_instance_valid(_skeleton) else null, feet, true))
+	# The real state: on the floor only while the controller is in ground mode, and the floor is where the feet first
+	# stood (the capture starts at rest, settled), not wherever the root is now: a jump's rise is not a foot skating on
+	# a floor that rose with it.
+	var on_floor := int(_local.get("controller").get("state").get("mode")) == GSFpsState.Mode.GROUND
+	if is_nan(_floor_y) and on_floor:
+		_floor_y = feet.y
+	var sample: Dictionary = _body.pose_sample(t, _skeleton if is_instance_valid(_skeleton) else null, feet, on_floor)
+	if not is_nan(_floor_y):
+		sample["ground_y"] = _floor_y
+	_body.add(sample)
 	_carry_sample(figure, out)
 	# Untyped on purpose: a typed local holding a freed node is itself the script error.
 	var cam = _client.get("camera")
