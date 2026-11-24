@@ -870,6 +870,11 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 		if set_node == null or not is_instance_valid(set_node):
 			continue
 
+		# A friend this close, holding the muzzle or not: the command fires a few ticks after this decision, and a stand-in that
+		# walks on in between has the friend at its muzzle by then (23 damage in headless_run, a friend 0.19 m away).
+		if Vector2(middle.x - eye.x, middle.z - eye.z).length() < FRIEND_NEAR:
+			return true
+
 		if level >= GSDamageRules.PASS_THROUGH_AT_MUZZLE and _holds_muzzle(set_node, eye):
 			continue
 
@@ -887,23 +892,6 @@ func _friend_in_the_way(player, at: Vector3) -> bool:
 				return true
 
 	return false
-
-## Whether a friend's hitboxes hold the eye with room to spare, not by a hair. The decision to
-## fire is made a tick before the shot, and both stand-ins keep walking in between: an eye
-## 2 cm inside a friend's capsule when it decided was 2 cm outside when the pellets left, so the
-## pass-through no longer applied and a shotgun volley hit that friend at 7 mm (86 damage in one
-## shot, the "102 friendly damage" that failed headless_run whenever the loot pool let a stand-in
-## pick the shotgun up). An eye near the edge counts as not held, so the line test below runs.
-func _holds_muzzle(set_node: GSHitboxSet, eye: Vector3) -> bool:
-	if not set_node.contains_point(eye):
-		return false
-
-	for offset in [Vector3(game.config.bot_muzzle_margin, 0.0, 0.0), Vector3(-game.config.bot_muzzle_margin, 0.0, 0.0),
-			Vector3(0.0, 0.0, game.config.bot_muzzle_margin), Vector3(0.0, 0.0, -game.config.bot_muzzle_margin)]:
-		if not set_node.contains_point(eye + offset):
-			return false
-
-	return true
 
 ## Whether the held weapon's round goes on through a body it hits (a friend behind the target is then hit too).
 func _round_passes_bodies(player) -> bool:

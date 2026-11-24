@@ -18,6 +18,9 @@ const ZzWeapons := preload("zz_weapons.gd")
 
 const CHANNEL := "zz.bots"
 
+## Metres from the eye within which any friend makes a stand-in hold fire, whichever way it aims.
+const FRIEND_NEAR := 0.5
+
 ## The survivors stand-ins are named after, solo and on a server; past the end of the list
 ## gs-bot's [GSBotNames] numbers them.
 ## Twenty-four, because a survival map is built for a dozen or more.
@@ -98,3 +101,20 @@ func _class_persona(id: StringName) -> GSBotPersona:
 func redraw_personas() -> void:
 	for id: StringName in _state:
 		_apply_persona(id, _state[id])
+
+## Whether a friend's hitboxes hold the eye with room to spare, not by a hair. The decision to
+## fire is made a tick before the shot, and both stand-ins keep walking in between: an eye
+## 2 cm inside a friend's capsule when it decided was 2 cm outside when the pellets left, so the
+## pass-through no longer applied and a shotgun volley hit that friend at 7 mm (86 damage in one
+## shot, the "102 friendly damage" that failed headless_run whenever the loot pool let a stand-in
+## pick the shotgun up). An eye near the edge counts as not held, so the line test below runs.
+func _holds_muzzle(set_node: GSHitboxSet, eye: Vector3) -> bool:
+	if not set_node.contains_point(eye):
+		return false
+
+	for offset in [Vector3(game.config.bot_muzzle_margin, 0.0, 0.0), Vector3(-game.config.bot_muzzle_margin, 0.0, 0.0),
+			Vector3(0.0, 0.0, game.config.bot_muzzle_margin), Vector3(0.0, 0.0, -game.config.bot_muzzle_margin)]:
+		if not set_node.contains_point(eye + offset):
+			return false
+
+	return true
