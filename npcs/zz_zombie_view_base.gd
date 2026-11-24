@@ -320,6 +320,15 @@ var _velocity := Vector3.ZERO
 var _rate := 1.0
 var _want_clip: StringName = &"idle"
 var _want_rate := 1.0
+## Speed below which a body counts as at rest, so a start from it is not eased in.
+const START_SPEED := 0.15
+## A swinging foot's height, and the share of its swing it spends rising and settling before and after it moves forward.
+const LIFT := 0.2
+const SETTLE := 0.25
+## Gait cycles walked, from the ground covered ([method ZzZombieView.step_length]); the shamble's feet follow it.
+var _stride_phase := 0.0
+## How much the planted feet hold the legs: whole while the body shambles, fading with [member _shamble] after.
+var _legs_held := 0.0
 ## Each foot planted on the floor through the shamble ([method _plant_feet]).
 var _plant := GSFootPlant.new()
 ## Per side: [upper, lower, ankle in the lower bone's frame, rest ankle, leg length], skeleton space.

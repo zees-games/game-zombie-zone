@@ -340,7 +340,11 @@ func present(delta: float, anim: int, flags: int) -> void:
 		_clip = &""
 
 	_pace_to_ground()
-	_shamble = move_toward(_shamble, 1.0 if _want_clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE else 0.0, delta * 3.0)
+	var shambling := _want_clip == &"walk" and _gait == GAIT_SHAMBLE and anim != ZzZombieBody.Anim.IDLE
+	_shamble = move_toward(_shamble, 1.0 if shambling else 0.0, delta * 3.0)
+	# The legs take hold at once when the body sets off (a foot half on the clip, half on the floor, skates through the blend)
+	# and let go with the shamble.
+	_legs_held = 1.0 if shambling else _shamble
 	_swap_for_real_clip(anim, striking, overrides)
 	_pick_reaction_clip(delta, anim, striking)
 	_prior_anim = anim
@@ -372,8 +376,13 @@ func present(delta: float, anim: int, flags: int) -> void:
 func _track_motion(at: Vector3, delta: float) -> void:
 	if _last_at != Vector3.INF and delta > 0.0:
 		var moved := Vector2(at.x - _last_at.x, at.z - _last_at.z).length() / delta
-		_speed = lerpf(_speed, moved, clampf(delta * 8.0, 0.0, 1.0))
-		_velocity = _velocity.lerp(Vector3(at.x - _last_at.x, 0.0, at.z - _last_at.z) / delta, clampf(delta * 8.0, 0.0, 1.0))
+		var along := Vector3(at.x - _last_at.x, 0.0, at.z - _last_at.z) / delta
+		# A body that starts to move from rest takes its measured velocity at once: easing up from zero made the planted
+		# feet's stride too short for the first few frames and they skated.
+		var ease_in := 1.0 if _speed < START_SPEED and moved > START_SPEED else clampf(delta * 8.0, 0.0, 1.0)
+		_speed = lerpf(_speed, moved, ease_in)
+		_velocity = _velocity.lerp(along, ease_in)
+		_stride_phase += moved * delta / (2.0 * step_length(_speed, float(_look.get("height", 1.75))))
 		_climb = lerpf(_climb, (at.y - _last_y) / delta, clampf(delta * 10.0, 0.0, 1.0))
 	_last_at = at
 	_last_y = at.y
@@ -590,7 +599,7 @@ func _pose(anim: int) -> void:
 
 	var head: int = _bones.get(&"Head", -1)
 
-	if _shamble > 0.01 and anim != ZzZombieBody.Anim.DEAD:
+	if (_shamble > 0.01 or _legs_held > 0.01) and anim != ZzZombieBody.Anim.DEAD:
 		_pose_shamble()
 		_plant_feet()
 	else:
@@ -707,7 +716,7 @@ func _lift_foot_bone(foot: int, floor_y: float) -> void:
 
 ## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
 ## step (gs-player-char's GSFootPlant over the clip's own phase), the hips lowered where a leg
-## would not reach and both legs bent to their feet. Weighted by [member _shamble].
+## would not reach and both legs bent to their feet. Weighted by [member _legs_held].
 func _plant_feet() -> void:
 	var legs := _leg_chains()
 	if legs.is_empty() or _anim == null:
@@ -719,7 +728,17 @@ func _plant_feet() -> void:
 	var homes: Array[Vector3] = []
 	for leg: Array in legs:
 		homes.append(to_world * (leg[3] as Vector3))
-	var feet := _plant.step(_anim.current_animation_position / length, homes, _velocity, length / maxf(_rate, 0.05))
+	# The legs keep their own cadence, from the ground covered (see step_length), not the clip's: the real walk's stride at the
+	# pace of a shamble is over a metre a step, further than a leg reaches, and playing the clip faster to shorten it popped the bones.
+	var speed := maxf(_velocity.length(), 0.05)
+	var stride := 2.0 * step_length(speed, float(_look.get("height", 1.75)))
+	# A planted foot's stance drifts duty * stride from where it landed; past `reach` it is re-planted (a visible skate).
+	_plant.reach = maxf(0.6, _plant.duty * stride * 1.15)
+	# A lifted foot clears the floor (0.2 m) before it moves forward, and lands from above it: a foot kept low through its swing
+	# is read, and looks, as a planted foot skating.
+	_plant.lift = LIFT
+	_plant.settle = SETTLE
+	var feet := _plant.step(fposmod(_stride_phase, 1.0), homes, _velocity, stride / speed)
 	var drop := 0.0
 	for i in legs.size():
 		var hip := GSHumanoidIk.global_pose(_skeleton, legs[i][0]).origin
@@ -729,9 +748,15 @@ func _plant_feet() -> void:
 		if gap.length() > longest and flat < longest:
 			drop = maxf(drop, -gap.y - sqrt(longest * longest - flat * flat))
 	if drop > 0.0:
-		_lift_pelvis(Vector3(0.0, -drop * _shamble, 0.0))
+		_lift_pelvis(Vector3(0.0, -drop * _legs_held, 0.0))
 	for i in legs.size():
-		var _reached := GSHumanoidIk.two_bone_to(_skeleton, legs[i][0], legs[i][1], legs[i][2], to_skeleton * feet[i], Vector3(0.0, 0.0, 1.0), _shamble)
+		var _reached := GSHumanoidIk.two_bone_to(_skeleton, legs[i][0], legs[i][1], legs[i][2], to_skeleton * feet[i], Vector3(0.0, 0.0, 1.0), _legs_held)
+
+
+## Metres between one footfall and the next of a body [param height] tall going [param speed]: short shuffling steps at a
+## shamble's pace, lengthening toward a leg's reach with the pace.
+static func step_length(speed: float, height: float) -> float:
+	return clampf(0.25 + 0.3 * speed, 0.4, 0.8) * height / 1.75
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.
