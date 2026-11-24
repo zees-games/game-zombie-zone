@@ -529,9 +529,11 @@ func _finish(count: int) -> void:
 		var top_at := -1
 		for n in range(1, _frames.size()):
 			var h := float(_frames[n].get("hop", 0.0))
-			var before := float(_frames[n - 1].get("hop", 0.0))
-			var after := float(_frames[n + 1].get("hop", 0.0)) if n + 1 < _frames.size() else 0.0
-			if h < POP_SPIKE * maxf(before, after):
+			var before := float(_frames[n - 1].get("hop", -1.0))
+			var after := float(_frames[n + 1].get("hop", -1.0)) if n + 1 < _frames.size() else 0.0
+			# A neighbour the wall retract left unjudged (no hop) has no known move: a steady swing that happens to sit
+			# beside such frames is not a spike against them.
+			if before < 0.0 or after < 0.0 or h < POP_SPIKE * maxf(before, after):
 				continue
 			if h > top:
 				top = h
