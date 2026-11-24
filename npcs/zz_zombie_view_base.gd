@@ -329,6 +329,10 @@ const SETTLE := 0.25
 var _stride_phase := 0.0
 ## How much the planted feet hold the legs: whole while the body shambles, fading with [member _shamble] after.
 var _legs_held := 0.0
+## Where each foot of a body standing still is held on the floor ([method _ground_feet]), world space; INF where free.
+var _hold: Array[Vector3] = []
+## A foot this near the floor in the clip is planted, and held.
+const HOLD_HEIGHT := 0.05
 ## Each foot planted on the floor through the shamble ([method _plant_feet]).
 var _plant := GSFootPlant.new()
 ## Per side: [upper, lower, ankle in the lower bone's frame, rest ankle, leg length], skeleton space.

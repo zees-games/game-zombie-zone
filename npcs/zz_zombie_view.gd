@@ -606,6 +606,8 @@ func _pose(anim: int) -> void:
 		_plant.reset()
 		if anim in STANDING_ANIMS and _clip != &"crawl":
 			_ground_feet()
+		else:
+			_hold.clear()
 
 	if anim == ZzZombieBody.Anim.STRIKE_DOWN:
 		_pose_ground_strike()
@@ -695,9 +697,29 @@ func _ground_feet() -> void:
 	if _leg_chains().is_empty():
 		return
 	_lift_pelvis(Vector3.ZERO)
-	for leg: Array in _legs:
+	var still := _speed < START_SPEED
+	if not still or _hold.size() != _legs.size():
+		_hold.clear()
+		_hold.resize(_legs.size())
+		_hold.fill(Vector3.INF)
+	var to_world := _skeleton.global_transform
+	for i in _legs.size():
+		var leg: Array = _legs[i]
 		var ankle := GSHumanoidIk.global_pose(_skeleton, leg[1]) * (leg[2] as Vector3)
 		var floor_y := (leg[3] as Vector3).y
+		# A body standing still keeps a foot the clip has down where it first stood, instead of letting the clip's sway drag it.
+		if still and ankle.y < floor_y + HOLD_HEIGHT:
+			if _hold[i] == Vector3.INF:
+				_hold[i] = to_world * Vector3(ankle.x, floor_y, ankle.z)
+			var target := to_world.affine_inverse() * _hold[i]
+			var hip := GSHumanoidIk.global_pose(_skeleton, leg[0]).origin
+			if Vector2(target.x - hip.x, target.z - hip.z).length() > float(leg[4]) * 0.8:
+				_hold[i] = to_world * Vector3(ankle.x, floor_y, ankle.z)
+				target = Vector3(ankle.x, floor_y, ankle.z)
+			GSHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], target, Vector3(0.0, 0.0, 1.0), 1.0)
+			_lift_foot_bone(int(leg[5]), floor_y)
+			continue
+		_hold[i] = Vector3.INF
 		if ankle.y < floor_y:
 			GSHumanoidIk.two_bone_to(_skeleton, leg[0], leg[1], leg[2], Vector3(ankle.x, floor_y, ankle.z), Vector3(0.0, 0.0, 1.0), 1.0)
 		_lift_foot_bone(int(leg[5]), floor_y)
