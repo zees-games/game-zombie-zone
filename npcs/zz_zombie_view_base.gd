@@ -526,7 +526,7 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 			merged = AnimationLibrary.new()
 			for clip in library.get_animation_list():
 				var _kept := merged.add_animation(clip, library.get_animation(clip))
-			var carried := GSHumanoidClips.retarget(real, from, skeleton)
+			var carried := GSHumanoidClips.retarget(_pelvis_named(real, skeleton), _rests_with_pelvis(from, skeleton), skeleton)
 			for clip in carried.get_animation_list():
 				var animation := carried.get_animation(clip)
 				animation.loop_mode = Animation.LOOP_LINEAR if LOOPING.has(StringName(clip)) else Animation.LOOP_NONE
@@ -536,6 +536,45 @@ static func _with_ual(id: StringName, skeleton: Skeleton3D, library: AnimationLi
 		_libraries[key] = merged
 
 	return _libraries[key]
+
+
+## The pelvis bone of the zombie_basic rig is imported as "Body_2" (the mesh node is already "Body"), while the
+## library's clips and the kit's rests call it "Body": without the rename every pelvis track (the whole fall of
+## a death, the bob of a walk) matches no bone and is dropped.
+const PELVIS := &"Body"
+const PELVIS_IMPORTED := &"Body_2"
+
+
+## [param library] with its pelvis tracks pointed at [param skeleton]'s pelvis bone, a copy; unchanged when the
+## skeleton names it "Body" already.
+static func _pelvis_named(library: AnimationLibrary, skeleton: Skeleton3D) -> AnimationLibrary:
+	if skeleton.find_bone(PELVIS) >= 0 or skeleton.find_bone(PELVIS_IMPORTED) < 0:
+		return library
+
+	var out := AnimationLibrary.new()
+
+	for clip in library.get_animation_list():
+		var animation := library.get_animation(clip).duplicate(true) as Animation
+
+		for t in animation.get_track_count():
+			var path := animation.track_get_path(t)
+
+			if String(path.get_concatenated_subnames()) == String(PELVIS):
+				animation.track_set_path(t, NodePath("%s:%s" % [path.get_concatenated_names(), PELVIS_IMPORTED]))
+
+		var _added := out.add_animation(clip, animation)
+
+	return out
+
+
+## The kit's rests [param from] with the pelvis also under the name [param skeleton] gives it.
+static func _rests_with_pelvis(from: Dictionary, skeleton: Skeleton3D) -> Dictionary:
+	if skeleton.find_bone(PELVIS) >= 0 or skeleton.find_bone(PELVIS_IMPORTED) < 0 or not from.has(PELVIS):
+		return from
+
+	var out := from.duplicate()
+	out[PELVIS_IMPORTED] = from[PELVIS]
+	return out
 
 
 ## A flinch is played where the body stands: its leg tracks are dropped so the legs keep the idle stance.

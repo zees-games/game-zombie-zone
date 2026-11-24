@@ -516,12 +516,12 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 
 
 ## The clip and rate of a hit number [param n] on a standing body: a head hit is the head clip (or a quick jolt of
-## the chest's), a body hit is the chest clip, the same quicker, or a stagger backwards.
+## the chest's), a body hit is the chest clip, or the same quicker. The library's knockback is a whole fall and get-up with the pelvis carried away, so only a launch's death plays it.
 static func hit_variant(head: bool, n: int) -> Array:
 	var pick := posmod(n, 3)
 	if head:
 		return [&"ual_hit_head", 1.0] if pick != 2 else [&"ual_hit_chest", 1.4]
-	return [[&"ual_hit_chest", 1.0], [&"ual_hit_chest", 1.5], [&"ual_knockback", 1.3]][pick]
+	return [[&"ual_hit_chest", 1.0], [&"ual_hit_chest", 1.5], [&"ual_hit_chest", 1.25]][pick]
 
 
 ## The clip a body dies by: a launch is the library's knockback, otherwise the death's seed picks the kit's fall or the library's.
@@ -1041,7 +1041,7 @@ func flinch(from_side: float = 1.0, head := false) -> void:
 		_hit_head = head
 		_hit_count += 1
 		_hit_left = 0.6
-		# A stagger plays out whole.
+		# A flinch plays out whole.
 		var pick := hit_variant(head, _hit_count + variant)
 		if _has(pick[0]):
 			_hit_left = maxf(_hit_left, _anim.get_animation(_qualified(pick[0])).length / float(pick[1]))
