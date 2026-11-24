@@ -33,6 +33,6 @@ jobs:
             contents: write
         with:
             pack: true
-            pack-deny: 'tmcdev(?:games)?.net|x-tmc-dev'
+            pack-deny: 'tmcdev(?:games)?\.net|x-tmc-dev'
         secrets:
             DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}
