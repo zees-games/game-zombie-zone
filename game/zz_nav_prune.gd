@@ -2,6 +2,8 @@ extends RefCounted
 ## Drops the nav points and edges a zombie's body cannot occupy in the physics world. The builder only knows the
 ## boxes the document names; hulls and small props that no box describes are what this catches.
 
+const ZzNavLadderSeed := preload("res://game/zz_nav_ladder_seed.gd")
+
 const CHANNEL := "zz.nav"
 const RADIUS := 0.32
 ## Extra clearance so a smoothed leg that cuts a corner between two kept points still clears a thin post.
@@ -58,7 +60,7 @@ static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int
 	prune.climb = CLIMB
 	prune.required = required
 	var dropped := prune.apply(nav)
-	var climbs := join_ladders(nav, ladders, ladder_side(space, mask, passable))
+	var climbs := join_ladders(nav, ladders, ladder_side(space, mask, passable), bare)
 
 	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or prune.bridged_edges > 0 or climbs > 0:
 		GSLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
@@ -68,13 +70,18 @@ static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int
 
 ## Joins the floor points nearest each ladder's foot and head; returns how many ladders were joined. With [param side]
 ## (from [method ladder_side]) an end is only a point on the ladder's side of the wall it is mounted on.
-static func join_ladders(nav: GSNpcNavData, ladders: Array[AABB], side: Callable = Callable()) -> int:
+## A ladder end the grid left without a point gets one ([ZzNavLadderSeed]) when [param bare] (a pruner for the bare body) is given.
+static func join_ladders(nav: GSNpcNavData, ladders: Array[AABB], side: Callable = Callable(), bare: Object = null) -> int:
 	var joined := 0
 
 	for box in ladders:
 		var mid := box.get_center()
 		var a := _ladder_end(nav, Vector3(mid.x, box.position.y + 0.1, mid.z), LADDER_HEIGHT, box, side)
 		var b := _ladder_end(nav, Vector3(mid.x, box.end.y, mid.z), LADDER_OVER, box, side)
+
+		if bare != null and (a < 0 or b < 0):
+			a = a if a >= 0 else ZzNavLadderSeed.seed_end(nav, box, false, bare._point_blocked, bare._edge_blocked, side)
+			b = b if b >= 0 else ZzNavLadderSeed.seed_end(nav, box, true, bare._point_blocked, bare._edge_blocked, side)
 
 		if a >= 0 and b >= 0 and absf(nav.points[a].y - nav.points[b].y) > CLIMB and nav.connect_points(a, b).ok:
 			joined += 1

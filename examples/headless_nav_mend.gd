@@ -130,6 +130,37 @@ func _test_mend_gap() -> void:
 
 ## The lot's leaning door panel (0.22 x 1.26 m, turned 147 degrees) closed the whole corner of the
 ## doorway in one box, so a stand-in beside it had no line to the graph.
+## A ladder whose foot and head the grid left without a point gets both seeded off its face and joined to the floors
+## around it (`ZzNavLadderSeed`), so the climb joins the two floors; a wall between the seed and the floor refuses it.
+func _test_ladder_seed() -> void:
+	_section("a ladder with no grid point at its ends gets seeded ones")
+	var nav := GSNpcNavData.new()
+	var low := PackedInt32Array()
+	var high := PackedInt32Array()
+	for i in 4:
+		low.append(nav.add_point(Vector3(4.0 + i, 0.0, 0.0)))
+		high.append(nav.add_point(Vector3(4.0 + i, 3.0, 0.0)))
+	for i in 3:
+		var _a := nav.connect_points(low[i], low[i + 1])
+		var _b := nav.connect_points(high[i], high[i + 1])
+	var box := AABB(Vector3(-0.2, 0.0, -0.2), Vector3(0.4, 3.0, 0.4))
+	var open := func(_p: Vector3) -> bool: return false
+	var free := func(_a: Vector3, _b: Vector3) -> bool: return false
+	var foot: int = ZzNavLadderSeed.seed_end(nav, box, false, open, free, Callable())
+	var head: int = ZzNavLadderSeed.seed_end(nav, box, true, open, free, Callable())
+	_check(foot >= 0 and head >= 0 and absf(nav.points[head].y - nav.points[foot].y - 3.0) < 0.1,
+		"a foot and a head are seeded at the ladder's own heights", "foot %d head %d" % [foot, head])
+	_check(foot >= 0 and nav.edges.has(foot) and head >= 0 and nav.edges.has(head), "each is joined to the floor around it")
+	var walled := func(a: Vector3, b: Vector3) -> bool: return a.x < 2.0 and b.x > 2.0 or a.x > 2.0 and b.x < 2.0
+	var bare := GSNpcNavData.new()
+	var _far := bare.add_point(Vector3(4.0, 0.0, 0.0))
+	var shut: int = ZzNavLadderSeed.seed_end(bare, box, false, open, walled, Callable())
+	_check(shut == -1 and bare.points.size() == 1, "a seed no floor can walk to is not added")
+	var wedged := func(_p: Vector3) -> bool: return true
+	_check(ZzNavLadderSeed.seed_end(nav, box, false, wedged, free, Callable()) == -1, "nor one inside a wall")
+	_finished()
+
+
 func _test_thin_props() -> void:
 	_section("a turned thin prop is cut by its length, not its corners")
 	var size := Vector3(0.22, 1.4, 1.26)
