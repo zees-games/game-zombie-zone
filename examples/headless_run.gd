@@ -1743,7 +1743,7 @@ func _test_what_zombies_look_like() -> void:
 	common.die(&"headshot_launch", Vector3(0, 0, -1.5), 3)
 	for i in 30:
 		common.present(1.0 / 30.0, ZzZombieBody.Anim.DEAD, 0)
-	_check(common.clip() == &"death" and common.position.z < -0.5, "a headshot throws it back as it dies",
+	_check(common.clip() == &"ual_knockback" and common.position.z < -0.5, "a headshot throws it back as it dies",
 		"%s, %.2f m" % [common.clip(), -common.position.z])
 	root.free()
 	_finished()

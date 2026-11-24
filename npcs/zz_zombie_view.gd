@@ -494,8 +494,16 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 	# A bullet's flinch on a standing body is a short hit clip.
 	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
 			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
-		_want_clip = &"ual_hit_head" if _hit_head else &"ual_hit_chest"
-		_want_rate = 1.0
+		var pick := hit_variant(_hit_head, _hit_count + variant)
+		_want_clip = pick[0] if _has(pick[0]) else &"ual_hit_chest"
+		_want_rate = float(pick[1])
+
+	# A killed body falls by one of the clips (the kit's, the library's death or its knockback), by the death's own seed.
+	if anim == ZzZombieBody.Anim.DEAD and not _death.is_empty():
+		var fall := death_clip(StringName(_death.get("reaction", &"limp")), int(_death.get("seed", 0)))
+		if _has(fall):
+			_want_clip = fall
+			_want_rate = 1.0
 
 	# Getting up from sitting, feeding or lying: the lay-to-idle clip, if it stands still while it plays.
 	if _rise_left > 0.0 and _speed < 0.6 and _has(&"ual_lay_to_idle") and not striking and anim != ZzZombieBody.Anim.DEAD:
@@ -505,6 +513,22 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 	if (_prior_anim == ZzZombieBody.Anim.SIT or _prior_anim == ZzZombieBody.Anim.FEED or _prior_anim == ZzZombieBody.Anim.CRY) \
 			and anim != _prior_anim and _has(&"ual_lay_to_idle"):
 		_rise_left = _anim.get_animation(_qualified(&"ual_lay_to_idle")).length
+
+
+## The clip and rate of a hit number [param n] on a standing body: a head hit is the head clip (or a quick jolt of
+## the chest's), a body hit is the chest clip, the same quicker, or a stagger backwards.
+static func hit_variant(head: bool, n: int) -> Array:
+	var pick := posmod(n, 3)
+	if head:
+		return [&"ual_hit_head", 1.0] if pick != 2 else [&"ual_hit_chest", 1.4]
+	return [[&"ual_hit_chest", 1.0], [&"ual_hit_chest", 1.5], [&"ual_knockback", 1.3]][pick]
+
+
+## The clip a body dies by: a launch is the library's knockback, otherwise the death's seed picks the kit's fall or the library's.
+static func death_clip(reaction: StringName, seed: int) -> StringName:
+	if reaction == &"power_launch" or reaction == &"headshot_launch":
+		return &"ual_knockback"
+	return &"death" if reaction == &"face_plant" or seed & 1 == 0 else &"ual_death"
 
 
 ## Level of detail: how often this one is advanced, by where it is from the camera.
@@ -824,6 +848,7 @@ const NATURAL_PACE := {&"walk": 1.3, &"run": 5.0, &"run_arms": 5.0, &"crawl": 1.
 var _paced := false
 var _hit_left := 0.0
 var _hit_head := false
+var _hit_count := 0
 var _rise_left := 0.0
 var _prior_anim := -1
 ## The stride [method present] matched to the ground speed: the share of the clip's leg swing kept.
@@ -1013,8 +1038,13 @@ func _pose_reach() -> void:
 func flinch(from_side: float = 1.0, head := false) -> void:
 	if _death.is_empty() and _flinch < 0.5:
 		_flinch = 1.0
-		_hit_left = 0.6
 		_hit_head = head
+		_hit_count += 1
+		_hit_left = 0.6
+		# A stagger plays out whole.
+		var pick := hit_variant(head, _hit_count + variant)
+		if _has(pick[0]):
+			_hit_left = maxf(_hit_left, _anim.get_animation(_qualified(pick[0])).length / float(pick[1]))
 		_flinch_side = signf(from_side) if from_side != 0.0 else 1.0
 
 
