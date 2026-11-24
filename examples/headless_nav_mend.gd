@@ -2,6 +2,8 @@ extends "headless_nav_base.gd"
 
 ## The nav suite's mending, wedge and lure sections.
 
+const IslandProbe := preload("../tools/island_probe.gd")
+
 
 ## Every survival map the game has, by its document's file name (the id).
 func _survival_maps() -> Array[StringName]:
@@ -158,6 +160,11 @@ func _test_ladder_seed() -> void:
 	_check(shut == -1 and bare.points.size() == 1, "a seed no floor can walk to is not added")
 	var wedged := func(_p: Vector3) -> bool: return true
 	_check(ZzNavLadderSeed.seed_end(nav, box, false, wedged, free, Callable()) == -1, "nor one inside a wall")
+	var ledge := GSNpcNavData.new()
+	for i in 3:
+		var _l := ledge.add_point(Vector3(4.0 + i, 4.0, 0.0))
+	var ledge_head: int = ZzNavLadderSeed.seed_end(ledge, box, true, open, free, Callable())
+	_check(ledge_head >= 0 and absf(ledge.points[ledge_head].y - 4.0) < 0.1, "a head over a ledge above its top is seeded at the ledge", "head %d" % ledge_head)
 	_finished()
 
 
@@ -575,12 +582,37 @@ func _check_ladder_link(data: GSNpcNavData, low: PackedInt32Array, high: PackedI
 		"%d up, %d down" % [rungs_up.size(), rungs_down.size()])
 	var standing := ladder.filter
 	ladder.filter = ladder.bot_filter
-	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
-		"a stand-in's search leaves the ladder to its own climbing")
+	ladder.relabel()
+	_check(not ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty()
+		and not ladder.find_path(Vector3(0.0, 3.0, 0.0), Vector3(2.0, 0.0, 6.0), 0.5).is_empty(),
+		"a stand-in climbs the same ladder, up and down (a survivor spawn below a post is not cut off)")
 	ladder.filter = standing
 	ladder.allow_ladders = false
 	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
 		"and with zz_zombie_ladder_speed 0 the ladder is off the graph")
+
+
+## The island report asks each piece for its nearest main-piece point over a bounded sample of its points: a 50 000
+## point island (gm_balkans) asked for every point's neighbours and ran for over 45 minutes.
+func _test_island_scan() -> void:
+	_section("the island probe's nearest-main scan is bounded")
+	var nav := GSNpcNavData.new()
+	var comp := PackedInt32Array()
+	for x in 120:
+		for z in 120:
+			var _p := nav.add_point(Vector3(x * 0.5, 0.0, z * 0.5))
+			comp.append(1)
+	for x in 20:
+		var _m := nav.add_point(Vector3(-4.0 - x * 0.5, 0.0, 0.0))
+		comp.append(0)
+	var island := IslandProbe._members(comp, 1)
+	_check(island.size() == 14400 and IslandProbe._sample(island, IslandProbe.SCAN_MAX).size() == IslandProbe.SCAN_MAX,
+		"a 14 400 point island is sampled down to the scan limit", "%d" % IslandProbe._sample(island, IslandProbe.SCAN_MAX).size())
+	var started := Time.get_ticks_msec()
+	var near: Array = IslandProbe.nearest_main(nav, comp, island, 0)
+	_check(near[1] >= 0 and near[2] >= 0 and float(near[0]) <= 8.0, "it still finds a main point within 8 m", str(near[0]))
+	_check(Time.get_ticks_msec() - started < 20000, "and returns in seconds, not an unbounded walk", "%d ms" % (Time.get_ticks_msec() - started))
+	_finished()
 
 
 ## The grid thinning of spawn points keeps what the director's own loop keeps, in its order.

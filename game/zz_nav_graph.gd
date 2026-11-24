@@ -10,13 +10,13 @@ extends GSNpcNavGraph
 ##
 ## [codeblock]
 ## a zombie        every drop, downward only (jump ups too, both ways, when `allow_climb`); ladders both ways (`allow_ladders`)
-## a stand-in      none: it walks the stairs the map has, and never falls off a balcony
+## a stand-in      the ladders both ways, no drop: it walks the stairs the map has, and never falls off a balcony
 ## [/codeblock]
 ##
 ## Which of the two is asking is the filter the spawner sets per search (`filter`), never a flag
 ## on the graph, for the reason gs-npc gives for filters: one graph serves everybody.
 
-## The filter a stand-in's search sets: no link at all. Its avoid cost is a number nothing else
+## The filter a stand-in's search sets: the ladders and no other link. Its avoid cost is a number nothing else
 ## uses, so the native search keeps a graph of its own for it (gs-npc keys them by signature).
 var bot_filter: GSNpcNavFilter = null
 
@@ -570,7 +570,7 @@ func _neighbours_walk(index: int) -> PackedInt32Array:
 	var base: PackedInt32Array = super.neighbours(index)
 
 	if filter == bot_filter and not _building:
-		return base
+		return _with_ladders(index, base)
 
 	if _steep_cut or not _building:
 		base = _without_steep(index, base, _steep_cut)
@@ -593,6 +593,20 @@ func _neighbours_walk(index: int) -> PackedInt32Array:
 		for to in _ladder.get(index, PackedInt32Array()) as PackedInt32Array:
 			if not out.has(to):
 				out.append(to)
+
+	return out
+
+
+## [param base] plus the ladders at [param index]: a stand-in climbs a ladder as a survivor does, both ways.
+func _with_ladders(index: int, base: PackedInt32Array) -> PackedInt32Array:
+	if not _ladder.has(index):
+		return base
+
+	var out := base.duplicate()
+
+	for to in _ladder[index] as PackedInt32Array:
+		if not out.has(to):
+			out.append(to)
 
 	return out
 
@@ -635,6 +649,7 @@ func _native_for(with: GSNpcNavFilter) -> AStar3D:
 			astar.connect_points(from, to, false)
 
 	if with == bot_filter:
+		_connect_ladders(astar)
 		return astar
 
 	# The steep plain edges, downhill (and uphill with allow_climb), one way each.
@@ -657,9 +672,14 @@ func _native_for(with: GSNpcNavFilter) -> AStar3D:
 				astar.connect_points(from, to, false)
 
 	if allow_ladders:
-		for from: int in _ladder:
-			for to in _ladder[from] as PackedInt32Array:
-				if astar.has_point(from) and astar.has_point(to):
-					astar.connect_points(from, to, false)
+		_connect_ladders(astar)
 
 	return astar
+
+
+## The ladders as one-way segments both ways round (every end is listed from the other).
+func _connect_ladders(astar: AStar3D) -> void:
+	for from: int in _ladder:
+		for to in _ladder[from] as PackedInt32Array:
+			if astar.has_point(from) and astar.has_point(to):
+				astar.connect_points(from, to, false)

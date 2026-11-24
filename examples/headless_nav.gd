@@ -14,8 +14,8 @@ extends "headless_nav_mend.gd"
 
 ## game.sh's SUITE_SHARDS for headless_nav_waves names exactly these.
 const WAVE_SHARDS := 6
-const CORE_SECTIONS := 14
-const CORE_CHECKS := 83
+const CORE_SECTIONS := 15
+const CORE_CHECKS := 87
 const HOLDS_SECTIONS := 10
 const HOLDS_CHECKS := 40
 
@@ -76,6 +76,7 @@ func _run() -> void:
 			await _test_lure_crowd()
 			_test_thin_props()
 			_test_ladder_seed()
+			_test_island_scan()
 
 	for game in _worlds.duplicate():
 		await _dispose(game)

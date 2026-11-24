@@ -7,8 +7,14 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzNavPrune := preload("../game/zz_nav_prune.gd")
+## The most points of one piece searched for its nearest main-piece point: a 50 000 point island (gm_balkans) asked for
+## every point's neighbours within 8 m ran for over 45 minutes. The points are taken at an even stride.
+const SCAN_MAX := 1500
 
 var _game: ZzGame
+## The edges of [member _edge_of] as (low, high) index pairs, so a lookup is not a walk of every edge.
+var _edge_set := {}
+var _edge_of: GSNpcNavData = null
 
 
 func _ready() -> void:
@@ -80,21 +86,12 @@ func _probe(id: String) -> void:
 		if i >= 0 and pc[i] != main:
 			pieces[pc[i]] = int(pieces.get(pc[i], 0)) + 1
 	for c: int in pieces:
-		var n := 0
-		var bi := -1
-		var bj := -1
-		var best := INF
-		for i in pr.points.size():
-			if pc[i] != c:
-				continue
-			n += 1
-			for j in pr.points_within(pr.points[i], 8.0):
-				if pc[j] == main:
-					var d := pr.points[i].distance_to(pr.points[j])
-					if d < best:
-						best = d
-						bi = i
-						bj = j
+		var members := _members(pc, c)
+		var n := members.size()
+		var near := nearest_main(pr, pc, members, main)
+		var bi: int = near[1]
+		var bj: int = near[2]
+		var best: float = near[0]
 		if bi < 0:
 			print("  piece %d (%d pts, %d ends): no main point within 8 m" % [c, n, pieces[c]])
 			continue
@@ -130,39 +127,47 @@ func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -
 	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
 
 
-## Each ladder box: its foot and head, the nearest graph point to each (distance, piece), to see which ends the grid left bare.
-func _ladder_report(pr: GSNpcNavData, pc: PackedInt32Array, main: int, ladders: Array[AABB]) -> void:
-	for box in ladders:
-		var mid := box.get_center()
-		var foot := Vector3(mid.x, box.position.y, mid.z)
-		var head := Vector3(mid.x, box.end.y, mid.z)
-		print("  ladder (%.2f,%.2f,%.2f) size (%.2f,%.2f,%.2f): foot %s head %s" % [mid.x, box.position.y, mid.z, box.size.x, box.size.y, box.size.z, _end_text(pr, pc, main, foot), _end_text(pr, pc, main, head)])
+
+## [distance, island point, main point] of the closest pair within 8 m between [param members] (an island's points) and
+## the [param main] piece, over at most [constant SCAN_MAX] of the members; [INF, -1, -1] when none is that close.
+static func nearest_main(pr: GSNpcNavData, pc: PackedInt32Array, members: PackedInt32Array, main: int) -> Array:
+	var best := INF
+	var bi := -1
+	var bj := -1
+	for i in _sample(members, SCAN_MAX):
+		for j in pr.points_within(pr.points[i], 8.0):
+			if pc[j] == main:
+				var d := pr.points[i].distance_to(pr.points[j])
+				if d < best:
+					best = d
+					bi = i
+					bj = j
+	return [best, bi, bj]
 
 
-func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -> String:
-	var i := pr.nearest_point(at, 8.0)
-	if i < 0:
-		return "none<8m"
-	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
+## The indices of [param comp]'s points in [param pc].
+static func _members(pc: PackedInt32Array, comp: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for i in pc.size():
+		if pc[i] == comp:
+			out.append(i)
+	return out
 
 
-## Each ladder box: its foot and head, the nearest graph point to each (distance, piece), to see which ends the grid left bare.
-func _ladder_report(pr: GSNpcNavData, pc: PackedInt32Array, main: int, ladders: Array[AABB]) -> void:
-	for box in ladders:
-		var mid := box.get_center()
-		var foot := Vector3(mid.x, box.position.y, mid.z)
-		var head := Vector3(mid.x, box.end.y, mid.z)
-		print("  ladder (%.2f,%.2f,%.2f) size (%.2f,%.2f,%.2f): foot %s head %s" % [mid.x, box.position.y, mid.z, box.size.x, box.size.y, box.size.z, _end_text(pr, pc, main, foot), _end_text(pr, pc, main, head)])
-
-
-func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -> String:
-	var i := pr.nearest_point(at, 8.0)
-	if i < 0:
-		return "none<8m"
-	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
+## At most [param limit] of [param all], evenly spread (all of them when there are fewer).
+static func _sample(all: PackedInt32Array, limit: int) -> PackedInt32Array:
+	if all.size() <= limit:
+		return all
+	var out := PackedInt32Array()
+	var step := float(all.size()) / float(limit)
+	for k in limit:
+		out.append(all[int(k * step)])
+	return out
 
 
 func _close() -> void:
+	_edge_of = null
+	_edge_set.clear()
 	remove_child(_game)
 	_game.free()
 	await get_tree().process_frame
@@ -304,9 +309,11 @@ func _raw_path_cuts(raw: GSNpcNavData, rc: PackedInt32Array, pr: GSNpcNavData, p
 		(adj.get_or_add(raw.edges[k + 1], []) as Array).append(raw.edges[k])
 	var prev := {start: -1}
 	var queue := [start]
+	var head := 0
 	var found := -1
-	while not queue.is_empty():
-		var u: int = queue.pop_front()
+	while head < queue.size():
+		var u: int = queue[head]
+		head += 1
 		var pu := pr.nearest_point(raw.points[u], 0.05)
 		if pu >= 0 and pc[pu] == main:
 			found = u
@@ -361,10 +368,12 @@ func _raw_path_cuts(raw: GSNpcNavData, rc: PackedInt32Array, pr: GSNpcNavData, p
 
 
 func _has_edge(d: GSNpcNavData, a: int, b: int) -> bool:
-	for k in range(0, d.edges.size(), 2):
-		if (d.edges[k] == a and d.edges[k + 1] == b) or (d.edges[k] == b and d.edges[k + 1] == a):
-			return true
-	return false
+	if d != _edge_of:
+		_edge_of = d
+		_edge_set.clear()
+		for k in range(0, d.edges.size(), 2):
+			_edge_set[Vector2i(mini(d.edges[k], d.edges[k + 1]), maxi(d.edges[k], d.edges[k + 1]))] = true
+	return _edge_set.has(Vector2i(mini(a, b), maxi(a, b)))
 
 
 func _first_hit(space: PhysicsDirectSpaceState3D, a: Vector3, z: Vector3, radius: float) -> String:

@@ -11,6 +11,10 @@ const JOIN_REACH := 6.0
 const JOIN_COUNT := 2
 ## How far (m) off the seed's height a floor point may stand and still be the same floor.
 const JOIN_HEIGHT := 0.6
+## Heights (m) around a head's top the seed may stand at: a ladder's top meets a ledge above or below its rail
+## (zs_krusty_krab_large: 4 heads the rail's own height left without a floor point to join).
+const HEAD_RISES: Array[float] = [0.0, 0.5, 1.0, 1.5, -0.5, -1.0, -1.5]
+const FOOT_RISES: Array[float] = [0.0]
 
 
 ## The index of a new point at the foot ([param head] false) or head of [param box], joined to the floor around it, or -1 when
@@ -18,29 +22,32 @@ const JOIN_HEIGHT := 0.6
 ## a floor point (`edge_blocked(a, b)`). Both blocked callables are the bare body's, from `ZzNavPrune`.
 static func seed_end(nav: GSNpcNavData, box: AABB, head: bool, point_blocked: Callable, edge_blocked: Callable, side: Callable) -> int:
 	var mid := box.get_center()
-	var y := box.end.y if head else box.position.y + 0.03
+	var rises: Array[float] = HEAD_RISES if head else FOOT_RISES
 	var half := Vector2(box.size.x, box.size.z) * 0.5
 	var best := PackedInt32Array()
 	var best_at := Vector3.ZERO
 	var best_cost := INF
 
-	for dir: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-		var at := Vector3(mid.x + dir.x * (half.x + OFFSET), y, mid.z + dir.y * (half.y + OFFSET))
+	for rise in rises:
+		var y := (box.end.y + rise) if head else box.position.y + 0.03
 
-		if point_blocked.call(at) or (side.is_valid() and not bool(side.call(box, at))):
-			continue
+		for dir: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+			var at := Vector3(mid.x + dir.x * (half.x + OFFSET), y, mid.z + dir.y * (half.y + OFFSET))
 
-		var joins := _joins(nav, at, edge_blocked)
+			if point_blocked.call(at) or (side.is_valid() and not bool(side.call(box, at))):
+				continue
 
-		if joins.is_empty():
-			continue
+			var joins := _joins(nav, at, edge_blocked)
 
-		var cost := at.distance_to(nav.points[joins[0]])
+			if joins.is_empty():
+				continue
 
-		if cost < best_cost:
-			best = joins
-			best_at = at
-			best_cost = cost
+			var cost := at.distance_to(nav.points[joins[0]])
+
+			if cost < best_cost:
+				best = joins
+				best_at = at
+				best_cost = cost
 
 	if best.is_empty():
 		return -1
