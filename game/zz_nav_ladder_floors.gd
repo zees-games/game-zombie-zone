@@ -4,6 +4,8 @@ extends RefCounted
 ## on is in `boxes`; with no floor the grid has no point there, so a ladder to it joins nothing. For each ladder end
 ## with no floor in reach, the tops of the slabs around it become floors, as if the converter had listed them.
 
+const ZzMapDoc := preload("zz_map_doc.gd")
+
 ## How far (m) off a ladder end a slab may lie and be its floor.
 const REACH := 3.0
 ## How far (m) off a ladder end a listed floor may lie and be its floor already.
@@ -16,6 +18,30 @@ const RISE := 0.5
 const MIN_SIDE := 1.0
 ## Shrunk off each edge of a slab top (m), where a wall's face or a kerb stands.
 const INSET := 0.1
+
+
+## The document's nav floors plus the rows under the ladder ends they leave bare. [param bounds_of] turns a box
+## record into its AABB.
+static func with_rows(doc: Dictionary, open_gates: PackedStringArray, bounds_of: Callable) -> Array:
+	var nav_doc: Dictionary = doc.get("nav", {})
+	var floors: Array = (nav_doc.get("floors", []) as Array).duplicate()
+
+	if not nav_doc.has("ladders"):
+		return floors
+
+	var slabs: Array[AABB] = []
+
+	for box: Dictionary in doc.get("boxes", []):
+		if not bool(box.get("solid", true)) or ZzMapDoc.is_trim(box) or box.has("nav") or str(box.get("kind", "")) == "sky":
+			continue
+
+		if box.has("gate") and open_gates.has(str(box["gate"])):
+			continue
+
+		slabs.append(bounds_of.call(box))
+
+	floors.append_array(rows(nav_doc["ladders"], floors, slabs))
+	return floors
 
 
 ## Floor rows `[min_x, min_z, max_x, max_z, y]` (the document's format) for the ladder ends in [param ladders] (rows of

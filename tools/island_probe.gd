@@ -26,6 +26,18 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
+## The survivor spawns, zombie hints and posts of the document.
+func _ends(doc: Dictionary) -> Array:
+	var ends: Array = []
+	for s: Variant in (doc.get("spawns", {}) as Dictionary).get("survivors", []):
+		ends.append(_v(s["at"] if s is Dictionary else s))
+	for z: Variant in doc.get("zombie_spawns", []):
+		ends.append(_v(z))
+	for q: Variant in doc.get("posts", []):
+		ends.append(_v(q))
+	return ends
+
+
 func _probe(id: String) -> void:
 	var config := ZzConfig.new()
 	config.warmup_seconds = 0.0
@@ -61,13 +73,7 @@ func _probe(id: String) -> void:
 	var rc := _comps(raw)
 	var main := _biggest(pc)
 	print("MAP %s: pruned %d pts, raw %d pts, raw pieces %d" % [id, pr.points.size(), raw.points.size(), _count(rc)])
-	var ends: Array = []
-	for s: Variant in (doc.get("spawns", {}) as Dictionary).get("survivors", []):
-		ends.append(_v(s["at"] if s is Dictionary else s))
-	for z: Variant in doc.get("zombie_spawns", []):
-		ends.append(_v(z))
-	for q: Variant in doc.get("posts", []):
-		ends.append(_v(q))
+	var ends := _ends(doc)
 	var pieces := {}
 	for e: Vector3 in ends:
 		var i := pr.nearest_point(e, 2.5)
@@ -102,10 +108,6 @@ func _probe(id: String) -> void:
 			_raw_path_cuts(raw, rc, pr, pc, main, ra, rz)
 		if OS.get_cmdline_user_args().has("--links"):
 			_links_near(doc, pr, pc, c, main)
-	if OS.get_cmdline_user_args().has("--ladders"):
-		_ladder_report(pr, pc, main, horde.ladders())
-	if OS.get_cmdline_user_args().has("--ladders"):
-		_ladder_report(pr, pc, main, horde.ladders())
 	if OS.get_cmdline_user_args().has("--ladders"):
 		_ladder_report(pr, pc, main, horde.ladders())
 	_zombie_view(ends)
