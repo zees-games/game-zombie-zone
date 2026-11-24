@@ -29,7 +29,7 @@ const LADDER_SIDE_RISES: Array[float] = [0.5, 1.0, 1.6]
 ## How far (m) out from a ladder's middle, toward a head end over its top, the climber's column is tested for a deck above.
 const LADDER_SIDE_FRONT := 0.35
 ## How far (m) in front of a ladder's face a wall hit still counts as the wall it is set in.
-const LADDER_SIDE_SLACK := 0.01
+const LADDER_SIDE_SLACK := 0.35
 
 ## What a zombie body collides with that the graph must clear: world, prop and clip (a hull clip ceiling or a solid prop no document box describes).
 static func body_mask(physics: Object) -> int:

@@ -617,7 +617,10 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 	builder.generate_cover = true
 	builder.cover_range = NAV_COVER_RANGE
 
-	var floors: Array = nav_doc.get("floors", [])
+	var floors: Array = (nav_doc.get("floors", []) as Array).duplicate()
+
+	if nav_doc.has("ladders"):
+		floors.append_array(ZzNavLadderFloors.rows(nav_doc["ladders"], floors, _slab_boxes(doc, open_gates)))
 
 	for f: Array in floors:
 		var area := AABB(Vector3(float(f[0]), float(f[4]), float(f[1])),
@@ -709,6 +712,21 @@ static func _builder_for(doc: Dictionary, sizes: Dictionary, sizes_known: bool, 
 		GSLog.debug(CHANNEL, "nav links through solid geometry dropped", {"map": doc.get("id", ""), "dropped": rejected})
 
 	return builder
+
+## The bounds of the document's solid boxes that could be a floor (what the builder's box loop would take as an obstacle).
+static func _slab_boxes(doc: Dictionary, open_gates: PackedStringArray) -> Array[AABB]:
+	var out: Array[AABB] = []
+
+	for box: Dictionary in doc.get("boxes", []):
+		if not bool(box.get("solid", true)) or ZzMapDoc.is_trim(box) or box.has("nav") or str(box.get("kind", "")) == "sky":
+			continue
+
+		if box.has("gate") and open_gates.has(str(box["gate"])):
+			continue
+
+		out.append(_box_bounds(box))
+
+	return out
 
 ## Whether the straight run from [param from] to [param to] goes through a wall: the importer
 ## emits links without looking, and one through a wall joins two rooms that have no door. Tested

@@ -196,7 +196,7 @@ func _reach_map(id: String) -> PackedStringArray:
 	var ladders: Array = _game.map.mechanics.ladder_boxes() if _game.map != null and _game.map.mechanics != null else []
 	out.append("  ladders: %d boxes, %d graph links" % [ladders.size(), int(graph.get(&"ladder_count")) if &"ladder_count" in graph else 0])
 	for box: AABB in ladders:
-		out.append("    ladder %s to %s" % [_f(box.position), _f(box.end)])
+		out.append("    ladder %s to %s%s" % [_f(box.position), _f(box.end), _ladder_ends(graph, box)])
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--near="):
 			out.append_array(_near_dump(graph, arg.substr(7)))
@@ -402,3 +402,16 @@ static func _f2(v: Vector3) -> String:
 static func _vec(s: String) -> Vector3:
 	var p := s.split(",")
 	return Vector3(float(p[0]), float(p[1]), float(p[2]))
+
+
+## " [foot .. head ..]" for a ladder: the graph point each end would join (`ZzNavPrune.ladder_side` on) and its piece.
+func _ladder_ends(graph: GSNpcNavGraph, box: AABB) -> String:
+	var side := ZzNavPrune.ladder_side(_game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(_game.physics), _game.map.mechanics.walk_through_bodies())
+	var mid := box.get_center()
+	var foot: int = graph._ladder_end(Vector3(mid.x, box.position.y + 0.1, mid.z), graph.LADDER_REACHES[0], graph.LADDER_HEIGHT, box, side)
+	var head: int = graph._ladder_end(Vector3(mid.x, box.end.y, mid.z), graph.LADDER_REACHES[0], graph.LADDER_OVER, box, side)
+	return " [foot %s head %s]" % [_end(graph, foot), _end(graph, head)]
+
+
+func _end(graph: GSNpcNavGraph, i: int) -> String:
+	return "none" if i < 0 else "piece %d at %s" % [graph._component[i], _f(graph.data.points[i])]

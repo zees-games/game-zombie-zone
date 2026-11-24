@@ -14,6 +14,8 @@ const ZzPaths := preload("zz_paths.gd")
 
 const ZzNavJob := preload("zz_nav_job.gd")
 
+const ZzNavLadderFloors := preload("zz_nav_ladder_floors.gd")
+
 ## What can come at you, and the ground it walks on. [b]Twelve kinds, and only one is the crowd.[/b] The common infected are most of what is ever alive; the eleven specials are each a different answer to "what does a team that sticks together and shoots straight still have to fear", which is the genre's whole design: [codeblock] common the crowd. Weak alone, a down in seconds when it surrounds you. leaper waits crouched out of sight, then jumps from twenty metres and pins whoever strayed. strangler a tongue from cover across a street: drags one survivor away and chokes them. bloater slow and soft. Its vomit blinds you and calls every common in earshot to
 ## you; so does its bursting, which is why you shove it rather than shoot it close. ram charges in a straight line, carries whoever it hit and beats them on the floor. spitter lobs acid where you are standing, or where your friend is lying pinned. rider leaps onto a head and steers its victim away from help. brute the boss. Throws a rock, then a car's worth of fists; you shoot it together. sleeper sits crying in the dark. Leave her alone. screamer keeps its distance and screams: a mob comes for whoever it saw. Thin, quick to kill, and the one to shoot first. crawler no legs, flat on the ground, slow; grabs the ankle of whoever walks past and holds them in
 ## place, gnawing, until somebody shoves it off (the victim can still shoot). riot a common in riot gear: a shield in front that a bullet barely gets through, so it walks into the team's fire. Shot from the side or behind, or shoved round. [/codeblock] [b]Every number here is a default the catalogue carries in `meta`.[/b] A brain reads its numbers with [method GSNpcBrain.tune], so a server owner who wants a faster leaper edits a definition rather than a brain; the difficulty scales on top (see [ZzConfig]). [b]A path, never a `class_name`, for every brain[/b], because a brain in a mounted gs-cloud pack cannot resolve one.
@@ -24,7 +26,7 @@ const CHANNEL := "zz.npcs"
 ## builder's output changes for the same document (the digest cannot see code).
 const NAV_CACHE_DIR := "user://nav_cache"
 
-const NAV_CACHE_VERSION := 12
+const NAV_CACHE_VERSION := 13
 
 ## Metres across which two pieces of the graph are joined when nothing solid is between (a floor plan whose rooms stop short of each other); a map's `nav.bridge` overrides, 0 is off.
 const NAV_BRIDGE_GAP := 2.5

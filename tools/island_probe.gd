@@ -102,8 +102,62 @@ func _probe(id: String) -> void:
 			_raw_path_cuts(raw, rc, pr, pc, main, ra, rz)
 		if OS.get_cmdline_user_args().has("--links"):
 			_links_near(doc, pr, pc, c, main)
+	if OS.get_cmdline_user_args().has("--ladders"):
+		_ladder_report(pr, pc, main, horde.ladders())
+	if OS.get_cmdline_user_args().has("--ladders"):
+		_ladder_report(pr, pc, main, horde.ladders())
+	if OS.get_cmdline_user_args().has("--ladders"):
+		_ladder_report(pr, pc, main, horde.ladders())
 	_zombie_view(ends)
 	await _close()
+
+
+## Each ladder box: its foot and head, the nearest graph point to each (distance, piece), to see which ends the grid left bare.
+func _ladder_report(pr: GSNpcNavData, pc: PackedInt32Array, main: int, ladders: Array[AABB]) -> void:
+	for box in ladders:
+		var mid := box.get_center()
+		var foot := Vector3(mid.x, box.position.y, mid.z)
+		var head := Vector3(mid.x, box.end.y, mid.z)
+		print("  ladder (%.2f,%.2f,%.2f) size (%.2f,%.2f,%.2f): foot %s head %s" % [mid.x, box.position.y, mid.z, box.size.x, box.size.y, box.size.z, _end_text(pr, pc, main, foot), _end_text(pr, pc, main, head)])
+
+
+func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -> String:
+	var i := pr.nearest_point(at, 8.0)
+	if i < 0:
+		return "none<8m"
+	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
+
+
+## Each ladder box: its foot and head, the nearest graph point to each (distance, piece), to see which ends the grid left bare.
+func _ladder_report(pr: GSNpcNavData, pc: PackedInt32Array, main: int, ladders: Array[AABB]) -> void:
+	for box in ladders:
+		var mid := box.get_center()
+		var foot := Vector3(mid.x, box.position.y, mid.z)
+		var head := Vector3(mid.x, box.end.y, mid.z)
+		print("  ladder (%.2f,%.2f,%.2f) size (%.2f,%.2f,%.2f): foot %s head %s" % [mid.x, box.position.y, mid.z, box.size.x, box.size.y, box.size.z, _end_text(pr, pc, main, foot), _end_text(pr, pc, main, head)])
+
+
+func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -> String:
+	var i := pr.nearest_point(at, 8.0)
+	if i < 0:
+		return "none<8m"
+	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
+
+
+## Each ladder box: its foot and head, the nearest graph point to each (distance, piece), to see which ends the grid left bare.
+func _ladder_report(pr: GSNpcNavData, pc: PackedInt32Array, main: int, ladders: Array[AABB]) -> void:
+	for box in ladders:
+		var mid := box.get_center()
+		var foot := Vector3(mid.x, box.position.y, mid.z)
+		var head := Vector3(mid.x, box.end.y, mid.z)
+		print("  ladder (%.2f,%.2f,%.2f) size (%.2f,%.2f,%.2f): foot %s head %s" % [mid.x, box.position.y, mid.z, box.size.x, box.size.y, box.size.z, _end_text(pr, pc, main, foot), _end_text(pr, pc, main, head)])
+
+
+func _end_text(pr: GSNpcNavData, pc: PackedInt32Array, main: int, at: Vector3) -> String:
+	var i := pr.nearest_point(at, 8.0)
+	if i < 0:
+		return "none<8m"
+	return "%.1fm dy%.1f %s" % [pr.points[i].distance_to(at), pr.points[i].y - at.y, "main" if pc[i] == main else "piece%d" % pc[i]]
 
 
 func _close() -> void:
