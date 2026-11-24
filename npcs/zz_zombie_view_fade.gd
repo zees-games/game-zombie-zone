@@ -1,6 +1,6 @@
 extends "zz_zombie_view_base.gd"
 
-## A zombie drawn at an alpha (the spawn and despawn fade, its stumps and gibs too): the layer under zz_zombie_view.gd.
+## A zombie drawn at an alpha (the spawn and despawn fade, its stumps and gibs too): the layer under zz_zombie_view_legs.gd.
 
 ## Draws the zombie at [param alpha] (1 solid). Every mesh gets its own copy of its material, so
 ## the look shared by the whole crowd is never written; a copy only exists while a zombie fades.

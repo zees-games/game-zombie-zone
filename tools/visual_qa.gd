@@ -473,6 +473,12 @@ func _sample(i: int) -> Dictionary:
 		out["truth_mag"] = int(truth.arsenal.current().magazine)
 	if seq != null:
 		out["phase"] = String(seq.call("phase_at", out["reload"]))
+	_hop_sample(model, inverse, scoped, out)
+	return out
+
+
+## The largest hop of a hand or weapon part in the eye's frame since the last frame, and the wall retract's amount, into [param out].
+func _hop_sample(model: Object, inverse: Transform3D, scoped: bool, out: Dictionary) -> void:
 	var stale := _parts.is_empty()
 	for part in _parts:
 		if not is_instance_valid(part):
@@ -504,7 +510,6 @@ func _sample(i: int) -> Dictionary:
 		out["part"] = where
 	_last_wall = wall
 	_was_scoped = scoped
-	return out
 
 
 ## The third-person carry as drawn (style, blends, the closed grip), so a capture shows whether it ran at all.
