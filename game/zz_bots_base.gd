@@ -1,5 +1,7 @@
 extends RefCounted
 
+const ZzBotLadders := preload("zz_bot_ladders.gd")
+
 const ZzLoot := preload("zz_loot.gd")
 
 const ZzMapDoc := preload("zz_map_doc.gd")

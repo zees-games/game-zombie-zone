@@ -1026,6 +1026,9 @@ func _walk_to(player, command: GSFpsCommand, goal: Vector3, memory: Dictionary) 
 	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
 	var path: PackedVector3Array = memory["path"]
 
+	if ZzBotLadders.drive(game, player, command, memory):
+		return
+
 	# An empty path (unreachable goal, or arrived) retries at most every 0.5 s: searching the
 	# whole graph every tick for an unreachable post cost 9 ms a tick on Boat Escape.
 	var age: float = game.now() - float(memory["path_at"])
