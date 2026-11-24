@@ -8,6 +8,8 @@ Quaternius' [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalyps
 
 The kit is not vendored. `tools/build_zombie_models.py` is the source: download the kit's `Characters/glTF` folder and run it in Blender. It keeps the one skinned mesh of each body (the survivors carry eleven weapons on a finger bone), joins it to one surface, decimates it to 35% (two to three thousand triangles), paints three noise fields into the vertex colours (dirt, blood with less on the head, rot), renames the clips, and exports without the atlas. Only the zombies keep clips; the survivor bodies are a quarter of the size without them.
 
+The exports carry no image, so `tools/link_zombie_textures.py` writes each body's atlas (and normal map) into its GLB as relative-URI images, the same table as `ATLAS_OF` and `NORMALS` in `zz_zombie_view_base.gd`. That is what lets Nightly's Asset Manager and `rsi_asset_audit.py` see the textures; it adds no pack size. Run it after every re-export (`--check` fails if a GLB is unlinked).
+
 ## One rig, two rest poses
 
 The survivor bodies are driven by `zombie_basic`'s clips, which is what makes them shamble rather than jog. A clip stores where each bone **is**, not how far it moved, and the survivors' rest pose is not the zombie's (their chest bone points up, the zombie's leans forward along the chest). Played as they are, the zombie's clips bent every survivor double at the waist. `_retarget` moves each key off the zombie's rest and onto the survivor's (`rotation = to_rest * from_rest^-1 * key`, a position turned the same way about the new rest), once per body, shared by every zombie drawn with it.
