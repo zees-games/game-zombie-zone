@@ -11,7 +11,7 @@ const ZzTouch := preload("../game/zz_touch.gd")
 ## Blood behind a hit body (zz_blood.gd over gs-fx's GSFxDecals) and which end of a hold's day a map's own light becomes
 ## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
 
-const CHECKS := 35
+const CHECKS := 43
 
 
 
@@ -27,6 +27,7 @@ func _run() -> void:
 	_light()
 	_fade()
 	_touch_fit()
+	_special_looks()
 	_report(CHECKS)
 
 
@@ -189,3 +190,21 @@ func _touch_fit() -> void:
 		_check(smallest >= 43.99, "every touch button is at least 44 real px across at %dx%d (smallest %.1f)" % [phone.x, phone.y, smallest])
 		fit.detach()
 		host.free()
+
+
+## The six specials' bodies carry gear skinned to the same bones, so a bone scale reshapes the gear too: keep every scale
+## in a band where a body stays a body (a bloater a stout man, not a toad; a screamer slim, not a cone).
+func _special_looks() -> void:
+	var worst := 1.0
+	var widest := 1.0
+	for kind: StringName in [&"brute", &"bloater", &"screamer", &"strangler", &"spitter", &"sleeper"]:
+		var look := ZzZombieView.look_for(kind, 0)
+		_check(look["body"] != &"" and float(look["girth"]) > 0.5 and float(look["girth"]) < 1.8, "%s has its own body and a sane girth (%.2f)" % [kind, float(look["girth"])])
+
+		for bone: Variant in (look["bones"] as Dictionary).values():
+			var s: Vector3 = bone if bone is Vector3 else Vector3.ONE * float(bone)
+			worst = minf(worst, minf(s.x, minf(s.y, s.z)))
+			widest = maxf(widest, maxf(s.x, maxf(s.y, s.z)))
+
+	_check(worst >= 0.6, "no special squashes a bone below 0.6 (%.2f)" % worst)
+	_check(widest <= 2.7, "no special stretches a bone past 2.7 (%.2f)" % widest)

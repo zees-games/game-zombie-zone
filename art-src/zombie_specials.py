@@ -398,9 +398,17 @@ def sleeper(b):
 		b.bevel(b.obj("band" + s, tube_bm(lt - (lt - lh) * 0.22, lt - (lt - lh) * 0.1, 0.05, 10), TAG, "LowerArm." + s), 0.0)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
-	wrap = sphere_bm(1.0, (hcx, hcy + 0.005, hcz + 0.02), ((hx1 - hx0) * 0.6, (hy1 - hy0) * 0.6, (hz1 - hz0) * 0.55), 18, 10, cut_below=hcz + (hz1 - hz0) * 0.12)
-	strip = loft([ring(hcx, hcy, (hx1 - hx0) * 0.57, (hy1 - hy0) * 0.57, hcz + (hz1 - hz0) * 0.14 - 0.02, 18), ring(hcx, hcy, (hx1 - hx0) * 0.58, (hy1 - hy0) * 0.58, hcz + (hz1 - hz0) * 0.14 + 0.03, 18)])
-	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, strip), WRAP, "Head"), 0.008), 0.002)
+	hw, hd, hh = hx1 - hx0, hy1 - hy0, hz1 - hz0
+	# Bandages that hug the skull (a dome wider than the head and a brim read as a mushroom cap): a shell
+	# 4% over the skull from the crown to the brow, then three cloth strips round it, each tilted differently.
+	zc0, zr = hcz - hh * 0.08, hh * 0.6
+	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.53, hd * 0.53, zr), 18, 10, cut_below=hcz - hh * 0.2)
+
+	def skull_ring(z, lean):
+		f = max(0.2, 1.0 - ((z - zc0) / zr) ** 2) ** 0.5
+		return ring(hcx, hcy + 0.004 + lean, hw * 0.53 * f + 0.012, hd * 0.53 * f + 0.012, z, 18)
+	strips = [loft([skull_ring(hcz + hh * (zc + k * 0.06), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((-0.1, 0.012), (0.06, -0.014), (0.22, 0.01))]
+	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.006), 0.002)
 	cx, cy, rx, ry = b.band(1.2, 1.3)
 	b.obj("tie", merge_bm(*[box_bm((0.012, 0.01, 0.1), (cx + dx, cy + ry + 0.04, 1.2), (0, 0.2 * dx / abs(dx), 0)) for dx in (-0.03, 0.03)]), TAG, "Torso")
 
@@ -412,7 +420,7 @@ def screamer(b):
 	cx, cy, rx, ry = b.band(1.0, 1.27)
 	bodice = loft([ring(cx, cy, rx + 0.02, ry + 0.025, z, 24) for z in (0.96, 1.06, 1.16, 1.26)])
 	b.bevel(b.solid(b.obj("bodice", bodice, ROBE, lambda co: b.trunk(co)), 0.008), 0.002)
-	levels = [(0.95, 0.0), (0.8, 0.07), (0.62, 0.14), (0.42, 0.22), (0.2, 0.3), (0.06, 0.36)]
+	levels = [(0.95, 0.0), (0.8, 0.05), (0.62, 0.1), (0.42, 0.15), (0.2, 0.2), (0.06, 0.23)]
 	rings = []
 	for z, flare in levels:
 		cx2, cy2, rx2, ry2 = b.band(max(z - 0.03, 0.56), max(z + 0.03, 0.62), ("Hips", "Abdomen", "UpperLeg.L", "UpperLeg.R"))
