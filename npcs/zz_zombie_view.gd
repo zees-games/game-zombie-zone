@@ -458,6 +458,10 @@ func _pace_to_ground() -> void:
 			_paced = true
 
 
+## The specials: their own bodies stand hunched, so the upright hit clips are skipped and their scratch is warped.
+const STEADY_KINDS: Array[StringName] = [&"bloater", &"sleeper", &"screamer"]
+
+
 ## Swaps a generic clip for the real animation-library one when the body has it.
 func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> void:
 	_ual = false
@@ -485,7 +489,9 @@ func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> vo
 	# to fill the swing it is one windup, blow and recovery a swing, ending where the next one starts.
 	_strike_clip = &""
 
-	if striking and not _ual and not LOOPING.has(_want_clip) and _has(_want_clip):
+	# A special's scratch is a lunge from standing to bent double: at its own clock (about 2x) the slam was 1 to 4 frames, so
+	# it too is timed by how far the pose moves.
+	if striking and not LOOPING.has(_want_clip) and _has(_want_clip) and (not _ual or STEADY_KINDS.has(kind)):
 		_want_rate = _anim.get_animation(_qualified(_want_clip)).length / (SWING_PERIOD * SWING_FILL)
 		_strike_clip = _want_clip
 
@@ -501,7 +507,9 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 	_rise_left = maxf(_rise_left - delta, 0.0)
 
 	# A bullet's flinch on a standing body is a short hit clip.
-	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
+	# Not on a special: the hit clips stand bolt upright, which from a special's hunch was a snap up and back down. It keeps
+	# its stance and flinches by the procedural jolt alone.
+	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking and not STEADY_KINDS.has(kind) \
 			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
 		var pick := hit_variant(_hit_head, _hit_count + variant)
 		_want_clip = pick[0] if _has(pick[0]) else &"ual_hit_chest"
@@ -570,8 +578,15 @@ func _advance_clip(clip: StringName, rate: float) -> void:
 	# A kit strike plays once a swing, timed by how far the pose moves rather than by the clip's own clock: the punch
 	# throws the arm 50 degrees between two keys, which played on its clock (or stretched evenly) was a snap. Its last
 	# frame is its first, so the next swing starts where this one ends.
+	# Stepped forward by advance() where it can be: a seek does not move the blend from the clip before, which then
+	# never faded out and the strike never showed.
 	if clip == _strike_clip:
-		_anim.seek(length * strike_reach(_strike_phase, _strike_warp(_anim.get_animation(_qualified(clip)))), true)
+		var target := length * strike_reach(_strike_phase, _strike_warp(_anim.get_animation(_qualified(clip))))
+		var step := target - _anim.current_animation_position
+		if step > 0.0 and step < length * 0.5:
+			_anim.advance(step)
+		else:
+			_anim.seek(target, true)
 		return
 
 	if not looping and _anim.current_animation_position + _owed * rate >= length - 0.01:

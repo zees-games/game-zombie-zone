@@ -167,6 +167,28 @@ class Build:
 						hook = (d + V(0, 0, -0.35)).normalized()
 						self.obj("claw_" + name, spike_bm(t - d * r1 * 0.4, hook, r1 * claw_len, r1 * 0.75, 6), claw, name)
 
+	def rigid_feet(self, reach=0.3, blend=0.06):
+		"""Binds each shoe wholly to its Foot bone up to [param reach] of the shin above the ankle, fading back to
+		the kit's weights over [param blend]: the kit splits the shoe between shin and foot, so a pitched foot
+		stretched the shoe up the shin and twisted it each stride."""
+		for s in ("L", "R"):
+			fg = self.body.vertex_groups.get("Foot." + s)
+			if fg is None or "LowerLeg." + s not in self.arm.data.bones:
+				continue
+			fh, _ = self.bone("Foot." + s)
+			lh, lt = self.bone("LowerLeg." + s)
+			top = fh.z + reach * (lt - lh).length
+			for v in self.body.data.vertices:
+				w = max((x.weight for x in v.groups if x.group == fg.index), default=0.0)
+				if w <= 0.0 or v.co.z > top + blend:
+					continue
+				nw = max(w, 1.0 if v.co.z <= top else 1.0 - (v.co.z - top) / blend)
+				others = [(x.group, x.weight) for x in v.groups if x.group != fg.index and x.weight > 0.0]
+				tot = sum(wt for _, wt in others)
+				for g, wt in others:
+					self.body.vertex_groups[g].add([v.index], (1.0 - nw) * wt / tot if tot > 0 else 0.0, "REPLACE")
+				fg.add([v.index], nw, "REPLACE")
+
 	def swatch_verts(self, group, pred):
 		"""Rest positions of the skin weighted to [param group] whose atlas texel passes pred(r, g, b):
 		the kit paints its eyes as a black swatch, so this finds where the face is."""
@@ -528,26 +550,33 @@ def bloater(b):
 	PUPIL = b.mat("Pupil", (0.08, 0.05, 0.02, 1), 0.1)
 	SOCKET = b.mat("Socket", (0.22, 0.12, 0.04, 1), 0.6)
 	NAIL = b.mat("Nail", (0.42, 0.36, 0.16, 1), 0.4, blood=0.4)
-	eyes = b.face(EYE, PUPIL, SOCKET, brow=FLESH, lid=FLESH, lid_drop=0.25, bulge=1.0)
-	b.fingers(FLESH, NAIL, thick=0.9, shrink=0.6, claw_len=2.2)
+	MOUTH = b.mat("Mouth", (0.16, 0.04, 0.03, 1), 0.3)
+	LIP = b.mat("Lip", (0.6, 0.5, 0.26, 1), 0.5, blood=0.3)
+	TOOTH = b.mat("Tooth", (0.74, 0.68, 0.42, 1), 0.35, blood=0.3)
+	eyes = b.face(EYE, PUPIL, SOCKET, lid=FLESH, lid_drop=0.25, bulge=1.0)
+	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
+	# A round slack mouth over the kit's square one (the judge read the kit's mouth as a block).
+	b.mouth(eyes, MOUTH, LIP, TOOTH, drop=(hz1 - hz0) * 0.24, width=(hx1 - hx0) * 0.17, gape=(hz1 - hz0) * 0.06)
+	b.fingers(FLESH, NAIL, thick=1.05, shrink=0.6, claw_len=1.2)
 	cx, cy, rx, ry = b.band(0.87, 1.07)
-	belly_c = (cx, cy - ry * 0.4, 0.96)
-	srx, sry, srz = rx * 1.18, ry * 1.4, 0.22
-	b.obj("belly", sphere_bm(1.0, belly_c, (srx, sry, srz), 20, 12), FLESH, "Abdomen")
-	for i in range(18):
-		a = b.rng.uniform(-math.pi * 0.95, -math.pi * 0.05) if i < 15 else b.rng.uniform(0.2, math.pi - 0.2)
-		z = b.rng.uniform(-0.45, 0.85)
+	# A sagging gut on the front only, low and soft, and boils on it alone: a dome round the back and boils
+	# over it read as a turtle shell when the corpse lay face down.
+	belly_c = (cx, cy - ry * 0.3, 0.92)
+	srx, sry, srz = rx * 1.08, ry * 1.25, 0.17
+	gut = sphere_bm(1.0, belly_c, (srx, sry, srz), 24, 14)
+	bmesh.ops.delete(gut, geom=[v for v in gut.verts if v.co.y > cy + ry * 0.2], context="VERTS")
+	b.obj("belly", gut, FLESH, "Abdomen")
+	for i in range(12):
+		a = b.rng.uniform(-math.pi * 0.85, -math.pi * 0.15)
+		z = b.rng.uniform(-0.4, 0.7)
 		k = math.sqrt(max(0.0, 1 - z * z))
 		pos = V(belly_c[0] + srx * k * math.cos(a), belly_c[1] + sry * k * math.sin(a), belly_c[2] + srz * z * 1.0)
-		r = b.rng.uniform(0.028, 0.065)
+		r = b.rng.uniform(0.022, 0.048)
 		d = V(math.cos(a) * k / srx, math.sin(a) * k / sry, z / srz).normalized()
-		pos = pos + d * (r * 0.4)
-		b.obj("boil%d" % i, sphere_bm(r, pos, (1, 1, 0.8), 10, 6), RAW if i % 4 == 3 else BOIL, b.trunk(pos))
+		pos = pos - d * (r * 0.25)
+		b.obj("boil%d" % i, sphere_bm(r, pos, (1, 1, 0.75), 16, 10), RAW if i % 4 == 3 else BOIL, b.trunk(pos))
 	nh, nt = b.bone("Neck")
-	b.obj("goitre", sphere_bm(0.085, (0, nh.y - 0.06, nh.z + 0.02), (1.15, 0.95, 1.0), 12, 8), BOIL, "Neck")
-	for sx in (-1, 1):
-		sh, _ = b.bone("UpperArm." + ("L" if sx > 0 else "R"))
-		b.obj("shoulderboil%d" % sx, sphere_bm(0.05, (sh.x + sx * 0.04, sh.y + 0.03, sh.z + 0.06), (1, 1, 0.8), 10, 6), BOIL, "Shoulder." + ("L" if sx > 0 else "R"))
+	b.obj("goitre", sphere_bm(0.062, (0, nh.y - 0.055, nh.z + 0.015), (1.15, 0.9, 0.95), 16, 10), BOIL, "Neck")
 	cx2, cy2, rx2, ry2 = b.band(0.55, 0.85)
 	# A belt round the hips, then four flaps hung from it, each lower edge carried by its own thigh: one tube
 	# weighted to the hips was walked through by the thighs.
@@ -562,6 +591,7 @@ def bloater(b):
 			bmesh.ops.delete(flap, geom=[v for v in flap.verts if not v.link_faces], context="VERTS")
 			b.bevel(b.solid(b.smooth(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.775 else "UpperLeg." + s)), 0.008), 0.002)
 	b.taper_tongue()
+	b.rigid_feet()
 
 
 def strangler(b):
@@ -637,7 +667,11 @@ def sleeper(b):
 	trunk = ("Torso", "Abdomen", "Hips", "Shoulder.L", "Shoulder.R")
 	nh, nt = b.bone("Neck")
 	ncx, ncy, nrx, nry = b.band(nh.z + 0.02, nh.z + 0.04, ("Neck",))
-	rings = [ring(ncx, ncy, nrx + 0.03, nry + 0.03, nh.z + 0.035, 32), ring(ncx, ncy, nrx + 0.05, nry + 0.045, nh.z + 0.005, 32)]
+	# A yoke over the shoulders just above their peak (~0.98 on this kit): a gown that dropped from the collar
+	# straight to 0.93 let the shoulder skin poke through as grey patches.
+	scx, scy, srx, sry = b.band(0.95, 0.97, trunk)
+	rings = [ring(ncx, ncy, nrx + 0.03, nry + 0.03, nh.z + 0.04, 32), ring(ncx, ncy, nrx + 0.06, nry + 0.05, nh.z + 0.05, 32),
+		ring(scx, scy, srx * 0.85, sry * 0.8 + 0.02, 0.995, 32), ring(scx, scy, srx + 0.02, sry + 0.03, 0.965, 32)]
 	levels = [(0.93, 0.0), (0.86, 0.0), (0.78, 0.01), (0.7, 0.03), (0.6, 0.06), (0.5, 0.1)]
 	for i, (zz, flare) in enumerate(levels):
 		cx, cy, rx, ry = b.band(zz - 0.02, zz + 0.02, trunk)
@@ -645,19 +679,19 @@ def sleeper(b):
 		rings.append(ring(cx, cy, rx + 0.025 + flare, ry + 0.03 + flare, zz, 32, 0.03 if i == len(levels) - 1 else 0.0, b.rng,
 			folds=7, amp=0.07 * hem * hem, phase=0.6))
 	print("GOWN", [(round(r[0].x, 3), round(r[8].y, 3), round(r[0].z, 3)) for r in rings])
-	b.bevel(b.solid(b.smooth(b.obj("gown", loft(rings), GOWN, lambda co: "Neck" if co.z > nh.z - 0.01 else b.trunk(co))), 0.006), 0.002)
+	b.bevel(b.solid(b.smooth(b.obj("gown", loft(rings), GOWN, lambda co: b.trunk(co))), 0.006), 0.002)
 	for s, sx in (("L", 1), ("R", -1)):
 		uh, ut = b.bone("UpperArm." + s)
 		ur = max(b.limb_r("UpperArm." + s, 0.0, 0.6), 0.04) + 0.02
 		# The sleeve reaches into the gown's shoulder and down past the elbow, so no bare arm shows between them.
-		sl = loft(sleeve_rings(uh, ut, [-0.25, 0.2, 0.6, 0.98], [ur + 0.01, ur + 0.006, ur, ur + 0.012], 14, b.rng))
+		sl = capped(loft(sleeve_rings(uh, ut, [-0.3, -0.05, 0.2, 0.6, 0.98], [ur + 0.022, ur + 0.016, ur + 0.006, ur, ur + 0.012], 14, b.rng)))
 		b.bevel(b.solid(b.smooth(b.obj("sleeve" + s, sl, GOWN, "UpperArm." + s)), 0.005), 0.0)
 		lh, lt = b.bone("LowerArm." + s)
 		# Bandaged forearms, round and closed, over the kit's flat ones; the hospital band over the wrist end.
 		fr = max(b.limb_r("LowerArm." + s, 0.05, 0.95), 0.035) + 0.012
 		b.bevel(b.obj("forearm" + s, merge_bm(tube_bm(lh - (lt - lh) * 0.06, lt - (lt - lh) * 0.02, fr, 12), sphere_bm(fr, lt - (lt - lh) * 0.02, (1, 1, 1), 12, 6)), WRAP, "LowerArm." + s), 0.002)
 		b.bevel(b.obj("band" + s, tube_bm(lt - (lt - lh) * 0.22, lt - (lt - lh) * 0.1, fr + 0.008, 12), TAG, "LowerArm." + s), 0.0)
-	b.fingers(LID, NAIL, thick=0.9, shrink=0.5, claw_len=2.0)
+	b.fingers(LID, NAIL, thick=1.15, shrink=0.55, claw_len=1.0)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	hw, hd, hh = hx1 - hx0, hy1 - hy0, hz1 - hz0
@@ -670,16 +704,17 @@ def sleeper(b):
 	# Bandages over the crown, the back of the head and the nape, open over the face from the brow down.
 	zc0, zr = hcz - hh * 0.08, hh * 0.6
 	brow = ez + er * 1.9
-	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.56, hd * 0.56, zr * 1.05), 22, 12)
+	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.51, hd * 0.51, zr * 0.92), 22, 12)
 	bmesh.ops.delete(wrap, geom=[v for v in wrap.verts if v.co.z < brow and v.co.y < hcy + hd * 0.08], context="VERTS")
 
 	def skull_ring(zz, lean):
 		f = max(0.2, 1.0 - ((zz - zc0) / zr) ** 2) ** 0.5
-		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.018, hd * 0.56 * f + 0.018, zz, 24)
+		return ring(hcx, hcy + 0.004 + lean, hw * 0.51 * f + 0.008, hd * 0.51 * f + 0.008, zz, 24)
 	strips = [loft([skull_ring(max(hcz + hh * (zc + k * 0.05), brow + 0.01), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((0.12, -0.01), (0.26, 0.008))]
 	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.008), 0.002)
 	cx, cy, rx, ry = b.band(0.86, 0.9, trunk)
 	b.obj("tie", merge_bm(*[box_bm((0.012, 0.01, 0.1), (cx + dx, cy + ry + 0.045, 0.86), (0, 0.2 * dx / abs(dx), 0)) for dx in (-0.03, 0.03)]), TAG, "Torso")
+	b.rigid_feet()
 
 
 def screamer(b):
@@ -708,13 +743,17 @@ def screamer(b):
 	b.obj("crest", merge_bm(*crest), BONE, "Head")
 	CLOTH = b.mat("Trouser", (0.16, 0.05, 0.08, 1), 0.92, blood=0.55, bump=0.8, bump_scale=60, weave=True)
 	for s in ("L", "R"):
-		for bone_name, t0, t1 in (("UpperLeg." + s, -0.02, 1.08), ("LowerLeg." + s, -0.04, 0.86)):
+		for bone_name, t0, t1 in (("UpperLeg." + s, -0.02, 1.08), ("LowerLeg." + s, -0.04, 0.62)):
 			h, t = b.bone(bone_name)
 			# Rings fitted to the skin along the bone, so the cloth follows the leg's taper instead of a barrel round it.
 			shares = [t0 + (t1 - t0) * k / 5 for k in range(6)]
 			radii = [max(b.limb_r(bone_name, s - 0.15, s + 0.15), 0.035) + 0.012 for s in shares]
+			if bone_name.startswith("LowerLeg"):
+				# The cuff closes on the shin above the shoe, so the foot shows and no open tube end does.
+				radii[-1] = max(b.limb_r(bone_name, shares[-1] - 0.1, shares[-1] + 0.1), 0.03) + 0.004
 			b.bevel(b.solid(b.obj("trouser%s%s" % (bone_name[:5], s), capped(loft(sleeve_rings(h, t, shares, radii, 16, b.rng))), CLOTH, bone_name), 0.006), 0.002)
 	b.taper_tongue()
+	b.rigid_feet()
 	for s, sx in (("L", 1), ("R", -1)):
 		sh, _ = b.bone("UpperArm." + s)
 		b.obj("spur" + s, merge_bm(spike_bm((sh.x, sh.y, sh.z + 0.03), (sx, 0.1, 0.5), 0.2, 0.035), spike_bm((sh.x, sh.y, sh.z + 0.03), (sx * 0.3, 0.1, 1), 0.13, 0.03)), BONE, "Shoulder." + s)
