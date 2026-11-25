@@ -13,7 +13,7 @@ on:
 # A suite added to examples/ goes in one of the two lists.
 jobs:
     validate:
-        uses: gamespice-platform/ci/.github/workflows/validate.yml@v1
+        uses: gamespice-platform/ci/.github/workflows/validate.yml@1f427d257382fc5e1944ceaf54c3074cc13f7731  # v1.4.2 plus the source-lock restore (validate/resolve-deps/package); back to @v1 once the tag moves
         with:
             suite-timeout: 900
             profiles: true
