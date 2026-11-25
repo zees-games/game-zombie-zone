@@ -102,6 +102,8 @@ func _lift_foot_bone(foot: int, floor_y: float) -> void:
 
 ## The share of a leg's length out to the side a planted foot is reached at, at most ([method _plant_feet]).
 const REACH_FLAT := 0.9
+## The longest stride (two steps) as leg lengths ([method _plant_feet]).
+const STRIDE_LEGS := 1.3
 ## The most the hips are lowered toward a planted foot, as a share of the leg's length.
 const DROP_MOST := 0.12
 
@@ -124,6 +126,10 @@ func _plant_feet() -> void:
 	# pace of a shamble is over a metre a step, further than a leg reaches, and playing the clip faster to shorten it popped the bones.
 	var speed := maxf(_velocity.length(), 0.05)
 	var stride := 2.0 * step_length(speed, float(_look.get("height", 1.75)))
+	# A big-headed kit (the sleeper's) has short legs for its height: a step taken from the height alone was further than the
+	# leg swings, and the thigh snapped forward to catch the foot (a 139 degree bone pop). The step stays within the leg.
+	var leg_m := float(legs[0][4]) * maxf(to_world.basis.get_scale().y, 0.01)
+	stride = minf(stride, leg_m * STRIDE_LEGS)
 	# A planted foot's stance drifts duty * stride from where it landed; past `reach` it is re-planted (a visible skate).
 	_plant.reach = maxf(0.6, _plant.duty * stride * 1.15)
 	# A lifted foot clears the floor (0.2 m) before it moves forward, and lands from above it: a foot kept low through its swing

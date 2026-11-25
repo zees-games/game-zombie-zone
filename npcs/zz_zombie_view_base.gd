@@ -86,6 +86,10 @@ static var NORMALS := {&"city": CITY_NORMAL, &"gent": "res://assets/zombies/gent
 	&"sleeper": "res://assets/zombies/sleeper_normal.png",
 	&"screamer": "res://assets/zombies/screamer_normal.png"}
 
+## Bodies that also bake a roughness map (`art-src/zombie_specials.py`): wet blood glossy, cloth matte.
+static var ROUGHS := {&"bloater": "res://assets/zombies/bloater_rough.png", &"sleeper": "res://assets/zombies/sleeper_rough.png",
+	&"screamer": "res://assets/zombies/screamer_rough.png"}
+
 ## Where the head bone sits against the body's height, for the bodies that are not the kit's big-headed
 ## proportions (the kit's is 1.22, [method _measure]).
 const HEAD_TOP := {&"city": 1.137, &"gent": 1.077, &"cop": 1.107, &"punk": 1.124, &"convict": 1.087, &"hazmat": 1.138, &"walker": 1.136}
@@ -167,8 +171,8 @@ const LOOKS := {
 		"bones": {"UpperArm.L*": 1.4, "UpperArm.R*": 1.4, "Shoulder.L": 1.3, "Shoulder.R": 1.3, "Head": 0.6, "Torso": Vector3(1.2, 1.0, 1.15)}, "hunch": 0.35, "shamble": {"stoop": 0.35, "head": 0.1, "arms": -0.5, "hang": -0.9, "swing": 0.6, "drag": 0.6, "trail": 0.1, "sway": 0.22, "hip": 0.2, "cadence": 0.8, "lurch": 0.0},
 		"wear": [], "blood": 2.0, "dirt": 0.0},
 	&"sleeper": {"body": &"sleeper", "height": 1.65, "girth": 0.85,
-		"bones": {"Head*": 0.6, "Index1.L*": Vector3(0.8, 1.9, 0.8), "Index1.R*": Vector3(0.8, 1.9, 0.8), "Middle1.L*": Vector3(0.8, 1.9, 0.8), "Middle1.R*": Vector3(0.8, 1.9, 0.8), "Pinky1.L*": Vector3(0.8, 1.9, 0.8), "Pinky1.R*": Vector3(0.8, 1.9, 0.8)},
-		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "blood": 2.0, "dirt": 0.0},
+		"bones": {"Head*": 0.6},
+		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.65, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.8, "lurch": 0.0}, "wear": [&"red_eyes"], "blood": 2.0, "dirt": 0.0},
 	&"screamer": {"body": &"screamer", "height": 2.0, "girth": 0.85,
 		"bones": {"Abdomen": Vector3(0.8, 1.1, 0.8), "Torso": Vector3(0.85, 1.05, 0.85), "Neck": Vector3(0.85, 1.25, 0.85), "BottomMouth": 1.4}, "hunch": 0.2, "shamble": {"stoop": 0.1, "head": -0.1, "arms": -0.5, "hang": -0.7, "swing": 0.7, "drag": 0.7, "trail": 0.0, "sway": 0.08, "hip": 0.06, "cadence": 1.1, "lurch": 0.0},
 		"wear": [], "blood": 2.0, "dirt": 0.0},
@@ -327,6 +331,7 @@ static var attack_anim := 0
 static var _materials: Dictionary = {}
 static var _shader: Shader = null
 static var _shader_normal: Shader = null
+static var _shader_rough: Shader = null
 static var _atlases: Dictionary = {}
 
 
@@ -600,13 +605,14 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 		return _materials[key]
 
 	var normal_tex: bool = NORMALS.has(look["body"])
+	var rough_tex: bool = normal_tex and ROUGHS.has(look["body"])
 
-	_ensure_shaders(normal_tex)
+	_ensure_shaders(normal_tex, rough_tex)
 
 	var atlas_id := _load_atlas(look)
 
 	var material := ShaderMaterial.new()
-	material.shader = _shader_normal if normal_tex else _shader
+	material.shader = _shader_rough if rough_tex else (_shader_normal if normal_tex else _shader)
 	material.set_shader_parameter(&"atlas", _atlases[atlas_id])
 
 	if normal_tex:
@@ -616,6 +622,14 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 			_atlases[normal_id] = GSHumanoidFigure.load_texture(ZzPaths.rebase(NORMALS[look["body"]]))
 
 		material.set_shader_parameter(&"normal_tex", _atlases[normal_id])
+
+	if rough_tex:
+		var rough_id := StringName("%s_rough" % look["body"])
+
+		if not _atlases.has(rough_id):
+			_atlases[rough_id] = GSHumanoidFigure.load_texture(ZzPaths.rebase(ROUGHS[look["body"]]))
+
+		material.set_shader_parameter(&"rough_tex", _atlases[rough_id])
 
 	while from.size() < ZzZombieShader.SWAPS:
 		from.append(Vector4(-9.0, -9.0, -9.0, 0.0))
@@ -641,7 +655,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	return material
 
 
-static func _ensure_shaders(normal_tex: bool) -> void:
+static func _ensure_shaders(normal_tex: bool, rough_tex: bool = false) -> void:
 	if _shader == null:
 		_shader = Shader.new()
 		_shader.code = ZzZombieShader.SHADER
@@ -651,6 +665,12 @@ static func _ensure_shaders(normal_tex: bool) -> void:
 		_shader_normal = Shader.new()
 		_shader_normal.code = ZzZombieShader.SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
 			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
+
+	if rough_tex and _shader_rough == null:
+		# The specials bake their roughness too: the map replaces the shader's blood-driven guess.
+		_shader_rough = Shader.new()
+		_shader_rough.code = _shader_normal.code.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D rough_tex : hint_default_white, filter_linear_mipmap, repeat_disable;") \
+			.replace("	ROUGHNESS = mix(0.9, 0.3, blood);", "	ROUGHNESS = texture(rough_tex, UV).r;")
 
 
 ## Loads (once) the atlas a look is painted on and returns its id.

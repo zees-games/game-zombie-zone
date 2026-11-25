@@ -567,10 +567,11 @@ func _advance_clip(clip: StringName, rate: float) -> void:
 	var length := _anim.current_animation_length
 	var looping := LOOPING.has(clip)
 
-	# A kit strike follows the swing out and back: restarted at its first frame each swing it snapped from the
-	# blow's reach back to the windup in one frame (a clip cannot blend into itself).
+	# A kit strike plays once a swing, timed by how far the pose moves rather than by the clip's own clock: the punch
+	# throws the arm 50 degrees between two keys, which played on its clock (or stretched evenly) was a snap. Its last
+	# frame is its first, so the next swing starts where this one ends.
 	if clip == _strike_clip:
-		_anim.seek(length * strike_reach(_strike_phase), true)
+		_anim.seek(length * strike_reach(_strike_phase, _strike_warp(_anim.get_animation(_qualified(clip)))), true)
 		return
 
 	if not looping and _anim.current_animation_position + _owed * rate >= length - 0.01:
@@ -581,12 +582,57 @@ func _advance_clip(clip: StringName, rate: float) -> void:
 		_anim.advance(_owed * rate)
 
 
-## How far into a kit strike clip (0 to 1) the swing at [param phase] is: out through the windup and blow, then
-## back to the first frame, so one swing ends on the pose the next begins with.
-static func strike_reach(phase: float) -> float:
-	if phase < STRIKE_OUT:
-		return STRIKE_REACH * smoothstep(0.0, STRIKE_OUT, phase)
-	return STRIKE_REACH * (1.0 - smoothstep(STRIKE_OUT, 1.0, phase))
+## How far into a kit strike clip (0 to 1) the swing at [param phase] is, given the clip's [param warp]
+## ([method _strike_warp]): the clip's fast keys get more of the swing, its still ones less.
+static func strike_reach(phase: float, warp: PackedFloat32Array) -> float:
+	var n := warp.size() - 1
+	if n < 1:
+		return clampf(phase, 0.0, 1.0)
+	var i := clampi(warp.bsearch(phase), 1, n)
+	var a := warp[i - 1]
+	var b := warp[i]
+	var f := (phase - a) / (b - a) if b > a else 0.0
+	return (float(i - 1) + clampf(f, 0.0, 1.0)) / float(n)
+
+
+## Per clip, the share of the swing (0 to 1) reached at each of STRIKE_SAMPLES even steps through it.
+static var _strike_warps := {}
+
+
+## The swing share at each step of [param clip]: the step's weight is how far its fastest bone turns, plus a floor so
+## a still stretch still takes some time. Built once per clip.
+static func _strike_warp(clip: Animation) -> PackedFloat32Array:
+	if clip == null:
+		return PackedFloat32Array()
+	var id := clip.get_instance_id()
+	if _strike_warps.has(id):
+		return _strike_warps[id]
+	var rots: Array[int] = []
+	for t in clip.get_track_count():
+		if clip.track_get_type(t) == Animation.TYPE_ROTATION_3D:
+			rots.append(t)
+	var step := clip.length / float(STRIKE_SAMPLES)
+	var turn := PackedFloat32Array()
+	turn.resize(STRIKE_SAMPLES)
+	var total := 0.0
+	for i in STRIKE_SAMPLES:
+		var most := 0.0
+		for t in rots:
+			var q0 := clip.rotation_track_interpolate(t, step * float(i))
+			var q1 := clip.rotation_track_interpolate(t, step * float(i + 1))
+			most = maxf(most, q0.angle_to(q1))
+		turn[i] = most
+		total += most
+	var floor_ := STRIKE_FLOOR * total / float(STRIKE_SAMPLES)
+	var warp := PackedFloat32Array([0.0])
+	var sum := 0.0
+	for i in STRIKE_SAMPLES:
+		sum += turn[i] + floor_
+		warp.append(sum)
+	for i in warp.size():
+		warp[i] = warp[i] / sum if sum > 0.0 else float(i) / float(STRIKE_SAMPLES)
+	_strike_warps[id] = warp
+	return warp
 
 
 ## True when this body has the real clip [param clip] (the file is missing or the body is a capsule otherwise).
@@ -797,10 +843,10 @@ const STRIKE_RISE := 0.1
 ## The share of a swing a kit's one-shot strike clip is played over: it ends a little before the next swing starts, so a
 ## body's own tempo (up to 10% slower) still finishes it.
 const SWING_FILL := 0.88
-## The share of a swing a kit strike runs out over ([method strike_reach]); it comes back over the rest.
-const STRIKE_OUT := 0.55
-## How far into a kit strike clip it runs out to: past the blow, short of the clip's own recovery.
-const STRIKE_REACH := 0.75
+## The even steps a kit strike clip is measured in for [method _strike_warp].
+const STRIKE_SAMPLES := 36
+## The time a still step of a kit strike still takes, as a share of an average step's.
+const STRIKE_FLOOR := 0.35
 
 
 ## How far into the blow it is: 0 at rest, rising to 1 on the swing's landing frame.

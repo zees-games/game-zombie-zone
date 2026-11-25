@@ -16,6 +16,7 @@ mesh, one material, one draw call. Procedural throughout: no other artist's work
 """
 import bpy, bmesh, sys, os, math, random, mathutils
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 args = sys.argv[sys.argv.index("--") + 1:]
 KIT, OUT, KINDS = args[0], args[1], args[2].split(",")
@@ -28,6 +29,8 @@ for a in args[3:]:
 	if a == "--sheet":
 		SHEET = True
 os.makedirs(OUT, exist_ok=True)
+
+FINGERS = (("Thumb", 2), ("Index", 3), ("Middle", 3), ("Pinky", 3))
 
 CLIPS = {"Crawl": "crawl", "Death": "death", "HitReact": "hit", "Idle": "idle", "Idle_Attack": "attack_idle",
 	"Jump": "jump", "Jump_Idle": "jump_idle", "Jump_Land": "jump_land", "Punch": "attack", "Run": "run",
@@ -129,7 +132,152 @@ class Build:
 				f = k * (1.0 - 0.25 * s)
 				v.co = axis + (v.co - axis) * f
 
-	def mat(self, name, colour, rough=0.7, metal=0.0, blood=0.0, bump=0.0, bump_scale=40.0, veins=None):
+	def shrink_to_axis(self, name, f):
+		"""Pulls the skin weighted to bone [param name] toward its axis by factor f (1 keeps it)."""
+		h, t = self.bone(name)
+		d = t - h
+		gi = self.body.vertex_groups[name].index
+		for v in self.body.data.vertices:
+			if max((x.weight for x in v.groups if x.group == gi), default=0.0) < 0.5:
+				continue
+			s = max(0.0, min(1.0, (v.co - h).dot(d) / max(d.length_squared, 1e-9)))
+			axis = h + d * s
+			v.co = axis + (v.co - axis) * f
+
+	def fingers(self, mat, claw, thick=0.85, shrink=0.55, claw_len=2.6):
+		"""Jointed fingers over the kit's mitten: each joint's skin drawn in, then a tapered segment with a
+		knuckle at its root, and a hooked claw past the last joint (the judge read the kit's hands as paddles)."""
+		for s in ("L", "R"):
+			for f, n in FINGERS:
+				for k in range(1, n + 1):
+					name = "%s%d.%s" % (f, k, s)
+					if name not in self.arm.data.bones or name not in self.body.vertex_groups:
+						continue
+					h, t = self.bone(name)
+					r = max(self.limb_r(name), 0.011) * thick
+					self.shrink_to_axis(name, shrink)
+					tip = k == n
+					r0, r1 = r * (1.0 - 0.1 * (k - 1)), r * (1.0 - 0.1 * k) * (0.85 if tip else 1.0)
+					parts = [cone_bm(h, t, r0, r1, 8), sphere_bm(r0 * 1.15, h, (1, 1, 1), 8, 5)]
+					if tip:
+						parts.append(sphere_bm(r1, t, (1, 1, 1), 8, 5))
+					self.obj("finger_" + name, merge_bm(*parts), mat, name)
+					if tip:
+						d = (t - h).normalized()
+						hook = (d + V(0, 0, -0.35)).normalized()
+						self.obj("claw_" + name, spike_bm(t - d * r1 * 0.4, hook, r1 * claw_len, r1 * 0.75, 6), claw, name)
+
+	def swatch_verts(self, group, pred):
+		"""Rest positions of the skin weighted to [param group] whose atlas texel passes pred(r, g, b):
+		the kit paints its eyes as a black swatch, so this finds where the face is."""
+		img = bpy.data.images.load(os.path.join(KIT, self.spec["atlas"]), check_existing=True)
+		W, H = img.size
+		px = img.pixels[:]
+		uv = self.body.data.uv_layers[0].data
+		gi = self.body.vertex_groups[group].index
+		hit = set()
+		for p in self.body.data.polygons:
+			for li, vi in zip(p.loop_indices, p.vertices):
+				u, v_ = uv[li].uv
+				x = min(W - 1, max(0, int((u % 1.0) * W)))
+				y = min(H - 1, max(0, int((v_ % 1.0) * H)))
+				i = (y * W + x) * 4
+				if pred(px[i], px[i + 1], px[i + 2]):
+					hit.add(vi)
+		vs = self.body.data.vertices
+		return [vs[i].co.copy() for i in hit if any(x.group == gi and x.weight > 0.5 for x in vs[i].groups)]
+
+	def ray(self, origin, d):
+		"""First hit of the rest skin along d from origin: (point, normal) or None."""
+		if not hasattr(self, "_bvh"):
+			me = self.body.data
+			self._bvh = BVHTree.FromPolygons([v.co.copy() for v in me.vertices], [tuple(p.vertices) for p in me.polygons])
+		loc, nrm, _, _ = self._bvh.ray_cast(Vector(origin), Vector(d).normalized())
+		return (loc, nrm) if loc is not None else None
+
+	def eyes(self, front=1.0):
+		"""Centre, outward normal and radius of each eye (L then R), from the atlas's black swatch, else
+		cast at a fixed height and spread on the head's front."""
+		hx0, hx1, hy0, hy1, hz0, hz1 = self.head
+		hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
+		dark = self.swatch_verts("Head", lambda r, g, b: max(r, g, b) < 0.1)
+		out = []
+		for sx in (1, -1):
+			# front: how far back from the face the swatch may lie (a share of the head's depth), so dark hair is not an eye.
+			side = [p for p in dark if p.x * sx > max(0.01, (hx1 - hx0) * 0.08) and p.y < min(hcy, hy0 + (hy1 - hy0) * front)]
+			if len(side) >= 3:
+				c = sum(side, V(0, 0, 0)) / len(side)
+				rad = max(0.012, sorted((p - c).length for p in side)[int(len(side) * 0.8)])
+				nd = V(0, -1, 0) if front < 1.0 else (c - V(hcx, hcy, hcz)).normalized()
+				hit = self.ray(c + nd * 0.6, -nd)
+				if hit:
+					c, n = hit[0], (hit[1] if hit[1].dot(nd) > 0 else -hit[1])
+				else:
+					n = nd
+				out.append((c, n, rad))
+				continue
+			z = hcz + (hz1 - hz0) * 0.05
+			d = V(sx * 0.42, -1, 0)
+			hit = self.ray(V(hcx, hcy, z), d)
+			c, n = hit if hit else (V(hcx + sx * (hx1 - hx0) * 0.2, hy0, z), V(0, -1, 0))
+			out.append((c, n, (hx1 - hx0) * 0.07))
+		print("EYES", self.kind, len(dark), [(tuple(round(x, 3) for x in c), round(r, 3)) for c, _, r in out])
+		return out
+
+	def face(self, eye, pupil, socket, lid=None, brow=None, bone="Head", lid_drop=0.0, bulge=0.35, front=1.0):
+		"""Eyeballs set in dark sockets, with a pupil each, optional heavy lids (lid_drop: how far the lid
+		hangs over the eyeball, 0 to 1) and brow ridges; returns the eyes for the nose and mouth to follow."""
+		eyes = self.eyes(front)
+		for i, (c, n, r) in enumerate(eyes):
+			s = "LR"[i]
+			ball = c + n * r * (bulge - 0.5)
+			parts_socket = sphere_bm(1.0, c - n * r * 0.7, (r * 1.2, r * 1.2, r * 1.15), 12, 8)
+			self.obj("socket" + s, parts_socket, socket, bone)
+			self.obj("eye" + s, sphere_bm(r, ball, (1, 1, 1), 14, 9), eye, bone)
+			self.obj("pupil" + s, sphere_bm(r * 0.42, ball + n * r * 0.72, (1, 1, 1), 10, 6), pupil, bone)
+			if lid is not None and lid_drop > 0:
+				top = sphere_bm(r * 1.12, ball, (1, 1, 1), 14, 9, cut_below=ball.z + r * (1.0 - 2.0 * lid_drop))
+				self.bevel(self.solid(self.obj("lid" + s, top, lid, bone), 0.003), 0.0)
+			if brow is not None:
+				sx = 1 if i == 0 else -1
+				self.obj("brow" + s, spike_bm(c + V(0, 0, r * 1.25) + n * r * 0.4 - V(sx * r * 1.1, 0, 0), V(sx, -0.25, 0.3), r * 2.6, r * 0.55, 8), brow, bone)
+		return eyes
+
+	def nose(self, eyes, mat, nostril, drop, size, bone="Head"):
+		"""A bulb nose on the centre line, [param drop] below the eyes, with two dark nostrils."""
+		hx0, hx1, hy0, hy1, hz0, hz1 = self.head
+		hcx, hcy = (hx0 + hx1) / 2, (hy0 + hy1) / 2
+		z = sum(c.z for c, _, _ in eyes) / len(eyes) - drop
+		hit = self.ray(V(hcx, hcy, z), V(0, -1, 0))
+		if not hit:
+			return None
+		p, n = hit
+		tip = p + n * size * 0.55
+		self.obj("nose", merge_bm(sphere_bm(1.0, tip, (size * 0.8, size, size * 0.9), 10, 7),
+			cone_bm(p + V(0, 0, size * 1.6), tip + V(0, 0, size * 0.3), size * 0.4, size * 0.6, 8)), mat, bone)
+		self.obj("nostrils", merge_bm(*[sphere_bm(size * 0.24, tip + V(sx * size * 0.34, -size * 0.55, -size * 0.45), (1, 0.7, 0.8), 6, 4) for sx in (-1, 1)]), nostril, bone)
+		return p
+
+	def mouth(self, eyes, cavity, lip, tooth, drop, width, gape, bone="Head", teeth=5):
+		"""A slack open mouth [param drop] below the eyes: a dark cavity set into the face, a lip rim
+		round it and a ragged row of teeth along the top."""
+		hx0, hx1, hy0, hy1, hz0, hz1 = self.head
+		hcx, hcy = (hx0 + hx1) / 2, (hy0 + hy1) / 2
+		z = sum(c.z for c, _, _ in eyes) / len(eyes) - drop
+		hit = self.ray(V(hcx, hcy, z), V(0, -1, 0))
+		if not hit:
+			return
+		p, n = hit
+		self.obj("mouth", sphere_bm(1.0, p + n * 0.002, (width, width * 0.6, gape), 14, 8), cavity, bone)
+		self.obj("lips", torus_bm(1.0, 0.06, p + n * width * 0.02, (math.pi / 2, 0, 0), (width * 0.95, gape * 1.0, width * 0.5), 20, 6), lip, bone)
+		row = []
+		for i in range(teeth):
+			x = (i - (teeth - 1) / 2) / max(teeth - 1, 1) * width * 1.3
+			hgt = gape * self.rng.uniform(0.35, 0.6)
+			row.append(box_bm((width * 0.16, width * 0.12, hgt), p + n * width * 0.18 + V(x, 0, gape * 0.72 - hgt / 2), (0, self.rng.uniform(-0.2, 0.2), 0)))
+		self.obj("teeth", merge_bm(*row), tooth, bone)
+
+	def mat(self, name, colour, rough=0.7, metal=0.0, blood=0.0, bump=0.0, bump_scale=40.0, veins=None, weave=False):
 		if name in self.mats:
 			return self.mats[name]
 		m = bpy.data.materials.new(name)
@@ -138,7 +286,7 @@ class Build:
 		b.inputs["Base Color"].default_value = colour
 		b.inputs["Roughness"].default_value = rough
 		b.inputs["Metallic"].default_value = metal
-		PARAMS[name] = ((blood, bump, bump_scale), veins)
+		PARAMS[name] = ((blood, bump, bump_scale, weave), veins)
 		self.mats[name] = m
 		return m
 
@@ -184,11 +332,13 @@ class Build:
 		return o
 
 
-def ring(cx, cy, rx, ry, z, n=24, jit=0.0, rng=None, rot=0.0):
+def ring(cx, cy, rx, ry, z, n=24, jit=0.0, rng=None, rot=0.0, folds=0, amp=0.0, phase=0.0):
+	"""An ellipse of n points; folds/amp ripple its radius (cloth folds: a hem that hangs in pleats, not a pipe)."""
 	pts = []
 	for i in range(n):
 		a = 2 * math.pi * i / n + rot
-		pts.append(V(cx + rx * math.cos(a), cy + ry * math.sin(a), z + (rng.uniform(-jit, jit) if jit else 0.0)))
+		k = 1.0 + amp * math.sin(folds * a + phase) if folds else 1.0
+		pts.append(V(cx + rx * k * math.cos(a), cy + ry * k * math.sin(a), z + (rng.uniform(-jit, jit) if jit else 0.0)))
 	return pts
 
 
@@ -298,6 +448,17 @@ def tube_bm(a, b, r, n=8):
 	return bm
 
 
+def cone_bm(a, b, r1, r2, n=8):
+	"""A closed tapered tube from a (radius r1) to b (radius r2): a finger joint."""
+	a, b = Vector(a), Vector(b)
+	d = b - a
+	bm = bmesh.new()
+	bmesh.ops.create_cone(bm, cap_ends=True, segments=n, radius1=r1, radius2=r2, depth=d.length)
+	bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=V(0, 0, 1).rotation_difference(d.normalized()).to_matrix())
+	bmesh.ops.translate(bm, vec=(a + b) / 2, verts=bm.verts)
+	return bm
+
+
 def torus_bm(R, r, loc, rot=(0, 0, 0), scale=(1, 1, 1), nu=20, nv=6, turns=1.0, rise=0.0):
 	"""A ring of tube; turns > 1 with a rise makes a coil."""
 	bm = bmesh.new()
@@ -362,7 +523,13 @@ def bloater(b):
 	FLESH = b.mat("BloatFlesh", (0.74, 0.72, 0.34, 1), 0.55, blood=0.35, bump=0.6, bump_scale=30, veins=((0.42, 0.5, 0.08, 1), 0.9, 6.0))
 	BOIL = b.mat("Boil", (0.9, 0.84, 0.32, 1), 0.3, blood=0.2, bump=0.4, bump_scale=60, veins=((0.9, 0.5, 0.2, 1), 0.7, 14.0))
 	RAW = b.mat("RawBoil", (0.62, 0.14, 0.1, 1), 0.3, blood=0.4, bump=0.5, bump_scale=60)
-	RAG = b.mat("Rag", (0.28, 0.22, 0.14, 1), 0.95, blood=0.5, bump=0.8, bump_scale=60)
+	RAG = b.mat("Rag", (0.28, 0.22, 0.14, 1), 0.95, blood=0.5, bump=0.8, bump_scale=60, weave=True)
+	EYE = b.mat("Eye", (0.88, 0.78, 0.3, 1), 0.12, blood=0.2)
+	PUPIL = b.mat("Pupil", (0.08, 0.05, 0.02, 1), 0.1)
+	SOCKET = b.mat("Socket", (0.22, 0.12, 0.04, 1), 0.6)
+	NAIL = b.mat("Nail", (0.42, 0.36, 0.16, 1), 0.4, blood=0.4)
+	eyes = b.face(EYE, PUPIL, SOCKET, brow=FLESH, lid=FLESH, lid_drop=0.25, bulge=1.0)
+	b.fingers(FLESH, NAIL, thick=0.9, shrink=0.6, claw_len=2.2)
 	cx, cy, rx, ry = b.band(0.87, 1.07)
 	belly_c = (cx, cy - ry * 0.4, 0.96)
 	srx, sry, srz = rx * 1.18, ry * 1.4, 0.22
@@ -390,9 +557,10 @@ def bloater(b):
 			lo, hi = (mid, mid + sx * 0.95) if sx * math.cos(mid + sx * 0.5) > 0 else (mid - sx * 0.95, mid)
 			lo, hi = min(lo, hi), max(lo, hi)
 			keep = lambda a, lo=lo, hi=hi: abs(angle_diff(a, (lo + hi) / 2)) < (hi - lo) / 2
-			flap = loft([ring(cx2, cy2, rx2 + 0.03, ry2 + 0.035, 0.81, 24), ring(cx2, cy2, rx2 + 0.1, ry2 + 0.11, 0.63, 24, 0.03, b.rng)], keep=keep)
+			flap = loft([ring(cx2, cy2, rx2 + 0.03, ry2 + 0.035, 0.81, 32), ring(cx2, cy2, rx2 + 0.085, ry2 + 0.095, 0.72, 32, 0.0, None, folds=9, amp=0.04),
+				ring(cx2, cy2, rx2 + 0.1, ry2 + 0.11, 0.63, 32, 0.03, b.rng, folds=9, amp=0.09)], keep=keep)
 			bmesh.ops.delete(flap, geom=[v for v in flap.verts if not v.link_faces], context="VERTS")
-			b.bevel(b.solid(b.smooth(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.74 else "UpperLeg." + s)), 0.008), 0.002)
+			b.bevel(b.solid(b.smooth(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.775 else "UpperLeg." + s)), 0.008), 0.002)
 	b.taper_tongue()
 
 
@@ -452,45 +620,77 @@ def spitter(b):
 
 
 def sleeper(b):
-	GOWN = b.mat("Gown", (0.74, 0.84, 0.92, 1), 0.92, blood=0.85, bump=0.6, bump_scale=60)
-	WRAP = b.mat("Wrap", (0.88, 0.85, 0.76, 1), 0.9, blood=0.9, bump=0.8, bump_scale=70)
+	GOWN = b.mat("Gown", (0.74, 0.84, 0.92, 1), 0.92, blood=0.85, bump=0.6, bump_scale=60, weave=True)
+	WRAP = b.mat("Wrap", (0.88, 0.85, 0.76, 1), 0.9, blood=0.9, bump=0.8, bump_scale=70, weave=True)
 	TAG = b.mat("Tag", (0.9, 0.92, 0.95, 1), 0.5, blood=0.3, bump=0.2, bump_scale=60)
-	levels = [(1.29, 0.0), (1.2, 0.0), (1.08, 0.01), (0.94, 0.03), (0.8, 0.06), (0.66, 0.09), (0.52, 0.12)]
-	rings = []
-	for z, flare in levels:
-		cx, cy, rx, ry = b.band(z - 0.03, z + 0.03)
-		rings.append(ring(cx, cy, rx + 0.03 + flare, ry + 0.035 + flare, z, 24, 0.035 if z == levels[-1][0] else 0.0, b.rng))
-	b.bevel(b.solid(b.smooth(b.obj("gown", loft(rings), GOWN, lambda co: b.trunk(co))), 0.006), 0.002)
+	EYE = b.mat("Eye", (0.86, 0.8, 0.62, 1), 0.12, blood=0.15)
+	PUPIL = b.mat("Pupil", (0.2, 0.03, 0.03, 1), 0.1)
+	SOCKET = b.mat("Socket", (0.2, 0.08, 0.1, 1), 0.6)
+	LID = b.mat("Lid", (0.72, 0.64, 0.7, 1), 0.6, bump=0.3, bump_scale=90, veins=((0.5, 0.25, 0.4, 1), 0.5, 18.0))
+	MOUTH = b.mat("Mouth", (0.12, 0.02, 0.03, 1), 0.3)
+	LIP = b.mat("Lip", (0.56, 0.44, 0.46, 1), 0.5, blood=0.25)
+	TOOTH = b.mat("Tooth", (0.78, 0.74, 0.58, 1), 0.35, blood=0.2)
+	NAIL = b.mat("Nail", (0.5, 0.45, 0.38, 1), 0.4, blood=0.4)
+	# The kit is big-headed: its torso ends at the neck (z ~0.97) and the head sits on it. The gown once ran up
+	# to 1.29, round the head, so the game's 0.6 head left a grey disc of gown round the neck; now it starts at
+	# a collar round the neck bone, weighted to it so the head never leaves it, and widens over the shoulders.
+	trunk = ("Torso", "Abdomen", "Hips", "Shoulder.L", "Shoulder.R")
+	nh, nt = b.bone("Neck")
+	ncx, ncy, nrx, nry = b.band(nh.z + 0.02, nh.z + 0.04, ("Neck",))
+	rings = [ring(ncx, ncy, nrx + 0.03, nry + 0.03, nh.z + 0.035, 32), ring(ncx, ncy, nrx + 0.05, nry + 0.045, nh.z + 0.005, 32)]
+	levels = [(0.93, 0.0), (0.86, 0.0), (0.78, 0.01), (0.7, 0.03), (0.6, 0.06), (0.5, 0.1)]
+	for i, (zz, flare) in enumerate(levels):
+		cx, cy, rx, ry = b.band(zz - 0.02, zz + 0.02, trunk)
+		hem = i / (len(levels) - 1)
+		rings.append(ring(cx, cy, rx + 0.025 + flare, ry + 0.03 + flare, zz, 32, 0.03 if i == len(levels) - 1 else 0.0, b.rng,
+			folds=7, amp=0.07 * hem * hem, phase=0.6))
+	print("GOWN", [(round(r[0].x, 3), round(r[8].y, 3), round(r[0].z, 3)) for r in rings])
+	b.bevel(b.solid(b.smooth(b.obj("gown", loft(rings), GOWN, lambda co: "Neck" if co.z > nh.z - 0.01 else b.trunk(co))), 0.006), 0.002)
 	for s, sx in (("L", 1), ("R", -1)):
 		uh, ut = b.bone("UpperArm." + s)
-		b.obj("sleeve" + s, tube_bm(uh - V(sx * 0.02, 0, 0), uh + (ut - uh) * 0.45, 0.075, 10), GOWN, "UpperArm." + s)
+		ur = max(b.limb_r("UpperArm." + s, 0.0, 0.6), 0.04) + 0.02
+		# The sleeve reaches into the gown's shoulder and down past the elbow, so no bare arm shows between them.
+		sl = loft(sleeve_rings(uh, ut, [-0.25, 0.2, 0.6, 0.98], [ur + 0.01, ur + 0.006, ur, ur + 0.012], 14, b.rng))
+		b.bevel(b.solid(b.smooth(b.obj("sleeve" + s, sl, GOWN, "UpperArm." + s)), 0.005), 0.0)
 		lh, lt = b.bone("LowerArm." + s)
 		# Bandaged forearms, round and closed, over the kit's flat ones; the hospital band over the wrist end.
 		fr = max(b.limb_r("LowerArm." + s, 0.05, 0.95), 0.035) + 0.012
-		b.bevel(b.obj("forearm" + s, merge_bm(tube_bm(lh + (lt - lh) * 0.04, lt - (lt - lh) * 0.02, fr, 12), sphere_bm(fr, lt - (lt - lh) * 0.02, (1, 1, 1), 12, 6)), WRAP, "LowerArm." + s), 0.002)
+		b.bevel(b.obj("forearm" + s, merge_bm(tube_bm(lh - (lt - lh) * 0.06, lt - (lt - lh) * 0.02, fr, 12), sphere_bm(fr, lt - (lt - lh) * 0.02, (1, 1, 1), 12, 6)), WRAP, "LowerArm." + s), 0.002)
 		b.bevel(b.obj("band" + s, tube_bm(lt - (lt - lh) * 0.22, lt - (lt - lh) * 0.1, fr + 0.008, 12), TAG, "LowerArm." + s), 0.0)
+	b.fingers(LID, NAIL, thick=0.9, shrink=0.5, claw_len=2.0)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	hw, hd, hh = hx1 - hx0, hy1 - hy0, hz1 - hz0
-	# Bandages that hug the skull (a dome wider than the head and a brim read as a mushroom cap): a shell
-	# 4% over the skull from the crown to the brow, then three cloth strips round it, each tilted differently.
+	# A face: sunken eyes under heavy half-shut lids, a bulb nose and a slack open mouth.
+	eyes = b.face(EYE, PUPIL, SOCKET, lid=LID, lid_drop=0.45)
+	ez = sum(c.z for c, _, _ in eyes) / 2
+	er = sum(r for _, _, r in eyes) / 2
+	b.nose(eyes, LID, MOUTH, drop=hh * 0.1, size=max(er * 0.55, 0.02))
+	b.mouth(eyes, MOUTH, LIP, TOOTH, drop=hh * 0.21, width=hw * 0.13, gape=hh * 0.03)
+	# Bandages over the crown, the back of the head and the nape, open over the face from the brow down.
 	zc0, zr = hcz - hh * 0.08, hh * 0.6
-	# Closed underneath: a shell cut at the jaw showed its black inside from behind and below.
-	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.56, hd * 0.56, zr * 1.05), 18, 10)
+	brow = ez + er * 1.9
+	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.56, hd * 0.56, zr * 1.05), 22, 12)
+	bmesh.ops.delete(wrap, geom=[v for v in wrap.verts if v.co.z < brow and v.co.y < hcy + hd * 0.08], context="VERTS")
 
-	def skull_ring(z, lean):
-		f = max(0.2, 1.0 - ((z - zc0) / zr) ** 2) ** 0.5
-		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.018, hd * 0.56 * f + 0.018, z, 24)
-	# Above the brow only: a strip at the eyes ran through the nose and cheeks, a brim cut through the face.
-	strips = [loft([skull_ring(hcz + hh * (zc + k * 0.05), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((0.1, -0.01), (0.26, 0.008))]
-	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.006), 0.002)
-	cx, cy, rx, ry = b.band(1.2, 1.3)
-	b.obj("tie", merge_bm(*[box_bm((0.012, 0.01, 0.1), (cx + dx, cy + ry + 0.04, 1.2), (0, 0.2 * dx / abs(dx), 0)) for dx in (-0.03, 0.03)]), TAG, "Torso")
+	def skull_ring(zz, lean):
+		f = max(0.2, 1.0 - ((zz - zc0) / zr) ** 2) ** 0.5
+		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.018, hd * 0.56 * f + 0.018, zz, 24)
+	strips = [loft([skull_ring(max(hcz + hh * (zc + k * 0.05), brow + 0.01), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((0.12, -0.01), (0.26, 0.008))]
+	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.008), 0.002)
+	cx, cy, rx, ry = b.band(0.86, 0.9, trunk)
+	b.obj("tie", merge_bm(*[box_bm((0.012, 0.01, 0.1), (cx + dx, cy + ry + 0.045, 0.86), (0, 0.2 * dx / abs(dx), 0)) for dx in (-0.03, 0.03)]), TAG, "Torso")
 
 
 def screamer(b):
-	ROBE = b.mat("Robe", (0.34, 0.06, 0.13, 1), 0.9, blood=0.65, bump=0.8, bump_scale=50)
+	ROBE = b.mat("Robe", (0.34, 0.06, 0.13, 1), 0.9, blood=0.65, bump=0.8, bump_scale=50, weave=True)
 	BONE = b.mat("Crest", (0.82, 0.8, 0.7, 1), 0.55, blood=0.2, bump=0.5, bump_scale=40)
+	EYE = b.mat("Eye", (0.92, 0.9, 0.86, 1), 0.1, blood=0.3, veins=((0.6, 0.08, 0.08, 1), 0.6, 30.0))
+	PUPIL = b.mat("Pupil", (0.55, 0.05, 0.05, 1), 0.1)
+	SOCKET = b.mat("Socket", (0.1, 0.06, 0.12, 1), 0.6)
+	SKIN = b.mat("Pale", (0.76, 0.8, 0.86, 1), 0.5, blood=0.3, bump=0.4, bump_scale=60, veins=((0.32, 0.38, 0.62, 1), 0.7, 6.0))
+	eyes = b.face(EYE, PUPIL, SOCKET, brow=SKIN, bulge=1.0)
+	b.fingers(SKIN, BONE, thick=0.8, shrink=0.55, claw_len=3.6)
 	cx, cy, rx, ry = b.band(1.0, 1.27)
 	bodice = loft([ring(cx, cy, rx + 0.02, ry + 0.025, z, 24) for z in (0.96, 1.06, 1.16, 1.26)])
 	b.bevel(b.solid(b.smooth(b.obj("bodice", bodice, ROBE, lambda co: b.trunk(co))), 0.008), 0.002)
@@ -499,13 +699,14 @@ def screamer(b):
 	rings = []
 	for z, flare in levels:
 		cx2, cy2, rx2, ry2 = b.band(max(z - 0.03, 0.56), max(z + 0.03, 0.62), ("Hips", "Abdomen", "UpperLeg.L", "UpperLeg.R"))
-		rings.append(ring(cx2, cy2 + 0.01, rx2 + 0.06 + flare, ry2 + 0.07 + flare, z, 28, 0.05 if z == levels[-1][0] else 0.0, b.rng))
+		hem = (0.95 - z) / 0.25
+		rings.append(ring(cx2, cy2 + 0.01, rx2 + 0.06 + flare, ry2 + 0.07 + flare, z, 36, 0.05 if z == levels[-1][0] else 0.0, b.rng, folds=9, amp=0.08 * hem, phase=0.3))
 	b.bevel(b.solid(b.smooth(b.obj("skirt", loft(rings), ROBE, "Hips")), 0.01), 0.002)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	crest = [spike_bm((hcx + (i % 2 - 0.5) * 0.04, hcy - 0.03 + 0.03 * i, hz1 - 0.01 - 0.008 * i), (0, 0.5 + 0.1 * i, 1), 0.2 - 0.018 * i, 0.03) for i in range(6)]
 	b.obj("crest", merge_bm(*crest), BONE, "Head")
-	CLOTH = b.mat("Trouser", (0.16, 0.05, 0.08, 1), 0.92, blood=0.55, bump=0.8, bump_scale=60)
+	CLOTH = b.mat("Trouser", (0.16, 0.05, 0.08, 1), 0.92, blood=0.55, bump=0.8, bump_scale=60, weave=True)
 	for s in ("L", "R"):
 		for bone_name, t0, t1 in (("UpperLeg." + s, -0.02, 1.08), ("LowerLeg." + s, -0.04, 0.86)):
 			h, t = b.bone(bone_name)
@@ -544,12 +745,13 @@ def recolour(img, swap, tol=0.06):
 
 def grime(m):
 	"""Dirt, edge wear, blood, veins and a bump on the material's base colour (all procedural)."""
-	(blood, bump, bump_scale), veins = PARAMS[m.name]
+	(blood, bump, bump_scale, weave), veins = PARAMS[m.name]
 	nt = m.node_tree
 	bs = next(n for n in nt.nodes if n.type == "BSDF_PRINCIPLED")
 	src = bs.inputs["Base Color"]
 	base_link = src.links[0].from_socket if src.links else None
 	base_val = tuple(src.default_value)
+	rough_val = bs.inputs["Roughness"].default_value
 	l = nt.links
 	co = nt.nodes.new("ShaderNodeTexCoord")
 
@@ -577,17 +779,39 @@ def grime(m):
 
 	n1 = node("ShaderNodeTexNoise"); n1.inputs["Scale"].default_value = 9; n1.inputs["Detail"].default_value = 9
 	n2 = node("ShaderNodeTexNoise"); n2.inputs["Scale"].default_value = 60; n2.inputs["Detail"].default_value = 3
-	vor = node("ShaderNodeTexVoronoi"); vor.inputs["Scale"].default_value = 14
-	l.new(co.outputs["Object"], n1.inputs["Vector"]); l.new(co.outputs["Object"], n2.inputs["Vector"]); l.new(co.outputs["Object"], vor.inputs["Vector"])
+	l.new(co.outputs["Object"], n1.inputs["Vector"]); l.new(co.outputs["Object"], n2.inputs["Vector"])
+	# Blood runs down: a noise stretched along z draws drips and smears, cut by a broad patch noise so
+	# it gathers in stains instead of the even red dots a Voronoi spattered everywhere.
+	mp = node("ShaderNodeMapping"); mp.inputs["Scale"].default_value = (16, 16, 2.2)
+	l.new(co.outputs["Object"], mp.inputs["Vector"])
+	drip = node("ShaderNodeTexNoise"); drip.inputs["Scale"].default_value = 1.0; drip.inputs["Detail"].default_value = 5
+	l.new(mp.outputs["Vector"], drip.inputs["Vector"])
+	patch = node("ShaderNodeTexNoise"); patch.inputs["Scale"].default_value = 2.6; patch.inputs["Detail"].default_value = 3
+	l.new(co.outputs["Object"], patch.inputs["Vector"])
+	mask = node("ShaderNodeMath", operation="MULTIPLY")
+	dr = node("ShaderNodeMapRange"); dr.inputs["From Min"].default_value = 0.36; dr.inputs["From Max"].default_value = 0.26
+	pr = node("ShaderNodeMapRange"); pr.inputs["From Min"].default_value = 0.5; pr.inputs["From Max"].default_value = 0.62
+	l.new(drip.outputs["Fac"], dr.inputs["Value"]); l.new(patch.outputs["Fac"], pr.inputs["Value"])
+	l.new(dr.outputs["Result"], mask.inputs[0]); l.new(pr.outputs["Result"], mask.inputs[1])
+	stain = ramp(0.0, 1.0, (1, 1, 1, 1), (0.42, 0.18, 0.12, 1)); l.new(pr.outputs["Result"], stain.inputs["Fac"])
+	splash = ramp(0.0, 0.7, (1, 1, 1, 1), (0.36, 0.03, 0.02, 1)); l.new(mask.outputs["Value"], splash.inputs["Fac"])
 	dirt = ramp(0.38, 0.62, (0.5, 0.45, 0.38, 1), (1, 1, 1, 1)); l.new(n1.outputs["Fac"], dirt.inputs["Fac"])
 	fine = ramp(0.4, 0.55, (0.84, 0.84, 0.84, 1), (1, 1, 1, 1)); l.new(n2.outputs["Fac"], fine.inputs["Fac"])
-	splash = ramp(0.1, 0.18, (0.36, 0.03, 0.02, 1), (1, 1, 1, 1)); l.new(vor.outputs["Distance"], splash.inputs["Fac"])
 	geo = node("ShaderNodeNewGeometry")
 	edge = ramp(0.42, 0.55, (0.74, 0.66, 0.54, 1), (1, 1, 1, 1)); l.new(geo.outputs["Pointiness"], edge.inputs["Fac"])
 	cur = base_link if base_link else base_val
 	cur = mulmix(cur, dirt.outputs["Color"])
 	cur = mulmix(cur, fine.outputs["Color"])
 	cur = mulmix(cur, edge.outputs["Color"])
+	if weave:
+		# Linen: fine threads along two axes, so cloth does not read as painted plastic.
+		for sc_ in ((90, 90, 6), (6, 90, 90)):
+			mw = node("ShaderNodeMapping"); mw.inputs["Scale"].default_value = sc_
+			l.new(co.outputs["Object"], mw.inputs["Vector"])
+			tw = node("ShaderNodeTexNoise"); tw.inputs["Scale"].default_value = 1.0; tw.inputs["Detail"].default_value = 2
+			l.new(mw.outputs["Vector"], tw.inputs["Vector"])
+			th = ramp(0.35, 0.65, (0.86, 0.86, 0.86, 1), (1, 1, 1, 1)); l.new(tw.outputs["Fac"], th.inputs["Fac"])
+			cur = mulmix(cur, th.outputs["Color"])
 	if veins:
 		vc, va, vs = veins
 		vv = node("ShaderNodeTexVoronoi", feature="DISTANCE_TO_EDGE"); vv.inputs["Scale"].default_value = vs
@@ -599,8 +823,16 @@ def grime(m):
 		l.new(add.outputs["Vector"], vv.inputs["Vector"])
 		vr = ramp(0.0, 0.05, vc, (1, 1, 1, 1)); l.new(vv.outputs["Distance"], vr.inputs["Fac"])
 		cur = mulmix(cur, vr.outputs["Color"], va)
+	cur = mulmix(cur, stain.outputs["Color"], blood * 0.5)
 	cur = mulmix(cur, splash.outputs["Color"], blood)
 	l.new(cur, src)
+	# Roughness: the material's value broken up by the fine noise, and wet (glossy) where the blood runs.
+	rr = node("ShaderNodeMapRange"); rr.inputs["To Min"].default_value = max(0.05, rough_val - 0.12); rr.inputs["To Max"].default_value = min(1.0, rough_val + 0.06)
+	l.new(n2.outputs["Fac"], rr.inputs["Value"])
+	wet = node("ShaderNodeMix", data_type="FLOAT"); wet.inputs["B"].default_value = 0.25
+	fm = node("ShaderNodeMath", operation="MULTIPLY"); fm.inputs[1].default_value = min(1.0, blood * 1.3)
+	l.new(mask.outputs["Value"], fm.inputs[0]); l.new(fm.outputs["Value"], wet.inputs["Factor"]); l.new(rr.outputs["Result"], wet.inputs["A"])
+	l.new(wet.outputs["Result"], bs.inputs["Roughness"])
 	if bump > 0:
 		bn = node("ShaderNodeBump"); bn.inputs["Strength"].default_value = min(bump, 1.0); bn.inputs["Distance"].default_value = 0.01
 		nz = node("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = bump_scale; nz.inputs["Detail"].default_value = 8
@@ -645,6 +877,8 @@ def finish(b):
 	ao = bpy.data.images.new("%s_ao" % kind, BAKE, BAKE)
 	nrm = bpy.data.images.new("%s_normal" % kind, BAKE, BAKE)
 	nrm.colorspace_settings.name = "Non-Color"
+	rgh = bpy.data.images.new("%s_rough" % kind, BAKE, BAKE)
+	rgh.colorspace_settings.name = "Non-Color"
 	targets = {}
 	for o in allo:
 		for m in o.data.materials:
@@ -682,12 +916,14 @@ def finish(b):
 	set_target(nrm)
 	scene.cycles.samples = 8
 	bpy.ops.object.bake(type="NORMAL")
+	set_target(rgh)
+	bpy.ops.object.bake(type="ROUGHNESS")
 	px = list(img.pixels); pa = list(ao.pixels)
 	for i in range(0, len(px), 4):
 		k = 0.4 + 0.6 * pa[i]
 		px[i] *= k; px[i + 1] *= k; px[i + 2] *= k
 	img.pixels = px
-	for im in (img, nrm):
+	for im in (img, nrm, rgh):
 		im.filepath_raw = os.path.join(OUT, im.name + ".png")
 		im.file_format = "PNG"
 		im.save()
@@ -701,7 +937,8 @@ def finish(b):
 	final.node_tree.links.new(ti.outputs["Color"], fb.inputs["Base Color"])
 	final.node_tree.links.new(tn_.outputs["Color"], nm.inputs["Color"])
 	final.node_tree.links.new(nm.outputs["Normal"], fb.inputs["Normal"])
-	fb.inputs["Roughness"].default_value = 0.75
+	tr_ = final.node_tree.nodes.new("ShaderNodeTexImage"); tr_.image = bpy.data.images.load(rgh.filepath_raw); tr_.image.colorspace_settings.name = "Non-Color"
+	final.node_tree.links.new(tr_.outputs["Color"], fb.inputs["Roughness"])
 	for o in gear:
 		o.parent = None
 		for mod in list(o.modifiers):
