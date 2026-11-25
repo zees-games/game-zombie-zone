@@ -168,6 +168,13 @@ class Build:
 		bpy.ops.object.modifier_apply(modifier="s")
 		return o
 
+	def smooth(self, o, levels=1):
+		"""Rounds cloth: the lofts' 16 to 28 sides read as facets in close-up."""
+		m = o.modifiers.new("ss", "SUBSURF"); m.levels = levels; m.render_levels = levels
+		bpy.context.view_layer.objects.active = o
+		bpy.ops.object.modifier_apply(modifier="ss")
+		return o
+
 	def bevel(self, o, w=0.003, seg=2):
 		if w <= 0:
 			return o
@@ -231,6 +238,13 @@ def sleeve_rings(h, t, shares, radii, n=16, rng=None):
 		c = h + (t - h) * s
 		out.append([c + (u * math.cos(2 * math.pi * i / n) + w * math.sin(2 * math.pi * i / n)) * r * (1 + (rng.uniform(-0.04, 0.04) if rng else 0.0)) for i in range(n)])
 	return out
+
+
+def capped(bm):
+	"""Closes a lofted tube's open ends (a trouser leg read as a hollow pipe at the knee and ankle)."""
+	bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+	bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+	return bm
 
 
 def merge_bm(*bms):
@@ -376,9 +390,9 @@ def bloater(b):
 			lo, hi = (mid, mid + sx * 0.95) if sx * math.cos(mid + sx * 0.5) > 0 else (mid - sx * 0.95, mid)
 			lo, hi = min(lo, hi), max(lo, hi)
 			keep = lambda a, lo=lo, hi=hi: abs(angle_diff(a, (lo + hi) / 2)) < (hi - lo) / 2
-			flap = loft([ring(cx2, cy2, rx2 + 0.03, ry2 + 0.035, 0.81, 24), ring(cx2, cy2, rx2 + 0.06, ry2 + 0.07, 0.6, 24, 0.04, b.rng)], keep=keep)
+			flap = loft([ring(cx2, cy2, rx2 + 0.03, ry2 + 0.035, 0.81, 24), ring(cx2, cy2, rx2 + 0.1, ry2 + 0.11, 0.63, 24, 0.03, b.rng)], keep=keep)
 			bmesh.ops.delete(flap, geom=[v for v in flap.verts if not v.link_faces], context="VERTS")
-			b.bevel(b.solid(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.74 else "UpperLeg." + s), 0.008), 0.002)
+			b.bevel(b.solid(b.smooth(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.74 else "UpperLeg." + s)), 0.008), 0.002)
 	b.taper_tongue()
 
 
@@ -446,7 +460,7 @@ def sleeper(b):
 	for z, flare in levels:
 		cx, cy, rx, ry = b.band(z - 0.03, z + 0.03)
 		rings.append(ring(cx, cy, rx + 0.03 + flare, ry + 0.035 + flare, z, 24, 0.035 if z == levels[-1][0] else 0.0, b.rng))
-	b.bevel(b.solid(b.obj("gown", loft(rings), GOWN, lambda co: b.trunk(co)), 0.006), 0.002)
+	b.bevel(b.solid(b.smooth(b.obj("gown", loft(rings), GOWN, lambda co: b.trunk(co))), 0.006), 0.002)
 	for s, sx in (("L", 1), ("R", -1)):
 		uh, ut = b.bone("UpperArm." + s)
 		b.obj("sleeve" + s, tube_bm(uh - V(sx * 0.02, 0, 0), uh + (ut - uh) * 0.45, 0.075, 10), GOWN, "UpperArm." + s)
@@ -466,8 +480,9 @@ def sleeper(b):
 
 	def skull_ring(z, lean):
 		f = max(0.2, 1.0 - ((z - zc0) / zr) ** 2) ** 0.5
-		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.012, hd * 0.53 * f + 0.012, z, 18)
-	strips = [loft([skull_ring(hcz + hh * (zc + k * 0.06), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((-0.1, 0.012), (0.06, -0.014), (0.22, 0.01))]
+		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.018, hd * 0.56 * f + 0.018, z, 24)
+	# Above the brow only: a strip at the eyes ran through the nose and cheeks, a brim cut through the face.
+	strips = [loft([skull_ring(hcz + hh * (zc + k * 0.05), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((0.1, -0.01), (0.26, 0.008))]
 	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.006), 0.002)
 	cx, cy, rx, ry = b.band(1.2, 1.3)
 	b.obj("tie", merge_bm(*[box_bm((0.012, 0.01, 0.1), (cx + dx, cy + ry + 0.04, 1.2), (0, 0.2 * dx / abs(dx), 0)) for dx in (-0.03, 0.03)]), TAG, "Torso")
@@ -478,14 +493,14 @@ def screamer(b):
 	BONE = b.mat("Crest", (0.82, 0.8, 0.7, 1), 0.55, blood=0.2, bump=0.5, bump_scale=40)
 	cx, cy, rx, ry = b.band(1.0, 1.27)
 	bodice = loft([ring(cx, cy, rx + 0.02, ry + 0.025, z, 24) for z in (0.96, 1.06, 1.16, 1.26)])
-	b.bevel(b.solid(b.obj("bodice", bodice, ROBE, lambda co: b.trunk(co)), 0.008), 0.002)
+	b.bevel(b.solid(b.smooth(b.obj("bodice", bodice, ROBE, lambda co: b.trunk(co))), 0.008), 0.002)
 	# A short peplum over trousers: a cone robe to the floor had no legs, and the legs poked through it in the walk.
 	levels = [(0.95, 0.0), (0.82, 0.04), (0.7, 0.08)]
 	rings = []
 	for z, flare in levels:
 		cx2, cy2, rx2, ry2 = b.band(max(z - 0.03, 0.56), max(z + 0.03, 0.62), ("Hips", "Abdomen", "UpperLeg.L", "UpperLeg.R"))
 		rings.append(ring(cx2, cy2 + 0.01, rx2 + 0.06 + flare, ry2 + 0.07 + flare, z, 28, 0.05 if z == levels[-1][0] else 0.0, b.rng))
-	b.bevel(b.solid(b.obj("skirt", loft(rings), ROBE, "Hips"), 0.01), 0.002)
+	b.bevel(b.solid(b.smooth(b.obj("skirt", loft(rings), ROBE, "Hips")), 0.01), 0.002)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	crest = [spike_bm((hcx + (i % 2 - 0.5) * 0.04, hcy - 0.03 + 0.03 * i, hz1 - 0.01 - 0.008 * i), (0, 0.5 + 0.1 * i, 1), 0.2 - 0.018 * i, 0.03) for i in range(6)]
@@ -497,7 +512,7 @@ def screamer(b):
 			# Rings fitted to the skin along the bone, so the cloth follows the leg's taper instead of a barrel round it.
 			shares = [t0 + (t1 - t0) * k / 5 for k in range(6)]
 			radii = [max(b.limb_r(bone_name, s - 0.15, s + 0.15), 0.035) + 0.012 for s in shares]
-			b.bevel(b.solid(b.obj("trouser%s%s" % (bone_name[:5], s), loft(sleeve_rings(h, t, shares, radii, 16, b.rng)), CLOTH, bone_name), 0.006), 0.002)
+			b.bevel(b.solid(b.obj("trouser%s%s" % (bone_name[:5], s), capped(loft(sleeve_rings(h, t, shares, radii, 16, b.rng))), CLOTH, bone_name), 0.006), 0.002)
 	b.taper_tongue()
 	for s, sx in (("L", 1), ("R", -1)):
 		sh, _ = b.bone("UpperArm." + s)

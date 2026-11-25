@@ -154,7 +154,7 @@ const LOOKS := {
 	&"strangler": {"body": &"strangler", "height": 2.05, "girth": 0.78,
 		"bones": {"Neck": Vector3(0.9, 2.2, 0.9), "Head": 0.85, "Tongue1*": Vector3(1.5, 2.6, 1.5)}, "hunch": 0.3, "shamble": {"stoop": 0.3, "head": 0.45, "arms": -0.2, "swing": 0.5, "drag": 0.25, "sway": 0.18}, "wear": [], "blood": 2.0, "dirt": 0.0},
 	&"bloater": {"body": &"bloater", "height": 1.85, "girth": 1.2,
-		"bones": {"Abdomen": Vector3(1.2, 1.0, 1.2), "Torso": Vector3(1.1, 1.0, 1.12), "Head": 0.95}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [], "blood": 2.0, "dirt": 0.0},
+		"bones": {"Abdomen": Vector3(1.2, 1.0, 1.2), "Torso": Vector3(1.1, 1.0, 1.12), "Head": 0.95, "Tongue1*": 0.6}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [], "blood": 2.0, "dirt": 0.0},
 	&"ram": {"body": &"arm", "height": 2.05, "girth": 1.1, "skin": "6e6152", "bottom": "2e3440",
 		"bones": {}, "hunch": 0.2, "shamble": {"stoop": 0.4, "head": -0.1, "arms": -0.35, "swing": 0.65, "drag": 0.5, "sway": 0.2, "hip": 0.2}, "wear": [], "mark": "3a2a24", "vein": "1c1814", "blood": 0.64,
 		"clips": {"attack_idle": &"attack", "crawl": &"walk"}},
@@ -167,10 +167,10 @@ const LOOKS := {
 		"bones": {"UpperArm.L*": 1.4, "UpperArm.R*": 1.4, "Shoulder.L": 1.3, "Shoulder.R": 1.3, "Head": 0.6, "Torso": Vector3(1.2, 1.0, 1.15)}, "hunch": 0.35, "shamble": {"stoop": 0.35, "head": 0.1, "arms": -0.5, "hang": -0.9, "swing": 0.6, "drag": 0.6, "trail": 0.1, "sway": 0.22, "hip": 0.2, "cadence": 0.8, "lurch": 0.0},
 		"wear": [], "blood": 2.0, "dirt": 0.0},
 	&"sleeper": {"body": &"sleeper", "height": 1.65, "girth": 0.85,
-		"bones": {"Head": 0.6, "Index1.L*": Vector3(0.8, 1.9, 0.8), "Index1.R*": Vector3(0.8, 1.9, 0.8), "Middle1.L*": Vector3(0.8, 1.9, 0.8), "Middle1.R*": Vector3(0.8, 1.9, 0.8), "Pinky1.L*": Vector3(0.8, 1.9, 0.8), "Pinky1.R*": Vector3(0.8, 1.9, 0.8)},
+		"bones": {"Head*": 0.6, "Index1.L*": Vector3(0.8, 1.9, 0.8), "Index1.R*": Vector3(0.8, 1.9, 0.8), "Middle1.L*": Vector3(0.8, 1.9, 0.8), "Middle1.R*": Vector3(0.8, 1.9, 0.8), "Pinky1.L*": Vector3(0.8, 1.9, 0.8), "Pinky1.R*": Vector3(0.8, 1.9, 0.8)},
 		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "blood": 2.0, "dirt": 0.0},
 	&"screamer": {"body": &"screamer", "height": 2.0, "girth": 0.85,
-		"bones": {"Abdomen": Vector3(0.8, 1.1, 0.8), "Torso": Vector3(0.85, 1.05, 0.85), "Neck": Vector3(0.85, 1.5, 0.85), "BottomMouth": 1.4}, "hunch": 0.2, "shamble": {"stoop": 0.1, "head": -0.1, "arms": -0.5, "hang": -0.7, "swing": 0.7, "drag": 0.7, "trail": 0.0, "sway": 0.08, "hip": 0.06, "cadence": 1.1, "lurch": 0.0},
+		"bones": {"Abdomen": Vector3(0.8, 1.1, 0.8), "Torso": Vector3(0.85, 1.05, 0.85), "Neck": Vector3(0.85, 1.25, 0.85), "BottomMouth": 1.4}, "hunch": 0.2, "shamble": {"stoop": 0.1, "head": -0.1, "arms": -0.5, "hang": -0.7, "swing": 0.7, "drag": 0.7, "trail": 0.0, "sway": 0.08, "hip": 0.06, "cadence": 1.1, "lurch": 0.0},
 		"wear": [], "blood": 2.0, "dirt": 0.0},
 	&"crawler": {"body": &"basic", "height": 1.75, "girth": 1.0, "skin": "6f7a55", "bottom": "3a3a30", "belt": "4a2020",
 		"bones": {"UpperLeg.L*": 0.04, "UpperLeg.R*": 0.04}, "hunch": 0.0,
@@ -263,6 +263,8 @@ var _bones: Dictionary = {}
 var _shape_bones: Dictionary = {}
 var _dead_bones: Dictionary = {}
 var _clip: StringName = &""
+## The kit strike clip this swing drives by its phase, or empty.
+var _strike_clip: StringName = &""
 var _look: Dictionary = {}
 var _material: ShaderMaterial = null
 var _fade := 1.0

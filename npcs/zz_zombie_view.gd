@@ -356,7 +356,7 @@ func present(delta: float, anim: int, flags: int) -> void:
 
 	var every := _lod_every(at)
 	_owed += delta
-	_flinch = maxf(_flinch - delta * 4.0, 0.0)
+	_flinch = maxf(_flinch - delta * 3.0, 0.0)
 
 	# The bones are written only on a frame the clip was evaluated: the overrides go on top of
 	# the clip's pose, so writing them again over last frame's result would stack them.
@@ -483,8 +483,11 @@ func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> vo
 	# A kit's one-shot strike (the specials' punch, about 0.6 s) played at its own rate was a rear-up of a few frames, then
 	# the last frame held for the rest of the swing, then a snap back to its first frame when the next swing began. Played
 	# to fill the swing it is one windup, blow and recovery a swing, ending where the next one starts.
+	_strike_clip = &""
+
 	if striking and not _ual and not LOOPING.has(_want_clip) and _has(_want_clip):
 		_want_rate = _anim.get_animation(_qualified(_want_clip)).length / (SWING_PERIOD * SWING_FILL)
+		_strike_clip = _want_clip
 
 	# A stalking crouch (not a crawler's or a leaper's, which crawl all the time) is the real squat walk.
 	if anim == ZzZombieBody.Anim.CROUCH and _want_clip == &"crawl" and overrides.get(&"walk", &"") != &"crawl" and _has(&"ual_crouch_walk"):
@@ -564,12 +567,26 @@ func _advance_clip(clip: StringName, rate: float) -> void:
 	var length := _anim.current_animation_length
 	var looping := LOOPING.has(clip)
 
+	# A kit strike follows the swing out and back: restarted at its first frame each swing it snapped from the
+	# blow's reach back to the windup in one frame (a clip cannot blend into itself).
+	if clip == _strike_clip:
+		_anim.seek(length * strike_reach(_strike_phase), true)
+		return
+
 	if not looping and _anim.current_animation_position + _owed * rate >= length - 0.01:
 		# A one-shot clip holds its last frame; evaluated there rather than stepped past
 		# the end, where the player stops and nothing writes the pose again.
 		_anim.seek(maxf(length - 0.01, 0.0), true)
 	else:
 		_anim.advance(_owed * rate)
+
+
+## How far into a kit strike clip (0 to 1) the swing at [param phase] is: out through the windup and blow, then
+## back to the first frame, so one swing ends on the pose the next begins with.
+static func strike_reach(phase: float) -> float:
+	if phase < STRIKE_OUT:
+		return STRIKE_REACH * smoothstep(0.0, STRIKE_OUT, phase)
+	return STRIKE_REACH * (1.0 - smoothstep(STRIKE_OUT, 1.0, phase))
 
 
 ## True when this body has the real clip [param clip] (the file is missing or the body is a capsule otherwise).
@@ -588,7 +605,8 @@ func _play(clip: StringName, _rate: float) -> void:
 		return
 
 	_clip = clip
-	_anim.play(name, 0.15)
+	# A fall blends in over longer: the stance it starts from (a stoop, a hunch) fades over the same time.
+	_anim.play(name, 0.35 if String(clip).contains("death") or clip == &"ual_knockback" else 0.15)
 
 	# play() leaves the position where the last clip ended until the next evaluation, so a repeated swing was read as already over and held its last frame.
 	if not LOOPING.has(clip):
@@ -612,8 +630,9 @@ func _pose(anim: int) -> void:
 
 	var hunch := _hunch
 
+	# The hunch lets go over the fall's first half second, not in one frame.
 	if anim == ZzZombieBody.Anim.DEAD:
-		hunch = 0.0
+		hunch *= 1.0 - smoothstep(0.0, 0.5, maxf(_dead_for, 0.0))
 
 	# A severed limb's collapsed bone: the clip wrote its scale back this frame.
 	for gone: int in _skeleton.get_meta(GSNpcGibs.COLLAPSED, []):
@@ -629,6 +648,11 @@ func _pose(anim: int) -> void:
 	if (_shamble > 0.01 or _legs_held > 0.01) and anim != ZzZombieBody.Anim.DEAD:
 		_pose_shamble()
 		_plant_feet()
+	elif _shamble > 0.01 and anim == ZzZombieBody.Anim.DEAD:
+		# The stoop eases out under the fall (it was dropped in one frame), the feet no longer held.
+		_plant.reset()
+		_hold.clear()
+		_pose_shamble()
 	else:
 		_plant.reset()
 		if anim in STANDING_ANIMS and _clip != &"crawl":
@@ -659,14 +683,15 @@ func _pose(anim: int) -> void:
 	if jaw >= 0 and anim in [ZzZombieBody.Anim.SCREAM, ZzZombieBody.Anim.RAGE, ZzZombieBody.Anim.VOMIT, ZzZombieBody.Anim.SPIT]:
 		_skeleton.set_bone_pose_rotation(jaw, Quaternion(Vector3.RIGHT, 0.7) * _skeleton.get_bone_pose_rotation(jaw))
 
-	# A flinch: the chest snaps back from the hit and comes back over a quarter of a second.
+	# A flinch: the chest snaps back from the hit and comes back over a third of a second; the head
+	# follows the chest only a little (tipped back further it showed the throat in place of the face).
 	if _flinch > 0.0:
-		var snap := sin(_flinch * PI) * 0.45
+		var snap := sin(_flinch * PI) * 0.4
 
 		if spine >= 0:
 			_skeleton.set_bone_pose_rotation(spine, Quaternion(Vector3(-1.0, 0.0, _flinch_side * 0.4).normalized(), snap) * _skeleton.get_bone_pose_rotation(spine))
 		if head >= 0:
-			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
+			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.3) * _skeleton.get_bone_pose_rotation(head))
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.
@@ -772,6 +797,10 @@ const STRIKE_RISE := 0.1
 ## The share of a swing a kit's one-shot strike clip is played over: it ends a little before the next swing starts, so a
 ## body's own tempo (up to 10% slower) still finishes it.
 const SWING_FILL := 0.88
+## The share of a swing a kit strike runs out over ([method strike_reach]); it comes back over the rest.
+const STRIKE_OUT := 0.55
+## How far into a kit strike clip it runs out to: past the blow, short of the clip's own recovery.
+const STRIKE_REACH := 0.75
 
 
 ## How far into the blow it is: 0 at rest, rising to 1 on the swing's landing frame.
