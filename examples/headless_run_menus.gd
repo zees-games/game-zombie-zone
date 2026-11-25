@@ -233,10 +233,18 @@ func _check_font_coverage() -> void:
 
 func _check_requires() -> void:
 	var asks := GSAddonApi.derive()
+	var floors := {}
+	var floor_path := "res://" + GSAddonApi.FLOOR_FILE
+	if FileAccess.file_exists(floor_path):
+		var read := GSAddonApi.parse(FileAccess.get_file_as_string(floor_path), GSAddonApi.FLOOR_FILE)
+		floors = read.value as Dictionary if read.ok else {}
+	# The floor file only lowers the addons it names, so the ask a shell sees is the derived one
+	# with the floors applied; the glance pieces need gs-ui level 4 on either side of that.
+	var asked := GSAddonApi.apply_floors(asks, floors)
 	_check(
-		int(asks.get("gs_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
+		int(asks.get("gs_ui", 0)) >= 4 and int(asked.get("gs_ui", 0)) >= 4,
 		"the pack asks a shell for gs-ui level 4, the glance pieces",
-		str(asks.get("gs_ui"))
+		"derived %s, asked %s" % [str(asks.get("gs_ui")), str(asked.get("gs_ui"))]
 	)
 
 
