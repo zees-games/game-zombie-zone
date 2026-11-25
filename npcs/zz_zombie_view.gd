@@ -480,6 +480,12 @@ func _swap_for_real_clip(anim: int, striking: bool, overrides: Dictionary) -> vo
 			_want_clip = &"ual_jog"
 			_want_rate = clampf(_speed / (JOG_NATURAL * float(_look["height"]) / 1.75), 0.7, 1.5)
 
+	# A kit's one-shot strike (the specials' punch, about 0.6 s) played at its own rate was a rear-up of a few frames, then
+	# the last frame held for the rest of the swing, then a snap back to its first frame when the next swing began. Played
+	# to fill the swing it is one windup, blow and recovery a swing, ending where the next one starts.
+	if striking and not _ual and not LOOPING.has(_want_clip) and _has(_want_clip):
+		_want_rate = _anim.get_animation(_qualified(_want_clip)).length / (SWING_PERIOD * SWING_FILL)
+
 	# A stalking crouch (not a crawler's or a leaper's, which crawl all the time) is the real squat walk.
 	if anim == ZzZombieBody.Anim.CROUCH and _want_clip == &"crawl" and overrides.get(&"walk", &"") != &"crawl" and _has(&"ual_crouch_walk"):
 		_want_clip = &"ual_crouch_walk"
@@ -761,15 +767,28 @@ func _pose_shamble() -> void:
 	_pitch_limb("Foot" + drag, 0.3 * k)
 
 
+## The share of a swing the blow takes to come forward from the drawn-back windup ([method _strike_curve]).
+const STRIKE_RISE := 0.1
+## The share of a swing a kit's one-shot strike clip is played over: it ends a little before the next swing starts, so a
+## body's own tempo (up to 10% slower) still finishes it.
+const SWING_FILL := 0.88
+
+
 ## How far into the blow it is: 0 at rest, rising to 1 on the swing's landing frame.
 func _strike_curve() -> float:
 	var p := _strike_phase
+	var windup := HIT_AT - STRIKE_RISE
+
+	# The windup draws back, the blow comes forward over STRIKE_RISE of the swing rather than in one frame (a pose that
+	# jumped from drawn back to landed between two frames), and the recovery eases out.
+	if p < windup:
+		return -0.35 * sin(p / windup * PI * 0.5)
 
 	if p < HIT_AT:
-		return -0.35 * sin(p / HIT_AT * PI * 0.5)
+		return lerpf(-0.35, 1.0, smoothstep(windup, HIT_AT, p))
 
 	var q := (p - HIT_AT) / (1.0 - HIT_AT)
-	return lerpf(1.0, 0.0, clampf(q * 1.6, 0.0, 1.0)) if q < 0.625 else 0.0
+	return 1.0 - smoothstep(0.0, 0.625, q)
 
 
 ## Swings [param bone]'s tip forward by [param angle] (negative backward) about the body's own side

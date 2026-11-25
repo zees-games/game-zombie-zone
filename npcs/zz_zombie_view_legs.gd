@@ -100,6 +100,12 @@ func _lift_foot_bone(foot: int, floor_y: float) -> void:
 	_skeleton.set_bone_pose_position(foot, _skeleton.get_bone_pose_position(foot) + local)
 
 
+## The share of a leg's length out to the side a planted foot is reached at, at most ([method _plant_feet]).
+const REACH_FLAT := 0.9
+## The most the hips are lowered toward a planted foot, as a share of the leg's length.
+const DROP_MOST := 0.12
+
+
 ## The shamble's legs: each foot stands still on the floor for its stance and swings to its next
 ## step (gs-player-char's GSFootPlant over the clip's own phase), the hips lowered where a leg
 ## would not reach and both legs bent to their feet. Weighted by [member _legs_held].
@@ -129,10 +135,13 @@ func _plant_feet() -> void:
 	for i in legs.size():
 		var hip := GSHumanoidIk.global_pose(_skeleton, legs[i][0]).origin
 		var gap := to_skeleton * feet[i] - hip
-		var flat := Vector2(gap.x, gap.z).length()
 		var longest := float(legs[i][4]) * 0.97
-		if gap.length() > longest and flat < longest:
-			drop = maxf(drop, -gap.y - sqrt(longest * longest - flat * flat))
+		# The reach is taken at no more than REACH_FLAT of the leg out and the drop held under DROP_MOST of it: a foot
+		# left far behind otherwise sank the hips, then let go of them in one frame once it was further out than the leg
+		# (a whole-body pop the judge read as the body changing size).
+		var flat := minf(Vector2(gap.x, gap.z).length(), longest * REACH_FLAT)
+		if gap.length() > longest:
+			drop = maxf(drop, minf(-gap.y - sqrt(longest * longest - flat * flat), longest * DROP_MOST))
 	if drop > 0.0:
 		_lift_pelvis(Vector3(0.0, -drop * _legs_held, 0.0))
 	for i in legs.size():

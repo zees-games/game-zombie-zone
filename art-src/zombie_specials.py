@@ -41,7 +41,7 @@ SPEC = {
 	"screamer": dict(body="chubby", atlas="atlas_heavy.png", swap={"5f6397": "c3ccd8", "63503f": "571a2c"}, vein=((0.32, 0.38, 0.62, 1), 0.7, 6.0), blood=0.25, bump=0.35),
 	"strangler": dict(body="basic", atlas="atlas_basic.png", swap={"769751": "7f8fa2", "3f5363": "1d1d22", "664531": "3a2a1c"}, vein=((0.25, 0.1, 0.32, 1), 0.8, 6.0), blood=0.5, bump=0.5),
 	"spitter": dict(body="lis", atlas="atlas_people.png", swap={"c09264": "86b832", "bd8e30": "35461f", "466469": "23281d", "225385": "172214"}, vein=((0.1, 0.4, 0.04, 1), 0.9, 6.0), blood=0.3, bump=0.5),
-	"sleeper": dict(body="lis", atlas="atlas_people.png", swap={"c09264": "ebe9f0", "bd8e30": "d9e2ec", "466469": "cdd5de", "225385": "121216"}, vein=((0.55, 0.28, 0.4, 1), 0.55, 8.0), blood=0.35, bump=0.3),
+	"sleeper": dict(body="lis", atlas="atlas_people.png", swap={"c09264": "ebe9f0", "bd8e30": "d9e2ec", "466469": "cdd5de", "225385": "d8d2c0"}, vein=((0.55, 0.28, 0.4, 1), 0.55, 8.0), blood=0.35, bump=0.3),
 }
 
 
@@ -95,6 +95,39 @@ class Build:
 			pts = [v.co for v in self.body.data.vertices if z0 <= v.co.z <= z1 and abs(v.co.x) < 0.4]
 		xs = [p.x for p in pts]; ys = [p.y for p in pts]
 		return ((max(xs) + min(xs)) / 2, (max(ys) + min(ys)) / 2, (max(xs) - min(xs)) / 2, (max(ys) - min(ys)) / 2)
+
+	def limb_r(self, name, t0=0.0, t1=1.0):
+		"""The skin's radius round bone [param name] between shares t0 and t1 of its length (verts weighted over half to it):
+		the 75th percentile, since the largest caught the knee and calf bulges and a sleeve that wide gaped."""
+		h, t = self.bone(name)
+		d = t - h
+		gi = self.body.vertex_groups[name].index
+		found = []
+		for v in self.body.data.vertices:
+			if not any(x.group == gi and x.weight > 0.5 for x in v.groups):
+				continue
+			s = (v.co - h).dot(d) / d.length_squared
+			if t0 <= s <= t1:
+				found.append((v.co - (h + d * s)).length)
+		return sorted(found)[int(len(found) * 0.75)] if found else 0.0
+
+	def taper_tongue(self, shares=(0.95, 0.85, 0.7, 0.55, 0.4)):
+		"""Draws the kit's capsule tongue to a point: each Tongue bone's skin pulled toward its axis, the more the nearer the tip."""
+		for i, k in enumerate(shares):
+			name = "Tongue%d" % (i + 1)
+			if name not in self.body.vertex_groups:
+				return
+			h, t = self.bone(name)
+			d = t - h
+			gi = self.body.vertex_groups[name].index
+			for v in self.body.data.vertices:
+				w = max((x.weight for x in v.groups if x.group == gi), default=0.0)
+				if w < 0.5:
+					continue
+				s = max(0.0, min(1.0, (v.co - h).dot(d) / max(d.length_squared, 1e-9)))
+				axis = h + d * s
+				f = k * (1.0 - 0.25 * s)
+				v.co = axis + (v.co - axis) * f
 
 	def mat(self, name, colour, rough=0.7, metal=0.0, blood=0.0, bump=0.0, bump_scale=40.0, veins=None):
 		if name in self.mats:
@@ -186,6 +219,18 @@ def not_front(w):
 
 def not_back(w):
 	return lambda a: abs(angle_diff(a, math.pi / 2)) >= w
+
+
+def sleeve_rings(h, t, shares, radii, n=16, rng=None):
+	"""Rings round the segment h-t at the given shares of its length and radii, for loft()."""
+	d = (t - h).normalized()
+	u = d.cross(V(0, 1, 0) if abs(d.y) < 0.9 else V(1, 0, 0)).normalized()
+	w = d.cross(u)
+	out = []
+	for s, r in zip(shares, radii):
+		c = h + (t - h) * s
+		out.append([c + (u * math.cos(2 * math.pi * i / n) + w * math.sin(2 * math.pi * i / n)) * r * (1 + (rng.uniform(-0.04, 0.04) if rng else 0.0)) for i in range(n)])
+	return out
 
 
 def merge_bm(*bms):
@@ -310,7 +355,7 @@ def bloater(b):
 	b.obj("belly", sphere_bm(1.0, belly_c, (srx, sry, srz), 20, 12), FLESH, "Abdomen")
 	for i in range(18):
 		a = b.rng.uniform(-math.pi * 0.95, -math.pi * 0.05) if i < 15 else b.rng.uniform(0.2, math.pi - 0.2)
-		z = b.rng.uniform(-0.8, 0.85)
+		z = b.rng.uniform(-0.45, 0.85)
 		k = math.sqrt(max(0.0, 1 - z * z))
 		pos = V(belly_c[0] + srx * k * math.cos(a), belly_c[1] + sry * k * math.sin(a), belly_c[2] + srz * z * 1.0)
 		r = b.rng.uniform(0.028, 0.065)
@@ -323,7 +368,18 @@ def bloater(b):
 		sh, _ = b.bone("UpperArm." + ("L" if sx > 0 else "R"))
 		b.obj("shoulderboil%d" % sx, sphere_bm(0.05, (sh.x + sx * 0.04, sh.y + 0.03, sh.z + 0.06), (1, 1, 0.8), 10, 6), BOIL, "Shoulder." + ("L" if sx > 0 else "R"))
 	cx2, cy2, rx2, ry2 = b.band(0.55, 0.85)
-	b.solid(b.obj("rags", loft([ring(cx2, cy2, rx2 + 0.02, ry2 + 0.02, 0.84, 22, 0.0), ring(cx2, cy2, rx2 + 0.07, ry2 + 0.08, 0.62, 22, 0.05, b.rng)]), RAG, "Hips"), 0.008)
+	# A belt round the hips, then four flaps hung from it, each lower edge carried by its own thigh: one tube
+	# weighted to the hips was walked through by the thighs.
+	b.solid(b.obj("ragbelt", loft([ring(cx2, cy2, rx2 + 0.025, ry2 + 0.025, z, 24) for z in (0.86, 0.8)]), RAG, "Hips"), 0.01)
+	for s, sx in (("L", 1), ("R", -1)):
+		for mid in (-math.pi / 2, math.pi / 2):
+			lo, hi = (mid, mid + sx * 0.95) if sx * math.cos(mid + sx * 0.5) > 0 else (mid - sx * 0.95, mid)
+			lo, hi = min(lo, hi), max(lo, hi)
+			keep = lambda a, lo=lo, hi=hi: abs(angle_diff(a, (lo + hi) / 2)) < (hi - lo) / 2
+			flap = loft([ring(cx2, cy2, rx2 + 0.03, ry2 + 0.035, 0.81, 24), ring(cx2, cy2, rx2 + 0.06, ry2 + 0.07, 0.6, 24, 0.04, b.rng)], keep=keep)
+			bmesh.ops.delete(flap, geom=[v for v in flap.verts if not v.link_faces], context="VERTS")
+			b.bevel(b.solid(b.obj("rag%s%d" % (s, mid > 0), flap, RAG, lambda co, s=s: "Hips" if co.z > 0.74 else "UpperLeg." + s), 0.008), 0.002)
+	b.taper_tongue()
 
 
 def strangler(b):
@@ -390,23 +446,27 @@ def sleeper(b):
 	for z, flare in levels:
 		cx, cy, rx, ry = b.band(z - 0.03, z + 0.03)
 		rings.append(ring(cx, cy, rx + 0.03 + flare, ry + 0.035 + flare, z, 24, 0.035 if z == levels[-1][0] else 0.0, b.rng))
-	b.bevel(b.solid(b.obj("gown", loft(rings, keep=not_back(0.42)), GOWN, lambda co: b.trunk(co)), 0.006), 0.002)
+	b.bevel(b.solid(b.obj("gown", loft(rings), GOWN, lambda co: b.trunk(co)), 0.006), 0.002)
 	for s, sx in (("L", 1), ("R", -1)):
 		uh, ut = b.bone("UpperArm." + s)
 		b.obj("sleeve" + s, tube_bm(uh - V(sx * 0.02, 0, 0), uh + (ut - uh) * 0.45, 0.075, 10), GOWN, "UpperArm." + s)
 		lh, lt = b.bone("LowerArm." + s)
-		b.bevel(b.obj("band" + s, tube_bm(lt - (lt - lh) * 0.22, lt - (lt - lh) * 0.1, 0.05, 10), TAG, "LowerArm." + s), 0.0)
+		# Bandaged forearms, round and closed, over the kit's flat ones; the hospital band over the wrist end.
+		fr = max(b.limb_r("LowerArm." + s, 0.05, 0.95), 0.035) + 0.012
+		b.bevel(b.obj("forearm" + s, merge_bm(tube_bm(lh + (lt - lh) * 0.04, lt - (lt - lh) * 0.02, fr, 12), sphere_bm(fr, lt - (lt - lh) * 0.02, (1, 1, 1), 12, 6)), WRAP, "LowerArm." + s), 0.002)
+		b.bevel(b.obj("band" + s, tube_bm(lt - (lt - lh) * 0.22, lt - (lt - lh) * 0.1, fr + 0.008, 12), TAG, "LowerArm." + s), 0.0)
 	hx0, hx1, hy0, hy1, hz0, hz1 = b.head
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	hw, hd, hh = hx1 - hx0, hy1 - hy0, hz1 - hz0
 	# Bandages that hug the skull (a dome wider than the head and a brim read as a mushroom cap): a shell
 	# 4% over the skull from the crown to the brow, then three cloth strips round it, each tilted differently.
 	zc0, zr = hcz - hh * 0.08, hh * 0.6
-	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.53, hd * 0.53, zr), 18, 10, cut_below=hcz - hh * 0.2)
+	# Closed underneath: a shell cut at the jaw showed its black inside from behind and below.
+	wrap = sphere_bm(1.0, (hcx, hcy + 0.004, zc0), (hw * 0.56, hd * 0.56, zr * 1.05), 18, 10)
 
 	def skull_ring(z, lean):
 		f = max(0.2, 1.0 - ((z - zc0) / zr) ** 2) ** 0.5
-		return ring(hcx, hcy + 0.004 + lean, hw * 0.53 * f + 0.012, hd * 0.53 * f + 0.012, z, 18)
+		return ring(hcx, hcy + 0.004 + lean, hw * 0.56 * f + 0.012, hd * 0.53 * f + 0.012, z, 18)
 	strips = [loft([skull_ring(hcz + hh * (zc + k * 0.06), tilt * k) for k in (-1, 0, 1)]) for zc, tilt in ((-0.1, 0.012), (0.06, -0.014), (0.22, 0.01))]
 	b.bevel(b.solid(b.obj("headwrap", merge_bm(wrap, *strips), WRAP, "Head"), 0.006), 0.002)
 	cx, cy, rx, ry = b.band(1.2, 1.3)
@@ -416,11 +476,11 @@ def sleeper(b):
 def screamer(b):
 	ROBE = b.mat("Robe", (0.34, 0.06, 0.13, 1), 0.9, blood=0.65, bump=0.8, bump_scale=50)
 	BONE = b.mat("Crest", (0.82, 0.8, 0.7, 1), 0.55, blood=0.2, bump=0.5, bump_scale=40)
-	MAW = b.mat("Maw", (0.02, 0.0, 0.01, 1), 0.9, bump=0.1)
 	cx, cy, rx, ry = b.band(1.0, 1.27)
 	bodice = loft([ring(cx, cy, rx + 0.02, ry + 0.025, z, 24) for z in (0.96, 1.06, 1.16, 1.26)])
 	b.bevel(b.solid(b.obj("bodice", bodice, ROBE, lambda co: b.trunk(co)), 0.008), 0.002)
-	levels = [(0.95, 0.0), (0.8, 0.05), (0.62, 0.1), (0.42, 0.15), (0.2, 0.2), (0.06, 0.23)]
+	# A short peplum over trousers: a cone robe to the floor had no legs, and the legs poked through it in the walk.
+	levels = [(0.95, 0.0), (0.82, 0.04), (0.7, 0.08)]
 	rings = []
 	for z, flare in levels:
 		cx2, cy2, rx2, ry2 = b.band(max(z - 0.03, 0.56), max(z + 0.03, 0.62), ("Hips", "Abdomen", "UpperLeg.L", "UpperLeg.R"))
@@ -430,7 +490,15 @@ def screamer(b):
 	hcx, hcy, hcz = (hx0 + hx1) / 2, (hy0 + hy1) / 2, (hz0 + hz1) / 2
 	crest = [spike_bm((hcx + (i % 2 - 0.5) * 0.04, hcy - 0.03 + 0.03 * i, hz1 - 0.01 - 0.008 * i), (0, 0.5 + 0.1 * i, 1), 0.2 - 0.018 * i, 0.03) for i in range(6)]
 	b.obj("crest", merge_bm(*crest), BONE, "Head")
-	b.obj("maw", sphere_bm(1.0, (hcx, hy0 + 0.004, hz0 + (hz1 - hz0) * 0.3), (0.05, 0.022, 0.07), 14, 8), MAW, "Head")
+	CLOTH = b.mat("Trouser", (0.16, 0.05, 0.08, 1), 0.92, blood=0.55, bump=0.8, bump_scale=60)
+	for s in ("L", "R"):
+		for bone_name, t0, t1 in (("UpperLeg." + s, -0.02, 1.08), ("LowerLeg." + s, -0.04, 0.86)):
+			h, t = b.bone(bone_name)
+			# Rings fitted to the skin along the bone, so the cloth follows the leg's taper instead of a barrel round it.
+			shares = [t0 + (t1 - t0) * k / 5 for k in range(6)]
+			radii = [max(b.limb_r(bone_name, s - 0.15, s + 0.15), 0.035) + 0.012 for s in shares]
+			b.bevel(b.solid(b.obj("trouser%s%s" % (bone_name[:5], s), loft(sleeve_rings(h, t, shares, radii, 16, b.rng)), CLOTH, bone_name), 0.006), 0.002)
+	b.taper_tongue()
 	for s, sx in (("L", 1), ("R", -1)):
 		sh, _ = b.bone("UpperArm." + s)
 		b.obj("spur" + s, merge_bm(spike_bm((sh.x, sh.y, sh.z + 0.03), (sx, 0.1, 0.5), 0.2, 0.035), spike_bm((sh.x, sh.y, sh.z + 0.03), (sx * 0.3, 0.1, 1), 0.13, 0.03)), BONE, "Shoulder." + s)
