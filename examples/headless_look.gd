@@ -138,7 +138,7 @@ func _fade() -> void:
 	b.build(&"spitter", 0)
 	var meshes_a := a.find_children("*", "MeshInstance3D", true, false)
 	var solid: Material = (meshes_a[0] as MeshInstance3D).material_override
-	_check(meshes_a.size() >= 2 and solid == (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override,
+	_check(meshes_a.size() >= 1 and solid == (b.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).material_override,
 		"two spitters share one look before any fade (%d parts)" % meshes_a.size())
 	a.set_fade(0.5)
 	var every := true

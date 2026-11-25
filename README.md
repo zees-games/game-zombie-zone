@@ -314,6 +314,7 @@ Each kit's licence is next to its files. `sounds/CREDITS.md`, `sounds/real/CREDI
 | --- | --- | --- | --- |
 | Godot Engine logo (boot splash) | Andrea Calabró, [godotengine.org](https://godotengine.org/press/) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `branding/splash.png` |
 | Zombies (three zombies, four survivors turned zombies) and survivors | [Quaternius](https://quaternius.com), [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), simplified and recoloured by `tools/build_zombie_models.py` | CC0 | gs-player-char |
+| Special zombie bodies (`brute`, `bloater`, `strangler`, `spitter`, `sleeper`, `screamer`) | Made for this game on the Quaternius CC0 kit's rig, clips and base meshes (`art-src/zombie_specials.py`: procedural gear, procedurally baked albedo and normal maps) | MIT (kit parts CC0) | `art-src/` |
 | Construction-worker zombie gear, sentry turret | Made for this game (`art-src/zombie_worker.py`, `art-src/turret.py`) | MIT | `art-src/` |
 | Realistic common infected | [Male City Zombie](https://opengameart.org/node/111870), OpenGameArt; decimated and rigged by `art-src/zombie_city.py` | CC0 | `art-src/` |
 | Walking-dead commons (`gent`, `cop`, `punk`, `convict`) | [Animated Zombie Characters Walking Dead loop](https://sketchfab.com/3d-models/animated-zombie-characters-walking-dead-loop-8088449c35634de18cbf531c58544f26) by LasquetiSpice, modified | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `art-src/zombie_sketchfab.py` |

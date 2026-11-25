@@ -60,7 +60,7 @@ static func _faded_copy(source: Material) -> Material:
 	if copy is ShaderMaterial:
 		if _fade_shader == null:
 			_fade_shader = Shader.new()
-			_fade_shader.code = SHADER \
+			_fade_shader.code = ZzZombieShader.SHADER \
 				.replace("specular_disabled;", "specular_disabled, depth_draw_always;") \
 				.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform float fade = 1.0;") \
 				.replace("EMISSION = ", "ALPHA = fade;\n\tEMISSION = ")

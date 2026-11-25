@@ -34,6 +34,12 @@ static var BODIES := {
 	&"convict": ZzPaths.rebase("res://assets/zombies/zombie_convict.glb"),
 	&"hazmat": ZzPaths.rebase("res://assets/zombies/zombie_hazmat.glb"),
 	&"walker": ZzPaths.rebase("res://assets/zombies/zombie_walker.glb"),
+	&"brute": ZzPaths.rebase("res://assets/zombies/zombie_brute.glb"),
+	&"bloater": ZzPaths.rebase("res://assets/zombies/zombie_bloater.glb"),
+	&"strangler": ZzPaths.rebase("res://assets/zombies/zombie_strangler.glb"),
+	&"spitter": ZzPaths.rebase("res://assets/zombies/zombie_spitter.glb"),
+	&"sleeper": ZzPaths.rebase("res://assets/zombies/zombie_sleeper.glb"),
+	&"screamer": ZzPaths.rebase("res://assets/zombies/zombie_screamer.glb"),
 }
 
 ## The kit's atlas, in the three versions its bodies were painted against: they differ in a few
@@ -52,6 +58,12 @@ static var ATLASES := {
 	&"convict": ZzPaths.rebase("res://assets/zombies/convict_albedo.png"),
 	&"hazmat": ZzPaths.rebase("res://assets/zombies/hazmat_albedo.png"),
 	&"walker": ZzPaths.rebase("res://assets/zombies/walker_albedo.png"),
+	&"brute": ZzPaths.rebase("res://assets/zombies/brute_albedo.png"),
+	&"bloater": ZzPaths.rebase("res://assets/zombies/bloater_albedo.png"),
+	&"strangler": ZzPaths.rebase("res://assets/zombies/strangler_albedo.png"),
+	&"spitter": ZzPaths.rebase("res://assets/zombies/spitter_albedo.png"),
+	&"sleeper": ZzPaths.rebase("res://assets/zombies/sleeper_albedo.png"),
+	&"screamer": ZzPaths.rebase("res://assets/zombies/screamer_albedo.png"),
 }
 
 ## The city body's painted people (`art-src/zombie_city_paint.py`): skin, outfit and hair differ per texture.
@@ -66,7 +78,13 @@ const CITY_NORMAL := "res://assets/zombies/city_normal.png"
 ## colour, blood and dirt are in the texture, so the shader's splashes are off and only these sample a normal map.
 static var NORMALS := {&"city": CITY_NORMAL, &"gent": "res://assets/zombies/gent_normal.png", &"cop": "res://assets/zombies/cop_normal.png",
 	&"punk": "res://assets/zombies/punk_normal.png", &"convict": "res://assets/zombies/convict_normal.png", &"hazmat": "res://assets/zombies/hazmat_normal.png",
-	&"walker": "res://assets/zombies/walker_normal.png"}
+	&"walker": "res://assets/zombies/walker_normal.png",
+	&"brute": "res://assets/zombies/brute_normal.png",
+	&"bloater": "res://assets/zombies/bloater_normal.png",
+	&"strangler": "res://assets/zombies/strangler_normal.png",
+	&"spitter": "res://assets/zombies/spitter_normal.png",
+	&"sleeper": "res://assets/zombies/sleeper_normal.png",
+	&"screamer": "res://assets/zombies/screamer_normal.png"}
 
 ## Where the head bone sits against the body's height, for the bodies that are not the kit's big-headed
 ## proportions (the kit's is 1.22, [method _measure]).
@@ -74,10 +92,17 @@ const HEAD_TOP := {&"city": 1.137, &"gent": 1.077, &"cop": 1.107, &"punk": 1.124
 
 const ATLAS_OF := {&"basic": &"basic", &"chubby": &"heavy", &"arm": &"heavy", &"matt": &"people",
 	&"lis": &"people", &"sam": &"people", &"shaun": &"people", &"worker": &"worker", &"city": &"city",
-	&"gent": &"gent", &"cop": &"cop", &"punk": &"punk", &"convict": &"convict", &"hazmat": &"hazmat", &"walker": &"walker"}
+	&"gent": &"gent", &"cop": &"cop", &"punk": &"punk", &"convict": &"convict", &"hazmat": &"hazmat", &"walker": &"walker",
+	&"brute": &"brute",
+	&"bloater": &"bloater",
+	&"strangler": &"strangler",
+	&"spitter": &"spitter",
+	&"sleeper": &"sleeper",
+	&"screamer": &"screamer"}
 
 ## Bodies that carry no clips of their own and are driven by another's (same rig, same bone names).
-const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic"}
+const CLIPS_FROM := {&"matt": &"basic", &"lis": &"basic", &"sam": &"basic", &"shaun": &"basic",
+	&"spitter": &"basic", &"sleeper": &"basic"}
 
 ## The atlas colours each body wears, by role, measured from the kit (`tools/build_zombie_models.py`
 ## run with a probe: the colour under each face, by the bone that face follows). The shader swaps
@@ -98,6 +123,12 @@ const WEARS := {
 	&"convict": {},
 	&"hazmat": {},
 	&"walker": {},
+	&"brute": {},
+	&"bloater": {},
+	&"strangler": {},
+	&"spitter": {},
+	&"sleeper": {},
+	&"screamer": {},
 }
 
 ## The commons' bodies, in variant order: the realistic ones only; the kit's cartoon bodies stay for other roles.
@@ -120,27 +151,27 @@ const LOOKS := {
 	&"leaper": {"body": &"sam", "height": 1.7, "girth": 0.9, "skin": "9ea39a", "top": "262d3d", "bottom": "202226", "hat": "1d2230",
 		"bones": {"UpperArm.L*": 1.12, "UpperArm.R*": 1.12, "Head": 0.95}, "hunch": 0.35,
 		"clips": {"walk": &"crawl", "idle": &"crawl", "run_arms": &"crawl", "run": &"crawl"}, "wear": [], "blood": 0.6},
-	&"strangler": {"body": &"basic", "height": 2.05, "girth": 0.78, "skin": "8e9a5c", "bottom": "3b3a33", "belt": "2b2a26",
-		"bones": {"Neck": Vector3(0.9, 2.2, 0.9), "Head": 0.85, "Tongue1*": Vector3(1.5, 2.6, 1.5)}, "hunch": 0.3, "shamble": {"stoop": 0.3, "head": 0.45, "arms": -0.2, "swing": 0.5, "drag": 0.25, "sway": 0.18}, "wear": [&"neck_growth"], "mark": "4a2a3a", "vein": "5a2e55", "blood": 0.62},
-	&"bloater": {"body": &"chubby", "height": 1.85, "girth": 1.4, "skin": "a8a45a", "bottom": "4a3f30",
-		"bones": {"Abdomen": Vector3(1.45, 1.0, 1.45), "Torso": Vector3(1.25, 1.0, 1.3), "Head": 0.9}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [&"boils"], "mark": "6b7a2a", "vein": "4f5a1c", "blood": 0.7},
+	&"strangler": {"body": &"strangler", "height": 2.05, "girth": 0.78,
+		"bones": {"Neck": Vector3(0.9, 2.2, 0.9), "Head": 0.85, "Tongue1*": Vector3(1.5, 2.6, 1.5)}, "hunch": 0.3, "shamble": {"stoop": 0.3, "head": 0.45, "arms": -0.2, "swing": 0.5, "drag": 0.25, "sway": 0.18}, "wear": [], "blood": 2.0, "dirt": 0.0},
+	&"bloater": {"body": &"bloater", "height": 1.85, "girth": 1.4,
+		"bones": {"Abdomen": Vector3(1.45, 1.0, 1.45), "Torso": Vector3(1.25, 1.0, 1.3), "Head": 0.9}, "hunch": 0.0, "shamble": {"stoop": 0.1, "swing": 0.45, "drag": 0.5, "trail": 0.2, "sway": 0.25, "hip": 0.25, "cadence": 0.8}, "wear": [], "blood": 2.0, "dirt": 0.0},
 	&"ram": {"body": &"arm", "height": 2.05, "girth": 1.1, "skin": "6e6152", "bottom": "2e3440",
 		"bones": {}, "hunch": 0.2, "shamble": {"stoop": 0.4, "head": -0.1, "arms": -0.35, "swing": 0.65, "drag": 0.5, "sway": 0.2, "hip": 0.2}, "wear": [], "mark": "3a2a24", "vein": "1c1814", "blood": 0.64,
 		"clips": {"attack_idle": &"attack", "crawl": &"walk"}},
-	&"spitter": {"body": &"lis", "height": 1.95, "girth": 0.8, "skin": "9fb35a", "top": "3d4a2e", "bottom": "2c2e26", "hair": "1c1d18",
-		"bones": {"Neck": Vector3(0.9, 2.4, 0.9), "Head": 0.9}, "hunch": 0.15, "shamble": {"stoop": 0.3, "head": 0.55, "hang": -0.9, "swing": 0.5, "drag": 0.2}, "wear": [&"acid_mouth"], "mark": "2e4a12", "vein": "3f6a14", "blood": 0.65, "glow": "4f8a12"},
+	&"spitter": {"body": &"spitter", "height": 1.95, "girth": 0.8,
+		"bones": {"Neck": Vector3(0.9, 2.4, 0.9), "Head": 0.9}, "hunch": 0.15, "shamble": {"stoop": 0.3, "head": 0.55, "hang": -0.9, "swing": 0.5, "drag": 0.2}, "wear": [], "blood": 2.0, "dirt": 0.0, "glow": "4f8a12"},
 	&"rider": {"body": &"basic", "height": 1.2, "girth": 1.0, "skin": "8a7a66", "bottom": "4a3a2a", "belt": "2a221a",
 		"bones": {"UpperArm.L*": 1.35, "UpperArm.R*": 1.35, "Head": 1.15, "UpperLeg.L*": 0.8, "UpperLeg.R*": 0.8}, "hunch": 0.55, "wear": [], "blood": 0.64,
 		"clips": {"run": &"run_arms", "walk": &"run_arms"}},
-	&"brute": {"body": &"chubby", "height": 2.95, "girth": 1.55, "skin": "5e5263", "bottom": "2e2a2a",
+	&"brute": {"body": &"brute", "height": 2.95, "girth": 1.55,
 		"bones": {"UpperArm.L*": 1.4, "UpperArm.R*": 1.4, "Shoulder.L": 1.3, "Shoulder.R": 1.3, "Head": 0.6, "Torso": Vector3(1.2, 1.0, 1.15)}, "hunch": 0.35, "shamble": {"stoop": 0.35, "head": 0.1, "arms": -0.5, "hang": -0.9, "swing": 0.6, "drag": 0.6, "trail": 0.1, "sway": 0.22, "hip": 0.2, "cadence": 0.8, "lurch": 0.0},
-		"wear": [&"spikes"], "mark": "2a1d3a", "vein": "1e1230", "blood": 0.62},
-	&"sleeper": {"body": &"lis", "height": 1.65, "girth": 0.85, "skin": "e4e4e8", "top": "d6d2c8", "bottom": "c8c2b8", "hair": "16161a",
+		"wear": [], "blood": 2.0, "dirt": 0.0},
+	&"sleeper": {"body": &"sleeper", "height": 1.65, "girth": 0.85,
 		"bones": {"Index1.L*": Vector3(0.8, 1.9, 0.8), "Index1.R*": Vector3(0.8, 1.9, 0.8), "Middle1.L*": Vector3(0.8, 1.9, 0.8), "Middle1.R*": Vector3(0.8, 1.9, 0.8), "Pinky1.L*": Vector3(0.8, 1.9, 0.8), "Pinky1.R*": Vector3(0.8, 1.9, 0.8)},
-		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "mark": "7a8a9a", "vein": "7a3040", "blood": 0.62},
-	&"screamer": {"body": &"chubby", "height": 2.0, "girth": 0.72, "skin": "b6bfc6", "bottom": "3a1e22",
+		"hunch": 0.0, "shamble": {"stoop": 0.12, "head": 0.1, "arms": -0.5, "hang": -0.8, "swing": 0.8, "drag": 0.8, "trail": 0.0, "sway": 0.05, "hip": 0.04, "cadence": 0.7, "lurch": 0.0}, "wear": [&"red_eyes"], "blood": 2.0, "dirt": 0.0},
+	&"screamer": {"body": &"screamer", "height": 2.0, "girth": 0.72,
 		"bones": {"Abdomen": Vector3(0.62, 1.15, 0.62), "Torso": Vector3(0.68, 1.1, 0.7), "Neck": Vector3(0.8, 1.6, 0.8), "BottomMouth": 1.4}, "hunch": 0.2, "shamble": {"stoop": 0.1, "head": -0.1, "arms": -0.5, "hang": -0.7, "swing": 0.7, "drag": 0.7, "trail": 0.0, "sway": 0.08, "hip": 0.06, "cadence": 1.1, "lurch": 0.0},
-		"wear": [], "mark": "5a6a8a", "vein": "4a5878", "blood": 0.62},
+		"wear": [], "blood": 2.0, "dirt": 0.0},
 	&"crawler": {"body": &"basic", "height": 1.75, "girth": 1.0, "skin": "6f7a55", "bottom": "3a3a30", "belt": "4a2020",
 		"bones": {"UpperLeg.L*": 0.04, "UpperLeg.R*": 0.04}, "hunch": 0.0,
 		"clips": {"idle": &"crawl", "walk": &"crawl", "run": &"crawl", "run_arms": &"crawl", "attack": &"crawl", "attack_idle": &"crawl", "attack_run": &"crawl", "hit": &"crawl", "jump_idle": &"crawl"}, "wear": [&"gore"], "blood": 0.55},
@@ -214,76 +245,7 @@ const CROUCH_NATURAL := 1.4
 const UAL_LIBRARY := "res://addons/gs_player_char/people/people_ual.res"
 const UAL_FROM := "res://addons/gs_player_char/people/people_matt.glb"
 
-## The palette shader: up to [constant SWAPS] atlas colours swapped within a tolerance, then dirt and blood
-## from the vertex-colour noise, then the kind's glow. Compatibility renderer: no per-instance
-## uniforms (a material per look) and no arrays with hints.
-const SWAPS := 6
-## How much of a kind's `glow` the whole body gives off (the throat is its own mesh): at full
-## strength the spitter was a flat green silhouette with no face. And the share of its own
-## colour every zombie emits, which keeps a dark body readable in the dark.
-const GLOW_BODY := 0.25
-const BODY_LIFT := 0.22
-const SHADER := """
-shader_type spatial;
-render_mode cull_back, specular_disabled;
-uniform sampler2D atlas : source_color, filter_nearest, repeat_disable;
-uniform vec4 from_colour[6];
-uniform vec4 to_colour[6];
-uniform vec4 from_linear[6];
-uniform vec4 to_linear[6];
-uniform int swaps = 0;
-uniform float tolerance = 0.004;
-uniform float dirt = 0.5;
-uniform float blood_cut = 0.6;
-uniform vec3 blood_colour : source_color = vec3(0.45, 0.06, 0.05);
-uniform vec3 glow = vec3(0.0);
-uniform vec3 mark_colour : source_color = vec3(0.0);
-uniform float mark_amount = 0.0;
-uniform vec3 vein_colour : source_color = vec3(0.0);
-uniform float vein_amount = 0.0;
-uniform float flash = 0.0;
-uniform float lift = 0.0;
-
-void fragment() {
-	// Sampled exactly as a StandardMaterial3D samples its albedo (source_color), so a zombie is
-	// lit like everything else on the street. Which space that hands back differs by renderer
-	// (the compatibility one gave the stored sRGB values here), so a swap is matched in both and
-	// answered in the space it matched: a shader that converted by hand drew every zombie a
-	// shade from black at night.
-	vec3 c = texture(atlas, UV).rgb;
-	for (int i = 0; i < swaps; i++) {
-		vec3 d = c - from_colour[i].rgb;
-		if (dot(d, d) < tolerance) {
-			c = to_colour[i].rgb;
-			break;
-		}
-		vec3 e = c - from_linear[i].rgb;
-		if (dot(e, e) < tolerance * 0.25) {
-			c = to_linear[i].rgb;
-			break;
-		}
-	}
-	c *= mix(1.0, 0.6, smoothstep(0.45, 0.85, COLOR.r) * dirt);
-	c *= mix(0.88, 1.05, COLOR.b);
-	// Blood where two noises agree: splashes rather than a coat.
-	float blood = smoothstep(blood_cut, blood_cut + 0.05, COLOR.g) * smoothstep(0.52, 0.6, COLOR.r);
-	c = mix(c, blood_colour, blood * 0.85);
-	// Bruises and sores: where the noises disagree with the blood, so the two never overlap.
-	float mark = smoothstep(0.48, 0.56, COLOR.g) * (1.0 - smoothstep(0.45, 0.52, COLOR.r));
-	c = mix(c, mark_colour, mark * mark_amount);
-	// Veins, cracks and scars: the contour lines of a smooth field built from the skin-fixed
-	// noises, so a flat-coloured body carries a pattern that moves with it and costs no texture.
-	float field = COLOR.b * 11.0 + COLOR.r * 6.0 - COLOR.g * 5.0;
-	float vein_d = abs(fract(field) - 0.5);
-	float vein = (1.0 - smoothstep(0.012, 0.012 + 0.02 + fwidth(field), vein_d)) * smoothstep(0.5, 0.62, COLOR.b) * smoothstep(0.35, 0.5, COLOR.g) * (1.0 - blood);
-	c = mix(c, vein_colour, vein * vein_amount);
-	ALBEDO = c;
-	ROUGHNESS = mix(0.9, 0.3, blood);
-	// A little self-light so a dark skin on a night map keeps its legs, head and face: lit by
-	// the moon alone the specials' charcoal bodies drew as black cones.
-	EMISSION = c * lift + glow + vec3(flash * 0.35, flash * 0.05, flash * 0.03);
-}
-"""
+const ZzZombieShader := preload("zz_zombie_shader.gd")
 
 var kind: StringName = &""
 var variant: int = -1
@@ -620,7 +582,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 			continue
 
 		for hex: String in wears[role]:
-			if from.size() >= SWAPS:
+			if from.size() >= ZzZombieShader.SWAPS:
 				break
 			from.append(_raw(hex))
 			to.append(_raw(str(look[role])))
@@ -653,7 +615,7 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 
 		material.set_shader_parameter(&"normal_tex", _atlases[normal_id])
 
-	while from.size() < SWAPS:
+	while from.size() < ZzZombieShader.SWAPS:
 		from.append(Vector4(-9.0, -9.0, -9.0, 0.0))
 		to.append(Vector4.ZERO)
 		from_lin.append(Vector4(-9.0, -9.0, -9.0, 0.0))
@@ -663,12 +625,12 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 	material.set_shader_parameter(&"to_colour", to)
 	material.set_shader_parameter(&"from_linear", from_lin)
 	material.set_shader_parameter(&"to_linear", to_lin)
-	material.set_shader_parameter(&"swaps", SWAPS)
+	material.set_shader_parameter(&"swaps", ZzZombieShader.SWAPS)
 	material.set_shader_parameter(&"blood_cut", float(look.get("blood", 0.6)))
 	material.set_shader_parameter(&"dirt", float(look.get("dirt", 0.5)))
 	var g := glow.srgb_to_linear()
-	material.set_shader_parameter(&"glow", Vector3(g.r, g.g, g.b) * GLOW_BODY)
-	material.set_shader_parameter(&"lift", BODY_LIFT)
+	material.set_shader_parameter(&"glow", Vector3(g.r, g.g, g.b) * ZzZombieShader.GLOW_BODY)
+	material.set_shader_parameter(&"lift", ZzZombieShader.BODY_LIFT)
 	material.set_shader_parameter(&"mark_colour", Color(mark.r, mark.g, mark.b))
 	material.set_shader_parameter(&"mark_amount", 0.95 if mark != Color.BLACK else 0.0)
 	material.set_shader_parameter(&"vein_colour", Color(vein.r, vein.g, vein.b))
@@ -680,12 +642,12 @@ static func _material_for(look: Dictionary) -> ShaderMaterial:
 static func _ensure_shaders(normal_tex: bool) -> void:
 	if _shader == null:
 		_shader = Shader.new()
-		_shader.code = SHADER
+		_shader.code = ZzZombieShader.SHADER
 
 	if normal_tex and _shader_normal == null:
 		# Only the body that has a normal map pays for sampling one.
 		_shader_normal = Shader.new()
-		_shader_normal.code = SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
+		_shader_normal.code = ZzZombieShader.SHADER.replace("uniform float lift = 0.0;", "uniform float lift = 0.0;\nuniform sampler2D normal_tex : hint_normal, filter_linear_mipmap, repeat_disable;") \
 			.replace("	ALBEDO = c;", "	ALBEDO = c;\n	NORMAL_MAP = texture(normal_tex, UV).rgb;")
 
 

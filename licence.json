@@ -179,5 +179,25 @@
     "author": "TMC",
     "url": "https://github.com/zees-games/game-zombie-zone",
     "title": "Construction-worker zombie gear (modelled here on the Quaternius rig)"
+  },
+  {
+    "paths": [
+      "assets/zombies/zombie_brute.glb",
+      "assets/zombies/zombie_bloater.glb",
+      "assets/zombies/zombie_strangler.glb",
+      "assets/zombies/zombie_spitter.glb",
+      "assets/zombies/zombie_sleeper.glb",
+      "assets/zombies/zombie_screamer.glb",
+      "assets/zombies/brute_",
+      "assets/zombies/bloater_",
+      "assets/zombies/strangler_",
+      "assets/zombies/spitter_",
+      "assets/zombies/sleeper_",
+      "assets/zombies/screamer_"
+    ],
+    "licence": "MIT",
+    "author": "TMC",
+    "url": "https://github.com/zees-games/game-zombie-zone",
+    "title": "Special zombie bodies (built procedurally by art-src/zombie_specials.py on the CC0 Quaternius Zombie Apocalypse Kit rig, clips and base meshes; textures baked here)"
   }
 ]

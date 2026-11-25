@@ -26,6 +26,12 @@ BODIES = {
 	"cop": ("cop_albedo.png", "cop_normal.png"), "punk": ("punk_albedo.png", "punk_normal.png"),
 	"convict": ("convict_albedo.png", "convict_normal.png"), "hazmat": ("hazmat_albedo.png", "hazmat_normal.png"),
 	"walker": ("walker_albedo.png", "walker_normal.png"),
+	"brute": ("brute_albedo.png", "brute_normal.png"),
+	"bloater": ("bloater_albedo.png", "bloater_normal.png"),
+	"strangler": ("strangler_albedo.png", "strangler_normal.png"),
+	"spitter": ("spitter_albedo.png", "spitter_normal.png"),
+	"sleeper": ("sleeper_albedo.png", "sleeper_normal.png"),
+	"screamer": ("screamer_albedo.png", "screamer_normal.png"),
 }
 
 
