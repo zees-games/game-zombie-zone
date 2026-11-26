@@ -11,7 +11,7 @@ const ZzWorkshop := preload("../game/zz_workshop.gd")
 ## and the ballot with its pack's name, an online session lists none, a map kind the game does not accept is left out, the game's own ids win,
 ## a pack's map entry builds from the document its `scene` names, and a malformed document is refused. `godot --headless --path . res://examples/headless_workshop.tscn`
 
-const SECTIONS := 8
+const SECTIONS := 9
 const MAP := "fixture_ruin"
 const OTHER_KIND := "fixture_run"
 const BAD := "fixture_bad"
@@ -35,6 +35,7 @@ func _run() -> void:
 	_test_ballot_needs_two()
 	_test_ids()
 	_test_refused()
+	_test_default_weapons()
 	await _test_play()
 
 	_report_sections(_entered, _completed, SECTIONS)
@@ -117,6 +118,15 @@ func _labels(vote: ZzVote) -> PackedStringArray:
 	for choice in vote.source.choices():
 		out.append(choice.label())
 	return out
+
+
+## The base game names zz-modern-weapons as its suggested weapon pack, so the Workshop subscribes it on install and for solo play.
+func _test_default_weapons() -> void:
+	_entered += 1
+	var text := FileAccess.get_file_as_string("res://game.yml")
+	_check(text.contains("  - weapons=gamemann/zz-modern-weapons"), "game.yml suggests the modern weapons pack")
+	_check(text.contains("  - maps=gamemann/zombie-zone-maps"), "game.yml still suggests the maps pack")
+	_completed += 1
 
 
 func _test_accepts() -> void:
