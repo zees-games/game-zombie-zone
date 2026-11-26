@@ -30,6 +30,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzNetBridge := preload("../game/net/zz_net_bridge.gd")
 const ZzEvents := preload("../game/net/zz_events.gd")
+const Brain := preload("../npcs/zz_zombie_brain.gd")
 
 const SNAPSHOT_RATE := 30
 
@@ -206,6 +207,7 @@ func _run() -> void:
 			_acc.clear()
 			_near_hist.clear()
 			Engine.set_meta(&"_prof", {})
+			Brain.prof = {}
 		if measuring:
 			_detail_ticks += 1
 		var t0 := Time.get_ticks_usec()
@@ -423,6 +425,11 @@ func _print_detail() -> void:
 	var laps: Dictionary = Engine.get_meta(&"_prof", {})
 	for k: String in laps:
 		prof[k] = snappedf(float(laps[k]) / 1000.0 / float(_detail_ticks), 0.01)
+	# Brain.prof: ms per tick per part of a think, "think.n" the thinks per tick.
+	var thinks: Variant = Brain.prof
+	if thinks != null:
+		for k: String in thinks:
+			prof[k] = snappedf(float(thinks[k]) / (1.0 if k == "think.n" else 1000.0) / float(_detail_ticks), 0.01)
 	print("DETAIL %s" % JSON.stringify({"parts": per, "nearest_survivor_m": _near_hist, "prof": prof}))
 
 

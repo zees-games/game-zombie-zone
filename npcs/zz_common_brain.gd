@@ -153,30 +153,57 @@ func at_lure() -> bool:
 	return lure != Vector3.INF and flat_distance(npc.position(), lure) <= ring
 
 
+## The kind machine's states by [constant ZzThinkCore] number (the core answers in numbers, `state` is a name).
+const KINDS: Array[StringName] = [&"idle", &"alert", &"investigate", &"chase", &"lure"]
+
+
+## Each think: the conditions the state reads become a bitmask, the core ([method _core]: gs-sim's, else the
+## script twin) answers the next state and what to do, and this runs the side effects (the engine's part).
 func _decide(_delta: float) -> void:
 	var b := body()
-	var c := context.conditions
+	var core := _core()
+	var k := KINDS.find(state)
+	var c := 0
 
 	# A lure outranks everything but a survivor in its face.
-	if lure != Vector3.INF and state != &"lure" and forced == &"":
-		go(&"lure")
+	if lure != Vector3.INF:
+		c |= ZzThinkCore.C_LURE
+	if forced != &"":
+		c |= ZzThinkCore.C_FORCED
 
-	match state:
-		&"idle":
+	if k >= 0 and core.kind_pre(k, c) >= 0:
+		go(&"lure")
+		k = ZzThinkCore.LURE
+
+	match k:
+		ZzThinkCore.IDLE:
 			_idle(b)
 
 			if _woken_at != INF and now() >= _woken_at:
-				_woken_at = INF
-				_begin_alert(_alert_target, _alert_noise, 0.0)
-			elif forced != &"":
-				_begin_alert(forced, Vector3.INF, 0.1)
-			elif npc.has_target() and has_reacted():
-				_begin_alert(npc.target_id, Vector3.INF, 0.0)
-			elif c.has(GSNpcAiConditions.LIGHT_DAMAGE) or c.has(GSNpcAiConditions.HEAR_COMBAT):
-				var heard := last_known_position()
-				_begin_alert(&"", heard if heard != Vector3.INF else npc.position(), 0.0)
+				c |= ZzThinkCore.C_WOKEN
+			elif c & ZzThinkCore.C_FORCED == 0:
+				if npc.has_target() and has_reacted():
+					c |= ZzThinkCore.C_REACTED
+				else:
+					var cond := context.conditions
+					if cond.has(GSNpcAiConditions.LIGHT_DAMAGE) or cond.has(GSNpcAiConditions.HEAR_COMBAT):
+						c |= ZzThinkCore.C_HEARD
 
-		&"alert":
+			var r := core.kind_step(k, c) as int
+
+			match r >> 8:
+				ZzThinkCore.A_BEGIN_WOKEN:
+					_woken_at = INF
+					_begin_alert(_alert_target, _alert_noise, 0.0)
+				ZzThinkCore.A_BEGIN_FORCED:
+					_begin_alert(forced, Vector3.INF, 0.1)
+				ZzThinkCore.A_BEGIN_TARGET:
+					_begin_alert(npc.target_id, Vector3.INF, 0.0)
+				ZzThinkCore.A_BEGIN_HEARD:
+					var heard := last_known_position()
+					_begin_alert(&"", heard if heard != Vector3.INF else npc.position(), 0.0)
+
+		ZzThinkCore.ALERT:
 			halt()
 			b.anim = ZzZombieBody.Anim.RAGE
 
@@ -185,55 +212,83 @@ func _decide(_delta: float) -> void:
 				face(look - npc.position())
 
 			if in_state_for() >= _alert_for:
-				if quarry() != &"" or _alert_target != &"":
-					if forced == &"" and _alert_target != &"" and quarry() == &"":
-						forced = _alert_target
-					go(&"chase")
-				else:
-					go(&"investigate")
+				c |= ZzThinkCore.C_ALERT_DONE
+				if quarry() != &"":
+					c |= ZzThinkCore.C_QUARRY
+				if _alert_target != &"":
+					c |= ZzThinkCore.C_ALERT_TARGET
 
-		&"investigate":
+			var r := core.kind_step(k, c) as int
+
+			if r >> 8 == ZzThinkCore.A_ALERT_FORCE:
+				forced = _alert_target
+			if r & 255 != k:
+				go(KINDS[r & 255])
+
+		ZzThinkCore.INVESTIGATE:
 			if quarry() != &"":
-				go(&"chase")
-			elif search(context, tune(&"walk_speed", 1.1) * 3.5 * pace, 1.1) != GSNpcAiNode.Status.RUNNING:
-				home = npc.position()
-				go(&"idle")
-				_set_sight(IDLE_SIGHT[Idle.STAND])
-				idle_kind = Idle.MILL
-			else:
-				b.anim = ZzZombieBody.Anim.RUN if b.wish.length() > 2.0 else ZzZombieBody.Anim.IDLE
-				# Chase hopped a wedged body free; investigating one sat 24 s on a floor seam (ze_death_star_escape).
-				_unstick(b, npc.position())
+				c |= ZzThinkCore.C_QUARRY
 
-		&"chase":
-			_set_sight(ALERT_SIGHT)
+			var r := core.kind_step(k, c) as int
 
-			if not _chase(b):
-				if remembers_target():
-					go(&"investigate")
-				else:
+			if r >> 8 == ZzThinkCore.A_SEARCH:
+				var running := search(context, tune(&"walk_speed", 1.1) * 3.5 * pace, 1.1) == GSNpcAiNode.Status.RUNNING
+				var after := core.kind_after_search(running) as int
+
+				if after & 255 == ZzThinkCore.IDLE:
 					home = npc.position()
-					idle_kind = Idle.SHAMBLE
 					go(&"idle")
+					_set_sight(IDLE_SIGHT[Idle.STAND])
+					idle_kind = Idle.MILL
+				else:
+					b.anim = ZzZombieBody.Anim.RUN if b.wish.length() > 2.0 else ZzZombieBody.Anim.IDLE
+					# Chase hopped a wedged body free; investigating one sat 24 s on a floor seam (ze_death_star_escape).
+					_unstick(b, npc.position())
+			else:
+				go(KINDS[r & 255])
 
-		&"lure":
+		ZzThinkCore.CHASE:
 			_set_sight(ALERT_SIGHT)
 
-			if lure == Vector3.INF:
-				go(&"chase" if quarry() != &"" else &"idle")
-			elif forced != &"" or (npc.has_target() and distance_to(npc.target_id) < 3.0):
-				go(&"chase")
-			else:
-				var gap := flat_distance(npc.position(), lure)
+			var ok := _chase(b)
+			var after := core.kind_after_chase(ok, not ok and remembers_target()) as int
 
-				if gap > ring:
+			if after & 255 == ZzThinkCore.INVESTIGATE:
+				go(&"investigate")
+			elif after & 255 == ZzThinkCore.IDLE:
+				home = npc.position()
+				idle_kind = Idle.SHAMBLE
+				go(&"idle")
+
+		ZzThinkCore.LURE:
+			_set_sight(ALERT_SIGHT)
+
+			var gap := 0.0
+			if lure != Vector3.INF:
+				if quarry() != &"":
+					c |= ZzThinkCore.C_QUARRY
+				if c & ZzThinkCore.C_FORCED != 0 or (npc.has_target() and distance_to(npc.target_id) < 3.0):
+					c |= ZzThinkCore.C_TARGET_NEAR
+				else:
+					gap = flat_distance(npc.position(), lure)
+					if gap > ring:
+						c |= ZzThinkCore.C_OUT_OF_RING
+			elif quarry() != &"":
+				c |= ZzThinkCore.C_QUARRY
+
+			var r := core.kind_step(k, c) as int
+
+			match r >> 8:
+				ZzThinkCore.A_LURE_GO:
 					go_to(lure, _chase_speed() * pace, 1.0)
 					b.anim = ZzZombieBody.Anim.RUN
 					_unstick(b, lure)
-				else:
+				ZzThinkCore.A_LURE_HOLD:
 					halt()
 					face(lure - npc.position())
 					b.anim = ZzZombieBody.Anim.RAGE
+				_:
+					go(KINDS[r & 255])
 
 
 func _begin_alert(who: StringName, where: Vector3, extra: float) -> void:

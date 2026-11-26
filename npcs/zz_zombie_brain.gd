@@ -23,6 +23,7 @@ const ZzLadders := preload("../game/zz_ladders.gd")
 ## and gravity are one move a tick.
 
 ## The swing: how long from starting it to the hit landing, and to being able to swing again.
+const ZzThinkCore := preload("zz_think_core.gd")
 const SWING_WINDUP := 0.32
 const SWING_RECOVER := 0.55
 
@@ -283,9 +284,11 @@ func _advance_swing() -> void:
 	if _swing_at == INF:
 		return
 
-	var t := now() - _swing_at
+	var t := now()
+	var scale := _attack_scale()
+	var code := _core().swing_step(_swing_at, _swing_landed, t, scale) as int
 
-	if not _swing_landed and t >= SWING_WINDUP * _attack_scale():
+	if code & ZzThinkCore.SWING_LAND:
 		_swing_landed = true
 		var at := survivor_at(_swing_victim)
 		var reach := tune(&"reach", 1.5) + 0.45
@@ -297,9 +300,16 @@ func _advance_swing() -> void:
 				var mult := (h.call(&"down_attack_rules") as Vector2).y if _swing_down else 1.0
 				h.call(&"melee", npc, _swing_victim, tune(&"damage", 2.0) * mult)
 
-	if t >= (SWING_WINDUP + SWING_RECOVER) * _attack_scale():
+	if code & ZzThinkCore.SWING_END:
 		_swing_at = INF
-		_next_swing = now() + maxf(tune(&"attack_interval", 0.9) - SWING_WINDUP - SWING_RECOVER, 0.0) * _attack_scale()
+		_next_swing = _core().swing_next(now(), scale, tune(&"attack_interval", 0.9))
+
+
+## The think glue's cores: the horde's ([member ZzHorde.think_core], gs-sim's when it has them), else the script twin.
+func _core() -> Object:
+	var h := horde()
+	var c: Variant = h.get(&"think_core") if h != null else null
+	return c if c != null else _twin
 
 
 ## A burning zombie swings faster; a staggered one does not swing.
@@ -468,7 +478,24 @@ func _victim_in_front() -> StringName:
 	return best
 
 
+## The function-level profile (tools/server_probe.gd --detail sets it to a Dictionary; null costs one test): usec per
+## part of one think, "think.<part>" -> usec, and a "think.n" count, read back as ms per tick under "prof".
+static var prof: Variant = null
+
+## The script twin of the cores, for a brain with no horde (a tool or suite thinking one by hand).
+static var _twin: Object = ZzThinkCore.new()
+
+
+func _lap(part: String, t0: int) -> int:
+	var now_us := Time.get_ticks_usec()
+	prof[part] = int(prof.get(part, 0)) + now_us - t0
+	return now_us
+
+
 func _think_now(delta: float) -> void:
+	if prof != null:
+		_think_now_profiled(delta)
+		return
 	super._npc_think(delta)
 
 	if npc == null or not npc.is_alive() or body() == null:
@@ -498,6 +525,43 @@ func _think_now(delta: float) -> void:
 	_unstick_watch(delta)
 
 
+## `_think_now` with a lap between its parts; the same calls in the same order.
+func _think_now_profiled(delta: float) -> void:
+	var t := Time.get_ticks_usec()
+	prof["think.n"] = int(prof.get("think.n", 0)) + 1
+	super._npc_think(delta)
+	t = _lap("think.senses", t)
+
+	if npc == null or not npc.is_alive() or body() == null:
+		return
+
+	var h := horde()
+	if h != null and float(h.get(&"zombie_speed_scale")) <= 0.0:
+		halt()
+		cancel_swing()
+		return
+
+	_advance_swing()
+	t = _lap("think.swing", t)
+
+	if staggered():
+		halt()
+		return
+
+	if probe_goal != Vector3.INF:
+		go_to(probe_goal, npc.def.move_speed)
+		body().anim = ZzZombieBody.Anim.RUN
+		_unstick_watch(delta)
+		return
+
+	_decide(delta)
+	t = _lap("think.decide", t)
+	_bash_if_barred(delta)
+	t = _lap("think.bash", t)
+	_unstick_watch(delta)
+	_lap("think.unstick", t)
+
+
 ## The watchdog every kind shares: a zombie that is trying to move and has not got anywhere in
 ## `unstick_seconds` is nudged along where it was going, then, if that did not free it, put on
 ## the nearest clear ground toward its quarry. The kinds' own hops catch the common wedge; this
@@ -510,33 +574,32 @@ func _unstick_watch(delta: float) -> void:
 
 	# In the air the clock pauses, ahead of the wish test because a leap zeroes wish: a common
 	# hopping on the spot never stays grounded for limit.
-	if b != null and b.flying:
-		return
-
-	if limit <= 0.0 or b == null or bashing or swinging() or b.wish.length() < 1.0:
-		_watch_at = Vector3.INF
-		_watch_for = 0.0
-		return
-
 	var here := npc.position()
+	var code := _core().unstick_step(b != null and b.flying, limit, b == null or bashing or swinging(), \
+			b.wish.length() if b != null else 0.0, here, _watch_at, _watch_for, _watch_stage, delta) as int
 
-	# Up or down counts as getting somewhere: a zombie on a ladder moves straight up.
-	if _watch_at == Vector3.INF or flat_distance(here, _watch_at) > WATCH_RADIUS or absf(here.y - _watch_at.y) > WATCH_RADIUS:
-		_watch_at = here
-		_watch_for = 0.0
-		_watch_stage = 0
-		return
-
-	_watch_for += delta
-
-	if _watch_for < limit:
-		return
+	match code:
+		ZzThinkCore.WATCH_HOLD:
+			return
+		ZzThinkCore.WATCH_RESET:
+			_watch_at = Vector3.INF
+			_watch_for = 0.0
+			return
+		ZzThinkCore.WATCH_ANCHOR:
+			# Up or down counts as getting somewhere: a zombie on a ladder moves straight up.
+			_watch_at = here
+			_watch_for = 0.0
+			_watch_stage = 0
+			return
+		ZzThinkCore.WATCH_COUNT:
+			_watch_for += delta
+			return
 
 	_watch_for = 0.0
 	var goal := survivor_at(quarry()) if quarry() != &"" else Vector3.INF
 	var forward := b.wish if goal == Vector3.INF else goal - here
 
-	if _watch_stage == 0 and ZzUnstick.nudge(b, forward):
+	if code == ZzThinkCore.WATCH_NUDGE and ZzUnstick.nudge(b, forward):
 		note_unstick("watch nudge")
 		# Kept where it now stands, not cleared: clearing reset the stage, so a nudge that never
 		# freed it was repeated for ever and the relocate after it was never reached.
@@ -632,32 +695,31 @@ func _nearest_survivor(h: Object) -> float:
 ## (asked a few times a second, not every tick). A zombie with somebody to hit, swinging, or
 ## staggered always thinks every tick.
 func _think_every() -> int:
-	if npc == null or not npc.is_alive() or staggered():
-		return 1
+	var core := _core()
+	var h := horde()
+	var flags := 0
 
-	if swinging():
+	if npc == null or not npc.is_alive() or staggered():
+		flags = ZzThinkCore.EVERY_OFF
+	elif swinging():
 		# Once the blow has landed only the recovery is left to run out: nothing to decide, so a
 		# crowd chewing on one survivor thinks half as often. Every tick before the landing (the
 		# hit is on time) and for the last few ticks of the recovery (the swing ends on time).
-		if _swing_landed and (SWING_WINDUP + SWING_RECOVER) * _attack_scale() - (now() - _swing_at) > 0.05:
-			return 2
+		flags = ZzThinkCore.EVERY_SWINGING | (ZzThinkCore.EVERY_LANDED if _swing_landed else 0)
+	elif bashing:
+		# Tearing at boards is a halt, a face and a blow paid by the time owed: a quarter as often.
+		flags = ZzThinkCore.EVERY_BASHING
+	elif h == null:
+		flags = ZzThinkCore.EVERY_NO_HORDE
 
-		return 1
-
-	# Tearing at boards is a halt, a face and a blow paid by the time owed: a quarter as often.
-	if bashing:
-		return 4
-
-	var h := horde()
-
-	if h == null:
-		return 1
+	if flags != 0:
+		return core.every_early(flags, now(), _swing_at, _attack_scale()) as int
 
 	var now_s := now()
+	var config: Variant = h.get(&"config")
 
 	if now_s - _nearest_at >= 0.3:
 		_nearest_at = now_s
-		var config: Variant = h.get(&"config")
 		var scale := float(config.think_range) if config != null else 1.0
 		# Distances are compared divided by `ZzConfig.think_range` (zz_zombie_think_range).
 		_nearest = _nearest_survivor(h) / scale
@@ -666,33 +728,19 @@ func _think_every() -> int:
 			var near := float(config.body_stride_near) if config != null else BODY_STRIDE_FROM
 			var far := float(config.body_stride_far) if config != null else BODY_STRIDE_FAR_FROM
 			var dormant := float(config.dormant_from) if config != null else 0.0
-			var far_stride := DORMANT_BODY_STRIDE if dormant > 0.0 and _nearest >= dormant else 4
-			b.set_stride(1 if _nearest < near else (2 if _nearest < far else far_stride))
 			var cheap := float(config.body_cheap_from) if config != null else 0.0
-			b.cheap_step = cheap > 0.0 and _nearest >= cheap
+			var packed := core.body_stride(_nearest, near, far, dormant, cheap) as int
+			b.set_stride(packed & 255)
+			b.cheap_step = (packed >> 8) != 0
 
 	# Within reach of a swing or the ring round somebody, every tick; a run at somebody from
 	# further off, every second tick (its body still moves every tick), every third past twenty
 	# metres and every fourth past forty-five. At wave 10 on the school seventy-eight zombies
 	# all within twenty metres thought every tick, nine of a tick's sixteen milliseconds
 	# (tools/survival_long_run --profile).
-	if _nearest < THINK_CLOSE:
-		return 1
-
-	if _nearest < THINK_NEAR:
-		return 2
-
-	if _nearest < THINK_FAR:
-		return 3
-	if _nearest < THINK_DISTANT:
-		return 4
-
-	var config: Variant = h.get(&"config")
-	var dormant := float(config.dormant_from) if config != null else 0.0
-
-	if dormant > 0.0 and _nearest >= dormant:
-		return maxi(int(config.dormant_think_every), 8)
-	return 8
+	var dormant_from := float(config.dormant_from) if config != null else 0.0
+	var dormant_every := int(config.dormant_think_every) if config != null else 8
+	return core.every_tier(_nearest, dormant_from, dormant_every) as int
 
 
 ## A kind's own machine. Called every think after sensing, unless staggered.
