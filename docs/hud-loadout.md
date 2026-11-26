@@ -1,6 +1,6 @@
 # The loadout row (bottom right)
 
-`game/zz_loadout_bar.gd` (`ZzLoadoutBar`, a `GSHudPiece`) draws one horizontal row of slots, with the weight bar over it. It takes values only, never a game object. `ZzHud._draw_loadout` feeds it from the weapon arsenal each frame; an equal row is a no-op.
+`GSLoadoutBar` (gs-ui `hud/gs_loadout_bar.gd`, a `GSHudPiece`, API 26; promoted from this game on 2026-11-26) draws one horizontal row of slots, with the weight bar over it. It takes values only, never a game object. `ZzHud._draw_loadout` feeds it from the weapon arsenal each frame; an equal row is a no-op.
 
 ## Slot API
 
@@ -23,7 +23,7 @@ Weapons come first; the inventory and healing work appends its medkit, pill and 
 
 Not shown anywhere on screen: speed, "SLOWED", or text boxes saying what a pickup, crate or prop does. A looked-at weapon shows only its name over its hold circle.
 
-Promotion to gs-ui (for FC) is filed in Nightly.
+The widget lives in gs-ui (its docs/hud.md, "Loadout bar"); this game only feeds it.
 
 ## Kit slots and hold-to-heal
 

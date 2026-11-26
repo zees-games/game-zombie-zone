@@ -7,10 +7,10 @@ func screen() -> Control:
 		_build()
 	return _root
 
-const LOADOUT_WIDTH := 8.0 * (ZzLoadoutBar.SLOT_W + ZzLoadoutBar.GAP)
+const LOADOUT_WIDTH := 8.0 * (GSLoadoutBar.SLOT_W + GSLoadoutBar.GAP)
 
 ## The loadout row's top edge off the bottom; the counter and fire modes stand on it.
-const LOADOUT_TOP := 24.0 + ZzLoadoutBar.SLOT_H + ZzLoadoutBar.WEIGHT_H + 8.0
+const LOADOUT_TOP := 24.0 + GSLoadoutBar.SLOT_H + GSLoadoutBar.WEIGHT_H + 8.0
 ## Where the bottom-right HUD (loadout, ammo, fire mode) ends; gs-core's loading panel sits above it.
 const CORNER_TOP := LOADOUT_TOP + 106.0 + 12.0
 
@@ -204,12 +204,12 @@ func _build() -> void:
 	_root.add_child(ammo)
 
 	# The loadout row and the weight bar over it: bottom right, one picture per slot.
-	loadout = ZzLoadoutBar.new()
+	loadout = GSLoadoutBar.new()
 	loadout.name = "Loadout"
 	loadout.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	loadout.offset_left = -24.0 - LOADOUT_WIDTH
 	loadout.offset_right = -24.0
-	loadout.offset_top = -24.0 - ZzLoadoutBar.SLOT_H - ZzLoadoutBar.WEIGHT_H
+	loadout.offset_top = -24.0 - GSLoadoutBar.SLOT_H - GSLoadoutBar.WEIGHT_H
 	loadout.offset_bottom = -24.0
 	_root.add_child(loadout)
 	_icons = ZzShopIcons.new()
