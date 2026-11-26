@@ -7,6 +7,7 @@ const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzTouch := preload("../game/zz_touch.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 
 ## Blood behind a hit body (zz_blood.gd over gs-fx's GSFxDecals) and which end of a hold's day a map's own light becomes
 ## (ZzMapDoc.take_derived_light). `godot --headless --path . res://examples/headless_look.tscn`
@@ -195,6 +196,9 @@ func _touch_fit() -> void:
 ## The six specials' bodies carry gear skinned to the same bones, so a bone scale reshapes the gear too: keep every scale
 ## in a band where a body stays a body (a bloater a stout man, not a toad; a screamer slim, not a cone).
 func _special_looks() -> void:
+	# The specials live in the zz-mutants pack now: their looks exist once the packs are scanned.
+	ZzPacks.root = "res://addons"
+	ZzPacks.scan()
 	var worst := 1.0
 	var widest := 1.0
 	for kind: StringName in [&"brute", &"bloater", &"screamer", &"strangler", &"spitter", &"sleeper"]:
