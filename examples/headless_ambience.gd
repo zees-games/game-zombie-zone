@@ -6,7 +6,7 @@ extends GSGameCheckSuite
 const ZzAudio := preload("../game/zz_audio.gd")
 const ZzAmbientRules := preload("../game/zz_ambient_rules.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
-const CHECKS := 72
+const CHECKS := 77
 
 
 func _ready() -> void:
@@ -263,6 +263,31 @@ func _check_real_sounds(audio: ZzAudio) -> void:
 	_check(audio.cue(&"mutant", &"jet") == &"real_mutant_jet", "the Mutant's jet cue resolves")
 	_check(audio.cue(&"sleeper", &"voice") == &"sleeper", "the sleeper keeps her looping cry")
 	_check(audio.cue(&"nobody", &"idle") == ZzAudio.MOAN, "an unknown kind falls back to the first-generation sound")
+
+	var cat := ZzAudio.sound_catalogue()
+	var moan_def := cat.find(ZzAudio.MOAN)
+	_check(moan_def != null and PackedStringArray(moan_def.variants) == ZzAudio._real_files(&"moan"), "the first-generation moan plays the recorded set")
+	var missing_ui: Array[String] = []
+	for id: StringName in [ZzAudio.MAP_START, ZzAudio.OBJECTIVE, ZzAudio.YOU_ARE_DOWN, ZzAudio.YOU_ARE_UP, ZzAudio.YOU_ARE_DEAD,
+			ZzAudio.MAP_WON, ZzAudio.MAP_LOST, ZzAudio.PICKUP, ZzAudio.HEALED, ZzAudio.DEFIB_CHARGE, ZzAudio.DEFIB_ZAP,
+			ZzAudio.UI_CLICK, ZzAudio.UI_DENY]:
+		var path := ZzAudio._file(String(id))
+		if not FileAccess.file_exists(path) and not FileAccess.file_exists(path + ".import"):
+			missing_ui.append(String(id))
+	_check(missing_ui.is_empty(), "every UI, map and defib sound is a recorded file: %s" % ", ".join(missing_ui))
+
+	# The brute's stem layers over the horde's bed, then fades out and takes the bed with it.
+	audio.music(&"")
+	audio.brute_layer(true)
+	audio.advance_music(0.1)
+	_check(audio.manager.music_id() == ZzAudio.MUSIC_HORDE and audio._brute_handle != 0, "a brute starts the bed and its own stem")
+	for _i in 40:
+		audio.advance_music(0.1)
+	_check(is_equal_approx(audio._brute_level, 1.0), "the brute stem fades fully in")
+	audio.brute_layer(false)
+	for _i in 40:
+		audio.advance_music(0.1)
+	_check(audio._brute_handle == 0 and audio.manager.music_id() == &"", "with the brute gone the stem and its bed stop")
 
 
 func _dict_doc() -> Dictionary:

@@ -1109,7 +1109,7 @@ func _on_zombie(kind: StringName, appeared: bool) -> void:
 	_brutes = maxi(_brutes + (1 if appeared else -1), 0)
 
 	if audio != null:
-		audio.music(ZzAudio.MUSIC_BRUTE if _brutes > 0 else &"")
+		audio.brute_layer(_brutes > 0)
 
 	if appeared and hud != null:
 		hud.shout("A BRUTE IS COMING", 3.0)
