@@ -14,4 +14,5 @@ Every file here is CC0 (public domain dedication) or derived from a CC0 file.
 | `woosh.ogg`, `rock_hit.ogg` | Kenney Foley Sounds | Kenney | CC0 |
 | `box_open.ogg` | Kenney RPG Audio | Kenney | CC0 |
 | `call_medic.ogg`, `call_cover_me.ogg`, `call_look_out.ogg` | Kenney Voiceover Pack | Kenney | CC0 |
-| `music_brute.ogg`, `music_horde.ogg` | Kenney Music Loops ("Infinite Descent", "Sad Descent") | Kenney | CC0 |
+| `music_horde.ogg` | [Ambient Horror Track 01](https://opengameart.org/content/ambient-horror-track-01), loop seam cross-faded (2 s) and set to -17 LUFS with ffmpeg | cleytonkauffman | CC0 |
+| `music_brute.ogg` | [Darkest Hour](https://opengameart.org/content/darkest-hour), loop seam cross-faded (2 s) and set to -17 LUFS with ffmpeg | indieteur | CC0 |
