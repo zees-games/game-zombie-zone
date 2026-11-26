@@ -475,10 +475,10 @@ const ZzConfigText := preload("zz_config_text.gd")
 ## How much dismemberment there is (gs-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 flying limbs and blood (the default), 3 limbs give way sooner and the spray is heavier. Family-friendly servers set 0. `zz_gore_level`.
 @export_range(0, 3, 1, "or_greater") var gore_level: int = 2
 
-## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_max_gibs`.
+## The most severed limbs lying about at once on a machine; the oldest is recycled. 0 is unlimited. `zz_gore_max_gibs`.
 @export_range(0, 200, 1, "or_greater") var gore_max_gibs: int = 24
 
-## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 draws none. `zz_gore_max_wounds`.
+## Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; the oldest is recycled). 0 is unlimited. `zz_gore_max_wounds`.
 @export_range(0, 400, 1, "or_greater") var gore_max_wounds: int = 48
 
 ## Which swing the commons use when they strike standing still (drawn only): 0 a mix by body (the default), 1 every one the scratching swipe, 2 every one the grapple on the spot. A zombie that strikes on the run keeps its running swing. `zz_attack_anim`.
