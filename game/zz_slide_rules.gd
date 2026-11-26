@@ -4,7 +4,8 @@ extends RefCounted
 ## [method GSFpsSlidePreset.cvar_table]. Part of the predicted motor, so each is REPLICATED and a client follows it
 ## ([method follow_cvars]) as [ZzCrawlRules] does the crawl. ZZ's slide is the sprint one (only a sprinter holding C).
 
-## `zz_slide_min_speed` 0 means the preset's floor, just over a run ([constant GSFpsSlidePreset.SPRINT_MIN_FACTOR]).
+## The numbers are Fatal Contact's slide (the addon's run preset: boost, friction, duration, cooldown), so the two games slide alike; only the
+## gate differs (ZZ needs the sprint button). `zz_slide_min_speed` 0 means the preset's floor, just over a run ([constant GSFpsSlidePreset.SPRINT_MIN_FACTOR]).
 ## The slide's top speed is not in the shared table and stays a [ZzConfig] number.
 
 signal changed
@@ -22,15 +23,11 @@ const LIMITS := {
 }
 
 var slide_enabled: float = 1.0
-var slide_boost: float = 1.5
+var slide_boost: float = GSFpsSlidePreset.RUN_BOOST
 var slide_min_speed: float = 0.0
-var slide_duration: float = 0.9
-var slide_friction: float = 0.0
-var slide_cooldown: float = 1.0
-
-
-func _init() -> void:
-	slide_friction = GSFpsTunables.new().slide_friction
+var slide_duration: float = GSFpsSlidePreset.RUN_DURATION
+var slide_friction: float = GSFpsSlidePreset.RUN_FRICTION
+var slide_cooldown: float = GSFpsSlidePreset.RUN_COOLDOWN
 
 
 ## cvar name -> [member, help].

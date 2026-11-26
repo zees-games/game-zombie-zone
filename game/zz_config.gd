@@ -97,7 +97,7 @@ const ZzConfigText := preload("zz_config_text.gd")
 @export var sprint_toggle: bool = false
 
 ## Slide top speed; the rest of the slide is the `zz_slide*` cvars.
-@export_range(1.0, 30.0, 0.1, "or_greater") var slide_max_speed: float = 10.5
+@export_range(1.0, 30.0, 0.1, "or_greater") var slide_max_speed: float = GSFpsSlidePreset.RUN_MAX_SPEED
 @export_range(0.1, 5.0, 0.05, "or_greater") var jump_height: float = 1.1
 @export_range(1.0, 60.0, 0.5, "or_greater") var gravity: float = 20.0
 @export_range(0.0, 200.0, 1.0, "or_greater") var air_accelerate: float = 12.0

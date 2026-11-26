@@ -78,7 +78,7 @@
 # Whether Shift toggles sprint instead of being held.
 # sprint_toggle: false
 # Slide top speed; the rest of the slide is the `zz_slide*` cvars. [1.0..]
-# slide_max_speed: 10.5
+# slide_max_speed: 14.0
 #  [0.1..]
 # jump_height: 1.1
 #  [1.0..]

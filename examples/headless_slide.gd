@@ -3,12 +3,13 @@ extends GSGameCheckSuite
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzPlayer := preload("../game/zz_player.gd")
 const ZzSlideRules := preload("../game/zz_slide_rules.gd")
+const ZzViewMotion := preload("../game/zz_view_motion.gd")
 
 ## Slide in Zombie Zone: only a sprinter holding C slides. A walk, a plain run or a crouch alone
 ## never does. (Fatal Contact keeps the addon default and slides at a run; its own suite holds that.)
 
-const SECTIONS := 3
-const CHECKS := 18
+const SECTIONS := 5
+const CHECKS := 33
 const STEP := 1.0 / 30.0
 
 var _sections_entered := 0
@@ -26,6 +27,8 @@ func _run() -> void:
 	_test_tunables()
 	_test_gated()
 	_test_sprint_slide()
+	_test_matches_fatal_contact()
+	_test_camera_motion()
 	await get_tree().process_frame
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
@@ -122,4 +125,92 @@ func _test_sprint_slide() -> void:
 	motor.simulate(s, _command(1.0, GSFpsCommand.BUTTON_SPRINT | GSFpsCommand.BUTTON_CROUCH), STEP)
 	_check(s.is_sliding(), "sprint plus crouch starts a slide")
 	_check(s.horizontal_speed() > before, "it starts with a burst")
+	_sections_finished += 1
+
+
+## Fatal Contact slides on the addon's run preset (`GSFpsSlidePreset.apply_run`). ZZ's survivor must feel the same once the gate is met:
+## the same numbers, and in a sim the same burst, carry and cooldown from the same entry speed.
+func _test_matches_fatal_contact() -> void:
+	_sections_entered += 1
+	print("the slide feels like Fatal Contact's")
+	var zz := ZzPlayer.tunables_for(ZzConfig.new())
+	var fc := GSFpsTunables.new()
+	GSFpsSlidePreset.apply_run(fc)
+	_check(is_equal_approx(zz.slide_boost, fc.slide_boost), "same boost", "%.2f vs %.2f" % [zz.slide_boost, fc.slide_boost])
+	_check(is_equal_approx(zz.slide_friction, fc.slide_friction), "same friction", "%.2f vs %.2f" % [zz.slide_friction, fc.slide_friction])
+	_check(is_equal_approx(zz.slide_duration, fc.slide_duration), "same duration")
+	_check(is_equal_approx(zz.slide_cooldown, fc.slide_cooldown), "same cooldown")
+	_check(is_equal_approx(zz.slide_max_speed, fc.slide_max_speed), "same top speed")
+
+	# Both from the same entry speed on a flat floor: the speed after the burst and the distance of the whole slide.
+	var entry := zz.max_speed * 1.45
+	var zz_run := _slide_from(zz, entry, GSFpsCommand.BUTTON_SPRINT)
+	var fc_run := _slide_from(fc, entry, 0)
+	_check(absf(zz_run[0] - fc_run[0]) < 0.01, "same speed after the burst", "%.2f vs %.2f" % [zz_run[0], fc_run[0]])
+	_check(absf(zz_run[1] - fc_run[1]) < 0.15, "same distance carried", "%.2f vs %.2f" % [zz_run[1], fc_run[1]])
+	_check(absf(zz_run[2] - fc_run[2]) < 0.1, "same time sliding", "%.2f vs %.2f" % [zz_run[2], fc_run[2]])
+	_check(zz_run[0] > entry + 3.0, "the burst is a real shove, not a nudge", "%.2f from %.2f" % [zz_run[0], entry])
+	_sections_finished += 1
+
+
+## [speed right after the burst, metres slid, seconds slid] for a slide started at [param entry] m/s.
+func _slide_from(t: GSFpsTunables, entry: float, extra: int) -> Array:
+	var motor := GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.GROUND
+	s.velocity = Vector3(0.0, 0.0, -entry)
+	var held := extra | GSFpsCommand.BUTTON_CROUCH
+	motor.simulate(s, _command(1.0, held), STEP)
+	var burst := s.horizontal_speed()
+	var start := s.position
+	var seconds := 0.0
+
+	while s.is_sliding() and seconds < 6.0:
+		motor.simulate(s, _command(1.0, held), STEP)
+		seconds += STEP
+
+	return [burst, s.position.distance_to(start), seconds]
+
+
+func _test_camera_motion() -> void:
+	_sections_entered += 1
+	print("the camera leans and widens in a slide, and not on a walk")
+	var t := ZzPlayer.tunables_for(ZzConfig.new())
+	var motor := GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
+	var motion := ZzViewMotion.picks()
+	var s := _run_for(motor, 0, 1.0)
+
+	for _i in range(30):
+		motion.advance(s, STEP)
+
+	_check(is_zero_approx(motion.fov_added()) and absf(motion.roll()) < 0.05, "a plain run adds nothing")
+
+	var run := _run_for(motor, GSFpsCommand.BUTTON_SPRINT, 3.0)
+	motor.simulate(run, _command(1.0, GSFpsCommand.BUTTON_SPRINT | GSFpsCommand.BUTTON_CROUCH), STEP)
+	_check(run.is_sliding(), "a slide to look at")
+	var widest := 0.0
+	var rolled := 0.0
+
+	for _i in range(20):
+		motor.simulate(run, _command(1.0, GSFpsCommand.BUTTON_SPRINT | GSFpsCommand.BUTTON_CROUCH), STEP)
+		motion.advance(run, STEP)
+		widest = maxf(widest, motion.fov_added())
+		rolled = maxf(rolled, absf(motion.roll()))
+
+	_check(widest > 1.0, "sliding widens the view", "%.2f degrees" % widest)
+	_check(rolled > 0.2 and rolled <= 5.0, "and rolls it, bounded", "%.2f degrees" % rolled)
+
+	var landing := ZzViewMotion.picks()
+	landing.note_landing(12.0)
+	var deepest := 0.0
+
+	for _i in range(20):
+		landing.advance(run, STEP)
+		deepest = minf(deepest, landing.eye_drop())
+
+	_check(deepest < -0.01, "a hard landing dips the eye", "%.3f m" % deepest)
+	var small := ZzViewMotion.picks()
+	small.note_landing(3.0)
+	small.advance(run, STEP)
+	_check(is_zero_approx(small.eye_drop()), "a hop's landing dips nothing")
 	_sections_finished += 1
