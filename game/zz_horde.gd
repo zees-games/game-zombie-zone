@@ -273,6 +273,9 @@ func rebuild_navigation() -> GSResult:
 	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
+	if _prune_warm != null:
+		_prune_warm.cancel()
+
 	_prune_warm = null
 
 	if _nav_job != null:

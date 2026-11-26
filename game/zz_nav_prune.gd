@@ -74,7 +74,14 @@ static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int
 	prune.nudge = NUDGE
 	prune.climb = CLIMB
 	prune.required = required
-	var dropped := prune.apply(nav)
+	var dropped := Vector2i.ZERO
+
+	if warm != null and warm.result != null:
+		warm.adopt_into(nav)
+		dropped = warm.result_dropped
+	else:
+		dropped = prune.apply(nav)
+
 	var climbs := join_ladders(nav, ladders, ladder_side(space, mask, passable), bare)
 
 	if warm != null and warm.recording:

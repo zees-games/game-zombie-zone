@@ -20,6 +20,10 @@ var replays := 0
 var replay_ms := 0.0
 ## Shape queries asked so far.
 var asked := 0
+## The pruned copy the last replay made when it lacked no answer: that replay is the prune, done on a thread with nothing
+## left to ask, so the graph takes it over ([method adopt_into]) instead of walking the whole prune again on the main thread.
+var result: GSNpcNavData = null
+var result_dropped := Vector2i.ZERO
 
 var _nav: GSNpcNavData = null
 var _space: PhysicsDirectSpaceState3D = null
@@ -36,6 +40,9 @@ var _queued := {}
 var _next := 0
 var _in_edges := false
 var _done := false
+## The replay's thread: a replay is pure computation over the answers (an unanswered question is queued, not asked), and
+## the main thread leaves the answers alone until it ends.
+var _thread: Thread = null
 
 
 func _init(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, passable: Array[RID] = [], ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array()) -> void:
@@ -54,6 +61,31 @@ func is_done() -> bool:
 	return _done
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		cancel()
+
+
+## Waits out a running replay (it holds no physics, so this is quick next to a build).
+func cancel() -> void:
+	if _thread != null:
+		_thread.wait_to_finish()
+		_thread = null
+
+
+## Puts the pruned graph the final replay made into [param nav] (the object the game already holds), in place.
+func adopt_into(nav: GSNpcNavData) -> void:
+	nav.points = result.points
+	nav.edges = result.edges
+	nav.areas = result.areas
+	nav.flags = result.flags
+	nav.cover_positions = result.cover_positions
+	nav.cover_normals = result.cover_normals
+	nav.cover_flags = result.cover_flags
+	nav.meta = result.meta
+	nav.invalidate_index()
+
+
 ## 0 to 1 over both passes.
 func progress() -> float:
 	if _done:
@@ -68,6 +100,15 @@ func progress() -> float:
 func step(budget_ms: float) -> bool:
 	if _done:
 		return true
+
+	if _thread != null:
+		if _thread.is_alive():
+			return false
+
+		_thread.wait_to_finish()
+		_thread = null
+		_done = _queue.is_empty()
+		return _done
 
 	var deadline := Time.get_ticks_usec() + int(maxf(budget_ms, 0.1) * 1000.0)
 	var pts := _nav.points
@@ -126,9 +167,9 @@ func _learn(deadline: int) -> bool:
 	_queue.clear()
 	_queue_at = 0
 	_queued.clear()
-	_replay()
-	_done = _queue.is_empty()
-	return false if not _done else true
+	_thread = Thread.new()
+	_thread.start(_replay)
+	return false
 
 
 func want_point(p: Vector3, loose: bool) -> void:
@@ -143,14 +184,21 @@ func want_edge(a: Vector3, b: Vector3, loose: bool) -> void:
 		_queue.append([1, loose, a, b])
 
 
-## The prune is run on a copy, where an unanswered question is queued and answered "blocked" at no cost; the copy is thrown
-## away. Answers the strict point and edge passes did not cover (a slide off a blocked point, the loose body, a column beside
-## a steep edge, a bridge between pieces) are found this way without this class knowing the prune's logic.
+## The prune is run on a copy (on a thread: it is a whole walk of the graph), where an unanswered question is queued and
+## answered "blocked" at no cost. Answers the strict point and edge passes did not cover (a slide off a blocked point, the
+## loose body, a column beside a steep edge, a bridge between pieces) are found this way without this class knowing the
+## prune's logic. A replay that queued nothing is the finished prune and is kept in [member result]. Ladders are joined
+## later, on the main thread, since that asks physics rays.
 func _replay() -> void:
 	var began := Time.get_ticks_usec()
 	recording = true
 	var copy := _nav.duplicate(true) as GSNpcNavData
-	var _dropped := ZzNavPrune.apply(copy, _space, _mask, _ladders, _required, _passable, self)
+	var no_ladders: Array[AABB] = []
+	var dropped := ZzNavPrune.apply(copy, _space, _mask, no_ladders, _required, _passable, self)
 	recording = false
 	replays += 1
 	replay_ms = maxf(replay_ms, float(Time.get_ticks_usec() - began) / 1000.0)
+
+	if _queue.is_empty():
+		result = copy
+		result_dropped = dropped
