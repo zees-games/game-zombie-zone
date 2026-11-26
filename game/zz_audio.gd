@@ -38,6 +38,8 @@ const PICKUP := &"pickup"
 const HEALED := &"healed"
 const DEFIB_CHARGE := &"defib_charge"
 const DEFIB_ZAP := &"defib_zap"
+const VOICE_DUCK_SECONDS := 1.6
+const DEFIB_DUCK_SECONDS := 1.2
 const UI_CLICK := &"ui_click"
 const UI_DENY := &"ui_deny"
 const HURT := &"hurt"
@@ -562,7 +564,24 @@ func on_weapon(where: Vector3, kind: int, weapon_id: StringName = &"") -> bool:
 
 func special_voice(kind: StringName, where: Vector3) -> int:
 	var id := cue(kind, &"voice")
-	return at(id, where) if id != &"" else 0
+	if id == &"":
+		return 0
+	_duck_music(&"special_voice", VOICE_DUCK_SECONDS)
+	return at(id, where)
+
+
+## Lowers the music bus under a loud one-shot and lets it back up after [param seconds].
+func _duck_music(holder: StringName, seconds: float) -> void:
+	if manager == null or not is_inside_tree():
+		return
+	manager.duck(holder)
+	get_tree().create_timer(seconds).timeout.connect(manager.unduck.bind(holder), CONNECT_ONE_SHOT)
+
+
+## A defibrillator's charge and zap, with the music stepping aside for them.
+func defib(id: StringName, where: Vector3) -> int:
+	_duck_music(&"defib", DEFIB_DUCK_SECONDS)
+	return at(id, where)
 
 
 ## The kind's cue for [param key] (`idle`, `rage`, `attack`, `die`, `hurt`, `voice`, ...): its profile's
