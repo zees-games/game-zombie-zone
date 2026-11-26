@@ -575,10 +575,6 @@ var _kit_rows: Array = []
 
 var _build_kit_rows: Callable = func() -> Array:
 	var rows: Array = []
-	if player.medkits > 0:
-		rows.append(["medkit x%d" % player.medkits, _kit_keys[0]])
-	if player.pills > 0:
-		rows.append(["pills x%d" % player.pills, _kit_keys[1]])
 	if player.defibs > 0:
 		rows.append(["defibrillator x%d" % player.defibs, _kit_keys[2]])
 	return rows
@@ -772,7 +768,26 @@ func _draw_loadout(arsenal: GSWeaponArsenal) -> void:
 			low = float(weapon.magazine) <= float(def.magazine) * 0.25
 		rows.append({"key": str(key), "icon": picture, "name": ZzWeapons.title_of(def.id), "text": line,
 			"selected": key == arsenal.current_slot(), "low": low})
+	_append_kit_slots(rows)
 	loadout.set_slots(rows)
+
+## 0..1 of a hold-to-heal in progress, set by whatever runs the heal (the inventory work); 0 draws no bar.
+var _heal_fraction: float = 0.0
+
+func set_heal_fraction(fraction: float) -> void:
+	_heal_fraction = clampf(fraction, 0.0, 1.0)
+
+## The medkits and pills after the weapons, one slot each (a text slot: no model to render). A heal in progress
+## ([method set_heal_fraction]) fills the bar along the foot of its slot. The kits' hint rows over the health plate keep only the defibrillator.
+func _append_kit_slots(rows: Array) -> void:
+	if player.medkits <= 0 and player.pills <= 0:
+		return
+	var green := Color(0.35, 0.9, 0.5)
+	if player.medkits > 0:
+		rows.append({"key": _kit_keys[0], "name": "MEDKIT", "text": "x%d" % player.medkits, "accent": green,
+			"fill": _heal_fraction})
+	if player.pills > 0:
+		rows.append({"key": _kit_keys[1], "name": "PILLS", "text": "x%d" % player.pills, "accent": green})
 
 func _draw_weight() -> void:
 	if loadout == null:
