@@ -16,6 +16,7 @@ extends GSHudPiece
 ##     "low": false,               # the line in the low colour
 ##     "empty": false,             # nothing there: drawn faint (a vacant slot, a used-up kit)
 ##     "accent": Color(...),       # optional: the selected edge's colour (a medkit may be green)
+##     "fill": 0.4,                # optional 0..1: a progress bar along the slot's foot (hold E to heal)
 ## }
 ## [/codeblock]
 ## Weapons first, then whatever else the host appends: the row grows to the left and stays anchored at the
@@ -185,6 +186,12 @@ func _draw_slot(slot: Dictionary, rect: Rect2, lift: float) -> void:
 	else:
 		ink_text(Vector2(picture.position.x, picture.get_center().y + 5.0), str(slot.get("name", "")), 14,
 			Color(colour(&"text"), alpha), HORIZONTAL_ALIGNMENT_CENTER, picture.size.x, 4)
+
+	var fill := clampf(float(slot.get("fill", 0.0)), 0.0, 1.0)
+	if fill > 0.0:
+		var track := Rect2(rect.position.x + 8.0, rect.end.y - 5.0, rect.size.x - 16.0, 3.0)
+		draw_rect(track, Color(0.0, 0.0, 0.0, 0.45))
+		draw_rect(Rect2(track.position, Vector2(track.size.x * fill, track.size.y)), accent)
 
 	var text := str(slot.get("text", ""))
 	if text != "":
