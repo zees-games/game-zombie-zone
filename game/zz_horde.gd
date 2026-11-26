@@ -200,6 +200,8 @@ var _nav_job: ZzNavJob = null
 
 ## The graph's physics prune asked ahead a slice a tick, once its job is done ([ZzNavPruneWarm]); null when none is.
 var _prune_warm: RefCounted = null
+## Builds the search graph of the pruned nav off the frame (the job's own thread could not: it ran before the prune).
+var _graph_thread: Thread = null
 
 var _map_nav_pending: bool = false
 
@@ -273,6 +275,10 @@ func rebuild_navigation() -> GSResult:
 	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
+	if _graph_thread != null:
+		_graph_thread.wait_to_finish()
+		_graph_thread = null
+
 	if _prune_warm != null:
 		_prune_warm.cancel()
 
@@ -315,6 +321,14 @@ func _poll_nav() -> void:
 ## Whether the physics prune of a finished graph may run in one call: its questions are asked a slice a tick first, so
 ## that call only reads the answers. True at once for a graph already pruned (the cache) or with no world to ask.
 func _prune_ready(data: GSNpcNavData) -> bool:
+	if _graph_thread != null:
+		if _graph_thread.is_alive():
+			return false
+
+		_graph_thread.wait_to_finish()
+		_graph_thread = null
+		return true
+
 	if not _prune_due(data):
 		return true
 
@@ -328,7 +342,23 @@ func _prune_ready(data: GSNpcNavData) -> bool:
 		var ladders: Array[AABB] = game.map.mechanics.ladder_boxes() if game.map != null and game.map.mechanics != null else []
 		_prune_warm = ZzNavPruneWarm.new(data, space, ZzNavPrune.body_mask(game.physics), passable, ladders, _required_spots())
 
-	return _prune_warm.step(config.nav_budget_ms)
+	if not _prune_warm.step(config.nav_budget_ms):
+		return false
+
+	# Every answer is in: take the pruned graph over now (a read of the answers), then build the search graph on a thread.
+	_prune_blocked(data, _nav_job)
+
+	if GSPlatform.has_threads() and config.nav_threads > 0:
+		_graph_thread = Thread.new()
+		_graph_thread.start(_graph_for_job.bind(_nav_job))
+		return false
+
+	return true
+
+
+func _graph_for_job(job: ZzNavJob) -> void:
+	job.graph = _graph_off_thread(job.nav)
+
 
 func _prune_due(data: GSNpcNavData) -> bool:
 	return data != null and int(data.meta.get("pruned", 0)) < PRUNE_VERSION and game != null and game.physics != null and game.is_inside_tree()
