@@ -28,8 +28,14 @@ func _test_the_hud() -> void:
 		hud.vitals.number_text() == "30" and is_equal_approx(hud.vitals.bonus, 25.0) and hud.vitals.status == "",
 		"GSVitals: real health as the number, borrowed health as its bonus", str(hud.vitals.describe())
 	)
-	_check(hud.kits.rows.size() == 1 and str(hud.kits.rows[0][0]) == "medkit x1" and str(hud.kits.rows[0][1]) != "",
-		"the medkit is a GSKeyHints row with its key", str(hud.kits.rows))
+	var with_kit: int = hud.loadout.slot_count()
+	me.medkits = 0
+	hud._process(0.0)
+	_check(hud.kits.rows.is_empty() and with_kit == hud.loadout.slot_count() + 1,
+		"the medkit is a slot in the loadout row, not a key hint (the hints keep the defibrillator)",
+		"kits=%s slots %d -> %d" % [hud.kits.rows, with_kit, hud.loadout.slot_count()])
+	me.medkits = 1
+	hud._process(0.0)
 
 	_check_hud_roster(game, me, hud)
 	_hurt(game, me, 500.0)
