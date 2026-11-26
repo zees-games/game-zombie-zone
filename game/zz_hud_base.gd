@@ -70,12 +70,12 @@ var _element_nodes: Dictionary = {}
 func _attach_elements() -> void:
 	var map := {
 		&"vitals": [vitals, stamina_bar, kits],
-		&"weapons": [_weapon_icon, _weight, _weight_back, _weight_fill, _carry],
+		&"weapons": [loadout],
 		&"ammo": [ammo],
 		&"fire_mode": [fire_mode],
 		&"teammates": [_team],
 		&"wave": [strip],
-		&"prompts": [_prompt, _use_back, _use_fill, _use_label, _held],
+		&"prompts": [_use_back, _use_fill, _held],
 		&"damage_dir": _hurt_marks.map(func(m: Dictionary) -> Control: return m["rect"]),
 		&"hit_markers": [hit_marker, damage_numbers],
 	}
@@ -138,9 +138,6 @@ var vitals: GSVitals = null
 ## What is in hand and how much is in it.
 var ammo: GSAmmoCounter = null
 
-## The carried weapon's sprite above the counter (`cl_weapon_icons`); hidden when the weapon has none.
-var _weapon_icon: GSWeaponIconPlate = null
-
 ## The held gun's fire modes, above the ammunition.
 var fire_mode: GSFireModeIndicator = null
 
@@ -177,8 +174,6 @@ var _team_rows: Array[Dictionary] = []
 
 var _effects: GSStatusLines = null
 
-var _prompt: Label = null
-
 ## The box file's order, titles and colours, set by the client: the carried slot is drawn from
 ## `player.carried_index` (an index into it plus one; 0 is unknown, or nothing carried).
 var box_order: Array[StringName] = []
@@ -187,22 +182,14 @@ var box_titles: Dictionary = {}
 
 var box_colours: Dictionary = {}
 
-var _carry: Label = null
-
-## The weight readout (bar and slot contents), fed by [method set_carry]; hidden when the rule is off.
-var _weight: Label = null
-
-var _weight_back: ColorRect = null
-
-var _weight_fill: ColorRect = null
+## The row of weapon slots and the weight bar over it (see [ZzLoadoutBar]).
+var loadout: ZzLoadoutBar = null
 
 var _weight_state: Dictionary = {"on": false}
 
 var _use_back: ColorRect = null
 
 var _use_fill: ColorRect = null
-
-var _use_label: Label = null
 
 var _held: Label = null
 
@@ -302,9 +289,10 @@ func box_banner(title: String, message: String, colour: Color) -> void:
 	_banner_line.text = message
 	_banner_for = 4.0
 
-func set_prompt(text: String) -> void:
-	if _prompt != null:
-		_prompt.text = text
+## Kept for the client's call; nothing is drawn. The "press E to ..." line was a box that said what a key does,
+## and the owner had the HUD stop explaining itself.
+func set_prompt(_text: String) -> void:
+	pass
 
 ## A hit of this survivor's that the server confirmed: the marker round the crosshair, and
 ## the number rising off the body. Never called from the local prediction.
