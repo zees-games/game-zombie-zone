@@ -1,6 +1,10 @@
 extends "zz_client_ending.gd"
 
 const ZzViewGrip := preload("zz_view_grip.gd")
+const ZzViewMotion := preload("zz_view_motion.gd")
+const DOWN_EASE_SECONDS := 0.25
+## [GSPlayerViewArms] fits itself on its third tick; before that the arms stand where the figure was built, which showed as a body at the lens.
+const ARMS_FIT_FRAMES := 4
 const ScopePrefs := preload("res://addons/gs_weapon/view/gs_weapon_scope_prefs.gd")
 
 
@@ -1286,6 +1290,9 @@ func _build_camera() -> void:
 	camera.current = true
 	camera.far = 400.0
 
+	if player.controller != null and not player.controller.landed.is_connected(_on_landed):
+		player.controller.landed.connect(_on_landed)
+
 	# Survivors and stand-ins, handed over (their hulls are off while players pass through
 	# each other), and zombies, found on their layer: hidden at the lens, faded in third
 	# person between the camera and you. It rides the camera wherever the camera goes.
@@ -1300,6 +1307,11 @@ func _build_camera() -> void:
 		game.view_rules.changed.connect(_on_view_rules_changed)
 	third_person = game.view_rules.resolve(third_person)
 	_place_camera()
+
+
+## The controller's landing (not emitted in a prediction replay) kicks the own camera's dip.
+func _on_landed(impact: float) -> void:
+	_motion.note_landing(impact)
 
 
 func _place_camera() -> void:
@@ -1840,14 +1852,27 @@ func _process(delta: float) -> void:
 		yaw += deg_to_rad(punch.y)
 
 	# Down, the view tips over a little and drops to the floor.
-	var roll := deg_to_rad(12.0) if player.is_down() else 0.0
-	rig.rotation = Vector3(pitch, yaw, roll)
-
+	# Eased in and out: the roll and the drop used to jump the frame a survivor went down or got up.
+	_down_eased = move_toward(_down_eased, 1.0 if player.is_down() else 0.0, delta / DOWN_EASE_SECONDS)
+	var roll := deg_to_rad(12.0) * smoothstep(0.0, 1.0, _down_eased)
 	var drawn := player.controller.render_state()
+	var dip := 0.0
+	_motion_fov = 0.0
+
+	if not third_person and not player.is_down() and not player.is_held():
+		_motion.advance(drawn, delta)
+		roll += deg_to_rad(_motion.roll())
+		pitch += deg_to_rad(_motion.pitch())
+		dip = _motion.eye_drop()
+		_motion_fov = _motion.fov_added()
+	else:
+		_motion.snap()
+
+	rig.rotation = Vector3(pitch, yaw, roll)
 	# Follows the crouch: the height taken when the camera was placed is the standing one.
 	_rig_height = player.eye_position().y - state.position.y
-	var height := ZzPlayer.EYE_DOWN if player.is_down() else _rig_height
-	rig.global_position = drawn.position + Vector3(0.0, height, 0.0)
+	var height := lerpf(_rig_height, ZzPlayer.EYE_DOWN, smoothstep(0.0, 1.0, _down_eased))
+	rig.global_position = drawn.position + Vector3(0.0, height + dip, 0.0)
 	_present_end_camera(delta, drawn.position + Vector3(0.0, _rig_height, 0.0))
 
 	if weapons != null:
@@ -1877,6 +1902,13 @@ var cl_viewarms_held: bool = false
 var _held_grip: GSViewGrip = null
 var _held_on: bool = false
 var _arms_downed: bool = false
+## Slide roll, sprint widening and the landing dip of the own camera ([ZzViewMotion]); its numbers are added in [method _present_rig].
+var _motion: GSFpsViewMotion = ZzViewMotion.picks()
+var _motion_fov: float = 0.0
+## 0 standing, 1 down: the camera's roll and drop follow it over [constant DOWN_EASE_SECONDS].
+var _down_eased: float = 0.0
+## Frames since the crawl arms were switched on; they stay hidden until the addon has fitted them ([constant ARMS_FIT_FRAMES]).
+var _arms_age: int = 0
 
 
 func _present_view_arms(delta: float, yaw: float) -> void:
@@ -1893,11 +1925,18 @@ func _present_view_arms(delta: float, yaw: float) -> void:
 	_arms_yaw.global_position = camera.global_position
 	# Holding a weapon the arms follow the look's pitch too: the gun they grip is under the camera.
 	_arms_yaw.global_rotation = Vector3(camera.global_rotation.x if _held_on else 0.0, yaw, 0.0)
-	var on := player.is_down() and player.is_alive() and not third_person and not is_spectating() and _end_weight < 0.3
+	# The empty crawling hands only while crawling with the gun put away. Still down (propped) or crawling with the weapon out, the
+	# weapon's own hands are the ones drawn, and the crawl arms on top of them made two pairs.
+	var on := player.is_crawling() and player.is_holstered() and player.is_alive() and not third_person \
+		and not is_spectating() and _end_weight < 0.3
 
 	if on != _arms_downed:
 		_arms_downed = on
+		_arms_age = 0
 		view_arms.set_downed(on)
+
+	_arms_age += 1
+	_arms_yaw.visible = (on and _arms_age >= ARMS_FIT_FRAMES) or (_held_on and not on)
 
 	_present_held_hands()
 
@@ -1988,7 +2027,7 @@ func _present_aim() -> void:
 	if hands != null and not is_spectating():
 		zoom = hands.aim_fov_scale()
 		view_zoom = scope_view_zoom(hands)
-	camera.fov = base_fov * view_zoom
+	camera.fov = base_fov * view_zoom + _motion_fov
 	if _sampler != null:
 		_sampler.look_scale = zoom
 	if player != null and player.sampler != null:

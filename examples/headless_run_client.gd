@@ -150,9 +150,9 @@ func _check_client_endings(client: ZzClient, rules: ZzEndCameraRules, spot: Vect
 	var arms_up: bool = arms != null and arms.get_parent() != null and arms.get_parent() is Node3D and not (arms.get_parent() is Camera3D)
 	_check(arms_up and not arms.shown and not arms.arms().visible, "the first-person arms are mounted under a yaw pivot, hidden while up")
 	_hurt(client.game, client.player, 500.0)
-	for _i in 6:
+	for _i in 12:
 		await get_tree().process_frame
-	_check(client.player.is_down() and arms.shown and arms.arms().visible, "and shown once the survivor is down", str(client.player.is_down()))
+	_check(client.player.is_down() and not arms.shown, "and still hidden while propped up (the weapon draws its own hands)", str(client.player.is_down()))
 	_check(arms.get_parent().global_position.distance_to(client.camera.global_position) < 0.01, "at the eye")
 	rules.enabled = 0.0
 	client.game.map_ending.emit(true, 1.0, 0.4, spot)

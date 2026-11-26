@@ -276,7 +276,7 @@ func _run() -> void:
 			await _view_possess(game, local, stand)
 		"ending", "trail":
 			await _view_ending(game, local, stand)
-		"crawl", "crawl_third", "crawl_down":
+		"crawl", "crawl_third", "crawl_down", "crawl_seq":
 			await _view_crawl(game, local, stand)
 		"deploy", "deploy_third", "deploy_side":
 			await _view_deploy(game, local, stand)
