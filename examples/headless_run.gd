@@ -1111,17 +1111,7 @@ func _test_ground_strike() -> void:
 ## Knees, feet, hands and the stomach are gs-combat zone ids on a zombie, and fold into leg, arm and chest with mp_hitzones 0.
 func _test_limb_zones() -> void:
 	_section("zombie limbs use gs-combat's zone ids (knee, foot, hand, stomach)")
-	const L := preload("../npcs/zz_zombie_limbs.gd")
-	var hc1: int = L.hit_code(&"head", true, 0)
-	var hc2: int = L.hit_code(&"head", true, hc1)
-	_check((hc1 & 7) == L.HIT_HEAD and (hc1 & 8) != 0 and hc1 != hc2, "a hit code carries region and side and toggles on every hit so a repeat hit still replicates", "%d %d" % [hc1, hc2])
-	_check(L.zone_of(&"legL", 0.27) == GSHitGroup.KNEE and L.zone_of(&"legR", 0.27) == GSHitGroup.KNEE, "a leg hit at knee height is the knee")
-	_check(L.zone_of(&"legL", 0.03) == GSHitGroup.FOOT, "a leg hit at the ground is the foot")
-	_check(L.zone_of(&"legL", 0.45) == GSHitGroup.LEG, "a thigh is the leg")
-	_check(L.zone_of(&"armR", 0.3) == GSHitGroup.HAND and L.zone_of(&"armR", 0.7) == GSHitGroup.ARM, "a low arm hit is the hand, a high one the arm")
-	_check(L.zone_of(&"head", 0.95) == GSHitGroup.HEAD and L.zone_of(&"gunL", 0.5) == GSHitGroup.CHEST, "the head is the head and a mutant's gun the chest")
-	_check(GSHitzone.coarse(L.zone_of(&"legL", 0.27)) == GSHitGroup.LEG and GSHitzone.coarse(L.zone_of(&"armL", 0.3)) == GSHitGroup.ARM, "with zones off knee folds to leg and hand to arm")
-	_check(GSHitzone.coarse(GSHitGroup.STOMACH) == GSHitGroup.CHEST, "with zones off the stomach folds into chest")
+	_check_limb_codes()
 	var game := await _team(1, _quiet)
 	var npc := game.horde.spawner.spawn(ZzNpcs.COMMON, STREET + Vector3(0.0, 0.0, -8.0), &"test", Basis(Vector3.UP, PI))
 	var belly := npc.node.get_node_or_null(^"Hitboxes/Stomach") as GSHitbox

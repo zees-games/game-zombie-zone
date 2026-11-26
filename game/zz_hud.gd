@@ -767,8 +767,24 @@ func _draw_stamina() -> void:
 	stamina_bar.refresh()
 
 ## The row of slots: one picture each, from the weapon's own model (the first time it is asked for), else the
-## sprite sheet's. A slot holding several weapons shows the one in hand.
+## sprite sheet's; a slot of several shows the one in hand. Rebuilt only when a weapon, count, key or selection changes.
 func _draw_loadout(arsenal: GSWeaponArsenal) -> void:
+	var sig := hash(arsenal.current_slot()) + player.medkits * 1009 + player.pills * 100003 + int(_heal_fraction * 1000.0) * 31
+	sig = sig * 31 + hash(_kit_keys[0]) * 7 + hash(_kit_keys[1]) * 13
+	for key in arsenal.slots():
+		var held: Array[GSWeaponSlot] = arsenal.weapons_in(key)
+		if not held.is_empty():
+			var def := held[0].def
+			var reserve := arsenal.ammo().count(def.ammo_type) if def.ammo_type != &"" else 0
+			sig = sig * 31 + hash(key) + def.id.hash() * 7 + held[0].magazine * 131 + reserve * 1031
+	if sig == _loadout_sig:
+		return
+	_loadout_sig = sig
+	loadout.set_slots(_build_loadout_rows.call(arsenal))
+
+var _loadout_sig: int = 0
+
+var _build_loadout_rows: Callable = func(arsenal: GSWeaponArsenal) -> Array:
 	var rows: Array = []
 	for key in arsenal.slots():
 		var held: Array[GSWeaponSlot] = arsenal.weapons_in(key)
@@ -793,7 +809,7 @@ func _draw_loadout(arsenal: GSWeaponArsenal) -> void:
 		rows.append({"key": str(key), "icon": picture, "name": ZzWeapons.title_of(def.id), "text": line,
 			"selected": key == arsenal.current_slot(), "low": low})
 	_append_kit_slots(rows)
-	loadout.set_slots(rows)
+	return rows
 
 ## 0..1 of a hold-to-heal in progress, set by whatever runs the heal (the inventory work); 0 draws no bar.
 var _heal_fraction: float = 0.0
@@ -852,6 +868,7 @@ func _draw_weapon() -> void:
 		ammo.clear()
 		fire_mode.clear()
 		loadout.set_slots([])
+		_loadout_sig = 0
 		return
 
 	_offered.clear()

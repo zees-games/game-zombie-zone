@@ -41,6 +41,22 @@ static func hit_code(limb: StringName, pos_x: bool, prior: int) -> int:
 	return region | (8 if pos_x else 0) | ((prior & 16) ^ 16)
 
 
+## A shot landing on [param limb] of [param body] (a ZzZombieBody [param height] m tall): the zone it was in gs-combat's
+## ids in the damage's context (for whoever reads the damage afterwards), where it landed in [member ZzZombieBody.hit_code]
+## for the flinch the clients draw (the side from the point against the body's own right axis), and [param amount] off
+## the limb, thrown in the damage's gore style.
+static func land_hit(body: Node3D, limb: StringName, damage: GSDamage, height: float, amount: float) -> void:
+	var at := body.global_position
+	damage.context[&"limb_zone"] = zone_of(limb, (damage.point.y - at.y) / maxf(0.5, height))
+	var side := (damage.point - at).dot(body.global_transform.basis.x)
+	body.set(&"hit_code", hit_code(limb, side >= 0.0, int(body.get(&"hit_code"))))
+	var limbs: GSNpcLimbs = body.get(&"limbs")
+	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
+	GSNpcGore.hit_style = gore_style(damage)
+	var _took := limbs.hit_limb(limb, damage.point, amount, impulse)
+	GSNpcGore.hit_style = GSNpcGore.STYLE_GENERIC
+
+
 ## The zone a limb belongs to when a shot lands on it, as gs-combat's [GSHitGroup] ids. Under `mp_hitzones` 0
 ## gs-combat folds knee and foot into leg, hand into arm (GSHitzone.coarse), so these never change damage then.
 const LIMB_ZONE := {&"head": GSHitGroup.HEAD, &"armL": GSHitGroup.ARM, &"armR": GSHitGroup.ARM,

@@ -1,6 +1,6 @@
 extends "zz_zombie_view_fade.gd"
 
-## A zombie's legs: the leg chains, the pelvis, feet held to the floor and the shamble's planted steps. The layer under zz_zombie_view.gd.
+## A zombie's legs: the leg chains, the pelvis, feet held to the floor and the shamble's planted steps. The layer under zz_zombie_view_hits.gd.
 
 func _qualified(clip: StringName) -> StringName:
 	return StringName("zz/" + String(clip))

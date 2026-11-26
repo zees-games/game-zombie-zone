@@ -125,6 +125,28 @@ func classify(ats: PackedVector3Array) -> PackedInt32Array:
 	return _native.classify(ats, camera_at, _forward, planes, _settings)
 
 
+## [method refresh] by [param camera], then gives every view in [param zombies] (key -> {"view": Node3D}) its
+## [method classify] code from one native call, or -1 when there is none (the view then judges itself by [method every]).
+func code_views(camera: Camera3D, zombies: Dictionary) -> void:
+	refresh(camera)
+	var codes := PackedInt32Array()
+	if batched():
+		var ats := PackedVector3Array()
+		ats.resize(zombies.size())
+		var i := 0
+		for key: int in zombies.keys():
+			var v: Node3D = (zombies[key] as Dictionary).get("view")
+			ats[i] = v.global_position if v != null and is_instance_valid(v) and v.is_inside_tree() else Vector3.INF
+			i += 1
+		codes = classify(ats)
+	var slot := 0
+	for key: int in zombies.keys():
+		var v: Node3D = (zombies[key] as Dictionary).get("view")
+		if v != null and is_instance_valid(v):
+			v.set(&"lod_code", codes[slot] if slot < codes.size() else -1)
+		slot += 1
+
+
 ## Frames between clip advances for a zombie whose [method classify] code is [param code].
 func every_coded(code: int) -> int:
 	match code & TIER_MASK:

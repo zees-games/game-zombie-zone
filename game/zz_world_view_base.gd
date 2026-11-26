@@ -38,3 +38,6 @@ const BLAST_SECONDS := 0.6
 
 ## Gravity a thrown thing falls by on a client: the server's (`ZzHazards.GRAVITY`).
 const GRAVITY := 18.0
+
+## The client's blood, given to every zombie view so a cut limb paints the walls (see [method ZzZombieView._spray_walls]).
+var blood: GSFxBlood = null
