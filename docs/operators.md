@@ -146,7 +146,8 @@ Everything here defaults to the small-server behaviour and changes live (console
 Cvars, each also a key in `config/game.yml` (live from the console or the workbench):
 
 - `zz_nav_cache` (default 1): a built navigation graph is kept in `user://nav_cache`, keyed by the map's contents, and loaded next time; a large map takes a minute or more to build and milliseconds to load. 0 builds every time.
-- `zz_nav_threads` (default 2, 0 to 16): worker tasks a graph build uses, off the main thread, so a host keeps drawing and the first build holds READY (no wave starts before the ground exists). 0, and every platform without threads, builds on the main thread in slices.
+- `zz_nav_threads` (default 2, 0 or more, no upper limit): worker tasks a graph build uses, off the main thread, so a host keeps drawing and the first build holds READY (no wave starts before the ground exists). 0, and every platform without threads, builds on the main thread in slices.
+- `zz_nav_prune_thread` (default 1): when the graph is built off the main thread, also ask the world's collision about it (the prune that drops points inside props and clip hulls) on a worker, against a private copy of the world's bodies, so the tick the graph lands on no longer freezes (36 s on a cold rp_asheville before). 0 prunes on the main thread.
 - `zz_nav_budget_ms` (default 6, 0.5 to 14): milliseconds a tick a main-thread build may take; only read when `zz_nav_threads` is 0 or there are no threads. A bottom-right "Navigation regenerating" panel shows progress.
 - `zz_bot_open_boxes` (default 1): stand-ins pick up and open the boxes zombies drop; 0 leaves every box to the humans.
 - `zz_bot_repress_use` (default 1): a stand-in going for a box lets go of E every few ticks so a press that missed is made again; 0 holds the key as before, and a box may then stand untouched.

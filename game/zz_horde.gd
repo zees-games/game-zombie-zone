@@ -267,17 +267,29 @@ func rebuild_navigation() -> GSResult:
 	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
+	if _pruning != null:
+		_pruning.finish({})
+		_pruning = null
+
 	if _nav_job != null:
 		_nav_job.cancel()
 		_nav_job = null
 
 ## Once a tick: lets a sliced build work for its budget, and takes a finished graph in.
 func _poll_nav() -> void:
-	if _nav_job == null:
+	if _nav_job == null or (_pruning == null and not _nav_job.advance(config.nav_budget_ms)):
 		return
 
-	if not _nav_job.advance(config.nav_budget_ms):
-		return
+	# The landed graph's capsule queries go to a worker; this tick and the next ones only look whether it is done.
+	if _pruning == null and config.nav_prune_thread:
+		_pruning = ZzNavPruneThread.begin(game, _nav_job, _required_spots, PRUNE_VERSION)
+
+	if _pruning != null:
+		if not _pruning.done():
+			return
+
+		_pruning.finish(sections)
+		_pruning = null
 
 	var job := _nav_job
 	_nav_job = null
@@ -299,7 +311,7 @@ func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:
 	sections[&"nav_wall"] = float(Time.get_ticks_msec() - _nav_started)
 	var lap := Time.get_ticks_usec()
 	var ready_graph: ZzNavGraph = job.graph as ZzNavGraph if job.graph != null and (job.graph as ZzNavGraph).data == nav else null
-	_prune_blocked(nav, job)
+	ZzNavPruneThread.on_main(game, nav, job, _required_spots, PRUNE_VERSION)
 	lap = ZzLaps.lap(sections, &"nav_prune", lap)
 	# Built once (on the job's thread when it can): the spawner's set_nav_data would build a plain graph only to be replaced.
 	var graph_built := ready_graph
@@ -333,25 +345,6 @@ func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:
 		"cache": job.cache_path.get_file() if job.cache_path != "" else "off", "cache_file": job.cache_path != "" and FileAccess.file_exists(job.cache_path),
 	})
 	return GSResult.success(kept)
-
-## Takes out what the world's collision blocks; the graph is built from boxes and cached without asking physics.
-func _prune_blocked(data: GSNpcNavData, job: ZzNavJob) -> void:
-	if int(data.meta.get("pruned", 0)) >= PRUNE_VERSION or game == null or game.physics == null or not game.is_inside_tree():
-		return
-
-	var ladders: Array[AABB] = []
-	var passable: Array[RID] = []
-
-	if game.map != null and game.map.mechanics != null:
-		ladders = game.map.mechanics.ladder_boxes()
-		passable = game.map.mechanics.walk_through_bodies()
-
-	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
-	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
-	var mask: int = ZzNavPrune.body_mask(game.physics)
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots(), passable)
-	data.meta["pruned"] = PRUNE_VERSION
-	job.save(data)
 
 ## The survivors' spawns and the posts: where a body must be able to walk to, whatever the prune cut.
 func _required_spots() -> PackedVector3Array:
