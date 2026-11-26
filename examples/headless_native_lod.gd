@@ -74,6 +74,28 @@ func _run() -> void:
 	_check(offscreen > 300 and far_count > 100, "the crowds had unseen and far bodies",
 		"%d unseen, %d far" % [offscreen, far_count])
 	_finished += 1
+
+	# Cost of one frame's judgement for a 400-zombie crowd (printed, not asserted: a box's speed varies).
+	var lod := ZzZombieLod.new()
+	lod.apply_detail(1)
+	cam.global_transform = Transform3D(Basis.IDENTITY, Vector3(0, 2, 0))
+	lod.refresh(cam)
+	var crowd := PackedVector3Array()
+	for i in 400:
+		crowd.append(Vector3(rng.randf_range(-120, 120), 0.0, rng.randf_range(-120, 120)))
+	var t0 := Time.get_ticks_usec()
+	for _r in 50:
+		for at in crowd:
+			lod.every(at)
+			lod.camera_at.distance_to(at)
+	var script_us := float(Time.get_ticks_usec() - t0) / 50.0
+	t0 = Time.get_ticks_usec()
+	for _r in 50:
+		var codes := lod.classify(crowd)
+		for c in codes:
+			lod.every_coded(c)
+	var native_us := float(Time.get_ticks_usec() - t0) / 50.0
+	print("  probe: 400 zombies per frame, script %.0f us, native batch %.0f us" % [script_us, native_us])
 	cam.queue_free()
 	await get_tree().process_frame
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
