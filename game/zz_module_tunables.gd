@@ -93,6 +93,9 @@ func _add_tunables_bots(world: ZzGame) -> void:
 	_tunable("zz_nav_prune_thread", 1.0 if config.nav_prune_thread else 0.0,
 		"Ask the world's collision about a graph built off the main thread on a worker too; 0 asks on the main thread",
 		func(value: float) -> void: config.nav_prune_thread = value > 0.5)
+	_tunable("zz_nav_warm_bots", 1.0 if config.nav_warm_bots else 0.0,
+		"Build the stand-ins' search on the graph's worker so the first tick of play does not; 0 builds it on first use",
+		func(value: float) -> void: config.nav_warm_bots = value > 0.5)
 	_tunable("zz_nav_budget_ms", config.nav_budget_ms,
 		"Milliseconds a tick a main-thread navigation build may take (zz_nav_threads 0, or no threads)",
 		func(value: float) -> void: config.nav_budget_ms = value)

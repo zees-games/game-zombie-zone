@@ -630,6 +630,13 @@ func _without_steep(index: int, base: PackedInt32Array, both: bool) -> PackedInt
 	return out if cut else base
 
 
+## Builds the stand-ins' search ([member bot_filter]'s native graph) now, on the thread that owns this graph, so the
+## first stand-in that walks does not ([method ZzNavDerive.run]). The same build as on first use, so the same paths;
+## anything that changes the links or the flags clears it and it is built on first use again.
+func warm_bot_search() -> void:
+	var _astar := _native_for(bot_filter)
+
+
 ## The native search's graph: [method super]'s (the plain edges), which has no link in it, plus
 ## the links as one-way segments.
 func _native_for(with: GSNpcNavFilter) -> AStar3D:
