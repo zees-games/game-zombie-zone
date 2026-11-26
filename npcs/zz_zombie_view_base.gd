@@ -14,6 +14,8 @@ const ZzZombieLod := preload("zz_zombie_lod.gd")
 var lod: ZzZombieLod = null
 var _shadowed := true
 var _own_lod := false
+## This frame's batched LOD code from [method ZzZombieLod.classify], or -1 for the view to judge itself.
+var lod_code := -1
 
 ## Below 1, the mesh switches to its simpler levels sooner. A crowd is small on screen.
 const LOD_BIAS := 0.4

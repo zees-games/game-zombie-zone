@@ -25,6 +25,22 @@ var detail := 1
 
 var camera_at := Vector3.INF
 var _planes: Array[Plane] = []
+## The shared native judge (`GSSimPresentLod`, gs-sim) when the library is loaded, else null and the script judges each zombie.
+var _native: RefCounted = null
+var _forward := Vector3.FORWARD
+var _settings := PackedFloat64Array()
+
+## The tiers of a [method classify] code (low three bits), and the bit set past the shadow range.
+const TIER_FAR := 3
+const TIER_FARTHEST := 4
+const TIER_OFF := 5
+const TIER_MASK := 7
+const BEYOND_SHADOW := 8
+
+
+func _init() -> void:
+	if ClassDB.class_exists(&"GSSimPresentLod"):
+		_native = ClassDB.instantiate(&"GSSimPresentLod")
 
 
 ## Picks preset [param level] (0 low, 1 normal, 2 high).
@@ -61,6 +77,7 @@ func refresh(camera: Camera3D) -> void:
 		return
 	camera_at = camera.global_position
 	_planes.assign(camera.get_frustum())
+	_forward = -camera.global_transform.basis.z
 
 
 ## Whether a sphere of [param radius] at [param at] is at least partly in view.
@@ -79,6 +96,50 @@ func every(at: Vector3) -> int:
 		return offscreen_every
 	var d := camera_at.distance_to(at)
 	return 4 if d > far else (2 if d > near else 1)
+
+
+## Whether [method classify] can judge a whole crowd in one native call.
+func batched() -> bool:
+	return _native != null
+
+
+## One code per position of [param ats] in one native call: the tier ([constant TIER_OFF] unseen, else the clip rate
+## by distance) and [constant BEYOND_SHADOW]. Empty when there is no camera or no native judge; the script then
+## judges each zombie by [method every].
+func classify(ats: PackedVector3Array) -> PackedInt32Array:
+	if _native == null or camera_at == Vector3.INF or _planes.is_empty():
+		return PackedInt32Array()
+	# near2 below zero so every body is frustum-tested as the script does; the anim tiers are pushed out of reach.
+	_settings.resize(10)
+	_settings[0] = -1.0
+	_settings[1] = 0.0
+	_settings[2] = 1.5
+	_settings[3] = far * far
+	_settings[4] = near * near
+	_settings[5] = 1.0e30
+	_settings[6] = 1.0e30
+	_settings[7] = shadow_until * shadow_until
+	_settings[8] = 1.0
+	_settings[9] = 0.0
+	var planes: Array[Plane] = _planes
+	return _native.classify(ats, camera_at, _forward, planes, _settings)
+
+
+## Frames between clip advances for a zombie whose [method classify] code is [param code].
+func every_coded(code: int) -> int:
+	match code & TIER_MASK:
+		TIER_OFF:
+			return offscreen_every
+		TIER_FARTHEST:
+			return 4
+		TIER_FAR:
+			return 2
+	return 1
+
+
+## Whether a zombie with [param code] is near enough to cast a shadow.
+func shadowed_coded(code: int) -> bool:
+	return code & BEYOND_SHADOW == 0
 
 
 func describe() -> Dictionary:
