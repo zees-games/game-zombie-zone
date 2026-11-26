@@ -225,7 +225,9 @@ func _bake() -> bool:
 	if background and GSPlatform.has_threads():
 		_bot = bot
 		_bot_result = null
-		var started := bot.bake_in_background(_root, agent, _mask, [], func(res: GSResult) -> void: _bot_result = res)
+		# A method Callable, not a lambda: a quit mid-bake frees the server's pending callback after
+		# the script languages are gone, and a lambda's captured state then aborts the process (134).
+		var started := bot.bake_in_background(_root, agent, _mask, [], _on_bot_baked)
 
 		if not started.ok:
 			_bot = null
@@ -240,6 +242,10 @@ func _bake() -> bool:
 		return _bake_failed(baked)
 
 	return _baked(bot)
+
+
+func _on_bot_baked(res: GSResult) -> void:
+	_bot_result = res
 
 
 ## A background bake: nothing until the mesh lands, then the rest of [method _baked].

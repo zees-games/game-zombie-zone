@@ -56,6 +56,15 @@ var _loose := false
 ## Returns (points dropped, edges dropped); (0, 0) when there is no collision to ask. Each of [param ladders] is then
 ## joined foot to head, which this prune may cut; [param passable] bodies (doors that open to walkers) block nothing.
 static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = [], warm: RefCounted = null) -> Vector2i:
+	var report := {}
+	var dropped := run(nav, space, mask, ladders, required, passable, report, warm)
+	log_report(report)
+	return dropped
+
+
+## [method apply] without the log line, for a worker thread ([ZzNavPruneThread]): what it would log goes in
+## [param report] for [method log_report] on the main thread.
+static func run(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB], required: PackedVector3Array, passable: Array[RID], report: Dictionary, warm: RefCounted = null) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN, passable)
 	var bare := new()
@@ -88,9 +97,15 @@ static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int
 		return dropped
 
 	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or prune.bridged_edges > 0 or climbs > 0:
-		GSLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
+		report.merge({"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs}, true)
 
 	return dropped
+
+
+## Main thread: the one line about what a prune dropped; nothing when it dropped and joined nothing.
+static func log_report(report: Dictionary) -> void:
+	if not report.is_empty():
+		GSLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", report)
 
 
 ## Joins the floor points nearest each ladder's foot and head; returns how many ladders were joined. With [param side]

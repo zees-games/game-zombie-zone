@@ -34,6 +34,10 @@ var cache_ms := 0.0
 var make_graph: Callable
 ## What [member make_graph] made of [member nav], or null.
 var graph: Object = null
+## `(nav, graph, space: PhysicsDirectSpaceState3D or null, mask: int) -> Dictionary`, run on the worker after
+## [member make_graph] made a graph: the rest the game derives from it ([member derived]).
+var derive: Callable
+var derived := {}
 
 var _step := Step.CACHE
 var _builder: GSNpcNavBuilder = null
@@ -73,6 +77,9 @@ func _run_thread() -> void:
 
 	if not _cancelled and _step == Step.DONE and nav != null and make_graph.is_valid():
 		graph = make_graph.call(nav)
+
+		if graph != null and derive.is_valid():
+			derived = derive.call(nav, graph, null, 0)
 
 	_lock.lock()
 	_finished = true
@@ -253,11 +260,16 @@ func _do_try(deadline: int) -> void:
 
 ## Main thread: writes [param data] over the cache (the pruned graph, so the next load skips the physics pass).
 func save(data: GSNpcNavData) -> void:
-	nav = data
-	_do_save()
+	write(data)
 
 	if _save_error != 0:
 		GSLog.warn(CHANNEL, "the pruned navigation cache could not be written", {"path": cache_path, "error": _save_error})
+
+
+## [method save] without the warning, for a worker thread: [method flush_log] warns on the main thread.
+func write(data: GSNpcNavData) -> void:
+	nav = data
+	_do_save()
 
 
 func _do_save() -> void:

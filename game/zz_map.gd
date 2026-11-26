@@ -1912,7 +1912,10 @@ func daylight() -> float:
 ## apart, so nobody starts inside anybody else.
 func spawn(side: String, seat: int) -> Array:
 	var list: Array = (doc.get("spawns", {}) as Dictionary).get(side, [])
-	var live := list.filter(spawn_enabled)
+	# The map's start entities are listed once for every point, not once per point: a converted map's 64 starts each
+	# scanning its thousands of entities held a stand-in's first walk to its start for half a second (headless_nav_stall).
+	var points: Array = mechanics.spawn_entities() if mechanics != null else []
+	var live := list.filter(func(entry: Dictionary) -> bool: return spawn_enabled(entry, points))
 	# A map that disabled every start point still starts somebody.
 	list = live if not live.is_empty() else list
 
@@ -1971,7 +1974,8 @@ func _fits(space: PhysicsDirectSpaceState3D, mask: int, feet: Vector3) -> bool:
 	return not space.intersect_ray(down).is_empty()
 
 ## Whether a start point is on: the map's `info_player_*` entity says so live, else the document's `disabled`. Found by name (the document keeps 64 characters of it); where several share a name, the one nearest the entry, else by standing within 0.75 m of it.
-func spawn_enabled(entry: Dictionary) -> bool:
+## [param points] is [method ZzMechanics.spawn_entities] when the caller already has it.
+func spawn_enabled(entry: Dictionary, points: Variant = null) -> bool:
 	if mechanics != null:
 		var named := str(entry.get("name", ""))
 		var at := ZzMapDoc.v3(entry["at"])
@@ -1980,7 +1984,7 @@ func spawn_enabled(entry: Dictionary) -> bool:
 		var near: Dictionary = {}
 		var near_d := 0.75
 
-		for point: Dictionary in mechanics.spawn_entities():
+		for point: Dictionary in (points if points != null else mechanics.spawn_entities()):
 			var o: Vector3 = point["origin"]
 			var d := Vector2(o.x - at.x, o.z - at.z).length()
 
