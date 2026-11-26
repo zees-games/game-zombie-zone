@@ -580,6 +580,12 @@ func _unstick_watch(delta: float) -> void:
 	var config: Variant = h.get(&"config") if h != null else null
 	var limit: float = float(config.unstick_seconds) if config != null else 0.0
 
+	# The think that calls this can let go of its npc (it died mid-think): nothing to watch.
+	if npc == null:
+		_watch_at = Vector3.INF
+		_watch_for = 0.0
+		return
+
 	# In the air the clock pauses, ahead of the wish test because a leap zeroes wish: a common
 	# hopping on the spot never stays grounded for limit.
 	var here := npc.position()

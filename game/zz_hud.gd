@@ -483,7 +483,7 @@ func _map_name(id: StringName) -> String:
 ##
 ## [codeblock]
 ## waves    Wave 3 of 10 · Sprinters        42 left          (in a wave)
-##          Breather — wave 4 next          0:24 to wave 4   mend the barricades, restock
+##          Breather                        0:24 until wave 4
 ## nights   Night 2 of 5                    1:40 until dawn
 ##          Day 2                           0:40 until dark
 ## clock    the map's name                  3:12 held
