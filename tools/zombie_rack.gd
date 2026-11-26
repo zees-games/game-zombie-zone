@@ -76,6 +76,8 @@ func _initialize() -> void:
 		return
 	elif _set == "gore":
 		_gore(root)
+	elif _set == "hits":
+		_hits(root)
 		return
 	else:
 		for kind in SPECIALS:
@@ -171,6 +173,11 @@ func _deaths(root: Node3D) -> void:
 	var ground := StandardMaterial3D.new()
 	ground.albedo_color = Color(0.42, 0.42, 0.4)
 	var capture := int(_at * 30.0)
+	# --region=1..4 (head, chest, arm, leg): the killing shot is flinched first, so the death is the hit-location one.
+	var region := 0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--region="):
+			region = int(arg.trim_prefix("--region="))
 
 	for r in reactions.size():
 		var floor_mesh := MeshInstance3D.new()
@@ -188,7 +195,7 @@ func _deaths(root: Node3D) -> void:
 			view.rotation.y = deg_to_rad(180.0 - 60.0)
 			view.build(&"common", 900 + r * 37)
 			# Shot from the camera's side: pushed away from it, into the picture.
-			_cells.append([view, ZzZombieBody.Anim.IDLE, capture - int(float(times[c]) * 30.0), reactions[r]])
+			_cells.append([view, ZzZombieBody.Anim.IDLE, capture - int(float(times[c]) * 30.0), reactions[r], region])
 
 	var camera := Camera3D.new()
 	root.add_child(camera)
@@ -252,6 +259,53 @@ func _ragdolls(root: Node3D) -> void:
 	get_root().size = Vector2i(2400, 600)
 
 
+func _arg_float(prefix: String, fallback: float) -> float:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(prefix):
+			return float(arg.trim_prefix(prefix))
+	return fallback
+
+
+## The flinch of a shot limb, facing the camera and labelled: the first row is left (the body's own .L), the second right,
+## each cell a different region, the frame at the flinch's peak. Run with `--at=0.23`. A shot arm must be thrown back (the
+## hand behind the hip), a shot leg must buckle at the knee with the hip on that side dropping.
+func _hits(root: Node3D) -> void:
+	var regions := [[3, "arm"], [4, "leg"], [2, "chest"], [1, "head"]]
+	var ground := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(regions.size() * 2.4, 3.0)
+	ground.mesh = plane
+	for side in 2:
+		var strip := MeshInstance3D.new()
+		strip.mesh = plane
+		strip.position = Vector3(regions.size() * 1.2 - 1.2, -float(side) * 2.7, 0.0)
+		root.add_child(strip)
+	for r in regions.size():
+		for side in 2:
+			var view := ZzZombieView.new()
+			root.add_child(view)
+			view.position = Vector3(float(r) * 2.4, -float(side) * 2.7, 0.0)
+			view.rotation.y = PI + deg_to_rad(_arg_float("--yaw=", 0.0))
+			view.build(&"common", 4111)
+			_cells.append([view, ZzZombieBody.Anim.IDLE])
+			var label := Label3D.new()
+			label.text = "%s %s\nfrom %s" % [regions[r][1], "L" if side == 0 else "R", "+1" if side == 0 else "-1"]
+			label.pixel_size = 0.004
+			label.no_depth_test = true
+			root.add_child(label)
+			label.position = view.position + Vector3(0.0, 2.1, 0.0)
+			var region: int = regions[r][0]
+			var from := 1.0 if side == 0 else -1.0
+			_deferred.append(func() -> void: view.flinch(from, region == 1, region))
+	var camera := Camera3D.new()
+	root.add_child(camera)
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.size = 5.6
+	var mid := Vector3(regions.size() * 1.2 - 1.2, -0.2, 0.0)
+	camera.look_at_from_position(mid + Vector3(0.0, 0.5, 30.0), mid)
+
+
 ## Dismemberment: a common with no limb, then one each, then several, side by side, standing and walking.
 ## `--level=N` sets GSNpcGore.level first.
 func _gore(root: Node3D) -> void:
@@ -298,7 +352,7 @@ func _gore(root: Node3D) -> void:
 					view.wound_at(view.global_position + view.global_basis * w, 0.1)
 				if "legL" in sets[i] and "legR" in sets[i]:
 					for k in 4:
-						var _p := GSNpcGibs.add_pool(root.get_tree(), view.global_position + view.global_basis * Vector3(0.0, 0.0, -0.5 - 0.7 * float(k)), 0.22 - 0.02 * float(k))
+						GSNpcGibs.add_pool(root.get_tree(), view.global_position + view.global_basis * Vector3(0.0, 0.0, -0.5 - 0.7 * float(k)), 0.22 - 0.02 * float(k))
 		_deferred.append(setup)
 	var camera := Camera3D.new()
 	root.add_child(camera)
@@ -352,6 +406,8 @@ func _process(_delta: float) -> bool:
 		if entry.size() > 2:
 			# A death cell: standing until its moment, then killed and falling.
 			if _frames == int(entry[2]):
+				if entry.size() > 4 and int(entry[4]) > 0:
+					(entry[0] as ZzZombieView).flinch(1.0, int(entry[4]) == 1, int(entry[4]))
 				(entry[0] as ZzZombieView).die(entry[3], Vector3(0.0, 0.0, -1.6), 5)
 			(entry[0] as ZzZombieView).present(1.0 / 30.0,
 				ZzZombieBody.Anim.DEAD if _frames >= int(entry[2]) else ZzZombieBody.Anim.IDLE, 0)
