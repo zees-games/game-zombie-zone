@@ -92,7 +92,10 @@
 # Fatal Contact's weapon addon is never a Zombie Zone dependency: a stray link to it stays out of the repository.
 # The trailing * keeps gs-ci's resolve-deps (which reads every bare /addons/<name> line as a dependency) from cloning it.
 /addons/fc_weapons*
-/addons/fc_weapons*
+
+# natural-disasters is not a Zombie Zone dependency either (nothing here names its classes); a local
+# link to it (one was committed as an absolute symlink in 84443e9) stays out. Same trailing * reason.
+/addons/natural_disasters*
 
 # Exports
 build/
