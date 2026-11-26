@@ -1112,6 +1112,9 @@ func _test_ground_strike() -> void:
 func _test_limb_zones() -> void:
 	_section("zombie limbs use gs-combat's zone ids (knee, foot, hand, stomach)")
 	const L := preload("../npcs/zz_zombie_limbs.gd")
+	var hc1: int = L.hit_code(&"head", true, 0)
+	var hc2: int = L.hit_code(&"head", true, hc1)
+	_check((hc1 & 7) == L.HIT_HEAD and (hc1 & 8) != 0 and hc1 != hc2, "a hit code carries region and side and toggles on every hit so a repeat hit still replicates", "%d %d" % [hc1, hc2])
 	_check(L.zone_of(&"legL", 0.27) == GSHitGroup.KNEE and L.zone_of(&"legR", 0.27) == GSHitGroup.KNEE, "a leg hit at knee height is the knee")
 	_check(L.zone_of(&"legL", 0.03) == GSHitGroup.FOOT, "a leg hit at the ground is the foot")
 	_check(L.zone_of(&"legL", 0.45) == GSHitGroup.LEG, "a thigh is the leg")

@@ -24,6 +24,23 @@ static func gore_style(damage: GSDamage) -> int:
 	return GSNpcGore.STYLE_RIFLE
 
 
+## Where a hit landed, in 5 bits: region 1 head, 2 chest, 3 arm, 4 leg (bits 0-2), bit 3 set when on the side its own x axis points to,
+## bit 4 flipped on every hit so two in one place still read as two. [param prior] is the code it replaces.
+const HIT_HEAD := 1
+const HIT_CHEST := 2
+const HIT_ARM := 3
+const HIT_LEG := 4
+static func hit_code(limb: StringName, pos_x: bool, prior: int) -> int:
+	var region := HIT_CHEST
+	if limb == &"head":
+		region = HIT_HEAD
+	elif limb == &"armL" or limb == &"armR":
+		region = HIT_ARM
+	elif limb == &"legL" or limb == &"legR":
+		region = HIT_LEG
+	return region | (8 if pos_x else 0) | ((prior & 16) ^ 16)
+
+
 ## The zone a limb belongs to when a shot lands on it, as gs-combat's [GSHitGroup] ids. Under `mp_hitzones` 0
 ## gs-combat folds knee and foot into leg, hand into arm (GSHitzone.coarse), so these never change damage then.
 const LIMB_ZONE := {&"head": GSHitGroup.HEAD, &"armL": GSHitGroup.ARM, &"armR": GSHitGroup.ARM,
