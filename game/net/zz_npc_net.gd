@@ -30,6 +30,8 @@ var net_flags: int = 0
 var net_limbs: int = 0
 ## Client: wall-clock msec of the last snapshot that carried or listed this zombie.
 var state_msec: int = 0
+## Client: the newest interpolator tick seen for this zombie (see [method is_stale]).
+var seen_tick: int = -1
 
 
 func _register_net_vars() -> void:
@@ -62,6 +64,18 @@ func pull() -> void:
 func _net_simulate(_tick: int, _delta: float) -> void:
 	if identity != null and identity.is_authoritative:
 		pull()
+
+
+## Client: whether no snapshot has carried or listed this zombie for [param after_msec]. A snapshot
+## that lists it with no changed value skips [method _net_state_applied] (gs-net API 26) but still
+## adds an interpolator sample, so a new newest tick counts as heard from too.
+func is_stale(now: int, after_msec: int, interpolator: GSNetInterpolator, net_id: int) -> bool:
+	if interpolator != null:
+		var tick := interpolator.newest_tick(net_id)
+		if tick != seen_tick:
+			seen_tick = tick
+			state_msec = now
+	return now - state_msec > after_msec
 
 
 func _net_state_applied(_tick: int) -> void:
