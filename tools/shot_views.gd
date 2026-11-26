@@ -290,9 +290,17 @@ func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
 
 
 ## `--view=crawl_seq`: the first-person frames across the whole crawl, saved as `<out>_NN.png` every `--seconds`/10 of a second:
-## standing, going down, down and still (propped), crawling, still again. `--weapons=` is not read; the survivor holds what the
-## map gave them. A frame sequence shows the transitions a single shot cannot (a pop, a double pair of hands, a body at the lens).
+## standing, going down, down and still (propped), crawling, still again. `--weapons=` picks the weapon crawled with (see the body). A frame sequence shows the transitions a single shot cannot (a pop, a double pair of hands, a body at the lens).
 func _crawl_sequence(game: ZzGame, local) -> void:
+	# `--weapons=zz_m4` hands that weapon over and lets the downed survivor crawl with it out; `--weapons=none` is the holstered crawl.
+	var holster := true
+	if _weapons.size() > 0 and _weapons[0] != "none":
+		holster = false
+		var _held := await _hold_exact(game, local, StringName(_weapons[0]))
+		game.downed_rules.set_cvar("sv_downed_weapon", "primary_in_place")
+		game.downed_rules.set_cvar("sv_downed_crawl_primary", "1")
+		game.downed_rules.set_cvar("sv_downed_crawl_pistol", "1")
+	game.downed_rules.set_cvar("sv_downed_holster_crawl", "1" if holster else "0")
 	var step := maxf(_seconds, 1.0) / 10.0
 	var n := 0
 	await _seconds_of(0.5)

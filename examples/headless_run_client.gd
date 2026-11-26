@@ -4,6 +4,7 @@ extends "headless_run_menus.gd"
 
 
 const ZzClient := preload("../game/zz_client.gd")
+const ZzViewMotion := preload("../game/zz_view_motion.gd")
 const ZzEndCameraRules := preload("../game/zz_end_camera_rules.gd")
 
 
@@ -159,6 +160,13 @@ func _check_client_endings(client: ZzClient, rules: ZzEndCameraRules, spot: Vect
 	for _i in 5:
 		await get_tree().process_frame
 	_check(client.end_camera_weight() == 0.0, "zz_end_camera 0 keeps the view even then")
+	var cue_pick := ZzViewMotion.picks()
+	client.settings.settings.set_value(&"camera_landing_dip", 0.0)
+	client.settings.settings.set_value(&"camera_strafe_roll", 2.0)
+	_check(client._motion.landing_dip == 0.0 and is_equal_approx(client._motion.strafe_roll, cue_pick.strafe_roll * 2.0)
+		and client._motion.fov_speed_gain == cue_pick.fov_speed_gain, "the camera motion settings scale the view cues")
+	client.settings.settings.set_value(&"camera_landing_dip", 1.0)
+	client.settings.settings.set_value(&"camera_strafe_roll", 1.0)
 	rules.enabled = 1.0
 	client.slowmo_in_headless = true
 	client._on_map_ending(true, 0.5, 1.0, null)

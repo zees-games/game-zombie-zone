@@ -6,8 +6,8 @@ const STREET := Vector3(0.0, 0.05, 14.0)
 ## Sprint must be faster than a run: measured as ground speed on the server's player and on a predicting client's motor,
 ## unarmed, armed and with carry weight on. Counts sections AND checks, because a script error aborts a section silently.
 
-const SECTIONS := 3
-const CHECKS := 9
+const SECTIONS := 4
+const CHECKS := 15
 
 
 func _ready() -> void:
@@ -22,6 +22,7 @@ func _run() -> void:
 	await _test_server()
 	_test_client()
 	_test_config()
+	await _test_slide_reaches_view()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -81,6 +82,37 @@ func _test_server() -> void:
 	print("    armed: run %.2f sprint %.2f ratio %.3f expected %.3f load %.2f weight_scale %.2f" % [run_w, sprint_w, sprint_w / maxf(run_w, 0.01), expect, load, me.carry_scale])
 	_check(sprint_w > run_w * 1.05, "armed and loaded, sprint is still clearly faster than a run", "%.2f vs %.2f" % [sprint_w, run_w])
 	_check(absf(sprint_w / maxf(run_w, 0.01) - expect) < 0.08, "and by the load-reduced ratio", "%.3f vs %.3f" % [sprint_w / maxf(run_w, 0.01), expect])
+	_finished()
+
+
+func _test_slide_reaches_view() -> void:
+	_section("a slide reaches the weapon's view model and the scrape")
+	var game := await _team1(_quiet)
+	var me := game.survivors()[0]
+	me.health.invulnerable = true
+	me.place_at(STREET, 0.0)
+	me.controller.state.velocity = Vector3.ZERO
+	var idle := GSWeaponPlayerBridge.context_for(me, 0)
+	_check(not idle.sliding, "standing still is not a slide in the weapon context")
+	var go := GSFpsCommand.new()
+	go.move = Vector2(0.0, 1.0)
+	go.buttons = GSFpsCommand.BUTTON_SPRINT
+	me.controller.apply_command(go)
+	await _sim(game, 1.5)
+	go = GSFpsCommand.new()
+	go.move = Vector2(0.0, 1.0)
+	go.buttons = GSFpsCommand.BUTTON_SPRINT | GSFpsCommand.BUTTON_CROUCH
+	me.controller.apply_command(go)
+	await _sim(game, 0.2)
+	_check(me.controller.state.is_sliding(), "sprint and crouch start a slide on the server's player")
+	var ctx := GSWeaponPlayerBridge.context_for(me, 0)
+	_check(ctx.sliding, "the weapon context says sliding, which is what the view model reads")
+	_check(bool(me.controller.motion().get("sliding", false)), "the controller's motion dictionary says sliding")
+	var sounds := preload("res://addons/gs_game/runtime/gs_game_slide_sounds.gd")
+	_check(sounds.is_controller(me.controller), "the slide scrape recognises the survivor's controller")
+	var spec: Dictionary = sounds.cvar_spec()
+	_check(str(spec.get("value", "")) == "1", "and the server leaves the scrape on by default")
+	me.controller.apply_command(GSFpsCommand.new())
 	_finished()
 
 

@@ -9,6 +9,26 @@ const SPRINT_SPEED := 6.2
 const FULL_SPEED := 12.0
 
 
+## The camera motion settings: key, menu title, description. Each 0 (off) to 2, 1 the pick; see [method scale].
+const SETTING_KEYS := {
+	&"camera_landing_dip": ["Landing dip", "How far the view dips when you land from a height. All the way left is off."],
+	&"camera_strafe_roll": ["Strafe and slide lean", "How far the view leans into a strafe or a slide. All the way left is off."],
+	&"camera_speed_fov": ["Speed widening", "How much the view widens when you sprint or slide. All the way left is off."],
+}
+
+
+## [param motion] set to the picks times the player's scales (0 off, 1 the pick, 2 double). Wall running is not in ZZ.
+static func scale(motion: GSFpsViewMotion, landing: float, strafe: float, widen: float) -> void:
+	var p := picks()
+	motion.landing_dip = p.landing_dip * maxf(landing, 0.0)
+	motion.landing_pitch = p.landing_pitch * maxf(landing, 0.0)
+	motion.strafe_roll = p.strafe_roll * maxf(strafe, 0.0)
+	motion.slide_roll = p.slide_roll * maxf(strafe, 0.0)
+	motion.roll_limit = p.roll_limit * maxf(strafe, 0.0)
+	motion.fov_speed_gain = p.fov_speed_gain * maxf(widen, 0.0)
+	motion.slide_fov_gain = p.slide_fov_gain * maxf(widen, 0.0)
+
+
 static func picks() -> GSFpsViewMotion:
 	var m := GSFpsViewMotion.new()
 	m.landing_dip = 0.06
