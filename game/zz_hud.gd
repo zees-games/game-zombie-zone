@@ -483,7 +483,7 @@ func _map_name(id: StringName) -> String:
 ##
 ## [codeblock]
 ## waves    Wave 3 of 10 · Sprinters        42 left          (in a wave)
-##          Breather — wave 4 next          0:24 to wave 4   mend the barricades, restock
+##          Breather                        0:24 until wave 4
 ## nights   Night 2 of 5                    1:40 until dawn
 ##          Day 2                           0:40 until dark
 ## clock    the map's name                  3:12 held
@@ -506,7 +506,7 @@ static func survival_lines(hold: Dictionary) -> Array:
 					title += " · %s" % twist.capitalize()
 				return [title, "%d" % maxi(int(hold.get("remaining", 0)), 0), "left", "", false]
 			if stage == GSNpcDirectorWaves.Stage.QUIET:
-				# The hint goes under the clock, not under the title: the title's second line is
+				# What the clock counts to goes under it, not under the title: the title's second line is
 				# where the strip's clock sits, and the two were drawn over each other.
 				var opening := index <= 1
 				return ["Get ready" if opening else "Breather", clock,

@@ -580,8 +580,9 @@ func _test_the_hud() -> void:
 		"remaining": 42, "twist": "sprinters"})
 	_check(wave[0] == "Wave 3 of 10 · Sprinters" and wave[1] == "42" and wave[2] == "left", "a wave: which, its twist, how many left", str(wave))
 	var breather := ZzHud.survival_lines({"style": 0, "stage": GSNpcDirectorWaves.Stage.QUIET, "index": 4, "count": 10, "left": 24.0})
-	_check(breather[0] == "Breather" and breather[1] == "0:24" and str(breather[2]).contains("wave 4") and str(breather[2]).contains("mend")
-		and str(breather[3]) == "", "a breather: the clock to the next, the hint under it, nothing over it", str(breather))
+	# No "mend the barricades" hint: explanatory text is a HUD judge defect (docs/hud-judge-brief.md), dropped in 0db7224.
+	_check(breather[0] == "Breather" and breather[1] == "0:24" and str(breather[2]) == "until wave 4"
+		and str(breather[3]) == "", "a breather: the clock to the next wave under it, nothing over it", str(breather))
 	var night := ZzHud.survival_lines({"style": 1, "stage": GSNpcDirectorWaves.Stage.HORDE, "index": 2, "count": 5, "left": 100.0})
 	_check(night[0] == "Night 2 of 5" and night[2] == "until dawn", "a night: until dawn", str(night))
 	var last := ZzHud.survival_lines({"style": 0, "stage": GSNpcDirectorWaves.Stage.HORDE, "index": 10, "count": 10, "remaining": 3})
