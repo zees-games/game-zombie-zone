@@ -10,6 +10,20 @@ const ZzZombieView := preload("zz_zombie_view.gd")
 const BASE := &"zombie"
 
 
+## How a blow should read when it takes a limb off (a [GSNpcGore] style): blasts throw, strikes are short and
+## wet, a shotgun is wide and heavy, anything else is a rifle jet. Presentation only.
+static func gore_style(damage: GSDamage) -> int:
+	var kind: StringName = damage.type.id if damage.type != null else &""
+	if kind == &"blast":
+		return GSNpcGore.STYLE_BLAST
+	if kind == &"strike":
+		return GSNpcGore.STYLE_MELEE
+	var w := String(damage.weapon_id)
+	if w.contains("shotgun") or w.contains("spas") or w.contains("pump"):
+		return GSNpcGore.STYLE_SHOTGUN
+	return GSNpcGore.STYLE_RIFLE
+
+
 ## The zone a limb belongs to when a shot lands on it, as gs-combat's [GSHitGroup] ids. Under `mp_hitzones` 0
 ## gs-combat folds knee and foot into leg, hand into arm (GSHitzone.coarse), so these never change damage then.
 const LIMB_ZONE := {&"head": GSHitGroup.HEAD, &"armL": GSHitGroup.ARM, &"armR": GSHitGroup.ARM,

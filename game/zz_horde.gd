@@ -2191,7 +2191,9 @@ func limb_hit(damage: GSDamage) -> void:
 	damage.context[&"limb_zone"] = ZzZombieLimbs.zone_of(limb, (damage.point.y - feet) / tall)
 
 	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
+	GSNpcGore.hit_style = ZzZombieLimbs.gore_style(damage)
 	var _took := limbs.hit_limb(limb, damage.point, limb_damage(npc, damage), impulse)
+	GSNpcGore.hit_style = GSNpcGore.STYLE_GENERIC
 
 	if not limbs.is_lethal():
 		return
