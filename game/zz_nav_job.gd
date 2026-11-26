@@ -253,11 +253,16 @@ func _do_try(deadline: int) -> void:
 
 ## Main thread: writes [param data] over the cache (the pruned graph, so the next load skips the physics pass).
 func save(data: GSNpcNavData) -> void:
-	nav = data
-	_do_save()
+	write(data)
 
 	if _save_error != 0:
 		GSLog.warn(CHANNEL, "the pruned navigation cache could not be written", {"path": cache_path, "error": _save_error})
+
+
+## [method save] without the warning, for a worker thread: [method flush_log] warns on the main thread.
+func write(data: GSNpcNavData) -> void:
+	nav = data
+	_do_save()
 
 
 func _do_save() -> void:
