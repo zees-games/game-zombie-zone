@@ -3,8 +3,6 @@ extends "zz_client_ending.gd"
 const ZzViewGrip := preload("zz_view_grip.gd")
 const ZzViewMotion := preload("zz_view_motion.gd")
 const DOWN_EASE_SECONDS := 0.25
-## [GSPlayerViewArms] fits itself on its third tick; before that the arms stand where the figure was built, which showed as a body at the lens.
-const ARMS_FIT_FRAMES := 4
 const ScopePrefs := preload("res://addons/gs_weapon/view/gs_weapon_scope_prefs.gd")
 
 
@@ -1920,8 +1918,6 @@ var _motion: GSFpsViewMotion = ZzViewMotion.picks()
 var _motion_fov: float = 0.0
 ## 0 standing, 1 down: the camera's roll and drop follow it over [constant DOWN_EASE_SECONDS].
 var _down_eased: float = 0.0
-## Frames since the crawl arms were switched on; they stay hidden until the addon has fitted them ([constant ARMS_FIT_FRAMES]).
-var _arms_age: int = 0
 
 
 func _present_view_arms(delta: float, yaw: float) -> void:
@@ -1931,6 +1927,7 @@ func _present_view_arms(delta: float, yaw: float) -> void:
 		_arms_yaw.top_level = true
 		add_child(_arms_yaw)
 		view_arms = GSPlayerViewArms.new()
+		view_arms.hide_until_fitted = true
 		view_arms.name = "ViewArms"
 		_arms_yaw.add_child(view_arms)
 		view_arms.build(player.view_look(game.side_colour(ZzGame.SURVIVORS)), ZzPlayer.BODY_HEIGHT)
@@ -1945,11 +1942,9 @@ func _present_view_arms(delta: float, yaw: float) -> void:
 
 	if on != _arms_downed:
 		_arms_downed = on
-		_arms_age = 0
 		view_arms.set_downed(on)
 
-	_arms_age += 1
-	_arms_yaw.visible = (on and _arms_age >= ARMS_FIT_FRAMES) or (_held_on and not on)
+	_arms_yaw.visible = on or _held_on
 
 	_present_held_hands()
 

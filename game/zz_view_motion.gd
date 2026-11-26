@@ -19,14 +19,7 @@ const SETTING_KEYS := {
 
 ## [param motion] set to the picks times the player's scales (0 off, 1 the pick, 2 double). Wall running is not in ZZ.
 static func scale(motion: GSFpsViewMotion, landing: float, strafe: float, widen: float) -> void:
-	var p := picks()
-	motion.landing_dip = p.landing_dip * maxf(landing, 0.0)
-	motion.landing_pitch = p.landing_pitch * maxf(landing, 0.0)
-	motion.strafe_roll = p.strafe_roll * maxf(strafe, 0.0)
-	motion.slide_roll = p.slide_roll * maxf(strafe, 0.0)
-	motion.roll_limit = p.roll_limit * maxf(strafe, 0.0)
-	motion.fov_speed_gain = p.fov_speed_gain * maxf(widen, 0.0)
-	motion.slide_fov_gain = p.slide_fov_gain * maxf(widen, 0.0)
+	motion.apply_scales(picks(), landing, strafe, 0.0, widen)
 
 
 static func picks() -> GSFpsViewMotion:
