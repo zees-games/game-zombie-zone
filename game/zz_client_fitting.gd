@@ -43,6 +43,38 @@ func is_shop_open() -> bool:
 	return _shop_menu != null and _shop_menu.is_open()
 
 
+func is_bestiary_open() -> bool:
+	return _bestiary_menu != null and _bestiary_menu.is_open()
+
+
+## The list of infected the installed packs offer. Holds the pointer and the input like the shop.
+func open_bestiary() -> void:
+	if _bestiary_menu == null or is_bestiary_open() or is_shop_open():
+		return
+	_using = false
+	_firing = false
+	_aiming = false
+	_suspend_input(true)
+	platform.hold_pointer(&"bestiary")
+	_chat_shown(false)
+	_bestiary_menu.open()
+
+
+func close_bestiary() -> void:
+	if not is_bestiary_open():
+		return
+	_bestiary_menu.close()
+	_chat_shown(true)
+	_suspend_input(false)
+	platform.release_pointer(&"bestiary")
+
+
+## A card was clicked: the server decides whether this player may spawn it.
+func _bestiary_pick(kind: String) -> void:
+	if console != null:
+		console.submit("zz_spawn %s" % kind)
+
+
 ## The chat log is its own layer above the HUD and wrote over the menu's lower cards.
 func _chat_shown(shown: bool) -> void:
 	if chat != null and chat.window != null:

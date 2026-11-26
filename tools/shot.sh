@@ -29,6 +29,7 @@
 #   tools/shot.sh --view=crawl_down                                 # as crawl, then the view at its steepest look-down (_level first)
 #   tools/shot.sh --view=killcam --seconds=3                         # the last stand replayed (--seconds=9: the podium)
 #   tools/shot.sh --view=trader                                      # the trader menu open at the start
+#   tools/shot.sh --view=bestiary                                    # the list of infected the packs offer, with icons
 #   tools/shot.sh --view=deploy --seconds=2.5                        # carrying a box, primary fire held that long (deploy_third, deploy_side)
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope

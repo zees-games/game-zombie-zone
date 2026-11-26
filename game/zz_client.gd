@@ -1413,6 +1413,10 @@ func _build_hud() -> void:
 	_shop_menu = ZzShopMenu.new()
 	_shop_menu.buy_requested.connect(_shop_buy)
 	hud.add_child(_shop_menu)
+	_bestiary_menu = ZzBestiaryMenu.new()
+	_bestiary_menu.picked.connect(_bestiary_pick)
+	_bestiary_menu.close_requested.connect(close_bestiary)
+	hud.add_child(_bestiary_menu)
 	_attach_menu = GSWeaponAttachMenu.new()
 	_attach_menu.name = "AttachMenu"
 	_attach_menu.hide()
@@ -1629,6 +1633,10 @@ func _bind_crosshair_console() -> void:
 		if not sources.is_empty() and sources[0] is GSConsoleLocal:
 			ZzWeaponIcons.shared.bind_console(sources[0])
 			hud.bind_elements(sources[0])
+			(sources[0] as GSConsoleLocal).add_command(&"zz_bestiary", "Open the list of infected the packs offer (admins click one to spawn it)",
+				func(_args: Variant = null) -> String:
+					open_bestiary()
+					return "")
 
 
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
@@ -2349,6 +2357,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Tab, M and a click taking the pointer back are the platform's (GSGameClient).
 	if event.is_action_pressed("ui_cancel") and is_shop_open():
 		close_shop()
+		get_viewport().set_input_as_handled()
+		return
+
+	if event.is_action_pressed("ui_cancel") and is_bestiary_open():
+		close_bestiary()
 		get_viewport().set_input_as_handled()
 		return
 

@@ -290,6 +290,8 @@ func _run() -> void:
 			await _view_defib(game, local, stand)
 		"trader":
 			await _view_trader(game, local, stand)
+		"bestiary":
+			await _view_bestiary(game, local, stand)
 		"hit":
 			await _view_hit(game, local, stand)
 		"ads", "crosshair", "stamina", "firemode", "held", "weapons", "reload":

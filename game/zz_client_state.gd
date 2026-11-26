@@ -37,6 +37,7 @@ const ZzPlayer := preload("zz_player.gd")
 const ZzWeapons := preload("zz_weapons.gd")
 const ZzWorldView := preload("zz_world_view.gd")
 const ZzShopMenu := preload("zz_shop_menu.gd")
+const ZzBestiaryMenu := preload("zz_bestiary_menu.gd")
 const ZzPacks := preload("zz_packs.gd")
 const ZzFittings := preload("zz_fittings.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
@@ -183,6 +184,7 @@ var _using: bool = false
 ## The trader's list as the server last said it ({menu, open, radius, at, items}), and its menu.
 var shop_state: Dictionary = {}
 var _shop_menu: PanelContainer = null
+var _bestiary_menu: PanelContainer = null
 ## The fitting screen (I), and the fittings it saves in the settings ([constant ZzFittings.SETTING]):
 ## one dictionary for the session, which the local arsenal's watcher holds by reference.
 var _attach_menu: GSWeaponAttachMenu = null

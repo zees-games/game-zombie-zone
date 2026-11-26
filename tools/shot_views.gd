@@ -93,6 +93,13 @@ func _view_trader(game: ZzGame, local, stand: Vector3) -> void:
 	await _seconds_of(maxf(_seconds - 0.5, 0.3))
 
 
+func _view_bestiary(_game: ZzGame, _local, _stand: Vector3) -> void:
+	# The list of infected the installed packs offer, with their icons.
+	await _seconds_of(0.5)
+	_client.call("open_bestiary")
+	await _seconds_of(maxf(_seconds - 0.5, 0.5))
+
+
 func _view_crates(game: ZzGame, local, stand: Vector3) -> void:
 	# A ring of ammo piles and boxes, a blast in the middle, and frames before it and 0.35 s and --seconds after.
 	_clear_view(game, local, stand)

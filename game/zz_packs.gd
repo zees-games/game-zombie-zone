@@ -91,6 +91,8 @@ class Monster:
 	var title: String = ""
 	var weight: float = 1.0
 	var boss: bool = false
+	## The row's `icon` (a texture path in the pack, or ""); see ZzBestiary.texture.
+	var icon: String = ""
 	var spawn: Dictionary = {}
 
 ## Where packs are looked for; a test points it at a fixture.
@@ -104,7 +106,7 @@ static var weapon_rows: Array[Dictionary] = []
 static var pack_of: Dictionary = {}
 static var monsters: Array[Monster] = []
 ## The game's own special infected, when a pack carries them (`core` rows, see [method _add_core]): each
-## `{pack, id, role, data, brain}`. Empty without the pack, and the game then runs on commons alone.
+## `{pack, id, name, icon, role, data, brain}`. Empty without the pack, and the game then runs on commons alone.
 static var cores: Array[Dictionary] = []
 ## Pack monster id -> `{path, dir}` of its own view script (see [method view_for]).
 static var views: Dictionary = {}
@@ -355,7 +357,8 @@ static func _add_core(pack: String, row: Dictionary, dir: String) -> void:
 		GSLog.warn(CHANNEL, "a core kind has no usable brain, left out", {"pack": pack, "id": String(id)})
 		return
 
-	cores.append({"pack": pack, "id": id, "role": str(row.get("role", "special")), "data": data, "brain": brain})
+	cores.append({"pack": pack, "id": id, "name": str(row.get("name", id)), "icon": str(row.get("icon", "")),
+		"role": str(row.get("role", "special")), "data": data, "brain": brain})
 	var view := str(data.get("view", ""))
 
 	if view != "":
@@ -368,6 +371,7 @@ static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> voi
 	m.pack = pack
 	m.id = StringName(str(spawn.get("npc", row["id"])))
 	m.title = str(row.get("name", m.id))
+	m.icon = str(row.get("icon", ""))
 	m.spawn = spawn
 	# The pack's own brain, on this game's body, where the pack has one we know how to seat (see ZzPackBrains).
 	var own: Dictionary = ZzPackBrains.adapt(dir, m.id, spawn) if dir != "" else {}

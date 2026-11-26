@@ -12,6 +12,8 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
 const ZzWorldView := preload("../game/zz_world_view.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
+const ZzBestiary := preload("../game/zz_bestiary.gd")
+const ZzBestiaryMenu := preload("../game/zz_bestiary_menu.gd")
 
 ## Optional content packs (game/zz_packs.gd), against a fixture provider (a weapon with and one without a definition, a special,
 ## a boss, a monster named like a built-in): nothing installed changes nothing; installed, the weapon joins the pool and the
@@ -20,7 +22,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
 const SECTIONS := 7
-const CHECKS := 63
+const CHECKS := 68
 ## Each real pack scanned alone from a directory holding only a link to it.
 const ALONE_CHECKS := 12
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
@@ -66,6 +68,24 @@ func _run() -> void:
 	ZzPacks.root = "res://addons"
 	_report_sections(_entered, _finished, _sections, _checks)
 
+
+## The icon a row names reaches the list of infected; a missing, empty or unloadable one gives no texture and the menu a stand-in.
+func _check_bestiary() -> void:
+	ZzBestiary.clear()
+	var rows := ZzBestiary.entries()
+	var ids: Array = rows.map(func(r: Dictionary) -> String: return str(r["id"]))
+	_check(ids.has("fx_ghoul") and ids.has("fx_titan") and not ids.has("brute"), "the list holds the pack's monsters and not the refused one", str(ids))
+	var by_id := {}
+	for r in rows:
+		by_id[r["id"]] = r
+	_check(str(by_id["fx_ghoul"]["icon"]).ends_with("ghoul.png") and by_id["fx_titan"]["role"] == "boss", "a row's icon and role reach the list")
+	_check(ZzBestiary.texture(by_id["fx_ghoul"]["icon"]) != null, "an icon the editor never imported still loads")
+	_check(ZzBestiary.texture(by_id["fx_titan"]["icon"]) == null and ZzBestiary.texture("") == null, "a missing or empty icon is no texture, not an error")
+	var menu := ZzBestiaryMenu.new()
+	add_child(menu)
+	menu.open()
+	_check(menu.card_count() == rows.size() and menu.drawn.get("fx_ghoul", false) and not menu.drawn.get("fx_titan", true), "the menu draws a card per row, a stand-in where the icon is missing")
+	menu.queue_free()
 
 func _write(name: String, body: String) -> void:
 	DirAccess.make_dir_recursive_absolute(CFG_DIR)
@@ -298,6 +318,7 @@ func _installed() -> void:
 	var ghoul: GSNpcDef = cat.get_npc(&"fx_ghoul")
 	_check(ghoul != null and ghoul.move_speed == 5.0 and float(ghoul.meta.get("damage", 0)) == 7.0, "a row's numbers reach the definition")
 	_check(ZzNpcs.is_special(&"fx_ghoul"), "a pack monster counts as a special")
+	_check_bestiary()
 	_check(ZzPacks.pick(ZzPacks.specials(), 0.5).id == &"fx_ghoul", "a weighted pick finds it")
 	_finished += 1
 
