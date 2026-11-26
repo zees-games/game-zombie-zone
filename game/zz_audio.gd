@@ -40,6 +40,8 @@ const DEFIB_CHARGE := &"defib_charge"
 const DEFIB_ZAP := &"defib_zap"
 const VOICE_DUCK_SECONDS := 1.6
 const DEFIB_DUCK_SECONDS := 1.2
+## Seconds the brute stem takes to fade fully in or out.
+const BRUTE_FADE_SECONDS := 3.0
 const UI_CLICK := &"ui_click"
 const UI_DENY := &"ui_deny"
 const HURT := &"hurt"
@@ -96,6 +98,11 @@ const SPECIAL_VOICES := {
 }
 
 var manager: GSAudioManager = null
+var _horde_wanted := false
+var _bed_for_brute := false
+var _brute_handle := 0
+var _brute_level := 0.0
+var _brute_target := 0.0
 ## The recorded, layered gun reports; the synthesised `weapon_shot` family is only the fallback.
 var shots: ZzShotSound = null
 
@@ -194,6 +201,7 @@ static func sound_catalogue() -> GSAudioCatalogue:
 	c.add(cry)
 
 	_add_real(c)
+	_use_real_voices(c)
 
 	var boom := _placed(EXPLOSION, 160.0, 18.0, 3, 95, 0.9, 1.05, "explosion_1")
 	boom.variants = PackedStringArray([_file("explosion_1"), _file("explosion_2")])
@@ -285,6 +293,22 @@ static func _add_real(c: GSAudioCatalogue) -> void:
 	var horde := _flat(REAL_HORDE, &"SFX", 1, 90, "horde_distant")
 	horde.variants = _real_files(&"horde")
 	c.add(horde)
+
+
+## The first-generation voice ids (what a profile without cues falls back to) play the recorded sets
+## too, so no zombie is voiced by a pitched or filtered copy. The sleeper has no recorded set yet.
+static func _use_real_voices(c: GSAudioCatalogue) -> void:
+	var pairs := {
+		MOAN: &"moan", SCREAM: &"rage", CLAW: &"claw", ZOMBIE_DIE: &"die", LEAPER: &"leaper",
+		STRANGLER: &"strangler", BLOATER: &"bloater", RAM: &"ram", SPITTER: &"spitter", RIDER: &"rider",
+		BRUTE: &"brute", SCREAMER: &"screamer", CRAWLER: &"crawler", RIOT: &"riot",
+	}
+	for id: StringName in pairs:
+		var def := c.find(id)
+		if def != null:
+			def.variants = _real_files(pairs[id])
+			if id == CLAW:
+				def.variants.append_array(_real_files(&"bite"))
 
 
 static func _real_files(event: StringName) -> PackedStringArray:
@@ -643,10 +667,48 @@ func music(id: StringName) -> void:
 		else:
 			ambient.duck(&"music", 0.25)
 
+	_horde_wanted = id == MUSIC_HORDE
 	if id == &"":
+		_brute_target = 0.0
 		manager.stop_music(2.0)
 	elif manager.music_id() != id:
 		var _handle := manager.play_music(id, 1.5)
+
+
+## A brute on the field adds its stem over the horde's bed instead of replacing it: the two loops play
+## together, the brute's fading in and out with [method advance_music] and the bed stepping back under it.
+func brute_layer(on: bool) -> void:
+	if manager == null:
+		return
+	_brute_target = 1.0 if on else 0.0
+	if on and manager.music_id() == &"":
+		_bed_for_brute = true
+		var _bed := manager.play_music(MUSIC_HORDE, 1.5)
+	if on and ambient != null:
+		ambient.duck(&"music", 0.25)
+
+
+## Moves the brute stem's level toward its target and keeps its voice alive; call every frame.
+func advance_music(delta: float) -> void:
+	if manager == null:
+		return
+	if _brute_level != _brute_target:
+		_brute_level = move_toward(_brute_level, _brute_target, delta / BRUTE_FADE_SECONDS)
+	if _brute_handle != 0 and not manager.is_playing(_brute_handle):
+		_brute_handle = 0
+	if _brute_target > 0.0 and _brute_handle == 0:
+		_brute_handle = manager.play(MUSIC_BRUTE, 0.01)
+	if _brute_handle != 0:
+		if _brute_level <= 0.0 and _brute_target <= 0.0:
+			manager.stop(_brute_handle)
+			_brute_handle = 0
+			if _bed_for_brute and not _horde_wanted:
+				manager.stop_music(2.0)
+				if ambient != null:
+					ambient.unduck(&"music")
+			_bed_for_brute = false
+		else:
+			var _ok := manager.shape(_brute_handle, maxf(_brute_level, 0.01))
 
 
 func click() -> bool:
