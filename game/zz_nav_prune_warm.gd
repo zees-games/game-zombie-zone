@@ -33,10 +33,12 @@ var _ladders: Array[AABB] = []
 var _required := PackedVector3Array()
 var _tester: RefCounted = null
 var _bare: RefCounted = null
-## Questions the replay found unanswered: [kind (0 point, 1 edge), loose, a, b].
-var _queue: Array = []
+## Questions the replay found unanswered, flat (a million small Arrays cost more to free than the questions to ask):
+## [member _queue_a] and [member _queue_b] hold the point or the edge's ends; [member _queue_kind] is bit 0 edge, bit 1 loose.
+var _queue_a := PackedVector3Array()
+var _queue_b := PackedVector3Array()
+var _queue_kind := PackedByteArray()
 var _queue_at := 0
-var _queued := {}
 var _next := 0
 var _in_edges := false
 var _done := false
@@ -102,7 +104,7 @@ func step(budget_ms: float) -> bool:
 
 		_thread.wait_to_finish()
 		_thread = null
-		_done = _queue.is_empty()
+		_done = _queue_kind.is_empty()
 		return _done
 
 	var deadline := Time.get_ticks_usec() + int(maxf(budget_ms, 0.1) * 1000.0)
@@ -141,42 +143,51 @@ func step(budget_ms: float) -> bool:
 
 ## What the replay found it lacked, asked in slices; then the replay again, until it lacks nothing.
 func _learn(deadline: int) -> bool:
-	while _queue_at < _queue.size():
-		var q: Array = _queue[_queue_at]
+	while _queue_at < _queue_kind.size():
+		var kind := _queue_kind[_queue_at]
+		var a := _queue_a[_queue_at]
+		var b := _queue_b[_queue_at]
 		_queue_at += 1
-		var tester := _bare if q[1] else _tester
+		var loose := (kind & 2) != 0
+		var tester := _bare if loose else _tester
 
-		if q[0] == 0:
-			(loose_points if q[1] else points)[q[2]] = tester._hit(q[2])
+		if kind & 1 == 0:
+			var memo: Dictionary = loose_points if loose else points
+
+			if not memo.has(a):
+				memo[a] = tester._hit(a)
+				asked += 1
 		else:
-			var table: Dictionary = loose_edges if q[1] else edges
-			var row: Dictionary = table.get(q[2], {})
-			row[q[3]] = tester._edge_blocked_asked(q[2], q[3])
-			table[q[2]] = row
+			var table: Dictionary = loose_edges if loose else edges
+			var row: Dictionary = table.get(a, {})
 
-		asked += 1
+			if not row.has(b):
+				row[b] = tester._edge_blocked_asked(a, b)
+				table[a] = row
+				asked += 1
 
 		if _queue_at % 16 == 0 and Time.get_ticks_usec() >= deadline:
 			return false
 
-	_queue.clear()
+	_queue_a = PackedVector3Array()
+	_queue_b = PackedVector3Array()
+	_queue_kind = PackedByteArray()
 	_queue_at = 0
-	_queued.clear()
 	_thread = Thread.new()
 	_thread.start(_replay)
 	return false
 
 
 func want_point(p: Vector3, loose: bool) -> void:
-	if not _queued.has([0, loose, p]):
-		_queued[[0, loose, p]] = true
-		_queue.append([0, loose, p, p])
+	_queue_a.append(p)
+	_queue_b.append(p)
+	_queue_kind.append(2 if loose else 0)
 
 
 func want_edge(a: Vector3, b: Vector3, loose: bool) -> void:
-	if not _queued.has([1, loose, a, b]):
-		_queued[[1, loose, a, b]] = true
-		_queue.append([1, loose, a, b])
+	_queue_a.append(a)
+	_queue_b.append(b)
+	_queue_kind.append(3 if loose else 1)
 
 
 ## The prune is run on a copy (on a thread: it is a whole walk of the graph), where an unanswered question is queued and
@@ -194,6 +205,6 @@ func _replay() -> void:
 	replays += 1
 	replay_ms = maxf(replay_ms, float(Time.get_ticks_usec() - began) / 1000.0)
 
-	if _queue.is_empty():
+	if _queue_kind.is_empty():
 		result = copy
 		result_dropped = dropped
