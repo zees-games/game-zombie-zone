@@ -7,11 +7,20 @@ func screen() -> Control:
 		_build()
 	return _root
 
-## Moves the weight readout (slot list and bar) [param px] left of the right edge, clear of the touch
+const LOADOUT_WIDTH := 8.0 * (ZzLoadoutBar.SLOT_W + ZzLoadoutBar.GAP)
+
+## The loadout row's top edge off the bottom; the counter and fire modes stand on it.
+const LOADOUT_TOP := 24.0 + ZzLoadoutBar.SLOT_H + ZzLoadoutBar.WEIGHT_H + 8.0
+
+const ZzShopIcons := preload("zz_shop_icons.gd")
+
+var _icons: ZzShopIcons = null
+
+## Moves the loadout row (slots and weight bar) [param px] left of the right edge, clear of the touch
 ## buttons: FIRE and its cluster sit over it on a phone.
 func shift_weight_left(px: float) -> void:
 	screen()
-	for c: Control in [_weight, _weight_back, _weight_fill]:
+	for c: Control in [loadout, ammo, fire_mode]:
 		c.offset_left -= px
 		c.offset_right -= px
 
@@ -116,11 +125,15 @@ func _build() -> void:
 	# Bottom left, above the chat box: the health plate, the kits over it, the downs over them.
 	vitals = GSVitals.new()
 	vitals.name = "Vitals"
-	vitals.bar_end = 300.0
+	vitals.slim = true
+	vitals.slim_height = 10.0
+	vitals.slim_armour_height = 4.0
+	vitals.armour_height = 5.0
+	vitals.ease_sec = 0.28
 	vitals.fill_colour = HEALTH_COLOUR
 	vitals.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	vitals.offset_left = 22.0
-	vitals.offset_right = 22.0 + 420.0
+	vitals.offset_left = 24.0
+	vitals.offset_right = 24.0 + 420.0
 	vitals.offset_top = -PLATE_BOTTOM - 56.0
 	vitals.offset_bottom = -PLATE_BOTTOM
 	_root.add_child(vitals)
@@ -177,27 +190,29 @@ func _build() -> void:
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	ammo.offset_left = -420.0
 	ammo.offset_right = -24.0
-	ammo.offset_top = -100.0
-	ammo.offset_bottom = -24.0
+	ammo.offset_top = -LOADOUT_TOP - 76.0
+	ammo.offset_bottom = -LOADOUT_TOP
 	_root.add_child(ammo)
 
-	_weapon_icon = GSWeaponIconPlate.new()
-	_weapon_icon.name = "WeaponIcon"
-	_weapon_icon.show_plate = false
-	_weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_weapon_icon.offset_left = -310.0
-	_weapon_icon.offset_right = -150.0
-	_weapon_icon.offset_top = -96.0
-	_weapon_icon.offset_bottom = -28.0
-	_root.add_child(_weapon_icon)
+	# The loadout row and the weight bar over it: bottom right, one picture per slot.
+	loadout = ZzLoadoutBar.new()
+	loadout.name = "Loadout"
+	loadout.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	loadout.offset_left = -24.0 - LOADOUT_WIDTH
+	loadout.offset_right = -24.0
+	loadout.offset_top = -24.0 - ZzLoadoutBar.SLOT_H - ZzLoadoutBar.WEIGHT_H
+	loadout.offset_bottom = -24.0
+	_root.add_child(loadout)
+	_icons = ZzShopIcons.new()
+	add_child(_icons)
 
 	fire_mode = GSFireModeIndicator.new()
 	fire_mode.name = "FireMode"
 	fire_mode.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	fire_mode.offset_left = -420.0
 	fire_mode.offset_right = -24.0
-	fire_mode.offset_top = -130.0
-	fire_mode.offset_bottom = -104.0
+	fire_mode.offset_top = -LOADOUT_TOP - 106.0
+	fire_mode.offset_bottom = -LOADOUT_TOP - 80.0
 	_root.add_child(fire_mode)
 
 	# While the map's graph is built: above the ammunition.
@@ -221,15 +236,6 @@ func _build() -> void:
 	_crosshair.name = "Crosshair"
 	_root.add_child(_crosshair)
 
-	_prompt = _label(17)
-	_prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_prompt.offset_left = -400.0
-	_prompt.offset_right = 400.0
-	_prompt.offset_top = 40.0
-	_prompt.offset_bottom = 66.0
-	_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_prompt.add_theme_color_override("font_color", Color(0.95, 0.95, 0.85))
-
 	_use_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_CENTER, -160.0, 74.0, 320.0, 12.0)
 	_use_fill = _rect(Color(0.95, 0.85, 0.35), Control.PRESET_CENTER, -160.0, 74.0, 0.0, 12.0)
 	# The breath, above the use bar's place; shown only while it is not full.
@@ -237,34 +243,6 @@ func _build() -> void:
 	_air_fill = _rect(Color(0.55, 0.85, 1.0), Control.PRESET_CENTER, -100.0, 96.0, 200.0, 8.0)
 	_air_back.visible = false
 	_air_fill.visible = false
-	_carry = _label(16)
-	_carry.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	_carry.offset_left = -300.0
-	_carry.offset_right = 300.0
-	_carry.offset_top = -150.0
-	_carry.offset_bottom = -126.0
-	_carry.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_use_label = _label(16)
-	_use_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_use_label.offset_left = -300.0
-	_use_label.offset_right = 300.0
-	_use_label.offset_top = 88.0
-	_use_label.offset_bottom = 112.0
-	_use_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-
-	_weight = _label(15)
-	_weight.name = "Weight"
-	_weight.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_weight.offset_left = -330.0
-	_weight.offset_right = -20.0
-	_weight.offset_top = -240.0
-	_weight.offset_bottom = -140.0
-	_weight.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_weight.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	_weight.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_weight_back = _rect(Color(0.0, 0.0, 0.0, 0.55), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 310.0, 8.0)
-	_weight_fill = _rect(Color(0.55, 0.8, 0.4), Control.PRESET_BOTTOM_RIGHT, -330.0, -136.0, 0.0, 8.0)
-
 	_held = _label(28)
 	_held.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_held.offset_left = -500.0
@@ -741,35 +719,9 @@ func team_lines() -> PackedStringArray:
 				(fill.size.x / TEAM_BAR_WIDTH) if fill.visible else 0.0])
 	return out
 
-## The weight readout's words, rebuilt when [method set_carry] brings a new state.
-var _weight_text: String = ""
-
-var _weight_text_stale: bool = true
-
-var _weight_text_fn: Callable = func() -> String:
-	var carried := float(_weight_state.get("w", 0.0))
-	var limit := maxf(float(_weight_state.get("l", 1.0)), 0.1)
-	var lines := PackedStringArray()
-	var slots: Dictionary = _weight_state.get("slots", {})
-	var keys := slots.keys()
-	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return int(a) < int(b))
-	for key in keys:
-		var names := PackedStringArray()
-		for id: Variant in slots[key]:
-			names.append(ZzWeapons.title_of(StringName(str(id))))
-		if names.size() > 1:
-			var rest := names.slice(1)
-			lines.append("%s: [%s] %s" % [key, names[0], " ".join(rest)])
-		else:
-			lines.append("%s: %s" % [key, names[0]])
-	var pack: String = " | pack %d" % int(_weight_state.get("tier", 0)) if int(_weight_state.get("max", 0)) > 0 else ""
-	var slow: String = " | SLOWED" if float(_weight_state.get("scale", 1.0)) < 0.999 else ""
-	return "%s\nweight %.1f / %.1f%s%s" % ["\n".join(lines), carried, limit, pack, slow]
-
 ## What the player carries (the CARRY event's document, or [method ZzCarry.state_json] offline).
 func set_carry(state: Dictionary) -> void:
 	_weight_state = state
-	_weight_text_stale = true
 
 func _draw_stamina() -> void:
 	var s: GSFpsState = player.controller.state if player.controller != null else null
@@ -783,27 +735,39 @@ func _draw_stamina() -> void:
 	_stamina_pct = s.stamina * 100.0
 	stamina_bar.refresh()
 
+## The row of slots: one picture each, from the weapon's own model (the first time it is asked for), else the
+## sprite sheet's. A slot holding several weapons shows the one in hand.
+func _draw_loadout(arsenal: GSWeaponArsenal) -> void:
+	var rows: Array = []
+	for key in arsenal.slots():
+		var held: Array[GSWeaponSlot] = arsenal.weapons_in(key)
+		if held.is_empty():
+			continue
+		var weapon: GSWeaponSlot = held[0]
+		var def := weapon.def
+		var picture: Texture2D = _icons.icon_for(def.id)
+		if picture == null:
+			picture = ZzWeaponIcons.shared.texture(def.id)
+		var line := ""
+		var low := false
+		if def.magazine > 0:
+			if def.infinite_reserve:
+				line = "%d / ∞" % weapon.magazine
+			else:
+				line = "%d / %d" % [weapon.magazine, arsenal.ammo().count(def.ammo_type) if def.ammo_type != &"" else 0]
+			low = float(weapon.magazine) <= float(def.magazine) * 0.25
+		rows.append({"key": str(key), "icon": picture, "name": ZzWeapons.title_of(def.id), "text": line,
+			"selected": key == arsenal.current_slot(), "low": low})
+	loadout.set_slots(rows)
+
 func _draw_weight() -> void:
-	if _weight == null:
+	if loadout == null:
 		return
-	var on := bool(_weight_state.get("on", false)) and player.is_alive()
-	_weight.visible = on
-	_weight_back.visible = on
-	_weight_fill.visible = on
-	if not on:
+	if not (bool(_weight_state.get("on", false)) and player.is_alive()):
+		loadout.clear_weight()
 		return
-	var carried := float(_weight_state.get("w", 0.0))
-	var limit := maxf(float(_weight_state.get("l", 1.0)), 0.1)
-	var share := carried / limit
-	var over := share > 1.0
-	var colour := Color(1.0, 0.35, 0.3) if over else (AMBER if share > 0.8 else Color(0.55, 0.8, 0.4))
-	_set_width(_weight_fill, 310.0 * minf(share, 1.0))
-	_weight_fill.color = colour
-	if _weight_text_stale:
-		_weight_text_stale = false
-		_weight_text = _weight_text_fn.call()
-	_weight.text = _weight_text
-	_weight.add_theme_color_override("font_color", colour)
+	loadout.set_weight(float(_weight_state.get("w", 0.0)), float(_weight_state.get("l", 1.0)),
+		int(_weight_state.get("tier", 0)), int(_weight_state.get("max", 0)))
 
 const FIRE_NAMES := {GSWeaponDef.Fire.AUTO: &"auto", GSWeaponDef.Fire.SEMI: &"semi", GSWeaponDef.Fire.BURST: &"burst"}
 
@@ -834,7 +798,7 @@ func _draw_weapon() -> void:
 	if rig == null or rig.arsenal == null or rig.arsenal.current() == null:
 		ammo.clear()
 		fire_mode.clear()
-		_weapon_icon.clear()
+		loadout.set_slots([])
 		return
 
 	_offered.clear()
@@ -844,8 +808,7 @@ func _draw_weapon() -> void:
 
 	var slot := rig.arsenal.current()
 	var title := ZzWeapons.title_of(slot.def.id)
-	var sprite := ZzWeaponIcons.shared.texture(slot.def.id)
-	_weapon_icon.show_icon(sprite, slot.def.id)
+	_draw_loadout(rig.arsenal)
 
 	if slot.def.magazine > 0:
 		var reserve := rig.arsenal.ammo().count(slot.def.ammo_type) if slot.def.ammo_type != &"" else 0
@@ -854,8 +817,6 @@ func _draw_weapon() -> void:
 			slot.def.infinite_reserve)
 	else:
 		ammo.show_ammo(title, -1, -1)
-
-const USE_TEXT := {&"revive": "Picking them up…", &"heal": "Healing…", &"pills": "Taking a pill — hold still…", &"loot": "Opening…", &"objective": "Working…", &"repair": "Mending the barricade…", &"defib": "Charging the defibrillator — hold still…", &"deploy": "Setting the box down — stay put and keep firing held…"}
 
 const HELD_TEXT := {
 	&"grab": "GRABBED — shoot it, or a friend can shove it off",
@@ -870,20 +831,16 @@ const HELD_DEFAULT := "HELD — your team has to free you"
 
 func _draw_use() -> void:
 	var fraction := 0.0
-	var text := ""
 
+	# Only the bar: the words under it said what the action was, which the hands already show.
 	if player.using != &"":
 		fraction = player.use_fraction
-		text = USE_TEXT.get(player.using, "")
 	elif player.helped_fraction > 0.0:
 		fraction = player.helped_fraction
-		text = "Somebody is helping you…"
 
 	_use_back.visible = fraction > 0.0
-	_use_label.visible = fraction > 0.0
 	_set_width(_use_fill, 320.0 * fraction)
 	_use_fill.visible = fraction > 0.0
-	_use_label.text = text
 
 	if player.is_pinned():
 		_held.text = HELD_TEXT.get(player.pin_kind, HELD_DEFAULT)
@@ -891,38 +848,8 @@ func _draw_use() -> void:
 	else:
 		_held.visible = false
 
-## The box slot: what is in the hands and the key that opens it. Without `box_labels` the type is
-## not known to this end at all (`carried_index` is 0), so this says only "a box".
-var _carry_sig: int = -1
-
-var _carry_keys: Array = ["", ""]
-
-var _carry_text_fn: Callable = func(id: StringName) -> String:
-	var title := str(box_titles.get(id, "Box")) if id != &"" else "Unknown box"
-	var more := " x%d" % player.carried_count if player.carried_count > 1 else ""
-	if player.box_out:
-		return "%s%s — hold %s to deploy (%s puts it away)" % [title, more, _carry_keys[0], _carry_keys[1]]
-	return "%s%s — %s takes it out" % [title, more, _carry_keys[1]]
-
+## The deploy meter pulses while it fills: the first-person cue that something is happening.
 func _draw_carry() -> void:
-	if _carry == null:
-		return
-
-	_carry.visible = player.carried_count > 0 and player.is_alive()
-
-	if not _carry.visible:
-		return
-
-	var id: StringName = box_order[player.carried_index - 1] if player.carried_index > 0 and player.carried_index <= box_order.size() else &""
-	var fire_key := _key(ZzBindings.FIRE)
-	var box_key := _key(ZzBindings.BOX)
-	var carry_sig := player.carried_index + (player.carried_count << 8) + ((1 << 20) if player.box_out else 0)
-	if carry_sig != _carry_sig or fire_key != _carry_keys[0] or box_key != _carry_keys[1]:
-		_carry_sig = carry_sig
-		_carry_keys = [fire_key, box_key]
-		_carry.text = _carry_text_fn.call(id)
-	_carry.add_theme_color_override("font_color", (box_colours.get(id, Color(0.98, 0.84, 0.5)) as Color).lightened(0.2))
-	# The meter pulses while it fills: the first-person cue that something is happening.
 	if player.using == &"deploy":
 		_use_fill.color = Color(0.95, 0.85, 0.35).lerp(Color(1.0, 0.45, 0.2), 0.5 + 0.5 * sin(Time.get_ticks_msec() / 90.0))
 	else:
