@@ -120,3 +120,12 @@ A special that drew as a legless, headless cone was a zombie whose limbs had com
 ## The six specials' own bodies (2026-11-24)
 
 `brute`, `bloater`, `strangler`, `spitter`, `sleeper` and `screamer` no longer wear a recoloured kit body. `art-src/zombie_specials.py` (Blender 4.3, run through `gpu.sh blender`) takes the CC0 Quaternius kit body each was built on (chubby for brute, bloater and screamer, basic for strangler, lis for spitter and sleeper), recolours its atlas swatches, models the gear procedurally (brute: pauldrons, chest plate, spine spikes, wrapped fists, horns; bloater: belly, boils, goitre; strangler: ragged cloak, hood, noose, claws; spitter: throat sac, acid tanks and pipes; sleeper: hospital gown, wrist tags, head wrap; screamer: bodice, flared robe, bone crest, maw), skins the gear to the rig, and bakes diffuse, AO and a tangent normal map into 1024 px `<kind>_albedo.png` and `<kind>_normal.png`. The GLBs keep the kit's rig and clips (spitter and sleeper reuse `basic`'s through `CLIPS_FROM`), so skinned gear follows every pose and bone-scale in `LOOKS`. They are in `NORMALS` (colour, blood and dirt are in the texture, so the look sets blood 2.0 and dirt 0.0) and `tools/link_zombie_textures.py` links the textures into the GLBs. Run: `gpu.sh blender --stage W --pull W/out -- -b --factory-startup --python zombie_specials.py -- <kit dir> <out dir> brute,bloater,... [--sheet]`. Sources: Quaternius kit (CC0) plus our procedural geometry and textures (MIT).
+
+## Gore on a cut
+
+A limb that comes off is thrown as a gib by gs-npc (`GSNpcGibs`), and what the cut looks like follows the blow:
+`ZzHorde.limb_hit` sets `GSNpcGore.hit_style` from `ZzZombieLimbs.gore_style(damage)` (a blast, a strike, a
+shotgun or a rifle jet) just before `hit_limb`, and the gib's throw, spin and the spray's cone, count and speed come
+from `GSNpcGore.style_params`. The cut face is a closed, ragged collar of torn flesh with muscle, bone and marrow
+layers (four shared mesh variants, scaled per limb), and blood is thin streaks aligned to their travel.
+`gore_max_gibs` and `gore_max_wounds` of 0 mean unlimited; `zz_gore_level 1` is stumps only.
