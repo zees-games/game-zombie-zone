@@ -1704,7 +1704,7 @@ func _hide_unsent_zombies() -> void:
 		if body == null or not is_instance_valid(body) or body.kind == ZzNpcs.BRUTE:
 			continue
 
-		var stale := now - behaviour.state_msec > STALE_MSEC
+		var stale := behaviour.is_stale(now, STALE_MSEC, net.interpolator, net_id)
 		body.visible = not (stale and body.global_position.distance_to(eye) > NEAR_KEPT)
 
 
