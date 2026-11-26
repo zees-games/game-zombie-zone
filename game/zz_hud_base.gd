@@ -184,8 +184,8 @@ var box_titles: Dictionary = {}
 
 var box_colours: Dictionary = {}
 
-## The row of weapon slots and the weight bar over it (see [ZzLoadoutBar]).
-var loadout: ZzLoadoutBar = null
+## The row of weapon slots and the weight bar over it (see [GSLoadoutBar]).
+var loadout: GSLoadoutBar = null
 
 var _weight_state: Dictionary = {"on": false}
 
