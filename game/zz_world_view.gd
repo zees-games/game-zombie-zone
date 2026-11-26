@@ -750,9 +750,26 @@ func _hit_side(body: Node3D, view: Node3D) -> float:
 	return 1.0 if side >= 0.0 else -1.0
 
 
+## One native LOD judgement for every zombie in [member _zombies] order (empty: the views judge themselves).
+func _lod_codes() -> PackedInt32Array:
+	if not lod.batched():
+		return PackedInt32Array()
+	var ats := PackedVector3Array()
+	ats.resize(_zombies.size())
+	var i := 0
+	for key: int in _zombies.keys():
+		var v: Node3D = (_zombies[key] as Dictionary).get("view")
+		ats[i] = v.global_position if v != null and is_instance_valid(v) and v.is_inside_tree() else Vector3.INF
+		i += 1
+	return lod.classify(ats)
+
+
 func _present_zombies(delta: float, listener: Vector3) -> void:
 	lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
+	var codes := _lod_codes()
+	var slot := -1
 	for key: int in _zombies.keys():
+		slot += 1
 		var entry: Dictionary = _zombies[key]
 		var body: Node3D = entry["body"]
 		var view: ZzZombieView = entry["view"]
@@ -761,6 +778,7 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 			_zombies.erase(key)
 			continue
 
+		view.lod_code = codes[slot] if slot < codes.size() else -1
 		var anim := int(body.get(&"anim"))
 		var flags := int(body.get(&"flags"))
 

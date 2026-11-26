@@ -536,6 +536,13 @@ func _lod_every(at: Vector3) -> int:
 	var every := 1
 
 	if _death.is_empty():
+		if lod_code >= 0 and lod != null and not _own_lod:
+			var lit := lod.shadowed_coded(lod_code)
+			if _mesh != null and lit != _shadowed:
+				_shadowed = lit
+				_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if lit \
+						else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			return lod.every_coded(lod_code)
 		if lod == null or _own_lod:
 			_own_lod = true
 			lod = lod if lod != null else ZzZombieLod.new()
