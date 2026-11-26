@@ -789,7 +789,13 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 		if health < was - 0.5 and health > 0.0:
 			# The snapshot carries no hit location: the flinch leans away from the viewer's side (shots mostly come from
 			# the camera), and the second health bit picks the head or the chest clip for variety.
-			view.flinch(_hit_side(body, view), (int(health) & 2) != 0)
+			var code := int(body.get(&"hit_code"))
+			if code != 0:
+				# The server said where it landed: region in the low 3 bits, side in the 4th.
+				var region := code & 7
+				view.flinch(1.0 if (code & 8) != 0 else -1.0, region == 1, region)
+			else:
+				view.flinch(_hit_side(body, view), (int(health) & 2) != 0)
 
 		view.present(delta, anim, flags)
 

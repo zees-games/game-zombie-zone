@@ -46,6 +46,8 @@ var variant: int = 0
 
 var anim: int = Anim.IDLE
 var flags: int = 0
+## Where the last shot that hurt it landed, for the flinch ([method ZzZombieLimbs.hit_code]): 0 when none yet. Replicated in 5 bits.
+var hit_code: int = 0
 
 ## Its health as last heard: the server's own, or a client's from the snapshot. A client's view
 ## flinches when it drops.

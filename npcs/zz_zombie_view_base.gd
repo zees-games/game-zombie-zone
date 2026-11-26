@@ -306,6 +306,8 @@ var _owed: float = 0.0
 var _frame: int = 0
 var _flinch: float = 0.0
 var _flinch_side: float = 1.0
+## Where the flinch's shot landed ([constant ZzZombieLimbs.HIT_CHEST] and kin): 3 an arm, 4 a leg buckles the knee.
+var _flinch_region: int = 2
 var _hunch: float = 0.0
 ## Seconds since the attack state began, and where in the swing that puts it (0 to 1).
 var _strike_t: float = 0.0
