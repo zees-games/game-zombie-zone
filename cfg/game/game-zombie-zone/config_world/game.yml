@@ -4,7 +4,7 @@
 # --- Gore
 # How much dismemberment there is (gs-npc's GSNpcGore): 0 none (limbs cannot be shot off), 1 clean stumps, 2 ... [0..]
 # gore_level: 2
-# The most severed limbs lying about at once on a machine; the oldest is recycled. 0 throws none. `zz_gore_ma... [0..]
+# The most severed limbs lying about at once on a machine; the oldest is recycled. 0 is unlimited. `zz_gore_m... [0..]
 # gore_max_gibs: 24
 # Wound marks on bodies plus blood pools under crawling zombies, at most this many on a machine (drawn only; ... [0..]
 # gore_max_wounds: 48
