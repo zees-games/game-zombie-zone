@@ -2054,11 +2054,6 @@ func _shop_item_state(item: Dictionary) -> String:
 	return ""
 
 
-func is_spectating() -> bool:
-	return player != null and game != null and game.spectate != null \
-		and game.spectate.is_spectating(player.player_id)
-
-
 func _watched_through_eyes() -> ZzPlayer:
 	if not is_spectating():
 		return null

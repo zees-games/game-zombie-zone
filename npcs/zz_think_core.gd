@@ -5,6 +5,17 @@ extends RefCounted
 ## calls one or the other and `headless_native_think` holds them bit-equal. The brains own what only
 ## the engine can do (the hit, the nudge and relocate, the survivor scan) and act on the codes.
 
+## One script twin for brains with no horde (a tool or suite thinking one by hand). Made on first use, not at load:
+## an instance made at load pins this script, and the parse pass can then not reload it.
+static var _shared: RefCounted = null
+
+
+static func shared() -> RefCounted:
+	if _shared == null:
+		_shared = new()
+	return _shared
+
+
 const SWING_WINDUP := 0.32
 const SWING_RECOVER := 0.55
 const WATCH_RADIUS := 1.0

@@ -309,7 +309,7 @@ func _advance_swing() -> void:
 func _core() -> Object:
 	var h := horde()
 	var c: Variant = h.get(&"think_core") if h != null else null
-	return c if c != null else _twin
+	return c if c != null else ZzThinkCore.shared()
 
 
 ## A burning zombie swings faster; a staggered one does not swing.
@@ -481,9 +481,6 @@ func _victim_in_front() -> StringName:
 ## The function-level profile (tools/server_probe.gd --detail sets it to a Dictionary; null costs one test): usec per
 ## part of one think, "think.<part>" -> usec, and a "think.n" count, read back as ms per tick under "prof".
 static var prof: Variant = null
-
-## The script twin of the cores, for a brain with no horde (a tool or suite thinking one by hand).
-static var _twin: Object = ZzThinkCore.new()
 
 
 func _lap(part: String, t0: int) -> int:

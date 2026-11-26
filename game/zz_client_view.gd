@@ -54,6 +54,12 @@ func _motion_cues(drawn: GSFpsState, delta: float) -> Vector3:
 	return Vector3(deg_to_rad(_motion.roll()), deg_to_rad(_motion.pitch()), _motion.eye_drop())
 
 
+## Whether this client watches someone else (the view arms hide then).
+func is_spectating() -> bool:
+	return player != null and game != null and game.spectate != null \
+		and game.spectate.is_spectating(player.player_id)
+
+
 ## Your crawling arms while down in first person. The pivot turns with the yaw only: under the pitch they would swing with the look.
 var cl_viewarms_held: bool = false
 var _held_grip: GSViewGrip = null
