@@ -36,6 +36,7 @@ func _process(delta: float) -> void:
 		var def: Variant = me.weapons.arsenal.catalogue.get_def(id)
 		return def.name_or_id() if def != null else String(id)
 	view.show_prompt(info, 0.0)
+	_name_only(view)
 	if game.has_meta(&"hud"):
 		game.get_meta(&"hud").set_hold_progress(hold.progress)
 
@@ -58,3 +59,14 @@ func _key_text() -> String:
 				var code: Key = ev.physical_keycode if ev.physical_keycode != KEY_NONE else ev.keycode
 				return OS.get_keycode_string(code)
 	return "E"
+
+
+## The floating label says which weapon it is and nothing about what the key does: the shared view's text also
+## spelled out ammunition and "[E] Take", a box that explained itself.
+func _name_only(shown: GSWeaponPickupView) -> void:
+	if not shown.visible:
+		return
+	var id := StringName(shown.get("_info").get("weapon", &"")) if shown.get("_info") is Dictionary else &""
+	for child in shown.get_children():
+		if child is Label3D:
+			(child as Label3D).text = String(shown.name_of.call(id)) if shown.name_of.is_valid() else String(id)

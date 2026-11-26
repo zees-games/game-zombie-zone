@@ -65,8 +65,8 @@ func _init() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	offset_left = -WIDTH - 24.0 - 24.0
 	offset_right = -24.0
-	offset_top = -190.0
-	offset_bottom = -112.0
+	offset_top = -330.0
+	offset_bottom = -252.0
 	grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	grow_vertical = Control.GROW_DIRECTION_BEGIN
 

@@ -115,6 +115,7 @@ Publishing: `tools/publish.sh [--version V | --bump patch] [--site URL --token-f
 
 **The HUD and the screen** ([design](docs/design.md#the-hud-gs-uis-glance-pieces))
 - Glance pieces are gs-ui's (vitals, ammo, strip, key hints, hit marker, damage numbers); naming them needs a shell with gs-ui API level 4, which `headless_run` checks.
+- Bottom right is `ZzLoadoutBar` (one icon per slot from the weapon's own model, key, ammo, selected; the weight bar over it; slot API in [docs/hud-loadout.md](docs/hud-loadout.md)); the HUD shows no speed and no boxes saying what a pickup or prop does; the toast stays clear of the ammo counter.
 - The HUD follows the menu's theme (`ZzHud.follow_menu`, gs-menu's `follow_hud` by name); `piece_theme()` is accent only (amber, health green); Labels set no colour of their own except accent lines.
 - Every character the game writes is in the HUD's font (`headless_run` scans `game/` and `npcs/`); bars are drawn, never block characters. [design](docs/design.md#what-the-first-play-test-changed-2026-10-11)
 - The top-left team-mate list is a server setting, `zz_team_roster` (`ZzConfig.team_roster`, OFF by default, REPLICATED, followed by `ZzClient.follow_roster`); the Tab board carries each survivor's Health and Downs left (`ZzClient.health_text`/`downs_text`) so nothing is lost with it off.
