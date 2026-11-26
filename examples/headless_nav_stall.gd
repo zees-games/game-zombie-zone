@@ -90,7 +90,7 @@ func _test_build(id: StringName) -> void:
 			landed = spent
 		elif spent > worst:
 			worst = spent
-			worst_stage = stage
+			worst_stage = "%s #%d -> %s" % [stage, ticks, game.horde.nav_stage()]
 
 		if ticks % 4 == 0:
 			await get_tree().physics_frame
