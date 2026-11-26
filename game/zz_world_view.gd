@@ -104,7 +104,8 @@ static func view_for(kind: StringName) -> ZzZombieView:
 		&"oil_monster":
 			return ZzOilMonsterView.new()
 
-	return ZzZombieView.new()
+	var theirs := ZzPacks.view_for(kind) as ZzZombieView
+	return theirs if theirs != null else ZzZombieView.new()
 
 func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	if body == null or _zombies.has(key):

@@ -10,6 +10,7 @@ const ZzPacks := preload("../game/zz_packs.gd")
 const ZzPackBrains := preload("../game/zz_pack_brains.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view_base.gd")
+const ZzWorldView := preload("../game/zz_world_view.gd")
 const ZzWeapons := preload("../game/zz_weapons.gd")
 
 ## Optional content packs (game/zz_packs.gd), against a fixture provider (a weapon with and one without a definition, a special,
@@ -52,7 +53,7 @@ func _run() -> void:
 
 	if _real_packs_linked():
 		_sections += 1
-		_checks += REAL_CHECKS
+		_checks += REAL_CHECKS + (3 if FileAccess.file_exists("res://addons/zz_mutants/%s" % ZzPacks.PROVIDER_FILE) else 2)
 		await _real_packs()
 		_sections += 1
 		_checks += ALONE_CHECKS
@@ -660,9 +661,11 @@ func _real_packs() -> void:
 	var extra := 0
 	# The class pack (zz_ply_class_pack) is a provider too, with no weapon rows.
 	var class_pack := 1 if FileAccess.file_exists("res://addons/zz_ply_class_pack/%s" % ZzPacks.PROVIDER_FILE) else 0
+	# zz-mutants (the Parasite Host) is a fourth provider where it is linked, and one more monster, a special.
+	var mut := 1 if FileAccess.file_exists("res://addons/zz_mutants/%s" % ZzPacks.PROVIDER_FILE) else 0
 	var extra_rows := ZzPacks.weapon_rows.filter(func(r: Dictionary) -> bool: return str(r.get("id", "")).begins_with("aw_")).size()
 	_check(extra_rows == 0 and not ZzPacks.providers.has("fc_weapons") and not ZzPacks.providers.has("fc_weapons"), "Fatal Contact's weapon addon is never loaded as a pack", "%d" % extra_rows)
-	_check(found == 3 + extra + class_pack, "the three packs and any optional weapon pack are loaded from addons/", "%d" % found)
+	_check(found == 3 + extra + class_pack + mut, "the three packs and any optional weapon pack are loaded from addons/", "%d" % found)
 	_check(ZzPacks.weapon_rows.size() - extra_rows == MODERN_IDS.size() + MEDIEVAL_IDS.size(), "every weapon row of both weapon packs has a definition", "%d" % ZzPacks.weapon_rows.size())
 	_check(extra == 0 or extra_rows > 0, "an optional weapon pack's rows join the catalogue", "%d" % extra_rows)
 
@@ -691,10 +694,11 @@ func _real_packs() -> void:
 	_check(not ZzWeapons.offered(&"dagger") and not ZzWeapons.offered(&"war_axe"), "medieval weapons are not offered by default")
 	_check(MEDIEVAL_IDS.all(func(id: String) -> bool: return not ZzWeapons.ids_of(ZzWeapons.tier_of(StringName(id))).has(StringName(id))),
 		"no pool draws a medieval weapon by default")
-	_check(ZzPacks.monsters.size() == 6 and ZzPacks.specials().size() == 5 and ZzPacks.bosses().size() == 1,
-		"six monsters: five specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
+	_check(ZzPacks.monsters.size() == 6 + mut and ZzPacks.specials().size() == 5 + mut and ZzPacks.bosses().size() == 1,
+		"six monsters (seven with zz-mutants): the rest specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
-	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 20, "the catalogue is the fourteen built-in kinds and the six monsters")
+	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 20 + mut, "the catalogue is the fourteen built-in kinds and the monsters")
+	_pack_view(mut == 1)
 	_check_pack_numbers()
 	# A real game spawns each monster once, and arms a survivor with a weapon from each pack.
 	var config := ZzConfig.new()
@@ -738,6 +742,35 @@ func _real_packs() -> void:
 	_finished += 1
 
 
+## A pack monster's own picture: the Parasite Host's view loads, builds on the game's view, poses every state without
+## an error, and where the pack is not scanned the same kind draws as the game's own body.
+func _pack_view(linked: bool) -> void:
+	var view := ZzPacks.view_for(&"parasite_host") as ZzZombieView
+	_check((view != null) == linked, "a pack's own view is made exactly where its pack is scanned", str(view))
+
+	if view != null:
+		add_child(view)
+		view.build(&"parasite_host", 0)
+		var states := [ZzZombieBody.Anim.IDLE, ZzZombieBody.Anim.WALK, ZzZombieBody.Anim.RUN, ZzZombieBody.Anim.ATTACK, ZzZombieBody.Anim.STAGGER, ZzZombieBody.Anim.DEAD]
+
+		for anim: int in states:
+			view.present(0.05, anim, 0)
+
+		view.flinch()
+		_check(view.get_child_count() > 0 and view.get(&"_skeleton") != null, "the Parasite Host builds a skinned model and poses every state")
+		remove_child(view)
+		view.free()
+
+	var kept := ZzPacks.views.duplicate()
+	ZzPacks.views.clear()
+	var fallback := ZzWorldView.view_for(&"parasite_host")
+	_check(ZzPacks.view_for(&"parasite_host") == null and fallback != null,
+		"with the pack absent its kind is drawn as the game's own body, no error")
+	if fallback != null:
+		fallback.free()
+	ZzPacks.views.merge(kept)
+
+
 ## Damage, health and tuning: the packs' own yml, the cfg yml over it, and the game's weights.
 func _check_pack_numbers() -> void:
 	# Numbers: the game's damage table is handed to weapon_defs, and the pack's own yml defaults arrive.
@@ -760,7 +793,7 @@ func _check_pack_numbers() -> void:
 	_check(is_equal_approx(_damage_of(&"zz_sniper"), 125.0), "a weapon the yml does not name keeps its default")
 	tiger = ZzNpcs.catalogue(ZzConfig.new()).get_npc(&"zhm_tiger")
 	_check(tiger != null and is_equal_approx(float(tiger.meta.get("damage", 0)), 33.0), "a monster's damage follows its cfg yml")
-	_check(ZzPacks.monsters.size() == 5 and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
+	_check(ZzPacks.monsters.size() == 5 + (1 if FileAccess.file_exists("res://addons/zz_mutants/%s" % ZzPacks.PROVIDER_FILE) else 0) and not ZzPacks.is_pack_kind(&"zhm_bear"), "the game's own yml drops one monster by weight")
 	_clean_real()
 	_clean()
 	var _found := ZzPacks.scan()

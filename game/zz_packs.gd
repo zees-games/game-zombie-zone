@@ -4,6 +4,7 @@ extends RefCounted
 ##
 const ZzClasses := preload("zz_classes.gd")
 const ZzPackBrains := preload("zz_pack_brains.gd")
+const ZzPackViews := preload("zz_pack_views.gd")
 const ZzZombieViewBase := preload("../npcs/zz_zombie_view_base.gd")
 ## [b]The game ships without them and nothing here is needed to run.[/b] At start every
 ## directory under `res://addons` is looked at for one file, `spawn_provider.gd` (the contract
@@ -102,6 +103,8 @@ static var weapon_rows: Array[Dictionary] = []
 ## Weapon id -> the pack directory that defined it.
 static var pack_of: Dictionary = {}
 static var monsters: Array[Monster] = []
+## Pack monster id -> `{path, dir}` of its own view script (see [method view_for]).
+static var views: Dictionary = {}
 static var _sources: Array[StringName] = []
 ## The attachment art lookups registered with [ZeeAttachmentArt], one per pack that draws its own.
 static var _art_sources: Array[StringName] = []
@@ -179,6 +182,8 @@ static func clear() -> void:
 	pack_of.clear()
 	monsters.clear()
 	ZzZombieViewBase.aliases.clear()
+	views.clear()
+	ZzPackViews.clear()
 	_notes = PackedStringArray()
 
 
@@ -342,12 +347,28 @@ static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> voi
 		_notes.append("%s switched off by weight 0" % m.id)
 		return
 
+	# A pack's own picture, `spawn.view` (a script path under the pack, see ZzPackViews); absent or unloadable, the body below.
+	var view := str(spawn.get("view", ""))
+	if view != "" and dir != "":
+		views[m.id] = {"path": "%s/%s" % [dir, view], "dir": dir}
+
 	# Both ends draw it as the zombie body it names (the client has no scene of the pack's).
 	var body := StringName(str(spawn.get("body", "common")))
 	if ZzZombieViewBase.LOOKS.has(body):
 		ZzZombieViewBase.aliases[m.id] = body
 
 	monsters.append(m)
+
+
+## The view a pack monster draws with, or null (the game's body for it): [ZzPackViews] seats the pack's script.
+static func view_for(kind: StringName) -> Node3D:
+	var v: Variant = views.get(kind)
+
+	if v == null:
+		return null
+
+	var script := ZzPackViews.script_for(str(v["path"]), str(v["dir"]))
+	return script.new() as Node3D if script != null else null
 
 
 ## The monsters sent as specials in [param wave] (0 = any); `monsters.min_wave` holds each back.

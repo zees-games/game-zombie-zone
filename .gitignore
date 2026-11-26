@@ -82,6 +82,7 @@
 # links them by default and skips them under --min; the game parses and passes its suites without.
 # bootstrap-optional
 /addons/zz_modern_weapons
+/addons/zz_mutants
 # bootstrap-optional
 /addons/zz_medieval_weapons
 # bootstrap-optional
