@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Prints the atlas colours each zombie body wears, by role, for `ZzZombieView.WEARS`.
+## Prints the atlas colours each zombie body wears, by role, for `ZzZombieView.WEARS` (a pack's bodies through its `zombie_kit`).
 ##
 ## [codeblock]
 ## godot --headless --path . --script tools/zombie_palette.gd
@@ -12,6 +12,7 @@ extends SceneTree
 ## most (head, torso, arm, hand, hips, leg, foot), and the colour under its UV is counted.
 
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 
 const ROLES := [["Head", "head"], ["Neck", "head"], ["Tongue", "head"], ["Eyelid", "head"], ["Mouth", "head"],
 	["Torso", "torso"], ["Abdomen", "torso"], ["Shoulder", "torso"], ["UpperArm", "arm"], ["LowerArm", "arm"],
@@ -20,6 +21,8 @@ const ROLES := [["Head", "head"], ["Neck", "head"], ["Tongue", "head"], ["Eyelid
 
 
 func _initialize() -> void:
+	# The six special bodies and their atlases are the zz-mutants pack's: scanning registers them in the kit tables.
+	ZzPacks.scan()
 	for id: StringName in ZzZombieView.BODIES:
 		var model := (load(ZzZombieView.BODIES[id]) as PackedScene).instantiate()
 		var mesh: MeshInstance3D = model.find_children("*", "MeshInstance3D", true, false).front()

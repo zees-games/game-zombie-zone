@@ -237,11 +237,15 @@ func _npc_profiles() -> void:
 				and got.cost == def.cost and got.weight == def.weight and got.display_name == def.display_name \
 				and got.require_line_of_sight == def.require_line_of_sight and got.meta == def.meta:
 			same += 1
-		if FileAccess.get_file_as_string("%s/%s.yml" % [ZzNpcProfiles.DIR, String(def.id)]) != ZzNpcProfiles.yaml_of(def, c):
+		var file := "%s/%s.yml" % [ZzNpcProfiles.DIR, String(def.id)]
+		# The game ships a profile for its own kind only; a pack's kinds carry their numbers in the pack (no file here).
+		if ZzNpcs.is_pack_core(def.id):
+			stale += 1 if FileAccess.file_exists(file) else 0
+		elif FileAccess.get_file_as_string(file) != ZzNpcProfiles.yaml_of(def, c):
 			stale += 1
-	_check(DirAccess.get_files_at(ZzNpcProfiles.DIR).size() == built.size(), "a profile file for each of the fourteen kinds", "%d" % DirAccess.get_files_at(ZzNpcProfiles.DIR).size())
+	_check(DirAccess.get_files_at(ZzNpcProfiles.DIR).size() == 1, "a profile file for the common only, none for the pack's thirteen", "%d" % DirAccess.get_files_at(ZzNpcProfiles.DIR).size())
 	_check(same == built.size(), "with the shipped files, every kind resolves to its code numbers", "%d of %d" % [same, built.size()])
-	_check(stale == 0, "the shipped files are what tools/export_npc_profiles.gd writes", "%d stale" % stale)
+	_check(stale == 0, "the shipped file is what tools/export_npc_profiles.gd writes, and no pack kind has one", "%d stale" % stale)
 
 	var hard := ZzConfig.new()
 	hard.common_health = 80.0

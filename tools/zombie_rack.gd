@@ -18,6 +18,7 @@ extends SceneTree
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 const ZzWorldView := preload("../game/zz_world_view.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 
 const SPECIALS: Array[StringName] = [&"leaper", &"strangler", &"bloater", &"ram", &"spitter", &"rider",
 	&"brute", &"sleeper", &"screamer", &"crawler", &"riot", &"mutant", &"oil_monster"]
@@ -47,6 +48,8 @@ var _present_frames := 0
 
 func _initialize() -> void:
 	_read_args()
+	# The thirteen special kinds, their bodies and their views come from the zz-mutants pack.
+	ZzPacks.scan()
 
 	var root := Node3D.new()
 	get_root().add_child(root)
@@ -78,7 +81,7 @@ func _initialize() -> void:
 		_gore(root)
 		return
 	else:
-		for kind in SPECIALS:
+		for kind in _specials():
 			if _kinds.is_empty() or _kinds.has(String(kind)):
 				rows.append([kind, 1])
 
@@ -118,6 +121,19 @@ func _initialize() -> void:
 	var middle := Vector3(wide * 0.5 - cell.x * 0.5, -tall * 0.5 + cell.y * 0.62, 0.0)
 	camera.look_at_from_position(middle + Vector3(0.0, 6.0, 30.0), middle)
 	get_root().size = Vector2i(1500, int(1500.0 * tall / wide))
+
+
+## The kinds the scanned packs carry (none without zz-mutants: the rack then shows the common alone).
+func _specials() -> Array[StringName]:
+	var out: Array[StringName] = []
+
+	for kind in SPECIALS:
+		for core in ZzPacks.cores:
+			if core["id"] == kind:
+				out.append(kind)
+				break
+
+	return out
 
 
 func _read_args() -> void:
@@ -205,7 +221,7 @@ func _deaths(root: Node3D) -> void:
 ## Every kind dropped as a skeletal ragdoll the way `ZzWorldView` does it, a common first: a body whose bones
 ## are scaled for its shape must still fall as itself.
 func _ragdolls(root: Node3D) -> void:
-	var kinds: Array = [&"common"] + SPECIALS
+	var kinds: Array = [&"common"] + _specials()
 	if not _kinds.is_empty():
 		kinds = kinds.filter(func(k: StringName) -> bool: return _kinds.has(String(k)))
 	var ground := StaticBody3D.new()

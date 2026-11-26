@@ -42,6 +42,14 @@ static func builtin(c: ZzConfig) -> Array:
 
 	return out
 
+## Whether [param id] is one of a pack's core kinds (the zz-mutants thirteen), not the game's own common.
+static func is_pack_core(id: StringName) -> bool:
+	for core in ZzPackList.cores:
+		if core["id"] == id:
+			return true
+
+	return false
+
 ## The kinds the director chooses between (the `special` core rows): empty without the pack. Not the brute (its own
 ## clock) or the sleeper (placed by the map).
 static func specials() -> Array[StringName]:

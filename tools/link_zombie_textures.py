@@ -4,7 +4,7 @@
     python3 tools/link_zombie_textures.py [--check]
 
 The bodies are drawn with the view's palette shader and the atlas/albedo/normal PNGs it samples
-(`ZzZombieView.ATLAS_OF`, `NORMALS`), so the GLBs were exported with no image at all: Nightly's Asset
+(`ZzZombieView.ATLAS_OF`, `NORMALS`, and a pack's `zombie_kit`), so the GLBs were exported with no image at all: Nightly's Asset
 Manager read them as untextured (NO_TEXTURES). This adds each body's images as relative URIs
 (`atlas_basic.png`, `city_albedo_0.png`, `city_normal.png`) and points the material's base colour (and
 normal) at them. The PNGs stay the one copy, nothing is embedded, so the pack does not grow; the Asset
@@ -26,6 +26,11 @@ BODIES = {
 	"cop": ("cop_albedo.png", "cop_normal.png"), "punk": ("punk_albedo.png", "punk_normal.png"),
 	"convict": ("convict_albedo.png", "convict_normal.png"), "hazmat": ("hazmat_albedo.png", "hazmat_normal.png"),
 	"walker": ("walker_albedo.png", "walker_normal.png"),
+}
+
+# The six special bodies are the zz-mutants pack's (addons/zz_mutants/zombies, its kit.gd names them); the same linking is
+# done there when the pack is mounted, and skipped when it is not.
+PACK_BODIES = {
 	"brute": ("brute_albedo.png", "brute_normal.png"),
 	"bloater": ("bloater_albedo.png", "bloater_normal.png"),
 	"strangler": ("strangler_albedo.png", "strangler_normal.png"),
@@ -33,6 +38,7 @@ BODIES = {
 	"sleeper": ("sleeper_albedo.png", "sleeper_normal.png"),
 	"screamer": ("screamer_albedo.png", "screamer_normal.png"),
 }
+PACK_DIR = os.path.join(HERE, "..", "addons", "zz_mutants", "zombies")
 
 
 def read(path):
@@ -66,10 +72,15 @@ def link(js, albedo, normal):
 def main():
 	check = "--check" in sys.argv
 	bad = 0
-	for body, (albedo, normal) in BODIES.items():
-		path = os.path.join(DIR, "zombie_%s.glb" % body)
+	jobs = [(DIR, body, tex) for body, tex in BODIES.items()]
+	if os.path.isdir(PACK_DIR):
+		jobs += [(PACK_DIR, body, tex) for body, tex in PACK_BODIES.items()]
+	else:
+		print("zz-mutants not mounted: its six bodies are skipped")
+	for folder, body, (albedo, normal) in jobs:
+		path = os.path.join(folder, "zombie_%s.glb" % body)
 		for u in (albedo, normal):
-			if u and not os.path.exists(os.path.join(DIR, u)):
+			if u and not os.path.exists(os.path.join(folder, u)):
 				print("missing image", u); bad += 1
 		js, rest = read(path)
 		want = link(json.loads(json.dumps(js)), albedo, normal)
