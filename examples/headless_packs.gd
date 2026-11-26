@@ -18,8 +18,8 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
-const SECTIONS := 6
-const CHECKS := 54
+const SECTIONS := 7
+const CHECKS := 59
 ## Each real pack scanned alone from a directory holding only a link to it.
 const ALONE_CHECKS := 12
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
@@ -46,6 +46,7 @@ func _run() -> void:
 	_installed()
 	_tuned()
 	await _in_a_game()
+	await _without_the_weapons_pack()
 	_npc_profiles()
 	_box_profiles()
 
@@ -163,6 +164,39 @@ func _box_profiles() -> void:
 	GSLog.set_level(GSLog.Level.ERROR)
 	_check(bad.types[&"explosive"]["title"] == "Explosive Box", "a bad server file is refused and the shipped type stays")
 	DirAccess.remove_absolute(base + "/explosive.yml")
+	_finished += 1
+
+
+## game.yml suggests zz-modern-weapons, and a player may remove it (the Workshop warns first): the game must then start, run a wave's worth of ticks and refuse a pack weapon quietly.
+func _without_the_weapons_pack() -> void:
+	_entered += 1
+	print("the weapons pack absent")
+	_clean()
+	ZzPacks.root = "res://examples/fixtures/none"
+	var config := ZzConfig.new()
+	config.warmup_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.map_ids = PackedStringArray(["zz_practice"])
+	var game := ZzGame.new()
+	game.config = config
+	game.tick_rate = 64
+	game.authoritative = true
+	game.register_service = false
+	add_child(game)
+	game.set_physics_process(false)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check(ZzPacks.weapon_rows.is_empty() and not ZzWeapons.exists(&"zz_m4"), "no pack weapon is in the pool")
+	var player := game.add_player(&"u100", "One")
+	game.start()
+	for i in 128:
+		game.simulate(1.0 / 64.0)
+	_check(game.horde != null and game.horde.catalogue.get_npc(&"common") != null, "the horde runs on the built-in kinds")
+	_check(not game.arm(player, &"zz_m4"), "arming with a weapon the absent pack would have given is refused")
+	_check(player != null and is_instance_valid(player), "and the survivor is still in the game")
+	_check(not game.is_queued_for_deletion(), "the game keeps running")
+	game.queue_free()
 	_finished += 1
 
 
