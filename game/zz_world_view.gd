@@ -96,14 +96,8 @@ func drop_survivor(figure: Node3D, death: GSPlayerDeath, velocity: Vector3) -> G
 
 # Zombies
 
-## The view class a kind draws with: the mutant and the oil monster have bodies of their own.
+## The view class a kind draws with: a pack's own (the mutant, the oil monster), or the common one.
 static func view_for(kind: StringName) -> ZzZombieView:
-	match kind:
-		&"mutant":
-			return ZzMutantView.new()
-		&"oil_monster":
-			return ZzOilMonsterView.new()
-
 	var theirs := ZzPacks.view_for(kind) as ZzZombieView
 	return theirs if theirs != null else ZzZombieView.new()
 

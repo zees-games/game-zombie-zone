@@ -18,11 +18,9 @@ const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
 
 const ZzPacks := preload("zz_packs.gd")
 
-const ZzOilMonsterView := preload("../npcs/zz_oil_monster_view.gd")
 
 const ZzZombieLimbs := preload("../npcs/zz_zombie_limbs.gd")
 

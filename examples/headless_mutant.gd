@@ -3,8 +3,7 @@ extends "zz_suite.gd"
 const ZzNpcs := preload("../game/zz_npcs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzWorldView := preload("../game/zz_world_view.gd")
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
-const ZzOilMonsterModel := preload("../npcs/zz_oil_monster_model.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 
 ## The mutant: its catalogue entry, both gravity guns (zap, prop pull and throw), gun and jetpack
 ## destruction, flight, and the angry dive and slam. Counts sections AND checks.
@@ -20,7 +19,9 @@ var _blasts: Array = []
 
 func _ready() -> void:
 	GSLog.set_level(GSLog.Level.ERROR)
-	load("res://game/zz_packs.gd").root = "res://addons"
+	ZzPacks.root = "res://addons"
+	# The mutant is zz-mutants' kind: the catalogue checks below need its provider read before any game exists.
+	ZzPacks.scan()
 	_run.call_deferred()
 
 
@@ -69,7 +70,7 @@ func _beams_of(kind: StringName) -> int:
 func _test_catalogue() -> void:
 	_section("catalogue: the mutant is a rare special with a body, numbers and parts of its own")
 	var def := ZzNpcs.builtin(ZzConfig.new()).filter(func(d: GSNpcDef) -> bool: return d.id == ZzNpcs.MUTANT)
-	_check(def.size() == 1 and ZzNpcs.SPECIALS.has(ZzNpcs.MUTANT), "it is in the catalogue and the director's list")
+	_check(def.size() == 1 and ZzNpcs.specials().has(ZzNpcs.MUTANT), "it is in the catalogue and the director's list")
 	_check(def[0].move_speed < 3.0, "and slow on the ground, being heavy", "%.1f" % def[0].move_speed)
 	_check(float(def[0].meta.get("slam_damage", 0.0)) > 0.0 and float(def[0].meta.get("zap_damage", 0.0)) > 0.0, "its damage numbers are meta (cvars reach them)")
 	var defs: Dictionary = load("res://npcs/zz_zombie_limbs.gd").defs_for(&"mutant", 900.0)
@@ -199,7 +200,8 @@ func _test_view() -> void:
 	var flying := view._model.position
 	view.present(0.05, ZzZombieBody.Anim.IDLE, 0)
 	_check(view.get_class() != "" and flying.is_finite(), "flying then idle poses finitely")
-	_check(ZzMutantView.MUTANT_CREDITS != "" and ZzOilMonsterModel.OIL_MONSTER_CREDITS != "", "both own-model kinds carry a credit")
+	var credits := " ".join(ZzPacks.credit_lines())
+	_check(credits.contains("Zeldrix") and credits.contains("lealeelu"), "the pack credits both own-model kinds")
 	root.queue_free()
 	_finished()
 

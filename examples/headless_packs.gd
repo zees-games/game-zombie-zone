@@ -20,7 +20,7 @@ const ZzWeapons := preload("../game/zz_weapons.gd")
 const FIXTURE := "res://examples/fixtures/addons"
 const CFG_DIR := "user://cfg/addon/zombie_zone"
 const SECTIONS := 7
-const CHECKS := 59
+const CHECKS := 63
 ## Each real pack scanned alone from a directory holding only a link to it.
 const ALONE_CHECKS := 12
 ## The real packs (zz-modern-weapons, zz-medieval-weapons, zz-historical-monsters), symlinked into
@@ -95,7 +95,7 @@ func _none_installed() -> void:
 		"a mounted pack's cfg root is found, a linked pack has none")
 	_check(not ZzWeapons.exists(&"fx_rifle"), "no pack weapon in the pool")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
-	_check(cat.size() == 14, "the catalogue is the fourteen built-in kinds", "%d" % cat.size())
+	_check(cat.size() == 1, "the catalogue is the common zombie alone (the special infected come with zz-mutants)", "%d" % cat.size())
 	_check(ZzPacks.specials().is_empty() and ZzPacks.bosses().is_empty(), "no pack specials or bosses")
 	_finished += 1
 
@@ -197,6 +197,12 @@ func _without_the_weapons_pack() -> void:
 	_check(not game.arm(player, &"zz_m4"), "arming with a weapon the absent pack would have given is refused")
 	_check(player != null and is_instance_valid(player), "and the survivor is still in the game")
 	_check(not game.is_queued_for_deletion(), "the game keeps running")
+	_check(ZzPacks.cores.is_empty() and ZzNpcs.specials().is_empty(), "with no mutants pack the game has no special infected")
+	_check(ZzNpcs.core_def(ZzNpcs.MUTANT, config) == null and game.horde.catalogue.get_npc(ZzNpcs.BRUTE) == null, "and no mutant or brute definition")
+	_check(game.horde.spawn_brute(Vector3.ZERO) == null, "a brute request is refused quietly")
+	for i in 64:
+		game.simulate(1.0 / 64.0)
+	_check(not game.is_queued_for_deletion(), "specials rolls and sleepers pass without the pack")
 	game.queue_free()
 	_finished += 1
 
@@ -204,6 +210,20 @@ func _without_the_weapons_pack() -> void:
 func _npc_profiles() -> void:
 	_entered += 1
 	print("npc profiles (cfg/game/game-zombie-zone/npc)")
+	# The special infected are the zz-mutants pack's: load it alone (the shipped profiles overlay its definitions).
+	var mutants_here := FileAccess.file_exists("res://addons/zz_mutants/%s" % ZzPacks.PROVIDER_FILE)
+	_clean()
+	ZzPacks.root = "res://addons"
+	ZzPacks.only = PackedStringArray(["zz_mutants"]) if mutants_here else PackedStringArray(["none"])
+	ZzPacks.scan()
+
+	if not mutants_here:
+		print("  zz-mutants not linked: the special-infected profile checks are skipped")
+		ZzPacks.only = PackedStringArray()
+		_checks -= 8
+		_finished += 1
+		return
+
 	var c := ZzConfig.new()
 	var built := ZzNpcs.builtin(c)
 	var cat := ZzNpcs.catalogue(c)
@@ -245,6 +265,8 @@ func _npc_profiles() -> void:
 	_check(leaper.max_health == 250.0 and float(leaper.meta["pounce_min"]) == 4.0 and leaper.sight_range == 60.0, "and leaves the rest as shipped")
 	_check(is_equal_approx(ZzNpcs.brute_health(c, 1, over.get_npc(&"brute")), 5000.0), "a brute's profile health is its base")
 	_clean_tier(dir)
+	ZzPacks.only = PackedStringArray()
+	_clean()
 	_finished += 1
 
 
@@ -268,7 +290,7 @@ func _installed() -> void:
 	_check(ZzPacks.specials().size() == 1 and ZzPacks.bosses().size() == 1, "one special, one boss", "%d, %d" % [ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(not ZzPacks.is_pack_kind(&"brute"), "a monster named like a built-in is refused")
 	var cat := ZzNpcs.catalogue(ZzConfig.new())
-	_check(cat.size() == 16, "the catalogue gains both monsters", "%d" % cat.size())
+	_check(cat.size() == 3, "the catalogue gains both monsters", "%d" % cat.size())
 	var ghoul: GSNpcDef = cat.get_npc(&"fx_ghoul")
 	_check(ghoul != null and ghoul.move_speed == 5.0 and float(ghoul.meta.get("damage", 0)) == 7.0, "a row's numbers reach the definition")
 	_check(ZzNpcs.is_special(&"fx_ghoul"), "a pack monster counts as a special")
@@ -403,7 +425,7 @@ func _each_pack_alone() -> void:
 		var usable: bool = rows == 0 or ids.all(func(id: String) -> bool: return ZzWeapons.exists(StringName(id)) and ZzWeapons.def_of(StringName(id)) != null)
 		_check(usable, "%s alone: every weapon has a definition" % pack)
 		var cat_size := ZzNpcs.catalogue(ZzConfig.new()).size()
-		_check(cat_size == 14 + kinds, "%s alone: the catalogue holds the built-in kinds plus its monsters" % pack, "%d" % cat_size)
+		_check(cat_size == 1 + kinds, "%s alone: the catalogue holds the built-in kinds plus its monsters" % pack, "%d" % cat_size)
 		_check(kinds == 0 or ZzPacks.bosses().size() == 1, "%s alone: its boss is registered" % pack)
 
 	ZzPacks.only = PackedStringArray()
@@ -452,10 +474,16 @@ func _pack_brain(game: ZzGame, player: Object) -> void:
 	# Drawn as the body each names (a client has no scene of the pack's): the bear and T-Rex as the brute, the cat as the leaper.
 	var brute: Dictionary = ZzZombieView.look_for(&"brute", 0)
 	var common: Dictionary = ZzZombieView.look_for(&"common", 0)
-	_check(ZzZombieView.look_for(&"zhm_bear", 0)["body"] == brute["body"] and is_equal_approx(ZzZombieView.look_for(&"zhm_trex", 0)["height"], brute["height"]),
-		"the bear and the T-Rex are drawn as the brute")
-	_check(ZzZombieView.look_for(&"zhm_tiger", 0)["body"] == ZzZombieView.look_for(&"leaper", 0)["body"] and ZzZombieView.look_for(&"zhm_tiger", 0)["body"] != common["body"],
-		"the tiger is drawn as the leaper")
+	if ZzZombieView.LOOKS.has(&"brute"):
+		_check(ZzZombieView.look_for(&"zhm_bear", 0)["body"] == brute["body"] and is_equal_approx(ZzZombieView.look_for(&"zhm_trex", 0)["height"], brute["height"]),
+			"the bear and the T-Rex are drawn as the brute")
+		_check(ZzZombieView.look_for(&"zhm_tiger", 0)["body"] == ZzZombieView.look_for(&"leaper", 0)["body"] and ZzZombieView.look_for(&"zhm_tiger", 0)["body"] != common["body"],
+			"the tiger is drawn as the leaper")
+	else:
+		# The brute and leaper bodies are zz-mutants': without that pack a monster naming them is drawn as the common zombie.
+		_check(ZzZombieView.look_for(&"zhm_bear", 0)["body"] == common["body"] and ZzZombieView.look_for(&"zhm_tiger", 0)["body"] == common["body"],
+			"the bear and the tiger are drawn as the common zombie while zz-mutants is absent")
+		_check(true, "(the brute and leaper bodies come with zz-mutants)")
 
 	var at: Vector3 = game.horde.survivor_position(&"u100") + Vector3(5.0, 0.0, 0.0)
 	var npc := game.horde.spawn_special(&"zhm_tiger", at)
@@ -697,7 +725,7 @@ func _real_packs() -> void:
 	_check(ZzPacks.monsters.size() == 6 + mut and ZzPacks.specials().size() == 5 + mut and ZzPacks.bosses().size() == 1,
 		"six monsters (seven with zz-mutants): the rest specials and one boss", "%d, %d, %d" % [ZzPacks.monsters.size(), ZzPacks.specials().size(), ZzPacks.bosses().size()])
 	_check(ZzPacks.bosses()[0].id == &"zhm_trex", "the boss is the T-Rex")
-	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 20 + mut, "the catalogue is the fourteen built-in kinds and the monsters")
+	_check(ZzNpcs.catalogue(ZzConfig.new()).size() == 7 + 14 * mut, "the catalogue is the common zombie, the six monsters and, with zz-mutants, its thirteen kinds plus the Parasite Host")
 	_pack_view(mut == 1)
 	_check_pack_numbers()
 	# A real game spawns each monster once, and arms a survivor with a weapon from each pack.

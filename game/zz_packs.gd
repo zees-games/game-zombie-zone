@@ -103,6 +103,9 @@ static var weapon_rows: Array[Dictionary] = []
 ## Weapon id -> the pack directory that defined it.
 static var pack_of: Dictionary = {}
 static var monsters: Array[Monster] = []
+## The game's own special infected, when a pack carries them (`core` rows, see [method _add_core]): each
+## `{pack, id, role, data, brain}`. Empty without the pack, and the game then runs on commons alone.
+static var cores: Array[Dictionary] = []
 ## Pack monster id -> `{path, dir}` of its own view script (see [method view_for]).
 static var views: Dictionary = {}
 static var _sources: Array[StringName] = []
@@ -181,6 +184,8 @@ static func clear() -> void:
 	weapon_rows.clear()
 	pack_of.clear()
 	monsters.clear()
+	cores.clear()
+	ZzZombieViewBase.clear_kit()
 	ZzZombieViewBase.aliases.clear()
 	views.clear()
 	ZzPackViews.clear()
@@ -237,6 +242,11 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 		return
 
 	var rows: Array = provider.call(&"spawn_entries")
+
+	# A pack that carries the game's own kinds also carries their bodies; they are laid over the game's before any row is read.
+	if provider.has_method(&"zombie_kit"):
+		ZzZombieViewBase.register_kit(provider.call(&"zombie_kit", dir))
+
 	var weapon_ids := PackedStringArray()
 	var defs: Array = []
 
@@ -284,6 +294,8 @@ static func _take(pack: String, provider: Object, dir: String = "") -> void:
 			else:
 				GSLog.warn(CHANNEL, "a weapon row has no definition here (provider lacks weapon_defs or the weapon is excluded)",
 					{"pack": pack, "id": id})
+		elif kind == "npc" and bool(row.get("core", false)):
+			_add_core(pack, row, dir)
 		elif kind == "npc" and bool(cfg("monsters.enabled", true)):
 			_add_monster(pack, row, dir)
 
@@ -320,6 +332,22 @@ static func _take_attachments(pack: String, source: StringName, provider: Object
 		_art_sources.append(source)
 
 
+static func _add_core(pack: String, row: Dictionary, dir: String) -> void:
+	var data: Dictionary = row.get("spawn", {})
+	var id := StringName(str(row["id"]))
+	var brain := ZzPackViews.brain_path("%s/%s" % [dir, str(data.get("brain", ""))], dir)
+
+	if brain == "":
+		GSLog.warn(CHANNEL, "a core kind has no usable brain, left out", {"pack": pack, "id": String(id)})
+		return
+
+	cores.append({"pack": pack, "id": id, "role": str(row.get("role", "special")), "data": data, "brain": brain})
+	var view := str(data.get("view", ""))
+
+	if view != "":
+		views[id] = {"path": "%s/%s" % [dir, view], "dir": dir}
+
+
 static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> void:
 	var spawn: Dictionary = row.get("spawn", {})
 	var m := Monster.new()
@@ -354,8 +382,9 @@ static func _add_monster(pack: String, row: Dictionary, dir: String = "") -> voi
 
 	# Both ends draw it as the zombie body it names (the client has no scene of the pack's).
 	var body := StringName(str(spawn.get("body", "common")))
-	if ZzZombieViewBase.LOOKS.has(body):
-		ZzZombieViewBase.aliases[m.id] = body
+	# Not checked against the looks yet: the pack that has the body (zz-mutants) may be scanned after this one, and
+	# a body nobody provides draws as the common zombie (look_for falls back).
+	ZzZombieViewBase.aliases[m.id] = body
 
 	monsters.append(m)
 

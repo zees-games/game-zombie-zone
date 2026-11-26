@@ -64,27 +64,10 @@ const MUTANT := &"mutant"
 
 const OIL_MONSTER := &"oil_monster"
 
-## The specials the director chooses between. Not the brute (its own clock) or the sleeper
-## (placed by the map).
-const SPECIALS: Array[StringName] = [LEAPER, STRANGLER, BLOATER, RAM, SPITTER, RIDER, SCREAMER, CRAWLER, RIOT, MUTANT, OIL_MONSTER]
-
 const FACTION := &"infected"
 
 static var SCENE := ZzPaths.rebase("res://npcs/zz_zombie.tscn")
 static var COMMON_BRAIN := ZzPaths.rebase("res://npcs/zz_common_brain.gd")
-static var LEAPER_BRAIN := ZzPaths.rebase("res://npcs/zz_leaper_brain.gd")
-static var STRANGLER_BRAIN := ZzPaths.rebase("res://npcs/zz_strangler_brain.gd")
-static var BLOATER_BRAIN := ZzPaths.rebase("res://npcs/zz_bloater_brain.gd")
-static var RAM_BRAIN := ZzPaths.rebase("res://npcs/zz_ram_brain.gd")
-static var SPITTER_BRAIN := ZzPaths.rebase("res://npcs/zz_spitter_brain.gd")
-static var RIDER_BRAIN := ZzPaths.rebase("res://npcs/zz_rider_brain.gd")
-static var BRUTE_BRAIN := ZzPaths.rebase("res://npcs/zz_brute_brain.gd")
-static var SLEEPER_BRAIN := ZzPaths.rebase("res://npcs/zz_sleeper_brain.gd")
-static var SCREAMER_BRAIN := ZzPaths.rebase("res://npcs/zz_screamer_brain.gd")
-static var CRAWLER_BRAIN := ZzPaths.rebase("res://npcs/zz_crawler_brain.gd")
-static var RIOT_BRAIN := ZzPaths.rebase("res://npcs/zz_riot_brain.gd")
-static var MUTANT_BRAIN := ZzPaths.rebase("res://npcs/zz_mutant_brain.gd")
-static var OIL_MONSTER_BRAIN := ZzPaths.rebase("res://npcs/zz_oil_monster_brain.gd")
 
 ## The 27 cells round a point's own, its own first: on a dense graph the point that rules a new one out
 ## is nearly always in the same cell, so most points stop at the first look-up. Order changes no answer.

@@ -10,6 +10,12 @@ const DIR := "user://zz_pack_views"
 const PARENT_TOKEN := "ZZ_VIEW_PARENT"
 const DIR_TOKEN := "ZZ_PACK_DIR"
 const PARENT := "res://npcs/zz_zombie_view.gd"
+## A pack brain starts `extends "ZZ_SPECIAL_BRAIN"` (or `"ZZ_ZOMBIE_BRAIN"`), and names a game file as `ZZ_GAME_DIR/x.gd`.
+const TOKENS := {
+	"ZZ_SPECIAL_BRAIN": "res://npcs/zz_special_brain.gd",
+	"ZZ_ZOMBIE_BRAIN": "res://npcs/zz_zombie_brain.gd",
+	"ZZ_GAME_DIR": "res://game",
+}
 const CHANNEL := "zz.packs"
 
 static var _cache: Dictionary = {}
@@ -27,21 +33,48 @@ static func script_for(path: String, pack_dir: String) -> Script:
 	return made
 
 
+## The generated file of the pack brain at [param path], for a def's `brain_script_path`; "" when it will not write.
+static func brain_path(path: String, pack_dir: String) -> String:
+	return _write(path, pack_dir)
+
+
 static func clear() -> void:
 	_cache.clear()
 
 
 static func _make(path: String, pack_dir: String) -> Script:
-	if not FileAccess.file_exists(path):
+	var file := _write(path, pack_dir)
+
+	if file == "":
 		return null
+
+	var script := ResourceLoader.load(file, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as Script
+	return script if script != null and script.can_instantiate() else null
+
+
+## Writes [param path] with every token filled in; the file is named by its text, so a rewrite is a no-op.
+static func _write(path: String, pack_dir: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
 
 	var text := FileAccess.get_file_as_string(path)
 
-	if not text.contains(PARENT_TOKEN):
-		GSLog.warn(CHANNEL, "a pack view does not extend ZZ_VIEW_PARENT, ignored", {"path": path})
-		return null
+	var seated := text.contains(PARENT_TOKEN)
 
-	text = text.replace(PARENT_TOKEN, ZzPaths.rebase(PARENT)).replace(DIR_TOKEN, pack_dir)
+	for token: String in TOKENS:
+		seated = seated or text.contains(token)
+
+	if not seated:
+		GSLog.warn(CHANNEL, "a pack script does not extend a game parent token, ignored", {"path": path})
+		return ""
+
+	text = text.replace(PARENT_TOKEN, ZzPaths.rebase(PARENT))
+
+	for token: String in TOKENS:
+		text = text.replace(token, ZzPaths.rebase(str(TOKENS[token])))
+
+	text = text.replace(DIR_TOKEN, pack_dir)
+
 	var _made := DirAccess.make_dir_recursive_absolute(DIR)
 	var file := "%s/%d.gd" % [DIR, text.hash()]
 
@@ -49,11 +82,10 @@ static func _make(path: String, pack_dir: String) -> Script:
 		var out := FileAccess.open(file, FileAccess.WRITE)
 
 		if out == null:
-			GSLog.warn(CHANNEL, "a pack view could not be written", {"path": file})
-			return null
+			GSLog.warn(CHANNEL, "a pack script could not be written", {"path": file})
+			return ""
 
 		out.store_string(text)
 		out.close()
 
-	var script := ResourceLoader.load(file, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as Script
-	return script if script != null and script.can_instantiate() else null
+	return file

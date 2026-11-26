@@ -244,6 +244,9 @@ func _warm_zombies() -> void:
 	for kind: StringName in [ZzNpcs.COMMON, ZzNpcs.LEAPER, ZzNpcs.STRANGLER, ZzNpcs.BLOATER, ZzNpcs.RAM,
 			ZzNpcs.SPITTER, ZzNpcs.RIDER, ZzNpcs.BRUTE, ZzNpcs.SLEEPER, ZzNpcs.SCREAMER, ZzNpcs.CRAWLER,
 			ZzNpcs.RIOT]:
+		if kind != ZzNpcs.COMMON and not ZzZombieView.LOOKS.has(kind):
+			continue
+
 		var variants := ZzZombieView.common_variety() if kind == ZzNpcs.COMMON else 1
 
 		for variant in variants:
@@ -262,6 +265,9 @@ func _warm_zombies() -> void:
 	# The mutant and the oil monster draw their own models: build one of each so the glb loads and
 	# its materials compile under the cover (they have no recolourable look to warm).
 	for kind: StringName in [ZzNpcs.MUTANT, ZzNpcs.OIL_MONSTER]:
+		if not ZzNpcs.specials().has(kind):
+			continue
+
 		var own := ZzWorldView.view_for(kind)
 		world_view.add_child(own)
 		own.build(kind, 0)

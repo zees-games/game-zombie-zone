@@ -82,7 +82,7 @@ func _run() -> void:
 					ids.append(file.trim_suffix(".json"))
 
 	ids.sort()
-	var kinds: Array[StringName] = ZzNpcs.SPECIALS.duplicate()
+	var kinds: Array[StringName] = ZzNpcs.specials().duplicate()
 	kinds.append(ZzNpcs.BRUTE)
 	kinds.push_front(ZzNpcs.COMMON)
 

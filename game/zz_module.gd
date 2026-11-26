@@ -849,7 +849,7 @@ func _spawn_in_tick(ctx: GSCmdContext) -> void:
 		return
 
 	if world == null or world.horde == null or world.horde.catalogue.get_npc(kind) == null:
-		ctx.reply("Which? common, %s, brute, sleeper" % ", ".join(ZzNpcs.SPECIALS))
+		ctx.reply("Which? common, %s, brute, sleeper" % ", ".join(ZzNpcs.specials()))
 		return
 
 	var at := _command_spot(ctx, 8.0)

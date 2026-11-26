@@ -41,8 +41,6 @@ const ZzPacks := preload("zz_packs.gd")
 const ZzFittings := preload("zz_fittings.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
-const ZzMutantView := preload("../npcs/zz_mutant_view.gd")
-const ZzOilMonsterModel := preload("../npcs/zz_oil_monster_model.gd")
 const ZzWeaponIcons := preload("zz_weapon_icons.gd")
 
 ## One local survivor, a camera, a HUD and the world drawn round them, over a [ZzGame], offline or on a server.

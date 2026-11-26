@@ -82,7 +82,7 @@ func _prepare_board(snap: Dictionary) -> void:
 	snap["header"] = {"Map": str(game.map_doc.get("name", "")), "Difficulty": game.config.difficulty_name().capitalize()}
 	if game.map != null and game.map.world_credits != "":
 		snap["header"]["Credits"] = game.map.world_credits
-	snap["header"]["Zombies"] = " | ".join([ZzZombieView.CREDITS, ZzMutantView.MUTANT_CREDITS, ZzOilMonsterModel.OIL_MONSTER_CREDITS])
+	snap["header"]["Zombies"] = ZzZombieView.CREDITS
 	var pack_credits := preload("zz_packs.gd").credit_lines()
 	if not pack_credits.is_empty():
 		snap["header"]["Models"] = " | ".join(pack_credits)

@@ -72,25 +72,6 @@
   },
   {
     "paths": [
-      "assets/zombies/zombie_mutant.glb",
-      "assets/zombies/mutant_clips.tres"
-    ],
-    "licence": "CC-BY-4.0",
-    "author": "Zeldrix",
-    "url": "https://sketchfab.com/3d-models/buff-mutant-20-8933f1f4a728486e8bcbe09714b842be",
-    "title": "Buff Mutant 2.0 (re-rigged, split)"
-  },
-  {
-    "paths": [
-      "assets/zombies/zombie_oil_monster"
-    ],
-    "licence": "CC-BY-4.0",
-    "author": "lealeelu",
-    "url": "https://sketchfab.com/3d-models/scary-lovcraftian-toothy-oil-monster-7b89564025b94fceb3153668f538f8f5",
-    "title": "Scary, Lovcraftian, Toothy, Oil-monster (modified; teeth by mStuff, CC0, https://blendswap.com/blend/12455)"
-  },
-  {
-    "paths": [
       "assets/defib/"
     ],
     "licence": "CC-BY-4.0",
@@ -179,25 +160,5 @@
     "author": "TMC",
     "url": "https://github.com/zees-games/game-zombie-zone",
     "title": "Construction-worker zombie gear (modelled here on the Quaternius rig)"
-  },
-  {
-    "paths": [
-      "assets/zombies/zombie_brute.glb",
-      "assets/zombies/zombie_bloater.glb",
-      "assets/zombies/zombie_strangler.glb",
-      "assets/zombies/zombie_spitter.glb",
-      "assets/zombies/zombie_sleeper.glb",
-      "assets/zombies/zombie_screamer.glb",
-      "assets/zombies/brute_",
-      "assets/zombies/bloater_",
-      "assets/zombies/strangler_",
-      "assets/zombies/spitter_",
-      "assets/zombies/sleeper_",
-      "assets/zombies/screamer_"
-    ],
-    "licence": "MIT",
-    "author": "TMC",
-    "url": "https://github.com/zees-games/game-zombie-zone",
-    "title": "Special zombie bodies (built procedurally by art-src/zombie_specials.py on the CC0 Quaternius Zombie Apocalypse Kit rig, clips and base meshes; textures baked here)"
   }
 ]

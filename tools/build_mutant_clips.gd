@@ -1,11 +1,11 @@
 extends SceneTree
 
-## Writes assets/zombies/mutant_clips.tres: the Mutant's idle, walk, run, attack, hit and death as
+## Writes addons/zz_mutants/zombies/mutant_clips.tres: the Mutant's idle, walk, run, attack, hit and death as
 ## AnimationPlayer tracks on its part rig. Rotations are rest * delta, so a clip survives a re-rig
 ## that keeps the bone names. Run: godot --headless --path . --script tools/build_mutant_clips.gd
 
-const MODEL := "res://assets/zombies/zombie_mutant.glb"
-const OUT := "res://assets/zombies/mutant_clips.tres"
+const MODEL := "res://addons/zz_mutants/zombies/zombie_mutant.glb"
+const OUT := "res://addons/zz_mutants/zombies/mutant_clips.tres"
 const STEPS := 12
 
 var _rest_q: Dictionary = {}

@@ -611,7 +611,7 @@ func stop_pacing() -> void:
 
 ## Sleepers sit where the map put them.
 func _place_sleepers() -> void:
-	if not config.sleepers_enabled:
+	if not config.sleepers_enabled or catalogue.get_npc(ZzNpcs.SLEEPER) == null:
 		return
 
 	for s: Array in _doc.get("sleepers", []):
@@ -1921,7 +1921,7 @@ func bash(id: String, npc: GSNpcInstance, delta: float) -> void:
 func _allowed_specials() -> Array[StringName]:
 	var out: Array[StringName] = []
 
-	for kind in ZzNpcs.SPECIALS:
+	for kind in ZzNpcs.specials():
 		if config.special_kinds.is_empty() or config.special_kinds.has(String(kind)):
 			# The mutant is rare: a roll per pick, and not before its first wave.
 			if kind == ZzNpcs.MUTANT and (wave_index < config.mutant_min_wave or _rng.randf() >= config.mutant_chance):
@@ -1936,7 +1936,7 @@ func _allowed_specials() -> Array[StringName]:
 func specials_alive() -> int:
 	var n := 0
 
-	for kind in ZzNpcs.SPECIALS:
+	for kind in ZzNpcs.specials():
 		n += spawner.count_of(kind)
 
 	for m in ZzPackList.monsters:
@@ -2064,6 +2064,9 @@ func spawn_pack_boss(kind: StringName, at: Vector3 = Vector3.INF, owner: StringN
 	return npc
 
 func spawn_brute(at: Vector3 = Vector3.INF, owner: StringName = &"brute") -> GSNpcInstance:
+	if catalogue.get_npc(ZzNpcs.BRUTE) == null:
+		return null
+
 	var where := at if at != Vector3.INF else _spawn_point(20.0, 45.0, true)
 
 	if where == Vector3.INF and owner == WAVE:

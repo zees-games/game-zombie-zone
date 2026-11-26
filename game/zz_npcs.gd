@@ -32,13 +32,67 @@ static func catalogue(config: ZzConfig = null, roots: PackedStringArray = Packed
 
 	return out
 
-## The thirteen kinds from code and [param c] alone, no profile; the floor the shipped ymls are written from.
+## The common from code and [param c] alone, and the kinds an installed pack carries as `core` rows (the thirteen
+## specials of zz-mutants), no profile; the floor the shipped ymls are written from.
 static func builtin(c: ZzConfig) -> Array:
-	var out: Array = []
-	for def in [_common(c), _leaper(c), _strangler(c), _bloater(c), _ram(c), _spitter(c),
-			_rider(c), _brute(c, 1), _sleeper(c), _screamer(c), _crawler(c), _riot(c), _mutant(c), _oil_monster(c)]:
-		out.append(_eyes(def))
+	var out: Array = [_eyes(_common(c))]
+
+	for core in ZzPackList.cores:
+		out.append(_eyes(_core_def(core, c)))
+
 	return out
+
+## The kinds the director chooses between (the `special` core rows): empty without the pack. Not the brute (its own
+## clock) or the sleeper (placed by the map).
+static func specials() -> Array[StringName]:
+	var out: Array[StringName] = []
+
+	for core in ZzPackList.cores:
+		if core["role"] == "special":
+			out.append(core["id"])
+
+	return out
+
+## A core kind's def, built from a pack's row, or null where no pack carries it. [param c] is a ZzConfig.
+static func core_def(id: StringName, c: ZzConfig) -> GSNpcDef:
+	for core in ZzPackList.cores:
+		if core["id"] == id:
+			return _eyes(_core_def(core, c))
+
+	return null
+
+## One core row as a def. Its health is a number (`fixed`), the special scale over one (`special`) or the brute's own
+## rule (`brute`); a meta value `"cfg:<field>"` is that field of [param c].
+static func _core_def(core: Dictionary, c: ZzConfig) -> GSNpcDef:
+	var d: Dictionary = core["data"]
+	var health := float(d.get("health", 200.0))
+	var hp := str(d.get("hp", "special"))
+
+	if hp == "special":
+		health *= c.special_health_scale()
+	elif hp == "brute":
+		health = brute_health(c, 1)
+
+	var weight: GSNpcDef.Weight = {"light": GSNpcDef.Weight.LIGHT, "heavy": GSNpcDef.Weight.HEAVY}.get(str(d.get("weight", "normal")), GSNpcDef.Weight.NORMAL)
+	var def := _def(core["id"], str(d.get("name", core["id"])), core["brain"], health, float(d.get("speed", 4.4)), int(d.get("cost", 3)), weight)
+	def.sight_range = float(d.get("sight", 40.0))
+	def.sight_half_angle_deg = float(d.get("sight_angle", 90.0))
+	def.hearing_range = float(d.get("hearing", 18.0))
+	def.require_line_of_sight = bool(d.get("los", true))
+
+	if bool(d.get("narrow", false)):
+		def.nav_exclude_flags = ZzNavGraph.NARROW
+
+	var meta: Dictionary = (d.get("meta", {}) as Dictionary).duplicate(true)
+
+	for key: String in meta:
+		var v: Variant = meta[key]
+
+		if v is String and (v as String).begins_with("cfg:"):
+			meta[key] = c.get((v as String).substr(4))
+
+	def.meta = meta
+	return def
 
 ## An installed pack's monsters (see zz_packs.gd), each the common's numbers with the pack's
 ## `spawn` on top. A special's health scale applies, as it does to every special.
@@ -175,202 +229,9 @@ static func _common(c: ZzConfig) -> GSNpcDef:
 	}
 	return def
 
-static func _leaper(c: ZzConfig) -> GSNpcDef:
-	var def := _def(LEAPER, "Leaper", LEAPER_BRAIN, 250.0 * c.special_health_scale(), 7.4, 4, GSNpcDef.Weight.LIGHT)
-	def.sight_range = 60.0
-	def.sight_half_angle_deg = 100.0
-	def.hearing_range = 20.0
-	def.require_line_of_sight = false
-	def.meta = {
-		"damage": 5.0, "reach": 1.6, "attack_interval": 0.5,
-		"pounce_min": 4.0, "pounce_max": 22.0, "pounce_speed": 16.0, "pounce_damage": 5.0,
-		"pin_damage": 5.0, "pin_interval": 0.5, "stalk_speed": 3.2,
-		"body": "leaper", "radius": 0.3, "height": 1.6,
-	}
-	return def
-
-static func _strangler(c: ZzConfig) -> GSNpcDef:
-	var def := _def(STRANGLER, "Strangler", STRANGLER_BRAIN, 250.0 * c.special_health_scale(), 4.6, 4, GSNpcDef.Weight.NORMAL)
-	def.sight_range = 50.0
-	def.sight_half_angle_deg = 90.0
-	def.hearing_range = 18.0
-	def.meta = {
-		"damage": 6.0, "reach": 1.6, "attack_interval": 1.0,
-		"tongue_range": 24.0, "tongue_speed": 30.0, "pull_speed": 3.2, "drag_damage": 1.5,
-		"choke_damage": 5.0, "choke_interval": 1.0, "tongue_cooldown": 15.0, "tongue_health": 20.0,
-		"body": "strangler", "radius": 0.32, "height": 2.0,
-	}
-	return def
-
-static func _bloater(c: ZzConfig) -> GSNpcDef:
-	var def := _def(BLOATER, "Bloater", BLOATER_BRAIN, 50.0, 4.0, 3, GSNpcDef.Weight.HEAVY)
-	def.sight_range = 40.0
-	def.sight_half_angle_deg = 90.0
-	def.hearing_range = 16.0
-	def.meta = {
-		"damage": 4.0, "reach": 1.6, "attack_interval": 1.2,
-		"vomit_range": 5.0, "vomit_half_angle": 28.0, "vomit_cooldown": 20.0, "bile_seconds": 15.0,
-		"burst_radius": 3.6,
-		"body": "bloater", "radius": 0.5, "height": 1.85,
-	}
-	return def
-
-static func _ram(c: ZzConfig) -> GSNpcDef:
-	var def := _def(RAM, "Ram", RAM_BRAIN, 600.0 * c.special_health_scale(), 5.6, 5, GSNpcDef.Weight.HEAVY)
-	def.sight_range = 45.0
-	def.sight_half_angle_deg = 80.0
-	def.hearing_range = 16.0
-	def.meta = {
-		"damage": 10.0, "reach": 1.9, "attack_interval": 1.0,
-		"charge_range": 26.0, "charge_min": 6.0, "charge_speed": 14.0, "charge_seconds": 2.6,
-		"charge_cooldown": 12.0, "impact_damage": 10.0, "pummel_damage": 15.0, "pummel_interval": 1.1,
-		"body": "ram", "radius": 0.45, "height": 2.0,
-	}
-	return def
-
-static func _spitter(c: ZzConfig) -> GSNpcDef:
-	var def := _def(SPITTER, "Spitter", SPITTER_BRAIN, 100.0 * c.special_health_scale(), 5.2, 3, GSNpcDef.Weight.LIGHT)
-	def.sight_range = 50.0
-	def.sight_half_angle_deg = 90.0
-	def.hearing_range = 16.0
-	def.meta = {
-		"damage": 4.0, "reach": 1.6, "attack_interval": 1.0,
-		"spit_range": 28.0, "spit_min": 6.0, "spit_cooldown": 18.0, "spit_speed": 15.0,
-		"acid_radius": 3.2, "acid_seconds": 7.0, "acid_damage": 6.0,
-		"body": "spitter", "radius": 0.3, "height": 1.9,
-	}
-	return def
-
-static func _mutant(c: ZzConfig) -> GSNpcDef:
-	var def := _def(MUTANT, "Mutant", MUTANT_BRAIN, 900.0 * c.special_health_scale(), 2.4, 6, GSNpcDef.Weight.HEAVY)
-	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
-	def.nav_exclude_flags = ZzNavGraph.NARROW
-	def.sight_range = 60.0
-	def.sight_half_angle_deg = 120.0
-	def.hearing_range = 25.0
-	def.meta = {
-		"damage": 14.0, "reach": 1.9, "attack_interval": 1.4,
-		"zap_range": 24.0, "zap_damage": 4.0, "zap_interval": 2.5,
-		"prop_chance": 0.5, "prop_range": 14.0, "prop_mass": 40.0, "pull_speed": 14.0,
-		"hold_time": 1.0, "throw_speed": 22.0, "throw_range": 30.0, "throw_damage": 8.0, "throw_interval": 4.0,
-		"fuel": 14.0, "fuel_regen": 1.4, "fly_speed": 8.0, "cruise_height": 7.0, "fly_from": 14.0, "fly_time": 9.0,
-		"angry_health": 0.4, "charge_time": 1.4, "charge_height": 12.0, "dive_speed": 26.0,
-		"slam_radius": 7.0, "slam_damage": 30.0, "slam_recover": 3.0, "dive_cooldown": 8.0,
-		"body": "mutant", "radius": 0.55, "height": 2.4, "fit_height": 2.1,
-	}
-	return def
-
-## The oil monster: slides, leaves a trail, spits goo that blinds and pools. `goo_*` keys are the spit's puddle, `trail_*` the trail's
-## (gs-effects' GSHazardProfile keys), `blind_*` the screen impair; none is hardcoded in the brain.
-static func _oil_monster(c: ZzConfig) -> GSNpcDef:
-	var def := _def(OIL_MONSTER, "Oil monster", OIL_MONSTER_BRAIN, 700.0 * c.special_health_scale(), 3.0, 6, GSNpcDef.Weight.HEAVY)
-	# A body this wide would stand in the gaps between props the graph walks through: keep to the wide points (a search that finds none retries without).
-	def.nav_exclude_flags = ZzNavGraph.NARROW
-	def.sight_range = 50.0
-	def.sight_half_angle_deg = 110.0
-	def.hearing_range = 22.0
-	def.meta = {
-		"damage": 12.0, "reach": 2.0, "attack_interval": 1.6,
-		"spit_range": 26.0, "spit_min": 5.0, "spit_cooldown": 7.0, "spit_speed": 16.0, "spit_damage": 8.0, "spit_windup": 0.5,
-		"blind_seconds": 4.0, "blind_max_stacks": 3,
-		"goo_radius": 2.6, "goo_seconds": 9.0, "goo_dps": 9.0, "goo_dps_start": 9.0, "goo_slow_factor": 0.6,
-		"goo_tick_interval": 0.25, "goo_fade_seconds": 2.0, "goo_global_cap": 40,
-		"trail_radius": 1.1, "trail_seconds": 6.0, "trail_dps": 5.0, "trail_dps_start": 5.0, "trail_slow_factor": 0.75,
-		"trail_tick_interval": 0.5, "trail_fade_seconds": 1.5, "trail_max_per_owner": 30, "trail_global_cap": 120,
-		"trail_spacing": 1.4, "trail_interval": 0.2,
-		"eat_enabled": 1.0, "eat_health_below": 0.5, "eat_reach": 2.2, "eat_grab_seconds": 0.6, "eat_lift_seconds": 0.8,
-		"eat_bite_seconds": 2.4, "eat_swallow_seconds": 1.0, "eat_lift_height": 1.4, "eat_hold_gap": 1.1,
-		"eat_victim_dps": 6.0, "eat_interrupt_damage": 150.0, "eat_cooldown": 4.0,
-		"body": "oil_monster", "radius": 0.6, "height": 2.5, "fit_height": 2.1,
-	}
-	return def
-
-static func _rider(c: ZzConfig) -> GSNpcDef:
-	var def := _def(RIDER, "Rider", RIDER_BRAIN, 325.0 * c.special_health_scale(), 7.0, 4, GSNpcDef.Weight.LIGHT)
-	def.sight_range = 45.0
-	def.sight_half_angle_deg = 100.0
-	def.hearing_range = 18.0
-	def.meta = {
-		"damage": 4.0, "reach": 1.4, "attack_interval": 0.8,
-		"leap_range": 6.0, "leap_speed": 11.0, "ride_damage": 4.0, "ride_interval": 1.0,
-		"ride_speed": 3.4, "leap_cooldown": 6.0,
-		"body": "rider", "radius": 0.28, "height": 1.2,
-	}
-	return def
-
-## The boss. Its health is set at spawn from how many survivors there are; see [method brute_health].
-static func _brute(c: ZzConfig, survivors: int) -> GSNpcDef:
-	var def := _def(BRUTE, "Brute", BRUTE_BRAIN, brute_health(c, survivors), 6.1, 12, GSNpcDef.Weight.HEAVY)
-	def.nav_exclude_flags = ZzNavGraph.NARROW
-	def.sight_range = 80.0
-	def.sight_half_angle_deg = 120.0
-	def.hearing_range = 40.0
-	def.require_line_of_sight = false
-	def.meta = {
-		"damage": 24.0, "reach": 2.4, "attack_interval": 1.45, "knock": 1.0,
-		"rock_range": 40.0, "rock_min": 9.0, "rock_cooldown": 9.0, "rock_damage": 24.0, "rock_speed": 24.0,
-		"frustration_seconds": 25.0,
-		"body": "brute", "radius": 0.7, "height": 2.9, "fit_height": 2.1,
-	}
-	return def
-
 static func brute_health(c: ZzConfig, survivors: int, def: GSNpcDef = null) -> float:
 	var base: float = float(def.meta.get("brute_health", c.brute_health)) if def != null else c.brute_health
 	return (base + c.brute_health_per_survivor * float(maxi(survivors - 1, 0))) * c.special_health_scale()
-
-static func _sleeper(c: ZzConfig) -> GSNpcDef:
-	var def := _def(SLEEPER, "Sleeper", SLEEPER_BRAIN, 1000.0 * c.special_health_scale(), 7.8, 0, GSNpcDef.Weight.NORMAL)
-	def.sight_range = 14.0
-	def.sight_half_angle_deg = 180.0
-	def.hearing_range = 10.0
-	def.require_line_of_sight = false
-	def.meta = {
-		"damage": 100.0, "reach": 1.7, "attack_interval": 1.0,
-		"startle_near": 7.0, "startle_seconds": 3.0, "flee_seconds": 10.0,
-		"body": "sleeper", "radius": 0.3, "height": 1.6,
-	}
-	return def
-
-## Thin and quick to kill; what it does is call the horde. Health is low on purpose: it is the
-## special a team wins by noticing, not by emptying a magazine into.
-static func _screamer(c: ZzConfig) -> GSNpcDef:
-	var def := _def(SCREAMER, "Screamer", SCREAMER_BRAIN, 90.0 * c.special_health_scale(), 5.4, 3, GSNpcDef.Weight.LIGHT)
-	def.sight_range = 55.0
-	def.sight_half_angle_deg = 100.0
-	def.hearing_range = 20.0
-	def.meta = {
-		"damage": 3.0, "reach": 1.5, "attack_interval": 1.0,
-		"scream_range": 35.0, "scream_min": 9.0, "scream_seconds": 1.6, "scream_cooldown": c.screamer_cooldown,
-		"scream_mob": c.screamer_mob,
-		"body": "screamer", "radius": 0.28, "height": 2.0,
-	}
-	return def
-
-## Low enough that a shot over the crowd's heads misses it, and slow; its danger is where it
-## lies, not how fast it comes.
-static func _crawler(c: ZzConfig) -> GSNpcDef:
-	var def := _def(CRAWLER, "Crawler", CRAWLER_BRAIN, 150.0 * c.special_health_scale(), 2.6, 3, GSNpcDef.Weight.LIGHT)
-	def.sight_range = 25.0
-	def.sight_half_angle_deg = 120.0
-	def.hearing_range = 14.0
-	def.meta = {
-		"damage": 4.0, "reach": 1.3, "attack_interval": 1.0,
-		"grab_reach": 1.5, "pin_dps": c.crawler_grab_dps, "grab_cooldown": 6.0, "lunge_speed": 4.5,
-		"body": "crawler", "radius": 0.34, "height": 0.75,
-	}
-	return def
-
-## Walks into fire behind a shield (`shield` is the share of a frontal hit that gets through).
-static func _riot(c: ZzConfig) -> GSNpcDef:
-	var def := _def(RIOT, "Riot", RIOT_BRAIN, 260.0 * c.special_health_scale(), 4.4, 3, GSNpcDef.Weight.HEAVY)
-	def.sight_range = 40.0
-	def.sight_half_angle_deg = 90.0
-	def.hearing_range = 18.0
-	def.meta = {
-		"damage": 9.0, "reach": 1.6, "attack_interval": 1.1, "shield": c.riot_shield,
-		"body": "riot", "radius": 0.36, "height": 1.85,
-	}
-	return def
 
 
 # --- Navigation ------------------------------------------------------------------------------

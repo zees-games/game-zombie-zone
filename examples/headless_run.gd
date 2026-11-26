@@ -1572,7 +1572,7 @@ func _test_the_new_specials() -> void:
 	_check(through_front > 0.0 and through_front <= 100.0 * game.config.riot_shield + 1.0,
 		"a riot shield takes most of a frontal shot", "%.0f of 100" % through_front)
 	_check(through_back >= 90.0, "and none of one from behind", "%.0f of 100" % through_back)
-	_check(ZzNpcs.SPECIALS.has(ZzNpcs.SCREAMER) and ZzNpcs.SPECIALS.has(ZzNpcs.CRAWLER) and ZzNpcs.SPECIALS.has(ZzNpcs.RIOT),
+	_check(ZzNpcs.specials().has(ZzNpcs.SCREAMER) and ZzNpcs.specials().has(ZzNpcs.CRAWLER) and ZzNpcs.specials().has(ZzNpcs.RIOT),
 		"the director may send all three")
 	_finished()
 

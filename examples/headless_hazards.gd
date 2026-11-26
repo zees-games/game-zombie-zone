@@ -115,7 +115,7 @@ func _oil_ring(gap: float, tune: Dictionary = {}, mates: int = 0) -> Array:
 func _test_oil_catalogue() -> void:
 	_section("oil monster: catalogued, its keys reach the pools, the wire carries its kinds")
 	var def: GSNpcDef = ZzNpcs.builtin(ZzConfig.new()).filter(func(d: GSNpcDef) -> bool: return d.id == ZzNpcs.OIL_MONSTER)[0]
-	_check(ZzNpcs.SPECIALS.has(ZzNpcs.OIL_MONSTER) and def.move_speed > 0.0 and def.move_speed < 4.0, "it is a special and slides slowly", "%.1f" % def.move_speed)
+	_check(ZzNpcs.specials().has(ZzNpcs.OIL_MONSTER) and def.move_speed > 0.0 and def.move_speed < 4.0, "it is a special and slides slowly", "%.1f" % def.move_speed)
 	var hazards := ZzHazards.new(null)
 	hazards.configure_from_meta(def.meta)
 	var goo: GSHazardProfile = hazards.profiles[ZzHazards.GOO]

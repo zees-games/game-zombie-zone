@@ -756,8 +756,13 @@ func _do_special(a: Dictionary, _ctx: Dictionary) -> void:
 
 	for i in int(a.get("count", 1)):
 		var kind := StringName(str(a.get("kind", "any")))
-		if kind == &"any" or not ZzNpcs.SPECIALS.has(kind):
-			kind = ZzNpcs.SPECIALS[_rng.randi_range(0, ZzNpcs.SPECIALS.size() - 1)]
+		var specials := ZzNpcs.specials()
+
+		if specials.is_empty():
+			return
+
+		if kind == &"any" or not specials.has(kind):
+			kind = specials[_rng.randi_range(0, specials.size() - 1)]
 		var _s = game.horde.spawn_special(kind)
 
 

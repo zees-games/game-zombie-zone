@@ -317,12 +317,12 @@ func _add_tunables_specials(world: ZzGame) -> void:
 			config.riot_shield = clampf(value, 0.0, 1.0)
 			_set_meta(world, ZzNpcs.RIOT, "shield", config.riot_shield))
 	var kinds := add_cvar("zz_special_kinds", ",".join(config.special_kinds),
-		"Which specials the director sends, comma separated (empty: all of %s)" % ", ".join(ZzNpcs.SPECIALS))
+		"Which specials the director sends, comma separated (empty: all of %s)" % ", ".join(ZzNpcs.specials()))
 	if kinds != null:
 		kinds.changed.connect(func(_old: String, now: String) -> void:
 			var wanted := PackedStringArray()
 			for part in now.split(",", false):
-				if ZzNpcs.SPECIALS.has(StringName(part.strip_edges())):
+				if ZzNpcs.specials().has(StringName(part.strip_edges())):
 					wanted.append(part.strip_edges())
 			config.special_kinds = wanted
 			log_info("a tunable changed", {"cvar": "zz_special_kinds", "now": ",".join(wanted)}))
@@ -330,11 +330,13 @@ func _add_tunables_specials(world: ZzGame) -> void:
 		func(value: float) -> void: config.mutant_chance = clampf(value, 0.0, 1.0))
 	_tunable("zz_mutant_min_wave", float(config.mutant_min_wave), "First wave the mutant can appear on",
 		func(value: float) -> void: config.mutant_min_wave = maxi(int(value), 0))
-	for row: Array in [["zap_damage", "Damage of one gravity-gun zap", 0.0, 100.0], ["throw_damage", "Damage of a thrown prop", 0.0, 200.0],
+	var mutant := ZzNpcs.core_def(ZzNpcs.MUTANT, config)
+
+	for row: Array in [] if mutant == null else [["zap_damage", "Damage of one gravity-gun zap", 0.0, 100.0], ["throw_damage", "Damage of a thrown prop", 0.0, 200.0],
 			["slam_damage", "Damage at the centre of the angry dive's slam", 0.0, 500.0], ["slam_radius", "Radius of the slam in metres", 1.0, 30.0],
 			["fuel", "Seconds of jetpack fuel", 1.0, 120.0], ["angry_health", "Health share below which the mutant gets angry", 0.0, 1.0]]:
 		var key: String = row[0]
-		_tunable("zz_mutant_" + key, float(ZzNpcs._mutant(config).meta[key]), String(row[1]),
+		_tunable("zz_mutant_" + key, float(mutant.meta[key]), String(row[1]),
 			func(value: float) -> void: _set_meta(world, ZzNpcs.MUTANT, key, value),
 			[float(row[2]), float(row[3])])
 	_tunable("zz_oil_monster_chance", config.oil_monster_chance, "Chance a special roll may pick the oil monster (0 never)",
@@ -342,8 +344,10 @@ func _add_tunables_specials(world: ZzGame) -> void:
 	_tunable("zz_oil_monster_min_wave", float(config.oil_monster_min_wave), "First wave the oil monster can appear on",
 		func(value: float) -> void: config.oil_monster_min_wave = maxi(int(value), 0))
 	# Its profile keys as cvars (`zz_oil_<key>`): the spit, the screen impair, the puddle (`goo_*`) and the trail (`trail_*`, gs-effects' GSHazardProfile keys).
-	var oil := ZzNpcs._oil_monster(config).meta
-	for row: Array in OIL_TUNABLES:
+	var oil_def := ZzNpcs.core_def(ZzNpcs.OIL_MONSTER, config)
+	var oil: Dictionary = oil_def.meta if oil_def != null else {}
+
+	for row: Array in OIL_TUNABLES if oil_def != null else []:
 		var key: String = row[0]
 		_tunable("zz_oil_" + key, float(oil[key]), String(row[1]),
 			func(value: float) -> void: _set_meta(world, ZzNpcs.OIL_MONSTER, key, value),
