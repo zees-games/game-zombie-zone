@@ -50,3 +50,7 @@ suggested:
   # The weapons: the base game ships none but fists. The Workshop downloads and subscribes this pack on install or first run (solo too);
   # a player who unsubscribes is warned, and the game runs on fists and the built-in tools without it.
   - weapons=gamemann/zz-modern-weapons!
+  # The mutants and special infected live in this pack; the base game keeps only the mechanism and runs on plain zombies without it.
+  # The `!` marks it recommended: downloaded for solo play on first run, and a player who turns it off or removes it is warned first
+  # (GSCloudSuggested.uninstall_warning, shown by ZzPackWarning).
+  - mutants=zees-games/zz-mutants!

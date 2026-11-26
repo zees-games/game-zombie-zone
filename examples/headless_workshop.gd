@@ -6,6 +6,7 @@ const ZzConfig := preload("../game/zz_config.gd")
 const ZzGame := preload("../game/zz_game.gd")
 const ZzVote := preload("../game/zz_vote.gd")
 const ZzWorkshop := preload("../game/zz_workshop.gd")
+const ZzPackWarning := preload("../game/zz_pack_warning.gd")
 
 ## What a subscribed map pack does to this game's lists, against a fixture [GSContentIndex]: a solo map is listed on the map menu
 ## and the ballot with its pack's name, an online session lists none, a map kind the game does not accept is left out, the game's own ids win,
@@ -124,8 +125,19 @@ func _labels(vote: ZzVote) -> PackedStringArray:
 func _test_default_weapons() -> void:
 	_entered += 1
 	var text := FileAccess.get_file_as_string("res://game.yml")
-	_check(text.contains("  - weapons=gamemann/zz-modern-weapons"), "game.yml suggests the modern weapons pack")
+	_check(text.contains("  - weapons=gamemann/zz-modern-weapons!"), "game.yml suggests the modern weapons pack")
 	_check(text.contains("  - maps=gamemann/zombie-zone-maps"), "game.yml still suggests the maps pack")
+	_check(text.contains("  - mutants=zees-games/zz-mutants!"), "game.yml recommends the mutants pack")
+	var declared := GSCloudSuggested.from_entries(PackedStringArray(["maps=gamemann/zombie-zone-maps", "mutants=zees-games/zz-mutants!"]))
+	_check(not ZzPackWarning.text_for(declared, "zees-games/zz-mutants").is_empty(), "removing the mutants pack is warned")
+	_check(ZzPackWarning.text_for(declared, "gamemann/zombie-zone-maps").is_empty(), "removing the maps pack is not")
+	var ran := [0]
+	var host := Control.new()
+	var shown: Node = ZzPackWarning.confirm(host, declared, "zees-games/zz-mutants", func() -> void: ran[0] += 1)
+	_check(shown is ConfirmationDialog and ran[0] == 0, "a recommended pack asks first, and has not been removed yet")
+	var _none: Node = ZzPackWarning.confirm(host, declared, "gamemann/zombie-zone-maps", func() -> void: ran[0] += 1)
+	_check(ran[0] == 1, "any other pack goes straight through")
+	host.free()
 	_completed += 1
 
 
