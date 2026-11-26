@@ -190,7 +190,7 @@
 # exodus_team: 8
 # Whether a built navigation graph is kept in `user://nav_cache` and loaded next time, keyed by the map's con...
 # nav_cache: true
-# Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes... [0..]
+# Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes... [-1..]
 # nav_threads: 2
 # Whether a hosted game that builds its graph off the main thread also asks the world's collision about it th...
 # nav_prune_thread: true
