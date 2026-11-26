@@ -11,6 +11,8 @@ const LOADOUT_WIDTH := 8.0 * (ZzLoadoutBar.SLOT_W + ZzLoadoutBar.GAP)
 
 ## The loadout row's top edge off the bottom; the counter and fire modes stand on it.
 const LOADOUT_TOP := 24.0 + ZzLoadoutBar.SLOT_H + ZzLoadoutBar.WEIGHT_H + 8.0
+## Where the bottom-right HUD (loadout, ammo, fire mode) ends; gs-core's loading panel sits above it.
+const CORNER_TOP := LOADOUT_TOP + 106.0 + 12.0
 
 const ZzShopIcons := preload("zz_shop_icons.gd")
 
@@ -163,6 +165,13 @@ func _build() -> void:
 	kits.offset_left = 24.0
 	kits.offset_right = 24.0 + 300.0
 	_root.add_child(kits)
+
+	downs = ZzDownsPips.new()
+	downs.name = "Downs"
+	downs.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	downs.offset_left = 24.0
+	downs.offset_right = 24.0 + 200.0
+	_root.add_child(downs)
 
 	_status = GSStatusLines.new()
 	_status.name = "Status"
@@ -526,8 +535,9 @@ func _draw_health() -> void:
 		vitals.show_status("")
 
 		var downs_left := game.config.max_incaps - player.incaps
-		_set_status_sig(6 if downs_left <= 0 else 100 + downs_left)
+		_set_status_sig(6 if downs_left <= 0 else 0)
 	_status.show_lines(_status_lines)
+	downs.set_downs(game.config.max_incaps - player.incaps, game.config.max_incaps)
 
 	# The kit rows are rebuilt only when a count or a key changes, not every frame.
 	var heal_key := _key(ZzBindings.HEAL)
@@ -543,7 +553,10 @@ func _draw_health() -> void:
 
 	# Stacked upward from the plate: the kits' rows, then the line about downs.
 	var plate_top := -PLATE_BOTTOM - 56.0 - _plate_lift
-	kits.offset_bottom = plate_top - 4.0
+	downs.offset_bottom = plate_top - 6.0
+	downs.offset_top = downs.offset_bottom - ZzDownsPips.HEIGHT
+	var kits_floor := downs.offset_top if downs.visible else plate_top
+	kits.offset_bottom = kits_floor - 4.0
 	kits.offset_top = kits.offset_bottom - kits.row_height * rows.size()
 	_status.offset_bottom = kits.offset_top - 2.0
 	_status.offset_top = _status.offset_bottom - _status.row_height
@@ -572,6 +585,7 @@ var _build_kit_rows: Callable = func() -> Array:
 
 var _build_status_lines: Callable = func(sig: int) -> Array:
 	match sig:
+		0: return []
 		1: return ["Getting up…"]
 		2: return ["Down — crawl to a friend, or hold on for help"]
 		3: return ["Down — hold on for help"]
