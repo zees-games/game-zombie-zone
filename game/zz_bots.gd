@@ -446,7 +446,7 @@ func _post_of(player) -> Vector3:
 ## annotated (`zz_bot_hold_chokes`), falling back along the route when that choke is overrun,
 ## and its post when not. The post still says which barricade it mends.
 func _hold_of(player) -> Vector3:
-	var horde = game.horde
+	var horde: Variant = game.horde
 
 	if horde != null and game.config.bot_hold_chokes and horde.notes.is_ready():
 		var at: Vector3 = horde.notes.hold_for(_seat(player))
@@ -712,7 +712,13 @@ func _threat(player) -> GSNpcInstance:
 		return held
 
 	var eye: Vector3 = player.eye_position()
-	var near: Array = game.horde.zombies_near(player.feet(), game.config.bot_sight)
+	var horde: Variant = game.horde
+
+	if horde.threat_is_native():
+		return _threat_native(player, memory, horde.ranked_threats(
+				player.feet(), eye, game.config.bot_sight, game.config.bot_calm_radius))
+
+	var near: Array = horde.zombies_near(player.feet(), game.config.bot_sight)
 	# Sorted as one packed key (millimetres above, the index below) rather than with a lambda,
 	# which was a script call per comparison: six thousand a frame at wave 7.
 	var keys := PackedInt64Array()
@@ -749,6 +755,21 @@ func _threat(player) -> GSNpcInstance:
 			best = npc
 			break
 
+	return _threat_noted(player, memory, best, calm)
+
+## [method _threat] off gs-sim's ranking of [param ranked] (the ten it would rather shoot, best first).
+func _threat_native(player, memory: Dictionary, ranked: Array[GSNpcInstance]) -> GSNpcInstance:
+	var best: GSNpcInstance = null
+
+	for npc in ranked:
+		if _sees(player, _aim_point(npc)) or _sees(player, _head_point(npc)):
+			best = npc
+			break
+
+	return _threat_noted(player, memory, best, game.horde.threat_calm)
+
+## Keeps [param best] as [param player]'s threat for a few ticks, and whether nothing was near.
+func _threat_noted(player, memory: Dictionary, best: GSNpcInstance, calm: bool) -> GSNpcInstance:
 	memory["threat"] = best
 	# Staggered by the stand-in's own seat, so a dozen do not all look on the same tick.
 	memory["threat_until"] = game.current_tick() + 3 + (hash(String(player.player_id)) & 1)
@@ -792,6 +813,9 @@ func _sees(player, at: Vector3) -> bool:
 func _crowd_within(player, reach: float) -> int:
 	if game.horde == null:
 		return 0
+
+	if game.horde.threat_is_native():
+		return game.horde.commons_near(player.feet(), reach)
 
 	var n := 0
 

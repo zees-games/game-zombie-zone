@@ -301,6 +301,10 @@ func setup_seconds() -> float:
 ## `GSSimCrowdGrid` when the library is loaded: the same indices and pushes to the bit as gs-npc-ai's
 ## script grid, which false (or no library, the web) keeps. `zz_native_crowd`.
 @export var native_crowd: bool = true
+## Whether the stand-in survivors' look at the crowd (the ten zombies they would rather shoot, and how many commons
+## stand within reach) runs in gs-sim's native `GSSimBotThreat` when the library is loaded and the crowd grid is native:
+## the same ranking off the grid's tick-start positions; false keeps the script. `zz_native_threat`.
+@export var native_threat: bool = true
 
 ## gs-npc's perception pass (ranking, sight, hearing, smoke, rays, commitment) in gs-sim's `GSSimSenses`
 ## when the library is loaded: the same targets at the same moments as the script, which false (or no

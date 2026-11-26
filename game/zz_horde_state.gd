@@ -107,6 +107,11 @@ var crowd: Variant = CrowdGrid.new(GRID)
 ## Whether [member crowd] is the native grid now.
 var crowd_native: bool = false
 
+## gs-sim's `GSSimBotThreat` while [member ZzConfig.native_threat] is on, the crowd grid is native and the library is
+## loaded, else null: the bots' ranking of the crowd ([code]zz_bots.gd[/code] `_threat`), off a table of each zombie's height and kind.
+const NATIVE_THREAT := &"GSSimBotThreat"
+var threat_native: Object = null
+
 ## gs-sim's `GSSimZombieBrains` while [member ZzConfig.native_brains] is on and the library is loaded, else null:
 ## the commons' chase plan off a survivor table fed once a tick ([code]_feed_brains[/code]).
 const NATIVE_BRAINS := &"GSSimZombieBrains"

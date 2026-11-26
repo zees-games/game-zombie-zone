@@ -996,6 +996,7 @@ const HAND_FIELDS := {
 	"zz_wanderers": "wanderer_density", "zz_zombie_think_range": "think_range",
 	"zz_dormant_from": "dormant_from", "zz_dormant_think_every": "dormant_think_every",
 	"zz_path_reuse_thoughts": "path_reuse_thoughts", "zz_native_crowd": "native_crowd",
+	"zz_native_threat": "native_threat",
 	"zz_native_senses": "native_senses", "zz_native_brains": "native_brains",
 	"zz_native_pacing": "native_pacing",
 	"zz_body_stride_near": "body_stride_near", "zz_body_stride_far": "body_stride_far",

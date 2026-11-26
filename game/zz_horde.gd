@@ -917,6 +917,7 @@ func _rebuild_grid() -> void:
 	# Typed, so the script path pays no dynamic call per zombie.
 	var script_grid: CrowdGrid = null if native else crowd
 	var kill_y := float(_doc.get("kill_y", -30.0))
+	var sleepers: Object = threat_native
 
 	for npc in spawner.all_npcs():
 		if not npc.is_alive():
@@ -927,6 +928,9 @@ func _rebuild_grid() -> void:
 		# One below the map is the watch's to remove (wcull); it must not feed the grid meanwhile.
 		if p.y < kill_y or not p.is_finite():
 			continue
+
+		if sleepers != null and npc.def.id == ZzNpcs.SLEEPER:
+			var _s: bool = sleepers.set_sitting(npc.instance_id, npc.brain != null and str(npc.brain.get(&"state")) == "sitting")
 
 		if native:
 			_crowd_ids.append(npc.instance_id)
@@ -961,6 +965,14 @@ func _pick_crowd() -> void:
 		ZzBrainsFeed.push_barricades(self)
 
 	var want := config != null and config.native_crowd and ClassDB.class_exists(NATIVE_CROWD)
+	var threat := want and config.native_threat and ClassDB.class_exists(NATIVE_THREAT)
+
+	if threat != (threat_native != null):
+		threat_native = ClassDB.instantiate(NATIVE_THREAT) if threat else null
+
+		if threat and spawner != null:
+			for npc in spawner.all_npcs():
+				_register_threat(npc)
 
 	if want == crowd_native:
 		return
@@ -1011,6 +1023,31 @@ func zombies_near(point: Vector3, radius: float) -> Array[GSNpcInstance]:
 			out.append(npc)
 
 	return out
+
+## Whether [method ranked_threats] and [method commons_near] are answered natively now.
+func threat_is_native() -> bool:
+	return threat_native != null and crowd_native
+
+## Whether the last [method ranked_threats] found nobody within its calm radius.
+var threat_calm: bool = true
+
+## The (at most ten) zombies a survivor at [param feet] with eyes at [param eye] would rather shoot among those within
+## [param radius], best first (a special counts twelve metres closer, a sitting sleeper never), and [member threat_calm]
+## says whether nobody is within [param calm_radius]. Only while [method threat_is_native].
+func ranked_threats(feet: Vector3, eye: Vector3, radius: float, calm_radius: float) -> Array[GSNpcInstance]:
+	var out: Array[GSNpcInstance] = []
+
+	for i in threat_native.rank(crowd, feet, eye, radius, calm_radius):
+		var npc := _crowd_npcs[i]
+		if npc.is_alive():
+			out.append(npc)
+
+	threat_calm = threat_native.calm()
+	return out
+
+## How many living commons stand within [param reach] of [param point]. Only while [method threat_is_native].
+func commons_near(point: Vector3, reach: float) -> int:
+	return threat_native.commons(crowd, point, reach)
 
 ## Hostile zombies alive that count as "infected left": everything but a sleeper still sitting. Cached for a second.
 func infected_left() -> int:
@@ -2333,6 +2370,7 @@ func _on_spawned(npc: GSNpcInstance) -> void:
 			b.collision_mask = game.physics.collision_mask(&"zombie")
 
 	_register_combat(npc)
+	_register_threat(npc)
 
 	if b != null:
 		var _limbs := ZzZombieLimbs.attach(b, npc.def.id, b.variant, npc.def.max_health)
@@ -2354,7 +2392,24 @@ func _release_maker_child(npc: GSNpcInstance) -> void:
 		var _gone := _maker_of.erase(npc.instance_id)
 		maker_child_gone.emit(maker)
 
+## Tells the native threat table [param npc]'s height and kind (the sleeper sitting until the grid's rebuild says otherwise).
+func _register_threat(npc: GSNpcInstance) -> void:
+	if threat_native == null:
+		return
+
+	var flags := 0
+
+	if ZzNpcs.is_special(npc.def.id):
+		flags = ClassDB.class_get_integer_constant(NATIVE_THREAT, &"SPECIAL")
+	elif npc.def.id == ZzNpcs.COMMON:
+		flags = ClassDB.class_get_integer_constant(NATIVE_THREAT, &"COMMON")
+
+	threat_native.register(npc.instance_id, float(npc.def.meta.get("height", 1.7)), flags)
+
 func _on_removed(npc: GSNpcInstance, _reason: StringName) -> void:
+	if threat_native != null:
+		threat_native.forget(npc.instance_id)
+
 	_release_maker_child(npc)
 	zombie_removed.emit(npc)
 	_forget_combat(npc)

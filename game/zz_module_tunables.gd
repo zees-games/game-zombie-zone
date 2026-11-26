@@ -140,6 +140,9 @@ func _add_tunables_zombies(world: ZzGame) -> void:
 	_tunable("zz_native_crowd", 1.0 if config.native_crowd else 0.0,
 		"The horde's crowd grid runs in gs-sim's native library when loaded (the same answers); 0 keeps the script",
 		func(value: float) -> void: config.native_crowd = value > 0.5)
+	_tunable("zz_native_threat", 1.0 if config.native_threat else 0.0,
+		"The stand-in survivors rank the crowd in gs-sim's native library when loaded; 0 keeps the script",
+		func(value: float) -> void: config.native_threat = value > 0.5)
 	_tunable("zz_native_senses", 1.0 if config.native_senses else 0.0,
 		"Zombie senses run in gs-sim's native library when loaded (the same targets); 0 keeps the script",
 		func(value: float) -> void: config.native_senses = value > 0.5)
