@@ -272,6 +272,11 @@ func stump_limb(limb: StringName, d: Dictionary) -> Vector3:
 	return at
 
 
+## The mutant's parts are guns and a pack: a cut sparks (see [method _part_lost]) and does not bleed on the walls.
+func _spray_walls(_joint: Vector3, _impulse: Vector3) -> void:
+	pass
+
+
 ## Sparks, and for the pack smoke from a failed exhaust; a gun gets a smoking stump of its own.
 func _part_lost(limb: StringName, at: Vector3) -> void:
 	if _stump_fx.has(limb) or _skeleton == null:

@@ -4,6 +4,8 @@ var audio: ZzAudio = null
 
 ## The client's effects layer: where the smoke and fire clouds spawn.
 var effects: GSFxManager = null
+## The client's blood, given to every zombie view so a cut limb paints the walls (see [method ZzZombieView._spray_walls]).
+var blood: GSFxBlood = null
 
 ## The config the fade cvars live in, and the Hard Box stacks last heard of; a change of either redraws.
 var fade_config: Object = null
@@ -111,6 +113,7 @@ func add_zombie(key: int, kind: StringName, variant: int, body: Node3D) -> void:
 	var view: ZzZombieView = view_for(kind)
 	view.name = "View"
 	view.lod = lod
+	view.blood = blood
 	body.add_child(view)
 	view.build(kind, variant)
 	# A mirror has no limbs yet (the server's body has them from its spawn); the view cuts them.
