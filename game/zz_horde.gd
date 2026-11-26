@@ -165,14 +165,12 @@ func _begin_notes() -> void:
 
 ## Puts [param graph] (a `ZzNavGraph`, which also knows the drops) in the spawner's hands, after every
 ## rebuild, with the links put back.
-func _adopt_links(graph: ZzNavGraph) -> void:
+func _adopt_links(graph: ZzNavGraph, linked := false) -> void:
 	var lap := Time.get_ticks_usec()
-	graph.steep = config.nav_steep if config.nav_steep > 0.0 else INF
 	spawner.nav = graph
-	var _teles := graph.apply_teleports((_doc.get("nav", {}) as Dictionary).get("teleports", []))
-	graph.allow_ladders = config.zombie_ladder_speed > 0.0
-	var passable: Array[RID] = game.map.mechanics.walk_through_bodies() if game.map != null and game.map.mechanics != null else ([] as Array[RID])
-	var _rungs := graph.apply_ladders(ladders(), ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), passable))
+	if not linked:
+		var passable: Array[RID] = game.map.mechanics.walk_through_bodies() if game.map != null and game.map.mechanics != null else ([] as Array[RID])
+		ZzNavDerive.link(graph, _nav_rules(), ZzNavPrune.ladder_side(game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), passable))
 	lap = ZzLaps.lap(sections, &"links_teleports", lap)
 
 	if notes.is_ready():
@@ -244,7 +242,7 @@ func rebuild_navigation() -> GSResult:
 
 	_drop_nav_job()
 	_nav_started = Time.get_ticks_msec()
-	var threads := config.nav_threads if GSPlatform.has_threads() else 0
+	var threads := GSParallel.resolve_workers(config.nav_threads) if GSPlatform.has_threads() else 0
 	var lap := Time.get_ticks_usec()
 	var doc := nav_doc()
 	lap = ZzLaps.lap(sections, &"nav_doc", lap)
@@ -261,6 +259,7 @@ func rebuild_navigation() -> GSResult:
 
 	if threads > 0:
 		job.make_graph = _graph_off_thread
+		job.derive = ZzNavDerive.run.bind(_nav_rules())
 		job.start_thread()
 
 	GSLog.info(CHANNEL, "navigation build started", {"map": str(_doc.get("id", "")), "threads": threads})
@@ -324,14 +323,15 @@ func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:
 	sections[&"nav_graph_threaded"] = 1.0 if ready_graph != null else 0.0
 	lap = ZzLaps.lap(sections, &"nav_graph", lap)
 
+	var derived: Dictionary = job.derived if ready_graph != null else {}
 	var _cleared := spawner.set_nav_data(null)
-	_adopt_links(graph_built)
+	_adopt_links(graph_built, derived.has("linked"))
 	lap = ZzLaps.lap(sections, &"nav_links", lap)
-	_usable_posts = ZzNpcs.reachable_posts(nav, _doc)
+	_usable_posts = derived["posts"] if derived.has("posts") else ZzNpcs.reachable_posts(nav, _doc)
 	_usable_posts_for = nav
 	lap = ZzLaps.lap(sections, &"nav_posts", lap)
 
-	director.spawn_points = ZzNpcs.thinned_points(nav, 6.0, GSNpcNavFilter.walking_only())
+	director.spawn_points = derived["spawns"] if derived.has("spawns") else ZzNpcs.thinned_points(nav, ZzNavDerive.SPAWN_SPACING, GSNpcNavFilter.walking_only())
 	lap = ZzLaps.lap(sections, &"spawns_thin", lap)
 	_add_hinted_spawns()
 	var kept := _keep_out_of_safe_rooms()

@@ -22,7 +22,7 @@ const RANGES := {
 	"zz_team_damage_window": [5.0, 3600.0],
 	"zz_bot_defib_reach": [1.0, 200.0],
 	"zz_bot_idle_seconds": [0.0, 120.0],
-	"zz_nav_threads": [0, 0],
+	"zz_nav_threads": [-1, 0],
 	"zz_nav_budget_ms": [0.5, 14.0],
 	"zz_unstick_seconds": [0.0, 30.0],
 	"zz_nav_drop": [1.0, 10.0],

@@ -185,3 +185,7 @@ func _run(job: ZzNavJob, state: PhysicsDirectSpaceState3D, mask: int, ladders: A
 
 	if job.make_graph.is_valid():
 		job.graph = job.make_graph.call(nav)
+
+	# The links' ladder rays ask the private copy too.
+	if job.derive.is_valid():
+		job.derived = job.derive.call(nav, job.graph, state, mask)
