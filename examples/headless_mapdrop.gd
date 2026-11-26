@@ -10,9 +10,11 @@ const ZzCatalogue := preload("../game/zz_catalogue.gd")
 const ZzMapDoc := preload("../game/zz_map_doc.gd")
 const ZzMapDrop := preload("../game/zz_map_drop.gd")
 
-const SOURCE := "user://zz_headless_mapdrop_src"
-const MAP := "zz_mapdrop_drop"
-const DROPPED := "user://maps/zz_mapdrop_drop.json"
+# Suites on one machine share user:// (a full run beside another agent's), so the folder and the map id carry this process's id:
+# a second run's _clean() or a drop of the same id would otherwise delete the documents this one is about to read.
+var SOURCE := "user://zz_headless_mapdrop_src_%d" % OS.get_process_id()
+var MAP := "zz_mapdrop_drop_%d" % OS.get_process_id()
+var DROPPED := "user://maps/zz_mapdrop_drop_%d.json" % OS.get_process_id()
 const SECTIONS := 3
 
 
@@ -149,8 +151,8 @@ func _test_intake(game: FakeGame) -> void:
 		_errors(result))
 	_check(int(intake.get(&"refused_total")) == refused + 2, "and counted as refused")
 	_check(game.catalogue.maps.size() == before, "and add nothing")
-	result = intake.call(&"handle", PackedStringArray(["/no/such/zz_mapdrop_drop"]), "window")
-	_check(_errors(result).contains("zz_mapdrop_drop: not found"), "a path that does not exist is said", _errors(result))
+	result = intake.call(&"handle", PackedStringArray(["/no/such/" + MAP]), "window")
+	_check(_errors(result).contains(MAP + ": not found"), "a path that does not exist is said", _errors(result))
 
 	game.authoritative = false
 	_wipe_file(DROPPED)
