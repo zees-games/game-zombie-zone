@@ -95,7 +95,18 @@ func sever_limb(limb: StringName, d: Dictionary, impulse: Vector3) -> Vector3:
 	_note_limb(limb)
 	var joint := GSNpcGibs.sever(_skeleton, _model, "%s/%s" % [body_id, limb], limb, d, impulse)
 	_fade_new_parts(limb, joint)
+	_spray_walls(joint, impulse)
 	return joint
+
+
+## A cut paints the room the way the limb was thrown: a fan of splatters along the throw (up a little, so a wall is reached), and one on the floor under the wound. The count follows the gore level; the decal ring bounds the total.
+func _spray_walls(joint: Vector3, impulse: Vector3) -> void:
+	if blood == null or joint == Vector3.INF or GSNpcGore.level < 2:
+		return
+	var along := impulse + Vector3.UP * maxf(impulse.length() * 0.25, 0.5)
+	var count := 3 if GSNpcGore.level < 3 else 6
+	var _drawn := blood.splat_burst(joint, along, count, 0.7, 3.5)
+	var _under := blood.splat_below(joint, 2.5)
 
 
 ## A limb that was gone before this machine saw the zombie: the stump alone.

@@ -222,6 +222,7 @@ func _build_world_view() -> void:
 	game.add_child(world_view)
 	blood = ZzBlood.new()
 	blood.mask = game.world_mask()
+	world_view.blood = blood
 	game.add_child(blood)
 	blood.apply_settings(null)
 	if game.weapon_layer.knives != null:

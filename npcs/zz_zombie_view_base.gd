@@ -249,6 +249,8 @@ const UAL_FROM := "res://addons/gs_player_char/people/people_matt.glb"
 
 const ZzZombieShader := preload("zz_zombie_shader.gd")
 
+## The client's blood (game/zz_blood.gd): a limb cut off paints the surfaces it was thrown at. Null on a server.
+var blood: GSFxBlood = null
 var kind: StringName = &""
 var variant: int = -1
 
