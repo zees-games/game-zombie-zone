@@ -663,15 +663,23 @@ func bot_search_twin() -> RefCounted:
 ## Takes in the stand-ins' search [param twin] built: the same build as on first use, so the same paths. False, and
 ## nothing taken, when this graph changed what it is built from since the copy, or built it itself meanwhile.
 func adopt_bot_search(twin: Variant) -> bool:
-	var key := _native_key(bot_filter)
-	var astar: Variant = twin._native.get(key)
-
-	if astar == null or twin._twin_of != data or twin._bot_epoch != _bot_epoch or _native.has(key) or twin._bad != _bad:
+	if bot_search_stale(twin) != 0:
 		return false
 
+	var key := _native_key(bot_filter)
+	var astar: AStar3D = twin._native[key]
 	_native[key] = astar
 	_patched[(astar as AStar3D).get_instance_id()] = true
 	return true
+
+
+
+## Why [method adopt_bot_search] would turn [param twin]'s search down, 0 when it would take it: 1 the twin has none, 2
+## another graph landed, 3 links or teleports came since the copy, 4 a walk built it meanwhile, 5 the bad edges changed.
+func bot_search_stale(twin: Variant) -> int:
+	var key := _native_key(bot_filter)
+	var why := [twin._native.get(key) == null, twin._twin_of != data, twin._bot_epoch != _bot_epoch, _native.has(key), twin._bad != _bad]
+	return why.find(true) + 1
 
 
 ## Drops the cached native searches. [param keep_bots] keeps the stand-ins' one when the change is to something it does

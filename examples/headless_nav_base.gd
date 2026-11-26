@@ -73,7 +73,8 @@ class Crowd:
 
 
 
-func _world(configure: Callable = Callable()) -> ZzGame:
+## [param nav_async] builds the graph off the frame, as the hosts do (play waits for it).
+func _world(configure: Callable = Callable(), nav_async := false) -> ZzGame:
 	for old in _worlds.duplicate():
 		await _dispose(old)
 
@@ -95,6 +96,7 @@ func _world(configure: Callable = Callable()) -> ZzGame:
 	game.tick_rate = TICK_RATE
 	game.authoritative = true
 	game.register_service = false
+	game.nav_async = nav_async
 	add_child(game)
 	game.set_physics_process(false)
 	_worlds.append(game)

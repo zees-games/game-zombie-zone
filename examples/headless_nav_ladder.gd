@@ -5,8 +5,8 @@ extends "headless_nav_base.gd"
 ## following and the ride (`ZzBotLadders`, gs-bot's `GSBotClimb`), not what a bot would rather do.
 
 const MAP := "zs_krusty_krab_large"
-const SECTIONS := 1
-const CHECKS := 2
+const SECTIONS := 2
+const CHECKS := 6
 
 ## Linked ladders tried (all 7 tall ones of the map), each ridden up and then down.
 const TRIES := 7
@@ -26,6 +26,7 @@ func _run() -> void:
 	print("")
 	_linked = DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps")) and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://world"))
 	await _test_bot_ladders()
+	await _test_warm_wait()
 
 	for game in _worlds.duplicate():
 		await _dispose(game)
@@ -89,6 +90,64 @@ func _test_bot_ladders() -> void:
 
 	game.bots = bots
 	_check(failed.is_empty(), "the stand-in rides every tried ladder link both ways", "; ".join(failed))
+	_finished()
+
+
+## The hosts build the graph off the frame (`nav_async`); on a ladder map the stand-ins' search the links cleared is then
+## built on a worker ([code]ZzNavWarmThread[/code]) and the map build, and so play, waits for it in `_poll_nav`.
+func _test_warm_wait() -> void:
+	_section("an off-frame map build on %s waits for the stand-ins' search from the worker" % MAP)
+
+	if not _linked or not GSPlatform.has_threads():
+		for i in 4:
+			_check(true, "skipped without maps/ or threads")
+		_finished()
+		return
+
+	# A first build prunes and links on the worker, which warms the search there; only a cached load (the second
+	# world) links on the main thread and leaves the search to ZzNavWarmThread.
+	var game: ZzGame = null
+	var waited := 0
+	var cached := false
+	var landed := {}
+	var seen := {}
+	var ticks := 0
+
+	for build in 2:
+		game = await _world(func(c: ZzConfig) -> void:
+			c.map_ids = PackedStringArray([MAP])
+			c.survival_warmup_seconds = 600.0
+			c.wanderer_density = 0.0
+			c.sleepers_enabled = false
+			c.nav_warm_bots = true, true)
+		var walker := game.add_player(&"u301", "Waiter")
+		game.start()
+		ticks = 0
+		waited = 0
+		cached = false
+
+		# The map is laid out in a tick after start, so this waits for its notes too (BAKING comes after READY in the enum:
+		# a world freed mid-bake left the bake's parse on a freed root).
+		while (game.horde.nav_blocks_play() or game.horde.notes.state not in [ZzNavNotes.State.READY, ZzNavNotes.State.FAILED]) \
+				and ticks < 20000:
+			waited += 1 if game.horde._warming != null else 0
+			# A stand-in asks its way while the build waits: that search built the stand-ins' one here, first.
+			var _way: bool = game.bots._can_walk_to(walker, walker.feet() + Vector3(4.0, 0.0, 0.0))
+			game.simulate(TICK)
+			ticks += 1
+			cached = cached or game.horde.sections.get(&"nav_cache_hit", 0.0) == 1.0
+			seen.merge(game.horde.sections)
+			landed = game.horde.sections.duplicate() if game.horde.sections.has(&"nav_warm_taken") else landed
+
+			if ticks % 8 == 0:
+				await get_tree().physics_frame
+
+	_check(cached and waited > 0, "play waited on the worker's search (%d ticks) on the cached load" % waited,
+		"cached %s after %d ticks (async %s, notes %d), the warm never ran: %s" % [cached, ticks, game.horde.nav_async, game.horde.notes.state, seen.keys()])
+	_check(not game.horde.nav_blocks_play() and game.horde._warming == null, "the map build finished once the worker was done")
+	_check(float(landed.get(&"nav_warm_taken", -1.0)) == 1.0, "the graph took the worker's search", str(landed))
+	var nav: ZzNavGraph = game.horde.spawner.nav
+	_check(nav != null and nav.has_bot_search(), "the stand-ins have their search before the first round")
 	_finished()
 
 
