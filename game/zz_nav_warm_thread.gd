@@ -53,5 +53,10 @@ func finish() -> bool:
 ## null, for the holder's field.
 func land(sections: Dictionary) -> _Self:
 	sections[&"nav_warm_copy"] = snappedf(copy_ms, 0.1)
+	if _task >= 0:
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+
+	sections[&"nav_warm_why"] = float(_graph.bot_search_stale(_twin))
 	sections[&"nav_warm_taken"] = 1.0 if finish() else 0.0
 	return null
