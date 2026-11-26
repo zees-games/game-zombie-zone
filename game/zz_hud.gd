@@ -54,6 +54,26 @@ func _build() -> void:
 	add_child(_root)
 
 	_low = _cover("Low", Color(0.55, 0.0, 0.0, 0.0))
+	# Down: the edges go dark red and the middle stays clear, so the view reads as hurt without being hidden.
+	var ring := Gradient.new()
+	ring.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	ring.colors = PackedColorArray([Color(0.5, 0.0, 0.0, 0.0), Color(0.45, 0.0, 0.02, 0.18), Color(0.3, 0.0, 0.02, 0.85)])
+	var ring_texture := GradientTexture2D.new()
+	ring_texture.gradient = ring
+	ring_texture.fill = GradientTexture2D.FILL_RADIAL
+	ring_texture.fill_from = Vector2(0.5, 0.5)
+	ring_texture.fill_to = Vector2(1.0, 0.5)
+	ring_texture.width = 256
+	ring_texture.height = 256
+	_down_edge = TextureRect.new()
+	_down_edge.name = "DownEdge"
+	_down_edge.texture = ring_texture
+	_down_edge.stretch_mode = TextureRect.STRETCH_SCALE
+	_down_edge.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_down_edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_down_edge.modulate.a = 0.0
+	_down_edge.visible = false
+	_root.add_child(_down_edge)
 	# Eyes under water: a cold green-blue over everything, under the HUD (the fog does the depth).
 	_wet = _cover("Wet", Color(0.04, 0.30, 0.40))
 	_bile = _cover("Bile", Color(0.38, 0.52, 0.08))
@@ -198,7 +218,7 @@ func _build() -> void:
 	ammo.name = "Ammo"
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	ammo.offset_left = -420.0
-	ammo.offset_right = -24.0
+	ammo.offset_right = -36.0
 	ammo.offset_top = -LOADOUT_TOP - 76.0
 	ammo.offset_bottom = -LOADOUT_TOP
 	_root.add_child(ammo)
@@ -219,7 +239,7 @@ func _build() -> void:
 	fire_mode.name = "FireMode"
 	fire_mode.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	fire_mode.offset_left = -420.0
-	fire_mode.offset_right = -24.0
+	fire_mode.offset_right = -36.0
 	fire_mode.offset_top = -LOADOUT_TOP - 106.0
 	fire_mode.offset_bottom = -LOADOUT_TOP - 80.0
 	_root.add_child(fire_mode)
@@ -439,7 +459,8 @@ func _draw_streak() -> void:
 	_streak = step[0]
 	_streak_kills = step[1]
 	_streak_at = step[2]
-	vitals.show_streak(_streak, STREAK_FULL)
+	# No row at zero: an empty "Killstreak x0" is clutter, the row appears with the first run.
+	vitals.show_streak(_streak, STREAK_FULL if _streak > 0 else 0)
 
 ## The line under the title while the start grace runs; static so a suite reads it without a screen.
 static func grace_line(seconds: float) -> String:
@@ -489,7 +510,7 @@ static func survival_lines(hold: Dictionary) -> Array:
 				# where the strip's clock sits, and the two were drawn over each other.
 				var opening := index <= 1
 				return ["Get ready" if opening else "Breather", clock,
-					"until wave %d · %s" % [index, "find the doors and the caches" if opening else "mend the barricades, restock"], "", low]
+					"until wave %d" % index, "", low]
 			return ["All %d waves held" % count, "", "", "", false]
 		GSNpcDirectorWaves.Style.CYCLE:
 			if stage == GSNpcDirectorWaves.Stage.HORDE:
@@ -583,8 +604,8 @@ var _build_status_lines: Callable = func(sig: int) -> Array:
 	match sig:
 		0: return []
 		1: return ["Getting up…"]
-		2: return ["Down — crawl to a friend, or hold on for help"]
-		3: return ["Down — hold on for help"]
+		2: return []
+		3: return []
 		4: return ["Dead. Wait to be rescued."]
 		5: return ["Dead."]
 		6: return ["LAST LIFE — the next down is death"]
@@ -766,6 +787,9 @@ func _draw_loadout(arsenal: GSWeaponArsenal) -> void:
 			else:
 				line = "%d / %d" % [weapon.magazine, arsenal.ammo().count(def.ammo_type) if def.ammo_type != &"" else 0]
 			low = float(weapon.magazine) <= float(def.magazine) * 0.25
+		# The selected weapon's ammo lives in the counter; its slot would only repeat it.
+		if key == arsenal.current_slot():
+			line = ""
 		rows.append({"key": str(key), "icon": picture, "name": ZzWeapons.title_of(def.id), "text": line,
 			"selected": key == arsenal.current_slot(), "low": low})
 	_append_kit_slots(rows)
@@ -784,10 +808,10 @@ func _append_kit_slots(rows: Array) -> void:
 		return
 	var green := Color(0.35, 0.9, 0.5)
 	if player.medkits > 0:
-		rows.append({"key": _kit_keys[0], "name": "MEDKIT", "text": "x%d" % player.medkits, "accent": green,
+		rows.append({"key": _kit_keys[0], "glyph": &"medkit", "name": "MEDKIT", "text": "x%d" % player.medkits, "accent": green,
 			"fill": _heal_fraction})
 	if player.pills > 0:
-		rows.append({"key": _kit_keys[1], "name": "PILLS", "text": "x%d" % player.pills, "accent": green})
+		rows.append({"key": _kit_keys[1], "glyph": &"pills", "name": "PILLS", "text": "x%d" % player.pills, "accent": green})
 
 func _draw_weight() -> void:
 	if loadout == null:
@@ -958,6 +982,9 @@ func _draw_overlays(delta: float) -> void:
 		_fade(_flash, 0.0, step * 0.4)
 	_fade(_fire, 0.18 if player.burning else 0.0, step)
 	_fade(_grey, 0.35 if player.is_alive() and player.incaps >= game.config.max_incaps and not player.is_down() else 0.0, step * 0.3)
+
+	_down_edge.modulate.a = move_toward(_down_edge.modulate.a, 1.0 if player.is_down() and player.is_alive() else 0.0, step)
+	_down_edge.visible = _down_edge.modulate.a > 0.001
 
 	var low := player.is_alive() and not player.is_down() and player.health != null \
 		and player.health.health < game.config.limp_health

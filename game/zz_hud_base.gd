@@ -222,6 +222,7 @@ var _fire: ColorRect = null
 var _grey: ColorRect = null
 
 var _low: ColorRect = null
+var _down_edge: TextureRect = null
 
 var _wet: ColorRect = null
 

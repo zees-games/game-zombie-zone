@@ -11,6 +11,10 @@ func _make_crosshair() -> Control:
 		var cross := (shape as GDScript).new() as Control
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# A hard dark outline: the pale walls would swallow a bare white cross.
+		cross.set(&"outline_colour", Color(0.0, 0.0, 0.0, 0.95))
+		cross.set(&"thickness", 3.0)
+		cross.set(&"length", 10.0)
 		# Dead or spectating: nothing in hand to aim (gs-ui API 14; older ones ignore the property).
 		if GSAddonApi.build_level("gs_ui") >= 14:
 			cross.set(&"alive_source", func() -> bool: return player != null and player.is_alive() and not player.watching)

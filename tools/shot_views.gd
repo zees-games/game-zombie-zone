@@ -62,14 +62,35 @@ func _view_boxgun(game: ZzGame, local, stand: Vector3) -> void:
 	await _seconds_of(maxf(_seconds, 1.0))
 
 
+func _view_heal(game: ZzGame, local, stand: Vector3) -> void:
+	# Hurt, with the hold-to-heal part-way: the medkit slot's progress bar over the loadout row.
+	_clear_view(game, local, stand)
+	local.health.invulnerable = false
+	local.health.health = 55.0
+	local.health.invulnerable = true
+	await _seconds_of(maxf(_seconds, 1.0))
+	game.get_meta(&"hud").set_heal_fraction(0.6)
+	await _frames(3)
+
+
 func _view_pickup(game: ZzGame, local, stand: Vector3) -> void:
 	# A rifle in hand and the same one lying ahead: the prompt and the hold ring part-way round the crosshair.
 	_clear_view(game, local, stand)
 	game.boxes.run([{"do": "give_weapon", "id": "rifle"}], {"opener": local, "at": stand, "box": &"upgrade"})
 	var layer = game.weapon_layer
 	layer.rules.pickup_delay = 0.0
-	var _spawned: int = layer.drops.spawn({"id": &"rifle", "magazine": 12, "reserve": 60}, local.eye_position() + local.aim_direction() * 1.0, Vector3.ZERO, 0)
+	layer.rules.use_radius = 6.0
+	var spawned: int = layer.drops.spawn({"id": &"zz_m4", "magazine": 12, "reserve": 60}, local.eye_position() + local.aim_direction() * 3.6, Vector3.ZERO, 0)
+	# Offline there is no client panel to read the drop; build the one a client has, let it draw the
+	# prompt once, then freeze it so its idle hold (0) does not wipe the ring set below.
+	var panel = game.get_node_or_null("PickupPanel")
+	if panel == null:
+		panel = preload("res://game/zz_pickup_panel.gd").new()
+		panel.name = "PickupPanel"
+		panel.game = game
+		game.add_child(panel)
 	await _seconds_of(maxf(_seconds, 1.0))
+	panel.set_process(false)
 	game.get_meta(&"hud").set_hold_progress(0.6)
 	await _frames(3)
 

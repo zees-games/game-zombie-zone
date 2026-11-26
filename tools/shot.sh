@@ -33,6 +33,7 @@
 #   tools/shot.sh --view=deploy --seconds=2.5                        # carrying a box, primary fire held that long (deploy_third, deploy_side)
 #   tools/shot.sh --view=survivor --board                            # with the Tab scoreboard open
 #   tools/shot.sh --view=ads --out=res://screenshots/ads          # hip, raising and aimed: an iron sight and a scope
+#   tools/shot.sh --view=heal                                        # hurt, the medkit slot's hold-to-heal bar at 60 %
 #   tools/shot.sh --view=pickup                                      # the pickup prompt and the hold ring over the same weapon on the floor
 #   tools/shot.sh --view=crosshair --out=res://screenshots/crosshair   # the spread crosshair at rest, walking, running, crouched, aimed
 #   tools/shot.sh --view=room --zz-map-ids=zm_4way_tunnel --fire=break_roof_spawn:ForceSpawn --at=...   # a maker's copies
@@ -62,7 +63,7 @@ for arg in "$@"; do
         --out=*)     out="${arg#*=}" ;;
         --resolution=*) RESOLUTION="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
-        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--frames=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*|--touch=1) extra+=("$arg") ;;
+        --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--settled|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--frames=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*|--touch=1) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

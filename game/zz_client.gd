@@ -885,7 +885,8 @@ func _on_down(session_id: int, by: int, why: StringName, by_kind: StringName) ->
 	if mine and hud != null:
 		hud.shout("YOU ARE DOWN", 2.0)
 
-	if chat != null:
+	# Your own downing is on the health plate already: not said twice.
+	if chat != null and not mine:
 		chat.say_locally(_feed_line(_name_of(session_id), "is down", by, why, by_kind, mine), Color(0.98, 0.7, 0.4))
 
 
