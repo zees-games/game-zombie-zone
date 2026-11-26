@@ -101,7 +101,7 @@ func _test_build(id: StringName) -> void:
 	_check(not game.horde.nav_blocks_play(), "the graph landed", "%d ticks" % ticks)
 	_check(game.horde.nav != null and game.horde.nav.point_count() > 100, "and it has ground", "%d points" % (game.horde.nav.point_count() if game.horde.nav != null else 0))
 	_check(seen_prune, "the prune ran in slices (stage 'prune' was reported)")
-	_check(worst <= MAX_TICK_MS, "no tick took over %d ms while it was built" % int(MAX_TICK_MS), "worst %.0f ms in %s" % [worst, worst_stage])
+	_check(worst <= MAX_TICK_MS, "no tick took over %d ms while it was built" % int(MAX_TICK_MS), "worst %.0f ms in %s, horde sections %s" % [worst, worst_stage, worst_sections])
 	_check(landed <= MAX_LAND_MS, "the tick that lands the graph took at most %d ms" % int(MAX_LAND_MS), "%.0f ms" % landed)
 	print("  the worst tick's horde sections (ms): %s" % worst_sections)
 	print("  start %.0f ms, worst tick %.0f ms (%s), landing tick %.0f ms, %d ticks waited, sections %s" % [opened, worst, worst_stage, landed, ticks, game.horde.sections])
