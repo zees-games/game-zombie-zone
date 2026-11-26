@@ -77,7 +77,7 @@ func _test_build(id: StringName) -> void:
 	var landed := 0.0
 	var ticks := 0
 
-	# The first tick builds the map and starts the graph; every tick up to the one that lands it is timed.
+	# The first tick builds the map (its own cost, not the navigation's) and starts the graph; every later tick up to the one that lands it is timed.
 	while ticks < MAX_WAIT_TICKS and (ticks == 0 or game.horde.nav_blocks_play()):
 		ticks += 1
 		var stage: String = game.horde.nav_stage()
@@ -88,7 +88,7 @@ func _test_build(id: StringName) -> void:
 
 		if ticks > 1 and not game.horde.nav_blocks_play():
 			landed = spent
-		elif spent > worst:
+		elif ticks > 1 and spent > worst:
 			worst = spent
 			worst_stage = "%s #%d -> %s" % [stage, ticks, game.horde.nav_stage()]
 
