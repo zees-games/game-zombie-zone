@@ -1047,7 +1047,7 @@ func _move_world(_player, command: GSFpsCommand, direction: Vector3) -> void:
 
 func _walk_to(player, command: GSFpsCommand, goal: Vector3, memory: Dictionary) -> void:
 	var here: Vector3 = player.feet()
-	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
+	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null and not game.horde.nav_blocks_play() else null
 	var path: PackedVector3Array = memory["path"]
 
 	if ZzBotLadders.drive(game, player, command, memory):
@@ -1202,7 +1202,7 @@ func _give_up_pick(memory: Dictionary, loot, id: int) -> void:
 
 ## Whether the graph has a way from [param player] to [param at]; true when there is no graph to ask.
 func _can_walk_to(player, at: Vector3) -> bool:
-	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null else null
+	var nav: GSNpcNavGraph = game.horde.spawner.nav if game.horde != null and game.horde.spawner != null and not game.horde.nav_blocks_play() else null
 
 	if nav == null or not nav.is_ready():
 		return true

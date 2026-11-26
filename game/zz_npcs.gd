@@ -682,7 +682,7 @@ static func _is_floor(bounds: AABB, floors: Array) -> bool:
 	return false
 
 ## A fingerprint of everything the graph was built from, and of what the physics pass then cut it on: the cache holds
-## the PRUNED graph (ZzHorde._prune_blocked), so the document's choice of colliding world hulls and its solid props are
+## the PRUNED graph (ZzNavPruneThread.on_main), so the document's choice of colliding world hulls and its solid props are
 ## part of the key. Without them a map whose `world_collision` changed kept its old cuts on every box that had run it.
 static func digest_of(doc: Dictionary, open_gates: PackedStringArray = PackedStringArray(), extra_solids: Array[AABB] = []) -> String:
 	return GSNpcNavData.digest_of([

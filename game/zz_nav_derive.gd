@@ -35,9 +35,14 @@ static func link(graph: Object, rule: Dictionary, side: Callable) -> void:
 static func run(nav: GSNpcNavData, graph: Object, space: PhysicsDirectSpaceState3D, mask: int, rule: Dictionary) -> Dictionary:
 	var out := {}
 
-	if graph != null and space != null:
+	# Only a ladder asks the world which side it is on: with none the links go on here without a space.
+	if graph != null and (space != null or (rule["boxes"] as Array).is_empty()):
 		link(graph, rule, ZzNavPrune.ladder_side(space, mask))
 		out["linked"] = true
+
+		# After the links, which clear it: on the main thread this was the first tick of play's (1.3 to 1.8 s on gm_valley).
+		if rule.get("warm_bots", false):
+			graph.warm_bot_search()
 
 	out["posts"] = ZzNpcs.reachable_posts(nav, rule["doc"])
 	out["spawns"] = ZzNpcs.thinned_points(nav, SPAWN_SPACING, GSNpcNavFilter.walking_only())

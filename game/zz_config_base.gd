@@ -224,14 +224,21 @@ func setup_seconds() -> float:
 @export var nav_cache: bool = true
 
 ## Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes a minute or more
-## to build. 1 builds on one background thread, more split the heavy passes across that many; 0 (and every platform without
-## threads) builds on the main thread in slices of [member nav_budget_ms] a tick. `zz_nav_threads`.
-@export_range(0, 16, 1, "or_greater") var nav_threads: int = 2
+## to build. 1 builds on one background thread, more split the heavy passes across that many, -1 one per core but one
+## ([method GSParallel.resolve_workers]); 0 (and every platform without threads) builds on the main thread in slices of
+## [member nav_budget_ms] a tick. `zz_nav_threads`.
+@export_range(-1, 16, 1, "or_greater") var nav_threads: int = 2
 
 ## Whether a hosted game that builds its graph off the main thread also asks the world's collision about it there, against
-## a private copy of the world's bodies: asked a slice a tick on the main thread, that prune still held single ticks of
-## seconds on a loaded box. 0 asks on the main thread in slices of [member nav_budget_ms]. `zz_nav_prune_thread`.
+## a private copy of the world's bodies: that prune was 36 s of one frozen tick on a cold rp_asheville. 0 prunes on the main
+## thread. `zz_nav_prune_thread`.
 @export var nav_prune_thread: bool = true
+
+## Whether the graph's worker also builds the stand-ins' search (their filter's own graph) once the links are on, so
+## the first stand-in that walks does not: that build was 1.3 to 1.8 s of the first tick of play on gm_valley (289k
+## points). Only where the links go on off the main thread too (no ladder boxes, or the prune worker). 0 builds it on
+## first use. `zz_nav_warm_bots`.
+@export var nav_warm_bots: bool = true
 
 ## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
 @export_range(0.5, 14.0, 0.5, "or_greater") var nav_budget_ms: float = 6.0

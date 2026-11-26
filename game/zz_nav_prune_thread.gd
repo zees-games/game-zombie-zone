@@ -1,13 +1,12 @@
 extends RefCounted
-## Prunes a landed graph on a worker thread, then builds its [ZzNavGraph] and what the horde derives from it there too,
-## so the main thread only takes the result in. Asked a slice a tick on the main thread ([ZzNavPruneWarm]) the prune's
-## eight million capsule queries still held single ticks of 0.4 to 18 s on a loaded box (gm_balkans, headless_nav_stall).
+## Prunes a landed graph on a worker thread, then builds its [ZzNavGraph] there too, so the main thread only takes the
+## result in. The prune's capsule queries were 36 s of one main-thread tick on rp_asheville with a cold cache.
 ##
 ## They ask a private physics space that nothing steps, holding copies of the world's bodies on the prune's mask as they
-## stood when [method begin] ran (a prop that moves afterward is pruned where it stood), so the worker never reads the
+## stood when [method start] ran (a prop that moves afterward is pruned where it stood), so the worker never reads the
 ## space the main thread steps. The answers are the ones [ZzNavPrune] gets on the main thread: the same shapes at the
 ## same places, with the passable bodies left out of the copy instead of excluded from each query.
-## `zz_nav_prune_thread` 0, or a build with no worker, prunes on the main thread in slices as before.
+## `zz_nav_prune_thread` 0 prunes on the main thread as before.
 
 const ZzNavPrune := preload("zz_nav_prune.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
@@ -20,45 +19,83 @@ var copy_ms := 0.0
 ## Bodies copied into the private space.
 var bodies := 0
 
+## Set by `tools/cold_start.gd --prune-parity`: keeps the graph a worker prune started from and the one it ended with,
+## and each copied body's transform at the copy, so the result can be checked against a main-thread prune.
+static var parity := false
+static var parity_before: GSNpcNavData = null
+static var parity_after: GSNpcNavData = null
+static var parity_bodies := {}
+
 var _report := {}
 var _space := RID()
 var _copies: Array[RID] = []
 var _task := -1
+var _record := false
 
 
 ## Whether [param data] still needs the world's collision asked of it for [param version]; false with no world to ask.
 static func needs(game: Variant, data: GSNpcNavData, version: int) -> bool:
-	return data != null and int(data.meta.get("pruned", 0)) < version and game != null and game.physics != null and game.is_inside_tree()
+	return int(data.meta.get("pruned", 0)) < version and game != null and game.physics != null and game.is_inside_tree()
 
 
-## Main thread: starts pruning the landed graph of [param job] on a worker, or returns null where the main thread must
-## (the job builds no graph off the frame, or nothing needs pruning). [param required] is `func() -> PackedVector3Array`,
-## the spots a body must still reach.
+## Prunes [param data] on the main thread and rewrites the cache of [param job]: no worker, or `zz_nav_prune_thread` 0.
+## [param required] is `func() -> PackedVector3Array`, the spots a body must still reach.
+static func on_main(game: Variant, data: GSNpcNavData, job: ZzNavJob, required: Callable, version: int) -> void:
+	if not needs(game, data, version):
+		return
+
+	var mech: Variant = _mechanics(game)
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, ZzNavPrune.body_mask(game.physics), _ladders(mech), required.call(), _passable(mech))
+	data.meta["pruned"] = version
+	job.save(data)
+
+
+## Main thread: starts pruning the landed graph of [param job] on a worker, or returns null where [method on_main] must
+## (the job builds no graph off the frame, or nothing needs pruning). [param required] as [method on_main].
 static func begin(game: Variant, job: ZzNavJob, required: Callable, version: int) -> RefCounted:
 	if not job.make_graph.is_valid() or not needs(game, job.nav, version):
 		return null
 
-	var mech: Variant = game.map.mechanics if game.map != null else null
-	var ladders: Array[AABB] = []
-	var passable: Array[RID] = []
-
-	# What a zombie body collides with, less the boards it must reach (the mechanics' walk-through bodies): a hull clip
-	# ceiling or solid prop that no document box describes otherwise stays on the graph and wedges bodies under it.
-	if mech != null:
-		ladders = mech.ladder_boxes()
-		passable = mech.walk_through_bodies()
-
+	var mech: Variant = _mechanics(game)
 	var out: _Self = _Self.new()
-	out._start(job, game.get_world_3d(), game.get_tree().root, ZzNavPrune.body_mask(game.physics), ladders, required.call(), passable, version)
+	out._start(job, game.get_world_3d(), game.get_tree().root, ZzNavPrune.body_mask(game.physics), _ladders(mech), required.call(), _passable(mech), version)
 	return out
+
+
+# What a zombie body collides with, less the boards it must reach (the mechanics' walk-through bodies): a hull clip
+# ceiling or solid prop that no document box describes otherwise stays on the graph and wedges bodies under it.
+static func _mechanics(game: Variant) -> Variant:
+	return game.map.mechanics if game.map != null else null
+
+
+static func _ladders(mech: Variant) -> Array[AABB]:
+	var out: Array[AABB] = []
+	return mech.ladder_boxes() if mech != null else out
+
+
+static func _passable(mech: Variant) -> Array[RID]:
+	var out: Array[RID] = []
+	return mech.walk_through_bodies() if mech != null else out
 
 
 # Copies the bodies of [param world] on [param mask] (less [param passable]) found under [param root] into a private
 # space, and starts the worker; the pruned graph's [ZzNavGraph] lands in [member ZzNavJob.graph] by
 # [member ZzNavJob.make_graph], and the cache is rewritten pruned to [param version].
 func _start(job: ZzNavJob, world: World3D, root: Node, mask: int, ladders: Array[AABB], required: PackedVector3Array, passable: Array[RID], version: int) -> void:
+	if parity:
+		parity_before = job.nav.duplicate(true)
+		parity_bodies.clear()
+		_record = true
+
 	var state := _copy_world(world, root, mask, passable)
 	_task = WorkerThreadPool.add_task(_run.bind(job, state, mask, ladders, required, version), false, "zz nav prune")
+
+
+## Main thread: the same copy and prune with no worker, then [method finish]; `--prune-parity` compares it.
+func run_here(nav: GSNpcNavData, world: World3D, root: Node, mask: int, ladders: Array[AABB], required: PackedVector3Array, passable: Array[RID]) -> void:
+	var none: Array[RID] = []
+	var _dropped := ZzNavPrune.run(nav, _copy_world(world, root, mask, passable), mask, ladders, required, none, _report)
+	finish({})
 
 
 func _copy_world(world: World3D, root: Node, mask: int, passable: Array[RID]) -> PhysicsDirectSpaceState3D:
@@ -129,6 +166,9 @@ func _copy(from: CollisionObject3D) -> void:
 	PhysicsServer3D.body_set_space(body, _space)
 	_copies.append(body)
 
+	if _record:
+		parity_bodies[from] = PhysicsServer3D.body_get_state(rid, PhysicsServer3D.BODY_STATE_TRANSFORM)
+
 
 func _run(job: ZzNavJob, state: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB], required: PackedVector3Array, version: int) -> void:
 	var lap := Time.get_ticks_usec()
@@ -136,6 +176,10 @@ func _run(job: ZzNavJob, state: PhysicsDirectSpaceState3D, mask: int, ladders: A
 	var none: Array[RID] = []
 	var _dropped := ZzNavPrune.run(nav, state, mask, ladders, required, none, _report)
 	nav.meta["pruned"] = version
+
+	if parity:
+		parity_after = nav.duplicate(true)
+
 	job.write(nav)
 	prune_ms = (Time.get_ticks_usec() - lap) / 1000.0
 
@@ -143,5 +187,5 @@ func _run(job: ZzNavJob, state: PhysicsDirectSpaceState3D, mask: int, ladders: A
 		job.graph = job.make_graph.call(nav)
 
 	# The links' ladder rays ask the private copy too.
-	if job.graph != null and job.derive.is_valid():
+	if job.derive.is_valid():
 		job.derived = job.derive.call(nav, job.graph, state, mask)

@@ -7,8 +7,8 @@ const ZzMapDoc := preload("zz_map_doc.gd")
 const ZzNavGraph := preload("zz_nav_graph.gd")
 const ZzNavJob := preload("zz_nav_job.gd")
 const ZzNavPrune := preload("zz_nav_prune.gd")
-const ZzNavPruneWarm := preload("zz_nav_prune_warm.gd")
 const ZzNavPruneThread := preload("zz_nav_prune_thread.gd")
+const ZzNavWarmThread := preload("zz_nav_warm_thread.gd")
 ## Bumped when the prune records or tests more (6: the prop and clip layers too; 7: gs-npc v0.1.21 and the hull files in the key; 8: bridges between pieces holding a spawn or post; 11: ladder ends only on the ladder's side of its wall, knee to head, a head over its top only up an open column); 12: a ladder end with no grid point gets a seeded one), so older caches prune again.
 const PRUNE_VERSION := 13
 const ZzNavNotes := preload("zz_nav_notes.gd")
@@ -18,6 +18,9 @@ const ZzLaps := preload("zz_laps.gd")
 var sections: Dictionary = {}
 ## The landed graph's prune on a worker ([member ZzConfig.nav_prune_thread]); null when none is running.
 var _pruning = null
+## The stand-ins' search of a landed graph whose links went on here (a cached ladder map) built on a worker
+## ([member ZzConfig.nav_warm_bots]); the map build waits for it. Null when none is running.
+var _warming = null
 const ZzNpcs := preload("zz_npcs.gd")
 const MonsterHost := preload("zz_monster_host.gd")
 const ZzPackList := preload("zz_packs.gd")
