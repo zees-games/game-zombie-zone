@@ -309,7 +309,13 @@ func _advance_swing() -> void:
 func _core() -> Object:
 	var h := horde()
 	var c: Variant = h.get(&"think_core") if h != null else null
-	return c if c != null else _twin
+	if c != null:
+		return c
+
+	if _twin == null:
+		_twin = ZzThinkCore.new()
+
+	return _twin
 
 
 ## A burning zombie swings faster; a staggered one does not swing.
@@ -482,8 +488,10 @@ func _victim_in_front() -> StringName:
 ## part of one think, "think.<part>" -> usec, and a "think.n" count, read back as ms per tick under "prof".
 static var prof: Variant = null
 
-## The script twin of the cores, for a brain with no horde (a tool or suite thinking one by hand).
-static var _twin: Object = ZzThinkCore.new()
+## The script twin of the cores, for a brain with no horde (a tool or suite thinking one by hand). Made on first use,
+## not in the initializer: an instance made while this script loads pins zz_think_core.gd, and the parse pass's
+## reload() of it then fails ("Cannot reload script while instances exist").
+static var _twin: Object = null
 
 
 func _lap(part: String, t0: int) -> int:
