@@ -242,10 +242,23 @@ func _check_requires() -> void:
 	# with the floors applied; the glance pieces need gs-ui level 4 on either side of that.
 	var asked := GSAddonApi.apply_floors(asks, floors)
 	_check(
-		int(asks.get("gs_ui", 0)) >= 4 and int(asked.get("gs_ui", 0)) >= 4,
+		int(asks.get("gs_ui", 0)) >= 4 and _floor_of("gs_ui") >= 4,
 		"the pack asks a shell for gs-ui level 4, the glance pieces",
 		"derived %s, asked %s" % [str(asks.get("gs_ui")), str(asked.get("gs_ui"))]
 	)
+
+
+## The committed floor's level for [param addon]; the derived one when the floor file does not name it, so a floor
+## for another addon (gs_player_char) does not read as lowering this one.
+func _floor_of(addon: String) -> int:
+	var path := "res://" + GSAddonApi.FLOOR_FILE
+	var derived := int(GSAddonApi.derive().get(addon, 0))
+	if not FileAccess.file_exists(path):
+		return derived
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if parsed is Dictionary:
+		return int((parsed.get("addons", {}) as Dictionary).get(addon, derived))
+	return derived
 
 
 ## Another survivor wears gs-ui's name and health pill over the drawn body; the own player and

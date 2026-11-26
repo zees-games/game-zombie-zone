@@ -960,6 +960,11 @@ func _pick_crowd() -> void:
 	if spawner != null:
 		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"GSSimThinkPacer"))
 
+	var think := config != null and config.native_brains and ClassDB.class_exists(NATIVE_THINK)
+	if think != think_native:
+		think_native = think
+		think_core = ClassDB.instantiate(NATIVE_THINK) if think else preload("../npcs/zz_think_core.gd").new()
+
 	if brains != (brains_native != null):
 		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null
 		ZzBrainsFeed.push_barricades(self)
