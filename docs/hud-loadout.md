@@ -10,7 +10,8 @@
 | --- | --- | --- |
 | `key` | String | the key cap; `""` for none |
 | `icon` | Texture2D | exactly one picture per slot; weapons use `ZzShopIcons.icon_for(def.id)` (rendered from the model). `null` draws `name` |
-| `name` | String | shown only when there is no icon |
+| `glyph` | StringName | `&"medkit"` or `&"pills"`: a drawn picture for a kit slot that has no model; used when `icon` is null |
+| `name` | String | shown only when there is neither icon nor glyph |
 | `text` | String | small line under the icon (ammo, a count) |
 | `selected` | bool | in hand: eased lift and accent edge |
 | `low` | bool | line in the low colour |
@@ -27,4 +28,4 @@ The widget lives in gs-ui (its docs/hud.md, "Loadout bar"); this game only feeds
 
 ## Kit slots and hold-to-heal
 
-`ZzHud._append_kit_slots` appends a MEDKIT and a PILLS slot (text slots: there is no model to render; swap `name` for `icon` when one exists) after the weapons, with the key shown from the heal and pills bindings. A slot takes an optional `fill` (0..1), a progress bar along its foot: feed a hold-to-heal through `ZzHud.set_heal_fraction(f)` each frame (0 hides it). The kit hint rows over the health plate keep only the defibrillator. Kit slots 6 and 7 on the inventory branch use `ZzConsumables.slot_of` and the same row.
+`ZzHud._append_kit_slots` appends a MEDKIT and a PILLS slot (drawn `glyph` pictures: there is no model to render; swap `glyph` for `icon` when one exists) after the weapons, with the key shown from the heal and pills bindings. A slot takes an optional `fill` (0..1), a progress bar along its foot: feed a hold-to-heal through `ZzHud.set_heal_fraction(f)` each frame (0 hides it). The kit hint rows over the health plate keep only the defibrillator. Kit slots 6 and 7 on the inventory branch use `ZzConsumables.slot_of` and the same row.

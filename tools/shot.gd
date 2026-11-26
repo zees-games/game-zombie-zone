@@ -44,6 +44,11 @@ func _ready() -> void:
 		for _i in 2:
 			await RenderingServer.frame_post_draw
 		var platform: GSGameClient = _client.get("platform")
+		# Shipped, the shell's own cover is up and says so; gs-core's busy panel hides under it. Standalone,
+		# nothing says so and the panel would repeat the cover's line, so say it here as the shell does.
+		Engine.set_meta(&"gs_host_cover_up", true)
+		for _i in 2:
+			await RenderingServer.frame_post_draw
 		print("cover %s" % ("lifted" if platform.is_shown() else "up"))
 		var cover_path := ProjectSettings.globalize_path(_out)
 		DirAccess.make_dir_recursive_absolute(cover_path.get_base_dir())
@@ -88,6 +93,8 @@ func _take_arg(arg: String) -> void:
 		_as_spawned = true
 	elif arg == "--alone":
 		_alone = true
+	elif arg == "--settled":
+		_settled = true
 	elif arg.begins_with("--door="):
 		_doors.append(arg.trim_prefix("--door="))
 	elif arg == "--tint":
@@ -228,6 +235,17 @@ func _drive_mechanics(game: ZzGame) -> void:
 				print("copy node ", cn, " ", (cn as Node3D).global_position if cn != null else "none", " src ", (sn as Node3D).global_position if sn != null else "none", " src visible ", (sn as Node3D).visible if sn != null else "-")
 
 
+## --settled: the HUD of a game that has finished loading (no navigation meter, no loading panel), for the HUD judge.
+func _await_settled(game: ZzGame) -> void:
+	var deadline := Time.get_ticks_msec() + 180000
+	while Time.get_ticks_msec() < deadline:
+		var busy := GSBusyIndicator.current()
+		if game.nav_percent() < 0 and (busy == null or not busy.is_showing()):
+			break
+		await get_tree().create_timer(0.5).timeout
+	await _frames(10)
+
+
 func _run() -> void:
 	var game: ZzGame = _client.get("game")
 	await _until_a_round(game)
@@ -236,6 +254,8 @@ func _run() -> void:
 	# Waits past the load cover (slow on a cold GPU box) before any timing starts; capped, so a stuck cover cannot hang the shot.
 	if not await GSShotGate.wait_lifted(get_tree(), _client.get("platform")):
 		printerr("shot: load cover still up after the wait; shooting anyway")
+	if _settled:
+		await _await_settled(game)
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
 	# or from a free camera at --at (`wave_cam`).
@@ -284,6 +304,8 @@ func _run() -> void:
 			await _view_boxgun(game, local, stand)
 		"pickup":
 			await _view_pickup(game, local, stand)
+		"heal":
+			await _view_heal(game, local, stand)
 		"carry":
 			await _view_carry(game, local, stand)
 		"defib", "defib_third", "defib_ground":

@@ -5,7 +5,7 @@ extends GSHudPiece
 ## while it is left. Values in ([method set_downs]); the game's rules stay outside.
 
 const HEIGHT := 24.0
-const DOT := 9.0
+const DOT := 11.0
 const DOT_GAP := 7.0
 ## More lives than this draw a count instead of dots.
 const MAX_DOTS := 6
@@ -78,7 +78,8 @@ func _draw() -> void:
 	for i in _total:
 		var at := Vector2(x + DOT * 0.5, HEIGHT * 0.5)
 		var f := _fill[i] if i < _fill.size() else (1.0 if i < _left else 0.0)
-		draw_circle(at, DOT * 0.5, Color(1, 1, 1, 0.14))
+		draw_circle(at, DOT * 0.5 + 1.0, Color(0.0, 0.0, 0.0, 0.7))
+		draw_circle(at, DOT * 0.5, Color(0.62, 0.68, 0.76, 0.55))
 		if f > 0.01:
 			draw_circle(at, DOT * 0.5 * f, on)
 		x += DOT + DOT_GAP
