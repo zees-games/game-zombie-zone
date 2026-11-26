@@ -29,6 +29,7 @@ Where a Freesound sound was fetched, the high-quality preview (mp3) was the sour
 | `mutant_jet_1` | [Jetpack Loop](https://freesound.org/s/402816/) | jacksonacademyashmore | CC0 |
 | `mutant_jet_2` | [Jetpack SFX Looped 06](https://freesound.org/s/733986/) | velcronator | CC0 |
 | `mutant_jet_3` | [Good Jetpack sound Loop](https://freesound.org/s/512815/) | MostyXS | CC0 |
+| `sleeper_1`, `sleeper_2`, `sleeper_3` (`ghast_cries.1-3`), `sleeper_4`, `sleeper_5` (`ghast_hurt.1`, `ghast_hurt.3`) | [7 ghast sounds](https://opengameart.org/content/7-ghast-sounds) | StarNinjas | CC0 |
 | `bite_1`, `bite_2`, `bite_3` | [zombie flesh bites](https://freesound.org/s/155973/), cut at the silences | MrPokephile | CC0 |
 | `bite_4` | [Biting on bones](https://freesound.org/s/445987/) | Breviceps | CC0 |
 | `bite_5` | [zombie bite](https://freesound.org/s/518155/) | Lukeo135 | CC0 |
