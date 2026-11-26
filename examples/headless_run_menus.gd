@@ -234,10 +234,23 @@ func _check_font_coverage() -> void:
 func _check_requires() -> void:
 	var asks := GSAddonApi.derive()
 	_check(
-		int(asks.get("gs_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
+		int(asks.get("gs_ui", 0)) >= 4 and _floor_of("gs_ui") >= 4,
 		"the pack asks a shell for gs-ui level 4, the glance pieces",
 		str(asks.get("gs_ui"))
 	)
+
+
+## The committed floor's level for [param addon]; the derived one when the floor file does not name it, so a floor
+## for another addon (gs_player_char) does not read as lowering this one.
+func _floor_of(addon: String) -> int:
+	var path := "res://" + GSAddonApi.FLOOR_FILE
+	var derived := int(GSAddonApi.derive().get(addon, 0))
+	if not FileAccess.file_exists(path):
+		return derived
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if parsed is Dictionary:
+		return int((parsed.get("addons", {}) as Dictionary).get(addon, derived))
+	return derived
 
 
 ## Another survivor wears gs-ui's name and health pill over the drawn body; the own player and
