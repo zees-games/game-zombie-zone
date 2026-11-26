@@ -182,7 +182,12 @@ func _draw_slot(slot: Dictionary, rect: Rect2, lift: float) -> void:
 		var scale := minf(picture.size.x / used.size.x, picture.size.y / used.size.y)
 		var drawn := used.size * scale
 		var shade := Color(1.0, 1.0, 1.0, alpha * (0.8 + 0.2 * lift))
-		draw_texture_rect_region(icon, Rect2(picture.get_center() - drawn * 0.5, drawn), used, shade)
+		var at := Rect2(picture.get_center() - drawn * 0.5, drawn)
+		# Dark metal renders vanish on a dark plate: a pale rim under the picture keeps knives and pistols readable.
+		var rim := Color(0.86, 0.92, 1.0, 0.55 * alpha)
+		for offset in [Vector2(-1.5, 0.0), Vector2(1.5, 0.0), Vector2(0.0, -1.5), Vector2(0.0, 1.5)]:
+			draw_texture_rect_region(icon, Rect2(at.position + offset, at.size), used, rim)
+		draw_texture_rect_region(icon, at, used, shade)
 	else:
 		ink_text(Vector2(picture.position.x, picture.get_center().y + 5.0), str(slot.get("name", "")), 14,
 			Color(colour(&"text"), alpha), HORIZONTAL_ALIGNMENT_CENTER, picture.size.x, 4)
