@@ -3,6 +3,7 @@ extends "headless_nav_base.gd"
 ## The nav suite's mending, wedge and lure sections.
 
 const IslandProbe := preload("../tools/island_probe.gd")
+const ZzNavWarmThread := preload("../game/zz_nav_warm_thread.gd")
 
 
 ## Every survival map the game has, by its document's file name (the id).
@@ -590,6 +591,58 @@ func _check_ladder_link(data: GSNpcNavData, low: PackedInt32Array, high: PackedI
 	ladder.allow_ladders = false
 	_check(ladder.find_path(Vector3(2.0, 0.0, 6.0), Vector3(0.0, 3.0, 0.0), 0.5).is_empty(),
 		"and with zz_zombie_ladder_speed 0 the ladder is off the graph")
+
+
+## A cached ladder map links on the main thread, so the stand-ins' search is built on a worker from a copy
+## (`ZzNavWarmThread`) and handed back: the same paths as one built on first use, kept through what does not change
+## it, refused when a link it lacks went on meanwhile.
+func _check_ladder_warm(data: GSNpcNavData, low: PackedInt32Array, high: PackedInt32Array) -> void:
+	var lazy := ZzNavGraph.new()
+	var _a := lazy.rebuild(data)
+	lazy.add_ladder(low[1], high[1])
+	lazy.relabel()
+	var warmed := ZzNavGraph.new()
+	var _b := warmed.rebuild(data)
+	warmed.add_ladder(low[1], high[1])
+	warmed.relabel()
+	var warm := ZzNavWarmThread.begin(warmed)
+	_check(warm != null and not warmed.has_bot_search(), "a ladder graph's stand-in search starts on a worker")
+	var taken: bool = warm.finish() if warm != null else false
+	_check(taken and warmed.has_bot_search() and ZzNavWarmThread.begin(warmed) == null,
+		"and the graph takes it; a graph that has it starts none")
+	var ends := [data.points[low[0]], data.points[low[2]], data.points[high[0]], data.points[high[2]]]
+	var same := 0
+	var asked := 0
+	var found := 0
+	for from: Vector3 in ends:
+		for to: Vector3 in ends:
+			if from == to:
+				continue
+			asked += 1
+			var paths: Array[PackedVector3Array] = []
+			for graph: ZzNavGraph in [lazy, warmed]:
+				var standing := graph.filter
+				graph.filter = graph.bot_filter
+				paths.append(graph.find_path(from, to, 0.5))
+				graph.filter = standing
+			same += 1 if paths[0] == paths[1] else 0
+			found += 0 if paths[0].is_empty() else 1
+	_check(same == asked and found > asked / 2, "the worker's search walks every stand-in path the one built on first use does",
+		"%d of %d the same, %d found" % [same, asked, found])
+	var key := warmed._native_key(warmed.bot_filter)
+	var kept: Variant = warmed._native.get(key)
+	warmed.add_drop(high[2], low[0])
+	warmed.relabel()
+	_check(kept != null and warmed._native.get(warmed._native_key(warmed.bot_filter)) == kept,
+		"a drop going on (the notes landing) keeps it: a stand-in never takes one")
+	var late := ZzNavGraph.new()
+	var _c := late.rebuild(data)
+	late.relabel()
+	var stale := ZzNavWarmThread.begin(late)
+	late.add_ladder(low[1], high[1])
+	late.relabel()
+	_check(stale != null and not stale.finish() and not late.has_bot_search(),
+		"a ladder that went on while it built makes the graph refuse it")
 
 
 ## The island report asks each piece for its nearest main-piece point over a bounded sample of its points: a 50 000
