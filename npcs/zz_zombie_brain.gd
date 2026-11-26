@@ -572,10 +572,10 @@ func _unstick_watch(delta: float) -> void:
 	var config: Variant = h.get(&"config") if h != null else null
 	var limit: float = float(config.unstick_seconds) if config != null else 0.0
 
-	# In the air the clock pauses, ahead of the wish test because a leap zeroes wish: a common
-	# hopping on the spot never stays grounded for limit.
-	var here := npc.position()
-	var code := _core().unstick_step(b != null and b.flying, limit, b == null or bashing or swinging(), \
+	# In the air the clock pauses (ahead of the wish test: a leap zeroes wish, and a common hops on the spot). A zombie
+	# that died in the think calling this has no npc left (removal unbinds it): its watch resets.
+	var here := npc.position() if npc != null else Vector3.INF
+	var code := ZzThinkCore.WATCH_RESET if npc == null else _core().unstick_step(b != null and b.flying, limit, b == null or bashing or swinging(), \
 			b.wish.length() if b != null else 0.0, here, _watch_at, _watch_for, _watch_stage, delta) as int
 
 	match code:

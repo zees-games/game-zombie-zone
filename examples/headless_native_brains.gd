@@ -21,8 +21,8 @@ const CrowdGrid := preload("res://addons/gs_npc_ai/steer/gs_npc_ai_crowd_grid.gd
 ## `nearest_survivor_distance` do, pressed against boards, inside them and clear, mid-swing or not. Without the library
 ## the native half is skipped; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 
-const SECTIONS := 7
-const CHECKS := 25
+const SECTIONS := 8
+const CHECKS := 27
 const NATIVE := &"GSSimZombieBrains"
 const NATIVE_CROWD := &"GSSimCrowdGrid"
 const SEEDS := 60
@@ -58,8 +58,8 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("zombiezone native brains")
-	print("")
+	print("zombiezone native brains\n")
+	_unbound_watch()
 	_entered += 1
 	print("the brains are native by default, and the library is there")
 	_check(ZzConfig.new().native_brains, "ZzConfig.native_brains is on by default")
@@ -67,7 +67,7 @@ func _run() -> void:
 		print("  gs-sim's zombie module is not loaded: the native half is skipped")
 		_check(OS.get_environment("GS_SIM_REQUIRE_NATIVE") != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
-		_report_sections(_entered, _finished, 1, 2)
+		_report_sections(_entered, _finished, 2, 4)
 		return
 	_check(true, "the library has the zombie brains and the crowd")
 	_finished += 1
@@ -137,6 +137,28 @@ func _run() -> void:
 		_world = null
 
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
+
+
+## A zombie killed mid-think (a blast, a hazard, a stand-in's shot answered in the same tick) is removed at once,
+## and removal unbinds its brain, so the think's last step, the unstick watch, finds its npc gone. The native
+## think moved `npc.position()` ahead of the body guard that used to cover that (headless_nav_holds hit
+## `Nonexistent function 'position' in base 'Nil'`); the watch must let go instead.
+func _unbound_watch() -> void:
+	_entered += 1
+	print("the unstick watch of a zombie unbound mid-think lets go")
+	_fresh_world()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var brain: Object = _commons(rng, _horde(rng), 1)[0]
+	brain.set(&"_watch_at", Vector3(1.0, 0.0, 1.0))
+	brain.set(&"_watch_for", 2.0)
+	brain.call(&"unbind")
+	_check(brain.get(&"npc") == null and brain.call(&"body") == null, "unbind lets go of the npc and its body")
+	brain.call(&"_unstick_watch", 0.1)
+	_check(brain.get(&"_watch_at") == Vector3.INF and float(brain.get(&"_watch_for")) == 0.0,
+		"the watch resets instead of reading the gone npc's position",
+		"at %s for %s" % [brain.get(&"_watch_at"), brain.get(&"_watch_for")])
+	_finished += 1
 
 
 const PACE_PROBE := "res://examples/zz_paced_probe_brain.gd"
