@@ -266,6 +266,7 @@ func rebuild_navigation() -> GSResult:
 	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
+	_warming = _warming.land({}) if _warming != null else null
 	if _pruning != null:
 		_pruning.finish({})
 		_pruning = null
@@ -276,6 +277,10 @@ func _drop_nav_job() -> void:
 
 ## Once a tick: lets a sliced build work for its budget, and takes a finished graph in.
 func _poll_nav() -> void:
+	if _warming != null and _warming.done():
+		_warming = _warming.land(sections)
+		_finish_map_build()
+
 	if _nav_job == null or (_pruning == null and not _nav_job.advance(config.nav_budget_ms)):
 		return
 
@@ -300,7 +305,9 @@ func _poll_nav() -> void:
 		_map_nav_pending = false
 		return
 
-	if _map_nav_pending:
+	# The stand-ins' search a cached ladder map's links cleared, built on a worker while the round waits (ZzNavWarmThread).
+	_warming = ZzNavWarmThread.begin(spawner.nav) if _map_nav_pending and config.nav_warm_bots and GSPlatform.has_threads() else null
+	if _map_nav_pending and _warming == null:
 		_finish_map_build()
 
 func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:

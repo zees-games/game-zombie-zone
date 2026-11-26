@@ -15,7 +15,7 @@ extends "headless_nav_mend.gd"
 ## game.sh's SUITE_SHARDS for headless_nav_waves names exactly these.
 const WAVE_SHARDS := 6
 const CORE_SECTIONS := 15
-const CORE_CHECKS := 87
+const CORE_CHECKS := 92
 const HOLDS_SECTIONS := 10
 const HOLDS_CHECKS := 40
 
@@ -216,6 +216,7 @@ func _test_graph() -> void:
 		"and is taken, both ways, when they do")
 	graph.allow_climb = false
 	_check_ladder_link(data, low, high)
+	_check_ladder_warm(data, low, high)
 	_check_one_way()
 	_finished()
 

@@ -26,8 +26,7 @@ var allow_climb: bool = false:
 	set(value):
 		if value != allow_climb:
 			allow_climb = value
-			_native.clear()
-			_patched.clear()
+			_clear_native(true)
 
 			# Which piece walks to which changed with it.
 			if not _component.is_empty():
@@ -39,8 +38,7 @@ var allow_ladders: bool = true:
 	set(value):
 		if value != allow_ladders:
 			allow_ladders = value
-			_native.clear()
-			_patched.clear()
+			_clear_native(true)
 
 			if not _component.is_empty():
 				_label_components()
@@ -73,6 +71,13 @@ var tele_count: int = 0
 var _linked: Dictionary = {}
 
 var _patched: Dictionary = {}
+
+## Counts the changes to what the stand-ins' search is built from (ladders, teleports), so a search a worker built from
+## a copy ([method bot_search_twin]) is taken in only while it still matches ([method adopt_bot_search]).
+var _bot_epoch: int = 0
+
+## The graph a twin was copied from ([method bot_search_twin]); null on a graph in use.
+var _twin_of: GSNpcNavData = null
 
 ## filter -> the same without NARROW ([method _relaxed]).
 var _relaxed_for: Dictionary = {}
@@ -218,8 +223,7 @@ func mark_narrow(space: PhysicsDirectSpaceState3D, mask: int, radius: float = 0.
 		data.flags[i] = (flags | NARROW) if narrow else (flags & ~NARROW)
 		count += 1 if narrow else 0
 
-	_native.clear()
-	_patched.clear()
+	_clear_native(true)
 	return count
 
 
@@ -230,8 +234,7 @@ func add_drop(high: int, low: int) -> void:
 	_linked[high] = true
 	_linked[low] = true
 	drop_count += 1
-	_native.clear()
-	_patched.clear()
+	_clear_native(true)
 
 
 ## A jump up from [param low] to [param high], which only a climbing zombie takes.
@@ -240,8 +243,7 @@ func add_climb(low: int, high: int) -> void:
 	_linked[low] = true
 	_linked[high] = true
 	up_count += 1
-	_native.clear()
-	_patched.clear()
+	_clear_native(true)
 
 
 ## A ladder between graph points [param a] and [param b]: a zombie climbs it up and down while [member allow_ladders].
@@ -254,8 +256,7 @@ func add_ladder(a: int, b: int) -> void:
 	_linked[a] = true
 	_linked[b] = true
 	ladder_count += 1
-	_native.clear()
-	_patched.clear()
+	_clear_native(false)
 
 
 ## How far from a ladder's foot or top its end point may be: the prune's join (`ZzNavPrune.LADDER_REACH`) and the
@@ -326,8 +327,7 @@ func _in_column(box: AABB, p: Vector3) -> bool:
 func add_teleport(from: int, to: int) -> void:
 	_append(_tele, from, to)
 	tele_count += 1
-	_native.clear()
-	_patched.clear()
+	_clear_native(false)
 
 
 ## Puts the document's `nav.teleports` rows ([pad xyz, destination xyz]) on the graph, each joined to the nearest point
@@ -635,6 +635,62 @@ func _without_steep(index: int, base: PackedInt32Array, both: bool) -> PackedInt
 ## anything that changes the links or the flags clears it and it is built on first use again.
 func warm_bot_search() -> void:
 	var _astar := _native_for(bot_filter)
+
+
+## Whether the stand-ins' search is built and current.
+func has_bot_search() -> bool:
+	return _native.has(_native_key(bot_filter))
+
+
+## A copy of what the stand-ins' search is built from, for a worker to build it on ([method warm_bot_search]) while this
+## graph stays in use on the main thread: the cached ladder load linked here, and the first stand-in's walk built the
+## search on tick 1 (1.4 s on gm_valley). The point arrays are shared copy on write; the dictionaries are copied.
+## Untyped: this script cannot preload itself.
+func bot_search_twin() -> RefCounted:
+	var twin: Variant = (get_script() as GDScript).new()
+	twin.data = data.duplicate() as GSNpcNavData
+	twin._twin_of = data
+	twin._adjacency = _adjacency.duplicate()
+	twin._bad = _bad.duplicate(true)
+	twin._tele = _tele.duplicate()
+	twin._ladder = _ladder.duplicate()
+	twin.bot_filter = bot_filter
+	twin.steep = steep
+	twin._bot_epoch = _bot_epoch
+	return twin
+
+
+## Takes in the stand-ins' search [param twin] built: the same build as on first use, so the same paths. False, and
+## nothing taken, when this graph changed what it is built from since the copy, or built it itself meanwhile.
+func adopt_bot_search(twin: Variant) -> bool:
+	var key := _native_key(bot_filter)
+	var astar: Variant = twin._native.get(key)
+
+	if astar == null or twin._twin_of != data or twin._bot_epoch != _bot_epoch or _native.has(key) or twin._bad != _bad:
+		return false
+
+	_native[key] = astar
+	_patched[(astar as AStar3D).get_instance_id()] = true
+	return true
+
+
+## Drops the cached native searches. [param keep_bots] keeps the stand-ins' one when the change is to something it does
+## not read (the drops, the climbs, NARROW, the zombies' switches): rebuilding it was a second 1.4 s stall when the
+## notes landed.
+func _clear_native(keep_bots: bool) -> void:
+	var key := _native_key(bot_filter)
+	var kept: Variant = _native.get(key) if keep_bots else null
+	_native.clear()
+	_patched.clear()
+
+	if not keep_bots:
+		_bot_epoch += 1
+
+	if kept == null:
+		return
+
+	_native[key] = kept
+	_patched[(kept as AStar3D).get_instance_id()] = true
 
 
 ## The native search's graph: [method super]'s (the plain edges), which has no link in it, plus
