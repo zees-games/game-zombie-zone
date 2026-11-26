@@ -640,5 +640,27 @@
    "file": "bite_9",
    "source": "qubodup"
   }
+ ],
+ "sleeper": [
+  {
+   "file": "sleeper_1",
+   "source": "starninjas-ghast"
+  },
+  {
+   "file": "sleeper_2",
+   "source": "starninjas-ghast"
+  },
+  {
+   "file": "sleeper_3",
+   "source": "starninjas-ghast"
+  },
+  {
+   "file": "sleeper_4",
+   "source": "starninjas-ghast"
+  },
+  {
+   "file": "sleeper_5",
+   "source": "starninjas-ghast"
+  }
  ]
 }

@@ -79,7 +79,7 @@ const REAL_COUNTS := {
 	&"moan": 16, &"rage": 13, &"claw": 8, &"die": 7, &"hurt": 6, &"leaper": 5, &"strangler": 5, &"bloater": 4,
 	&"ram": 5, &"spitter": 7, &"rider": 6, &"brute": 4, &"screamer": 4, &"crawler": 5, &"riot": 5, &"mutant": 8,
 	&"mutant_zap": 4, &"mutant_grab": 4, &"mutant_throw": 3, &"mutant_jet": 3, &"gore_bone": 10, &"gore_rip": 1,
-	&"gore_splat": 2, &"horde": 4, &"bite": 9,
+	&"gore_splat": 2, &"horde": 4, &"bite": 9, &"sleeper": 5,
 }
 const GORE_BONE := &"real_gore_bone"
 const GORE_SPLAT := &"real_gore_splat"
@@ -296,12 +296,12 @@ static func _add_real(c: GSAudioCatalogue) -> void:
 
 
 ## The first-generation voice ids (what a profile without cues falls back to) play the recorded sets
-## too, so no zombie is voiced by a pitched or filtered copy. The sleeper has no recorded set yet.
+## too, so no zombie is voiced by a pitched or filtered copy.
 static func _use_real_voices(c: GSAudioCatalogue) -> void:
 	var pairs := {
 		MOAN: &"moan", SCREAM: &"rage", CLAW: &"claw", ZOMBIE_DIE: &"die", LEAPER: &"leaper",
 		STRANGLER: &"strangler", BLOATER: &"bloater", RAM: &"ram", SPITTER: &"spitter", RIDER: &"rider",
-		BRUTE: &"brute", SCREAMER: &"screamer", CRAWLER: &"crawler", RIOT: &"riot",
+		BRUTE: &"brute", SCREAMER: &"screamer", CRAWLER: &"crawler", RIOT: &"riot", SLEEPER: &"sleeper",
 	}
 	for id: StringName in pairs:
 		var def := c.find(id)
