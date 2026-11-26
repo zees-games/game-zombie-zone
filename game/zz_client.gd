@@ -19,6 +19,8 @@ func _ready() -> void:
 	platform.scoreboard_action = ZzBindings.SCOREBOARD
 	add_child(platform)
 	gate = platform.gate
+	if gate.indicator != null and "margin_bottom" in gate.indicator:  # older gs-core has no margin
+		gate.indicator.margin_bottom = ZzHud.CORNER_TOP
 	gate.hold(&"map", "Loading the map")
 	# Connected, the cover waits for the server's word on what this survivor holds, so the view model is
 	# drawn (and its materials warmed) before the player is shown; the gate's timeout is the backstop.
