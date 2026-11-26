@@ -1568,10 +1568,13 @@ func _build_settings() -> void:
 		world_view.lod.follow(settings.settings)
 
 	_apply_gore_pref()
+	_apply_motion_scales()
 
 	settings.settings.changed.connect(func(key: StringName, _value: Variant, _why: StringName) -> void:
 		if key == &"gore":
 			_apply_gore_pref()
+		if ZzViewMotion.SETTING_KEYS.has(key):
+			_apply_motion_scales()
 		if key == &"vis_mode" and game != null and game.map != null:
 			game.map.set_vis_mode(_vis_mode())
 			var _mode := platform.set_vis_mode(_vis_mode()))
@@ -1591,6 +1594,15 @@ func _build_settings() -> void:
 		_bind_crosshair_console()
 		board = platform.board as GSMenuScoreboard
 		_dress_board()
+
+
+## The camera motion settings onto the view cues ([method ZzViewMotion.scale]).
+func _apply_motion_scales() -> void:
+	if settings == null or settings.settings == null:
+		return
+
+	var st: GSSettingsManager = settings.settings
+	ZzViewMotion.scale(_motion, st.get_float(&"camera_landing_dip", 1.0), st.get_float(&"camera_strafe_roll", 1.0), st.get_float(&"camera_speed_fov", 1.0))
 
 
 ## The player's `cl_crosshair_*` cvars at the console's local source.
