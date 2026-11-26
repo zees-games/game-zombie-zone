@@ -159,7 +159,9 @@ static func _graph_off_thread(data: GSNpcNavData) -> ZzNavGraph:
 func _nav_rules() -> Dictionary:
 	var mech: Variant = game.map.mechanics if game != null and game.map != null else null
 	var boxes: Array[AABB] = mech.ladder_boxes() if mech != null else ([] as Array[AABB])
-	return ZzNavDerive.rules(_doc, config.nav_steep if config.nav_steep > 0.0 else INF, config.zombie_ladder_speed > 0.0, boxes)
+	var rule := ZzNavDerive.rules(_doc, config.nav_steep if config.nav_steep > 0.0 else INF, config.zombie_ladder_speed > 0.0, boxes)
+	rule["warm_bots"] = config.nav_warm_bots
+	return rule
 
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
 func _mark_narrow() -> void:

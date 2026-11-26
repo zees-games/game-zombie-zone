@@ -234,6 +234,12 @@ func setup_seconds() -> float:
 ## thread. `zz_nav_prune_thread`.
 @export var nav_prune_thread: bool = true
 
+## Whether the graph's worker also builds the stand-ins' search (their filter's own graph) once the links are on, so
+## the first stand-in that walks does not: that build was 1.3 to 1.8 s of the first tick of play on gm_valley (289k
+## points). Only where the links go on off the main thread too (no ladder boxes, or the prune worker). 0 builds it on
+## first use. `zz_nav_warm_bots`.
+@export var nav_warm_bots: bool = true
+
 ## Milliseconds a tick a main-thread navigation build may take. `zz_nav_budget_ms`.
 @export_range(0.5, 14.0, 0.5, "or_greater") var nav_budget_ms: float = 6.0
 
