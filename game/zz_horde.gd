@@ -291,6 +291,10 @@ func _poll_nav() -> void:
 	if _pruning == null and config.nav_prune_thread:
 		_pruning = ZzNavPruneThread.begin(game, _nav_job, _required_spots, PRUNE_VERSION)
 
+		# Listing the tree's bodies is this tick's work; the copy slices start on the next one.
+		if _pruning != null:
+			return
+
 	if _pruning != null:
 		if not _pruning.advance(config.nav_budget_ms):
 			return
