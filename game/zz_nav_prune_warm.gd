@@ -61,11 +61,6 @@ func is_done() -> bool:
 	return _done
 
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		cancel()
-
-
 ## Waits out a running replay (it holds no physics, so this is quick next to a build).
 func cancel() -> void:
 	if _thread != null:

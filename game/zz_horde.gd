@@ -346,7 +346,9 @@ func _prune_ready(data: GSNpcNavData) -> bool:
 		return false
 
 	# Every answer is in: take the pruned graph over now (a read of the answers), then build the search graph on a thread.
+	var lap := Time.get_ticks_usec()
 	_prune_blocked(data, _nav_job)
+	lap = ZzLaps.lap(sections, &"nav_prune_land", lap)
 
 	if GSPlatform.has_threads() and config.nav_threads > 0:
 		_graph_thread = Thread.new()
