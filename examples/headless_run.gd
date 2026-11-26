@@ -29,7 +29,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 56
 
-const CHECKS := 462
+const CHECKS := 463
 
 
 
@@ -1145,6 +1145,9 @@ func _test_a_legless_zombie_still_attacks() -> void:
 	body.limbs.sever(&"legL", Vector3.INF, Vector3.ZERO)
 	body.limbs.sever(&"legR", Vector3.INF, Vector3.ZERO)
 	_check(body.limb_speed_scale() < 0.3 and body.limb_speed_scale() >= 0.2, "both legs gone leave a quarter of its pace", str(body.limb_speed_scale()))
+	_check(ZzZombieView.death_clip(&"limp", 1, 1) == &"ual_death" and ZzZombieView.death_clip(&"limp", 0, 4) == &"death"
+			and ZzZombieView.death_clip(&"power_launch", 0, 1) == &"ual_knockback" and ZzZombieView.death_clip(&"limp", 1, 2) == &"ual_death",
+			"a shot head drops by the library's death, a shot leg folds by the kit's, a launch stays a launch, the chest keeps the seed's pick")
 	_check(ZzZombieView.CLIPS.has(ZzZombieBody.Anim.CRAWL) and ZzZombieView.CLIPS[ZzZombieBody.Anim.CRAWL][0] == &"crawl", "the view has a crawl clip for it")
 	var start := body.global_position.distance_to(me.global_position)
 	await _sim(game, 3.0)

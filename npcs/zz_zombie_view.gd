@@ -502,8 +502,17 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 	_hit_left = maxf(_hit_left - delta, 0.0)
 	_rise_left = maxf(_rise_left - delta, 0.0)
 
+	# A shot leg knocks a standing body down: the fall plays quick and holds, then the same get-up as a sitter's.
+	if _down_left > 0.0:
+		_down_left = maxf(_down_left - delta, 0.0)
+		if anim != ZzZombieBody.Anim.DEAD and _has(&"death"):
+			_want_clip = &"death"
+			_want_rate = 2.0
+			if _down_left <= 0.0 and _has(&"ual_lay_to_idle"):
+				_rise_left = _anim.get_animation(_qualified(&"ual_lay_to_idle")).length
+
 	# A bullet's flinch on a standing body is a short hit clip.
-	if _hit_left > 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
+	if _hit_left > 0.0 and _down_left <= 0.0 and _speed < 0.6 and anim != ZzZombieBody.Anim.DEAD and not striking \
 			and _has(&"ual_hit_head") and _has(&"ual_hit_chest"):
 		var pick := hit_variant(_hit_head, _hit_count + variant)
 		_want_clip = pick[0] if _has(pick[0]) else &"ual_hit_chest"
@@ -511,10 +520,10 @@ func _pick_reaction_clip(delta: float, anim: int, striking: bool) -> void:
 
 	# A killed body falls by one of the clips (the kit's, the library's death or its knockback), by the death's own seed.
 	if anim == ZzZombieBody.Anim.DEAD and not _death.is_empty():
-		var fall := death_clip(StringName(_death.get("reaction", &"limp")), int(_death.get("seed", 0)))
+		var fall := death_clip(StringName(_death.get("reaction", &"limp")), int(_death.get("seed", 0)), int(_death.get("region", 0)))
 		if _has(fall):
 			_want_clip = fall
-			_want_rate = 1.0
+			_want_rate = 1.3 if int(_death.get("region", 0)) == 1 and fall == &"ual_death" else 1.0
 
 	# Getting up from sitting, feeding or lying: the lay-to-idle clip, if it stands still while it plays.
 	if _rise_left > 0.0 and _speed < 0.6 and _has(&"ual_lay_to_idle") and not striking and anim != ZzZombieBody.Anim.DEAD:
@@ -536,9 +545,14 @@ static func hit_variant(head: bool, n: int) -> Array:
 
 
 ## The clip a body dies by: a launch is the library's knockback, otherwise the death's seed picks the kit's fall or the library's.
-static func death_clip(reaction: StringName, seed: int) -> StringName:
+## A shot head drops quick (the library's death), a shot leg folds (the kit's slow fall).
+static func death_clip(reaction: StringName, seed: int, region := 0) -> StringName:
 	if reaction == &"power_launch" or reaction == &"headshot_launch":
 		return &"ual_knockback"
+	if region == 1:
+		return &"ual_death"
+	if region == 4:
+		return &"death"
 	return &"death" if reaction == &"face_plant" or seed & 1 == 0 else &"ual_death"
 
 
@@ -743,6 +757,11 @@ var _hit_left := 0.0
 var _hit_head := false
 var _hit_count := 0
 var _rise_left := 0.0
+## Seconds left knocked down by a shot leg, and the region (1 head, 2 chest, 3 arm, 4 leg) of the last hit.
+var _down_left := 0.0
+## The upper body torn off by a heavy chest blast: [member GSNpcGibs] reads it like a limb def, rooted at the torso bone.
+const TORSO_GIB := {"bones": ["Torso"], "radius": 0.3, "tip": 0.3, "gib_mass": 30.0, "gib_seconds": 14.0}
+var _last_region := 0
 var _prior_anim := -1
 ## The stride [method present] matched to the ground speed: the share of the clip's leg swing kept.
 var _stride := 0.4
@@ -929,7 +948,11 @@ func _pose_reach() -> void:
 ## Hit: a flinch over whatever it is doing. [param from_side] is -1 or 1 for which side the hit
 ## came from; a flinch already running is not restarted, so a shotgun's pellets are one flinch.
 func flinch(from_side: float = 1.0, head := false, region := 2) -> void:
+	_last_region = region
 	if _death.is_empty() and _flinch < 0.5:
+		# Every other leg hit knocks it down, by the hit's count so it is the same on every screen.
+		if region == 4 and _down_left <= 0.0 and posmod(_hit_count + variant, 2) == 0:
+			_down_left = 1.4
 		_flinch = 1.0
 		_hit_head = head
 		_hit_count += 1
@@ -979,7 +1002,7 @@ func die(reaction: StringName, push: Vector3, seed: int) -> void:
 	if not _death.is_empty():
 		return
 
-	_death = {"reaction": reaction, "push": push, "seed": seed, "t": 0.0}
+	_death = {"reaction": reaction, "push": push, "seed": seed, "t": 0.0, "region": _last_region}
 	_death_from = transform
 	var flat := Vector3(push.x, 0.0, push.z)
 
@@ -989,7 +1012,8 @@ func die(reaction: StringName, push: Vector3, seed: int) -> void:
 	# a face plant is the backward fall, quick and short.
 	if flat.length() > 0.05:
 		var away := flat.normalized()
-		_death["yaw_to"] = atan2(away.x, away.z)
+		# A shot leg gives way under it: it folds toward the gun.
+		_death["yaw_to"] = atan2(away.x, away.z) + (PI if _last_region == 4 else 0.0)
 	else:
 		_death["yaw_to"] = rotation.y
 
@@ -997,6 +1021,11 @@ func die(reaction: StringName, push: Vector3, seed: int) -> void:
 		_drip.emitting = false
 
 	_flinch = 0.0
+	_down_left = 0.0
+
+	# A heavy blast to the chest at full gore tears the upper body off at the waist: head, arms and ribs go as one gib.
+	if _last_region == 2 and reaction == &"power_launch" and GSNpcGore.level >= 3 and push.length() > 0.05:
+		sever_limb(&"torso", TORSO_GIB, push.normalized() * clampf(push.length(), 1.5, 4.0))
 
 
 ## The death's motion over the clip: a launch is an arc, a headshot a step back, a crumple a
