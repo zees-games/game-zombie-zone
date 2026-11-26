@@ -267,6 +267,9 @@ func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
 	var ctx := {"opener": local, "at": stand, "box": &"swift"}
 	game.boxes.run([{"do": "effect", "name": "move_speed"}], ctx)
 	game.boxes.run([{"do": "effect", "name": "crawl_speed"}], {"opener": local, "at": stand, "box": &"lifeline"})
+	if _view == "crawl_seq":
+		await _crawl_sequence(game, local)
+		return
 	local.health.invulnerable = false
 	var wound := GSDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
 	var _hurt = game.combat.apply_damage(wound)
@@ -284,6 +287,37 @@ func _view_crawl(game: ZzGame, local, stand: Vector3) -> void:
 		if local.sampler != null:
 			local.sampler.look_at_angles(local.controller.state.yaw, -89.0)
 		await _seconds_of(0.3)
+
+
+## `--view=crawl_seq`: the first-person frames across the whole crawl, saved as `<out>_NN.png` every `--seconds`/10 of a second:
+## standing, going down, down and still (propped), crawling, still again. `--weapons=` is not read; the survivor holds what the
+## map gave them. A frame sequence shows the transitions a single shot cannot (a pop, a double pair of hands, a body at the lens).
+func _crawl_sequence(game: ZzGame, local) -> void:
+	var step := maxf(_seconds, 1.0) / 10.0
+	var n := 0
+	await _seconds_of(0.5)
+	for _i in range(2):
+		await _save_extra("_%02d" % n)
+		n += 1
+		await _seconds_of(step)
+	local.health.invulnerable = false
+	var wound := GSDamage.make(0, local.entity_id, 500.0, game.combat.damage_type(&"strike"))
+	var _hurt = game.combat.apply_damage(wound)
+	local.health.invulnerable = true
+	for _i in range(5):
+		await _save_extra("_%02d" % n)
+		n += 1
+		await _seconds_of(step * 0.5)
+	Input.action_press(&"gs_fps_forward")
+	for _i in range(6):
+		await _save_extra("_%02d" % n)
+		n += 1
+		await _seconds_of(step * 0.5)
+	Input.action_release(&"gs_fps_forward")
+	for _i in range(5):
+		await _save_extra("_%02d" % n)
+		n += 1
+		await _seconds_of(step * 0.5)
 
 
 func _view_deploy(game: ZzGame, local, stand: Vector3) -> void:
