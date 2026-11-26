@@ -224,7 +224,7 @@ func _build() -> void:
 	fire_mode.offset_bottom = -LOADOUT_TOP - 80.0
 	_root.add_child(fire_mode)
 
-	# While the map's graph is built: above the ammunition.
+	# While the map's graph is built: top centre, clear of the loadout.
 	_nav_meter = ZzNavMeter.new()
 	_root.add_child(_nav_meter)
 

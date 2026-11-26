@@ -198,6 +198,9 @@ var nav_async: bool = false
 
 var _nav_job: ZzNavJob = null
 
+## The graph's physics prune asked ahead a slice a tick, once its job is done ([ZzNavPruneWarm]); null when none is.
+var _prune_warm: RefCounted = null
+
 var _map_nav_pending: bool = false
 
 var _nav_started: int = 0
@@ -216,6 +219,9 @@ func nav_progress() -> float:
 
 ## The pass the build is in ("points", "edges", "links", "cover").
 func nav_stage() -> String:
+	if _prune_warm != null:
+		return "prune"
+
 	return _nav_job.stage() if _nav_job != null else ""
 
 ## The document the graph is built from: the map's, with its whole-map boxes and one climb link per ladder.
@@ -267,6 +273,8 @@ func rebuild_navigation() -> GSResult:
 	return GSResult.success(0)
 
 func _drop_nav_job() -> void:
+	_prune_warm = null
+
 	if _nav_job != null:
 		_nav_job.cancel()
 		_nav_job = null
@@ -279,10 +287,19 @@ func _poll_nav() -> void:
 	if not _nav_job.advance(config.nav_budget_ms):
 		return
 
+	if not _prune_ready(_nav_job.nav):
+		return
+
 	var job := _nav_job
 	_nav_job = null
 	job.flush_log()
+	if _prune_warm != null:
+		sections[&"nav_prune_replays"] = float(_prune_warm.replays)
+		sections[&"nav_prune_replay_ms"] = snappedf(_prune_warm.replay_ms, 0.1)
+		sections[&"nav_prune_asked"] = float(_prune_warm.asked)
+
 	var applied := _apply_nav(job.nav, job)
+	_prune_warm = null
 
 	if not applied.ok:
 		GSLog.error(CHANNEL, "the horde has nowhere to walk on this map", {"why": applied.error.message})
@@ -291,6 +308,27 @@ func _poll_nav() -> void:
 
 	if _map_nav_pending:
 		_finish_map_build()
+
+## Whether the physics prune of a finished graph may run in one call: its questions are asked a slice a tick first, so
+## that call only reads the answers. True at once for a graph already pruned (the cache) or with no world to ask.
+func _prune_ready(data: GSNpcNavData) -> bool:
+	if not _prune_due(data):
+		return true
+
+	if _prune_warm == null:
+		var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
+		var passable: Array[RID] = []
+
+		if game.map != null and game.map.mechanics != null:
+			passable = game.map.mechanics.walk_through_bodies()
+
+		var ladders: Array[AABB] = game.map.mechanics.ladder_boxes() if game.map != null and game.map.mechanics != null else []
+		_prune_warm = ZzNavPruneWarm.new(data, space, ZzNavPrune.body_mask(game.physics), passable, ladders, _required_spots())
+
+	return _prune_warm.step(config.nav_budget_ms)
+
+func _prune_due(data: GSNpcNavData) -> bool:
+	return data != null and int(data.meta.get("pruned", 0)) < PRUNE_VERSION and game != null and game.physics != null and game.is_inside_tree()
 
 func _apply_nav(graph: GSNpcNavData, job: ZzNavJob) -> GSResult:
 	nav = graph
@@ -349,7 +387,7 @@ func _prune_blocked(data: GSNpcNavData, job: ZzNavJob) -> void:
 	# What a zombie body collides with, less the boards it must reach: a hull clip ceiling or solid
 	# prop that no document box describes otherwise stays on the graph and wedges bodies under it.
 	var mask: int = ZzNavPrune.body_mask(game.physics)
-	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots(), passable)
+	var _dropped := ZzNavPrune.apply(data, game.get_world_3d().direct_space_state, mask, ladders, _required_spots(), passable, _prune_warm)
 	data.meta["pruned"] = PRUNE_VERSION
 	job.save(data)
 

@@ -40,16 +40,31 @@ var _space: PhysicsDirectSpaceState3D
 var _query := PhysicsShapeQueryParameters3D.new()
 ## The capsule's centre above the feet ([constant LIFT] plus half its height), set by [method _setup].
 var _rise := Vector3.ZERO
+## Answers already asked in slices ([ZzNavPruneWarm]): point -> bool, and edge start -> {edge end -> bool}. The same
+## shape query, so the prune reads the same verdicts; what is not in here is asked of physics as before.
+var _point_memo := {}
+var _edge_memo := {}
+## Set while [ZzNavPruneWarm] replays the prune to learn what it asks: a question not answered yet is handed to the warm
+## (to be asked in a later slice) and answered "blocked" for now, so the replay costs no physics.
+var _recording := false
+var _warm: RefCounted = null
+## This tester is the bare body's, not the margin's.
+var _loose := false
 
 
 ## [param required] (spawns, posts) keeps a piece holding one joined to the next by a bridge edge even through a floor.
 ## Returns (points dropped, edges dropped); (0, 0) when there is no collision to ask. Each of [param ladders] is then
 ## joined foot to head, which this prune may cut; [param passable] bodies (doors that open to walkers) block nothing.
-static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = []) -> Vector2i:
+static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int, ladders: Array[AABB] = [], required: PackedVector3Array = PackedVector3Array(), passable: Array[RID] = [], warm: RefCounted = null) -> Vector2i:
 	var pruner := new()
 	pruner._setup(space, mask, MARGIN, passable)
 	var bare := new()
 	bare._setup(space, mask, 0.0, passable)
+
+	if warm != null:
+		pruner._remember(warm.points, warm.edges, warm, false)
+		bare._remember(warm.loose_points, warm.loose_edges, warm, true)
+
 	var prune := GSNpcNavPrune.new()
 	prune.point_blocked = pruner._point_blocked
 	prune.edge_blocked = pruner._edge_blocked
@@ -61,6 +76,9 @@ static func apply(nav: GSNpcNavData, space: PhysicsDirectSpaceState3D, mask: int
 	prune.required = required
 	var dropped := prune.apply(nav)
 	var climbs := join_ladders(nav, ladders, ladder_side(space, mask, passable), bare)
+
+	if warm != null and warm.recording:
+		return dropped
 
 	if dropped != Vector2i.ZERO or prune.nudged > 0 or prune.joined_edges > 0 or prune.bridged_edges > 0 or climbs > 0:
 		GSLog.info(CHANNEL, "navigation points the world's collision blocks were dropped", {"points": dropped.x, "edges": dropped.y, "nudged": prune.nudged, "joined_points": prune.joined_points, "joined_edges": prune.joined_edges, "bridged": prune.bridged_edges, "ladders": climbs})
@@ -139,6 +157,13 @@ static func ladder_side(space: PhysicsDirectSpaceState3D, mask: int, passable: A
 		return space.intersect_ray(query).is_empty()
 
 
+## The strict (margin) tester the prune starts with, for [ZzNavPruneWarm] to ask ahead of the prune.
+static func strict(space: PhysicsDirectSpaceState3D, mask: int, passable: Array[RID] = [], bare: bool = false) -> RefCounted:
+	var pruner := new()
+	pruner._setup(space, mask, 0.0 if bare else MARGIN, passable)
+	return pruner
+
+
 ## The same test for a link added after the prune (a drop or a jump up): `func(a: Vector3, b: Vector3) -> bool`.
 static func edge_test(space: PhysicsDirectSpaceState3D, mask: int, passable: Array[RID] = []) -> Callable:
 	var pruner := new()
@@ -159,11 +184,46 @@ func _setup(space: PhysicsDirectSpaceState3D, mask: int, margin: float, passable
 	_rise = Vector3.UP * (LIFT + shape.height * 0.5)
 
 
+## Reads and (while the warm is recording) fills [param points] and [param edges].
+func _remember(points: Dictionary, edges: Dictionary, warm: RefCounted, loose: bool) -> void:
+	_point_memo = points
+	_edge_memo = edges
+	_recording = warm.recording
+	_warm = warm
+	_loose = loose
+
+
 func _point_blocked(p: Vector3) -> bool:
+	var known: Variant = _point_memo.get(p)
+
+	if known != null:
+		return known
+
+	if _recording:
+		_warm.want_point(p, _loose)
+		return true
+
 	return _hit(p)
 
 
 func _edge_blocked(a: Vector3, b: Vector3) -> bool:
+	var row: Variant = _edge_memo.get(a)
+
+	if row != null:
+		var known: Variant = (row as Dictionary).get(b)
+
+		if known != null:
+			return known
+
+	if _recording:
+		_warm.want_edge(a, b, _loose)
+		return true
+
+	return _edge_blocked_asked(a, b)
+
+
+## [method _edge_blocked] asked of physics: every sample along the edge.
+func _edge_blocked_asked(a: Vector3, b: Vector3) -> bool:
 	var steps := int(ceil(a.distance_to(b) / EDGE_STEP))
 
 	var space := _space

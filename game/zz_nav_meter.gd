@@ -5,6 +5,8 @@ extends PanelContainer
 
 const WIDTH := 300.0
 const BAR_HEIGHT := 8.0
+## Pixels from the top of the screen to the panel.
+const TOP_OFFSET := 72.0
 
 var _title: Label = null
 var _percent: Label = null
@@ -62,13 +64,14 @@ func _init() -> void:
 	_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	holder.add_child(_fill)
 
-	set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	offset_left = -WIDTH - 24.0 - 24.0
-	offset_right = -24.0
-	offset_top = -330.0
-	offset_bottom = -252.0
-	grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# Top centre: the bottom right is the loadout, weight bar, ammunition and fire mode.
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	offset_left = -(WIDTH + 24.0) * 0.5
+	offset_right = (WIDTH + 24.0) * 0.5
+	offset_top = TOP_OFFSET
+	offset_bottom = TOP_OFFSET + 56.0
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_END
 
 
 ## Shows the panel at [param percent] (0 to 100), or hides it for -1.
