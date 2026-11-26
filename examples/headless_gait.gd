@@ -22,6 +22,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	ZzPacks.scan()
 	print("zombiezone gait")
 	print("")
 	_test_bands()
