@@ -140,6 +140,10 @@ static func scan(from: String = "") -> int:
 
 		_set_pack_game("%s/%s/" % [base, dir_name])
 		var provider: Object = script.new()
+
+		if provider.has_method(&"set_pack_root"):
+			# A mounted pack's models are found under its mount, not under res://addons (a linked pack passes "").
+			provider.call(&"set_pack_root", _mount_of("%s/%s" % [base, dir_name]))
 		providers[dir_name] = provider
 		found += 1
 		_take(dir_name, provider, "%s/%s" % [base, dir_name])
@@ -170,6 +174,10 @@ static func _collect_class_roots() -> void:
 
 
 static func clear() -> void:
+	for provider: Object in providers.values():
+		if provider.has_method(&"set_pack_root"):
+			provider.call(&"set_pack_root", "")
+
 	ZzClasses.set_pack_roots(PackedStringArray())
 	for source in _sources:
 		ZeePackSource.unregister(source)
@@ -222,14 +230,20 @@ static func _set_pack_game(dir: String) -> void:
 ## A pack delivered by gs-cloud sits under `<mount prefix>/addons/<pack>/`, and its profiles under `<prefix>/cfg`
 ## (`GSCloudMounter.cfg_root_of`); a pack linked into `res://addons` has no root of its own, so this is empty.
 static func _mounted_cfg_root(dir: String) -> String:
-	var at := dir.find("/addons/")
-	var prefix := dir.substr(0, at) if at >= 0 else ""
+	var prefix := _mount_of(dir)
 
-	if prefix in ["", "res:/", "res:", "res://"]:
+	if prefix == "":
 		return ""
 
 	var root := prefix.path_join("cfg")
 	return root if DirAccess.dir_exists_absolute(root) else ""
+
+
+## The mount directory a pack delivered by gs-cloud sits under ("" for one linked into `res://addons`).
+static func _mount_of(dir: String) -> String:
+	var at := dir.find("/addons/")
+	var prefix := dir.substr(0, at) if at >= 0 else ""
+	return "" if prefix in ["", "res:/", "res:", "res://"] else prefix
 
 
 static func cfg(path: String, fallback: Variant) -> Variant:
