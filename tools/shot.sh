@@ -59,6 +59,7 @@ for arg in "$@"; do
         --view=*)    view="${arg#*=}" ;;
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
+        --resolution=*) RESOLUTION="${arg#*=}" ;;
         --zz-*)      config+=("$arg") ;;
         --at=*|--look=*|--spawn=*|--zombie=*|--sever=*|--pin=*|--pin-me|--alone|--as-spawned|--box=*|--hard=*|--goo=*|--flash|--workshop|--board|--name=*|--weapons=*|--frames=*|--aim=*|--hold=*|--sprint|--side|--door=*|--fire=*|--tint|--reaction=*|--action=*|--no-bake|--no-world|--cam=*|--target=*|--dist=*|--yaw=*|--pitch=*|--lift=*|--times=*|--standalone_content=*|--cloud-store=*|--day=*|--touch=1) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
@@ -78,7 +79,8 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
-# RESOLUTION=844x390 tools/shot.sh ... renders at a phone's size (the HUD's fit scale, not a 720p shot shrunk).
+# tools/shot.sh --resolution=1920x1080 ... (1440p: 2560x1440) or RESOLUTION=844x390 tools/shot.sh ... renders at that size, a phone's
+# included (the HUD's fit scale, not a 720p shot shrunk).
 res="${RESOLUTION:-1280x720}"
 exec xvfb-run -a -s "-screen 0 ${res}x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"
