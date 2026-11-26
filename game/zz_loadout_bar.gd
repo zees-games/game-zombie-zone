@@ -31,6 +31,8 @@ const EASE := 14.0
 
 var _slots: Array = []
 var _lift: Array[float] = []
+## Texture instance id -> its drawn rect (see [method _used_rect]).
+var _used: Dictionary = {}
 
 var _weight_on: bool = false
 var _carried: float = 0.0
@@ -141,13 +143,30 @@ func _draw_weight(area: Rect2) -> void:
 		ink_plate(fill, tone, 3, Color(0, 0, 0, 0), 0)
 
 
+## The part of [param icon] that has pixels, so a thin knife fills the slot like a rifle does. Cached per texture.
+func _used_rect(icon: Texture2D) -> Rect2:
+	var id := icon.get_instance_id()
+	if _used.has(id):
+		return _used[id]
+	var whole := Rect2(Vector2.ZERO, Vector2(icon.get_width(), icon.get_height()))
+	var image := icon.get_image()
+	if image != null and not image.is_empty() and not image.is_compressed():
+		var box := image.get_used_rect()
+		if box.size.x > 0 and box.size.y > 0:
+			_used[id] = Rect2(box)
+			return _used[id]
+	# Not rendered yet (a viewport's first frames): the whole picture, and ask again next draw.
+	return whole
+
+
 func _draw_slot(slot: Dictionary, rect: Rect2, lift: float) -> void:
 	var empty := bool(slot.get("empty", false))
 	var alpha := 0.4 if empty else 1.0
 	var accent: Color = slot.get("accent", colour(&"highlight"))
 	rect.position.y -= 5.0 * lift
-	var plate := colour(&"plate")
-	plate = plate.lerp(Color(0.1, 0.12, 0.17, 0.9), lift * 0.7)
+	# A lighter glass than the other plates: the weapon renders are dark metal and must read against it.
+	var plate := Color(0.2, 0.24, 0.3, 0.74)
+	plate = plate.lerp(Color(0.26, 0.31, 0.39, 0.9), lift * 0.7)
 	var edge := colour(&"plate_edge").lerp(accent, lift)
 	ink_plate(rect, Color(plate, plate.a * (0.6 + 0.4 * alpha)), 9, Color(edge, edge.a), 2 if lift > 0.5 else 1)
 
@@ -158,10 +177,11 @@ func _draw_slot(slot: Dictionary, rect: Rect2, lift: float) -> void:
 	var icon: Texture2D = slot.get("icon", null)
 	var picture := Rect2(rect.position + Vector2(8.0, 7.0), Vector2(rect.size.x - 16.0, rect.size.y - 29.0))
 	if icon != null:
-		var scale := minf(picture.size.x / icon.get_width(), picture.size.y / icon.get_height())
-		var drawn := Vector2(icon.get_width(), icon.get_height()) * scale
-		var shade := Color(1.0, 1.0, 1.0, alpha * (0.62 + 0.38 * lift))
-		draw_texture_rect(icon, Rect2(picture.get_center() - drawn * 0.5, drawn), false, shade)
+		var used := _used_rect(icon)
+		var scale := minf(picture.size.x / used.size.x, picture.size.y / used.size.y)
+		var drawn := used.size * scale
+		var shade := Color(1.0, 1.0, 1.0, alpha * (0.8 + 0.2 * lift))
+		draw_texture_rect_region(icon, Rect2(picture.get_center() - drawn * 0.5, drawn), used, shade)
 	else:
 		ink_text(Vector2(picture.position.x, picture.get_center().y + 5.0), str(slot.get("name", "")), 14,
 			Color(colour(&"text"), alpha), HORIZONTAL_ALIGNMENT_CENTER, picture.size.x, 4)

@@ -69,7 +69,7 @@ var _element_nodes: Dictionary = {}
 
 func _attach_elements() -> void:
 	var map := {
-		&"vitals": [vitals, stamina_bar, kits],
+		&"vitals": [vitals, stamina_bar, downs, kits],
 		&"weapons": [loadout],
 		&"ammo": [ammo],
 		&"fire_mode": [fire_mode],
@@ -145,7 +145,9 @@ var fire_mode: GSFireModeIndicator = null
 var strip: GSScoreStrip = null
 
 ## The medkit and pills, each with its key.
+## The downs left, a chip over the plate.
 var kits: GSKeyHints = null
+var downs: ZzDownsPips = null
 
 var stamina_bar: GSStatBar = null
 

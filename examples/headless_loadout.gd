@@ -4,8 +4,8 @@ const ZzLoadoutBar := preload("../game/zz_loadout_bar.gd")
 
 ## The HUD's loadout row: the slot dictionaries it takes, one picture per slot, the weight line, and its footprint.
 
-const SECTIONS := 3
-const CHECKS := 12
+const SECTIONS := 4
+const CHECKS := 16
 
 
 func _ready() -> void:
@@ -19,6 +19,7 @@ func _run() -> void:
 	_test_slots()
 	_test_weight()
 	_test_hud_has_no_boxes()
+	_test_downs()
 	await get_tree().process_frame
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
@@ -64,4 +65,19 @@ func _test_hud_has_no_boxes() -> void:
 	_check(text.find("SLOWED") < 0, "no slowed text")
 	_check(text.find("USE_TEXT") < 0, "no pickup help text")
 	_check(text.find("km/h") < 0 and text.find("speed_label") < 0, "no speed readout")
+	_finished()
+
+
+func _test_downs() -> void:
+	_section("downs chip")
+	var pips := ZzDownsPips.new()
+	add_child(pips)
+	pips.set_downs(2, 3)
+	_check(pips.visible and pips.text() == "2 / 3" and pips.downs_left() == 2, "two of three downs left")
+	_check(pips.chip_width() > 60.0, "the chip has a width")
+	pips.set_downs(9, 3)
+	_check(pips.downs_left() == 3, "more than the total is clamped")
+	pips.set_downs(0, 0)
+	_check(not pips.visible, "no downs rule, no chip")
+	pips.queue_free()
 	_finished()
