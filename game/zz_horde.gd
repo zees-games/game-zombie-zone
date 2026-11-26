@@ -2190,6 +2190,10 @@ func limb_hit(damage: GSDamage) -> void:
 	var tall := maxf(0.5, float(npc.def.meta.get("height", 1.75)))
 	damage.context[&"limb_zone"] = ZzZombieLimbs.zone_of(limb, (damage.point.y - feet) / tall)
 
+	# Where it landed, for the flinch the clients draw: the side of the body from the point against its own right axis.
+	var side := (damage.point - (npc.node as Node3D).global_position).dot((npc.node as Node3D).global_transform.basis.x)
+	body.hit_code = ZzZombieLimbs.hit_code(limb, side >= 0.0, body.hit_code)
+
 	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
 	GSNpcGore.hit_style = ZzZombieLimbs.gore_style(damage)
 	var _took := limbs.hit_limb(limb, damage.point, limb_damage(npc, damage), impulse)

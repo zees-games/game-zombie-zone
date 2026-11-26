@@ -668,6 +668,23 @@ func _pose(anim: int) -> void:
 			_skeleton.set_bone_pose_rotation(spine, Quaternion(Vector3(-1.0, 0.0, _flinch_side * 0.4).normalized(), snap) * _skeleton.get_bone_pose_rotation(spine))
 		if head >= 0:
 			_skeleton.set_bone_pose_rotation(head, Quaternion(Vector3.RIGHT, -snap * 0.8) * _skeleton.get_bone_pose_rotation(head))
+		_flinch_limb(snap)
+
+
+## What a shot in a limb adds to the chest's flinch: a hit arm is thrown back, a hit leg buckles at the knee and
+## drops the hips toward its side (the side is the one the shot came in on).
+func _flinch_limb(snap: float) -> void:
+	var side := ".L" if _flinch_side > 0.0 else ".R"
+
+	if _flinch_region == 3:
+		_pitch_limb("UpperArm" + side, -snap * 2.2)
+		_pitch_limb("LowerArm" + side, snap * 1.2)
+	elif _flinch_region == 4:
+		_pitch_limb("UpperLeg" + side, snap * 0.9)
+		_pitch_limb("LowerLeg" + side, -snap * 1.6)
+		var hips: int = _bones.get(&"Hips", -1)
+		if hips >= 0:
+			_roll_index(hips, _flinch_side * snap * 0.35)
 
 
 ## A look's shamble numbers: [constant SHAMBLE] with the look's own `shamble` keys over it.
@@ -900,7 +917,7 @@ func _pose_reach() -> void:
 
 ## Hit: a flinch over whatever it is doing. [param from_side] is -1 or 1 for which side the hit
 ## came from; a flinch already running is not restarted, so a shotgun's pellets are one flinch.
-func flinch(from_side: float = 1.0, head := false) -> void:
+func flinch(from_side: float = 1.0, head := false, region := 2) -> void:
 	if _death.is_empty() and _flinch < 0.5:
 		_flinch = 1.0
 		_hit_head = head
@@ -911,6 +928,7 @@ func flinch(from_side: float = 1.0, head := false) -> void:
 		if _has(pick[0]):
 			_hit_left = maxf(_hit_left, _anim.get_animation(_qualified(pick[0])).length / float(pick[1]))
 		_flinch_side = signf(from_side) if from_side != 0.0 else 1.0
+		_flinch_region = region
 
 
 func _draw_flags(flags: int) -> void:

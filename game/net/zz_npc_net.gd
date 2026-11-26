@@ -28,6 +28,8 @@ var net_state: int = 0
 var net_anim: int = 0
 var net_flags: int = 0
 var net_limbs: int = 0
+## Where the last shot landed ([member ZzZombieBody.hit_code]); the toggle bit makes two hits in one place two events.
+var net_hit: int = 0
 ## Client: wall-clock msec of the last snapshot that carried or listed this zombie.
 var state_msec: int = 0
 ## Client: the newest interpolator tick seen for this zombie (see [method is_stale]).
@@ -49,6 +51,7 @@ func _register_net_vars() -> void:
 
 	replicate(&"net_anim", GSNetVar.Type.UINT).bits(5)
 	replicate(&"net_flags", GSNetVar.Type.UINT).bits(5)
+	replicate(&"net_hit", GSNetVar.Type.UINT).bits(5)
 
 
 func pull() -> void:
@@ -58,6 +61,7 @@ func pull() -> void:
 	GSNpcNetSync.pull(npc, self, GSNpcNetSync.State.ATTACKING if npc.has_target() else GSNpcNetSync.State.IDLE)
 	net_anim = clampi(body.anim, 0, 31)
 	net_flags = body.flags & 31
+	net_hit = body.hit_code & 31
 	net_limbs = body.limb_mask & ((1 << GSNpcNetSync.LIMB_BITS) - 1)
 
 
@@ -85,6 +89,7 @@ func _net_state_applied(_tick: int) -> void:
 	if body != null and identity != null and not identity.is_authoritative:
 		body.anim = net_anim
 		body.flags = net_flags
+		body.hit_code = net_hit
 		body.limb_mask = net_limbs
 		body.health = float(net_health)
 
