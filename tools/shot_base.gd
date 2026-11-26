@@ -38,6 +38,7 @@ var _flash := false
 var _aim := INF
 ## --alone: the stand-ins stay in the start room, out of a close-up.
 var _alone := false
+var _settled := false
 ## --as-spawned: nobody is moved or held; the frame is what the round start dealt (stand-ins keep playing).
 var _as_spawned := false
 ## --door=INDEX:open|closed[:SIDE]: that door frozen in that state (side 1 or -1 is the way it swings), for a frame of it.
@@ -434,6 +435,9 @@ func _survival_frame(game: ZzGame, local) -> void:
 
 ## The stand-ins sent out of the frame, so a close first-person shot is not a head.
 func _clear_view(game: ZzGame, local, stand: Vector3) -> void:
+	# A medkit and pills on the belt, so the loadout row shows every kind of slot.
+	local.medkits = maxi(local.medkits, 1)
+	local.pills = maxi(local.pills, 2)
 	for p in game.survivors():
 		if p != local:
 			p.place_at(stand + Vector3(0.0, 0.0, 400.0), 0.0)
