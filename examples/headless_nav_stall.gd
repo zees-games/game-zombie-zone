@@ -73,6 +73,7 @@ func _test_build(id: StringName) -> void:
 	var opened := float(Time.get_ticks_usec() - began) / 1000.0
 	var worst := 0.0
 	var worst_stage := "-"
+	var worst_sections := {}
 	var seen_prune := false
 	var landed := 0.0
 	var ticks := 0
@@ -82,6 +83,7 @@ func _test_build(id: StringName) -> void:
 		ticks += 1
 		var stage: String = game.horde.nav_stage()
 		seen_prune = seen_prune or stage == "prune"
+		var before: Dictionary = game.horde.sections.duplicate()
 		var at := Time.get_ticks_usec()
 		game.simulate(TICK)
 		var spent := float(Time.get_ticks_usec() - at) / 1000.0
@@ -91,6 +93,7 @@ func _test_build(id: StringName) -> void:
 		elif ticks > 1 and spent > worst:
 			worst = spent
 			worst_stage = "%s #%d -> %s" % [stage, ticks, game.horde.nav_stage()]
+			worst_sections = _grown(before, game.horde.sections)
 
 		if ticks % 4 == 0:
 			await get_tree().physics_frame
@@ -100,7 +103,19 @@ func _test_build(id: StringName) -> void:
 	_check(seen_prune, "the prune ran in slices (stage 'prune' was reported)")
 	_check(worst <= MAX_TICK_MS, "no tick took over %d ms while it was built" % int(MAX_TICK_MS), "worst %.0f ms in %s" % [worst, worst_stage])
 	_check(landed <= MAX_LAND_MS, "the tick that lands the graph took at most %d ms" % int(MAX_LAND_MS), "%.0f ms" % landed)
+	print("  the worst tick's horde sections (ms): %s" % worst_sections)
 	print("  start %.0f ms, worst tick %.0f ms (%s), landing tick %.0f ms, %d ticks waited, sections %s" % [opened, worst, worst_stage, landed, ticks, game.horde.sections])
 	remove_child(game)
 	game.free()
 	_finished += 1
+
+
+# The sections that grew by over a millisecond from [param before] to [param after], so a slow tick names its cause.
+func _grown(before: Dictionary, after: Dictionary) -> Dictionary:
+	var out := {}
+	for key: Variant in after:
+		var grew := float(after[key]) - float(before.get(key, 0.0))
+		if grew > 1.0:
+			out[key] = snappedf(grew, 0.1)
+
+	return out

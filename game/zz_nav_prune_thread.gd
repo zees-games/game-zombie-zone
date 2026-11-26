@@ -3,9 +3,11 @@ extends RefCounted
 ## result in. The prune's capsule queries were 36 s of one main-thread tick on rp_asheville with a cold cache.
 ##
 ## They ask a private physics space that nothing steps, holding copies of the world's bodies on the prune's mask as they
-## stood when [method start] ran (a prop that moves afterward is pruned where it stood), so the worker never reads the
-## space the main thread steps. The answers are the ones [ZzNavPrune] gets on the main thread: the same shapes at the
-## same places, with the passable bodies left out of the copy instead of excluded from each query.
+## stood when [method advance] copied them (a prop that moves afterward is pruned where it stood), so the worker never
+## reads the space the main thread steps. The copy itself is sliced over ticks by [method advance]'s budget: one tick of
+## it was 0.55 to 0.8 s on gm_balkans on a loaded box (headless_nav_stall). The answers are the ones [ZzNavPrune] gets
+## on the main thread: the same shapes at the same places, with the passable bodies left out of the copy instead of
+## excluded from each query.
 ## `zz_nav_prune_thread` 0 prunes on the main thread as before.
 
 const ZzNavPrune := preload("zz_nav_prune.gd")
@@ -14,7 +16,7 @@ const _Self := preload("zz_nav_prune_thread.gd")
 
 ## Milliseconds the worker took over the prune and the cache write.
 var prune_ms := 0.0
-## Milliseconds the main thread took to copy the world's bodies.
+## Milliseconds the main thread took to copy the world's bodies, over every slice.
 var copy_ms := 0.0
 ## Bodies copied into the private space.
 var bodies := 0
@@ -31,6 +33,13 @@ var _space := RID()
 var _copies: Array[RID] = []
 var _task := -1
 var _record := false
+# The bodies still to copy, the world space they must still be in, the prune's mask, the passable bodies by RID, and the
+# worker's call, started once the copy is whole (null after).
+var _pending: Array[Node] = []
+var _world_space := RID()
+var _mask := 0
+var _skip := {}
+var _run_task := Callable()
 
 
 ## Whether [param data] still needs the world's collision asked of it for [param version]; false with no world to ask.
@@ -78,8 +87,8 @@ static func _passable(mech: Variant) -> Array[RID]:
 	return mech.walk_through_bodies() if mech != null else out
 
 
-# Copies the bodies of [param world] on [param mask] (less [param passable]) found under [param root] into a private
-# space, and starts the worker; the pruned graph's [ZzNavGraph] lands in [member ZzNavJob.graph] by
+# Lists the bodies of [param world] on [param mask] (less [param passable]) found under [param root] for [method advance]
+# to copy into a private space, then start the worker on; the pruned graph's [ZzNavGraph] lands in [member ZzNavJob.graph] by
 # [member ZzNavJob.make_graph], and the cache is rewritten pruned to [param version].
 func _start(job: ZzNavJob, world: World3D, root: Node, mask: int, ladders: Array[AABB], required: PackedVector3Array, passable: Array[RID], version: int) -> void:
 	if parity:
@@ -87,47 +96,75 @@ func _start(job: ZzNavJob, world: World3D, root: Node, mask: int, ladders: Array
 		parity_bodies.clear()
 		_record = true
 
-	var state := _copy_world(world, root, mask, passable)
-	_task = WorkerThreadPool.add_task(_run.bind(job, state, mask, ladders, required, version), false, "zz nav prune")
+	_open(world, root, mask, passable)
+	_run_task = _run.bind(job, PhysicsServer3D.space_get_direct_state(_space), mask, ladders, required, version)
+
+
+## Main thread, once a tick: copies bodies for up to [param budget_ms], starts the worker once the copy is whole, and
+## says whether the worker is done.
+func advance(budget_ms: float) -> bool:
+	if _run_task.is_valid() and _copy_some(budget_ms):
+		_task = WorkerThreadPool.add_task(_run_task, false, "zz nav prune")
+		_run_task = Callable()
+
+	return done()
 
 
 ## Main thread: the same copy and prune with no worker, then [method finish]; `--prune-parity` compares it.
 func run_here(nav: GSNpcNavData, world: World3D, root: Node, mask: int, ladders: Array[AABB], required: PackedVector3Array, passable: Array[RID]) -> void:
 	var none: Array[RID] = []
-	var _dropped := ZzNavPrune.run(nav, _copy_world(world, root, mask, passable), mask, ladders, required, none, _report)
+	_open(world, root, mask, passable)
+	var _copied := _copy_some(INF)
+	var _dropped := ZzNavPrune.run(nav, PhysicsServer3D.space_get_direct_state(_space), mask, ladders, required, none, _report)
 	finish({})
 
 
-func _copy_world(world: World3D, root: Node, mask: int, passable: Array[RID]) -> PhysicsDirectSpaceState3D:
+func _open(world: World3D, root: Node, mask: int, passable: Array[RID]) -> void:
 	var lap := Time.get_ticks_usec()
 	_space = PhysicsServer3D.space_create()
 	PhysicsServer3D.space_set_active(_space, false)
-	var skip := {}
+	_world_space = world.space
+	_mask = mask
 
 	for rid in passable:
-		skip[rid] = true
+		_skip[rid] = true
 
-	for node: Node in root.find_children("*", "CollisionObject3D", true, false):
+	_pending = root.find_children("*", "CollisionObject3D", true, false)
+	_pending.reverse()
+	copy_ms += (Time.get_ticks_usec() - lap) / 1000.0
+
+
+# Copies listed bodies until [param budget_ms] is spent; true once none is left.
+func _copy_some(budget_ms: float) -> bool:
+	var lap := Time.get_ticks_usec()
+	var until := lap + int(minf(budget_ms, 1.0e9) * 1000.0)
+
+	while not _pending.is_empty() and Time.get_ticks_usec() < until:
+		var node: Variant = _pending.pop_back()
+
+		# Freed since it was listed, in another world, out of the tree or disabled: in no space or another one.
+		if not is_instance_valid(node):
+			continue
+
 		var body := node as CollisionObject3D
 
-		# A body in another world, out of the tree or disabled is in no space or another one.
-		if body is Area3D or body.collision_layer & mask == 0 or skip.has(body.get_rid()) or PhysicsServer3D.body_get_space(body.get_rid()) != world.space:
+		if body is Area3D or body.collision_layer & _mask == 0 or _skip.has(body.get_rid()) or PhysicsServer3D.body_get_space(body.get_rid()) != _world_space:
 			continue
 
 		_copy(body)
 
 	bodies = _copies.size()
-	copy_ms = (Time.get_ticks_usec() - lap) / 1000.0
-	return PhysicsServer3D.space_get_direct_state(_space)
+	copy_ms += (Time.get_ticks_usec() - lap) / 1000.0
+	return _pending.is_empty()
 
 
 ## Whether the worker is done; [method finish] then takes none of the main thread's time.
 func done() -> bool:
-	return _task < 0 or WorkerThreadPool.is_task_completed(_task)
+	return not _run_task.is_valid() and (_task < 0 or WorkerThreadPool.is_task_completed(_task))
 
 
-## Main thread: waits for the worker (no wait once [method done]), frees the private space, logs what was dropped and
-## puts the timings in [param sections] (`nav_prune_copy`, `nav_prune_thread` ms, `nav_prune_bodies`).
+## Main thread: waits for the worker (no wait once [method done]; none started if the copy never finished), frees the
+## private space, logs what was dropped and puts the timings in [param sections] (`nav_prune_copy`, `nav_prune_thread` ms, `nav_prune_bodies`).
 func finish(sections: Dictionary) -> void:
 	if _task >= 0:
 		WorkerThreadPool.wait_for_task_completion(_task)
@@ -137,6 +174,8 @@ func finish(sections: Dictionary) -> void:
 		PhysicsServer3D.free_rid(rid)
 
 	_copies.clear()
+	_pending.clear()
+	_run_task = Callable()
 
 	if _space.is_valid():
 		PhysicsServer3D.free_rid(_space)

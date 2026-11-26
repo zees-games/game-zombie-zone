@@ -292,7 +292,7 @@ func _poll_nav() -> void:
 		_pruning = ZzNavPruneThread.begin(game, _nav_job, _required_spots, PRUNE_VERSION)
 
 	if _pruning != null:
-		if not _pruning.done():
+		if not _pruning.advance(config.nav_budget_ms):
 			return
 
 		_pruning.finish(sections)
