@@ -2,6 +2,7 @@ extends GSGameCheckSuite
 
 const ZzConfig := preload("../game/zz_config.gd")
 const ZzNpcs := preload("../game/zz_npcs.gd")
+const ZzPacks := preload("../game/zz_packs.gd")
 const ZzZombieBody := preload("../npcs/zz_zombie_body.gd")
 const ZzZombieView := preload("../npcs/zz_zombie_view.gd")
 
@@ -22,6 +23,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
+	ZzPacks.root = "res://addons"
 	ZzPacks.scan()
 	print("zombiezone gait")
 	print("")
