@@ -738,6 +738,18 @@ func wound_near(point: Vector3) -> void:
 	if best != null:
 		best.wound_at(point)
 
+## Which side of the body a shot from the camera lands on: 1 on its left, -1 on its right, 1 when unknown.
+func _hit_side(body: Node3D, view: Node3D) -> float:
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+
+	if cam == null:
+		return 1.0
+
+	var to_cam := cam.global_position - body.global_position
+	var side := to_cam.dot(view.global_transform.basis.x)
+	return 1.0 if side >= 0.0 else -1.0
+
+
 func _present_zombies(delta: float, listener: Vector3) -> void:
 	lod.refresh(get_viewport().get_camera_3d() if is_inside_tree() else null)
 	for key: int in _zombies.keys():
@@ -757,8 +769,9 @@ func _present_zombies(delta: float, listener: Vector3) -> void:
 		var was := float(entry.get("health", health))
 		entry["health"] = health
 		if health < was - 0.5 and health > 0.0:
-			# The snapshot carries no hit location: the second health bit picks the head or the chest clip for variety.
-			view.flinch(-1.0 if (int(health) & 1) == 0 else 1.0, (int(health) & 2) != 0)
+			# The snapshot carries no hit location: the flinch leans away from the viewer's side (shots mostly come from
+			# the camera), and the second health bit picks the head or the chest clip for variety.
+			view.flinch(_hit_side(body, view), (int(health) & 2) != 0)
 
 		view.present(delta, anim, flags)
 
