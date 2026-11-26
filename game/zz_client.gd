@@ -546,7 +546,7 @@ func _build_netcode() -> GSResult:
 			return
 		var who: ZzPlayer = game.players.get(ZzNetBridge.player_key(session_id))
 		if who != null:
-			var _heard := audio.on_weapon(who.global_position, kind))
+			var _heard := audio.on_weapon(who.global_position, kind, who.held_id()))
 
 	if link != null and link.has_method("ping_ms"):
 		bridge.rtt_source = func() -> float:
@@ -754,7 +754,7 @@ func _hear_rig(armed: ZzPlayer) -> void:
 
 func _on_rig_used(outcome: GSWeaponOutcome, armed: ZzPlayer) -> void:
 	if audio != null and is_instance_valid(armed):
-		var _heard := audio.on_weapon(armed.global_position, ZeeWeaponNet.kind_number(outcome.kind))
+		var _heard := audio.on_weapon(armed.global_position, ZeeWeaponNet.kind_number(outcome.kind), armed.held_id())
 
 
 func _on_notice(text: String) -> void:
@@ -1183,7 +1183,7 @@ func _arm_locally(weapon_id: StringName) -> void:
 
 		weapons.used.connect(func(outcome: GSWeaponOutcome) -> void:
 			if audio != null and camera != null:
-				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
+				var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind), player.held_id()))
 
 	_prewarm_weapons()
 	player.view_rig = weapons

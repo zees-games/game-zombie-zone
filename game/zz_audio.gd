@@ -94,6 +94,8 @@ const SPECIAL_VOICES := {
 }
 
 var manager: GSAudioManager = null
+## The recorded, layered gun reports; the synthesised `weapon_shot` family is only the fallback.
+var shots: ZzShotSound = null
 
 ## kind -> {key -> cue id}, read from the profiles on first use.
 var _cues: Dictionary = {}
@@ -429,6 +431,14 @@ func setup() -> GSResult:
 	if not director.has_moods():
 		ambience.set_map_bed(&"amb_night")
 
+	shots = ZzShotSound.new()
+	shots.name = "Shots"
+	if not shots.setup(manager):
+		shots.free()
+		shots = null
+	else:
+		add_child(shots)
+
 	var godot_sink := manager.sink as GSAudioSinkGodot
 
 	if godot_sink != null:
@@ -501,6 +511,8 @@ func indoor_mood_for_map() -> StringName:
 func follow_roof(delta: float, eye: Vector3, space: PhysicsDirectSpaceState3D, world_mask: int) -> void:
 	if director != null:
 		director.follow_roof(delta, eye, space, world_mask)
+	if shots != null:
+		shots.probe(delta, eye, space)
 
 
 ## The server's cvars and the player's own sliders, multiplied (see [GSAmbienceDirector.follow_settings]).
@@ -541,7 +553,9 @@ func stop(handle: int) -> void:
 		manager.stop(handle)
 
 
-func on_weapon(where: Vector3, kind: int) -> bool:
+func on_weapon(where: Vector3, kind: int, weapon_id: StringName = &"") -> bool:
+	if shots != null and shots.fire(weapon_id, kind, where):
+		return true
 	var id := weapon_sound(kind)
 	return id != &"" and at(id, where) != 0
 
