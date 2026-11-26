@@ -224,9 +224,10 @@ func setup_seconds() -> float:
 @export var nav_cache: bool = true
 
 ## Worker tasks a navigation build uses, off the main thread, in a hosted game; the graph of a large map takes a minute or more
-## to build. 1 builds on one background thread, more split the heavy passes across that many; 0 (and every platform without
-## threads) builds on the main thread in slices of [member nav_budget_ms] a tick. `zz_nav_threads`.
-@export_range(0, 16, 1, "or_greater") var nav_threads: int = 2
+## to build. 1 builds on one background thread, more split the heavy passes across that many, -1 one per core but one
+## ([method GSParallel.resolve_workers]); 0 (and every platform without threads) builds on the main thread in slices of
+## [member nav_budget_ms] a tick. `zz_nav_threads`.
+@export_range(-1, 16, 1, "or_greater") var nav_threads: int = 2
 
 ## Whether a hosted game that builds its graph off the main thread also asks the world's collision about it there, against
 ## a private copy of the world's bodies: that prune was 36 s of one frozen tick on a cold rp_asheville. 0 prunes on the main
