@@ -922,7 +922,7 @@ func _on_defib(session_id: int, by: int) -> void:
 	var body := _player_of(session_id)
 
 	if audio != null:
-		var _zap := audio.at(ZzAudio.DEFIB_ZAP, body.feet() + Vector3(0.0, 0.3, 0.0)) if body != null else 0
+		var _zap := audio.defib(ZzAudio.DEFIB_ZAP, body.feet() + Vector3(0.0, 0.3, 0.0)) if body != null else 0
 
 		if session_id == _watch_id:
 			var _up := audio.play(ZzAudio.YOU_ARE_UP)
@@ -970,7 +970,7 @@ func _hear_defib_charges() -> void:
 			continue
 
 		if other.feet().distance_to(player.feet()) <= reach:
-			var _charge := audio.at(ZzAudio.DEFIB_CHARGE, other.feet() + Vector3(0.0, 1.0, 0.0))
+			var _charge := audio.defib(ZzAudio.DEFIB_CHARGE, other.feet() + Vector3(0.0, 1.0, 0.0))
 
 	_defib_scratch = _defib_heard
 	_defib_heard = now
