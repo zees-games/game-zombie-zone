@@ -88,7 +88,7 @@ func _add_tunables_bots(world: ZzGame) -> void:
 		"Keep each built navigation graph on disk and load it next time; 0 builds every time",
 		func(value: float) -> void: config.nav_cache = value > 0.5)
 	_tunable("zz_nav_threads", float(config.nav_threads),
-		"Worker tasks a navigation build uses off the main thread; 0 builds on the main thread in slices",
+		"Worker tasks a navigation build uses off the main thread, -1 one per core but one; 0 builds on the main thread in slices",
 		func(value: float) -> void: config.nav_threads = int(value))
 	_tunable("zz_nav_prune_thread", 1.0 if config.nav_prune_thread else 0.0,
 		"Ask the world's collision about a graph built off the main thread on a worker too; 0 asks on the main thread",

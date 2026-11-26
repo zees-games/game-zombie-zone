@@ -1,6 +1,7 @@
 extends "zz_horde_state.gd"
 
 const ZzWatchCull := preload("zz_watch_cull.gd")
+const ZzNavDerive := preload("zz_nav_derive.gd")
 
 ## What a point inside a push volume costs to arrive at, times the usual.
 const PUSH_COST := 12.0
@@ -153,6 +154,12 @@ static func _graph_off_thread(data: GSNpcNavData) -> ZzNavGraph:
 
 	var graph := ZzNavGraph.new()
 	return graph if graph.rebuild(data).ok else null
+
+## The links' and the derived spots' inputs ([method ZzNavDerive.rules]).
+func _nav_rules() -> Dictionary:
+	var mech: Variant = game.map.mechanics if game != null and game.map != null else null
+	var boxes: Array[AABB] = mech.ladder_boxes() if mech != null else ([] as Array[AABB])
+	return ZzNavDerive.rules(_doc, config.nav_steep if config.nav_steep > 0.0 else INF, config.zombie_ladder_speed > 0.0, boxes)
 
 ## Flags the points a brute's body does not fit at, once the map's colliders are in the space.
 func _mark_narrow() -> void:
