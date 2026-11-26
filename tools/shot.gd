@@ -246,16 +246,21 @@ func _await_settled(game: ZzGame) -> void:
 	await _frames(10)
 
 
-func _run() -> void:
-	var game: ZzGame = _client.get("game")
-	await _until_a_round(game)
-	var local = _client.get("player")
+## The world built and the load cover gone (slow on a cold GPU box) before any timing starts; capped,
+## so a stuck cover cannot hang the shot. With --settled, also the loading HUD gone.
+func _await_shootable(game: ZzGame) -> void:
 	await _await_world(game)
-	# Waits past the load cover (slow on a cold GPU box) before any timing starts; capped, so a stuck cover cannot hang the shot.
 	if not await GSShotGate.wait_lifted(get_tree(), _client.get("platform")):
 		printerr("shot: load cover still up after the wait; shooting anyway")
 	if _settled:
 		await _await_settled(game)
+
+
+func _run() -> void:
+	var game: ZzGame = _client.get("game")
+	await _until_a_round(game)
+	var local = _client.get("player")
+	await _await_shootable(game)
 	# A survival hold in play: the stand-ins keep playing (their posts, the barricades), you are
 	# put at --at looking at --look, and the frame is taken --seconds in, with the HUD (`wave`)
 	# or from a free camera at --at (`wave_cam`).

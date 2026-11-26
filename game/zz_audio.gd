@@ -201,7 +201,6 @@ static func sound_catalogue() -> GSAudioCatalogue:
 	c.add(cry)
 
 	_add_real(c)
-	_use_real_voices(c)
 
 	var boom := _placed(EXPLOSION, 160.0, 18.0, 3, 95, 0.9, 1.05, "explosion_1")
 	boom.variants = PackedStringArray([_file("explosion_1"), _file("explosion_2")])
@@ -293,6 +292,7 @@ static func _add_real(c: GSAudioCatalogue) -> void:
 	var horde := _flat(REAL_HORDE, &"SFX", 1, 90, "horde_distant")
 	horde.variants = _real_files(&"horde")
 	c.add(horde)
+	_use_real_voices(c)
 
 
 ## The first-generation voice ids (what a profile without cues falls back to) play the recorded sets

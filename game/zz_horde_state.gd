@@ -128,6 +128,7 @@ var brains_native: Object = null
 const NATIVE_THINK := &"GSSimZombieThink"
 var think_core: Object = preload("../npcs/zz_think_core.gd").new()
 var think_native: bool = false
+
 ## What a brain asks while the brains think in [method tick] (null outside it, so a tool or suite that calls a brain
 ## by hand gets the script): [member brains_native], and the native crowd for the spaced heading when it is on too.
 var brains_now: Object = null
@@ -230,3 +231,9 @@ var _bile: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 
 
+## Swaps [member think_core] to gs-sim's when [param native] asks and the library has it, else to the script twin.
+func _pick_think(native: bool) -> void:
+	var think := native and ClassDB.class_exists(NATIVE_THINK)
+	if think != think_native:
+		think_native = think
+		think_core = ClassDB.instantiate(NATIVE_THINK) if think else preload("../npcs/zz_think_core.gd").new()

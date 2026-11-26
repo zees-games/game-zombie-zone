@@ -890,11 +890,7 @@ func _pick_crowd() -> void:
 	if spawner != null:
 		spawner.set(&"pacing", config != null and config.native_pacing and ClassDB.class_exists(&"GSSimThinkPacer"))
 
-	var think := config != null and config.native_brains and ClassDB.class_exists(NATIVE_THINK)
-	if think != think_native:
-		think_native = think
-		think_core = ClassDB.instantiate(NATIVE_THINK) if think else preload("../npcs/zz_think_core.gd").new()
-
+	_pick_think(config != null and config.native_brains)
 	if brains != (brains_native != null):
 		brains_native = ClassDB.instantiate(NATIVE_BRAINS) if brains else null
 		ZzBrainsFeed.push_barricades(self)
@@ -2233,19 +2229,7 @@ func limb_hit(damage: GSDamage) -> void:
 	if limb == &"" or (limb == &"head" and not head):
 		return
 
-	# Which zone the hit was, in gs-combat's ids, for whoever reads the damage afterwards.
-	var feet: float = (npc.node as Node3D).global_position.y
-	var tall := maxf(0.5, float(npc.def.meta.get("height", 1.75)))
-	damage.context[&"limb_zone"] = ZzZombieLimbs.zone_of(limb, (damage.point.y - feet) / tall)
-
-	# Where it landed, for the flinch the clients draw: the side of the body from the point against its own right axis.
-	var side := (damage.point - (npc.node as Node3D).global_position).dot((npc.node as Node3D).global_transform.basis.x)
-	body.hit_code = ZzZombieLimbs.hit_code(limb, side >= 0.0, body.hit_code)
-
-	var impulse := damage.direction * clampf(damage.amount * 0.1, 1.0, 8.0)
-	GSNpcGore.hit_style = ZzZombieLimbs.gore_style(damage)
-	var _took := limbs.hit_limb(limb, damage.point, limb_damage(npc, damage), impulse)
-	GSNpcGore.hit_style = GSNpcGore.STYLE_GENERIC
+	ZzZombieLimbs.land_hit(body, limb, damage, float(npc.def.meta.get("height", 1.75)), limb_damage(npc, damage))
 
 	if not limbs.is_lethal():
 		return

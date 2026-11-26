@@ -1,8 +1,5 @@
-extends "zz_client_ending.gd"
+extends "zz_client_view.gd"
 
-const ZzViewGrip := preload("zz_view_grip.gd")
-const ZzViewMotion := preload("zz_view_motion.gd")
-const DOWN_EASE_SECONDS := 0.25
 const ScopePrefs := preload("res://addons/gs_weapon/view/gs_weapon_scope_prefs.gd")
 
 
@@ -1296,8 +1293,7 @@ func _build_camera() -> void:
 	camera.current = true
 	camera.far = 400.0
 
-	if player.controller != null and not player.controller.landed.is_connected(_on_landed):
-		player.controller.landed.connect(_on_landed)
+	_follow_landings()
 
 	# Survivors and stand-ins, handed over (their hulls are off while players pass through
 	# each other), and zombies, found on their layer: hidden at the lens, faded in third
@@ -1313,11 +1309,6 @@ func _build_camera() -> void:
 		game.view_rules.changed.connect(_on_view_rules_changed)
 	third_person = game.view_rules.resolve(third_person)
 	_place_camera()
-
-
-## The controller's landing (not emitted in a prediction replay) kicks the own camera's dip.
-func _on_landed(impact: float) -> void:
-	_motion.note_landing(impact)
 
 
 func _place_camera() -> void:
@@ -1583,8 +1574,7 @@ func _build_settings() -> void:
 	settings.settings.changed.connect(func(key: StringName, _value: Variant, _why: StringName) -> void:
 		if key == &"gore":
 			_apply_gore_pref()
-		if ZzViewMotion.SETTING_KEYS.has(key):
-			_apply_motion_scales()
+		_apply_motion_scales(key)
 		if key == &"vis_mode" and game != null and game.map != null:
 			game.map.set_vis_mode(_vis_mode())
 			var _mode := platform.set_vis_mode(_vis_mode()))
@@ -1604,15 +1594,6 @@ func _build_settings() -> void:
 		_bind_crosshair_console()
 		board = platform.board as GSMenuScoreboard
 		_dress_board()
-
-
-## The camera motion settings onto the view cues ([method ZzViewMotion.scale]).
-func _apply_motion_scales() -> void:
-	if settings == null or settings.settings == null:
-		return
-
-	var st: GSSettingsManager = settings.settings
-	ZzViewMotion.scale(_motion, st.get_float(&"camera_landing_dip", 1.0), st.get_float(&"camera_strafe_roll", 1.0), st.get_float(&"camera_speed_fov", 1.0))
 
 
 ## The player's `cl_crosshair_*` cvars at the console's local source.
@@ -1877,28 +1858,14 @@ func _process(delta: float) -> void:
 		pitch += deg_to_rad(punch.x)
 		yaw += deg_to_rad(punch.y)
 
-	# Down, the view tips over a little and drops to the floor.
-	# Eased in and out: the roll and the drop used to jump the frame a survivor went down or got up.
-	_down_eased = move_toward(_down_eased, 1.0 if player.is_down() else 0.0, delta / DOWN_EASE_SECONDS)
-	var roll := deg_to_rad(12.0) * smoothstep(0.0, 1.0, _down_eased)
+	# Down, the view tips over a little and drops to the floor; standing, the motion cues roll, tip and dip it.
 	var drawn := player.controller.render_state()
-	var dip := 0.0
-	_motion_fov = 0.0
-
-	if not third_person and not player.is_down() and not player.is_held():
-		_motion.advance(drawn, delta)
-		roll += deg_to_rad(_motion.roll())
-		pitch += deg_to_rad(_motion.pitch())
-		dip = _motion.eye_drop()
-		_motion_fov = _motion.fov_added()
-	else:
-		_motion.snap()
-
-	rig.rotation = Vector3(pitch, yaw, roll)
+	var down := _ease_down(delta)
+	var cue := _motion_cues(drawn, delta)
+	rig.rotation = Vector3(pitch + cue.y, yaw, deg_to_rad(12.0) * down + cue.x)
 	# Follows the crouch: the height taken when the camera was placed is the standing one.
 	_rig_height = player.eye_position().y - state.position.y
-	var height := lerpf(_rig_height, ZzPlayer.EYE_DOWN, smoothstep(0.0, 1.0, _down_eased))
-	rig.global_position = drawn.position + Vector3(0.0, height + dip, 0.0)
+	rig.global_position = drawn.position + Vector3(0.0, lerpf(_rig_height, ZzPlayer.EYE_DOWN, down) + cue.z, 0.0)
 	_present_end_camera(delta, drawn.position + Vector3(0.0, _rig_height, 0.0))
 
 	if weapons != null:
@@ -1921,70 +1888,6 @@ func _process(delta: float) -> void:
 		_follow_shop_menu()
 
 	_present_effects(delta)
-
-
-## Your crawling arms while down in first person. The pivot turns with the yaw only: under the pitch they would swing with the look.
-var cl_viewarms_held: bool = false
-var _held_grip: GSViewGrip = null
-var _held_on: bool = false
-var _arms_downed: bool = false
-## Slide roll, sprint widening and the landing dip of the own camera ([ZzViewMotion]); its numbers are added in [method _present_rig].
-var _motion: GSFpsViewMotion = ZzViewMotion.picks()
-var _motion_fov: float = 0.0
-## 0 standing, 1 down: the camera's roll and drop follow it over [constant DOWN_EASE_SECONDS].
-var _down_eased: float = 0.0
-
-
-func _present_view_arms(delta: float, yaw: float) -> void:
-	if view_arms == null or not is_instance_valid(view_arms):
-		_arms_yaw = Node3D.new()
-		_arms_yaw.name = "ViewArmsYaw"
-		_arms_yaw.top_level = true
-		add_child(_arms_yaw)
-		view_arms = GSPlayerViewArms.new()
-		view_arms.hide_until_fitted = true
-		view_arms.name = "ViewArms"
-		_arms_yaw.add_child(view_arms)
-		view_arms.build(player.view_look(game.side_colour(ZzGame.SURVIVORS)), ZzPlayer.BODY_HEIGHT)
-
-	_arms_yaw.global_position = camera.global_position
-	# Holding a weapon the arms follow the look's pitch too: the gun they grip is under the camera.
-	_arms_yaw.global_rotation = Vector3(camera.global_rotation.x if _held_on else 0.0, yaw, 0.0)
-	# The empty crawling hands only while crawling with the gun put away. Still down (propped) or crawling with the weapon out, the
-	# weapon's own hands are the ones drawn, and the crawl arms on top of them made two pairs.
-	var on := player.is_crawling() and player.is_holstered() and player.is_alive() and not third_person \
-		and not is_spectating() and _end_weight < 0.3
-
-	if on != _arms_downed:
-		_arms_downed = on
-		view_arms.set_downed(on)
-
-	_arms_yaw.visible = on or _held_on
-
-	_present_held_hands()
-
-	var velocity := player.controller.state.velocity
-	view_arms.tick(Vector2(velocity.x, velocity.z).length(), delta)
-
-
-## `cl_viewarms_held 1` (opt-in): the arms hold the weapon where the view model measured its grip, in place of
-## the view model's own hands.
-func _on_hands_reached(anchor: Node3D, grip: Vector3, fore: Vector3, pose: StringName) -> void:
-	_held_grip = ZzViewGrip.update(_held_grip, anchor, grip, fore, pose)
-
-
-func _present_held_hands() -> void:
-	var opted := cl_viewarms_held and ZzViewGrip.available()
-	if view_model != null and is_instance_valid(view_model):
-		view_model.show_arms = not opted
-
-	var want := opted and _held_grip != null and player.is_alive() and not third_person \
-		and not is_spectating() and _end_weight < 0.3 and (view_model == null or view_model.visible)
-	if want != _held_on:
-		_held_on = want
-		if not want:
-			_held_grip = null
-	view_arms.set_held(_held_grip if want else null)
 
 
 ## The box in the hands, drawn under the camera in first person while one is out.
@@ -2163,11 +2066,6 @@ func _shop_item_state(item: Dictionary) -> String:
 	if owned and str(item.get("cat", "")) != "grenades":
 		return "Owned"
 	return ""
-
-
-func is_spectating() -> bool:
-	return player != null and game != null and game.spectate != null \
-		and game.spectate.is_spectating(player.player_id)
 
 
 func _watched_through_eyes() -> ZzPlayer:

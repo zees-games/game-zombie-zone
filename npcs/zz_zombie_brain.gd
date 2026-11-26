@@ -309,13 +309,7 @@ func _advance_swing() -> void:
 func _core() -> Object:
 	var h := horde()
 	var c: Variant = h.get(&"think_core") if h != null else null
-	if c != null:
-		return c
-
-	if _twin == null:
-		_twin = ZzThinkCore.new()
-
-	return _twin
+	return c if c != null else ZzThinkCore.shared()
 
 
 ## A burning zombie swings faster; a staggered one does not swing.
@@ -488,11 +482,6 @@ func _victim_in_front() -> StringName:
 ## part of one think, "think.<part>" -> usec, and a "think.n" count, read back as ms per tick under "prof".
 static var prof: Variant = null
 
-## The script twin of the cores, for a brain with no horde (a tool or suite thinking one by hand). Made on first use,
-## not in the initializer: an instance made while this script loads pins zz_think_core.gd, and the parse pass's
-## reload() of it then fails ("Cannot reload script while instances exist").
-static var _twin: Object = null
-
 
 func _lap(part: String, t0: int) -> int:
 	var now_us := Time.get_ticks_usec()
@@ -580,16 +569,10 @@ func _unstick_watch(delta: float) -> void:
 	var config: Variant = h.get(&"config") if h != null else null
 	var limit: float = float(config.unstick_seconds) if config != null else 0.0
 
-	# The think that calls this can let go of its npc (it died mid-think): nothing to watch.
-	if npc == null:
-		_watch_at = Vector3.INF
-		_watch_for = 0.0
-		return
-
-	# In the air the clock pauses, ahead of the wish test because a leap zeroes wish: a common
-	# hopping on the spot never stays grounded for limit.
-	var here := npc.position()
-	var code := _core().unstick_step(b != null and b.flying, limit, b == null or bashing or swinging(), \
+	# In the air the clock pauses (ahead of the wish test: a leap zeroes wish, and a common hops on the spot). A zombie
+	# that died in the think calling this has no npc left (removal unbinds it): its watch resets.
+	var here := npc.position() if npc != null else Vector3.INF
+	var code := ZzThinkCore.WATCH_RESET if npc == null else _core().unstick_step(b != null and b.flying, limit, b == null or bashing or swinging(), \
 			b.wish.length() if b != null else 0.0, here, _watch_at, _watch_for, _watch_stage, delta) as int
 
 	match code:
