@@ -29,7 +29,7 @@ const ZzTestToys := preload("zz_test_toys.gd")
 
 const SECTIONS := 56
 
-const CHECKS := 460
+const CHECKS := 461
 
 
 

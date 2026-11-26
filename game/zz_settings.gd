@@ -1,6 +1,7 @@
 extends GSMenuGameSettings
 
 const ZzBindings := preload("zz_bindings.gd")
+const ZzViewMotion := preload("zz_view_motion.gd")
 
 ## A player's own settings and the menu that changes them: how fast the view turns, how wide
 ## it is, how loud things are, the window, and the look of the menu itself.
@@ -80,7 +81,15 @@ static func spec_for() -> GSMenuGameSpec:
 	var fittings := GSSettingsDef.text(&"weapon_fittings", "", &"general")
 	fittings.max_length = 2048
 	s.late_defs.append(fittings)
-	s.extra_rows = [
+	# Camera motion, each 0 (off) to 2, 1 being the game's pick ([ZzViewMotion]). One each: a player who cannot take the roll may want the dip.
+	for key: StringName in ZzViewMotion.SETTING_KEYS:
+		s.late_defs.append(GSSettingsDef.number(key, 1.0, 0.0, 2.0, &"accessibility", 0.05).with_scope(
+			GSSettingsDef.Scope.ACCOUNT).with_description(ZzViewMotion.SETTING_KEYS[key][1]))
+	s.extra_rows = []
+	for key: StringName in ZzViewMotion.SETTING_KEYS:
+		s.extra_rows.append([&"general", "Comfort", GSMenuRow.slider(key, ZzViewMotion.SETTING_KEYS[key][0], ZzViewMotion.SETTING_KEYS[key][1])
+			.formatted(GSMenuRow.FORMAT_PERCENT_OR_OFF)])
+	s.extra_rows += [
 		[&"video", "Image", GSMenuRow.select(&"crowd_detail", "Crowd detail",
 			"Low animates, shadows and draws far zombies less: faster in a big horde.",
 			[[0, "Low"], [1, "Normal"], [2, "High"]])],
