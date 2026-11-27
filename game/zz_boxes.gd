@@ -4,6 +4,7 @@ const ZzBoxEffect := preload("zz_box_effect.gd")
 const ZzBoxProfiles := preload("zz_box_profiles.gd")
 const ZzBoxInstakill := preload("zz_box_instakill.gd")
 const ZzBoxSpeed := preload("zz_box_speed.gd")
+const ZzBoxZombies := preload("zz_box_zombies.gd")
 const ZzController := preload("zz_controller.gd")
 const ZzHazards := preload("zz_hazards.gd")
 const ZzLoot := preload("zz_loot.gd")
@@ -751,19 +752,7 @@ func _do_mob(a: Dictionary, ctx: Dictionary) -> void:
 
 ## `count` specials of `kind` (or any), near the opener.
 func _do_special(a: Dictionary, _ctx: Dictionary) -> void:
-	if game.horde == null:
-		return
-
-	for i in int(a.get("count", 1)):
-		var kind := StringName(str(a.get("kind", "any")))
-		var specials := ZzNpcs.specials()
-
-		if specials.is_empty():
-			return
-
-		if kind == &"any" or not specials.has(kind):
-			kind = specials[_rng.randi_range(0, specials.size() - 1)]
-		var _s = game.horde.spawn_special(kind)
+	ZzBoxZombies.special(game, _rng, a)
 
 
 ## Stands a sentry turret where the opener is looking (gs-combat's GSSentry; the rules are

@@ -30,7 +30,7 @@ static func start(map: Node3D, side: String, seat: int) -> Array:
 
 	return [map.clear_spot(at), float(base.get("yaw", 0.0))]
 
-## Whether a start point is on: the map's `info_player_*` entity says so live, else the document's `disabled`. Found by name (the document keeps 64 characters of it); where several share a name, the one nearest the entry, else by standing within 0.75 m of it.
+## Whether a start point is on: the map's `info_player_*` entity says so live, else the document's `disabled`. Matched by name (the document keeps 64 characters of it); where several share a name, the one nearest the entry, else by standing within 0.75 m of it.
 ## [param points] is [method ZzMechanics.spawn_entities] when the caller already has it.
 static func enabled(map: Node3D, entry: Dictionary, points: Variant = null) -> bool:
 	if map.mechanics != null:

@@ -1,4 +1,4 @@
-extends "zz_horde_state.gd"
+extends "zz_horde_crowd.gd"
 
 const ZzWatchCull := preload("zz_watch_cull.gd")
 const ZzNavDerive := preload("zz_nav_derive.gd")
