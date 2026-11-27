@@ -52,7 +52,8 @@ TIMEOUT=1200
 PARSE=1
 # A suite that legitimately needs at least this long, as name=seconds; a larger --timeout still wins.
 # headless_nav runs about 17 min on staging02, past the 1200 s default.
-MIN_TIMEOUTS="headless_nav=3300"
+# headless_nav_holds (up to 1165 s) and a headless_nav_waves shard (up to 1084 s) run close to it on PH (Nightly #12656).
+MIN_TIMEOUTS="headless_nav=3300 headless_nav_holds=1800 headless_nav_waves=1800"
 # tools/verify_ui.sh checks that drive the real client under xvfb.
 UI_CHECKS="trader crouch nav"
 # A suite too long for one run, as name=shard,shard,...: `test NAME` plays each shard as its own
